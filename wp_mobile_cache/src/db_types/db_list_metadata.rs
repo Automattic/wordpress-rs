@@ -56,12 +56,11 @@ impl DbListMetadata {
 #[derive(Debug, Clone, Copy)]
 pub enum ListMetadataItemColumn {
     Rowid = 0,
-    DbSiteId = 1,
-    Key = 2,
-    EntityId = 3,
-    ModifiedGmt = 4,
-    Parent = 5,
-    MenuOrder = 6,
+    ListMetadataId = 1,
+    EntityId = 2,
+    ModifiedGmt = 3,
+    Parent = 4,
+    MenuOrder = 5,
 }
 
 impl ColumnIndex for ListMetadataItemColumn {
@@ -77,8 +76,7 @@ impl DbListMetadataItem {
 
         Ok(Self {
             row_id: row.get_column(Col::Rowid)?,
-            db_site_id: row.get_column(Col::DbSiteId)?,
-            key: row.get_column(Col::Key)?,
+            list_metadata_id: row.get_column(Col::ListMetadataId)?,
             entity_id: row.get_column(Col::EntityId)?,
             modified_gmt: row.get_column(Col::ModifiedGmt)?,
             parent: row.get_column(Col::Parent)?,
@@ -110,12 +108,10 @@ impl DbListMetadataState {
     pub fn from_row(row: &Row) -> Result<Self, SqliteDbError> {
         use ListMetadataStateColumn as Col;
 
-        let state_str: String = row.get_column(Col::State)?;
-
         Ok(Self {
             row_id: row.get_column(Col::Rowid)?,
             list_metadata_id: row.get_column(Col::ListMetadataId)?,
-            state: ListState::from(state_str),
+            state: row.get_column(Col::State)?,
             error_message: row.get_column(Col::ErrorMessage)?,
             updated_at: row.get_column(Col::UpdatedAt)?,
         })
@@ -150,12 +146,11 @@ impl DbListHeaderWithState {
     pub fn from_row(row: &Row) -> Result<Self, SqliteDbError> {
         use ListHeaderWithStateColumn as Col;
 
-        // state is nullable due to LEFT JOIN - default to "idle"
-        let state_str: Option<String> = row.get_column(Col::State)?;
-        let state = state_str.map(ListState::from).unwrap_or(ListState::Idle);
+        // state is nullable due to LEFT JOIN - default to Idle
+        let state: Option<ListState> = row.get_column(Col::State)?;
 
         Ok(Self {
-            state,
+            state: state.unwrap_or(ListState::Idle),
             error_message: row.get_column(Col::ErrorMessage)?,
             current_page: row.get_column(Col::CurrentPage)?,
             total_pages: row.get_column(Col::TotalPages)?,

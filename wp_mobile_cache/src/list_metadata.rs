@@ -1,4 +1,61 @@
 use crate::RowId;
+use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
+use std::fmt;
+
+/// Type-safe wrapper for list keys.
+///
+/// List keys identify specific lists, e.g., `"edit:posts:publish"` or `"view:comments"`.
+/// Using a newtype prevents accidental misuse of arbitrary strings as keys.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ListKey(String);
+
+impl ListKey {
+    /// Create a new ListKey from a string.
+    pub fn new(key: impl Into<String>) -> Self {
+        Self(key.into())
+    }
+
+    /// Get the key as a string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for ListKey {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for ListKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for ListKey {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl From<String> for ListKey {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl ToSql for ListKey {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.0.as_str()))
+    }
+}
+
+impl FromSql for ListKey {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
+        String::column_result(value).map(ListKey)
+    }
+}
 
 /// Represents list metadata header in the database.
 ///
@@ -34,10 +91,8 @@ pub struct DbListMetadata {
 pub struct DbListMetadataItem {
     /// SQLite rowid (determines display order)
     pub row_id: RowId,
-    /// Database site ID
-    pub db_site_id: RowId,
-    /// List key this item belongs to
-    pub key: String,
+    /// Foreign key to list_metadata table
+    pub list_metadata_id: RowId,
     /// Entity ID (post ID, comment ID, etc.)
     pub entity_id: i64,
     /// Last modified timestamp (for staleness detection)
@@ -64,50 +119,40 @@ pub struct DbListMetadataState {
 }
 
 /// Sync state for a list.
+///
+/// Stored as INTEGER in the database. The repr(i32) ensures stable values
+/// even if the enum definition order changes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, uniffi::Enum)]
+#[repr(i32)]
 pub enum ListState {
     /// No sync in progress
     #[default]
-    Idle,
+    Idle = 0,
     /// Fetching first page (pull-to-refresh)
-    FetchingFirstPage,
+    FetchingFirstPage = 1,
     /// Fetching subsequent page (load more)
-    FetchingNextPage,
+    FetchingNextPage = 2,
     /// Last sync failed
-    Error,
+    Error = 3,
 }
 
-impl ListState {
-    /// Convert to database string representation.
-    pub fn as_db_str(&self) -> &'static str {
-        match self {
-            ListState::Idle => "idle",
-            ListState::FetchingFirstPage => "fetching_first_page",
-            ListState::FetchingNextPage => "fetching_next_page",
-            ListState::Error => "error",
-        }
+impl ToSql for ListState {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(*self as i32))
     }
 }
 
-impl From<&str> for ListState {
-    fn from(s: &str) -> Self {
-        match s {
-            "idle" => ListState::Idle,
-            "fetching_first_page" => ListState::FetchingFirstPage,
-            "fetching_next_page" => ListState::FetchingNextPage,
-            "error" => ListState::Error,
-            _ => {
-                // Default to Idle for unknown states to avoid panics
-                eprintln!("Warning: Unknown ListState '{}', defaulting to Idle", s);
-                ListState::Idle
-            }
-        }
-    }
-}
-
-impl From<String> for ListState {
-    fn from(s: String) -> Self {
-        ListState::from(s.as_str())
+impl FromSql for ListState {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
+        i32::column_result(value).and_then(|i| match i {
+            0 => Ok(ListState::Idle),
+            1 => Ok(ListState::FetchingFirstPage),
+            2 => Ok(ListState::FetchingNextPage),
+            3 => Ok(ListState::Error),
+            _ => Err(rusqlite::types::FromSqlError::Other(
+                format!("Invalid ListState value: {}", i).into(),
+            )),
+        })
     }
 }
 

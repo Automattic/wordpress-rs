@@ -5308,6 +5308,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "integration_test_credentials",
+ "log",
  "rstest",
  "rusqlite",
  "serde",
