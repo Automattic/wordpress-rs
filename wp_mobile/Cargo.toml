@@ -12,6 +12,7 @@ crate-type = ["lib", "cdylib", "staticlib"]
 name = "wp_mobile"
 
 [dependencies]
+log = { workspace = true }
 paste = { workspace = true }
 rand = { workspace = true }
 thiserror = { workspace = true }
