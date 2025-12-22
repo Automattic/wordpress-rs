@@ -335,6 +335,43 @@ impl MetadataService {
         ))
     }
 
+    /// Store items for a sync session.
+    ///
+    /// Replaces items if first page (refresh), appends if subsequent page.
+    /// This is the preferred method when using `SyncSession`.
+    pub fn store_for_session(
+        &self,
+        session: &SyncSession,
+        key: &ListKey,
+        metadata: &[EntityMetadata],
+    ) -> Result<(), WpServiceError> {
+        if session.is_first_page() {
+            self.set_items(key, session.per_page(), metadata)
+        } else {
+            self.append_items(key, session.per_page(), metadata)
+        }
+    }
+
+    /// Update pagination for a sync session.
+    ///
+    /// This is the preferred method when using `SyncSession`.
+    pub fn update_pagination_for_session(
+        &self,
+        session: &SyncSession,
+        key: &ListKey,
+        total_pages: Option<i64>,
+        total_items: Option<i64>,
+        current_page: i64,
+    ) -> Result<(), WpServiceError> {
+        self.update_pagination(
+            key,
+            total_pages,
+            total_items,
+            current_page,
+            session.per_page(),
+        )
+    }
+
     // ============================================================
     // Concurrency Helpers (Legacy API)
     // ============================================================
