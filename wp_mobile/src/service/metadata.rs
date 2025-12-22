@@ -5,12 +5,14 @@ use wp_mobile_cache::{
     db_types::db_site::DbSite,
     list_metadata::{ListKey, ListState},
     repository::list_metadata::{
-        FetchNextPageInfo, ListMetadataHeaderUpdate, ListMetadataItemInput, ListMetadataRepository,
-        RefreshInfo,
+        ListMetadataHeaderUpdate, ListMetadataItemInput, ListMetadataRepository,
     },
 };
 
-use crate::sync::{EntityMetadata, ListInfo, ListMetadataReader};
+use crate::sync::{
+    EntityMetadata, FetchNextPageInfo, ListInfo, ListMetadataReader, MetadataSyncManager,
+    RefreshInfo,
+};
 
 use super::WpServiceError;
 
@@ -295,9 +297,7 @@ impl MetadataService {
         per_page: i64,
     ) -> Result<RefreshInfo, WpServiceError> {
         self.cache
-            .execute(|conn| {
-                ListMetadataRepository::begin_refresh(conn, &self.db_site, key, per_page)
-            })
+            .execute(|conn| MetadataSyncManager::begin_refresh(conn, &self.db_site, key, per_page))
             .map_err(Into::into)
     }
 
@@ -314,7 +314,7 @@ impl MetadataService {
         key: &ListKey,
     ) -> Result<Option<FetchNextPageInfo>, WpServiceError> {
         self.cache
-            .execute(|conn| ListMetadataRepository::begin_fetch_next_page(conn, &self.db_site, key))
+            .execute(|conn| MetadataSyncManager::begin_fetch_next_page(conn, &self.db_site, key))
             .map_err(Into::into)
     }
 
@@ -324,7 +324,7 @@ impl MetadataService {
     /// `begin_refresh` or `begin_fetch_next_page`.
     pub fn complete_sync(&self, list_metadata_id: RowId) -> Result<(), WpServiceError> {
         self.cache
-            .execute(|conn| ListMetadataRepository::complete_sync(conn, list_metadata_id))?;
+            .execute(|conn| MetadataSyncManager::complete_sync(conn, list_metadata_id))?;
         Ok(())
     }
 
@@ -336,7 +336,7 @@ impl MetadataService {
         use wp_mobile_cache::SqliteDbError;
         self.cache.execute(|conn| {
             if let Some(header) = ListMetadataRepository::get_header(conn, &self.db_site, key)? {
-                ListMetadataRepository::complete_sync(conn, header.row_id)?;
+                MetadataSyncManager::complete_sync(conn, header.row_id)?;
             }
             Ok::<(), SqliteDbError>(())
         })?;
@@ -353,7 +353,7 @@ impl MetadataService {
         error_message: &str,
     ) -> Result<(), WpServiceError> {
         self.cache.execute(|conn| {
-            ListMetadataRepository::complete_sync_with_error(conn, list_metadata_id, error_message)
+            MetadataSyncManager::complete_sync_with_error(conn, list_metadata_id, error_message)
         })?;
         Ok(())
     }
@@ -370,11 +370,7 @@ impl MetadataService {
         use wp_mobile_cache::SqliteDbError;
         self.cache.execute(|conn| {
             if let Some(header) = ListMetadataRepository::get_header(conn, &self.db_site, key)? {
-                ListMetadataRepository::complete_sync_with_error(
-                    conn,
-                    header.row_id,
-                    error_message,
-                )?;
+                MetadataSyncManager::complete_sync_with_error(conn, header.row_id, error_message)?;
             }
             Ok::<(), SqliteDbError>(())
         })?;
