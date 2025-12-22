@@ -29,3 +29,11 @@ impl From<SqliteDbError> for FetchError {
         }
     }
 }
+
+impl From<crate::service::WpServiceError> for FetchError {
+    fn from(err: crate::service::WpServiceError) -> Self {
+        FetchError::Database {
+            err_message: err.to_string(),
+        }
+    }
+}

@@ -23,7 +23,7 @@ use wp_api::{
     request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_mobile_cache::{
-    DbTable, RowId, WpApiCache,
+    DbTable, WpApiCache,
     context::EditContext,
     db_types::db_site::DbSite,
     entity::{Entity, EntityId, FullEntity},
@@ -212,6 +212,9 @@ impl PostService {
     /// Stores metadata to `MetadataService` (database-backed) so list structure
     /// persists across app restarts.
     ///
+    /// Uses `SyncSession` for RAII-based error cleanup - if any step fails,
+    /// the session's `Drop` impl automatically marks the sync as failed.
+    ///
     /// # Arguments
     /// * `key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
@@ -232,131 +235,47 @@ impl PostService {
         per_page: u32,
         is_first_page: bool,
     ) -> Result<MetadataFetchResult, FetchError> {
-        let mut log = vec![format!(
-            "key={}, page={}, is_first_page={}",
-            key, page, is_first_page
-        )];
+        log::debug!(
+            "fetch_and_store_metadata_persistent: key={}, page={}, is_first_page={}",
+            key,
+            page,
+            is_first_page
+        );
 
-        // Helper to print log on early return
-        let print_log = |log: &[String], status: &str| {
-            println!(
-                "[PostService] fetch_metadata_persistent:\n  {} | {}",
-                log.join(" -> "),
-                status
-            );
-        };
+        // Begin sync with RAII cleanup - Drop will mark as error if not completed
+        let session =
+            MetadataService::begin_sync(self.metadata_service.clone(), key, per_page as i64, is_first_page)?;
 
-        // Update state to fetching (this creates the list if needed)
-        // Track list_metadata_id for later complete_sync calls
-        let list_metadata_id: RowId = if is_first_page {
-            match self.metadata_service.begin_refresh(key, per_page as i64) {
-                Ok(info) => {
-                    log.push("begin_refresh".to_string());
-                    info.list_metadata_id
-                }
-                Err(e) => {
-                    log.push(format!("begin_refresh failed: {}", e));
-                    print_log(&log, "FAILED");
-                    return Err(FetchError::Database {
-                        err_message: e.to_string(),
-                    });
-                }
-            }
-        } else {
-            match self.metadata_service.begin_fetch_next_page(key) {
-                Ok(Some(info)) => {
-                    log.push("begin_fetch_next_page".to_string());
-                    info.list_metadata_id
-                }
-                Ok(None) => {
-                    log.push("begin_fetch_next_page returned None".to_string());
-                    print_log(&log, "FAILED");
-                    return Err(FetchError::Database {
-                        err_message: "Cannot load next page: no pages loaded yet or already at last page. Try refresh first.".to_string(),
-                    });
-                }
-                Err(e) => {
-                    log.push(format!("begin_fetch_next_page failed: {}", e));
-                    print_log(&log, "FAILED");
-                    return Err(FetchError::Database {
-                        err_message: e.to_string(),
-                    });
-                }
-            }
-        };
-
-        // Fetch metadata from network
-        let result = match self
+        // Fetch metadata from network (error triggers Drop cleanup)
+        let result = self
             .fetch_posts_metadata(endpoint_type, filter, page, per_page)
-            .await
-        {
-            Ok(result) => {
-                log.push(format!("fetched {} items", result.metadata.len()));
-                result
-            }
-            Err(e) => {
-                log.push(format!("network failed: {}", e));
-                print_log(&log, "FAILED");
-                let _ = self
-                    .metadata_service
-                    .complete_sync_with_error(list_metadata_id, &e.to_string());
-                return Err(e);
-            }
-        };
+            .await?;
 
-        // Store metadata to database
-        let store_result = if is_first_page {
-            self.metadata_service
-                .set_items(key, per_page as i64, &result.metadata)
-        } else {
-            self.metadata_service
-                .append_items(key, per_page as i64, &result.metadata)
-        };
+        log::debug!(
+            "fetch_and_store_metadata_persistent: fetched {} items",
+            result.metadata.len()
+        );
 
-        if let Err(e) = store_result {
-            log.push(format!("store failed: {}", e));
-            print_log(&log, "FAILED");
-            let _ = self
-                .metadata_service
-                .complete_sync_with_error(list_metadata_id, &e.to_string());
-            return Err(FetchError::Database {
-                err_message: e.to_string(),
-            });
-        }
-        log.push("stored".to_string());
+        // Store metadata to database (error triggers Drop cleanup)
+        self.metadata_service
+            .store_for_session(&session, key, &result.metadata)?;
 
-        // Update pagination info
-        if let Err(e) = self.metadata_service.update_pagination(
+        // Update pagination info (error triggers Drop cleanup)
+        self.metadata_service.update_pagination_for_session(
+            &session,
             key,
             result.total_pages.map(|p| p as i64),
             result.total_items,
             page as i64,
-            per_page as i64,
-        ) {
-            log.push(format!("pagination failed: {}", e));
-            print_log(&log, "FAILED");
-            let _ = self
-                .metadata_service
-                .complete_sync_with_error(list_metadata_id, &e.to_string());
-            return Err(FetchError::Database {
-                err_message: e.to_string(),
-            });
-        }
-        log.push("pagination".to_string());
+        )?;
 
-        // Detect stale posts by comparing modified_gmt
+        // Entity-specific processing (not part of session)
         self.detect_and_mark_stale_posts(&result.metadata);
 
-        // Mark sync as complete
-        if let Err(e) = self.metadata_service.complete_sync(list_metadata_id) {
-            log.push(format!("complete_sync failed: {}", e));
-            print_log(&log, "FAILED");
-            return Err(FetchError::Database {
-                err_message: e.to_string(),
-            });
-        }
+        // Explicit success - prevents Drop cleanup
+        session.complete()?;
 
-        print_log(&log, "OK");
+        log::debug!("fetch_and_store_metadata_persistent: completed successfully");
         Ok(result)
     }
 
