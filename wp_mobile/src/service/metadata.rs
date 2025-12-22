@@ -11,7 +11,7 @@ use wp_mobile_cache::{
 
 use crate::sync::{
     EntityMetadata, FetchNextPageInfo, ListInfo, ListMetadataReader, MetadataSyncManager,
-    RefreshInfo,
+    RefreshInfo, SyncSession,
 };
 
 use super::WpServiceError;
@@ -280,7 +280,63 @@ impl MetadataService {
     }
 
     // ============================================================
-    // Concurrency Helpers
+    // Sync Session API
+    // ============================================================
+
+    /// Begin a sync operation with RAII-based error cleanup.
+    ///
+    /// This creates a `SyncSession` that automatically marks the sync as failed
+    /// if dropped without calling `complete()`. Use this for sync operations
+    /// where you want automatic cleanup on early returns or errors.
+    ///
+    /// # Arguments
+    /// * `service` - Arc reference to this service (for cleanup in Drop)
+    /// * `key` - The list key to sync
+    /// * `per_page` - Items per page setting
+    /// * `is_first_page` - Whether this is a refresh (true) or load-more (false)
+    ///
+    /// # Example
+    /// ```ignore
+    /// let session = MetadataService::begin_sync(
+    ///     self.metadata_service.clone(), &key, per_page, true
+    /// )?;
+    /// // Work with session...
+    /// session.complete()?;
+    /// ```
+    pub fn begin_sync(
+        service: Arc<Self>,
+        key: &ListKey,
+        per_page: i64,
+        is_first_page: bool,
+    ) -> Result<SyncSession, WpServiceError> {
+        let (list_metadata_id, version) = if is_first_page {
+            let info = service.cache.execute(|conn| {
+                MetadataSyncManager::begin_refresh(conn, &service.db_site, key, per_page)
+            })?;
+            (info.list_metadata_id, info.version)
+        } else {
+            let info = service
+                .cache
+                .execute(|conn| {
+                    MetadataSyncManager::begin_fetch_next_page(conn, &service.db_site, key)
+                })?
+                .ok_or_else(|| WpServiceError::DatabaseError {
+                    err_message: "Cannot load more: no pages loaded or at last page".to_string(),
+                })?;
+            (info.list_metadata_id, info.version)
+        };
+
+        Ok(SyncSession::new(
+            list_metadata_id,
+            version,
+            per_page,
+            is_first_page,
+            service,
+        ))
+    }
+
+    // ============================================================
+    // Concurrency Helpers (Legacy API)
     // ============================================================
 
     /// Begin a refresh operation (fetch first page).
