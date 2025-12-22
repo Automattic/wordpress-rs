@@ -243,8 +243,12 @@ impl PostService {
         );
 
         // Begin sync with RAII cleanup - Drop will mark as error if not completed
-        let session =
-            MetadataService::begin_sync(self.metadata_service.clone(), key, per_page as i64, is_first_page)?;
+        let session = MetadataService::begin_sync(
+            self.metadata_service.clone(),
+            key,
+            per_page as i64,
+            is_first_page,
+        )?;
 
         // Fetch metadata from network (error triggers Drop cleanup)
         let result = self

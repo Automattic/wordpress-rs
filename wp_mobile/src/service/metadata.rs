@@ -9,10 +9,7 @@ use wp_mobile_cache::{
     },
 };
 
-use crate::sync::{
-    EntityMetadata, FetchNextPageInfo, ListInfo, ListMetadataReader, MetadataSyncManager,
-    RefreshInfo, SyncSession,
-};
+use crate::sync::{EntityMetadata, ListInfo, ListMetadataReader, MetadataSyncManager, SyncSession};
 
 use super::WpServiceError;
 
@@ -373,48 +370,12 @@ impl MetadataService {
     }
 
     // ============================================================
-    // Concurrency Helpers (Legacy API)
+    // Sync Completion (used by SyncSession and by-key methods)
     // ============================================================
-
-    /// Begin a refresh operation (fetch first page).
-    ///
-    /// This atomically:
-    /// 1. Creates the list header if needed
-    /// 2. Increments version (invalidates any in-flight load-more)
-    /// 3. Sets state to FetchingFirstPage
-    ///
-    /// Returns info needed to make the API call and check version afterward.
-    pub fn begin_refresh(
-        &self,
-        key: &ListKey,
-        per_page: i64,
-    ) -> Result<RefreshInfo, WpServiceError> {
-        self.cache
-            .execute(|conn| MetadataSyncManager::begin_refresh(conn, &self.db_site, key, per_page))
-            .map_err(Into::into)
-    }
-
-    /// Begin a load-next-page operation.
-    ///
-    /// This atomically:
-    /// 1. Checks if there are more pages to load
-    /// 2. Sets state to FetchingNextPage
-    ///
-    /// Returns None if already at last page or no pages loaded yet.
-    /// Returns info including version to check before storing results.
-    pub fn begin_fetch_next_page(
-        &self,
-        key: &ListKey,
-    ) -> Result<Option<FetchNextPageInfo>, WpServiceError> {
-        self.cache
-            .execute(|conn| MetadataSyncManager::begin_fetch_next_page(conn, &self.db_site, key))
-            .map_err(Into::into)
-    }
 
     /// Complete a sync operation successfully (by list_metadata_id).
     ///
-    /// Sets state to Idle. Use this when you have the `list_metadata_id` from
-    /// `begin_refresh` or `begin_fetch_next_page`.
+    /// Sets state to Idle. This is typically called by `SyncSession::complete()`.
     pub fn complete_sync(&self, list_metadata_id: RowId) -> Result<(), WpServiceError> {
         self.cache
             .execute(|conn| MetadataSyncManager::complete_sync(conn, list_metadata_id))?;
@@ -438,8 +399,8 @@ impl MetadataService {
 
     /// Complete a sync operation with error (by list_metadata_id).
     ///
-    /// Sets state to Error with the provided message. Use this when you have the
-    /// `list_metadata_id` from `begin_refresh` or `begin_fetch_next_page`.
+    /// Sets state to Error with the provided message. This is typically called
+    /// by `SyncSession::drop()` for automatic error cleanup.
     pub fn complete_sync_with_error(
         &self,
         list_metadata_id: RowId,
@@ -700,57 +661,9 @@ mod tests {
         assert!(!test_ctx.service.has_more_pages(&key).unwrap());
     }
 
-    #[rstest]
-    fn test_begin_refresh_increments_version(test_ctx: TestContext) {
-        let key = ListKey::from("edit:posts:publish");
-
-        let info1 = test_ctx.service.begin_refresh(&key, PER_PAGE).unwrap();
-        assert_eq!(info1.version, 1);
-
-        test_ctx
-            .service
-            .complete_sync(info1.list_metadata_id)
-            .unwrap();
-
-        let info2 = test_ctx.service.begin_refresh(&key, PER_PAGE).unwrap();
-        assert_eq!(info2.version, 2);
-    }
-
-    #[rstest]
-    fn test_begin_fetch_next_page_returns_none_when_no_pages(test_ctx: TestContext) {
-        let key = ListKey::from("edit:posts:publish");
-
-        // Create header but don't load any pages
-        let info = test_ctx.service.begin_refresh(&key, PER_PAGE).unwrap();
-        test_ctx
-            .service
-            .complete_sync(info.list_metadata_id)
-            .unwrap();
-
-        let result = test_ctx.service.begin_fetch_next_page(&key).unwrap();
-        assert!(result.is_none());
-    }
-
-    #[rstest]
-    fn test_begin_fetch_next_page_returns_info_when_more_pages(test_ctx: TestContext) {
-        let key = ListKey::from("edit:posts:publish");
-
-        // Set up: page 1 of 3 loaded
-        let info = test_ctx.service.begin_refresh(&key, PER_PAGE).unwrap();
-        test_ctx
-            .service
-            .update_pagination(&key, Some(3), None, 1, 20)
-            .unwrap();
-        test_ctx
-            .service
-            .complete_sync(info.list_metadata_id)
-            .unwrap();
-
-        let result = test_ctx.service.begin_fetch_next_page(&key).unwrap();
-        assert!(result.is_some());
-        let info = result.unwrap();
-        assert_eq!(info.page, 2);
-    }
+    // Note: begin_refresh and begin_fetch_next_page functionality is tested in
+    // sync::metadata_sync_manager::tests. The MetadataService wraps these via
+    // begin_sync() which returns a SyncSession.
 
     #[rstest]
     fn test_delete_list(test_ctx: TestContext) {
@@ -831,8 +744,16 @@ mod tests {
             .set_items(&key, PER_PAGE, &metadata)
             .unwrap();
 
-        // Start a refresh
-        test_ctx.service.begin_refresh(&key, PER_PAGE).unwrap();
+        // Set state to FetchingFirstPage
+        test_ctx
+            .service
+            .set_state(
+                &key,
+                PER_PAGE,
+                wp_mobile_cache::list_metadata::ListState::FetchingFirstPage,
+                None,
+            )
+            .unwrap();
 
         let reader: &dyn ListMetadataReader = &test_ctx.service;
         let info = reader.get_list_info(&key).unwrap();
