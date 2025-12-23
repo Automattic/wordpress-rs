@@ -212,16 +212,15 @@ impl PostService {
     /// Stores metadata to `MetadataService` (database-backed) so list structure
     /// persists across app restarts.
     ///
-    /// Uses `SyncSession` for RAII-based error cleanup - if any step fails,
-    /// the session's `Drop` impl automatically marks the sync as failed.
+    /// Uses `MetadataService::refresh` or `load_more` for lifecycle orchestration.
+    /// The page number is determined internally by MetadataService.
     ///
     /// # Arguments
     /// * `key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
     /// * `filter` - Filter parameters (pagination is provided separately)
-    /// * `page` - Page number to fetch (1-indexed)
-    /// * `per_page` - Number of posts per page
-    /// * `is_first_page` - If true, replaces metadata; if false, appends
+    /// * `per_page` - Number of posts per page (only used for refresh)
+    /// * `is_first_page` - If true, refreshes (page 1); if false, loads more (next page)
     ///
     /// # Returns
     /// - `Ok(MetadataFetchResult)` with post IDs and modification times
@@ -231,55 +230,38 @@ impl PostService {
         key: &ListKey,
         endpoint_type: &PostEndpointType,
         filter: &PostListFilter,
-        page: u32,
         per_page: u32,
         is_first_page: bool,
     ) -> Result<MetadataFetchResult, FetchError> {
         log::debug!(
-            "fetch_and_store_metadata_persistent: key={}, page={}, is_first_page={}",
+            "fetch_and_store_metadata_persistent: key={}, per_page={}, is_first_page={}",
             key,
-            page,
+            per_page,
             is_first_page
         );
 
-        // Begin sync with RAII cleanup - Drop will mark as error if not completed
-        let session = MetadataService::begin_sync(
-            self.metadata_service.clone(),
-            key,
-            per_page as i64,
-            is_first_page,
-        )?;
+        // Use MetadataService orchestration - it handles state, storage, and pagination
+        let result = if is_first_page {
+            self.metadata_service
+                .refresh(key, per_page, |page, per_page| {
+                    self.fetch_posts_metadata(endpoint_type, filter, page, per_page)
+                })
+                .await?
+        } else {
+            self.metadata_service
+                .load_more(key, |page, per_page| {
+                    self.fetch_posts_metadata(endpoint_type, filter, page, per_page)
+                })
+                .await?
+        };
 
-        // Fetch metadata from network (error triggers Drop cleanup)
-        let result = self
-            .fetch_posts_metadata(endpoint_type, filter, page, per_page)
-            .await?;
-
-        log::debug!(
-            "fetch_and_store_metadata_persistent: fetched {} items",
-            result.metadata.len()
-        );
-
-        // Store metadata to database (error triggers Drop cleanup)
-        self.metadata_service
-            .store_for_session(&session, key, &result.metadata)?;
-
-        // Update pagination info (error triggers Drop cleanup)
-        self.metadata_service.update_pagination_for_session(
-            &session,
-            key,
-            result.total_pages.map(|p| p as i64),
-            result.total_items,
-            page as i64,
-        )?;
-
-        // Entity-specific processing (not part of session)
+        // Entity-specific processing (not part of metadata layer)
         self.detect_and_mark_stale_posts(&result.metadata);
 
-        // Explicit success - prevents Drop cleanup
-        session.complete()?;
-
-        log::debug!("fetch_and_store_metadata_persistent: completed successfully");
+        log::debug!(
+            "fetch_and_store_metadata_persistent: completed successfully, {} items",
+            result.metadata.len()
+        );
         Ok(result)
     }
 

@@ -75,7 +75,6 @@ impl PersistentPostMetadataFetcherWithEditContext {
 impl MetadataFetcher for PersistentPostMetadataFetcherWithEditContext {
     async fn fetch_metadata(
         &self,
-        page: u32,
         per_page: u32,
         is_first_page: bool,
     ) -> Result<MetadataFetchResult, FetchError> {
@@ -84,7 +83,6 @@ impl MetadataFetcher for PersistentPostMetadataFetcherWithEditContext {
                 &self.key,
                 &self.endpoint_type,
                 &self.filter,
-                page,
                 per_page,
                 is_first_page,
             )

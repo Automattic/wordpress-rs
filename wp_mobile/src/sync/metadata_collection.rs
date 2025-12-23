@@ -206,7 +206,8 @@ where
     pub async fn refresh(&self) -> Result<SyncResult, FetchError> {
         println!("[MetadataCollection] Refreshing collection...");
 
-        let result = self.fetcher.fetch_metadata(1, self.per_page, true).await?;
+        // MetadataService handles page determination internally (always page 1 for refresh)
+        let result = self.fetcher.fetch_metadata(self.per_page, true).await?;
 
         let total_pages_str = result
             .total_pages
@@ -244,10 +245,8 @@ where
             ));
         }
 
-        let next_page = current_page + 1;
-
-        // Check if we're already at the last page
-        if total_pages.is_some_and(|total| next_page > total) {
+        // Check if we're already at the last page (early exit for UX)
+        if total_pages.is_some_and(|total| current_page >= total as u32) {
             println!("[MetadataCollection] Already at last page, nothing to load");
             return Ok(SyncResult::no_op(
                 self.items().len(),
@@ -257,20 +256,19 @@ where
             ));
         }
 
-        println!("[MetadataCollection] Loading page {}...", next_page);
+        println!("[MetadataCollection] Loading next page...");
 
-        let result = self
-            .fetcher
-            .fetch_metadata(next_page, self.per_page, false)
-            .await?;
+        // MetadataService handles page determination internally (current_page + 1)
+        let result = self.fetcher.fetch_metadata(self.per_page, false).await?;
 
+        let new_page = self.current_page();
         let total_pages_str = result
             .total_pages
             .map(|p| p.to_string())
             .unwrap_or_else(|| "?".to_string());
         println!(
             "[MetadataCollection] Fetched metadata: page {} of {}, {} items",
-            next_page,
+            new_page,
             total_pages_str,
             result.metadata.len()
         );

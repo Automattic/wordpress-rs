@@ -12,6 +12,13 @@ use super::MetadataFetchResult;
 /// fetch specific entity types (posts, media, etc.) and update the
 /// appropriate stores.
 ///
+/// # Page Number Handling
+///
+/// The `page` parameter is no longer passed from `MetadataCollection` to `fetch_metadata`.
+/// Instead, `MetadataService` internally determines the correct page:
+/// - `refresh` always fetches page 1
+/// - `load_more` determines the next page from persisted state
+///
 /// # Example Implementation
 ///
 /// ```ignore
@@ -22,11 +29,11 @@ use super::MetadataFetchResult;
 /// }
 ///
 /// impl MetadataFetcher for PostMetadataFetcher<'_> {
-///     async fn fetch_metadata(&self, page: u32, per_page: u32, is_first_page: bool)
+///     async fn fetch_metadata(&self, per_page: u32, is_first_page: bool)
 ///         -> Result<MetadataFetchResult, FetchError>
 ///     {
 ///         self.service.fetch_and_store_metadata(
-///             &self.kv_key, &self.filter, page, per_page, is_first_page
+///             &self.kv_key, &self.filter, per_page, is_first_page
 ///         ).await
 ///     }
 ///
@@ -40,15 +47,18 @@ pub trait MetadataFetcher: Send + Sync {
     /// Fetch metadata for a page and store in the metadata store.
     ///
     /// # Arguments
-    /// * `page` - Page number (1-indexed)
     /// * `per_page` - Number of items per page
-    /// * `is_first_page` - If true, replaces existing metadata; if false, appends
+    /// * `is_first_page` - If true, refreshes (page 1); if false, loads more (next page)
     ///
     /// # Returns
     /// Metadata for the fetched page, including pagination info.
+    ///
+    /// # Note
+    /// The page number is determined internally by `MetadataService`:
+    /// - `refresh` always fetches page 1
+    /// - `load_more` determines the next page from persisted state
     fn fetch_metadata(
         &self,
-        page: u32,
         per_page: u32,
         is_first_page: bool,
     ) -> impl std::future::Future<Output = Result<MetadataFetchResult, FetchError>> + Send;
