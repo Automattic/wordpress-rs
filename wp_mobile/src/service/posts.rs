@@ -319,21 +319,16 @@ impl PostService {
     /// Sync a post list using persistent metadata storage.
     ///
     /// This method orchestrates the full sync flow:
-    /// 1. Updates state via MetadataService (FetchingFirstPage or FetchingNextPage)
-    /// 2. Fetches metadata from API
-    /// 3. Stores metadata in database via MetadataService
-    /// 4. Detects stale posts by comparing modified_gmt
-    /// 5. Fetches missing/stale posts
-    /// 6. Updates pagination info
-    /// 7. Sets state back to Idle (or Error on failure)
+    /// 1. Uses `MetadataService::refresh` or `load_more` for metadata sync
+    /// 2. Detects stale posts by comparing modified_gmt
+    /// 3. Fetches missing/stale posts (entity-specific step)
     ///
     /// # Arguments
     /// * `key` - Metadata store key (e.g., "site_1:edit:posts:status=publish")
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
     /// * `filter` - Filter parameters (pagination is provided separately)
-    /// * `page` - Page number to fetch (1-indexed)
-    /// * `per_page` - Number of posts per page
-    /// * `is_refresh` - If true, replaces metadata; if false, appends
+    /// * `per_page` - Number of posts per page (only used for refresh)
+    /// * `is_refresh` - If true, refreshes (page 1); if false, loads more (next page)
     ///
     /// # Returns
     /// - `Ok(SyncResult)` with sync statistics
@@ -343,68 +338,28 @@ impl PostService {
         key: &ListKey,
         endpoint_type: &PostEndpointType,
         filter: &PostListFilter,
-        page: u32,
         per_page: u32,
         is_refresh: bool,
     ) -> Result<SyncResult, FetchError> {
-        use crate::service::WpServiceError;
-        use wp_mobile_cache::list_metadata::ListState;
-
-        // 1. Update state to fetching
-        let state = if is_refresh {
-            ListState::FetchingFirstPage
-        } else {
-            ListState::FetchingNextPage
-        };
-
-        self.metadata_service
-            .set_state(key, per_page as i64, state, None)
-            .map_err(|e| match e {
-                WpServiceError::DatabaseError { err_message } => {
-                    FetchError::Database { err_message }
-                }
-                WpServiceError::SiteNotFound => FetchError::Database {
-                    err_message: "Site not found".to_string(),
-                },
-            })?;
-
-        // 2. Fetch metadata from API
-        let metadata_result = match self
-            .fetch_posts_metadata(endpoint_type, filter, page, per_page)
-            .await
-        {
-            Ok(result) => result,
-            Err(e) => {
-                // Update state to error
-                let _ = self
-                    .metadata_service
-                    .complete_sync_with_error_by_key(key, &e.to_string());
-                return Err(e);
-            }
-        };
-
-        // 3. Store metadata in database
-        let store_result = if is_refresh {
+        // 1. Use MetadataService orchestration for metadata sync
+        let metadata_result = if is_refresh {
             self.metadata_service
-                .set_items(key, per_page as i64, &metadata_result.metadata)
+                .refresh(key, per_page, |page, per_page| {
+                    self.fetch_posts_metadata(endpoint_type, filter, page, per_page)
+                })
+                .await?
         } else {
             self.metadata_service
-                .append_items(key, per_page as i64, &metadata_result.metadata)
+                .load_more(key, |page, per_page| {
+                    self.fetch_posts_metadata(endpoint_type, filter, page, per_page)
+                })
+                .await?
         };
 
-        if let Err(e) = store_result {
-            let _ = self
-                .metadata_service
-                .complete_sync_with_error_by_key(key, &e.to_string());
-            return Err(FetchError::Database {
-                err_message: e.to_string(),
-            });
-        }
-
-        // 4. Detect stale posts
+        // 2. Detect stale posts (entity-specific)
         self.detect_and_mark_stale_posts(&metadata_result.metadata);
 
-        // 5. Fetch missing/stale posts
+        // 3. Fetch missing/stale posts (entity-specific)
         let ids_to_fetch: Vec<PostId> = metadata_result
             .metadata
             .iter()
@@ -436,18 +391,6 @@ impl PostService {
             }
         }
 
-        // 6. Update pagination info
-        let _ = self.metadata_service.update_pagination(
-            key,
-            metadata_result.total_pages.map(|p| p as i64),
-            metadata_result.total_items,
-            page as i64,
-            per_page as i64,
-        );
-
-        // 7. Set state back to idle
-        let _ = self.metadata_service.complete_sync_by_key(key);
-
         // Get total items from metadata service
         let total_items = self
             .metadata_service
@@ -456,13 +399,20 @@ impl PostService {
             .unwrap_or(0);
 
         let has_more_pages = self.metadata_service.has_more_pages(key).unwrap_or(false);
+        let current_page = self
+            .metadata_service
+            .get_pagination(key)
+            .ok()
+            .flatten()
+            .map(|p| p.current_page as u32)
+            .unwrap_or(1);
 
         Ok(SyncResult::new(
             total_items,
             fetched_count,
             failed_count,
             has_more_pages,
-            page,
+            current_page,
             metadata_result.total_pages,
         ))
     }
