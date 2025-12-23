@@ -443,20 +443,19 @@ See `metadata_orchestration_flow.mmd` (and `.png`) for the visual flow.
 - [x] `PostService::fetch_and_store_metadata_persistent` uses `refresh/load_more`
 - [x] No duplicate lifecycle code across entity services
 - [x] SyncSession removed
-- [x] MetadataSyncManager kept (provides clean workflow abstractions)
+- [x] MetadataSyncManager removed (merged into MetadataService as private helpers)
 - [x] Legacy methods removed from MetadataService
-- [x] All unit tests pass (78 tests)
+- [x] All unit tests pass (65 tests)
 - [ ] Kotlin example app works
 
 ## Implementation Notes
 
-The implementation deviated from the original plan in the following ways:
-
-1. **MetadataSyncManager kept**: Rather than removing it, we kept MetadataSyncManager
-   as it provides clean workflow abstractions over ListMetadataRepository. The
-   `refresh()` and `load_more()` methods in MetadataService call MetadataSyncManager
-   directly for workflow operations (begin_refresh, begin_fetch_next_page, etc.)
-
-2. **Page parameter removed from API**: The `page` parameter was removed from
+1. **Page parameter removed from API**: The `page` parameter was removed from
    `fetch_and_store_metadata_persistent`, `MetadataFetcher::fetch_metadata`, and
    `sync_post_list`. MetadataService now determines the page internally.
+
+2. **MetadataSyncManager merged**: The workflow logic from MetadataSyncManager was
+   inlined into MetadataService as private helper methods (`begin_refresh`,
+   `begin_load_more`, `complete_sync`, `complete_sync_with_error`). This eliminates
+   the dual-path issue where some calls went through MetadataSyncManager while
+   others went directly to ListMetadataRepository.

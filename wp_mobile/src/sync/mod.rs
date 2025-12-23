@@ -38,7 +38,6 @@ mod list_metadata_reader;
 mod metadata_collection;
 mod metadata_fetch_result;
 mod metadata_fetcher;
-mod metadata_sync_manager;
 mod post_metadata_fetcher;
 mod sync_result;
 
@@ -50,6 +49,5 @@ pub use list_metadata_reader::{ListInfo, ListMetadataReader};
 pub use metadata_collection::MetadataCollection;
 pub use metadata_fetch_result::MetadataFetchResult;
 pub use metadata_fetcher::MetadataFetcher;
-pub use metadata_sync_manager::{FetchNextPageInfo, MetadataSyncManager, RefreshInfo};
 pub use post_metadata_fetcher::PersistentPostMetadataFetcherWithEditContext;
 pub use sync_result::SyncResult;
