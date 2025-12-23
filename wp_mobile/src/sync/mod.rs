@@ -41,7 +41,6 @@ mod metadata_fetcher;
 mod metadata_sync_manager;
 mod post_metadata_fetcher;
 mod sync_result;
-mod sync_session;
 
 pub use collection_item::CollectionItem;
 pub use entity_metadata::EntityMetadata;
@@ -54,4 +53,3 @@ pub use metadata_fetcher::MetadataFetcher;
 pub use metadata_sync_manager::{FetchNextPageInfo, MetadataSyncManager, RefreshInfo};
 pub use post_metadata_fetcher::PersistentPostMetadataFetcherWithEditContext;
 pub use sync_result::SyncResult;
-pub use sync_session::SyncSession;

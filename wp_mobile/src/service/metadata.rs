@@ -11,7 +11,7 @@ use wp_mobile_cache::{
 
 use crate::{
     collection::FetchError,
-    sync::{EntityMetadata, ListInfo, ListMetadataReader, MetadataSyncManager, SyncSession},
+    sync::{EntityMetadata, ListInfo, ListMetadataReader, MetadataSyncManager},
 };
 
 use super::WpServiceError;
@@ -569,105 +569,12 @@ impl MetadataService {
     }
 
     // ============================================================
-    // Sync Session API
-    // ============================================================
-
-    /// Begin a sync operation with RAII-based error cleanup.
-    ///
-    /// This creates a `SyncSession` that automatically marks the sync as failed
-    /// if dropped without calling `complete()`. Use this for sync operations
-    /// where you want automatic cleanup on early returns or errors.
-    ///
-    /// # Arguments
-    /// * `service` - Arc reference to this service (for cleanup in Drop)
-    /// * `key` - The list key to sync
-    /// * `per_page` - Items per page setting
-    /// * `is_first_page` - Whether this is a refresh (true) or load-more (false)
-    ///
-    /// # Example
-    /// ```ignore
-    /// let session = MetadataService::begin_sync(
-    ///     self.metadata_service.clone(), &key, per_page, true
-    /// )?;
-    /// // Work with session...
-    /// session.complete()?;
-    /// ```
-    pub fn begin_sync(
-        service: Arc<Self>,
-        key: &ListKey,
-        per_page: i64,
-        is_first_page: bool,
-    ) -> Result<SyncSession, WpServiceError> {
-        let (list_metadata_id, version) = if is_first_page {
-            let info = service.cache.execute(|conn| {
-                MetadataSyncManager::begin_refresh(conn, &service.db_site, key, per_page)
-            })?;
-            (info.list_metadata_id, info.version)
-        } else {
-            let info = service
-                .cache
-                .execute(|conn| {
-                    MetadataSyncManager::begin_fetch_next_page(conn, &service.db_site, key)
-                })?
-                .ok_or_else(|| WpServiceError::DatabaseError {
-                    err_message: "Cannot load more: no pages loaded or at last page".to_string(),
-                })?;
-            (info.list_metadata_id, info.version)
-        };
-
-        Ok(SyncSession::new(
-            list_metadata_id,
-            version,
-            per_page,
-            is_first_page,
-            service,
-        ))
-    }
-
-    /// Store items for a sync session.
-    ///
-    /// Replaces items if first page (refresh), appends if subsequent page.
-    /// This is the preferred method when using `SyncSession`.
-    pub fn store_for_session(
-        &self,
-        session: &SyncSession,
-        key: &ListKey,
-        metadata: &[EntityMetadata],
-    ) -> Result<(), WpServiceError> {
-        if session.is_first_page() {
-            self.set_items(key, session.per_page(), metadata)
-        } else {
-            self.append_items(key, session.per_page(), metadata)
-        }
-    }
-
-    /// Update pagination for a sync session.
-    ///
-    /// This is the preferred method when using `SyncSession`.
-    pub fn update_pagination_for_session(
-        &self,
-        session: &SyncSession,
-        key: &ListKey,
-        total_pages: Option<i64>,
-        total_items: Option<i64>,
-        current_page: i64,
-    ) -> Result<(), WpServiceError> {
-        self.update_pagination(
-            key,
-            total_pages,
-            total_items,
-            current_page,
-            session.per_page(),
-        )
-    }
-
-    // ============================================================
-    // Sync Completion (used by SyncSession and by-key methods)
+    // Sync Completion (internal, by-key methods)
     // ============================================================
 
     /// Complete a sync operation successfully (by list_metadata_id).
     ///
-    /// Sets state to Idle. This is typically called by `SyncSession::complete()`.
+    /// Sets state to Idle. Used internally by `refresh()` and `load_more()`.
     pub fn complete_sync(&self, list_metadata_id: RowId) -> Result<(), WpServiceError> {
         self.cache
             .execute(|conn| MetadataSyncManager::complete_sync(conn, list_metadata_id))?;
@@ -691,8 +598,8 @@ impl MetadataService {
 
     /// Complete a sync operation with error (by list_metadata_id).
     ///
-    /// Sets state to Error with the provided message. This is typically called
-    /// by `SyncSession::drop()` for automatic error cleanup.
+    /// Sets state to Error with the provided message. Used internally by
+    /// `refresh()` and `load_more()` when an error occurs.
     pub fn complete_sync_with_error(
         &self,
         list_metadata_id: RowId,
@@ -954,8 +861,8 @@ mod tests {
     }
 
     // Note: begin_refresh and begin_fetch_next_page functionality is tested in
-    // sync::metadata_sync_manager::tests. The MetadataService wraps these via
-    // begin_sync() which returns a SyncSession.
+    // sync::metadata_sync_manager::tests. The MetadataService uses these internally
+    // via the refresh() and load_more() orchestration methods.
 
     #[rstest]
     fn test_delete_list(test_ctx: TestContext) {
