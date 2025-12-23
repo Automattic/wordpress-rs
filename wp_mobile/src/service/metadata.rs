@@ -322,7 +322,11 @@ impl MetadataService {
         F: FnOnce(u32, u32) -> Fut,
         Fut: Future<Output = Result<crate::sync::MetadataFetchResult, FetchError>>,
     {
-        log::debug!("MetadataService::refresh: key={}, per_page={}", key, per_page);
+        log::debug!(
+            "MetadataService::refresh: key={}, per_page={}",
+            key,
+            per_page
+        );
 
         // 1. Begin refresh (increment version, set state to FetchingFirstPage)
         let info = self.cache.execute(|conn| {
@@ -357,7 +361,11 @@ impl MetadataService {
             .collect();
 
         if let Err(e) = self.cache.execute(|conn| {
-            ListMetadataRepository::set_items_by_list_metadata_id(conn, info.list_metadata_id, &items)
+            ListMetadataRepository::set_items_by_list_metadata_id(
+                conn,
+                info.list_metadata_id,
+                &items,
+            )
         }) {
             let _ = self.cache.execute(|conn| {
                 MetadataSyncManager::complete_sync_with_error(
@@ -393,11 +401,13 @@ impl MetadataService {
         }
 
         // 5. Set state to Idle
-        self.cache.execute(|conn| {
-            MetadataSyncManager::complete_sync(conn, info.list_metadata_id)
-        })?;
+        self.cache
+            .execute(|conn| MetadataSyncManager::complete_sync(conn, info.list_metadata_id))?;
 
-        log::debug!("MetadataService::refresh: completed successfully, {} items", result.metadata.len());
+        log::debug!(
+            "MetadataService::refresh: completed successfully, {} items",
+            result.metadata.len()
+        );
         Ok(result)
     }
 
@@ -483,9 +493,9 @@ impl MetadataService {
         };
 
         // 3. Check version (refresh might have happened while fetching)
-        let current_version = self.cache.execute(|conn| {
-            ListMetadataRepository::get_version(conn, &self.db_site, key)
-        })?;
+        let current_version = self
+            .cache
+            .execute(|conn| ListMetadataRepository::get_version(conn, &self.db_site, key))?;
 
         if current_version != version {
             log::warn!(
@@ -495,9 +505,9 @@ impl MetadataService {
             );
             // Don't set error state - this is expected when refresh races with load-more
             // Just reset to idle since the refresh would have completed
-            let _ = self.cache.execute(|conn| {
-                MetadataSyncManager::complete_sync(conn, list_metadata_id)
-            });
+            let _ = self
+                .cache
+                .execute(|conn| MetadataSyncManager::complete_sync(conn, list_metadata_id));
             return Err(FetchError::Database {
                 err_message: "List was refreshed during load more, discarding results".to_string(),
             });
@@ -516,11 +526,7 @@ impl MetadataService {
             .collect();
 
         if let Err(e) = self.cache.execute(|conn| {
-            ListMetadataRepository::append_items_by_list_metadata_id(
-                conn,
-                list_metadata_id,
-                &items,
-            )
+            ListMetadataRepository::append_items_by_list_metadata_id(conn, list_metadata_id, &items)
         }) {
             let _ = self.cache.execute(|conn| {
                 MetadataSyncManager::complete_sync_with_error(
@@ -556,9 +562,8 @@ impl MetadataService {
         }
 
         // 6. Set state to Idle
-        self.cache.execute(|conn| {
-            MetadataSyncManager::complete_sync(conn, list_metadata_id)
-        })?;
+        self.cache
+            .execute(|conn| MetadataSyncManager::complete_sync(conn, list_metadata_id))?;
 
         log::debug!(
             "MetadataService::load_more: completed successfully, {} items on page {}",
@@ -939,7 +944,9 @@ mod tests {
 
             let result = test_ctx
                 .service
-                .refresh(&key, 25, |_page, _per_page| async { Ok(fetch_result.clone()) })
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Ok(fetch_result.clone())
+                })
                 .await;
 
             assert!(result.is_ok());
@@ -993,7 +1000,9 @@ mod tests {
             // First refresh
             test_ctx
                 .service
-                .refresh(&key, 25, |_page, _per_page| async { Ok(fetch_result.clone()) })
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Ok(fetch_result.clone())
+                })
                 .await
                 .unwrap();
 
@@ -1002,7 +1011,9 @@ mod tests {
             // Second refresh
             test_ctx
                 .service
-                .refresh(&key, 25, |_page, _per_page| async { Ok(fetch_result.clone()) })
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Ok(fetch_result.clone())
+                })
                 .await
                 .unwrap();
 
@@ -1078,7 +1089,9 @@ mod tests {
             let fetch_result = create_fetch_result(vec![1, 2], Some(1));
             test_ctx
                 .service
-                .refresh(&key, 25, |_page, _per_page| async { Ok(fetch_result.clone()) })
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Ok(fetch_result.clone())
+                })
                 .await
                 .unwrap();
 
@@ -1118,7 +1131,9 @@ mod tests {
             let page1_result = create_fetch_result(vec![1, 2, 3], Some(3), 1);
             test_ctx
                 .service
-                .refresh(&key, 25, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Ok(page1_result.clone())
+                })
                 .await
                 .unwrap();
 
@@ -1158,10 +1173,7 @@ mod tests {
                 .await;
 
             assert!(result.is_err());
-            assert!(result
-                .unwrap_err()
-                .to_string()
-                .contains("Cannot load more"));
+            assert!(result.unwrap_err().to_string().contains("Cannot load more"));
         }
 
         #[rstest]
@@ -1173,7 +1185,9 @@ mod tests {
             let page1_result = create_fetch_result(vec![1, 2, 3], Some(1), 1);
             test_ctx
                 .service
-                .refresh(&key, 25, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Ok(page1_result.clone())
+                })
                 .await
                 .unwrap();
 
@@ -1186,10 +1200,7 @@ mod tests {
                 .await;
 
             assert!(result.is_err());
-            assert!(result
-                .unwrap_err()
-                .to_string()
-                .contains("Cannot load more"));
+            assert!(result.unwrap_err().to_string().contains("Cannot load more"));
         }
 
         #[rstest]
@@ -1203,7 +1214,9 @@ mod tests {
             let page1_result = create_fetch_result(vec![1], Some(3), 1);
             test_ctx
                 .service
-                .refresh(&key, 25, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Ok(page1_result.clone())
+                })
                 .await
                 .unwrap();
 
@@ -1247,7 +1260,9 @@ mod tests {
             let page1_result = create_fetch_result(vec![1], Some(3), 1);
             test_ctx
                 .service
-                .refresh(&key, 25, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Ok(page1_result.clone())
+                })
                 .await
                 .unwrap();
 
@@ -1279,7 +1294,9 @@ mod tests {
             let page1_result = create_fetch_result(vec![1], Some(3), 1);
             test_ctx
                 .service
-                .refresh(&key, 50, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .refresh(&key, 50, |_page, _per_page| async {
+                    Ok(page1_result.clone())
+                })
                 .await
                 .unwrap();
 
@@ -1308,7 +1325,9 @@ mod tests {
             let page1_result = create_fetch_result(vec![1], Some(3), 1);
             test_ctx
                 .service
-                .refresh(&key, 25, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Ok(page1_result.clone())
+                })
                 .await
                 .unwrap();
 
