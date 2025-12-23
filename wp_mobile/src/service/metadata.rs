@@ -580,55 +580,6 @@ impl MetadataService {
             .execute(|conn| MetadataSyncManager::complete_sync(conn, list_metadata_id))?;
         Ok(())
     }
-
-    /// Complete a sync operation successfully (by key).
-    ///
-    /// Sets state to Idle. Use this when you don't have the `list_metadata_id`.
-    /// Does nothing if the list doesn't exist.
-    pub fn complete_sync_by_key(&self, key: &ListKey) -> Result<(), WpServiceError> {
-        use wp_mobile_cache::SqliteDbError;
-        self.cache.execute(|conn| {
-            if let Some(header) = ListMetadataRepository::get_header(conn, &self.db_site, key)? {
-                MetadataSyncManager::complete_sync(conn, header.row_id)?;
-            }
-            Ok::<(), SqliteDbError>(())
-        })?;
-        Ok(())
-    }
-
-    /// Complete a sync operation with error (by list_metadata_id).
-    ///
-    /// Sets state to Error with the provided message. Used internally by
-    /// `refresh()` and `load_more()` when an error occurs.
-    pub fn complete_sync_with_error(
-        &self,
-        list_metadata_id: RowId,
-        error_message: &str,
-    ) -> Result<(), WpServiceError> {
-        self.cache.execute(|conn| {
-            MetadataSyncManager::complete_sync_with_error(conn, list_metadata_id, error_message)
-        })?;
-        Ok(())
-    }
-
-    /// Complete a sync operation with error (by key).
-    ///
-    /// Sets state to Error with the provided message. Use this when you don't have
-    /// the `list_metadata_id`. Does nothing if the list doesn't exist.
-    pub fn complete_sync_with_error_by_key(
-        &self,
-        key: &ListKey,
-        error_message: &str,
-    ) -> Result<(), WpServiceError> {
-        use wp_mobile_cache::SqliteDbError;
-        self.cache.execute(|conn| {
-            if let Some(header) = ListMetadataRepository::get_header(conn, &self.db_site, key)? {
-                MetadataSyncManager::complete_sync_with_error(conn, header.row_id, error_message)?;
-            }
-            Ok::<(), SqliteDbError>(())
-        })?;
-        Ok(())
-    }
 }
 
 /// Implement ListMetadataReader for database-backed metadata.
