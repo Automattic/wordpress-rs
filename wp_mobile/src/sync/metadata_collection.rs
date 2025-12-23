@@ -246,7 +246,7 @@ where
         }
 
         // Check if we're already at the last page (early exit for UX)
-        if total_pages.is_some_and(|total| current_page >= total as u32) {
+        if total_pages.is_some_and(|total| current_page >= total) {
             println!("[MetadataCollection] Already at last page, nothing to load");
             return Ok(SyncResult::no_op(
                 self.items().len(),
