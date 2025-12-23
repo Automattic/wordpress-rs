@@ -316,24 +316,18 @@ impl PostService {
         }
     }
 
-    /// Sync a post list using persistent metadata storage.
+    /// Sync a post list using the default full sync strategy.
     ///
-    /// This method orchestrates the full sync flow:
-    /// 1. Uses `MetadataService::refresh` or `load_more` for metadata sync
-    /// 2. Detects stale posts by comparing modified_gmt
-    /// 3. Fetches missing/stale posts (entity-specific step)
+    /// This is a convenience method that calls `sync_list_with_strategy` with
+    /// `SyncStrategy::Full`. See that method for full documentation.
     ///
     /// # Arguments
     /// * `key` - Metadata store key (e.g., "site_1:edit:posts:status=publish")
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
-    /// * `filter` - Filter parameters (pagination is provided separately)
+    /// * `filter` - Filter parameters (pagination is managed internally)
     /// * `per_page` - Number of posts per page (only used for refresh)
     /// * `is_refresh` - If true, refreshes (page 1); if false, loads more (next page)
-    ///
-    /// # Returns
-    /// - `Ok(SyncResult)` with sync statistics
-    /// - `Err(FetchError)` if network or database error occurs
-    pub async fn sync_post_list(
+    pub async fn sync_list(
         &self,
         key: &ListKey,
         endpoint_type: &PostEndpointType,
@@ -341,7 +335,51 @@ impl PostService {
         per_page: u32,
         is_refresh: bool,
     ) -> Result<SyncResult, FetchError> {
-        // 1. Use MetadataService orchestration for metadata sync
+        self.sync_list_with_strategy(
+            key,
+            endpoint_type,
+            filter,
+            per_page,
+            is_refresh,
+            super::SyncStrategy::Full,
+        )
+        .await
+    }
+
+    /// Sync a post list with explicit strategy control.
+    ///
+    /// Orchestrates the sync flow based on the chosen strategy:
+    ///
+    /// **`SyncStrategy::MetadataOnly`:**
+    /// 1. Fetch list metadata (IDs, modified_gmt, pagination)
+    /// 2. Store metadata in database
+    /// 3. Detect stale posts (marks them, but doesn't fetch)
+    ///
+    /// **`SyncStrategy::Full`:**
+    /// 1. All of MetadataOnly, plus:
+    /// 2. Fetch missing/stale post data from the API
+    ///
+    /// # Arguments
+    /// * `key` - Metadata store key (e.g., "site_1:edit:posts:status=publish")
+    /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
+    /// * `filter` - Filter parameters (pagination is managed internally)
+    /// * `per_page` - Number of posts per page (only used for refresh)
+    /// * `is_refresh` - If true, refreshes (page 1); if false, loads more (next page)
+    /// * `strategy` - Controls whether to fetch entity data or just metadata
+    ///
+    /// # Returns
+    /// - `Ok(SyncResult)` with sync statistics
+    /// - `Err(FetchError)` if network or database error occurs
+    pub async fn sync_list_with_strategy(
+        &self,
+        key: &ListKey,
+        endpoint_type: &PostEndpointType,
+        filter: &PostListFilter,
+        per_page: u32,
+        is_refresh: bool,
+        strategy: super::SyncStrategy,
+    ) -> Result<SyncResult, FetchError> {
+        // 1. Fetch and store metadata
         let metadata_result = if is_refresh {
             self.metadata_service
                 .refresh(key, per_page, |page, per_page| {
@@ -356,12 +394,53 @@ impl PostService {
                 .await?
         };
 
-        // 2. Detect stale posts (entity-specific)
+        // 2. Detect stale posts (always done - marks state but doesn't fetch)
         self.detect_and_mark_stale_posts(&metadata_result.metadata);
 
-        // 3. Fetch missing/stale posts (entity-specific)
-        let ids_to_fetch: Vec<PostId> = metadata_result
-            .metadata
+        // 3. Fetch missing/stale posts (only for Full strategy)
+        let (fetched_count, failed_count) = match strategy {
+            super::SyncStrategy::MetadataOnly => (0, 0),
+            super::SyncStrategy::Full => {
+                self.fetch_missing_and_stale_posts(endpoint_type, &metadata_result.metadata)
+                    .await
+            }
+        };
+
+        // Build result
+        let total_items = self
+            .metadata_service
+            .get_entity_ids(key)
+            .map(|ids| ids.len())
+            .unwrap_or(0);
+
+        let has_more_pages = self.metadata_service.has_more_pages(key).unwrap_or(false);
+        let current_page = self
+            .metadata_service
+            .get_pagination(key)
+            .ok()
+            .flatten()
+            .map(|p| p.current_page as u32)
+            .unwrap_or(1);
+
+        Ok(SyncResult::new(
+            total_items,
+            fetched_count,
+            failed_count,
+            has_more_pages,
+            current_page,
+            metadata_result.total_pages,
+        ))
+    }
+
+    /// Fetch posts that are missing or stale based on current state.
+    ///
+    /// Returns (fetched_count, failed_count).
+    async fn fetch_missing_and_stale_posts(
+        &self,
+        endpoint_type: &PostEndpointType,
+        metadata: &[crate::sync::EntityMetadata],
+    ) -> (usize, usize) {
+        let ids_to_fetch: Vec<PostId> = metadata
             .iter()
             .filter(|m| {
                 let state = self.state_store_with_edit_context.get(m.id);
@@ -391,30 +470,7 @@ impl PostService {
             }
         }
 
-        // Get total items from metadata service
-        let total_items = self
-            .metadata_service
-            .get_entity_ids(key)
-            .map(|ids| ids.len())
-            .unwrap_or(0);
-
-        let has_more_pages = self.metadata_service.has_more_pages(key).unwrap_or(false);
-        let current_page = self
-            .metadata_service
-            .get_pagination(key)
-            .ok()
-            .flatten()
-            .map(|p| p.current_page as u32)
-            .unwrap_or(1);
-
-        Ok(SyncResult::new(
-            total_items,
-            fetched_count,
-            failed_count,
-            has_more_pages,
-            current_page,
-            metadata_result.total_pages,
-        ))
+        (fetched_count, failed_count)
     }
 
     /// Fetch full post data for specific post IDs and save to cache.

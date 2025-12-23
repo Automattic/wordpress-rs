@@ -465,8 +465,13 @@ impl MetadataService {
         let result = match fetcher(1, per_page).await {
             Ok(result) => result,
             Err(e) => {
-                if let Err(cleanup_err) = self.complete_sync_with_error(info.list_metadata_id, &e.to_string()) {
-                    log::warn!("Failed to set error state after fetch failure: {}", cleanup_err);
+                if let Err(cleanup_err) =
+                    self.complete_sync_with_error(info.list_metadata_id, &e.to_string())
+                {
+                    log::warn!(
+                        "Failed to set error state after fetch failure: {}",
+                        cleanup_err
+                    );
                 }
                 return Err(e);
             }
@@ -491,8 +496,13 @@ impl MetadataService {
                 &items,
             )
         }) {
-            if let Err(cleanup_err) = self.complete_sync_with_error(info.list_metadata_id, &e.to_string()) {
-                log::warn!("Failed to set error state after store failure: {}", cleanup_err);
+            if let Err(cleanup_err) =
+                self.complete_sync_with_error(info.list_metadata_id, &e.to_string())
+            {
+                log::warn!(
+                    "Failed to set error state after store failure: {}",
+                    cleanup_err
+                );
             }
             return Err(e.into());
         }
@@ -510,8 +520,13 @@ impl MetadataService {
                 },
             )
         }) {
-            if let Err(cleanup_err) = self.complete_sync_with_error(info.list_metadata_id, &e.to_string()) {
-                log::warn!("Failed to set error state after pagination update failure: {}", cleanup_err);
+            if let Err(cleanup_err) =
+                self.complete_sync_with_error(info.list_metadata_id, &e.to_string())
+            {
+                log::warn!(
+                    "Failed to set error state after pagination update failure: {}",
+                    cleanup_err
+                );
             }
             return Err(e.into());
         }
@@ -572,10 +587,12 @@ impl MetadataService {
         log::debug!("MetadataService::load_more: key={}", key);
 
         // 1. Get current state and determine next page
-        let load_more_info = self.begin_load_more(key)?.ok_or_else(|| FetchError::Database {
-            err_message: "Cannot load more: list not found, no pages loaded, or at last page"
-                .to_string(),
-        })?;
+        let load_more_info = self
+            .begin_load_more(key)?
+            .ok_or_else(|| FetchError::Database {
+                err_message: "Cannot load more: list not found, no pages loaded, or at last page"
+                    .to_string(),
+            })?;
 
         let next_page = load_more_info.page as u32;
         let per_page = load_more_info.per_page as u32;
@@ -593,8 +610,13 @@ impl MetadataService {
         let result = match fetcher(next_page, per_page).await {
             Ok(result) => result,
             Err(e) => {
-                if let Err(cleanup_err) = self.complete_sync_with_error(list_metadata_id, &e.to_string()) {
-                    log::warn!("Failed to set error state after fetch failure: {}", cleanup_err);
+                if let Err(cleanup_err) =
+                    self.complete_sync_with_error(list_metadata_id, &e.to_string())
+                {
+                    log::warn!(
+                        "Failed to set error state after fetch failure: {}",
+                        cleanup_err
+                    );
                 }
                 return Err(e);
             }
@@ -614,7 +636,10 @@ impl MetadataService {
             // Don't set error state - this is expected when refresh races with load-more
             // Just reset to idle since the refresh would have completed
             if let Err(cleanup_err) = self.complete_sync(list_metadata_id) {
-                log::warn!("Failed to reset state after version mismatch: {}", cleanup_err);
+                log::warn!(
+                    "Failed to reset state after version mismatch: {}",
+                    cleanup_err
+                );
             }
             return Err(FetchError::Database {
                 err_message: "List was refreshed during load more, discarding results".to_string(),
@@ -636,8 +661,13 @@ impl MetadataService {
         if let Err(e) = self.cache.execute(|conn| {
             ListMetadataRepository::append_items_by_list_metadata_id(conn, list_metadata_id, &items)
         }) {
-            if let Err(cleanup_err) = self.complete_sync_with_error(list_metadata_id, &e.to_string()) {
-                log::warn!("Failed to set error state after append failure: {}", cleanup_err);
+            if let Err(cleanup_err) =
+                self.complete_sync_with_error(list_metadata_id, &e.to_string())
+            {
+                log::warn!(
+                    "Failed to set error state after append failure: {}",
+                    cleanup_err
+                );
             }
             return Err(e.into());
         }
@@ -655,8 +685,13 @@ impl MetadataService {
                 },
             )
         }) {
-            if let Err(cleanup_err) = self.complete_sync_with_error(list_metadata_id, &e.to_string()) {
-                log::warn!("Failed to set error state after pagination update failure: {}", cleanup_err);
+            if let Err(cleanup_err) =
+                self.complete_sync_with_error(list_metadata_id, &e.to_string())
+            {
+                log::warn!(
+                    "Failed to set error state after pagination update failure: {}",
+                    cleanup_err
+                );
             }
             return Err(e.into());
         }
@@ -671,7 +706,6 @@ impl MetadataService {
         );
         Ok(result)
     }
-
 }
 
 /// Implement ListMetadataReader for database-backed metadata.

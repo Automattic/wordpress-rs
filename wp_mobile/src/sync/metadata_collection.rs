@@ -206,20 +206,18 @@ where
     pub async fn refresh(&self) -> Result<SyncResult, FetchError> {
         println!("[MetadataCollection] Refreshing collection...");
 
-        // MetadataService handles page determination internally (always page 1 for refresh)
-        let result = self.fetcher.fetch_metadata(self.per_page, true).await?;
+        let result = self.fetcher.sync(self.per_page, true).await?;
 
         let total_pages_str = result
             .total_pages
             .map(|p| p.to_string())
             .unwrap_or_else(|| "?".to_string());
         println!(
-            "[MetadataCollection] Fetched metadata: page 1 of {}, {} items",
-            total_pages_str,
-            result.metadata.len()
+            "[MetadataCollection] Refreshed: {} items, page 1 of {}, fetched {}, failed {}",
+            result.total_items, total_pages_str, result.fetched_count, result.failed_count
         );
 
-        self.sync_missing_and_stale().await
+        Ok(result)
     }
 
     /// Load the next page of items.
@@ -258,22 +256,22 @@ where
 
         println!("[MetadataCollection] Loading next page...");
 
-        // MetadataService handles page determination internally (current_page + 1)
-        let result = self.fetcher.fetch_metadata(self.per_page, false).await?;
+        let result = self.fetcher.sync(self.per_page, false).await?;
 
-        let new_page = self.current_page();
         let total_pages_str = result
             .total_pages
             .map(|p| p.to_string())
             .unwrap_or_else(|| "?".to_string());
         println!(
-            "[MetadataCollection] Fetched metadata: page {} of {}, {} items",
-            new_page,
+            "[MetadataCollection] Loaded page {} of {}: {} items total, fetched {}, failed {}",
+            result.current_page,
             total_pages_str,
-            result.metadata.len()
+            result.total_items,
+            result.fetched_count,
+            result.failed_count
         );
 
-        self.sync_missing_and_stale().await
+        Ok(result)
     }
 
     /// Check if there are more pages to load.
@@ -300,80 +298,6 @@ where
     /// Get the total number of items, if known.
     pub fn total_items(&self) -> Option<i64> {
         self.list_info().and_then(|info| info.total_items)
-    }
-
-    /// Fetch missing and stale items.
-    async fn sync_missing_and_stale(&self) -> Result<SyncResult, FetchError> {
-        use super::EntityState;
-
-        let items = self.items();
-        let total_items = items.len();
-
-        // Count by state for logging
-        let missing_count = items
-            .iter()
-            .filter(|item| matches!(item.state, EntityState::Missing))
-            .count();
-        let stale_count = items
-            .iter()
-            .filter(|item| matches!(item.state, EntityState::Stale))
-            .count();
-        let cached_count = items
-            .iter()
-            .filter(|item| matches!(item.state, EntityState::Cached))
-            .count();
-
-        // Collect IDs that need fetching
-        let ids_to_fetch: Vec<i64> = items
-            .iter()
-            .filter(|item| item.needs_fetch())
-            .map(|item| item.id())
-            .collect();
-
-        let fetch_count = ids_to_fetch.len();
-
-        println!(
-            "[MetadataCollection] Sync: {} items total ({} cached, {} missing, {} stale)",
-            total_items, cached_count, missing_count, stale_count
-        );
-
-        if !ids_to_fetch.is_empty() {
-            println!(
-                "[MetadataCollection] Fetching {} posts by ID...",
-                fetch_count
-            );
-
-            // Batch into chunks of 100 (WordPress API limit)
-            for chunk in ids_to_fetch.chunks(100) {
-                self.fetcher.ensure_fetched(chunk.to_vec()).await?;
-            }
-        } else {
-            println!("[MetadataCollection] All items already cached, nothing to fetch");
-        }
-
-        // Count failures after fetch attempts
-        let failed_count = self
-            .items()
-            .iter()
-            .filter(|item| item.state.is_failed())
-            .count();
-
-        if fetch_count > 0 {
-            let success_count = fetch_count - failed_count;
-            println!(
-                "[MetadataCollection] Fetched {} posts ({} succeeded, {} failed)",
-                fetch_count, success_count, failed_count
-            );
-        }
-
-        Ok(SyncResult::new(
-            total_items,
-            fetch_count,
-            failed_count,
-            self.has_more_pages(),
-            self.current_page(),
-            self.total_pages(),
-        ))
     }
 }
 

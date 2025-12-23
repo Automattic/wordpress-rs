@@ -2,20 +2,22 @@
 
 use std::sync::Arc;
 
-use wp_api::{posts::PostId, request::endpoint::posts_endpoint::PostEndpointType};
+use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_mobile_cache::list_metadata::ListKey;
 
 use crate::{
     collection::FetchError,
     filters::PostListFilter,
     service::posts::PostService,
-    sync::{MetadataFetchResult, MetadataFetcher},
+    sync::{MetadataFetcher, SyncResult},
 };
 
 /// Database-backed `MetadataFetcher` implementation for posts with edit context.
 ///
-/// Stores metadata to the persistent database via `MetadataService`, allowing
-/// list metadata to survive app restarts.
+/// Delegates to `PostService::sync_list` which handles:
+/// 1. Fetching and storing list metadata
+/// 2. Detecting stale posts
+/// 3. Fetching missing/stale posts
 ///
 /// # Usage
 ///
@@ -29,7 +31,7 @@ use crate::{
 ///
 /// let mut collection = MetadataCollection::new(
 ///     ListKey::from("site_1:edit:posts:status=publish"),
-///     service.persistent_metadata_reader(),  // DB-backed reader
+///     service.persistent_metadata_reader(),
 ///     service.state_reader_with_edit_context(),
 ///     fetcher,
 ///     vec![DbTable::PostsEditContext, DbTable::ListMetadataItems],
@@ -73,28 +75,16 @@ impl PersistentPostMetadataFetcherWithEditContext {
 }
 
 impl MetadataFetcher for PersistentPostMetadataFetcherWithEditContext {
-    async fn fetch_metadata(
-        &self,
-        per_page: u32,
-        is_first_page: bool,
-    ) -> Result<MetadataFetchResult, FetchError> {
+    async fn sync(&self, per_page: u32, is_refresh: bool) -> Result<SyncResult, FetchError> {
         self.service
-            .fetch_and_store_metadata_persistent(
+            .sync_list(
                 &self.key,
                 &self.endpoint_type,
                 &self.filter,
                 per_page,
-                is_first_page,
+                is_refresh,
             )
             .await
-    }
-
-    async fn ensure_fetched(&self, ids: Vec<i64>) -> Result<(), FetchError> {
-        let post_ids: Vec<PostId> = ids.into_iter().map(PostId).collect();
-        self.service
-            .fetch_posts_by_ids(&self.endpoint_type, post_ids)
-            .await?;
-        Ok(())
     }
 }
 
