@@ -401,6 +401,173 @@ impl MetadataService {
         Ok(result)
     }
 
+    /// Load more items by fetching the next page and appending to existing data.
+    ///
+    /// Orchestrates the load-more lifecycle:
+    /// 1. Get current state, determine next page
+    /// 2. Verify there are more pages to load
+    /// 3. Set state to FetchingNextPage
+    /// 4. Call the fetcher with (next_page, per_page)
+    /// 5. Check version (if refresh happened, discard results)
+    /// 6. Append metadata to existing items
+    /// 7. Update pagination
+    /// 8. Set state to Idle (or Error on failure)
+    ///
+    /// # Arguments
+    /// * `key` - The list key identifying which list to load more for
+    /// * `fetcher` - Async closure that fetches metadata, receives (page, per_page)
+    ///
+    /// # Returns
+    /// - `Ok(MetadataFetchResult)` on success
+    /// - `Err(FetchError)` on failure (state is set to Error)
+    ///
+    /// # Errors
+    /// - Returns error if list doesn't exist (must call `refresh` first)
+    /// - Returns error if no more pages to load
+    /// - Returns error if refresh happened during load-more (stale results)
+    ///
+    /// # Example
+    /// ```ignore
+    /// let result = metadata_service.load_more(
+    ///     &key,
+    ///     |page, per_page| async move {
+    ///         api_client.fetch_metadata(page, per_page).await
+    ///     },
+    /// ).await?;
+    /// ```
+    pub async fn load_more<F, Fut>(
+        &self,
+        key: &ListKey,
+        fetcher: F,
+    ) -> Result<crate::sync::MetadataFetchResult, FetchError>
+    where
+        F: FnOnce(u32, u32) -> Fut,
+        Fut: Future<Output = Result<crate::sync::MetadataFetchResult, FetchError>>,
+    {
+        log::debug!("MetadataService::load_more: key={}", key);
+
+        // 1. Get current state and determine next page
+        let load_more_info = self
+            .cache
+            .execute(|conn| MetadataSyncManager::begin_fetch_next_page(conn, &self.db_site, key))?
+            .ok_or_else(|| FetchError::Database {
+                err_message: "Cannot load more: list not found, no pages loaded, or at last page"
+                    .to_string(),
+            })?;
+
+        let next_page = load_more_info.page as u32;
+        let per_page = load_more_info.per_page as u32;
+        let version = load_more_info.version;
+        let list_metadata_id = load_more_info.list_metadata_id;
+
+        log::debug!(
+            "MetadataService::load_more: next_page={}, per_page={}, version={}",
+            next_page,
+            per_page,
+            version
+        );
+
+        // 2. Call fetcher with next page (if this fails, set error state)
+        let result = match fetcher(next_page, per_page).await {
+            Ok(result) => result,
+            Err(e) => {
+                let _ = self.cache.execute(|conn| {
+                    MetadataSyncManager::complete_sync_with_error(
+                        conn,
+                        list_metadata_id,
+                        &e.to_string(),
+                    )
+                });
+                return Err(e);
+            }
+        };
+
+        // 3. Check version (refresh might have happened while fetching)
+        let current_version = self.cache.execute(|conn| {
+            ListMetadataRepository::get_version(conn, &self.db_site, key)
+        })?;
+
+        if current_version != version {
+            log::warn!(
+                "MetadataService::load_more: version mismatch (expected {}, got {}), discarding results",
+                version,
+                current_version
+            );
+            // Don't set error state - this is expected when refresh races with load-more
+            // Just reset to idle since the refresh would have completed
+            let _ = self.cache.execute(|conn| {
+                MetadataSyncManager::complete_sync(conn, list_metadata_id)
+            });
+            return Err(FetchError::Database {
+                err_message: "List was refreshed during load more, discarding results".to_string(),
+            });
+        }
+
+        // 4. Append metadata to existing items
+        let items: Vec<ListMetadataItemInput> = result
+            .metadata
+            .iter()
+            .map(|m| ListMetadataItemInput {
+                entity_id: m.id,
+                modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
+                parent: m.parent,
+                menu_order: m.menu_order,
+            })
+            .collect();
+
+        if let Err(e) = self.cache.execute(|conn| {
+            ListMetadataRepository::append_items_by_list_metadata_id(
+                conn,
+                list_metadata_id,
+                &items,
+            )
+        }) {
+            let _ = self.cache.execute(|conn| {
+                MetadataSyncManager::complete_sync_with_error(
+                    conn,
+                    list_metadata_id,
+                    &e.to_string(),
+                )
+            });
+            return Err(e.into());
+        }
+
+        // 5. Update pagination
+        if let Err(e) = self.cache.execute(|conn| {
+            ListMetadataRepository::update_header_by_list_metadata_id(
+                conn,
+                list_metadata_id,
+                &ListMetadataHeaderUpdate {
+                    total_pages: result.total_pages.map(|p| p as i64),
+                    total_items: result.total_items,
+                    current_page: next_page as i64,
+                    per_page: per_page as i64,
+                },
+            )
+        }) {
+            let _ = self.cache.execute(|conn| {
+                MetadataSyncManager::complete_sync_with_error(
+                    conn,
+                    list_metadata_id,
+                    &e.to_string(),
+                )
+            });
+            return Err(e.into());
+        }
+
+        // 6. Set state to Idle
+        self.cache.execute(|conn| {
+            MetadataSyncManager::complete_sync(conn, list_metadata_id)
+        })?;
+
+        log::debug!(
+            "MetadataService::load_more: completed successfully, {} items on page {}",
+            result.metadata.len(),
+            next_page
+        );
+        Ok(result)
+    }
+
     // ============================================================
     // Sync Session API
     // ============================================================
@@ -1060,6 +1227,247 @@ mod tests {
             // State should be Idle now
             assert_eq!(test_ctx.service.get_state(&key).unwrap(), ListState::Idle);
             assert_eq!(test_ctx.service.get_entity_ids(&key).unwrap(), vec![1, 2]);
+        }
+    }
+
+    // ============================================================
+    // Orchestration API tests (load_more)
+    // ============================================================
+
+    mod load_more_tests {
+        use super::*;
+        use crate::{collection::FetchError, sync::MetadataFetchResult};
+
+        /// Helper to create a fetch result for a specific page
+        fn create_fetch_result(
+            ids: Vec<i64>,
+            total_pages: Option<u32>,
+            page: u32,
+        ) -> MetadataFetchResult {
+            let metadata = ids
+                .into_iter()
+                .map(|id| EntityMetadata::new(id, None, None, None))
+                .collect();
+            MetadataFetchResult::new(metadata, Some(100), total_pages, page)
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_load_more_appends_metadata(test_ctx: TestContext) {
+            let key = ListKey::from("test:loadmore:basic");
+
+            // First, do a refresh to load page 1
+            let page1_result = create_fetch_result(vec![1, 2, 3], Some(3), 1);
+            test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .await
+                .unwrap();
+
+            // Now load more (page 2)
+            let page2_result = create_fetch_result(vec![4, 5, 6], Some(3), 2);
+            let result = test_ctx
+                .service
+                .load_more(&key, |_page, _per_page| async { Ok(page2_result.clone()) })
+                .await;
+
+            assert!(result.is_ok());
+
+            // Verify metadata was appended
+            let ids = test_ctx.service.get_entity_ids(&key).unwrap();
+            assert_eq!(ids, vec![1, 2, 3, 4, 5, 6]);
+
+            // Verify pagination was updated
+            let pagination = test_ctx.service.get_pagination(&key).unwrap().unwrap();
+            assert_eq!(pagination.current_page, 2);
+
+            // Verify state is Idle
+            let state = test_ctx.service.get_state(&key).unwrap();
+            assert_eq!(state, ListState::Idle);
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_load_more_fails_without_prior_refresh(test_ctx: TestContext) {
+            let key = ListKey::from("test:loadmore:norefresh");
+
+            // Try to load more without refresh
+            let result = test_ctx
+                .service
+                .load_more(&key, |_page, _per_page| async {
+                    Ok(create_fetch_result(vec![1], Some(1), 2))
+                })
+                .await;
+
+            assert!(result.is_err());
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains("Cannot load more"));
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_load_more_fails_at_last_page(test_ctx: TestContext) {
+            let key = ListKey::from("test:loadmore:lastpage");
+
+            // Refresh with total_pages = 1 (only one page)
+            let page1_result = create_fetch_result(vec![1, 2, 3], Some(1), 1);
+            test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .await
+                .unwrap();
+
+            // Try to load more
+            let result = test_ctx
+                .service
+                .load_more(&key, |_page, _per_page| async {
+                    Ok(create_fetch_result(vec![4], Some(1), 2))
+                })
+                .await;
+
+            assert!(result.is_err());
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains("Cannot load more"));
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_load_more_passes_correct_page_number(test_ctx: TestContext) {
+            use std::sync::atomic::{AtomicU32, Ordering};
+
+            let key = ListKey::from("test:loadmore:page");
+
+            // First refresh to page 1
+            let page1_result = create_fetch_result(vec![1], Some(3), 1);
+            test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .await
+                .unwrap();
+
+            // Load more - should request page 2
+            let received_page = Arc::new(AtomicU32::new(0));
+            let page_clone = received_page.clone();
+
+            test_ctx
+                .service
+                .load_more(&key, move |page, _per_page| {
+                    page_clone.store(page, Ordering::SeqCst);
+                    async { Ok(create_fetch_result(vec![2], Some(3), 2)) }
+                })
+                .await
+                .unwrap();
+
+            assert_eq!(received_page.load(Ordering::SeqCst), 2);
+
+            // Load more again - should request page 3
+            let received_page = Arc::new(AtomicU32::new(0));
+            let page_clone = received_page.clone();
+
+            test_ctx
+                .service
+                .load_more(&key, move |page, _per_page| {
+                    page_clone.store(page, Ordering::SeqCst);
+                    async { Ok(create_fetch_result(vec![3], Some(3), 3)) }
+                })
+                .await
+                .unwrap();
+
+            assert_eq!(received_page.load(Ordering::SeqCst), 3);
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_load_more_sets_error_on_fetch_failure(test_ctx: TestContext) {
+            let key = ListKey::from("test:loadmore:error");
+
+            // First refresh
+            let page1_result = create_fetch_result(vec![1], Some(3), 1);
+            test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .await
+                .unwrap();
+
+            // Load more fails
+            let result = test_ctx
+                .service
+                .load_more(&key, |_page, _per_page| async {
+                    Err::<MetadataFetchResult, _>(FetchError::Database {
+                        err_message: "Network error".to_string(),
+                    })
+                })
+                .await;
+
+            assert!(result.is_err());
+
+            // Verify state is Error
+            let state = test_ctx.service.get_state(&key).unwrap();
+            assert_eq!(state, ListState::Error);
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_load_more_uses_per_page_from_refresh(test_ctx: TestContext) {
+            use std::sync::atomic::{AtomicU32, Ordering};
+
+            let key = ListKey::from("test:loadmore:perpage");
+
+            // Refresh with per_page = 50
+            let page1_result = create_fetch_result(vec![1], Some(3), 1);
+            test_ctx
+                .service
+                .refresh(&key, 50, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .await
+                .unwrap();
+
+            // Load more should use same per_page
+            let received_per_page = Arc::new(AtomicU32::new(0));
+            let per_page_clone = received_per_page.clone();
+
+            test_ctx
+                .service
+                .load_more(&key, move |_page, per_page| {
+                    per_page_clone.store(per_page, Ordering::SeqCst);
+                    async { Ok(create_fetch_result(vec![2], Some(3), 2)) }
+                })
+                .await
+                .unwrap();
+
+            assert_eq!(received_per_page.load(Ordering::SeqCst), 50);
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_load_more_does_not_increment_version(test_ctx: TestContext) {
+            let key = ListKey::from("test:loadmore:version");
+
+            // Refresh
+            let page1_result = create_fetch_result(vec![1], Some(3), 1);
+            test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(page1_result.clone()) })
+                .await
+                .unwrap();
+
+            let version_after_refresh = test_ctx.service.get_version(&key).unwrap();
+
+            // Load more
+            let page2_result = create_fetch_result(vec![2], Some(3), 2);
+            test_ctx
+                .service
+                .load_more(&key, |_page, _per_page| async { Ok(page2_result.clone()) })
+                .await
+                .unwrap();
+
+            let version_after_load_more = test_ctx.service.get_version(&key).unwrap();
+
+            // Version should not change on load_more
+            assert_eq!(version_after_refresh, version_after_load_more);
         }
     }
 }
