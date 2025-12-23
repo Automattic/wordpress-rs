@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 use wp_api::prelude::WpGmtDateTime;
 use wp_mobile_cache::{
     RowId, WpApiCache,
@@ -9,7 +9,10 @@ use wp_mobile_cache::{
     },
 };
 
-use crate::sync::{EntityMetadata, ListInfo, ListMetadataReader, MetadataSyncManager, SyncSession};
+use crate::{
+    collection::FetchError,
+    sync::{EntityMetadata, ListInfo, ListMetadataReader, MetadataSyncManager, SyncSession},
+};
 
 use super::WpServiceError;
 
@@ -274,6 +277,128 @@ impl MetadataService {
                 )
             })
             .map_err(Into::into)
+    }
+
+    // ============================================================
+    // Orchestration API (async, owns lifecycle)
+    // ============================================================
+
+    /// Refresh a list by fetching the first page and replacing existing data.
+    ///
+    /// Orchestrates the full sync lifecycle:
+    /// 1. Increment version (invalidates in-flight load-more)
+    /// 2. Set state to FetchingFirstPage
+    /// 3. Call the fetcher with (page=1, per_page)
+    /// 4. Store metadata (replacing existing)
+    /// 5. Update pagination
+    /// 6. Set state to Idle (or Error on failure)
+    ///
+    /// # Arguments
+    /// * `key` - The list key identifying which list to refresh
+    /// * `per_page` - Items per page for the fetch
+    /// * `fetcher` - Async closure that fetches metadata, receives (page, per_page)
+    ///
+    /// # Returns
+    /// - `Ok(MetadataFetchResult)` on success
+    /// - `Err(FetchError)` on failure (state is set to Error)
+    ///
+    /// # Example
+    /// ```ignore
+    /// let result = metadata_service.refresh(
+    ///     &key,
+    ///     25,
+    ///     |page, per_page| async move {
+    ///         api_client.fetch_metadata(page, per_page).await
+    ///     },
+    /// ).await?;
+    /// ```
+    pub async fn refresh<F, Fut>(
+        &self,
+        key: &ListKey,
+        per_page: u32,
+        fetcher: F,
+    ) -> Result<crate::sync::MetadataFetchResult, FetchError>
+    where
+        F: FnOnce(u32, u32) -> Fut,
+        Fut: Future<Output = Result<crate::sync::MetadataFetchResult, FetchError>>,
+    {
+        log::debug!("MetadataService::refresh: key={}, per_page={}", key, per_page);
+
+        // 1. Begin refresh (increment version, set state to FetchingFirstPage)
+        let info = self.cache.execute(|conn| {
+            MetadataSyncManager::begin_refresh(conn, &self.db_site, key, per_page as i64)
+        })?;
+
+        // 2. Call fetcher with page=1 (if this fails, set error state)
+        let result = match fetcher(1, per_page).await {
+            Ok(result) => result,
+            Err(e) => {
+                let _ = self.cache.execute(|conn| {
+                    MetadataSyncManager::complete_sync_with_error(
+                        conn,
+                        info.list_metadata_id,
+                        &e.to_string(),
+                    )
+                });
+                return Err(e);
+            }
+        };
+
+        // 3. Store metadata (replacing existing)
+        let items: Vec<ListMetadataItemInput> = result
+            .metadata
+            .iter()
+            .map(|m| ListMetadataItemInput {
+                entity_id: m.id,
+                modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
+                parent: m.parent,
+                menu_order: m.menu_order,
+            })
+            .collect();
+
+        if let Err(e) = self.cache.execute(|conn| {
+            ListMetadataRepository::set_items_by_list_metadata_id(conn, info.list_metadata_id, &items)
+        }) {
+            let _ = self.cache.execute(|conn| {
+                MetadataSyncManager::complete_sync_with_error(
+                    conn,
+                    info.list_metadata_id,
+                    &e.to_string(),
+                )
+            });
+            return Err(e.into());
+        }
+
+        // 4. Update pagination
+        if let Err(e) = self.cache.execute(|conn| {
+            ListMetadataRepository::update_header_by_list_metadata_id(
+                conn,
+                info.list_metadata_id,
+                &ListMetadataHeaderUpdate {
+                    total_pages: result.total_pages.map(|p| p as i64),
+                    total_items: result.total_items,
+                    current_page: 1,
+                    per_page: per_page as i64,
+                },
+            )
+        }) {
+            let _ = self.cache.execute(|conn| {
+                MetadataSyncManager::complete_sync_with_error(
+                    conn,
+                    info.list_metadata_id,
+                    &e.to_string(),
+                )
+            });
+            return Err(e.into());
+        }
+
+        // 5. Set state to Idle
+        self.cache.execute(|conn| {
+            MetadataSyncManager::complete_sync(conn, info.list_metadata_id)
+        })?;
+
+        log::debug!("MetadataService::refresh: completed successfully, {} items", result.metadata.len());
+        Ok(result)
     }
 
     // ============================================================
@@ -762,5 +887,179 @@ mod tests {
             info.state,
             wp_mobile_cache::list_metadata::ListState::FetchingFirstPage
         );
+    }
+
+    // ============================================================
+    // Orchestration API tests (refresh)
+    // ============================================================
+
+    mod refresh_tests {
+        use super::*;
+        use crate::{collection::FetchError, sync::MetadataFetchResult};
+
+        /// Helper to create a successful fetch result
+        fn create_fetch_result(ids: Vec<i64>, total_pages: Option<u32>) -> MetadataFetchResult {
+            let metadata = ids
+                .into_iter()
+                .map(|id| EntityMetadata::new(id, None, None, None))
+                .collect();
+            MetadataFetchResult::new(metadata, Some(100), total_pages, 1)
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_refresh_stores_metadata_and_sets_state(test_ctx: TestContext) {
+            let key = ListKey::from("test:refresh:basic");
+            let fetch_result = create_fetch_result(vec![1, 2, 3], Some(5));
+
+            let result = test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(fetch_result.clone()) })
+                .await;
+
+            assert!(result.is_ok());
+
+            // Verify metadata was stored
+            let ids = test_ctx.service.get_entity_ids(&key).unwrap();
+            assert_eq!(ids, vec![1, 2, 3]);
+
+            // Verify pagination was updated
+            let pagination = test_ctx.service.get_pagination(&key).unwrap().unwrap();
+            assert_eq!(pagination.current_page, 1);
+            assert_eq!(pagination.total_pages, Some(5));
+            assert_eq!(pagination.per_page, 25);
+
+            // Verify state is Idle
+            let state = test_ctx.service.get_state(&key).unwrap();
+            assert_eq!(state, ListState::Idle);
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_refresh_replaces_existing_metadata(test_ctx: TestContext) {
+            let key = ListKey::from("test:refresh:replace");
+
+            // First refresh
+            let result1 = create_fetch_result(vec![1, 2, 3], Some(3));
+            test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(result1.clone()) })
+                .await
+                .unwrap();
+
+            // Second refresh should replace
+            let result2 = create_fetch_result(vec![10, 20], Some(2));
+            test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(result2.clone()) })
+                .await
+                .unwrap();
+
+            let ids = test_ctx.service.get_entity_ids(&key).unwrap();
+            assert_eq!(ids, vec![10, 20]);
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_refresh_increments_version(test_ctx: TestContext) {
+            let key = ListKey::from("test:refresh:version");
+            let fetch_result = create_fetch_result(vec![1], Some(1));
+
+            // First refresh
+            test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(fetch_result.clone()) })
+                .await
+                .unwrap();
+
+            let version1 = test_ctx.service.get_version(&key).unwrap();
+
+            // Second refresh
+            test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(fetch_result.clone()) })
+                .await
+                .unwrap();
+
+            let version2 = test_ctx.service.get_version(&key).unwrap();
+            assert!(version2 > version1, "Version should increment on refresh");
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_refresh_sets_error_state_on_fetch_failure(test_ctx: TestContext) {
+            let key = ListKey::from("test:refresh:error");
+
+            let result = test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Err::<MetadataFetchResult, _>(FetchError::Database {
+                        err_message: "Network error".to_string(),
+                    })
+                })
+                .await;
+
+            assert!(result.is_err());
+
+            // Verify state is Error
+            let state = test_ctx.service.get_state(&key).unwrap();
+            assert_eq!(state, ListState::Error);
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_refresh_passes_correct_page_and_per_page(test_ctx: TestContext) {
+            use std::sync::atomic::{AtomicU32, Ordering};
+
+            let key = ListKey::from("test:refresh:params");
+            let received_page = Arc::new(AtomicU32::new(0));
+            let received_per_page = Arc::new(AtomicU32::new(0));
+
+            let page_clone = received_page.clone();
+            let per_page_clone = received_per_page.clone();
+
+            test_ctx
+                .service
+                .refresh(&key, 42, move |page, per_page| {
+                    page_clone.store(page, Ordering::SeqCst);
+                    per_page_clone.store(per_page, Ordering::SeqCst);
+                    async { Ok(create_fetch_result(vec![1], Some(1))) }
+                })
+                .await
+                .unwrap();
+
+            assert_eq!(received_page.load(Ordering::SeqCst), 1);
+            assert_eq!(received_per_page.load(Ordering::SeqCst), 42);
+        }
+
+        #[rstest]
+        #[tokio::test]
+        async fn test_refresh_can_recover_from_error(test_ctx: TestContext) {
+            let key = ListKey::from("test:refresh:recover");
+
+            // First refresh fails
+            let _ = test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async {
+                    Err::<MetadataFetchResult, _>(FetchError::Database {
+                        err_message: "Error".to_string(),
+                    })
+                })
+                .await;
+
+            assert_eq!(test_ctx.service.get_state(&key).unwrap(), ListState::Error);
+
+            // Second refresh succeeds
+            let fetch_result = create_fetch_result(vec![1, 2], Some(1));
+            test_ctx
+                .service
+                .refresh(&key, 25, |_page, _per_page| async { Ok(fetch_result.clone()) })
+                .await
+                .unwrap();
+
+            // State should be Idle now
+            assert_eq!(test_ctx.service.get_state(&key).unwrap(), ListState::Idle);
+            assert_eq!(test_ctx.service.get_entity_ids(&key).unwrap(), vec![1, 2]);
+        }
     }
 }
