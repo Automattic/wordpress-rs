@@ -8,7 +8,7 @@ flowchart TB
 
     subgraph Collection["Collection Layer"]
         PMCEC[PostMetadataCollectionWithEditContext]
-        MCC[MetadataCollectionCore]
+        MCC[["MetadataCollectionCore<br/>(joins metadata + state)"]]
         PMCEC -.->|composes| MCC
     end
 
@@ -29,9 +29,7 @@ flowchart TB
     end
 
     %% Client to Collection
-    VM -->|"refresh()"| OC
-    VM -->|"loadNextPage()"| OC
-    VM -->|"listInfo()"| OC
+    VM -->|"refresh(), loadNextPage(), listInfo()"| OC
     OC -->|delegates| PMCEC
 
     %% Core reads via trait abstractions
