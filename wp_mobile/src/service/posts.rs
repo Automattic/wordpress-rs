@@ -207,64 +207,6 @@ impl PostService {
         ))
     }
 
-    /// Fetch metadata and store it in the persistent database.
-    ///
-    /// Stores metadata to `MetadataService` (database-backed) so list structure
-    /// persists across app restarts.
-    ///
-    /// Uses `MetadataService::refresh` or `load_more` for lifecycle orchestration.
-    /// The page number is determined internally by MetadataService.
-    ///
-    /// # Arguments
-    /// * `key` - Key for the metadata store (e.g., "site_1:posts:status=publish")
-    /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
-    /// * `filter` - Filter parameters (pagination is provided separately)
-    /// * `per_page` - Number of posts per page (only used for refresh)
-    /// * `is_first_page` - If true, refreshes (page 1); if false, loads more (next page)
-    ///
-    /// # Returns
-    /// - `Ok(MetadataFetchResult)` with post IDs and modification times
-    /// - `Err(FetchError)` if network or database error occurs
-    pub async fn fetch_and_store_metadata_persistent(
-        &self,
-        key: &ListKey,
-        endpoint_type: &PostEndpointType,
-        filter: &PostListFilter,
-        per_page: u32,
-        is_first_page: bool,
-    ) -> Result<MetadataFetchResult, FetchError> {
-        log::debug!(
-            "fetch_and_store_metadata_persistent: key={}, per_page={}, is_first_page={}",
-            key,
-            per_page,
-            is_first_page
-        );
-
-        // Use MetadataService orchestration - it handles state, storage, and pagination
-        let result = if is_first_page {
-            self.metadata_service
-                .refresh(key, per_page, |page, per_page| {
-                    self.fetch_posts_metadata(endpoint_type, filter, page, per_page)
-                })
-                .await?
-        } else {
-            self.metadata_service
-                .load_more(key, |page, per_page| {
-                    self.fetch_posts_metadata(endpoint_type, filter, page, per_page)
-                })
-                .await?
-        };
-
-        // Entity-specific processing (not part of metadata layer)
-        self.detect_and_mark_stale_posts(&result.metadata);
-
-        log::debug!(
-            "fetch_and_store_metadata_persistent: completed successfully, {} items",
-            result.metadata.len()
-        );
-        Ok(result)
-    }
-
     /// Compare fetched metadata against cached posts and mark stale ones.
     ///
     /// For each post that is currently `Cached`, compares the fetched `modified_gmt`
