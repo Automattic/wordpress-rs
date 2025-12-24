@@ -21,12 +21,10 @@
 //!
 //! ## Collection Types
 //!
-//! - [`MetadataFetcher`] - Trait for fetching metadata and entities
-//! - [`MetadataCollection`] - Collection using metadata-first strategy
+//! - [`MetadataCollectionCore`] - Core collection infrastructure for query logic
 //!
-//! ## Fetcher Implementations
-//!
-//! - [`PersistentPostMetadataFetcherWithEditContext`] - Fetcher for posts with edit context (database-backed)
+//! Entity-specific collections (e.g., `PostMetadataCollectionWithEditContext`) compose
+//! `MetadataCollectionCore` and add their own sync logic.
 //!
 //! See `wp_mobile/docs/design/metadata_collection_v3.md` for full design details.
 
@@ -37,8 +35,6 @@ mod entity_state_store;
 mod list_metadata_reader;
 mod metadata_collection;
 mod metadata_fetch_result;
-mod metadata_fetcher;
-mod post_metadata_fetcher;
 mod sync_result;
 
 pub use collection_item::CollectionItem;
@@ -46,8 +42,6 @@ pub use entity_metadata::EntityMetadata;
 pub use entity_state::EntityState;
 pub use entity_state_store::{EntityStateReader, EntityStateStore};
 pub use list_metadata_reader::{ListInfo, ListMetadataReader};
-pub use metadata_collection::MetadataCollection;
+pub use metadata_collection::MetadataCollectionCore;
 pub use metadata_fetch_result::MetadataFetchResult;
-pub use metadata_fetcher::MetadataFetcher;
-pub use post_metadata_fetcher::PersistentPostMetadataFetcherWithEditContext;
 pub use sync_result::SyncResult;

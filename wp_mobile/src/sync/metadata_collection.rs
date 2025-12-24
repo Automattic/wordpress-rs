@@ -2,58 +2,20 @@ use std::sync::Arc;
 
 use wp_mobile_cache::{DbTable, UpdateHook, list_metadata::ListKey};
 
-use crate::collection::FetchError;
+use super::{CollectionItem, EntityStateReader, ListInfo, ListMetadataReader};
 
-use super::{
-    CollectionItem, EntityStateReader, ListInfo, ListMetadataReader, MetadataFetcher, SyncResult,
-};
-
-/// Collection that uses metadata-first fetching strategy.
+/// Core collection infrastructure for metadata-first fetching.
 ///
-/// This collection type:
-/// 1. Uses lightweight metadata (id + modified_gmt) to define list structure
-/// 2. Shows cached entities immediately via `CollectionItem` states
-/// 3. Tracks which entities are missing or stale for selective fetching
+/// This provides the shared query logic for all entity-specific collections:
+/// - Items with their current fetch states
+/// - List info (pagination + sync state)
+/// - Database update relevance checking
 ///
-/// # Type Parameter
-/// - `F`: The fetcher implementation (e.g., `PostMetadataFetcher`)
+/// Entity-specific collections compose this core and add their own fields
+/// (filter, service reference, etc.) and sync logic.
 ///
-/// # Usage Flow
-/// 1. Create collection with filter-specific fetcher
-/// 2. Call `refresh()` to fetch metadata and sync missing entities
-/// 3. Call `items()` to get current list with states
-/// 4. Call `load_next_page()` for pagination
-/// 5. Use `is_relevant_update()` to check if DB changes affect this collection
-///
-/// # Example
-/// ```ignore
-/// let fetcher = PostMetadataFetcher::new(&service, filter, kv_key);
-/// let mut collection = MetadataCollection::new(
-///     kv_key,
-///     service.metadata_reader(),
-///     service.state_reader(),
-///     fetcher,
-///     vec![DbTable::PostsEditContext],
-/// );
-///
-/// // Initial load
-/// collection.refresh().await?;
-///
-/// // Get items with states
-/// let items = collection.items();
-/// for item in items {
-///     match item.state {
-///         EntityState::Cached => { /* show full entity */ }
-///         EntityState::Fetching => { /* show loading */ }
-///         EntityState::Failed { .. } => { /* show error */ }
-///         _ => { /* show placeholder */ }
-///     }
-/// }
-/// ```
-pub struct MetadataCollection<F>
-where
-    F: MetadataFetcher,
-{
+/// See `PostMetadataCollectionWithEditContext` for an example.
+pub struct MetadataCollectionCore {
     /// Key for metadata store lookup
     key: ListKey,
 
@@ -63,9 +25,6 @@ where
     /// Read-only access to entity states
     state_reader: Arc<dyn EntityStateReader>,
 
-    /// Fetcher for metadata and full entities
-    fetcher: F,
-
     /// Tables to monitor for data updates (entity tables like PostsEditContext)
     relevant_data_tables: Vec<DbTable>,
 
@@ -73,30 +32,24 @@ where
     per_page: u32,
 }
 
-impl<F> MetadataCollection<F>
-where
-    F: MetadataFetcher,
-{
-    /// Create a new metadata collection.
+impl MetadataCollectionCore {
+    /// Create a new metadata collection core.
     ///
     /// # Arguments
     /// * `key` - Key for metadata store lookup (e.g., "site_1:posts:publish")
     /// * `metadata_reader` - Read-only access to list metadata store
     /// * `state_reader` - Read-only access to entity state store
-    /// * `fetcher` - Implementation for fetching metadata and entities
     /// * `relevant_data_tables` - DB tables to monitor for data updates (entity tables)
     pub fn new(
         key: ListKey,
         metadata_reader: Arc<dyn ListMetadataReader>,
         state_reader: Arc<dyn EntityStateReader>,
-        fetcher: F,
         relevant_data_tables: Vec<DbTable>,
     ) -> Self {
         Self {
             key,
             metadata_reader,
             state_reader,
-            fetcher,
             relevant_data_tables,
             per_page: 20,
         }
@@ -108,6 +61,16 @@ where
     pub fn with_per_page(mut self, per_page: u32) -> Self {
         self.per_page = per_page;
         self
+    }
+
+    /// Get the key for metadata store lookup.
+    pub fn key(&self) -> &ListKey {
+        &self.key
+    }
+
+    /// Get the number of items per page.
+    pub fn per_page(&self) -> u32 {
+        self.per_page
     }
 
     /// Get current items with their states.
@@ -193,85 +156,6 @@ where
     pub fn is_relevant_list_info_update(&self, hook: &UpdateHook) -> bool {
         // Just check the table - don't query DB to avoid deadlock
         hook.table == DbTable::ListMetadata || hook.table == DbTable::ListMetadataState
-    }
-
-    /// Refresh the collection (fetch page 1, replace metadata).
-    ///
-    /// This:
-    /// 1. Fetches metadata from the network (page 1)
-    /// 2. Replaces existing metadata in the store
-    /// 3. Fetches missing/stale entities
-    ///
-    /// Returns sync statistics including counts and pagination info.
-    pub async fn refresh(&self) -> Result<SyncResult, FetchError> {
-        println!("[MetadataCollection] Refreshing collection...");
-
-        let result = self.fetcher.sync(self.per_page, true).await?;
-
-        let total_pages_str = result
-            .total_pages
-            .map(|p| p.to_string())
-            .unwrap_or_else(|| "?".to_string());
-        println!(
-            "[MetadataCollection] Refreshed: {} items, page 1 of {}, fetched {}, failed {}",
-            result.total_items, total_pages_str, result.fetched_count, result.failed_count
-        );
-
-        Ok(result)
-    }
-
-    /// Load the next page of items.
-    ///
-    /// This:
-    /// 1. Fetches metadata for the next page
-    /// 2. Appends to existing metadata in the store
-    /// 3. Fetches missing/stale entities from the new page
-    ///
-    /// Returns `SyncResult::no_op()` if already on the last page or no pages loaded yet.
-    pub async fn load_next_page(&self) -> Result<SyncResult, FetchError> {
-        let current_page = self.current_page();
-        let total_pages = self.total_pages();
-
-        // Check if no pages have been loaded yet (need refresh first)
-        if current_page == 0 {
-            println!("[MetadataCollection] No pages loaded yet, need refresh first");
-            return Ok(SyncResult::no_op(
-                self.items().len(),
-                true, // has_more_pages = true, but need refresh first
-                0,
-                None,
-            ));
-        }
-
-        // Check if we're already at the last page (early exit for UX)
-        if total_pages.is_some_and(|total| current_page >= total) {
-            println!("[MetadataCollection] Already at last page, nothing to load");
-            return Ok(SyncResult::no_op(
-                self.items().len(),
-                false,
-                current_page,
-                total_pages,
-            ));
-        }
-
-        println!("[MetadataCollection] Loading next page...");
-
-        let result = self.fetcher.sync(self.per_page, false).await?;
-
-        let total_pages_str = result
-            .total_pages
-            .map(|p| p.to_string())
-            .unwrap_or_else(|| "?".to_string());
-        println!(
-            "[MetadataCollection] Loaded page {} of {}: {} items total, fetched {}, failed {}",
-            result.current_page,
-            total_pages_str,
-            result.total_items,
-            result.fetched_count,
-            result.failed_count
-        );
-
-        Ok(result)
     }
 
     /// Check if there are more pages to load.

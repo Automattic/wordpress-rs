@@ -9,8 +9,8 @@ use crate::{
     filters::{AnyPostFilter, PostListFilter},
     service::metadata::MetadataService,
     sync::{
-        EntityMetadata, EntityState, EntityStateReader, EntityStateStore, MetadataCollection,
-        MetadataFetchResult, PersistentPostMetadataFetcherWithEditContext, SyncResult,
+        EntityMetadata, EntityState, EntityStateReader, EntityStateStore, MetadataCollectionCore,
+        MetadataFetchResult, SyncResult,
     },
 };
 use std::sync::Arc;
@@ -842,18 +842,10 @@ impl PostService {
         )
         .into();
 
-        let fetcher = PersistentPostMetadataFetcherWithEditContext::new(
-            self.clone(),
-            endpoint_type,
-            filter.clone(),
-            key.clone(),
-        );
-
-        let metadata_collection = MetadataCollection::new(
+        let core = MetadataCollectionCore::new(
             key,
             self.persistent_metadata_reader(),
             self.state_reader_with_edit_context(),
-            fetcher,
             vec![
                 DbTable::PostsEditContext,
                 DbTable::TermRelationships,
@@ -861,7 +853,7 @@ impl PostService {
             ],
         );
 
-        PostMetadataCollectionWithEditContext::new(metadata_collection, self.clone(), filter)
+        PostMetadataCollectionWithEditContext::new(core, self.clone(), endpoint_type, filter)
     }
 
     /// Get a collection of all posts with edit context for this site.

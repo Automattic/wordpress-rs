@@ -3,16 +3,14 @@
 use std::sync::Arc;
 
 use wp_api::posts::AnyPostWithEditContext;
+use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_mobile_cache::{UpdateHook, entity::FullEntity};
 
 use crate::{
     collection::{CollectionError, FetchError},
     filters::PostListFilter,
     service::posts::PostService,
-    sync::{
-        EntityState, ListInfo, MetadataCollection, PersistentPostMetadataFetcherWithEditContext,
-        SyncResult,
-    },
+    sync::{EntityState, ListInfo, MetadataCollectionCore, SyncResult},
 };
 
 // Generate PostItemState enum and PostMetadataCollectionItem struct using the macro
@@ -59,25 +57,30 @@ crate::wp_mobile_metadata_item!(
 /// ```
 #[derive(uniffi::Object)]
 pub struct PostMetadataCollectionWithEditContext {
-    /// The underlying metadata collection (database-backed)
-    collection: MetadataCollection<PersistentPostMetadataFetcherWithEditContext>,
+    /// Core collection infrastructure (shared query logic)
+    core: MetadataCollectionCore,
 
-    /// Reference to service for loading full entity data
-    post_service: Arc<PostService>,
+    /// Reference to service for sync operations and loading entity data
+    service: Arc<PostService>,
 
-    /// The filter parameters for this collection
+    /// The post endpoint type (Posts, Pages, or Custom)
+    endpoint_type: PostEndpointType,
+
+    /// Filter parameters for the post list
     filter: PostListFilter,
 }
 
 impl PostMetadataCollectionWithEditContext {
     pub fn new(
-        collection: MetadataCollection<PersistentPostMetadataFetcherWithEditContext>,
-        post_service: Arc<PostService>,
+        core: MetadataCollectionCore,
+        service: Arc<PostService>,
+        endpoint_type: PostEndpointType,
         filter: PostListFilter,
     ) -> Self {
         Self {
-            collection,
-            post_service,
+            core,
+            service,
+            endpoint_type,
             filter,
         }
     }
@@ -103,7 +106,7 @@ impl PostMetadataCollectionWithEditContext {
     /// will be executed on a background thread. The underlying Rust implementation
     /// is synchronous as rusqlite doesn't support async operations.
     pub async fn load_items(&self) -> Result<Vec<PostMetadataCollectionItem>, CollectionError> {
-        let items = self.collection.items();
+        let items = self.core.items();
 
         // Load ALL posts from cache - data availability is independent of EntityState.
         // After app restart, EntityState resets to Missing but data may still be cached.
@@ -112,7 +115,7 @@ impl PostMetadataCollectionWithEditContext {
         let cached_posts = if all_ids.is_empty() {
             Vec::new()
         } else {
-            self.post_service
+            self.service
                 .read_posts_by_ids_from_db(&all_ids)
                 .map_err(|e| CollectionError::DatabaseError {
                     err_message: e.to_string(),
@@ -177,7 +180,29 @@ impl PostMetadataCollectionWithEditContext {
     ///
     /// Returns sync statistics including counts and pagination info.
     pub async fn refresh(&self) -> Result<SyncResult, FetchError> {
-        self.collection.refresh().await
+        println!("[PostMetadataCollection] Refreshing collection...");
+
+        let result = self
+            .service
+            .sync_list(
+                self.core.key(),
+                &self.endpoint_type,
+                &self.filter,
+                self.core.per_page(),
+                true,
+            )
+            .await?;
+
+        let total_pages_str = result
+            .total_pages
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "?".to_string());
+        println!(
+            "[PostMetadataCollection] Refreshed: {} items, page 1 of {}, fetched {}, failed {}",
+            result.total_items, total_pages_str, result.fetched_count, result.failed_count
+        );
+
+        Ok(result)
     }
 
     /// Load the next page of items.
@@ -189,7 +214,58 @@ impl PostMetadataCollectionWithEditContext {
     ///
     /// Returns `SyncResult::no_op()` if already on the last page.
     pub async fn load_next_page(&self) -> Result<SyncResult, FetchError> {
-        self.collection.load_next_page().await
+        let current_page = self.core.current_page();
+        let total_pages = self.core.total_pages();
+
+        // Check if no pages have been loaded yet (need refresh first)
+        if current_page == 0 {
+            println!("[PostMetadataCollection] No pages loaded yet, need refresh first");
+            return Ok(SyncResult::no_op(
+                self.core.items().len(),
+                true, // has_more_pages = true, but need refresh first
+                0,
+                None,
+            ));
+        }
+
+        // Check if we're already at the last page (early exit for UX)
+        if total_pages.is_some_and(|total| current_page >= total) {
+            println!("[PostMetadataCollection] Already at last page, nothing to load");
+            return Ok(SyncResult::no_op(
+                self.core.items().len(),
+                false,
+                current_page,
+                total_pages,
+            ));
+        }
+
+        println!("[PostMetadataCollection] Loading next page...");
+
+        let result = self
+            .service
+            .sync_list(
+                self.core.key(),
+                &self.endpoint_type,
+                &self.filter,
+                self.core.per_page(),
+                false,
+            )
+            .await?;
+
+        let total_pages_str = result
+            .total_pages
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "?".to_string());
+        println!(
+            "[PostMetadataCollection] Loaded page {} of {}: {} items total, fetched {}, failed {}",
+            result.current_page,
+            total_pages_str,
+            result.total_items,
+            result.fetched_count,
+            result.failed_count
+        );
+
+        Ok(result)
     }
 
     /// Get combined list info (pagination + sync state) in a single query.
@@ -198,22 +274,22 @@ impl PostMetadataCollectionWithEditContext {
     /// Use this instead of calling `current_page()`, `total_pages()`, `sync_state()`
     /// separately to avoid multiple database queries.
     pub fn list_info(&self) -> Option<ListInfo> {
-        self.collection.list_info()
+        self.core.list_info()
     }
 
     /// Check if there are more pages to load.
     pub fn has_more_pages(&self) -> bool {
-        self.collection.has_more_pages()
+        self.core.has_more_pages()
     }
 
     /// Get the current page number (0 = not loaded yet).
     pub fn current_page(&self) -> u32 {
-        self.collection.current_page()
+        self.core.current_page()
     }
 
     /// Get the total number of pages, if known.
     pub fn total_pages(&self) -> Option<u32> {
-        self.collection.total_pages()
+        self.core.total_pages()
     }
 
     /// Get the current sync state for this collection.
@@ -232,7 +308,7 @@ impl PostMetadataCollectionWithEditContext {
     /// will be executed on a background thread. The underlying Rust implementation
     /// is synchronous as rusqlite doesn't support async operations.
     pub async fn sync_state(&self) -> wp_mobile_cache::list_metadata::ListState {
-        self.collection.sync_state()
+        self.core.sync_state()
     }
 
     /// Check if a database update is relevant to this collection (either data or state).
@@ -240,7 +316,7 @@ impl PostMetadataCollectionWithEditContext {
     /// Returns `true` if the update affects either data or state.
     /// For more granular control, use `is_relevant_data_update` or `is_relevant_state_update`.
     pub fn is_relevant_update(&self, hook: &UpdateHook) -> bool {
-        self.collection.is_relevant_update(hook)
+        self.core.is_relevant_update(hook)
     }
 
     /// Check if a database update affects this collection's data.
@@ -251,7 +327,7 @@ impl PostMetadataCollectionWithEditContext {
     ///
     /// Use this for data observers that should refresh list contents.
     pub fn is_relevant_data_update(&self, hook: &UpdateHook) -> bool {
-        self.collection.is_relevant_data_update(hook)
+        self.core.is_relevant_data_update(hook)
     }
 
     /// Check if a database update affects this collection's list info (pagination + state).
@@ -262,7 +338,7 @@ impl PostMetadataCollectionWithEditContext {
     ///
     /// Use this for listInfo observers that should update pagination display and loading indicators.
     pub fn is_relevant_list_info_update(&self, hook: &UpdateHook) -> bool {
-        self.collection.is_relevant_list_info_update(hook)
+        self.core.is_relevant_list_info_update(hook)
     }
 
     /// Get the filter parameters for this collection.
