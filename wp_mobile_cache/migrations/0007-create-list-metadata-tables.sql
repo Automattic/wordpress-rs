@@ -5,7 +5,7 @@ CREATE TABLE `list_metadata` (
   `key` TEXT NOT NULL,              -- e.g., "edit:posts:publish"
   `total_pages` INTEGER,
   `total_items` INTEGER,
-  `current_page` INTEGER NOT NULL DEFAULT 0,
+  `current_page` INTEGER,
   `per_page` INTEGER NOT NULL DEFAULT 20,
   `last_first_page_fetched_at` TEXT,
   `last_fetched_at` TEXT,

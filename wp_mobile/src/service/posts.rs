@@ -13,7 +13,7 @@ use crate::{
         MetadataFetchResult, SyncResult, SyncStrategy,
     },
 };
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 use wp_api::{
     api_client::WpApiClient,
     posts::{
@@ -28,8 +28,59 @@ use wp_mobile_cache::{
     db_types::db_site::DbSite,
     entity::{Entity, EntityId, FullEntity},
     list_metadata::ListKey,
-    repository::posts::PostRepository,
+    repository::{TransactionManager, posts::PostRepository},
 };
+
+/// Maximum number of posts to fetch in a single batch request
+const BATCH_FETCH_SIZE: usize = 100;
+
+// Internal types
+
+/// Result from fetching posts by IDs.
+pub struct FetchByIdsResult {
+    /// Entity IDs of successfully fetched posts
+    pub entity_ids: Vec<EntityId>,
+    /// Number of posts that were requested but failed to fetch
+    pub failed_count: usize,
+}
+
+/// Statistics from fetching missing and stale posts.
+pub(crate) struct FetchStats {
+    /// Number of posts that needed fetching (Missing or Stale state)
+    pub(crate) fetched_count: usize,
+    /// Number of posts that failed to fetch
+    pub(crate) failed_count: usize,
+}
+
+// Internal helpers
+
+/// Convert PostId slice to i64 Vec for database operations
+fn post_ids_to_i64(ids: &[PostId]) -> Vec<i64> {
+    ids.iter().map(|id| id.0).collect()
+}
+
+/// Convert i64 slice to PostId Vec for API operations
+fn i64_to_post_ids(ids: &[i64]) -> Vec<PostId> {
+    ids.iter().map(|&id| PostId(id)).collect()
+}
+
+/// Upsert posts to database and collect entity IDs
+fn upsert_posts_and_collect_ids(
+    transaction_manager: &mut impl TransactionManager,
+    db_site: &DbSite,
+    posts: &[AnyPostWithEditContext],
+) -> Result<Vec<EntityId>, FetchError> {
+    let repo = PostRepository::<EditContext>::new();
+    posts
+        .iter()
+        .map(|post| {
+            repo.upsert(transaction_manager, db_site, post)
+                .map_err(|e| FetchError::Database {
+                    err_message: e.to_string(),
+                })
+        })
+        .collect()
+}
 
 /// Service layer for post operations
 ///
@@ -119,20 +170,9 @@ impl PostService {
             .await?;
 
         // Upsert to database and collect entity IDs
-        let entity_ids = self.cache.execute(|conn| {
-            let repo = PostRepository::<EditContext>::new();
-
-            response
-                .data
-                .iter()
-                .map(|post| {
-                    repo.upsert(conn, &self.db_site, post)
-                        .map_err(|e| FetchError::Database {
-                            err_message: e.to_string(),
-                        })
-                })
-                .collect::<Result<Vec<_>, _>>()
-        })?;
+        let entity_ids = self
+            .cache
+            .execute(|conn| upsert_posts_and_collect_ids(conn, &self.db_site, &response.data))?;
 
         Ok(FetchResult {
             entity_ids,
@@ -211,7 +251,7 @@ impl PostService {
     ///
     /// For each post that is currently `Cached`, compares the fetched `modified_gmt`
     /// against the database value. If they differ, the post is marked as `Stale`.
-    fn detect_and_mark_stale_posts(&self, metadata: &[EntityMetadata]) {
+    pub(crate) fn detect_and_mark_stale_posts(&self, metadata: &[EntityMetadata]) {
         // Get IDs of posts that are currently Cached (candidates for staleness check)
         let cached_ids: Vec<PostId> = metadata
             .iter()
@@ -235,7 +275,13 @@ impl PostService {
                 let repo = PostRepository::<EditContext>::new();
                 repo.select_modified_gmt_by_ids(conn, &self.db_site, &cached_ids)
             })
-            .unwrap_or_default();
+            .unwrap_or_else(|e| {
+                log::warn!(
+                    "Failed to query cached modified_gmt values for staleness check: {}",
+                    e
+                );
+                Default::default()
+            });
 
         // Compare and mark stale
         let mut stale_count = 0;
@@ -254,8 +300,8 @@ impl PostService {
         }
 
         if stale_count > 0 {
-            println!(
-                "[PostService] Detected {} stale post(s) via modified_gmt comparison",
+            log::debug!(
+                "Detected {} stale post(s) via modified_gmt comparison",
                 stale_count
             );
         }
@@ -343,8 +389,11 @@ impl PostService {
         self.detect_and_mark_stale_posts(&metadata_result.metadata);
 
         // 3. Fetch missing/stale posts (only for Full strategy)
-        let (fetched_count, failed_count) = match strategy {
-            SyncStrategy::MetadataOnly => (0, 0),
+        let stats = match strategy {
+            SyncStrategy::MetadataOnly => FetchStats {
+                fetched_count: 0,
+                failed_count: 0,
+            },
             SyncStrategy::Full => {
                 self.fetch_missing_and_stale_posts(endpoint_type, &metadata_result.metadata)
                     .await
@@ -361,21 +410,16 @@ impl PostService {
         // Get pagination info from DB
         let pagination = self.metadata_service.get_pagination(key).ok().flatten();
 
-        // Convert DB types to SyncResult types at the boundary:
-        // - current_page: i64 (0 = not loaded) -> Option<u32> (None = not loaded)
-        // - has_more_pages: derived from current_page and total_pages -> Option<bool>
-        let current_page = pagination
-            .as_ref()
-            .and_then(|p| (p.current_page > 0).then_some(p.current_page as u32));
+        let current_page = pagination.as_ref().and_then(|p| p.current_page);
 
         let has_more_pages = pagination.as_ref().and_then(|p| {
-            current_page.and_then(|current| p.total_pages.map(|total| current < total as u32))
+            current_page.and_then(|current| p.total_pages.map(|total| current < total))
         });
 
         Ok(SyncResult::new(
             total_items,
-            fetched_count,
-            failed_count,
+            stats.fetched_count,
+            stats.failed_count,
             has_more_pages,
             current_page,
             metadata_result.total_pages,
@@ -384,12 +428,12 @@ impl PostService {
 
     /// Fetch posts that are missing or stale based on current state.
     ///
-    /// Returns (fetched_count, failed_count).
-    async fn fetch_missing_and_stale_posts(
+    /// Returns statistics about the fetch operation.
+    pub(crate) async fn fetch_missing_and_stale_posts(
         &self,
         endpoint_type: &PostEndpointType,
-        metadata: &[crate::sync::EntityMetadata],
-    ) -> (usize, usize) {
+        metadata: &[EntityMetadata],
+    ) -> FetchStats {
         let ids_to_fetch: Vec<PostId> = metadata
             .iter()
             .filter(|m| {
@@ -403,24 +447,31 @@ impl PostService {
         let mut failed_count = 0;
 
         if !ids_to_fetch.is_empty() {
-            // Batch into chunks of 100
-            for chunk in ids_to_fetch.chunks(100) {
-                if let Err(_e) = self.fetch_posts_by_ids(endpoint_type, chunk.to_vec()).await {
-                    // Count failures - items not marked as Cached are considered failed
-                    failed_count += chunk
-                        .iter()
-                        .filter(|id| {
-                            !matches!(
-                                self.state_store_with_edit_context.get(id.0),
-                                EntityState::Cached
-                            )
-                        })
-                        .count();
+            // Batch into chunks
+            for chunk in ids_to_fetch.chunks(BATCH_FETCH_SIZE) {
+                match self.fetch_posts_by_ids(endpoint_type, chunk.to_vec()).await {
+                    Ok(result) => {
+                        // Accumulate failures reported by fetch_posts_by_ids
+                        failed_count += result.failed_count;
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to fetch {} posts (IDs: {:?}): {}",
+                            chunk.len(),
+                            chunk,
+                            e
+                        );
+                        // Network/DB error - all items in this chunk failed
+                        failed_count += chunk.len();
+                    }
                 }
             }
         }
 
-        (fetched_count, failed_count)
+        FetchStats {
+            fetched_count,
+            failed_count,
+        }
     }
 
     /// Fetch full post data for specific post IDs and save to cache.
@@ -442,29 +493,35 @@ impl PostService {
     /// * `ids` - Post IDs to fetch
     ///
     /// # Returns
-    /// - `Ok(Vec<EntityId>)` with entity IDs of fetched posts
+    /// - `Ok(FetchByIdsResult)` with entity IDs of fetched posts and failure count
     /// - `Err(FetchError)` if network or database error occurs
     ///
     /// # Note
-    /// If `ids` is empty or all IDs are already fetching, returns an empty Vec
+    /// If `ids` is empty or all IDs are already fetching, returns an empty result
     /// without making a network request.
     pub async fn fetch_posts_by_ids(
         &self,
         endpoint_type: &PostEndpointType,
         ids: Vec<PostId>,
-    ) -> Result<Vec<EntityId>, FetchError> {
+    ) -> Result<FetchByIdsResult, FetchError> {
         if ids.is_empty() {
-            return Ok(Vec::new());
+            return Ok(FetchByIdsResult {
+                entity_ids: Vec::new(),
+                failed_count: 0,
+            });
         }
 
         // Convert to raw IDs and filter out already-fetching
-        let raw_ids: Vec<i64> = ids.iter().map(|id| id.0).collect();
+        let raw_ids = post_ids_to_i64(&ids);
         let fetchable = self
             .state_store_with_edit_context
             .filter_fetchable(&raw_ids);
 
         if fetchable.is_empty() {
-            return Ok(Vec::new());
+            return Ok(FetchByIdsResult {
+                entity_ids: Vec::new(),
+                failed_count: 0,
+            });
         }
 
         // Mark as fetching
@@ -472,14 +529,16 @@ impl PostService {
             .set_batch(&fetchable, EntityState::Fetching);
 
         // Convert back to PostId for the API call
-        let post_ids: Vec<PostId> = fetchable.iter().map(|&id| PostId(id)).collect();
+        let post_ids = i64_to_post_ids(&fetchable);
 
         let params = PostListParams {
             include: post_ids,
             // Ensure we get all requested posts regardless of default per_page
-            per_page: Some(100),
-            // Include all statuses - WordPress defaults to 'publish' which would
-            // filter out drafts, pending, etc. when fetching by ID
+            per_page: Some(BATCH_FETCH_SIZE as u32),
+            // UI-level decision: Include posts with these statuses when fetching by ID.
+            // WordPress API defaults to 'publish' only, which would filter out drafts/pending/etc.
+            // We exclude 'trash' status because trashed posts aren't shown in normal post lists
+            // (they have their own separate trash view in WordPress admin).
             status: vec![
                 PostStatus::Publish,
                 PostStatus::Draft,
@@ -498,21 +557,17 @@ impl PostService {
         {
             Ok(response) => {
                 // Upsert to database and collect entity IDs
-                let entity_ids = self.cache.execute(|conn| {
-                    let repo = PostRepository::<EditContext>::new();
-
-                    response
-                        .data
-                        .iter()
-                        .map(|post| {
-                            repo.upsert(conn, &self.db_site, post).map_err(|e| {
-                                FetchError::Database {
-                                    err_message: e.to_string(),
-                                }
-                            })
-                        })
-                        .collect::<Result<Vec<_>, _>>()
-                })?;
+                let entity_ids = match self.cache.execute(|conn| {
+                    upsert_posts_and_collect_ids(conn, &self.db_site, &response.data)
+                }) {
+                    Ok(ids) => ids,
+                    Err(e) => {
+                        // Database upsert failed - mark all as failed to avoid stuck Fetching state
+                        self.state_store_with_edit_context
+                            .set_batch(&fetchable, EntityState::failed(e.to_string()));
+                        return Err(e);
+                    }
+                };
 
                 // Mark successfully fetched posts as Cached
                 let fetched_ids: Vec<i64> = response.data.iter().map(|p| p.id.0).collect();
@@ -520,20 +575,25 @@ impl PostService {
                     .set_batch(&fetched_ids, EntityState::Cached);
 
                 // Mark posts that were requested but not returned as Failed
+                let fetched_set: HashSet<i64> = fetched_ids.iter().copied().collect();
                 let failed_ids: Vec<i64> = fetchable
                     .iter()
-                    .filter(|id| !fetched_ids.contains(id))
+                    .filter(|id| !fetched_set.contains(id))
                     .copied()
                     .collect();
+                let failed_count = failed_ids.len();
                 if !failed_ids.is_empty() {
                     self.state_store_with_edit_context
                         .set_batch(&failed_ids, EntityState::failed("Not found"));
                 }
 
-                Ok(entity_ids)
+                Ok(FetchByIdsResult {
+                    entity_ids,
+                    failed_count,
+                })
             }
             Err(e) => {
-                // Mark all as failed
+                // Network/API error - mark all as failed
                 self.state_store_with_edit_context
                     .set_batch(&fetchable, EntityState::failed(e.to_string()));
                 Err(e.into())
@@ -555,20 +615,6 @@ impl PostService {
     /// across app restarts. Use this for production collections.
     pub fn persistent_metadata_reader(&self) -> Arc<MetadataService> {
         self.metadata_service.clone()
-    }
-
-    /// Get direct access to the metadata service.
-    ///
-    /// Used when you need both read and write access to list metadata.
-    pub fn metadata_service(&self) -> Arc<MetadataService> {
-        self.metadata_service.clone()
-    }
-
-    /// Get the current state for a post (edit context).
-    ///
-    /// Returns `EntityState::Missing` if no state has been recorded.
-    pub fn get_entity_state_with_edit_context(&self, post_id: PostId) -> EntityState {
-        self.state_store_with_edit_context.get(post_id.0)
     }
 
     /// Read posts by IDs from the database cache.
@@ -594,11 +640,10 @@ impl PostService {
 
         self.cache.execute(|connection| {
             ids.iter()
-                .map(|&id| PostId(id))
-                .map(|post_id| repo.select_by_post_id(connection, &self.db_site, post_id))
+                .map(|&id| repo.select_by_post_id(connection, &self.db_site, PostId(id)))
                 .collect::<Result<Vec<_>, _>>()
-                .map(|options| {
-                    options
+                .map(|posts| {
+                    posts
                         .into_iter()
                         .flatten()
                         .map(|db_post| FullEntity::new(db_post.entity_id, db_post.data.post))
@@ -855,6 +900,7 @@ mod tests {
     use rstest::*;
     use rusqlite::Connection;
     use wp_api::posts::PostId;
+    use wp_api::prelude::*;
     use wp_mobile_cache::{
         HookAction, MigrationManager, UpdateHook, WpApiCache,
         db_types::self_hosted_site::SelfHostedSite,
@@ -1111,6 +1157,147 @@ mod tests {
 
         // Assert: Should return 0
         assert_eq!(deleted, 0, "Should return 0 for non-existent post");
+    }
+
+    // ============================================================
+    // State management and sync tests
+    // ============================================================
+
+    #[rstest]
+    fn test_detect_and_mark_stale_posts_ignores_posts_without_modified_gmt_in_metadata(
+        post_service_ctx: PostServiceTestContext,
+    ) {
+        use crate::sync::EntityMetadata;
+
+        // Setup: Insert a post and mark it as Cached
+        let test_post = insert_test_post(&post_service_ctx);
+        post_service_ctx
+            .post_service
+            .state_store_with_edit_context
+            .set(test_post.id.0, crate::sync::EntityState::Cached);
+
+        // Test: Metadata without modified_gmt (None)
+        let metadata = vec![EntityMetadata::new(test_post.id.0, None, None, None)];
+
+        post_service_ctx
+            .post_service
+            .detect_and_mark_stale_posts(&metadata);
+
+        // Assert: Post should still be Cached (staleness check requires modified_gmt)
+        let state = post_service_ctx
+            .post_service
+            .state_store_with_edit_context
+            .get(test_post.id.0);
+        assert!(
+            matches!(state, crate::sync::EntityState::Cached),
+            "Posts without modified_gmt in metadata should remain Cached"
+        );
+    }
+
+    #[rstest]
+    fn test_detect_and_mark_stale_posts_ignores_non_cached_posts(
+        post_service_ctx: PostServiceTestContext,
+    ) {
+        use crate::sync::EntityMetadata;
+
+        // Setup: Insert a post but don't mark it as Cached (it's Missing by default)
+        let test_post = insert_test_post(&post_service_ctx);
+        let modified = "2024-01-01T12:00:00Z"
+            .parse::<wp_api::prelude::WpGmtDateTime>()
+            .expect("Parse should succeed");
+
+        // Test: Metadata with modified_gmt
+        let metadata = vec![EntityMetadata::new(
+            test_post.id.0,
+            Some(modified),
+            None,
+            None,
+        )];
+
+        post_service_ctx
+            .post_service
+            .detect_and_mark_stale_posts(&metadata);
+
+        // Assert: Post should still be Missing (only Cached posts are checked for staleness)
+        let state = post_service_ctx
+            .post_service
+            .state_store_with_edit_context
+            .get(test_post.id.0);
+        assert!(
+            matches!(state, crate::sync::EntityState::Missing),
+            "Non-cached posts should not be marked as Stale"
+        );
+    }
+
+    // State transition tests
+    #[rstest]
+    #[tokio::test]
+    async fn test_fetch_posts_by_ids_marks_all_as_failed_on_network_error() {
+        use crate::testing::{EmptyAppNotifier, MockExecutor};
+        use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
+
+        // Setup: Create service with mock executor that returns network error
+        let mock_executor = Arc::new(MockExecutor::with_execute_fn(|_| {
+            Err(RequestExecutionError::RequestExecutionFailed {
+                status_code: None,
+                redirects: None,
+                reason: RequestExecutionErrorReason::GenericError {
+                    error_message: "Network timeout".to_string(),
+                },
+            })
+        }));
+
+        let api_root_url =
+            Arc::new(ParsedUrl::parse("https://test.local/wp-json").expect("Parse URL"));
+        let api_client = Arc::new(WpApiClient::new(
+            Arc::new(WpOrgSiteApiUrlResolver::new(api_root_url)),
+            WpApiClientDelegate {
+                auth_provider: Arc::new(WpAuthenticationProvider::none()),
+                request_executor: mock_executor,
+                middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+                app_notifier: Arc::new(EmptyAppNotifier),
+            },
+        ));
+
+        let mut conn = Connection::open_in_memory().expect("Create in-memory database");
+        let mut migration_manager = MigrationManager::new(&conn).expect("Create migration manager");
+        migration_manager
+            .perform_migrations()
+            .expect("Migrations succeed");
+
+        let site_repo = SiteRepository;
+        let self_hosted_site = SelfHostedSite {
+            url: "https://test.local".to_string(),
+            api_root: "https://test.local/wp-json".to_string(),
+        };
+        let db_site = site_repo
+            .upsert_self_hosted_site(&mut conn, &self_hosted_site)
+            .expect("Site creation")
+            .db_site;
+
+        let cache = Arc::new(WpApiCache::from(conn));
+        let db_site_arc = Arc::new(db_site);
+        let service = PostService::new(api_client, db_site_arc, cache);
+
+        // Test: Try to fetch posts
+        let result = service
+            .fetch_posts_by_ids(&PostEndpointType::Posts, vec![PostId(1), PostId(2)])
+            .await;
+
+        // Assert: Should return error
+        assert!(result.is_err(), "Network error should return Err");
+
+        // Assert: Posts should be marked as Failed
+        let state1 = service.state_store_with_edit_context.get(1);
+        let state2 = service.state_store_with_edit_context.get(2);
+        assert!(
+            matches!(state1, crate::sync::EntityState::Failed { .. }),
+            "Post 1 should be marked as Failed on network error"
+        );
+        assert!(
+            matches!(state2, crate::sync::EntityState::Failed { .. }),
+            "Post 2 should be marked as Failed on network error"
+        );
     }
 
     /// rstest fixture providing a PostService with in-memory database

@@ -72,8 +72,8 @@ pub struct DbListMetadata {
     pub total_pages: Option<i64>,
     /// Total number of items from API response
     pub total_items: Option<i64>,
-    /// Current page that has been loaded (0 = no pages loaded)
-    pub current_page: i64,
+    /// Current page that has been loaded (None = no pages loaded)
+    pub current_page: Option<i64>,
     /// Items per page
     pub per_page: i64,
     /// ISO 8601 timestamp of when page 1 was last fetched
@@ -165,8 +165,8 @@ pub struct DbListHeaderWithState {
     pub state: ListState,
     /// Error message if state is Error
     pub error_message: Option<String>,
-    /// Current page that has been loaded (0 = no pages loaded)
-    pub current_page: i64,
+    /// Current page that has been loaded (None = no pages loaded)
+    pub current_page: Option<i64>,
     /// Total number of pages from API response
     pub total_pages: Option<i64>,
     /// Total number of items from API response
