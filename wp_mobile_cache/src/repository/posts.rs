@@ -327,15 +327,15 @@ impl<C: PostContext> PostRepository<C> {
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
-        post_ids: &[i64],
-    ) -> Result<HashMap<i64, WpGmtDateTime>, SqliteDbError> {
+        post_ids: &[PostId],
+    ) -> Result<HashMap<PostId, WpGmtDateTime>, SqliteDbError> {
         if post_ids.is_empty() {
             return Ok(HashMap::new());
         }
 
         let ids_str = post_ids
             .iter()
-            .map(|id| id.to_string())
+            .map(|id| id.0.to_string())
             .collect::<Vec<_>>()
             .join(", ");
 
@@ -352,15 +352,16 @@ impl<C: PostContext> PostRepository<C> {
             Ok((id, modified_gmt_str))
         })?;
 
-        let mut result = HashMap::new();
-        for row_result in rows {
-            let (id, modified_gmt_str) = row_result.map_err(SqliteDbError::from)?;
-            if let Ok(modified_gmt) = modified_gmt_str.parse::<WpGmtDateTime>() {
-                result.insert(id, modified_gmt);
-            }
-        }
-
-        Ok(result)
+        Ok(rows
+            .filter_map(|row_result| {
+                row_result.ok().and_then(|(id, modified_gmt_str)| {
+                    modified_gmt_str
+                        .parse::<WpGmtDateTime>()
+                        .ok()
+                        .map(|modified_gmt| (PostId(id), modified_gmt))
+                })
+            })
+            .collect())
     }
 
     /// Delete a post by its EntityId for a given site.

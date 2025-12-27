@@ -33,7 +33,11 @@ crate::wp_mobile_metadata_item!(
 ///
 /// ```ignore
 /// // Create collection
-/// let collection = post_service.create_post_metadata_collection_with_edit_context(params);
+/// let collection = post_service.create_post_metadata_collection_with_edit_context(
+///     endpoint_type,
+///     filter,
+///     20, // per_page
+/// );
 ///
 /// // Initial load - fetches metadata, then syncs missing items
 /// collection.refresh().await?;
@@ -106,7 +110,10 @@ impl PostMetadataCollectionWithEditContext {
     /// will be executed on a background thread. The underlying Rust implementation
     /// is synchronous as rusqlite doesn't support async operations.
     pub async fn load_items(&self) -> Result<Vec<PostMetadataCollectionItem>, CollectionError> {
-        let items = self.core.items();
+        let Some(items) = self.core.items() else {
+            // No metadata loaded yet - return empty list
+            return Ok(Vec::new());
+        };
 
         // Load ALL posts from cache - data availability is independent of EntityState.
         // After app restart, EntityState resets to Missing but data may still be cached.
@@ -218,23 +225,23 @@ impl PostMetadataCollectionWithEditContext {
         let total_pages = self.core.total_pages();
 
         // Check if no pages have been loaded yet (need refresh first)
-        if current_page == 0 {
+        let Some(current_page) = current_page else {
             println!("[PostMetadataCollection] No pages loaded yet, need refresh first");
             return Ok(SyncResult::no_op(
-                self.core.items().len(),
-                true, // has_more_pages = true, but need refresh first
-                0,
+                self.core.items().map(|items| items.len()).unwrap_or(0),
+                Some(true), // has_more_pages = true, but need refresh first
+                None,       // current_page = None (not loaded)
                 None,
             ));
-        }
+        };
 
         // Check if we're already at the last page (early exit for UX)
         if total_pages.is_some_and(|total| current_page >= total) {
             println!("[PostMetadataCollection] Already at last page, nothing to load");
             return Ok(SyncResult::no_op(
-                self.core.items().len(),
-                false,
-                current_page,
+                self.core.items().map(|items| items.len()).unwrap_or(0),
+                Some(false), // has_more_pages = false (on last page)
+                Some(current_page),
                 total_pages,
             ));
         }
@@ -252,13 +259,17 @@ impl PostMetadataCollectionWithEditContext {
             )
             .await?;
 
+        let current_page_str = result
+            .current_page
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "?".to_string());
         let total_pages_str = result
             .total_pages
             .map(|p| p.to_string())
             .unwrap_or_else(|| "?".to_string());
         println!(
             "[PostMetadataCollection] Loaded page {} of {}: {} items total, fetched {}, failed {}",
-            result.current_page,
+            current_page_str,
             total_pages_str,
             result.total_items,
             result.fetched_count,
@@ -278,12 +289,21 @@ impl PostMetadataCollectionWithEditContext {
     }
 
     /// Check if there are more pages to load.
-    pub fn has_more_pages(&self) -> bool {
+    ///
+    /// Returns:
+    /// - `None` - Unknown (no metadata loaded or total_pages not provided by API)
+    /// - `Some(true)` - More pages available
+    /// - `Some(false)` - On last page
+    pub fn has_more_pages(&self) -> Option<bool> {
         self.core.has_more_pages()
     }
 
-    /// Get the current page number (0 = not loaded yet).
-    pub fn current_page(&self) -> u32 {
+    /// Get the current page number.
+    ///
+    /// Returns:
+    /// - `None` - No metadata loaded yet
+    /// - `Some(n)` - Currently on page n
+    pub fn current_page(&self) -> Option<u32> {
         self.core.current_page()
     }
 

@@ -40,10 +40,10 @@ data class PostMetadataCollectionState(
     val hasMorePages: Boolean
         get() = listInfo?.hasMorePages ?: true
 
-    val currentPage: Long
-        get() = listInfo?.currentPage ?: 0L
+    val currentPage: UInt?
+        get() = listInfo?.currentPage
 
-    val totalPages: Long?
+    val totalPages: UInt?
         get() = listInfo?.totalPages
 
     val syncState: ListState
@@ -191,7 +191,7 @@ class PostMetadataCollectionViewModel(
         if (!_state.value.hasMorePages) return
 
         // If no pages have been loaded yet, do a refresh instead
-        if (_state.value.currentPage == 0L) {
+        if (_state.value.currentPage == null) {
             refresh()
             return
         }

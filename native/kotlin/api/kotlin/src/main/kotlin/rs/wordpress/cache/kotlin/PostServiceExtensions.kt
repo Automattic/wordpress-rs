@@ -52,12 +52,14 @@ fun PostService.getObservablePostCollectionWithEditContext(
  *
  * @param endpointType The post endpoint type (Posts, Pages, or Custom)
  * @param filter Filter parameters (status, author, categories, etc.)
+ * @param perPage Number of items to fetch per page (default: 20)
  * @return Observable metadata collection that notifies on database changes
  */
 fun PostService.getObservablePostMetadataCollectionWithEditContext(
     endpointType: PostEndpointType,
-    filter: PostListFilter
+    filter: PostListFilter,
+    perPage: UInt = 20u
 ): ObservableMetadataCollection {
-    val collection = this.createPostMetadataCollectionWithEditContext(endpointType, filter)
+    val collection = this.createPostMetadataCollectionWithEditContext(endpointType, filter, perPage)
     return createObservableMetadataCollection(collection)
 }

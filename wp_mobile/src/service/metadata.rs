@@ -721,10 +721,14 @@ impl ListMetadataReader for MetadataService {
             .map(|db| ListInfo {
                 state: db.state,
                 error_message: db.error_message,
-                current_page: db.current_page,
-                total_pages: db.total_pages,
+                current_page: if db.current_page == 0 {
+                    None
+                } else {
+                    Some(db.current_page as u32)
+                },
+                total_pages: db.total_pages.map(|p| p as u32),
                 total_items: db.total_items,
-                per_page: db.per_page,
+                per_page: db.per_page as u32,
             })
     }
 
@@ -1004,7 +1008,7 @@ mod tests {
             .unwrap();
 
         let info = reader.get_list_info(&key).unwrap();
-        assert_eq!(info.current_page, 1);
+        assert_eq!(info.current_page, Some(1));
         assert_eq!(info.per_page, 20);
         assert_eq!(info.total_pages, Some(5));
         assert_eq!(info.total_items, Some(100));

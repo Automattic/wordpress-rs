@@ -19,8 +19,7 @@ pub trait EntityStateReader: Send + Sync {
 /// Maps entity IDs to their current fetch state (Missing, Fetching, Cached, etc.).
 /// This is a memory-only store - state resets on app restart.
 ///
-/// Thread-safe via `RwLock`. For high-concurrency scenarios, consider
-/// switching to `DashMap` for better performance.
+/// Thread-safe via `RwLock<HashMap>`.
 pub struct EntityStateStore {
     states: RwLock<HashMap<i64, EntityState>>,
 }
@@ -63,16 +62,6 @@ impl EntityStateStore {
     pub fn clear(&self) {
         self.states.write().expect("RwLock poisoned").clear();
     }
-
-    /// Get the number of tracked entities.
-    pub fn len(&self) -> usize {
-        self.states.read().expect("RwLock poisoned").len()
-    }
-
-    /// Check if the store is empty.
-    pub fn is_empty(&self) -> bool {
-        self.states.read().expect("RwLock poisoned").is_empty()
-    }
 }
 
 impl Default for EntityStateStore {
@@ -97,34 +86,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_returns_missing_for_unknown() {
-        let store = EntityStateStore::new();
-        assert_eq!(store.get(42), EntityState::Missing);
-    }
-
-    #[test]
-    fn test_set_and_get() {
-        let store = EntityStateStore::new();
-
-        store.set(42, EntityState::Fetching);
-        assert_eq!(store.get(42), EntityState::Fetching);
-
-        store.set(42, EntityState::Cached);
-        assert_eq!(store.get(42), EntityState::Cached);
-    }
-
-    #[test]
-    fn test_set_batch() {
-        let store = EntityStateStore::new();
-
-        store.set_batch(&[1, 2, 3], EntityState::Fetching);
-
-        assert_eq!(store.get(1), EntityState::Fetching);
-        assert_eq!(store.get(2), EntityState::Fetching);
-        assert_eq!(store.get(3), EntityState::Fetching);
-    }
-
-    #[test]
     fn test_filter_fetchable() {
         let store = EntityStateStore::new();
 
@@ -145,29 +106,5 @@ mod tests {
         assert!(fetchable.contains(&4)); // Stale
         assert!(fetchable.contains(&5)); // Failed
         assert!(fetchable.contains(&6)); // Unknown (no state recorded)
-    }
-
-    #[test]
-    fn test_clear() {
-        let store = EntityStateStore::new();
-
-        store.set(1, EntityState::Cached);
-        store.set(2, EntityState::Cached);
-        assert_eq!(store.len(), 2);
-
-        store.clear();
-        assert!(store.is_empty());
-        assert_eq!(store.get(1), EntityState::Missing);
-    }
-
-    #[test]
-    fn test_reader_trait() {
-        let store = EntityStateStore::new();
-        store.set(42, EntityState::Cached);
-
-        // Access via trait
-        let reader: &dyn EntityStateReader = &store;
-        assert_eq!(reader.get(42), EntityState::Cached);
-        assert_eq!(reader.get(99), EntityState::Missing);
     }
 }

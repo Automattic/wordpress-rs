@@ -400,7 +400,7 @@ fun LoadNextPageCard(
                 ) {
                     Text("Load Next Page")
                 }
-            } else if (state.currentPage > 0L) {
+            } else if (state.currentPage != null) {
                 Text(
                     text = "All pages loaded",
                     style = MaterialTheme.typography.caption,

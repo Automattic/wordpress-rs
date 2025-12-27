@@ -12,11 +12,16 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Check if there are more pages to load.
  *
  * Returns `true` if:
+ * - No metadata loaded yet (assume more)
  * - Total pages is unknown (assume more)
  * - Current page is less than total pages
  */
 val ListInfo.hasMorePages: Boolean
-    get() = totalPages?.let { currentPage < it } ?: true
+    get() {
+        val current = currentPage ?: return true // No pages loaded yet
+        val total = totalPages ?: return true // Total unknown, assume more
+        return current < total
+    }
 
 /**
  * Check if a sync operation is in progress.
@@ -203,7 +208,7 @@ class ObservableMetadataCollection(
      * The returned [ListInfo] contains:
      * - `state`: Current sync state (IDLE, FETCHING_FIRST_PAGE, FETCHING_NEXT_PAGE, ERROR)
      * - `errorMessage`: Error message if state is ERROR
-     * - `currentPage`: Current page number (0 = not loaded yet)
+     * - `currentPage`: Current page number (null = not loaded yet)
      * - `totalPages`: Total pages if known
      * - `totalItems`: Total items if known
      * - `perPage`: Items per page setting

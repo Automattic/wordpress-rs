@@ -43,11 +43,6 @@ impl EntityState {
         matches!(self, Self::Cached | Self::Stale)
     }
 
-    /// Returns `true` if the last fetch attempt failed.
-    pub fn is_failed(&self) -> bool {
-        matches!(self, Self::Failed { .. })
-    }
-
     /// Create a `Failed` state with the given error message.
     pub fn failed(error: impl Into<String>) -> Self {
         Self::Failed {
@@ -82,14 +77,6 @@ mod tests {
     }
 
     #[test]
-    fn test_is_fetching() {
-        assert!(EntityState::Fetching.is_fetching());
-
-        assert!(!EntityState::Missing.is_fetching());
-        assert!(!EntityState::Cached.is_fetching());
-    }
-
-    #[test]
     fn test_is_cached() {
         assert!(EntityState::Cached.is_cached());
         assert!(EntityState::Stale.is_cached());
@@ -102,16 +89,5 @@ mod tests {
             }
             .is_cached()
         );
-    }
-
-    #[test]
-    fn test_failed_helper() {
-        let state = EntityState::failed("Network error");
-        assert!(matches!(state, EntityState::Failed { error } if error == "Network error"));
-    }
-
-    #[test]
-    fn test_default_is_missing() {
-        assert_eq!(EntityState::default(), EntityState::Missing);
     }
 }

@@ -50,6 +50,7 @@ use wp_api::{
 /// let collection = post_service.create_post_metadata_collection_with_edit_context(
 ///     PostEndpointType::Posts,
 ///     filter,
+///     20, // per_page
 /// );
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, uniffi::Record)]

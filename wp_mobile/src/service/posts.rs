@@ -10,7 +10,7 @@ use crate::{
     service::metadata::MetadataService,
     sync::{
         EntityMetadata, EntityState, EntityStateReader, EntityStateStore, MetadataCollectionCore,
-        MetadataFetchResult, SyncResult,
+        MetadataFetchResult, SyncResult, SyncStrategy,
     },
 };
 use std::sync::Arc;
@@ -213,7 +213,7 @@ impl PostService {
     /// against the database value. If they differ, the post is marked as `Stale`.
     fn detect_and_mark_stale_posts(&self, metadata: &[EntityMetadata]) {
         // Get IDs of posts that are currently Cached (candidates for staleness check)
-        let cached_ids: Vec<i64> = metadata
+        let cached_ids: Vec<PostId> = metadata
             .iter()
             .filter(|m| {
                 matches!(
@@ -221,7 +221,7 @@ impl PostService {
                     EntityState::Cached
                 )
             })
-            .map(|m| m.id)
+            .map(|m| PostId(m.id))
             .collect();
 
         if cached_ids.is_empty() {
@@ -239,9 +239,12 @@ impl PostService {
 
         // Compare and mark stale
         let mut stale_count = 0;
-        for m in metadata.iter().filter(|m| cached_ids.contains(&m.id)) {
+        for m in metadata
+            .iter()
+            .filter(|m| cached_ids.contains(&PostId(m.id)))
+        {
             if let Some(fetched_modified) = &m.modified_gmt
-                && let Some(cached_modified) = cached_timestamps.get(&m.id)
+                && let Some(cached_modified) = cached_timestamps.get(&PostId(m.id))
                 && fetched_modified != cached_modified
             {
                 self.state_store_with_edit_context
@@ -261,7 +264,7 @@ impl PostService {
     /// Sync a post list using the default full sync strategy.
     ///
     /// This is a convenience method that calls `sync_list_with_strategy` with
-    /// `SyncStrategy::Full`. See that method for full documentation.
+    /// [`SyncStrategy::Full`]. See that method for full documentation.
     ///
     /// # Arguments
     /// * `key` - Metadata store key (e.g., "site_1:edit:posts:status=publish")
@@ -283,7 +286,7 @@ impl PostService {
             filter,
             per_page,
             is_refresh,
-            super::SyncStrategy::Full,
+            SyncStrategy::Full,
         )
         .await
     }
@@ -292,12 +295,12 @@ impl PostService {
     ///
     /// Orchestrates the sync flow based on the chosen strategy:
     ///
-    /// **`SyncStrategy::MetadataOnly`:**
+    /// **[`SyncStrategy::MetadataOnly`]:**
     /// 1. Fetch list metadata (IDs, modified_gmt, pagination)
     /// 2. Store metadata in database
     /// 3. Detect stale posts (marks them, but doesn't fetch)
     ///
-    /// **`SyncStrategy::Full`:**
+    /// **[`SyncStrategy::Full`]:**
     /// 1. All of MetadataOnly, plus:
     /// 2. Fetch missing/stale post data from the API
     ///
@@ -319,7 +322,7 @@ impl PostService {
         filter: &PostListFilter,
         per_page: u32,
         is_refresh: bool,
-        strategy: super::SyncStrategy,
+        strategy: SyncStrategy,
     ) -> Result<SyncResult, FetchError> {
         // 1. Fetch and store metadata
         let metadata_result = if is_refresh {
@@ -341,8 +344,8 @@ impl PostService {
 
         // 3. Fetch missing/stale posts (only for Full strategy)
         let (fetched_count, failed_count) = match strategy {
-            super::SyncStrategy::MetadataOnly => (0, 0),
-            super::SyncStrategy::Full => {
+            SyncStrategy::MetadataOnly => (0, 0),
+            SyncStrategy::Full => {
                 self.fetch_missing_and_stale_posts(endpoint_type, &metadata_result.metadata)
                     .await
             }
@@ -355,14 +358,19 @@ impl PostService {
             .map(|ids| ids.len())
             .unwrap_or(0);
 
-        let has_more_pages = self.metadata_service.has_more_pages(key).unwrap_or(false);
-        let current_page = self
-            .metadata_service
-            .get_pagination(key)
-            .ok()
-            .flatten()
-            .map(|p| p.current_page as u32)
-            .unwrap_or(1);
+        // Get pagination info from DB
+        let pagination = self.metadata_service.get_pagination(key).ok().flatten();
+
+        // Convert DB types to SyncResult types at the boundary:
+        // - current_page: i64 (0 = not loaded) -> Option<u32> (None = not loaded)
+        // - has_more_pages: derived from current_page and total_pages -> Option<bool>
+        let current_page = pagination
+            .as_ref()
+            .and_then(|p| (p.current_page > 0).then_some(p.current_page as u32));
+
+        let has_more_pages = pagination.as_ref().and_then(|p| {
+            current_page.and_then(|current| p.total_pages.map(|total| current < total as u32))
+        });
 
         Ok(SyncResult::new(
             total_items,
@@ -755,13 +763,15 @@ impl PostService {
     /// # Arguments
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
     /// * `filter` - Filter parameters (status, author, categories, etc.)
+    /// * `per_page` - Number of items per page
     ///
     /// # Example (Kotlin)
     /// ```kotlin
     /// val filter = PostListFilter(status = listOf(PostStatus.DRAFT))
     /// val collection = postService.createPostMetadataCollectionWithEditContext(
     ///     PostEndpointType.POSTS,
-    ///     filter
+    ///     filter,
+    ///     20u
     /// )
     ///
     /// // Initial load - fetches metadata, then syncs missing items
@@ -774,6 +784,7 @@ impl PostService {
         self: &Arc<Self>,
         endpoint_type: PostEndpointType,
         filter: PostListFilter,
+        per_page: u32,
     ) -> PostMetadataCollectionWithEditContext {
         // Generate cache key from filter
         let cache_key = post_list_filter_cache_key(&filter);
@@ -793,6 +804,7 @@ impl PostService {
                 DbTable::TermRelationships,
                 DbTable::ListMetadataItems,
             ],
+            per_page,
         );
 
         PostMetadataCollectionWithEditContext::new(core, self.clone(), endpoint_type, filter)

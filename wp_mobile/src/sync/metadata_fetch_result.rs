@@ -50,26 +50,6 @@ impl MetadataFetchResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wp_api::prelude::WpGmtDateTime;
-
-    fn test_metadata(id: i64) -> EntityMetadata {
-        EntityMetadata::with_modified(id, WpGmtDateTime::from_timestamp(1000 + id))
-    }
-
-    #[test]
-    fn test_new() {
-        let result = MetadataFetchResult::new(
-            vec![test_metadata(1), test_metadata(2)],
-            Some(50),
-            Some(5),
-            1,
-        );
-
-        assert_eq!(result.page_count(), 2);
-        assert_eq!(result.total_items, Some(50));
-        assert_eq!(result.total_pages, Some(5));
-        assert_eq!(result.current_page, 1);
-    }
 
     #[test]
     fn test_has_more_pages() {

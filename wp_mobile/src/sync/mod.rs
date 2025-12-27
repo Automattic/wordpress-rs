@@ -12,6 +12,7 @@
 //! - [`CollectionItem`] - Combines metadata with state
 //! - [`MetadataFetchResult`] - Result of metadata-only fetch
 //! - [`SyncResult`] - Result of sync operation
+//! - [`SyncStrategy`] - Strategy for list sync (MetadataOnly vs Full)
 //!
 //! ## Store Types
 //!
@@ -36,6 +37,7 @@ mod list_metadata_reader;
 mod metadata_collection;
 mod metadata_fetch_result;
 mod sync_result;
+mod sync_strategy;
 
 pub use collection_item::CollectionItem;
 pub use entity_metadata::EntityMetadata;
@@ -45,3 +47,4 @@ pub use list_metadata_reader::{ListInfo, ListMetadataReader};
 pub use metadata_collection::MetadataCollectionCore;
 pub use metadata_fetch_result::MetadataFetchResult;
 pub use sync_result::SyncResult;
+pub use sync_strategy::SyncStrategy;

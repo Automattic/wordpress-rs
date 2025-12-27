@@ -10,14 +10,19 @@ pub struct ListInfo {
     pub state: ListState,
     /// Error message if state is Error
     pub error_message: Option<String>,
-    /// Current page that has been loaded (0 = no pages loaded)
-    pub current_page: i64,
+    /// Current page that has been loaded
+    ///
+    /// `None` means no pages have been loaded yet.
+    #[uniffi(default = None)]
+    pub current_page: Option<u32>,
     /// Total number of pages from API response
-    pub total_pages: Option<i64>,
+    #[uniffi(default = None)]
+    pub total_pages: Option<u32>,
     /// Total number of items from API response
+    #[uniffi(default = None)]
     pub total_items: Option<i64>,
     /// Items per page
-    pub per_page: i64,
+    pub per_page: u32,
 }
 
 /// Read-only access to list metadata.
