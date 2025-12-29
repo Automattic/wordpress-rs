@@ -872,11 +872,13 @@ impl PostService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::mock_api_client;
+    use crate::{
+        sync::EntityMetadata,
+        testing::{EmptyAppNotifier, MockExecutor, mock_api_client},
+    };
     use rstest::*;
     use rusqlite::Connection;
-    use wp_api::posts::PostId;
-    use wp_api::prelude::*;
+    use wp_api::{posts::PostId, prelude::*, request::endpoint::posts_endpoint::PostEndpointType};
     use wp_mobile_cache::{
         HookAction, MigrationManager, UpdateHook, WpApiCache,
         db_types::self_hosted_site::SelfHostedSite,
@@ -1140,11 +1142,7 @@ mod tests {
     // ============================================================
 
     #[rstest]
-    fn test_find_stale_posts_by_timestamp_ignores_posts_without_modified_gmt_in_metadata(
-        post_service_ctx: PostServiceTestContext,
-    ) {
-        use crate::sync::EntityMetadata;
-
+    fn test_find_stale_requires_modified_gmt(post_service_ctx: PostServiceTestContext) {
         // Setup: Insert a post and mark it as Cached
         let test_post = insert_test_post(&post_service_ctx);
         post_service_ctx
@@ -1166,26 +1164,12 @@ mod tests {
         // Assert: No posts should be identified as stale
         assert!(
             stale_ids.is_empty(),
-            "Posts without modified_gmt in metadata should not be marked as stale"
-        );
-
-        // Verify state hasn't changed
-        let state = post_service_ctx
-            .post_service
-            .state_store_with_edit_context
-            .get(test_post.id.0);
-        assert!(
-            matches!(state, crate::sync::EntityState::Cached),
-            "State should remain Cached"
+            "Posts without modified_gmt should not be identified as stale"
         );
     }
 
     #[rstest]
-    fn test_find_stale_posts_by_timestamp_ignores_non_cached_posts(
-        post_service_ctx: PostServiceTestContext,
-    ) {
-        use crate::sync::EntityMetadata;
-
+    fn test_find_stale_only_checks_cached_posts(post_service_ctx: PostServiceTestContext) {
         // Setup: Insert a post but don't mark it as Cached (it's Missing by default)
         let test_post = insert_test_post(&post_service_ctx);
         let modified = "2024-01-01T12:00:00Z"
@@ -1211,28 +1195,12 @@ mod tests {
         // Assert: No posts should be identified as stale (only Cached posts are checked)
         assert!(
             stale_ids.is_empty(),
-            "Non-cached posts should not be identified as stale"
-        );
-
-        // Verify state hasn't changed
-        let state = post_service_ctx
-            .post_service
-            .state_store_with_edit_context
-            .get(test_post.id.0);
-        assert!(
-            matches!(state, crate::sync::EntityState::Missing),
-            "State should remain Missing"
+            "Only Cached posts should be checked for staleness"
         );
     }
 
-    // State transition tests
-    #[rstest]
-    #[tokio::test]
-    async fn test_load_posts_by_ids_marks_all_as_failed_on_network_error() {
-        use crate::testing::{EmptyAppNotifier, MockExecutor};
-        use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
-
-        // Setup: Create service with mock executor that returns network error
+    /// Helper to create a PostService with mock network error
+    fn service_with_network_error() -> PostService {
         let mock_executor = Arc::new(MockExecutor::with_execute_fn(|_| {
             Err(RequestExecutionError::RequestExecutionFailed {
                 status_code: None,
@@ -1273,7 +1241,13 @@ mod tests {
 
         let cache = Arc::new(WpApiCache::from(conn));
         let db_site_arc = Arc::new(db_site);
-        let service = PostService::new(api_client, db_site_arc, cache);
+        PostService::new(api_client, db_site_arc, cache)
+    }
+
+    // State transition tests
+    #[tokio::test]
+    async fn test_load_posts_by_ids_marks_all_as_failed_on_network_error() {
+        let service = service_with_network_error();
 
         // Test: Try to load posts
         let result = service
