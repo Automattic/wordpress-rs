@@ -146,7 +146,7 @@ struct PostMetadataCollectionWithEditContext {
 4. Metadata fetched via `PostService.fetch_posts_metadata()`
 5. Metadata stored in database via `ListMetadataRepository`
 6. Stale posts detected by comparing `modified_gmt`
-7. Missing/stale posts fetched via `PostService.fetch_posts_by_ids()`
+7. Missing/stale posts loaded via `PostService.load_posts_by_ids()`
 8. Entity states updated in `EntityStateStore`
 9. Database update hooks fire, UI observers notified
 

@@ -126,9 +126,9 @@ impl PostService {
         }
     }
 
-    /// Fetch posts from network and save to cache
+    /// Sync a page of posts from network to cache.
     ///
-    /// This is the core networking primitive. It:
+    /// Fetches full post data from the API and saves it to the database:
     /// 1. Converts filter to API parameters
     /// 2. Makes network request via WpApiClient
     /// 3. Upserts posts to database via repository
@@ -140,18 +140,12 @@ impl PostService {
     /// * `per_page` - Number of posts per page
     ///
     /// # Returns
-    /// - `Ok(FetchResult)` with entity IDs of fetched posts
+    /// - `Ok(FetchResult)` with entity IDs of saved posts
     /// - `Err(FetchError)` if network or database error occurs
     ///
     /// # Database Updates
-    /// Successful fetch triggers database update hooks, which notify
-    /// any observers watching the relevant tables.
-    ///
-    /// # Note
-    /// This is an async function because network operations are async.
-    /// Platform-specific wrappers (Kotlin/Swift) will need to handle
-    /// the async bridge.
-    pub async fn fetch_posts_page(
+    /// Triggers database update hooks which notify observers watching the relevant tables.
+    pub async fn sync_posts_page(
         &self,
         filter: &AnyPostFilter,
         page: u32,
@@ -182,25 +176,11 @@ impl PostService {
         })
     }
 
-    /// Fetch only metadata (id + modified_gmt) for a page of posts.
+    /// Fetch lightweight metadata (id, modified_gmt, parent, menu_order) for a page of posts.
     ///
-    /// This is a lightweight fetch that returns just enough information to:
-    /// 1. Define list structure (order and IDs)
-    /// 2. Determine which posts need full fetching (missing or stale)
-    ///
-    /// Unlike `fetch_posts_page`, this does NOT upsert to the database.
-    /// The metadata is used transiently to drive selective sync.
-    ///
-    /// # Arguments
-    /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
-    /// * `filter` - Filter parameters (pagination is provided separately)
-    /// * `page` - Page number to fetch (1-indexed)
-    /// * `per_page` - Number of posts per page
-    ///
-    /// # Returns
-    /// - `Ok(MetadataFetchResult)` with post IDs and modification times
-    /// - `Err(FetchError)` if network error occurs
-    pub async fn fetch_posts_metadata(
+    /// Returns only the minimal fields needed to determine list structure and staleness.
+    /// Does not fetch or save full post content.
+    pub(crate) async fn fetch_posts_metadata(
         &self,
         endpoint_type: &PostEndpointType,
         filter: &PostListFilter,
@@ -449,14 +429,14 @@ impl PostService {
         if !ids_to_fetch.is_empty() {
             // Batch into chunks
             for chunk in ids_to_fetch.chunks(BATCH_FETCH_SIZE) {
-                match self.fetch_posts_by_ids(endpoint_type, chunk.to_vec()).await {
+                match self.load_posts_by_ids(endpoint_type, chunk.to_vec()).await {
                     Ok(result) => {
-                        // Accumulate failures reported by fetch_posts_by_ids
+                        // Accumulate failures reported by load_posts_by_ids
                         failed_count += result.failed_count;
                     }
                     Err(e) => {
                         log::warn!(
-                            "Failed to fetch {} posts (IDs: {:?}): {}",
+                            "Failed to load {} posts (IDs: {:?}): {}",
                             chunk.len(),
                             chunk,
                             e
@@ -474,32 +454,30 @@ impl PostService {
         }
     }
 
-    /// Fetch full post data for specific post IDs and save to cache.
+    /// Load posts by IDs from network to cache with state tracking.
     ///
-    /// This is used for selective sync - fetching only the posts that are
-    /// missing or stale in the cache. Uses the `include` parameter to batch
-    /// multiple posts in a single request.
+    /// Fetches posts from the API, saves them to the database, and manages entity state.
+    /// Used for selective sync to load only missing or stale posts.
     ///
-    /// # State Tracking
+    /// # State Management
     ///
-    /// This method updates the entity state store:
-    /// 1. Filters out IDs that are already `Fetching` (prevents duplicate requests)
-    /// 2. Sets remaining IDs to `Fetching` before the API call
+    /// Tracks entity lifecycle through state store:
+    /// 1. Filters out IDs already `Fetching` (prevents duplicate requests)
+    /// 2. Sets remaining IDs to `Fetching` before API call
     /// 3. On success: Sets fetched posts to `Cached`, missing posts to `Failed`
     /// 4. On error: Sets all requested posts to `Failed`
     ///
     /// # Arguments
     /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
-    /// * `ids` - Post IDs to fetch
+    /// * `ids` - Post IDs to load
     ///
     /// # Returns
-    /// - `Ok(FetchByIdsResult)` with entity IDs of fetched posts and failure count
+    /// - `Ok(FetchByIdsResult)` with entity IDs of loaded posts and failure count
     /// - `Err(FetchError)` if network or database error occurs
     ///
     /// # Note
-    /// If `ids` is empty or all IDs are already fetching, returns an empty result
-    /// without making a network request.
-    pub async fn fetch_posts_by_ids(
+    /// Returns empty result without network request if `ids` is empty or all IDs are already fetching.
+    pub async fn load_posts_by_ids(
         &self,
         endpoint_type: &PostEndpointType,
         ids: Vec<PostId>,
@@ -1232,7 +1210,7 @@ mod tests {
     // State transition tests
     #[rstest]
     #[tokio::test]
-    async fn test_fetch_posts_by_ids_marks_all_as_failed_on_network_error() {
+    async fn test_load_posts_by_ids_marks_all_as_failed_on_network_error() {
         use crate::testing::{EmptyAppNotifier, MockExecutor};
         use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 
@@ -1279,9 +1257,9 @@ mod tests {
         let db_site_arc = Arc::new(db_site);
         let service = PostService::new(api_client, db_site_arc, cache);
 
-        // Test: Try to fetch posts
+        // Test: Try to load posts
         let result = service
-            .fetch_posts_by_ids(&PostEndpointType::Posts, vec![PostId(1), PostId(2)])
+            .load_posts_by_ids(&PostEndpointType::Posts, vec![PostId(1), PostId(2)])
             .await;
 
         // Assert: Should return error

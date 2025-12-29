@@ -346,11 +346,11 @@ pub async fn sync_post_list(...) -> Result<SyncResult, FetchError> {
             |page, per_page| self.fetch_posts_metadata(...)).await?
     };
 
-    // Entity-specific: detect stale and fetch full posts
+    // Entity-specific: detect stale and load full posts
     self.detect_and_mark_stale_posts(&metadata_result.metadata);
 
     let ids_to_fetch = ...;  // filter missing/stale
-    self.fetch_posts_by_ids(...).await?;
+    self.load_posts_by_ids(...).await?;
 
     Ok(SyncResult::new(...))
 }
