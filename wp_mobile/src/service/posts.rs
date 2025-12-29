@@ -28,7 +28,7 @@ use wp_mobile_cache::{
     db_types::db_site::DbSite,
     entity::{Entity, EntityId, FullEntity},
     list_metadata::ListKey,
-    repository::{TransactionManager, posts::PostRepository},
+    repository::posts::PostRepository,
 };
 
 /// Maximum number of posts to fetch in a single batch request
@@ -50,36 +50,6 @@ pub(crate) struct FetchStats {
     pub(crate) fetched_count: usize,
     /// Number of posts that failed to fetch
     pub(crate) failed_count: usize,
-}
-
-// Internal helpers
-
-/// Convert PostId slice to i64 Vec for database operations
-fn post_ids_to_i64(ids: &[PostId]) -> Vec<i64> {
-    ids.iter().map(|id| id.0).collect()
-}
-
-/// Convert i64 slice to PostId Vec for API operations
-fn i64_to_post_ids(ids: &[i64]) -> Vec<PostId> {
-    ids.iter().map(|&id| PostId(id)).collect()
-}
-
-/// Upsert posts to database and collect entity IDs
-fn upsert_posts_and_collect_ids(
-    transaction_manager: &mut impl TransactionManager,
-    db_site: &DbSite,
-    posts: &[AnyPostWithEditContext],
-) -> Result<Vec<EntityId>, FetchError> {
-    let repo = PostRepository::<EditContext>::new();
-    posts
-        .iter()
-        .map(|post| {
-            repo.upsert(transaction_manager, db_site, post)
-                .map_err(|e| FetchError::Database {
-                    err_message: e.to_string(),
-                })
-        })
-        .collect()
 }
 
 /// Service layer for post operations
@@ -164,9 +134,19 @@ impl PostService {
             .await?;
 
         // Upsert to database and collect entity IDs
-        let entity_ids = self
-            .cache
-            .execute(|conn| upsert_posts_and_collect_ids(conn, &self.db_site, &response.data))?;
+        let entity_ids = self.cache.execute(|conn| {
+            let repo = PostRepository::<EditContext>::new();
+            response
+                .data
+                .iter()
+                .map(|post| {
+                    repo.upsert(conn, &self.db_site, post)
+                        .map_err(|e| FetchError::Database {
+                            err_message: e.to_string(),
+                        })
+                })
+                .collect::<Result<Vec<EntityId>, FetchError>>()
+        })?;
 
         Ok(FetchResult {
             entity_ids,
@@ -497,7 +477,7 @@ impl PostService {
         }
 
         // Convert to raw IDs and filter out already-fetching
-        let raw_ids = post_ids_to_i64(&ids);
+        let raw_ids: Vec<i64> = ids.iter().map(|id| id.0).collect();
         let fetchable = self
             .state_store_with_edit_context
             .filter_fetchable(&raw_ids);
@@ -514,7 +494,7 @@ impl PostService {
             .set_batch(&fetchable, EntityState::Fetching);
 
         // Convert back to PostId for the API call
-        let post_ids = i64_to_post_ids(&fetchable);
+        let post_ids: Vec<PostId> = fetchable.iter().map(|&id| PostId(id)).collect();
 
         let params = PostListParams {
             include: post_ids,
@@ -543,7 +523,18 @@ impl PostService {
             Ok(response) => {
                 // Upsert to database and collect entity IDs
                 let entity_ids = match self.cache.execute(|conn| {
-                    upsert_posts_and_collect_ids(conn, &self.db_site, &response.data)
+                    let repo = PostRepository::<EditContext>::new();
+                    response
+                        .data
+                        .iter()
+                        .map(|post| {
+                            repo.upsert(conn, &self.db_site, post).map_err(|e| {
+                                FetchError::Database {
+                                    err_message: e.to_string(),
+                                }
+                            })
+                        })
+                        .collect::<Result<Vec<EntityId>, FetchError>>()
                 }) {
                     Ok(ids) => ids,
                     Err(e) => {
