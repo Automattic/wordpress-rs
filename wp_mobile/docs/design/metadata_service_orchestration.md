@@ -107,7 +107,8 @@ impl PostService {
         };
 
         // Entity-specific post-processing (not part of metadata layer)
-        self.detect_and_mark_stale_posts(&result.metadata);
+        let stale_ids = self.find_stale_posts_by_timestamp(&result.metadata, ...);
+        self.state_store.set_batch(&stale_ids, EntityState::Stale);
 
         Ok(result)
     }
@@ -347,7 +348,8 @@ pub async fn sync_post_list(...) -> Result<SyncResult, FetchError> {
     };
 
     // Entity-specific: detect stale and load full posts
-    self.detect_and_mark_stale_posts(&metadata_result.metadata);
+    let stale_ids = self.find_stale_posts_by_timestamp(&metadata_result.metadata, ...);
+    self.state_store.set_batch(&stale_ids, EntityState::Stale);
 
     let ids_to_fetch = ...;  // filter missing/stale
     self.load_posts_by_ids(...).await?;

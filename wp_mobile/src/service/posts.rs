@@ -227,28 +227,30 @@ impl PostService {
         ))
     }
 
-    /// Compare fetched metadata against cached posts and mark stale ones.
+    /// Find stale posts by comparing fetched metadata timestamps with cached DB values.
     ///
-    /// For each post that is currently `Cached`, compares the fetched `modified_gmt`
-    /// against the database value. If they differ, the post is marked as `Stale`.
-    pub(crate) fn detect_and_mark_stale_posts(&self, metadata: &[EntityMetadata]) {
-        // Get IDs of posts that are currently Cached (candidates for staleness check)
+    /// A post is considered stale if:
+    /// 1. It's currently in `Cached` state in the state store
+    /// 2. Its fetched `modified_gmt` differs from the cached `modified_gmt` in the database
+    ///
+    /// Returns empty vector if no stale posts found or if DB query fails.
+    pub(crate) fn find_stale_posts_by_timestamp(
+        &self,
+        metadata: &[EntityMetadata],
+        state_reader: &dyn EntityStateReader,
+    ) -> Vec<i64> {
+        // Filter to only posts currently in Cached state
         let cached_ids: Vec<PostId> = metadata
             .iter()
-            .filter(|m| {
-                matches!(
-                    self.state_store_with_edit_context.get(m.id),
-                    EntityState::Cached
-                )
-            })
+            .filter(|m| matches!(state_reader.get(m.id), EntityState::Cached))
             .map(|m| PostId(m.id))
             .collect();
 
         if cached_ids.is_empty() {
-            return;
+            return Vec::new();
         }
 
-        // Query database for cached modified_gmt values
+        // Query database for cached timestamps
         let cached_timestamps = self
             .cache
             .execute(|conn| {
@@ -257,34 +259,26 @@ impl PostService {
             })
             .unwrap_or_else(|e| {
                 log::warn!(
-                    "Failed to query cached modified_gmt values for staleness check: {}",
+                    "Failed to query cached timestamps for staleness check: {}",
                     e
                 );
                 Default::default()
             });
 
-        // Compare and mark stale
-        let mut stale_count = 0;
-        for m in metadata
+        // Compare timestamps and collect stale IDs
+        metadata
             .iter()
-            .filter(|m| cached_ids.contains(&PostId(m.id)))
-        {
-            if let Some(fetched_modified) = &m.modified_gmt
-                && let Some(cached_modified) = cached_timestamps.get(&PostId(m.id))
-                && fetched_modified != cached_modified
-            {
-                self.state_store_with_edit_context
-                    .set(m.id, EntityState::Stale);
-                stale_count += 1;
-            }
-        }
-
-        if stale_count > 0 {
-            log::debug!(
-                "Detected {} stale post(s) via modified_gmt comparison",
-                stale_count
-            );
-        }
+            .filter_map(|m| {
+                if let Some(fetched_modified) = &m.modified_gmt
+                    && let Some(cached_modified) = cached_timestamps.get(&PostId(m.id))
+                    && fetched_modified != cached_modified
+                {
+                    Some(m.id)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Sync a post list using the default full sync strategy.
@@ -365,8 +359,21 @@ impl PostService {
                 .await?
         };
 
-        // 2. Detect stale posts (always done - marks state but doesn't fetch)
-        self.detect_and_mark_stale_posts(&metadata_result.metadata);
+        // 2. Detect and mark stale posts (always done - doesn't fetch)
+        let stale_ids = self.find_stale_posts_by_timestamp(
+            &metadata_result.metadata,
+            self.state_reader_with_edit_context().as_ref(),
+        );
+
+        if !stale_ids.is_empty() {
+            log::debug!(
+                "Found {} stale post(s) via modified_gmt comparison",
+                stale_ids.len()
+            );
+            // Mark them as stale in state store
+            self.state_store_with_edit_context
+                .set_batch(&stale_ids, EntityState::Stale);
+        }
 
         // 3. Fetch missing/stale posts (only for Full strategy)
         let stats = match strategy {
@@ -1142,7 +1149,7 @@ mod tests {
     // ============================================================
 
     #[rstest]
-    fn test_detect_and_mark_stale_posts_ignores_posts_without_modified_gmt_in_metadata(
+    fn test_find_stale_posts_by_timestamp_ignores_posts_without_modified_gmt_in_metadata(
         post_service_ctx: PostServiceTestContext,
     ) {
         use crate::sync::EntityMetadata;
@@ -1157,23 +1164,33 @@ mod tests {
         // Test: Metadata without modified_gmt (None)
         let metadata = vec![EntityMetadata::new(test_post.id.0, None, None, None)];
 
-        post_service_ctx
-            .post_service
-            .detect_and_mark_stale_posts(&metadata);
+        let stale_ids = post_service_ctx.post_service.find_stale_posts_by_timestamp(
+            &metadata,
+            post_service_ctx
+                .post_service
+                .state_reader_with_edit_context()
+                .as_ref(),
+        );
 
-        // Assert: Post should still be Cached (staleness check requires modified_gmt)
+        // Assert: No posts should be identified as stale
+        assert!(
+            stale_ids.is_empty(),
+            "Posts without modified_gmt in metadata should not be marked as stale"
+        );
+
+        // Verify state hasn't changed
         let state = post_service_ctx
             .post_service
             .state_store_with_edit_context
             .get(test_post.id.0);
         assert!(
             matches!(state, crate::sync::EntityState::Cached),
-            "Posts without modified_gmt in metadata should remain Cached"
+            "State should remain Cached"
         );
     }
 
     #[rstest]
-    fn test_detect_and_mark_stale_posts_ignores_non_cached_posts(
+    fn test_find_stale_posts_by_timestamp_ignores_non_cached_posts(
         post_service_ctx: PostServiceTestContext,
     ) {
         use crate::sync::EntityMetadata;
@@ -1192,18 +1209,28 @@ mod tests {
             None,
         )];
 
-        post_service_ctx
-            .post_service
-            .detect_and_mark_stale_posts(&metadata);
+        let stale_ids = post_service_ctx.post_service.find_stale_posts_by_timestamp(
+            &metadata,
+            post_service_ctx
+                .post_service
+                .state_reader_with_edit_context()
+                .as_ref(),
+        );
 
-        // Assert: Post should still be Missing (only Cached posts are checked for staleness)
+        // Assert: No posts should be identified as stale (only Cached posts are checked)
+        assert!(
+            stale_ids.is_empty(),
+            "Non-cached posts should not be identified as stale"
+        );
+
+        // Verify state hasn't changed
         let state = post_service_ctx
             .post_service
             .state_store_with_edit_context
             .get(test_post.id.0);
         assert!(
             matches!(state, crate::sync::EntityState::Missing),
-            "Non-cached posts should not be marked as Stale"
+            "State should remain Missing"
         );
     }
 
