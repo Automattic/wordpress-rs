@@ -20,23 +20,6 @@ use super::WpServiceError;
 const FIRST_PAGE: i64 = 1;
 
 // ============================================================
-// Internal helpers
-// ============================================================
-
-/// Convert EntityMetadata slice to ListMetadataItemInput for database storage.
-fn to_list_metadata_items(metadata: &[EntityMetadata]) -> Vec<ListMetadataItemInput> {
-    metadata
-        .iter()
-        .map(|m| ListMetadataItemInput {
-            entity_id: m.id,
-            modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
-            parent: m.parent,
-            menu_order: m.menu_order,
-        })
-        .collect()
-}
-
-// ============================================================
 // Internal types for workflow orchestration
 // ============================================================
 
@@ -361,7 +344,17 @@ impl MetadataService {
         )?;
 
         // 3. Store metadata (replacing existing)
-        let items = to_list_metadata_items(&result.metadata);
+        // Convert domain EntityMetadata to database ListMetadataItemInput
+        let items: Vec<ListMetadataItemInput> = result
+            .metadata
+            .iter()
+            .map(|m| ListMetadataItemInput {
+                entity_id: m.id,
+                modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
+                parent: m.parent,
+                menu_order: m.menu_order,
+            })
+            .collect();
 
         self.execute_with_error_handling(
             info.list_metadata_id,
@@ -493,7 +486,17 @@ impl MetadataService {
         }
 
         // 4. Append metadata to existing items
-        let items = to_list_metadata_items(&result.metadata);
+        // Convert domain EntityMetadata to database ListMetadataItemInput
+        let items: Vec<ListMetadataItemInput> = result
+            .metadata
+            .iter()
+            .map(|m| ListMetadataItemInput {
+                entity_id: m.id,
+                modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
+                parent: m.parent,
+                menu_order: m.menu_order,
+            })
+            .collect();
 
         self.execute_with_error_handling(
             list_metadata_id,
