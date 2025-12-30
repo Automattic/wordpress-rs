@@ -160,13 +160,13 @@ class ObservableMetadataCollection(
      * Each item's `state` is a [PostItemState] sealed class that encodes both
      * sync status and data availability:
      *
-     * - [PostItemState.Cached]: Fresh data, no fetch needed
-     * - [PostItemState.Stale]: Outdated data, could benefit from refresh
-     * - [PostItemState.FetchingWithData]: Refresh in progress, showing cached data
-     * - [PostItemState.FailedWithData]: Fetch failed, showing last known data
-     * - [PostItemState.Missing]: Needs fetch, no cached data
-     * - [PostItemState.Fetching]: Fetch in progress, no cached data
-     * - [PostItemState.Failed]: Fetch failed, no cached data
+     * - `Cached`: Fresh data, no fetch needed
+     * - `Stale`: Outdated data, could benefit from refresh
+     * - `FetchingWithData`: Refresh in progress, showing cached data
+     * - `FailedWithData`: Fetch failed, showing last known data
+     * - `Missing`: Needs fetch, no cached data
+     * - `Fetching`: Fetch in progress, no cached data
+     * - `Failed`: Fetch failed, no cached data
      *
      * This is a suspend function that reads from cache on a background thread.
      */
