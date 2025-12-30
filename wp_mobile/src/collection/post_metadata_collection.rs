@@ -7,10 +7,10 @@ use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_mobile_cache::{UpdateHook, entity::FullEntity};
 
 use crate::{
-    collection::{CollectionError, FetchError},
+    collection::{CollectionError, FetchError, MetadataCollectionCore},
     filters::PostListFilter,
     service::posts::PostService,
-    sync::{EntityState, ListInfo, MetadataCollectionCore, SyncResult},
+    sync::{EntityState, ListInfo, SyncResult},
 };
 
 // Generate PostItemState enum and PostMetadataCollectionItem struct using the macro

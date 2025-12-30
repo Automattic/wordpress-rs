@@ -3,14 +3,14 @@ use crate::{
     PostCollectionWithEditContext,
     cache_key::{endpoint_type_cache_key, post_list_filter_cache_key},
     collection::{
-        FetchError, FetchResult, PostMetadataCollectionWithEditContext, StatelessCollection,
-        post_collection::PostCollection,
+        FetchError, FetchResult, MetadataCollectionCore, PostMetadataCollectionWithEditContext,
+        StatelessCollection, post_collection::PostCollection,
     },
     filters::{AnyPostFilter, PostListFilter},
     service::metadata::MetadataService,
     sync::{
-        EntityMetadata, EntityState, EntityStateReader, EntityStateStore, MetadataCollectionCore,
-        MetadataFetchResult, SyncResult, SyncStrategy,
+        EntityMetadata, EntityState, EntityStateReader, EntityStateStore, MetadataFetchResult,
+        SyncResult, SyncStrategy,
     },
 };
 use std::{collections::HashSet, sync::Arc};

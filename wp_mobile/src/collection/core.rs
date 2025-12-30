@@ -4,7 +4,7 @@ use wp_mobile_cache::{
     list_metadata::{ListKey, ListState},
 };
 
-use super::{CollectionItem, EntityStateReader, ListInfo, ListMetadataReader};
+use crate::sync::{CollectionItem, EntityStateReader, ListInfo, ListMetadataReader};
 
 /// Core collection infrastructure for metadata-first fetching.
 ///
@@ -216,10 +216,13 @@ impl MetadataCollectionCore {
     ///     service.sync_list(core.key(), &endpoint, &filter, core.per_page(), false).await
     /// }).await?;
     /// ```
-    pub async fn load_next_page_with<F, Fut, E>(&self, fetch_fn: F) -> Result<super::SyncResult, E>
+    pub async fn load_next_page_with<F, Fut, E>(
+        &self,
+        fetch_fn: F,
+    ) -> Result<crate::sync::SyncResult, E>
     where
         F: FnOnce() -> Fut,
-        Fut: std::future::Future<Output = Result<super::SyncResult, E>>,
+        Fut: std::future::Future<Output = Result<crate::sync::SyncResult, E>>,
     {
         let current_page = self.current_page();
         let total_pages = self.total_pages();
@@ -227,7 +230,7 @@ impl MetadataCollectionCore {
         // Check if no pages have been loaded yet (need refresh first)
         let Some(current_page) = current_page else {
             log::debug!("MetadataCollection: No pages loaded yet, need refresh first");
-            return Ok(super::SyncResult::no_op(
+            return Ok(crate::sync::SyncResult::no_op(
                 self.items().map(|items| items.len()).unwrap_or(0),
                 Some(true), // has_more_pages = true, but need refresh first
                 None,       // current_page = None (not loaded)
@@ -238,7 +241,7 @@ impl MetadataCollectionCore {
         // Check if we're already at the last page (early exit for UX)
         if total_pages.is_some_and(|total| current_page >= total) {
             log::debug!("MetadataCollection: Already at last page, nothing to load");
-            return Ok(super::SyncResult::no_op(
+            return Ok(crate::sync::SyncResult::no_op(
                 self.items().map(|items| items.len()).unwrap_or(0),
                 Some(false), // has_more_pages = false (on last page)
                 Some(current_page),
