@@ -191,4 +191,64 @@ impl MetadataCollectionCore {
     pub fn total_items(&self) -> Option<i64> {
         self.list_info().and_then(|info| info.total_items)
     }
+
+    /// Load the next page using a closure-based orchestrator pattern.
+    ///
+    /// This method handles all common pagination logic:
+    /// 1. Checks if any pages have been loaded (returns no-op if refresh needed)
+    /// 2. Checks if already at last page (returns no-op if done)
+    /// 3. Delegates to the provided fetch function if checks pass
+    ///
+    /// The fetch function should perform the actual network request and return
+    /// a `SyncResult`. The core orchestrates the pagination flow.
+    ///
+    /// # Arguments
+    /// * `fetch_fn` - Async closure that performs the fetch operation
+    ///
+    /// # Returns
+    /// * `Ok(SyncResult::no_op(...))` - If no fetch needed (not refreshed or on last page)
+    /// * `Ok(SyncResult)` - Result from the fetch operation
+    /// * `Err(E)` - Error from the fetch operation
+    ///
+    /// # Example
+    /// ```ignore
+    /// let result = core.load_next_page_with(|| async {
+    ///     service.sync_list(core.key(), &endpoint, &filter, core.per_page(), false).await
+    /// }).await?;
+    /// ```
+    pub async fn load_next_page_with<F, Fut, E>(&self, fetch_fn: F) -> Result<super::SyncResult, E>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<super::SyncResult, E>>,
+    {
+        let current_page = self.current_page();
+        let total_pages = self.total_pages();
+
+        // Check if no pages have been loaded yet (need refresh first)
+        let Some(current_page) = current_page else {
+            log::debug!("MetadataCollection: No pages loaded yet, need refresh first");
+            return Ok(super::SyncResult::no_op(
+                self.items().map(|items| items.len()).unwrap_or(0),
+                Some(true), // has_more_pages = true, but need refresh first
+                None,       // current_page = None (not loaded)
+                None,       // total_pages = None
+            ));
+        };
+
+        // Check if we're already at the last page (early exit for UX)
+        if total_pages.is_some_and(|total| current_page >= total) {
+            log::debug!("MetadataCollection: Already at last page, nothing to load");
+            return Ok(super::SyncResult::no_op(
+                self.items().map(|items| items.len()).unwrap_or(0),
+                Some(false), // has_more_pages = false (on last page)
+                Some(current_page),
+                total_pages,
+            ));
+        }
+
+        log::debug!("MetadataCollection: Loading next page");
+
+        // All checks passed, delegate to the fetch function
+        fetch_fn().await
+    }
 }

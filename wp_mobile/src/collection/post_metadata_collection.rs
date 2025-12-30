@@ -67,15 +67,21 @@ impl From<(EntityState, Option<crate::FullEntityAnyPostWithEditContext>)> for Po
     }
 }
 
-impl From<(crate::sync::CollectionItem, Option<crate::FullEntityAnyPostWithEditContext>)>
-    for PostMetadataCollectionItem
+impl
+    From<(
+        crate::sync::CollectionItem,
+        Option<crate::FullEntityAnyPostWithEditContext>,
+    )> for PostMetadataCollectionItem
 {
     /// Convert CollectionItem + optional cached data into PostMetadataCollectionItem.
     ///
     /// Extracts metadata fields (id, parent, menu_order) and converts the state+data
     /// into a type-safe PostItemState.
     fn from(
-        (item, data): (crate::sync::CollectionItem, Option<crate::FullEntityAnyPostWithEditContext>),
+        (item, data): (
+            crate::sync::CollectionItem,
+            Option<crate::FullEntityAnyPostWithEditContext>,
+        ),
     ) -> Self {
         PostMetadataCollectionItem {
             id: item.id(),
@@ -235,7 +241,10 @@ impl PostMetadataCollectionWithEditContext {
         log::debug!(
             "PostMetadataCollection: Refreshed {} items, page 1 of {}, fetched {}, failed {}",
             result.total_items,
-            result.total_pages.map(|p| p.to_string()).unwrap_or_else(|| "?".to_string()),
+            result
+                .total_pages
+                .map(|p| p.to_string())
+                .unwrap_or_else(|| "?".to_string()),
             result.fetched_count,
             result.failed_count
         );
@@ -252,54 +261,38 @@ impl PostMetadataCollectionWithEditContext {
     ///
     /// Returns `SyncResult::no_op()` if already on the last page.
     pub async fn load_next_page(&self) -> Result<SyncResult, FetchError> {
-        let current_page = self.core.current_page();
-        let total_pages = self.core.total_pages();
+        // Delegate pagination logic to core orchestrator
+        self.core
+            .load_next_page_with(|| async {
+                let result = self
+                    .service
+                    .sync_list(
+                        self.core.key(),
+                        &self.endpoint_type,
+                        &self.filter,
+                        self.core.per_page(),
+                        false,
+                    )
+                    .await?;
 
-        // Check if no pages have been loaded yet (need refresh first)
-        let Some(current_page) = current_page else {
-            log::debug!("PostMetadataCollection: No pages loaded yet, need refresh first");
-            return Ok(SyncResult::no_op(
-                self.core.items().map(|items| items.len()).unwrap_or(0),
-                Some(true), // has_more_pages = true, but need refresh first
-                None,       // current_page = None (not loaded)
-                None,
-            ));
-        };
+                log::debug!(
+                    "PostMetadataCollection: Loaded page {} of {}: {} items total, fetched {}, failed {}",
+                    result
+                        .current_page
+                        .map(|p| p.to_string())
+                        .unwrap_or_else(|| "?".to_string()),
+                    result
+                        .total_pages
+                        .map(|p| p.to_string())
+                        .unwrap_or_else(|| "?".to_string()),
+                    result.total_items,
+                    result.fetched_count,
+                    result.failed_count
+                );
 
-        // Check if we're already at the last page (early exit for UX)
-        if total_pages.is_some_and(|total| current_page >= total) {
-            log::debug!("PostMetadataCollection: Already at last page, nothing to load");
-            return Ok(SyncResult::no_op(
-                self.core.items().map(|items| items.len()).unwrap_or(0),
-                Some(false), // has_more_pages = false (on last page)
-                Some(current_page),
-                total_pages,
-            ));
-        }
-
-        log::debug!("PostMetadataCollection: Loading next page");
-
-        let result = self
-            .service
-            .sync_list(
-                self.core.key(),
-                &self.endpoint_type,
-                &self.filter,
-                self.core.per_page(),
-                false,
-            )
-            .await?;
-
-        log::debug!(
-            "PostMetadataCollection: Loaded page {} of {}: {} items total, fetched {}, failed {}",
-            result.current_page.map(|p| p.to_string()).unwrap_or_else(|| "?".to_string()),
-            result.total_pages.map(|p| p.to_string()).unwrap_or_else(|| "?".to_string()),
-            result.total_items,
-            result.fetched_count,
-            result.failed_count
-        );
-
-        Ok(result)
+                Ok(result)
+            })
+            .await
     }
 
     /// Get combined list info (pagination + sync state) in a single query.

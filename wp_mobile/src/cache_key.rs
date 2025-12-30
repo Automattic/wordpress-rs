@@ -73,10 +73,7 @@ pub fn post_list_filter_cache_key(filter: &PostListFilter) -> String {
         // are documented in the PostListFilter type definition.
 
         q.append_vec_query_value_pair(PostListParamsField::Author, &filter.author);
-        q.append_vec_query_value_pair(
-            PostListParamsField::AuthorExclude,
-            &filter.author_exclude,
-        );
+        q.append_vec_query_value_pair(PostListParamsField::AuthorExclude, &filter.author_exclude);
         q.append_vec_query_value_pair(PostListParamsField::Categories, &filter.categories);
         q.append_vec_query_value_pair(
             PostListParamsField::CategoriesExclude,
@@ -89,21 +86,18 @@ pub fn post_list_filter_cache_key(filter: &PostListFilter) -> String {
         q.append_option_query_value_pair(PostListParamsField::Order, filter.order.as_ref());
         q.append_option_query_value_pair(PostListParamsField::Orderby, filter.orderby.as_ref());
         q.append_option_query_value_pair(PostListParamsField::Parent, filter.parent.as_ref());
-        q.append_vec_query_value_pair(
-            PostListParamsField::ParentExclude,
-            &filter.parent_exclude,
-        );
+        q.append_vec_query_value_pair(PostListParamsField::ParentExclude, &filter.parent_exclude);
         q.append_option_query_value_pair(PostListParamsField::Search, filter.search.as_ref());
-        q.append_vec_query_value_pair(
-            PostListParamsField::SearchColumns,
-            &filter.search_columns,
-        );
+        q.append_vec_query_value_pair(PostListParamsField::SearchColumns, &filter.search_columns);
         q.append_vec_query_value_pair(PostListParamsField::Slug, &filter.slug);
         q.append_vec_query_value_pair(PostListParamsField::Status, &filter.status);
         q.append_option_query_value_pair(PostListParamsField::Sticky, filter.sticky.as_ref());
         q.append_vec_query_value_pair(PostListParamsField::Tags, &filter.tags);
         q.append_vec_query_value_pair(PostListParamsField::TagsExclude, &filter.tags_exclude);
-        q.append_option_query_value_pair(PostListParamsField::TaxRelation, filter.tax_relation.as_ref());
+        q.append_option_query_value_pair(
+            PostListParamsField::TaxRelation,
+            filter.tax_relation.as_ref(),
+        );
     }
 
     url.query().unwrap_or("").to_string()
