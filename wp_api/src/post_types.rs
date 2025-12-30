@@ -1,3 +1,4 @@
+use crate::request::endpoint::posts_endpoint::PostEndpointType;
 use crate::{JsonValue, impl_as_query_value_from_to_string};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -47,6 +48,17 @@ fn post_type_from_string(value: String) -> PostType {
 #[uniffi::export]
 fn post_type_to_string(post_type: PostType) -> String {
     post_type.to_string()
+}
+
+#[uniffi::export]
+fn post_type_details_to_post_endpoint_type(
+    post_type_details: &PostTypeDetailsWithEditContext,
+) -> PostEndpointType {
+    match post_type_details.rest_base.as_str() {
+        "posts" => PostEndpointType::Posts,
+        "pages" => PostEndpointType::Pages,
+        other => PostEndpointType::Custom(other.to_string()),
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]

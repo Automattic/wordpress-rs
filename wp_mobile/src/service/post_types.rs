@@ -98,6 +98,24 @@ impl PostTypeService {
             Arc::new(self.clone()),
         ))
     }
+
+    /// Get a post type by slug from the cache.
+    ///
+    /// # Returns
+    /// The post type details with edit context if found, None otherwise
+    pub fn get_by_slug(
+        &self,
+        slug: String,
+    ) -> Option<wp_api::post_types::PostTypeDetailsWithEditContext> {
+        self.cache
+            .execute(|conn| {
+                let repo = PostTypeRepository::<EditContext>::new();
+                repo.select_by_slug(conn, &self.db_site, &slug)
+            })
+            .ok()
+            .flatten()
+            .map(|db_full_entity| db_full_entity.data.post_type)
+    }
 }
 
 // Implement Clone manually since we need it for the collection

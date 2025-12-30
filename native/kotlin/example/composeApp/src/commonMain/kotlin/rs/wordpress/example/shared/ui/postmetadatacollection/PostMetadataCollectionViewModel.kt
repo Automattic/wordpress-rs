@@ -226,12 +226,19 @@ class PostMetadataCollectionViewModel(
 
     private fun createObservableCollection(filter: PostListFilter) {
         val postService = selfHostedService.posts()
+        val postTypeService = selfHostedService.postTypes()
 
-        // Convert slug to PostEndpointType
-        val endpointType = when (postTypeSlug.lowercase()) {
-            "post" -> PostEndpointType.Posts
-            "page" -> PostEndpointType.Pages
-            else -> PostEndpointType.Custom(postTypeSlug)
+        // Get the post type details from cache and convert to PostEndpointType using Rust
+        val postTypeDetails = postTypeService.getBySlug(postTypeSlug)
+        val endpointType = if (postTypeDetails != null) {
+            uniffi.wp_api.postTypeDetailsToPostEndpointType(postTypeDetails)
+        } else {
+            // Fallback if post type not found in cache
+            when (postTypeSlug.lowercase()) {
+                "post" -> PostEndpointType.Posts
+                "page" -> PostEndpointType.Pages
+                else -> PostEndpointType.Custom(postTypeSlug)
+            }
         }
 
         val observable = postService.getObservablePostMetadataCollectionWithEditContext(
