@@ -396,7 +396,7 @@ impl From<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 7] = [
+static MIGRATION_QUERIES: [&str; 8] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -404,6 +404,7 @@ static MIGRATION_QUERIES: [&str; 7] = [
     include_str!("../migrations/0005-create-posts-embed-context-table.sql"),
     include_str!("../migrations/0006-create-self-hosted-sites-table.sql"),
     include_str!("../migrations/0007-create-list-metadata-tables.sql"),
+    include_str!("../migrations/0008-create-post-types-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {
