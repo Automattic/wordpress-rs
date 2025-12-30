@@ -10,6 +10,7 @@ import rs.wordpress.example.shared.ui.login.LoginScreen
 import rs.wordpress.example.shared.ui.plugins.PluginListScreen
 import rs.wordpress.example.shared.ui.plugins.PluginListViewModel
 import rs.wordpress.example.shared.ui.postcollection.PostCollectionScreen
+import rs.wordpress.example.shared.ui.postmetadatacollection.PostMetadataCollectionScreen
 import rs.wordpress.example.shared.ui.site.SiteScreen
 import rs.wordpress.example.shared.ui.stresstest.StressTestScreen
 import rs.wordpress.example.shared.ui.users.UserListScreen
@@ -57,6 +58,9 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit) {
                     },
                     onPostCollectionClicked = {
                         navController.navigate("postcollection")
+                    },
+                    onPostMetadataCollectionClicked = {
+                        navController.navigate("postmetadatacollection")
                     }
                 )
             }
@@ -70,7 +74,14 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit) {
                 StressTestScreen()
             }
             composable("postcollection") {
-                PostCollectionScreen()
+                PostCollectionScreen(
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("postmetadatacollection") {
+                PostMetadataCollectionScreen(
+                    onBackClicked = { navController.popBackStack() }
+                )
             }
         }
     }

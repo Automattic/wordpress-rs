@@ -67,7 +67,7 @@ pub enum WpApiParamPostsSearchColumn {
 
 impl_as_query_value_from_to_string!(WpApiParamPostsSearchColumn);
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(true)]
 pub struct PostListParams {
     /// Current page of the collection.

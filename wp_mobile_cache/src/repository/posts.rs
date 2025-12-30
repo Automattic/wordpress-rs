@@ -20,7 +20,7 @@ use crate::{
     term_relationships::DbTermRelationship,
 };
 use rusqlite::{OptionalExtension, Row};
-use std::{marker::PhantomData, sync::Arc};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 use wp_api::{
     posts::{
         AnyPostWithEditContext, AnyPostWithEmbedContext, AnyPostWithViewContext,
@@ -28,6 +28,7 @@ use wp_api::{
         PostGuidWithViewContext, PostId, PostTitleWithEditContext, PostTitleWithEmbedContext,
         PostTitleWithViewContext, SparsePostExcerpt,
     },
+    prelude::WpGmtDateTime,
     taxonomies::TaxonomyType,
     terms::TermId,
 };
@@ -305,6 +306,62 @@ impl<C: PostContext> PostRepository<C> {
 
             FullEntity::new(entity_id, db_post)
         }))
+    }
+
+    /// Select `modified_gmt` timestamps for multiple posts by their WordPress post IDs.
+    ///
+    /// This is a lightweight query used for staleness detection - it only fetches
+    /// the `id` and `modified_gmt` columns without loading the full post data.
+    ///
+    /// Returns a HashMap mapping post IDs to their cached `modified_gmt` timestamps.
+    /// Posts not found in the cache are simply omitted from the result.
+    ///
+    /// # Arguments
+    /// * `executor` - Database connection or transaction
+    /// * `site` - The site to query posts for
+    /// * `post_ids` - WordPress post IDs to look up
+    ///
+    /// # Returns
+    /// HashMap where keys are post IDs and values are their `modified_gmt` timestamps.
+    pub fn select_modified_gmt_by_ids(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        post_ids: &[PostId],
+    ) -> Result<HashMap<PostId, WpGmtDateTime>, SqliteDbError> {
+        if post_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let ids_str = post_ids
+            .iter()
+            .map(|id| id.0.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let sql = format!(
+            "SELECT id, modified_gmt FROM {} WHERE db_site_id = ? AND id IN ({})",
+            Self::table_name(),
+            ids_str
+        );
+
+        let mut stmt = executor.prepare(&sql)?;
+        let rows = stmt.query_map([site.row_id], |row| {
+            let id: i64 = row.get(0)?;
+            let modified_gmt_str: String = row.get(1)?;
+            Ok((id, modified_gmt_str))
+        })?;
+
+        Ok(rows
+            .filter_map(|row_result| {
+                row_result.ok().and_then(|(id, modified_gmt_str)| {
+                    modified_gmt_str
+                        .parse::<WpGmtDateTime>()
+                        .ok()
+                        .map(|modified_gmt| (PostId(id), modified_gmt))
+                })
+            })
+            .collect())
     }
 
     /// Delete a post by its EntityId for a given site.

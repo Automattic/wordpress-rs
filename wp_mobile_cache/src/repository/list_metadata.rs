@@ -85,7 +85,7 @@ impl ListMetadataRepository {
 
         // Create new header
         let sql = format!(
-            "INSERT INTO {} (db_site_id, key, current_page, per_page, version) VALUES (?, ?, 0, ?, 0)",
+            "INSERT INTO {} (db_site_id, key, per_page, version) VALUES (?, ?, ?, 0)",
             Self::header_table().table_name()
         );
 
@@ -486,8 +486,8 @@ impl ListMetadataRepository {
         per_page: i64,
     ) -> Result<HeaderVersionInfo, SqliteDbError> {
         let sql = format!(
-            "INSERT INTO {} (db_site_id, key, current_page, per_page, version, last_first_page_fetched_at) \
-             VALUES (?1, ?2, 0, ?3, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) \
+            "INSERT INTO {} (db_site_id, key, per_page, version, last_first_page_fetched_at) \
+             VALUES (?1, ?2, ?3, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) \
              ON CONFLICT(db_site_id, key) DO UPDATE SET \
                  version = version + 1, \
                  last_first_page_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
@@ -577,7 +577,7 @@ pub struct ListMetadataHeaderUpdate {
     /// Total number of items from API response
     pub total_items: Option<i64>,
     /// Current page that has been loaded
-    pub current_page: i64,
+    pub current_page: Option<i64>,
     /// Items per page
     pub per_page: i64,
 }
@@ -624,7 +624,7 @@ mod tests {
             .expect("should succeed");
         assert_eq!(header.row_id, row_id);
         assert_eq!(header.key, key.as_str());
-        assert_eq!(header.current_page, 0);
+        assert_eq!(header.current_page, None);
         assert_eq!(header.per_page, TEST_PER_PAGE);
         assert_eq!(header.version, 0);
         assert!(header.total_pages.is_none());
@@ -984,7 +984,7 @@ mod tests {
         let update = ListMetadataHeaderUpdate {
             total_pages: Some(5),
             total_items: Some(100),
-            current_page: 1,
+            current_page: Some(1),
             per_page: TEST_PER_PAGE,
         };
 
@@ -1001,7 +1001,7 @@ mod tests {
             .expect("should succeed");
         assert_eq!(header.total_pages, Some(5));
         assert_eq!(header.total_items, Some(100));
-        assert_eq!(header.current_page, 1);
+        assert_eq!(header.current_page, Some(1));
         assert_eq!(header.per_page, TEST_PER_PAGE);
         assert!(header.last_fetched_at.is_some());
     }

@@ -31,7 +31,10 @@ import rs.wordpress.example.shared.ui.components.PostCard
 
 @Composable
 @Preview
-fun PostCollectionScreen(viewModel: PostCollectionViewModel = koinInject()) {
+fun PostCollectionScreen(
+    viewModel: PostCollectionViewModel = koinInject(),
+    onBackClicked: (() -> Unit)? = null
+) {
     val state by viewModel.state.collectAsState()
     val posts by viewModel.posts.collectAsState()
     val listState = rememberLazyListState()
@@ -41,6 +44,19 @@ fun PostCollectionScreen(viewModel: PostCollectionViewModel = koinInject()) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxSize().padding(16.dp),
         ) {
+            // Back button (for desktop)
+            if (onBackClicked != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    TextButton(onClick = onBackClicked) {
+                        Text("← Back")
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             // Filter controls
             FilterControls(
                 currentFilter = state.filterStatusString,

@@ -62,7 +62,7 @@ impl<T> PostCollection<T> {
     /// which pages have been fetched. ViewModels manage pagination state.
     pub async fn fetch_page(&self, page: u32, per_page: u32) -> Result<FetchResult, FetchError> {
         self.post_service
-            .fetch_posts_page(&self.filter, page, per_page)
+            .sync_posts_page(&self.filter, page, per_page)
             .await
     }
 
