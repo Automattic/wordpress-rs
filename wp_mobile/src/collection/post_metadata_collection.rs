@@ -20,6 +20,72 @@ crate::wp_mobile_metadata_item!(
     crate::FullEntityAnyPostWithEditContext
 );
 
+// ============================================================
+// From trait implementations for type conversions
+// ============================================================
+
+impl From<(EntityState, Option<crate::FullEntityAnyPostWithEditContext>)> for PostItemState {
+    /// Convert EntityState + optional cached data into PostItemState.
+    ///
+    /// This encodes the business logic for how fetch state and data availability
+    /// combine into user-facing states:
+    ///
+    /// - `Missing + no data` → Show placeholder (need to fetch)
+    /// - `Missing + has data` → Show stale data (app restart scenario)
+    /// - `Fetching + no data` → Show loading spinner
+    /// - `Fetching + has data` → Show data with loading indicator
+    /// - `Cached + has data` → Show fresh data
+    /// - `Cached + no data` → Defensive fallback to Missing
+    /// - `Stale + has data` → Show outdated data
+    /// - `Stale + no data` → Defensive fallback to Missing
+    /// - `Failed + no data` → Show error message
+    /// - `Failed + has data` → Show data with error indicator
+    fn from((state, data): (EntityState, Option<crate::FullEntityAnyPostWithEditContext>)) -> Self {
+        match (state, data) {
+            // Missing state
+            (EntityState::Missing, None) => PostItemState::Missing,
+            (EntityState::Missing, Some(data)) => PostItemState::Stale { data },
+
+            // Fetching state
+            (EntityState::Fetching, None) => PostItemState::Fetching,
+            (EntityState::Fetching, Some(data)) => PostItemState::FetchingWithData { data },
+
+            // Cached state (should always have data, but handle gracefully)
+            (EntityState::Cached, Some(data)) => PostItemState::Cached { data },
+            (EntityState::Cached, None) => PostItemState::Missing,
+
+            // Stale state (should always have data, but handle gracefully)
+            (EntityState::Stale, Some(data)) => PostItemState::Stale { data },
+            (EntityState::Stale, None) => PostItemState::Missing,
+
+            // Failed state
+            (EntityState::Failed { error }, None) => PostItemState::Failed { error },
+            (EntityState::Failed { error }, Some(data)) => {
+                PostItemState::FailedWithData { error, data }
+            }
+        }
+    }
+}
+
+impl From<(crate::sync::CollectionItem, Option<crate::FullEntityAnyPostWithEditContext>)>
+    for PostMetadataCollectionItem
+{
+    /// Convert CollectionItem + optional cached data into PostMetadataCollectionItem.
+    ///
+    /// Extracts metadata fields (id, parent, menu_order) and converts the state+data
+    /// into a type-safe PostItemState.
+    fn from(
+        (item, data): (crate::sync::CollectionItem, Option<crate::FullEntityAnyPostWithEditContext>),
+    ) -> Self {
+        PostMetadataCollectionItem {
+            id: item.id(),
+            parent: item.metadata.parent,
+            menu_order: item.metadata.menu_order,
+            state: PostItemState::from((item.state, data)),
+        }
+    }
+}
+
 /// Metadata-first collection for posts with edit context.
 ///
 /// This collection uses a two-phase sync strategy:
@@ -133,49 +199,15 @@ impl PostMetadataCollectionWithEditContext {
         let mut cached_map: std::collections::HashMap<i64, FullEntity<AnyPostWithEditContext>> =
             cached_posts.into_iter().map(|p| (p.data.id.0, p)).collect();
 
-        // Combine EntityState with cache data into type-safe PostItemState
-        let result = items
+        // Convert CollectionItem + cached data → PostMetadataCollectionItem using From trait
+        Ok(items
             .into_iter()
             .map(|item| {
                 let id = item.id();
-                // Extract parent and menu_order from metadata (available immediately)
-                let parent = item.metadata.parent;
-                let menu_order = item.metadata.menu_order;
-                let cached_data = cached_map.remove(&id).map(|e| e.into());
-                let state = match (item.state, cached_data) {
-                    // Missing state
-                    (EntityState::Missing, None) => PostItemState::Missing,
-                    (EntityState::Missing, Some(data)) => PostItemState::Stale { data },
-
-                    // Fetching state
-                    (EntityState::Fetching, None) => PostItemState::Fetching,
-                    (EntityState::Fetching, Some(data)) => PostItemState::FetchingWithData { data },
-
-                    // Cached state (should always have data, but handle gracefully)
-                    (EntityState::Cached, Some(data)) => PostItemState::Cached { data },
-                    (EntityState::Cached, None) => PostItemState::Missing,
-
-                    // Stale state (should always have data, but handle gracefully)
-                    (EntityState::Stale, Some(data)) => PostItemState::Stale { data },
-                    (EntityState::Stale, None) => PostItemState::Missing,
-
-                    // Failed state
-                    (EntityState::Failed { error }, None) => PostItemState::Failed { error },
-                    (EntityState::Failed { error }, Some(data)) => {
-                        PostItemState::FailedWithData { error, data }
-                    }
-                };
-
-                PostMetadataCollectionItem {
-                    id,
-                    parent,
-                    menu_order,
-                    state,
-                }
+                let cached_data = cached_map.remove(&id).map(Into::into);
+                PostMetadataCollectionItem::from((item, cached_data))
             })
-            .collect();
-
-        Ok(result)
+            .collect())
     }
 
     /// Refresh the collection (fetch page 1, replace metadata).
