@@ -10,87 +10,17 @@ use crate::{
     collection::{CollectionError, FetchError, MetadataCollectionCore},
     filters::PostListFilter,
     service::posts::PostService,
-    sync::{EntityState, ListInfo, SyncResult},
+    sync::{ListInfo, SyncResult},
 };
 
-// Generate PostItemState enum and PostMetadataCollectionItem struct using the macro
+// Generate PostItemState enum, PostMetadataCollectionItem struct, and From trait implementations
+// using the macro. This eliminates ~63 lines of boilerplate that would be duplicated across
+// all entity types (categories, users, comments, etc.).
 crate::wp_mobile_metadata_item!(
     PostMetadataCollectionItem,
     PostItemState,
     crate::FullEntityAnyPostWithEditContext
 );
-
-// ============================================================
-// From trait implementations for type conversions
-// ============================================================
-
-impl From<(EntityState, Option<crate::FullEntityAnyPostWithEditContext>)> for PostItemState {
-    /// Convert EntityState + optional cached data into PostItemState.
-    ///
-    /// This encodes the business logic for how fetch state and data availability
-    /// combine into user-facing states:
-    ///
-    /// - `Missing + no data` → Show placeholder (need to fetch)
-    /// - `Missing + has data` → Show stale data (app restart scenario)
-    /// - `Fetching + no data` → Show loading spinner
-    /// - `Fetching + has data` → Show data with loading indicator
-    /// - `Cached + has data` → Show fresh data
-    /// - `Cached + no data` → Defensive fallback to Missing
-    /// - `Stale + has data` → Show outdated data
-    /// - `Stale + no data` → Defensive fallback to Missing
-    /// - `Failed + no data` → Show error message
-    /// - `Failed + has data` → Show data with error indicator
-    fn from((state, data): (EntityState, Option<crate::FullEntityAnyPostWithEditContext>)) -> Self {
-        match (state, data) {
-            // Missing state
-            (EntityState::Missing, None) => PostItemState::Missing,
-            (EntityState::Missing, Some(data)) => PostItemState::Stale { data },
-
-            // Fetching state
-            (EntityState::Fetching, None) => PostItemState::Fetching,
-            (EntityState::Fetching, Some(data)) => PostItemState::FetchingWithData { data },
-
-            // Cached state (should always have data, but handle gracefully)
-            (EntityState::Cached, Some(data)) => PostItemState::Cached { data },
-            (EntityState::Cached, None) => PostItemState::Missing,
-
-            // Stale state (should always have data, but handle gracefully)
-            (EntityState::Stale, Some(data)) => PostItemState::Stale { data },
-            (EntityState::Stale, None) => PostItemState::Missing,
-
-            // Failed state
-            (EntityState::Failed { error }, None) => PostItemState::Failed { error },
-            (EntityState::Failed { error }, Some(data)) => {
-                PostItemState::FailedWithData { error, data }
-            }
-        }
-    }
-}
-
-impl
-    From<(
-        crate::sync::CollectionItem,
-        Option<crate::FullEntityAnyPostWithEditContext>,
-    )> for PostMetadataCollectionItem
-{
-    /// Convert CollectionItem + optional cached data into PostMetadataCollectionItem.
-    ///
-    /// Extracts metadata fields (id, parent, menu_order) and converts the state+data
-    /// into a type-safe PostItemState.
-    fn from(
-        (item, data): (
-            crate::sync::CollectionItem,
-            Option<crate::FullEntityAnyPostWithEditContext>,
-        ),
-    ) -> Self {
-        PostMetadataCollectionItem {
-            id: item.id(),
-            parent: item.metadata.parent,
-            menu_order: item.metadata.menu_order,
-            state: PostItemState::from((item.state, data)),
-        }
-    }
-}
 
 /// Metadata-first collection for posts with edit context.
 ///

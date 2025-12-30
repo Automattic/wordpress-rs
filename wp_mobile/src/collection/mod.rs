@@ -145,6 +145,72 @@ macro_rules! wp_mobile_metadata_item {
             /// Combined state and data - see the state enum for variants
             pub state: $state_name,
         }
+
+        // Generate From trait: EntityState + data -> ItemState
+        impl From<($crate::sync::EntityState, Option<$full_entity_type>)> for $state_name {
+            /// Convert EntityState + optional cached data into ItemState.
+            ///
+            /// This encodes the business logic for how fetch state and data availability
+            /// combine into user-facing states:
+            ///
+            /// - `Missing + no data` → Show placeholder (need to fetch)
+            /// - `Missing + has data` → Show stale data (app restart scenario)
+            /// - `Fetching + no data` → Show loading spinner
+            /// - `Fetching + has data` → Show data with loading indicator
+            /// - `Cached + has data` → Show fresh data
+            /// - `Cached + no data` → Defensive fallback to Missing
+            /// - `Stale + has data` → Show outdated data
+            /// - `Stale + no data` → Defensive fallback to Missing
+            /// - `Failed + no data` → Show error message
+            /// - `Failed + has data` → Show data with error indicator
+            fn from((state, data): ($crate::sync::EntityState, Option<$full_entity_type>)) -> Self {
+                match (state, data) {
+                    // Missing state
+                    ($crate::sync::EntityState::Missing, None) => $state_name::Missing,
+                    ($crate::sync::EntityState::Missing, Some(data)) => $state_name::Stale { data },
+
+                    // Fetching state
+                    ($crate::sync::EntityState::Fetching, None) => $state_name::Fetching,
+                    ($crate::sync::EntityState::Fetching, Some(data)) => {
+                        $state_name::FetchingWithData { data }
+                    }
+
+                    // Cached state (should always have data, but handle gracefully)
+                    ($crate::sync::EntityState::Cached, Some(data)) => $state_name::Cached { data },
+                    ($crate::sync::EntityState::Cached, None) => $state_name::Missing,
+
+                    // Stale state (should always have data, but handle gracefully)
+                    ($crate::sync::EntityState::Stale, Some(data)) => $state_name::Stale { data },
+                    ($crate::sync::EntityState::Stale, None) => $state_name::Missing,
+
+                    // Failed state
+                    ($crate::sync::EntityState::Failed { error }, None) => {
+                        $state_name::Failed { error }
+                    }
+                    ($crate::sync::EntityState::Failed { error }, Some(data)) => {
+                        $state_name::FailedWithData { error, data }
+                    }
+                }
+            }
+        }
+
+        // Generate From trait: CollectionItem + data -> MetadataCollectionItem
+        impl From<($crate::sync::CollectionItem, Option<$full_entity_type>)> for $item_name {
+            /// Convert CollectionItem + optional cached data into MetadataCollectionItem.
+            ///
+            /// Extracts metadata fields (id, parent, menu_order) and converts the state+data
+            /// into a type-safe ItemState.
+            fn from(
+                (item, data): ($crate::sync::CollectionItem, Option<$full_entity_type>),
+            ) -> Self {
+                $item_name {
+                    id: item.id(),
+                    parent: item.metadata.parent,
+                    menu_order: item.metadata.menu_order,
+                    state: $state_name::from((item.state, data)),
+                }
+            }
+        }
     };
 }
 
