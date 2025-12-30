@@ -4,6 +4,7 @@ mod fetch_error;
 mod fetch_result;
 pub(crate) mod post_collection;
 pub(crate) mod post_metadata_collection;
+pub(crate) mod post_type_collection;
 mod stateless_collection;
 
 pub use collection_error::CollectionError;
@@ -13,6 +14,7 @@ pub use fetch_result::FetchResult;
 pub use post_metadata_collection::{
     PostItemState, PostMetadataCollectionItem, PostMetadataCollectionWithEditContext,
 };
+pub use post_type_collection::PostTypeCollectionWithEditContext;
 pub use stateless_collection::StatelessCollection;
 
 /// Macro to create UniFFI-compatible item state enums for metadata collections.

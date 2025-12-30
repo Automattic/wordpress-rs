@@ -1,8 +1,8 @@
-use crate::collection::FetchError;
+use crate::collection::{FetchError, PostTypeCollectionWithEditContext, StatelessCollection};
 use std::sync::Arc;
 use wp_api::prelude::WpApiClient;
 use wp_mobile_cache::{
-    WpApiCache,
+    DbTable, WpApiCache,
     context::EditContext,
     db_types::db_site::DbSite,
     entity::EntityId,
@@ -70,6 +70,33 @@ impl PostTypeService {
             })?;
 
         Ok(entity_ids)
+    }
+
+    /// Create a stateless collection for post types with edit context.
+    ///
+    /// The collection provides reactive access to cached post types with
+    /// database change notifications.
+    pub fn create_post_type_collection_with_edit_context(
+        &self,
+    ) -> Arc<PostTypeCollectionWithEditContext> {
+        let cache = self.cache.clone();
+        let db_site = self.db_site.clone();
+
+        // Create the stateless collection with a closure that loads all post types
+        let stateless_collection = StatelessCollection::new(
+            vec![DbTable::PostTypesEditContext],
+            Box::new(move || {
+                cache.execute(|conn| {
+                    let repo = PostTypeRepository::<EditContext>::new();
+                    repo.select_all(conn, &db_site)
+                })
+            }),
+        );
+
+        Arc::new(PostTypeCollectionWithEditContext::new(
+            stateless_collection,
+            Arc::new(self.clone()),
+        ))
     }
 }
 
