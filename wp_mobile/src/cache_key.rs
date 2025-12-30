@@ -7,7 +7,7 @@
 use url::Url;
 use wp_api::{
     posts::PostListParamsField, request::endpoint::posts_endpoint::PostEndpointType,
-    url_query::AsQueryValue,
+    url_query::QueryPairsExtension,
 };
 
 use crate::filters::PostListFilter;
@@ -36,34 +36,6 @@ pub fn endpoint_type_cache_key(endpoint_type: &PostEndpointType) -> String {
         PostEndpointType::Posts => "post_type_posts".to_string(),
         PostEndpointType::Pages => "post_type_pages".to_string(),
         PostEndpointType::Custom(name) => format!("post_type_custom_{}", name),
-    }
-}
-
-/// Extension trait to add query pairs using `AsQueryValue`.
-///
-/// This replicates the functionality of `wp_api::url_query::QueryPairsExtension`
-/// which is `pub(crate)` in wp_api.
-trait QueryPairsExt {
-    fn append_option<T: AsQueryValue>(&mut self, key: &str, value: Option<&T>);
-    fn append_vec<T: AsQueryValue>(&mut self, key: &str, value: &[T]);
-}
-
-impl QueryPairsExt for url::form_urlencoded::Serializer<'_, url::UrlQuery<'_>> {
-    fn append_option<T: AsQueryValue>(&mut self, key: &str, value: Option<&T>) {
-        if let Some(v) = value {
-            self.append_pair(key, v.as_query_value().as_ref());
-        }
-    }
-
-    fn append_vec<T: AsQueryValue>(&mut self, key: &str, value: &[T]) {
-        if !value.is_empty() {
-            let csv: String = value
-                .iter()
-                .map(|v| v.as_query_value().as_ref().to_string())
-                .collect::<Vec<_>>()
-                .join(",");
-            self.append_pair(key, &csv);
-        }
     }
 }
 
@@ -100,44 +72,38 @@ pub fn post_list_filter_cache_key(filter: &PostListFilter) -> String {
         // Fields excluded from PostListFilter (pagination, instance-specific, date ranges)
         // are documented in the PostListFilter type definition.
 
-        q.append_vec(PostListParamsField::Author.into(), &filter.author);
-        q.append_vec(
-            PostListParamsField::AuthorExclude.into(),
+        q.append_vec_query_value_pair(PostListParamsField::Author, &filter.author);
+        q.append_vec_query_value_pair(
+            PostListParamsField::AuthorExclude,
             &filter.author_exclude,
         );
-        q.append_vec(PostListParamsField::Categories.into(), &filter.categories);
-        q.append_vec(
-            PostListParamsField::CategoriesExclude.into(),
+        q.append_vec_query_value_pair(PostListParamsField::Categories, &filter.categories);
+        q.append_vec_query_value_pair(
+            PostListParamsField::CategoriesExclude,
             &filter.categories_exclude,
         );
-        q.append_option(
-            PostListParamsField::MenuOrder.into(),
+        q.append_option_query_value_pair(
+            PostListParamsField::MenuOrder,
             filter.menu_order.as_ref(),
         );
-        q.append_option(PostListParamsField::Order.into(), filter.order.as_ref());
-        q.append_option(PostListParamsField::Orderby.into(), filter.orderby.as_ref());
-        q.append_option(PostListParamsField::Parent.into(), filter.parent.as_ref());
-        q.append_vec(
-            PostListParamsField::ParentExclude.into(),
+        q.append_option_query_value_pair(PostListParamsField::Order, filter.order.as_ref());
+        q.append_option_query_value_pair(PostListParamsField::Orderby, filter.orderby.as_ref());
+        q.append_option_query_value_pair(PostListParamsField::Parent, filter.parent.as_ref());
+        q.append_vec_query_value_pair(
+            PostListParamsField::ParentExclude,
             &filter.parent_exclude,
         );
-        q.append_option(PostListParamsField::Search.into(), filter.search.as_ref());
-        q.append_vec(
-            PostListParamsField::SearchColumns.into(),
+        q.append_option_query_value_pair(PostListParamsField::Search, filter.search.as_ref());
+        q.append_vec_query_value_pair(
+            PostListParamsField::SearchColumns,
             &filter.search_columns,
         );
-        q.append_vec(PostListParamsField::Slug.into(), &filter.slug);
-        q.append_vec(PostListParamsField::Status.into(), &filter.status);
-        q.append_option(PostListParamsField::Sticky.into(), filter.sticky.as_ref());
-        q.append_vec(PostListParamsField::Tags.into(), &filter.tags);
-        q.append_vec(
-            PostListParamsField::TagsExclude.into(),
-            &filter.tags_exclude,
-        );
-        q.append_option(
-            PostListParamsField::TaxRelation.into(),
-            filter.tax_relation.as_ref(),
-        );
+        q.append_vec_query_value_pair(PostListParamsField::Slug, &filter.slug);
+        q.append_vec_query_value_pair(PostListParamsField::Status, &filter.status);
+        q.append_option_query_value_pair(PostListParamsField::Sticky, filter.sticky.as_ref());
+        q.append_vec_query_value_pair(PostListParamsField::Tags, &filter.tags);
+        q.append_vec_query_value_pair(PostListParamsField::TagsExclude, &filter.tags_exclude);
+        q.append_option_query_value_pair(PostListParamsField::TaxRelation, filter.tax_relation.as_ref());
     }
 
     url.query().unwrap_or("").to_string()
