@@ -120,13 +120,24 @@ impl PostTypeService {
         let db_site = self.db_site.clone();
         let filter_clone = filter.clone();
 
-        // Create the stateless collection with a closure that loads filtered post types
+        // Create the stateless collection with a closure that loads and filters post types
         let stateless_collection = StatelessCollection::new(
             vec![DbTable::PostTypesEditContext],
             Box::new(move || {
                 cache.execute(|conn| {
                     let repo = PostTypeRepository::<EditContext>::new();
-                    repo.select_by_filter(conn, &db_site, filter_clone.viewable)
+                    let all_post_types = repo.select_all(conn, &db_site)?;
+
+                    // Apply filtering in memory
+                    let filtered = match filter_clone.viewable {
+                        None => all_post_types,
+                        Some(viewable_value) => all_post_types
+                            .into_iter()
+                            .filter(|entity| entity.data.post_type.viewable == viewable_value)
+                            .collect(),
+                    };
+
+                    Ok(filtered)
                 })
             }),
         );
