@@ -5,10 +5,7 @@ use crate::{
 use std::sync::Arc;
 use wp_api::prelude::WpApiClient;
 use wp_mobile_cache::{
-    DbTable, WpApiCache,
-    context::EditContext,
-    db_types::db_site::DbSite,
-    entity::EntityId,
+    DbTable, WpApiCache, context::EditContext, db_types::db_site::DbSite, entity::EntityId,
     repository::post_types::PostTypeRepository,
 };
 
@@ -16,7 +13,7 @@ use wp_mobile_cache::{
 ///
 /// Provides a bridge between clients and the underlying network/cache layers.
 /// Handles fetching and caching post types for a site.
-#[derive(uniffi::Object)]
+#[derive(Clone, uniffi::Object)]
 pub struct PostTypeService {
     db_site: Arc<DbSite>,
     api_client: Arc<WpApiClient>,
@@ -191,17 +188,6 @@ impl PostTypeService {
     }
 }
 
-// Implement Clone manually since we need it for the collection
-impl Clone for PostTypeService {
-    fn clone(&self) -> Self {
-        Self {
-            db_site: self.db_site.clone(),
-            api_client: self.api_client.clone(),
-            cache: self.cache.clone(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,8 +197,8 @@ mod tests {
     use rusqlite::Connection;
     use wp_mobile_cache::{
         MigrationManager, WpApiCache,
-        test_fixtures::{create_test_site, post_types::PostTypeBuilder},
         db_types::self_hosted_site::SelfHostedSite,
+        test_fixtures::{create_test_site, post_types::PostTypeBuilder},
     };
 
     struct PostTypeServiceTestContext {
@@ -238,11 +224,7 @@ mod tests {
         let cache = Arc::new(WpApiCache::from(conn));
         let api_client = mock_api_client();
 
-        let post_type_service = PostTypeService::new(
-            api_client,
-            Arc::new(db_site),
-            cache.clone(),
-        );
+        let post_type_service = PostTypeService::new(api_client, Arc::new(db_site), cache.clone());
 
         PostTypeServiceTestContext {
             cache,
@@ -296,8 +278,7 @@ mod tests {
             .post_type_service
             .create_post_type_collection_with_edit_context();
 
-        let result = block_on(collection.load_data())
-            .expect("load_data should succeed");
+        let result = block_on(collection.load_data()).expect("load_data should succeed");
 
         // Should only return the one that's both viewable AND show_ui
         assert_eq!(result.len(), 1);
@@ -335,8 +316,7 @@ mod tests {
             .post_type_service
             .create_post_type_collection_with_edit_context_filtered(filter);
 
-        let result = block_on(collection.load_data())
-            .expect("load_data should succeed");
+        let result = block_on(collection.load_data()).expect("load_data should succeed");
 
         // Should return both viewable types regardless of show_ui
         assert_eq!(result.len(), 2);
@@ -376,8 +356,7 @@ mod tests {
             .post_type_service
             .create_post_type_collection_with_edit_context_filtered(filter);
 
-        let result = block_on(collection.load_data())
-            .expect("load_data should succeed");
+        let result = block_on(collection.load_data()).expect("load_data should succeed");
 
         // Should return both show_ui=true types regardless of viewable
         assert_eq!(result.len(), 2);
@@ -420,8 +399,7 @@ mod tests {
             .post_type_service
             .create_post_type_collection_with_edit_context_filtered(filter);
 
-        let result = block_on(collection.load_data())
-            .expect("load_data should succeed");
+        let result = block_on(collection.load_data()).expect("load_data should succeed");
 
         // Should return both hierarchical types
         assert_eq!(result.len(), 2);
@@ -470,8 +448,7 @@ mod tests {
             .post_type_service
             .create_post_type_collection_with_edit_context_filtered(filter);
 
-        let result = block_on(collection.load_data())
-            .expect("load_data should succeed");
+        let result = block_on(collection.load_data()).expect("load_data should succeed");
 
         // Should only return the one matching ALL criteria
         assert_eq!(result.len(), 1);
@@ -514,8 +491,7 @@ mod tests {
             .post_type_service
             .create_post_type_collection_with_edit_context_filtered(filter);
 
-        let result = block_on(collection.load_data())
-            .expect("load_data should succeed");
+        let result = block_on(collection.load_data()).expect("load_data should succeed");
 
         // Should return all types
         assert_eq!(result.len(), 3);
@@ -549,8 +525,7 @@ mod tests {
             .post_type_service
             .create_post_type_collection_with_edit_context_filtered(filter);
 
-        let result = block_on(collection.load_data())
-            .expect("load_data should succeed");
+        let result = block_on(collection.load_data()).expect("load_data should succeed");
 
         // Should only return the non-viewable type
         assert_eq!(result.len(), 1);

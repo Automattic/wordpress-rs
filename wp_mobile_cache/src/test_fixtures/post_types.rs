@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use wp_api::{
     JsonValue,
     post_types::{
-        PostTypeCapabilities, PostTypeDetailsWithEditContext, PostTypeLabels,
-        PostTypeSupports, PostTypeSupportsMap, PostTypeVisibility,
+        PostTypeCapabilities, PostTypeDetailsWithEditContext, PostTypeLabels, PostTypeSupports,
+        PostTypeSupportsMap, PostTypeVisibility,
     },
 };
 

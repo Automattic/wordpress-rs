@@ -87,7 +87,9 @@ impl PostTypeCollectionWithEditContext {
     /// This async function is exported to client platforms (Kotlin/Swift) where it
     /// will be executed on a background thread. The underlying Rust implementation
     /// is synchronous as rusqlite doesn't support async operations.
-    pub async fn load_data(&self) -> Result<Vec<FullEntityPostTypeDetailsWithEditContext>, CollectionError> {
+    pub async fn load_data(
+        &self,
+    ) -> Result<Vec<FullEntityPostTypeDetailsWithEditContext>, CollectionError> {
         self.stateless_collection
             .load_data()
             .map(|full_entities| {

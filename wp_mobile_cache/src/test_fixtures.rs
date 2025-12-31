@@ -13,8 +13,8 @@ use rstest::*;
 use rusqlite::Connection;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-pub mod posts;
 pub mod post_types;
+pub mod posts;
 
 /// Test context bundling common test dependencies.
 ///

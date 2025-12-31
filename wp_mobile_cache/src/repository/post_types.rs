@@ -201,10 +201,13 @@ mod tests {
     /// This test ensures the column enum stays synchronized with the SQL schema.
     /// If columns are added, removed, or reordered, this test will fail.
     #[rstest]
-    fn test_post_type_edit_context_column_enum_matches_schema(test_ctx: crate::test_fixtures::TestContext) {
+    fn test_post_type_edit_context_column_enum_matches_schema(
+        test_ctx: crate::test_fixtures::TestContext,
+    ) {
         use PostTypeEditContextColumn::*;
 
-        let columns = crate::test_fixtures::get_table_column_names(&test_ctx.conn, "post_types_edit_context");
+        let columns =
+            crate::test_fixtures::get_table_column_names(&test_ctx.conn, "post_types_edit_context");
 
         // Verify each enum value maps to the correct column name
         assert_eq!(columns[Rowid.as_index()], "rowid");
