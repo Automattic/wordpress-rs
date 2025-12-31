@@ -58,15 +58,14 @@ impl PostTypeService {
             .cache
             .execute(|conn| {
                 let repo = PostTypeRepository::<EditContext>::new();
-                let mut ids = Vec::new();
 
-                for (post_type_enum, post_type_details) in post_types_map.iter() {
-                    let slug = post_type_enum.to_string();
-                    let entity_id = repo.upsert(conn, &self.db_site, &slug, post_type_details)?;
-                    ids.push(entity_id);
-                }
-
-                Ok::<Vec<EntityId>, wp_mobile_cache::SqliteDbError>(ids)
+                post_types_map
+                    .iter()
+                    .map(|(post_type_enum, post_type_details)| {
+                        let slug = post_type_enum.to_string();
+                        repo.upsert(conn, &self.db_site, &slug, post_type_details)
+                    })
+                    .collect::<Result<Vec<EntityId>, wp_mobile_cache::SqliteDbError>>()
             })
             .map_err(|e| FetchError::Database {
                 err_message: e.to_string(),

@@ -180,15 +180,13 @@ impl<C: PostTypeContext> PostTypeRepository<C> {
             C::from_row(row).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
 
-        let mut post_types = Vec::new();
-        for row_result in rows {
+        rows.map(|row_result| {
             let db_post_type = row_result?;
             let row_id = C::rowid(&db_post_type);
             let entity_id = Arc::new(EntityId::new(*site, C::table(), row_id));
-            post_types.push(FullEntity::new(entity_id, db_post_type));
-        }
-
-        Ok(post_types)
+            Ok(FullEntity::new(entity_id, db_post_type))
+        })
+        .collect()
     }
 }
 
