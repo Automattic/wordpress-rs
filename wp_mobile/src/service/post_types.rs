@@ -80,12 +80,13 @@ impl PostTypeService {
     /// The collection provides reactive access to cached post types with
     /// database change notifications.
     ///
-    /// By default, only viewable post types are returned (those with `viewable = true`).
+    /// By default, only viewable and UI-visible post types are returned
+    /// (those with `viewable = true` and `show_ui = true`).
     /// For custom filtering, use `create_post_type_collection_with_edit_context_filtered()`.
     ///
     /// # Example (Kotlin)
     /// ```kotlin
-    /// // Get viewable post types (default behavior)
+    /// // Get viewable and UI-visible post types (default behavior)
     /// val collection = postTypeService.createPostTypeCollectionWithEditContext()
     /// ```
     pub fn create_post_type_collection_with_edit_context(
@@ -100,16 +101,20 @@ impl PostTypeService {
     /// database change notifications.
     ///
     /// # Arguments
-    /// * `filter` - Filter criteria for post types (viewable status, etc.)
+    /// * `filter` - Filter criteria for post types (viewable, show_ui, hierarchical)
     ///
     /// # Example (Kotlin)
     /// ```kotlin
     /// // Get all post types (no filtering)
-    /// val allFilter = PostTypeFilter(viewable = null)
+    /// val allFilter = PostTypeFilter(viewable = null, showUi = null, hierarchical = null)
     /// val allCollection = postTypeService.createPostTypeCollectionWithEditContextFiltered(allFilter)
     ///
-    /// // Get only non-viewable post types
-    /// val hiddenFilter = PostTypeFilter(viewable = false)
+    /// // Get only hierarchical post types that are viewable and shown in UI
+    /// val hierarchicalFilter = PostTypeFilter(viewable = true, showUi = true, hierarchical = true)
+    /// val hierarchicalCollection = postTypeService.createPostTypeCollectionWithEditContextFiltered(hierarchicalFilter)
+    ///
+    /// // Get hidden/internal post types
+    /// val hiddenFilter = PostTypeFilter(viewable = null, showUi = false, hierarchical = null)
     /// val hiddenCollection = postTypeService.createPostTypeCollectionWithEditContextFiltered(hiddenFilter)
     /// ```
     pub fn create_post_type_collection_with_edit_context_filtered(
@@ -129,13 +134,33 @@ impl PostTypeService {
                     let all_post_types = repo.select_all(conn, &db_site)?;
 
                     // Apply filtering in memory
-                    let filtered = match filter_clone.viewable {
-                        None => all_post_types,
-                        Some(viewable_value) => all_post_types
-                            .into_iter()
-                            .filter(|entity| entity.data.post_type.viewable == viewable_value)
-                            .collect(),
-                    };
+                    let filtered = all_post_types
+                        .into_iter()
+                        .filter(|entity| {
+                            // Filter by viewable
+                            if let Some(viewable_value) = filter_clone.viewable {
+                                if entity.data.post_type.viewable != viewable_value {
+                                    return false;
+                                }
+                            }
+
+                            // Filter by show_ui
+                            if let Some(show_ui_value) = filter_clone.show_ui {
+                                if entity.data.post_type.visibility.show_ui != show_ui_value {
+                                    return false;
+                                }
+                            }
+
+                            // Filter by hierarchical
+                            if let Some(hierarchical_value) = filter_clone.hierarchical {
+                                if entity.data.post_type.hierarchical != hierarchical_value {
+                                    return false;
+                                }
+                            }
+
+                            true
+                        })
+                        .collect();
 
                     Ok(filtered)
                 })

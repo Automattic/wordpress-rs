@@ -13,7 +13,8 @@ import uniffi.wp_mobile.PostTypeService
  *
  * Unlike posts, post types don't support pagination - all types are returned in a single fetch.
  *
- * By default, only viewable post types are returned (those with `viewable = true`).
+ * By default, only viewable and UI-visible post types are returned
+ * (those with `viewable = true` and `show_ui = true`).
  * For custom filtering, use `getObservablePostTypeCollectionWithEditContextFiltered()`.
  *
  * The collection provides:
@@ -23,7 +24,7 @@ import uniffi.wp_mobile.PostTypeService
  * Example:
  * ```
  * class MyViewModel : ViewModel() {
- *     // Get viewable post types (default behavior)
+ *     // Get viewable and UI-visible post types (default behavior)
  *     private val postTypeCollection = postTypeService.getObservablePostTypeCollectionWithEditContext()
  *
  *     init {
@@ -39,7 +40,8 @@ import uniffi.wp_mobile.PostTypeService
  *
  * @return Observable collection that notifies on database changes
  */
-fun PostTypeService.getObservablePostTypeCollectionWithEditContext(): ObservableCollection<FullEntityPostTypeDetailsWithEditContext> {
+fun PostTypeService.getObservablePostTypeCollectionWithEditContext():
+    ObservableCollection<FullEntityPostTypeDetailsWithEditContext> {
     val collection = this.createPostTypeCollectionWithEditContext()
     return createObservableCollection(
         loadData = collection::loadData,
@@ -63,8 +65,8 @@ fun PostTypeService.getObservablePostTypeCollectionWithEditContext(): Observable
  * Example:
  * ```
  * class MyViewModel : ViewModel() {
- *     // Get all post types (no filtering)
- *     private val filter = PostTypeFilter(viewable = null)
+ *     // Get only hierarchical post types that are viewable and shown in UI
+ *     private val filter = PostTypeFilter(viewable = true, showUi = true, hierarchical = true)
  *     private val postTypeCollection = postTypeService.getObservablePostTypeCollectionWithEditContextFiltered(filter)
  *
  *     init {
@@ -78,7 +80,7 @@ fun PostTypeService.getObservablePostTypeCollectionWithEditContext(): Observable
  * }
  * ```
  *
- * @param filter Filter criteria for post types (viewable status, etc.)
+ * @param filter Filter criteria for post types (viewable, show_ui, hierarchical)
  * @return Observable collection that notifies on database changes
  */
 fun PostTypeService.getObservablePostTypeCollectionWithEditContextFiltered(
