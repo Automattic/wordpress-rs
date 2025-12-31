@@ -1,7 +1,11 @@
 use crate::{
     DbTable, RowId, SqliteDbError,
     context::{EditContext, IsContext},
-    db_types::{db_site::DbSite, post_types::DbPostTypeDetailsWithEditContext},
+    db_types::{
+        db_site::DbSite,
+        post_types::{DbPostTypeDetailsWithEditContext, PostTypeEditContextColumn},
+        row_ext::RowExt,
+    },
     entity::{EntityId, FullEntity},
     repository::QueryExecutor,
 };
@@ -38,11 +42,13 @@ impl PostTypeContext for EditContext {
     }
 
     fn from_row(row: &Row) -> Result<Self::DbPostTypeDetails, SqliteDbError> {
-        let row_id: RowId = row.get(0)?;
-        let db_site_id: RowId = row.get(1)?;
-        let slug: String = row.get(2)?;
-        let data_json: String = row.get(3)?;
-        let last_fetched_at: String = row.get(4)?;
+        use PostTypeEditContextColumn::*;
+
+        let row_id: RowId = row.get_column(Rowid)?;
+        let db_site_id: RowId = row.get_column(DbSiteId)?;
+        let slug: String = row.get_column(Slug)?;
+        let data_json: String = row.get_column(Data)?;
+        let last_fetched_at: String = row.get_column(LastFetchedAt)?;
 
         // Deserialize the JSON data into PostTypeDetailsWithEditContext
         let post_type: PostTypeDetailsWithEditContext = serde_json::from_str(&data_json)
@@ -183,5 +189,37 @@ impl<C: PostTypeContext> PostTypeRepository<C> {
         }
 
         Ok(post_types)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{db_types::row_ext::ColumnIndex, test_fixtures::test_ctx};
+    use rstest::*;
+
+    /// Verify that PostTypeEditContextColumn enum values match the actual database schema.
+    ///
+    /// This test ensures the column enum stays synchronized with the SQL schema.
+    /// If columns are added, removed, or reordered, this test will fail.
+    #[rstest]
+    fn test_post_type_edit_context_column_enum_matches_schema(test_ctx: crate::test_fixtures::TestContext) {
+        use PostTypeEditContextColumn::*;
+
+        let columns = crate::test_fixtures::get_table_column_names(&test_ctx.conn, "post_types_edit_context");
+
+        // Verify each enum value maps to the correct column name
+        assert_eq!(columns[Rowid.as_index()], "rowid");
+        assert_eq!(columns[DbSiteId.as_index()], "db_site_id");
+        assert_eq!(columns[Slug.as_index()], "slug");
+        assert_eq!(columns[Data.as_index()], "data");
+        assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
+
+        // Verify we have exactly the expected number of columns
+        assert_eq!(
+            columns.len(),
+            5,
+            "Expected 5 columns in post_types_edit_context table"
+        );
     }
 }
