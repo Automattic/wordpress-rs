@@ -14,6 +14,7 @@ use rusqlite::Connection;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 pub mod posts;
+pub mod post_types;
 
 /// Test context bundling common test dependencies.
 ///

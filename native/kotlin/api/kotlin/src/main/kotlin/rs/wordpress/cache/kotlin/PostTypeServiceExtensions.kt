@@ -5,21 +5,20 @@ import uniffi.wp_mobile.PostTypeFilter
 import uniffi.wp_mobile.PostTypeService
 
 /**
- * Create an observable post type collection with edit context using default filter.
+ * Create an observable post type collection with edit context.
  *
  * Post types define what content types are available on a WordPress site (e.g., 'post', 'page',
  * custom post types). They're configuration data that rarely changes - typically only when
- * plugins are activated or deactivated.
- *
- * Unlike posts, post types don't support pagination - all types are returned in a single fetch.
- *
- * By default, only viewable and UI-visible post types are returned
- * (those with `viewable = true` and `show_ui = true`).
- * For custom filtering, use `getObservablePostTypeCollectionWithEditContextFiltered()`.
+ * plugins are activated or deactivated. Unlike posts, post types don't support pagination -
+ * all types are returned in a single fetch.
  *
  * The collection provides:
  * - `loadData()`: Load all cached post types from the database
  * - Observable notifications when post types change
+ *
+ * By default, only viewable and UI-visible post types are returned
+ * (those with `viewable = true` and `show_ui = true`).
+ * For custom filtering, use [getObservablePostTypeCollectionWithEditContextFiltered].
  *
  * Example:
  * ```
@@ -52,32 +51,13 @@ fun PostTypeService.getObservablePostTypeCollectionWithEditContext():
 /**
  * Create an observable post type collection with edit context using a custom filter.
  *
- * Post types define what content types are available on a WordPress site (e.g., 'post', 'page',
- * custom post types). They're configuration data that rarely changes - typically only when
- * plugins are activated or deactivated.
- *
- * Unlike posts, post types don't support pagination - all types are returned in a single fetch.
- *
- * The collection provides:
- * - `loadData()`: Load all cached post types from the database
- * - Observable notifications when post types change
+ * See [getObservablePostTypeCollectionWithEditContext] for general information.
  *
  * Example:
  * ```
- * class MyViewModel : ViewModel() {
- *     // Get only hierarchical post types that are viewable and shown in UI
- *     private val filter = PostTypeFilter(viewable = true, showUi = true, hierarchical = true)
- *     private val postTypeCollection = postTypeService.getObservablePostTypeCollectionWithEditContextFiltered(filter)
- *
- *     init {
- *         postTypeCollection.addObserver {
- *             viewModelScope.launch {
- *                 val postTypes = postTypeCollection.loadData()
- *                 // Update UI with post types
- *             }
- *         }
- *     }
- * }
+ * // Get only hierarchical post types that are viewable and shown in UI
+ * val filter = PostTypeFilter(viewable = true, showUi = true, hierarchical = true)
+ * val collection = postTypeService.getObservablePostTypeCollectionWithEditContextFiltered(filter)
  * ```
  *
  * @param filter Filter criteria for post types (viewable, show_ui, hierarchical)

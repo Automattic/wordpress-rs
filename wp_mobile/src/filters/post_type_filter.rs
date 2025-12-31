@@ -1,8 +1,9 @@
 /// Filter for querying post types in a collection
 ///
 /// Represents domain-level filtering criteria for post types.
-/// Since there are typically few post types per site, filtering happens
-/// at the collection/database level rather than at the API level.
+/// Since there are typically few post types per site (usually < 20), filtering happens
+/// in-memory after loading all types from the database. Post types don't support
+/// pagination, so all types are loaded in a single query.
 ///
 /// # Default Behavior
 /// By default, only viewable and UI-visible post types are returned

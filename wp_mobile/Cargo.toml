@@ -23,6 +23,7 @@ wp_mobile_cache = { path = "../wp_mobile_cache" }
 
 [dev-dependencies]
 async-trait = { workspace = true }
+futures = { workspace = true }
 rstest = { workspace = true }
 rusqlite = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }

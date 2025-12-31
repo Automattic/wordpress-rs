@@ -229,17 +229,10 @@ class PostMetadataCollectionViewModel(
         val postTypeService = selfHostedService.postTypes()
 
         // Get the post type details from cache and convert to PostEndpointType using Rust
+        // This should always succeed if post types were fetched first
         val postTypeDetails = postTypeService.getBySlug(postTypeSlug)
-        val endpointType = if (postTypeDetails != null) {
-            uniffi.wp_api.postTypeDetailsToPostEndpointType(postTypeDetails)
-        } else {
-            // Fallback if post type not found in cache
-            when (postTypeSlug.lowercase()) {
-                "post" -> PostEndpointType.Posts
-                "page" -> PostEndpointType.Pages
-                else -> PostEndpointType.Custom(postTypeSlug)
-            }
-        }
+            ?: error("Post type '$postTypeSlug' not found in cache. Ensure post types are fetched before creating post collections.")
+        val endpointType = uniffi.wp_api.postTypeDetailsToPostEndpointType(postTypeDetails)
 
         val observable = postService.getObservablePostMetadataCollectionWithEditContext(
             endpointType,

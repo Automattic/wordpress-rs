@@ -138,24 +138,24 @@ impl PostTypeService {
                         .into_iter()
                         .filter(|entity| {
                             // Filter by viewable
-                            if let Some(viewable_value) = filter_clone.viewable {
-                                if entity.data.post_type.viewable != viewable_value {
-                                    return false;
-                                }
+                            if let Some(viewable_value) = filter_clone.viewable
+                                && entity.data.post_type.viewable != viewable_value
+                            {
+                                return false;
                             }
 
                             // Filter by show_ui
-                            if let Some(show_ui_value) = filter_clone.show_ui {
-                                if entity.data.post_type.visibility.show_ui != show_ui_value {
-                                    return false;
-                                }
+                            if let Some(show_ui_value) = filter_clone.show_ui
+                                && entity.data.post_type.visibility.show_ui != show_ui_value
+                            {
+                                return false;
                             }
 
                             // Filter by hierarchical
-                            if let Some(hierarchical_value) = filter_clone.hierarchical {
-                                if entity.data.post_type.hierarchical != hierarchical_value {
-                                    return false;
-                                }
+                            if let Some(hierarchical_value) = filter_clone.hierarchical
+                                && entity.data.post_type.hierarchical != hierarchical_value
+                            {
+                                return false;
                             }
 
                             true
@@ -200,5 +200,362 @@ impl Clone for PostTypeService {
             api_client: self.api_client.clone(),
             cache: self.cache.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testing::mock_api_client;
+    use futures::executor::block_on;
+    use rstest::*;
+    use rusqlite::Connection;
+    use wp_mobile_cache::{
+        MigrationManager, WpApiCache,
+        test_fixtures::{create_test_site, post_types::PostTypeBuilder},
+        db_types::self_hosted_site::SelfHostedSite,
+    };
+
+    struct PostTypeServiceTestContext {
+        cache: Arc<WpApiCache>,
+        db_site: Arc<DbSite>,
+        post_type_service: PostTypeService,
+    }
+
+    #[fixture]
+    fn post_type_service_ctx() -> PostTypeServiceTestContext {
+        let mut conn = Connection::open_in_memory().unwrap();
+        let mut migration_manager = MigrationManager::new(&conn).unwrap();
+        migration_manager
+            .perform_migrations()
+            .expect("Migrations should succeed");
+
+        let self_hosted_site = SelfHostedSite {
+            url: "https://test.local".to_string(),
+            api_root: "https://test.local/wp-json".to_string(),
+        };
+        let db_site = create_test_site(&mut conn, &self_hosted_site);
+
+        let cache = Arc::new(WpApiCache::from(conn));
+        let api_client = mock_api_client();
+
+        let post_type_service = PostTypeService::new(
+            api_client,
+            Arc::new(db_site),
+            cache.clone(),
+        );
+
+        PostTypeServiceTestContext {
+            cache,
+            db_site: Arc::new(db_site),
+            post_type_service,
+        }
+    }
+
+    /// Helper to insert a post type into the test database
+    fn insert_post_type(
+        ctx: &PostTypeServiceTestContext,
+        post_type: &wp_api::post_types::PostTypeDetailsWithEditContext,
+    ) {
+        ctx.cache
+            .execute(|conn| {
+                let repo = PostTypeRepository::<EditContext>::new();
+                repo.upsert(conn, &ctx.db_site, &post_type.slug, post_type)
+            })
+            .expect("Failed to insert post type");
+    }
+
+    #[rstest]
+    fn test_filter_default_returns_only_viewable_and_shown_types(
+        post_type_service_ctx: PostTypeServiceTestContext,
+    ) {
+        // Insert 4 post types with different visibility combinations
+        let visible = PostTypeBuilder::new("post")
+            .viewable(true)
+            .show_ui(true)
+            .build();
+        let hidden_ui = PostTypeBuilder::new("revision")
+            .viewable(true)
+            .show_ui(false)
+            .build();
+        let not_viewable = PostTypeBuilder::new("nav_menu_item")
+            .viewable(false)
+            .show_ui(true)
+            .build();
+        let completely_hidden = PostTypeBuilder::new("custom_css")
+            .viewable(false)
+            .show_ui(false)
+            .build();
+
+        insert_post_type(&post_type_service_ctx, &visible);
+        insert_post_type(&post_type_service_ctx, &hidden_ui);
+        insert_post_type(&post_type_service_ctx, &not_viewable);
+        insert_post_type(&post_type_service_ctx, &completely_hidden);
+
+        // Use default filter (viewable=true, show_ui=true)
+        let collection = post_type_service_ctx
+            .post_type_service
+            .create_post_type_collection_with_edit_context();
+
+        let result = block_on(collection.load_data())
+            .expect("load_data should succeed");
+
+        // Should only return the one that's both viewable AND show_ui
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].data.slug, "post");
+    }
+
+    #[rstest]
+    fn test_filter_by_viewable_only(post_type_service_ctx: PostTypeServiceTestContext) {
+        // Insert viewable and non-viewable types
+        let viewable1 = PostTypeBuilder::new("post")
+            .viewable(true)
+            .show_ui(true)
+            .build();
+        let viewable2 = PostTypeBuilder::new("page")
+            .viewable(true)
+            .show_ui(false)
+            .build();
+        let not_viewable = PostTypeBuilder::new("revision")
+            .viewable(false)
+            .show_ui(true)
+            .build();
+
+        insert_post_type(&post_type_service_ctx, &viewable1);
+        insert_post_type(&post_type_service_ctx, &viewable2);
+        insert_post_type(&post_type_service_ctx, &not_viewable);
+
+        // Filter only by viewable=true, ignore show_ui
+        let filter = PostTypeFilter {
+            viewable: Some(true),
+            show_ui: None,
+            hierarchical: None,
+        };
+
+        let collection = post_type_service_ctx
+            .post_type_service
+            .create_post_type_collection_with_edit_context_filtered(filter);
+
+        let result = block_on(collection.load_data())
+            .expect("load_data should succeed");
+
+        // Should return both viewable types regardless of show_ui
+        assert_eq!(result.len(), 2);
+        let slugs: Vec<_> = result.iter().map(|e| e.data.slug.as_str()).collect();
+        assert!(slugs.contains(&"post"));
+        assert!(slugs.contains(&"page"));
+    }
+
+    #[rstest]
+    fn test_filter_by_show_ui_only(post_type_service_ctx: PostTypeServiceTestContext) {
+        // Insert types with different show_ui values
+        let shown1 = PostTypeBuilder::new("post")
+            .viewable(true)
+            .show_ui(true)
+            .build();
+        let shown2 = PostTypeBuilder::new("attachment")
+            .viewable(false)
+            .show_ui(true)
+            .build();
+        let hidden = PostTypeBuilder::new("revision")
+            .viewable(true)
+            .show_ui(false)
+            .build();
+
+        insert_post_type(&post_type_service_ctx, &shown1);
+        insert_post_type(&post_type_service_ctx, &shown2);
+        insert_post_type(&post_type_service_ctx, &hidden);
+
+        // Filter only by show_ui=true, ignore viewable
+        let filter = PostTypeFilter {
+            viewable: None,
+            show_ui: Some(true),
+            hierarchical: None,
+        };
+
+        let collection = post_type_service_ctx
+            .post_type_service
+            .create_post_type_collection_with_edit_context_filtered(filter);
+
+        let result = block_on(collection.load_data())
+            .expect("load_data should succeed");
+
+        // Should return both show_ui=true types regardless of viewable
+        assert_eq!(result.len(), 2);
+        let slugs: Vec<_> = result.iter().map(|e| e.data.slug.as_str()).collect();
+        assert!(slugs.contains(&"post"));
+        assert!(slugs.contains(&"attachment"));
+    }
+
+    #[rstest]
+    fn test_filter_by_hierarchical_only(post_type_service_ctx: PostTypeServiceTestContext) {
+        // Insert hierarchical and flat types
+        let hierarchical1 = PostTypeBuilder::new("page")
+            .viewable(true)
+            .show_ui(true)
+            .hierarchical(true)
+            .build();
+        let hierarchical2 = PostTypeBuilder::new("custom_hierarchical")
+            .viewable(false)
+            .show_ui(false)
+            .hierarchical(true)
+            .build();
+        let flat = PostTypeBuilder::new("post")
+            .viewable(true)
+            .show_ui(true)
+            .hierarchical(false)
+            .build();
+
+        insert_post_type(&post_type_service_ctx, &hierarchical1);
+        insert_post_type(&post_type_service_ctx, &hierarchical2);
+        insert_post_type(&post_type_service_ctx, &flat);
+
+        // Filter only by hierarchical=true
+        let filter = PostTypeFilter {
+            viewable: None,
+            show_ui: None,
+            hierarchical: Some(true),
+        };
+
+        let collection = post_type_service_ctx
+            .post_type_service
+            .create_post_type_collection_with_edit_context_filtered(filter);
+
+        let result = block_on(collection.load_data())
+            .expect("load_data should succeed");
+
+        // Should return both hierarchical types
+        assert_eq!(result.len(), 2);
+        let slugs: Vec<_> = result.iter().map(|e| e.data.slug.as_str()).collect();
+        assert!(slugs.contains(&"page"));
+        assert!(slugs.contains(&"custom_hierarchical"));
+    }
+
+    #[rstest]
+    fn test_filter_all_criteria_combined(post_type_service_ctx: PostTypeServiceTestContext) {
+        // Insert types with all combinations
+        let matches_all = PostTypeBuilder::new("page")
+            .viewable(true)
+            .show_ui(true)
+            .hierarchical(true)
+            .build();
+        let wrong_viewable = PostTypeBuilder::new("type1")
+            .viewable(false)
+            .show_ui(true)
+            .hierarchical(true)
+            .build();
+        let wrong_show_ui = PostTypeBuilder::new("type2")
+            .viewable(true)
+            .show_ui(false)
+            .hierarchical(true)
+            .build();
+        let wrong_hierarchical = PostTypeBuilder::new("post")
+            .viewable(true)
+            .show_ui(true)
+            .hierarchical(false)
+            .build();
+
+        insert_post_type(&post_type_service_ctx, &matches_all);
+        insert_post_type(&post_type_service_ctx, &wrong_viewable);
+        insert_post_type(&post_type_service_ctx, &wrong_show_ui);
+        insert_post_type(&post_type_service_ctx, &wrong_hierarchical);
+
+        // Filter by all three criteria
+        let filter = PostTypeFilter {
+            viewable: Some(true),
+            show_ui: Some(true),
+            hierarchical: Some(true),
+        };
+
+        let collection = post_type_service_ctx
+            .post_type_service
+            .create_post_type_collection_with_edit_context_filtered(filter);
+
+        let result = block_on(collection.load_data())
+            .expect("load_data should succeed");
+
+        // Should only return the one matching ALL criteria
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].data.slug, "page");
+    }
+
+    #[rstest]
+    fn test_filter_with_all_none_returns_everything(
+        post_type_service_ctx: PostTypeServiceTestContext,
+    ) {
+        // Insert various types
+        let type1 = PostTypeBuilder::new("post")
+            .viewable(true)
+            .show_ui(true)
+            .hierarchical(false)
+            .build();
+        let type2 = PostTypeBuilder::new("page")
+            .viewable(true)
+            .show_ui(false)
+            .hierarchical(true)
+            .build();
+        let type3 = PostTypeBuilder::new("revision")
+            .viewable(false)
+            .show_ui(false)
+            .hierarchical(false)
+            .build();
+
+        insert_post_type(&post_type_service_ctx, &type1);
+        insert_post_type(&post_type_service_ctx, &type2);
+        insert_post_type(&post_type_service_ctx, &type3);
+
+        // Filter with all None (no filtering)
+        let filter = PostTypeFilter {
+            viewable: None,
+            show_ui: None,
+            hierarchical: None,
+        };
+
+        let collection = post_type_service_ctx
+            .post_type_service
+            .create_post_type_collection_with_edit_context_filtered(filter);
+
+        let result = block_on(collection.load_data())
+            .expect("load_data should succeed");
+
+        // Should return all types
+        assert_eq!(result.len(), 3);
+    }
+
+    #[rstest]
+    fn test_filter_by_false_values(post_type_service_ctx: PostTypeServiceTestContext) {
+        // Insert types to test filtering by false values
+        let hidden_type = PostTypeBuilder::new("revision")
+            .viewable(false)
+            .show_ui(false)
+            .hierarchical(false)
+            .build();
+        let visible_type = PostTypeBuilder::new("post")
+            .viewable(true)
+            .show_ui(true)
+            .hierarchical(true)
+            .build();
+
+        insert_post_type(&post_type_service_ctx, &hidden_type);
+        insert_post_type(&post_type_service_ctx, &visible_type);
+
+        // Filter for non-viewable types
+        let filter = PostTypeFilter {
+            viewable: Some(false),
+            show_ui: None,
+            hierarchical: None,
+        };
+
+        let collection = post_type_service_ctx
+            .post_type_service
+            .create_post_type_collection_with_edit_context_filtered(filter);
+
+        let result = block_on(collection.load_data())
+            .expect("load_data should succeed");
+
+        // Should only return the non-viewable type
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].data.slug, "revision");
+        assert!(!result[0].data.viewable);
     }
 }
