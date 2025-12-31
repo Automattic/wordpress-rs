@@ -18,13 +18,20 @@ use wp_mobile_cache::{
 /// # Usage
 ///
 /// ```ignore
+/// use crate::filters::PostTypeFilter;
+///
+/// // Create filter to only show viewable post types
+/// let filter = PostTypeFilter {
+///     viewable: Some(true),
+/// };
+///
 /// // Create collection
-/// let collection = post_type_service.create_post_type_collection_with_edit_context();
+/// let collection = post_type_service.create_post_type_collection_with_edit_context(filter);
 ///
 /// // Fetch all post types from API
 /// collection.fetch().await?;
 ///
-/// // Load cached post types
+/// // Load cached post types (only viewable ones)
 /// let post_types = collection.load_data().await?;
 /// ```
 #[derive(uniffi::Object)]

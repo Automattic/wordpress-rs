@@ -1,4 +1,7 @@
-use crate::collection::{FetchError, PostTypeCollectionWithEditContext, StatelessCollection};
+use crate::{
+    collection::{FetchError, PostTypeCollectionWithEditContext, StatelessCollection},
+    filters::PostTypeFilter,
+};
 use std::sync::Arc;
 use wp_api::prelude::WpApiClient;
 use wp_mobile_cache::{
@@ -72,23 +75,58 @@ impl PostTypeService {
         Ok(entity_ids)
     }
 
-    /// Create a stateless collection for post types with edit context.
+    /// Create a stateless collection for post types with edit context using default filter.
     ///
     /// The collection provides reactive access to cached post types with
     /// database change notifications.
+    ///
+    /// By default, only viewable post types are returned (those with `viewable = true`).
+    /// For custom filtering, use `create_post_type_collection_with_edit_context_filtered()`.
+    ///
+    /// # Example (Kotlin)
+    /// ```kotlin
+    /// // Get viewable post types (default behavior)
+    /// val collection = postTypeService.createPostTypeCollectionWithEditContext()
+    /// ```
     pub fn create_post_type_collection_with_edit_context(
         &self,
     ) -> Arc<PostTypeCollectionWithEditContext> {
+        self.create_post_type_collection_with_edit_context_filtered(PostTypeFilter::default())
+    }
+
+    /// Create a stateless collection for post types with edit context using a custom filter.
+    ///
+    /// The collection provides reactive access to cached post types with
+    /// database change notifications.
+    ///
+    /// # Arguments
+    /// * `filter` - Filter criteria for post types (viewable status, etc.)
+    ///
+    /// # Example (Kotlin)
+    /// ```kotlin
+    /// // Get all post types (no filtering)
+    /// val allFilter = PostTypeFilter(viewable = null)
+    /// val allCollection = postTypeService.createPostTypeCollectionWithEditContextFiltered(allFilter)
+    ///
+    /// // Get only non-viewable post types
+    /// val hiddenFilter = PostTypeFilter(viewable = false)
+    /// val hiddenCollection = postTypeService.createPostTypeCollectionWithEditContextFiltered(hiddenFilter)
+    /// ```
+    pub fn create_post_type_collection_with_edit_context_filtered(
+        &self,
+        filter: PostTypeFilter,
+    ) -> Arc<PostTypeCollectionWithEditContext> {
         let cache = self.cache.clone();
         let db_site = self.db_site.clone();
+        let filter_clone = filter.clone();
 
-        // Create the stateless collection with a closure that loads all post types
+        // Create the stateless collection with a closure that loads filtered post types
         let stateless_collection = StatelessCollection::new(
             vec![DbTable::PostTypesEditContext],
             Box::new(move || {
                 cache.execute(|conn| {
                     let repo = PostTypeRepository::<EditContext>::new();
-                    repo.select_all(conn, &db_site)
+                    repo.select_by_filter(conn, &db_site, filter_clone.viewable)
                 })
             }),
         );

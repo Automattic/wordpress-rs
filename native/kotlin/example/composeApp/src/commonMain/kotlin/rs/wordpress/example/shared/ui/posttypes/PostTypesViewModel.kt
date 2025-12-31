@@ -117,6 +117,7 @@ class PostTypesViewModel(
         val postTypeService = selfHostedService.postTypes()
 
         // Create the underlying PostTypeCollection (for fetch)
+        // Uses default filter (viewable = true)
         val underlyingCollection = postTypeService.createPostTypeCollectionWithEditContext()
         postTypeCollection = underlyingCollection
 

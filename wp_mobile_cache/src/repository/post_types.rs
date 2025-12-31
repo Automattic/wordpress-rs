@@ -164,13 +164,54 @@ impl<C: PostTypeContext> PostTypeRepository<C> {
         executor: &impl QueryExecutor,
         site: &DbSite,
     ) -> Result<Vec<FullEntity<C::DbPostTypeDetails>>, SqliteDbError> {
+        self.select_by_filter(executor, site, None)
+    }
+
+    /// Select post types filtered by criteria.
+    ///
+    /// Similar to `select_all` but applies filtering based on provided parameters.
+    /// Currently supports filtering by viewable status.
+    ///
+    /// # Arguments
+    /// * `executor` - Database connection or transaction
+    /// * `site` - The site to query post types from
+    /// * `viewable` - Optional viewable filter:
+    ///   - `None`: Returns all post types (viewable=true, viewable=false, viewable=null)
+    ///   - `Some(true)`: Returns only post types where viewable is explicitly true
+    ///   - `Some(false)`: Returns only post types where viewable is explicitly false
+    ///   - Post types with viewable=null are excluded when any filter is applied
+    ///
+    /// # Returns
+    /// Vector of post types matching the filter criteria, empty if no matches found.
+    pub fn select_by_filter(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        viewable: Option<bool>,
+    ) -> Result<Vec<FullEntity<C::DbPostTypeDetails>>, SqliteDbError> {
+        // Build WHERE clause
+        let mut where_clauses = vec!["db_site_id = ?"];
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(site.row_id)];
+
+        if let Some(viewable_value) = viewable {
+            // Filter by viewable field in the JSON data
+            // json_extract returns the JSON value, so we compare against JSON boolean
+            where_clauses.push("json_extract(data, '$.viewable') = ?");
+            params.push(Box::new(viewable_value));
+        }
+
+        let where_clause = where_clauses.join(" AND ");
+
         let sql = format!(
-            "SELECT * FROM {} WHERE db_site_id = ? ORDER BY slug",
-            Self::table_name()
+            "SELECT * FROM {} WHERE {} ORDER BY slug",
+            Self::table_name(),
+            where_clause
         );
 
         let mut stmt = executor.prepare(&sql)?;
-        let rows = stmt.query_map([site.row_id.0], |row| {
+        let param_refs: Vec<&dyn rusqlite::ToSql> =
+            params.iter().map(|p| p.as_ref()).collect();
+        let rows = stmt.query_map(param_refs.as_slice(), |row| {
             C::from_row(row).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         })?;
 
