@@ -36,12 +36,17 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
 import uniffi.wp_mobile.PostItemState
+import uniffi.wp_mobile.WpSelfHostedService
 import uniffi.wp_mobile_cache.ListState
 
 @Composable
 @Preview
 fun PostMetadataCollectionScreen(
-    viewModel: PostMetadataCollectionViewModel = koinInject(),
+    postTypeSlug: String = "post",
+    viewModel: PostMetadataCollectionViewModel = run {
+        val service = koinInject<WpSelfHostedService>()
+        PostMetadataCollectionViewModel(service, postTypeSlug)
+    },
     onBackClicked: (() -> Unit)? = null
 ) {
     val state by viewModel.state.collectAsState()
@@ -78,7 +83,8 @@ fun PostMetadataCollectionScreen(
             InfoCard(
                 state = state,
                 itemCount = items.size,
-                onRefreshClick = { viewModel.refresh() }
+                onRefreshClick = { viewModel.refresh() },
+                postTypeSlug = postTypeSlug
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -166,7 +172,8 @@ fun RowScope.FilterButton(
 fun InfoCard(
     state: PostMetadataCollectionState,
     itemCount: Int,
-    onRefreshClick: () -> Unit
+    onRefreshClick: () -> Unit,
+    postTypeSlug: String
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -178,11 +185,18 @@ fun InfoCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Metadata Collection",
-                    style = MaterialTheme.typography.subtitle1,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    Text(
+                        text = "Metadata Collection",
+                        style = MaterialTheme.typography.subtitle1,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Post Type: ${postTypeSlug.replaceFirstChar { it.uppercase() }}",
+                        style = MaterialTheme.typography.caption,
+                        color = MaterialTheme.colors.primary
+                    )
+                }
                 Button(
                     onClick = onRefreshClick,
                     enabled = !state.isSyncing

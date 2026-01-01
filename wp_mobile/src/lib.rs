@@ -20,6 +20,11 @@ wp_mobile_entity!(
     wp_api::posts::AnyPostWithEditContext
 );
 
+wp_mobile_entity!(
+    EntityPostTypeDetailsWithEditContext,
+    wp_api::post_types::PostTypeDetailsWithEditContext
+);
+
 wp_mobile_post_collection!(
     PostCollectionWithEditContext,
     AnyPostWithEditContext,

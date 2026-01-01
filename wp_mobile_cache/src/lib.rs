@@ -78,6 +78,8 @@ pub enum DbTable {
     PostsViewContext,
     /// Posts with embed context (minimal data for embeds)
     PostsEmbedContext,
+    /// Post types with edit context (post type configuration data)
+    PostTypesEditContext,
     /// Self-hosted WordPress sites
     SelfHostedSites,
     /// Database sites mapping table
@@ -102,6 +104,7 @@ impl DbTable {
             DbTable::PostsEditContext => "posts_edit_context",
             DbTable::PostsViewContext => "posts_view_context",
             DbTable::PostsEmbedContext => "posts_embed_context",
+            DbTable::PostTypesEditContext => "post_types_edit_context",
             DbTable::SelfHostedSites => "self_hosted_sites",
             DbTable::DbSites => "db_sites",
             DbTable::TermRelationships => "term_relationships",
@@ -133,6 +136,7 @@ impl TryFrom<&str> for DbTable {
             "posts_edit_context" => Ok(DbTable::PostsEditContext),
             "posts_view_context" => Ok(DbTable::PostsViewContext),
             "posts_embed_context" => Ok(DbTable::PostsEmbedContext),
+            "post_types_edit_context" => Ok(DbTable::PostTypesEditContext),
             "self_hosted_sites" => Ok(DbTable::SelfHostedSites),
             "db_sites" => Ok(DbTable::DbSites),
             "term_relationships" => Ok(DbTable::TermRelationships),
@@ -392,7 +396,7 @@ impl From<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 7] = [
+static MIGRATION_QUERIES: [&str; 8] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -400,6 +404,7 @@ static MIGRATION_QUERIES: [&str; 7] = [
     include_str!("../migrations/0005-create-posts-embed-context-table.sql"),
     include_str!("../migrations/0006-create-self-hosted-sites-table.sql"),
     include_str!("../migrations/0007-create-list-metadata-tables.sql"),
+    include_str!("../migrations/0008-create-post-types-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {

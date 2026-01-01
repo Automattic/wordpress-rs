@@ -1,10 +1,11 @@
-use crate::service::{posts::PostService, sites::SiteService};
+use crate::service::{post_types::PostTypeService, posts::PostService, sites::SiteService};
 use std::sync::Arc;
 use wp_api::prelude::{ApiUrlResolver, WpApiClient, WpApiClientDelegate};
 use wp_mobile_cache::WpApiCache;
 
 pub mod metadata;
 pub mod mock_post_service;
+pub mod post_types;
 pub mod posts;
 pub mod sites;
 
@@ -29,10 +30,11 @@ impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {
 ///
 /// This service coordinates between the API client and cache for a specific
 /// self-hosted WordPress site. It provides access to domain-specific services
-/// like PostService, CommentService, etc.
+/// like PostService, PostTypeService, CommentService, etc.
 #[derive(uniffi::Object)]
 pub struct WpSelfHostedService {
     posts: Arc<PostService>,
+    post_types: Arc<PostTypeService>,
     sites: Arc<SiteService>,
 }
 
@@ -62,19 +64,35 @@ impl WpSelfHostedService {
         let db_site =
             SiteService::get_or_create_self_hosted_site(cache.clone(), site_url, api_root)?;
 
+        let db_site_arc = Arc::new(db_site);
+
         let posts = Arc::new(PostService::new(
+            api_client.clone(),
+            db_site_arc.clone(),
+            cache.clone(),
+        ));
+        let post_types = Arc::new(PostTypeService::new(
             api_client,
-            Arc::new(db_site),
+            db_site_arc.clone(),
             cache.clone(),
         ));
         let sites = Arc::new(SiteService::new(cache, db_site));
 
-        Ok(Self { posts, sites })
+        Ok(Self {
+            posts,
+            post_types,
+            sites,
+        })
     }
 
     /// Get the post service for this WordPress site
     pub fn posts(&self) -> Arc<PostService> {
         self.posts.clone()
+    }
+
+    /// Get the post type service for this WordPress site
+    pub fn post_types(&self) -> Arc<PostTypeService> {
+        self.post_types.clone()
     }
 
     /// Get the site service for this WordPress site

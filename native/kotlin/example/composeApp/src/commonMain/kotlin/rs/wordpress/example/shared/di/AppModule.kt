@@ -10,6 +10,7 @@ import rs.wordpress.example.shared.repository.AuthenticationRepository
 import rs.wordpress.example.shared.ui.plugins.PluginListViewModel
 import rs.wordpress.example.shared.ui.postcollection.PostCollectionViewModel
 import rs.wordpress.example.shared.ui.postmetadatacollection.PostMetadataCollectionViewModel
+import rs.wordpress.example.shared.ui.posttypes.PostTypesViewModel
 import rs.wordpress.example.shared.ui.stresstest.StressTestViewModel
 import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
@@ -107,6 +108,7 @@ val viewModelModule = module {
     single { StressTestViewModel(get(), get(), get()) }
     single { PostCollectionViewModel(get()) }
     single { PostMetadataCollectionViewModel(get()) }
+    single { PostTypesViewModel(get()) }
 }
 
 fun commonModules() = listOf(

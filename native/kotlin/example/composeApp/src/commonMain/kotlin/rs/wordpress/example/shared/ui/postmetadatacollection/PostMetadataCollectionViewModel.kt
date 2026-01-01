@@ -26,6 +26,7 @@ import uniffi.wp_mobile_cache.ListState
  */
 data class PostMetadataCollectionState(
     val currentFilter: PostListFilter,
+    val postTypeSlug: String = "post",
     val listInfo: ListInfo? = null,
     val lastSyncResult: SyncResult? = null,
     val lastError: String? = null
@@ -110,11 +111,17 @@ data class PostItemDisplayData(
 }
 
 class PostMetadataCollectionViewModel(
-    private val selfHostedService: WpSelfHostedService
+    private val selfHostedService: WpSelfHostedService,
+    private val postTypeSlug: String = "post"
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    private val _state = MutableStateFlow(PostMetadataCollectionState(currentFilter = PostListFilter()))
+    private val _state = MutableStateFlow(
+        PostMetadataCollectionState(
+            currentFilter = PostListFilter(),
+            postTypeSlug = postTypeSlug
+        )
+    )
     val state: StateFlow<PostMetadataCollectionState> = _state.asStateFlow()
 
     private val _items = MutableStateFlow<List<PostItemDisplayData>>(emptyList())
@@ -142,6 +149,7 @@ class PostMetadataCollectionViewModel(
         // Read persisted state from database (single query)
         _state.value = PostMetadataCollectionState(
             currentFilter = newFilter,
+            postTypeSlug = postTypeSlug,
             listInfo = observableCollection?.listInfo(),
             lastSyncResult = null,
             lastError = null
@@ -218,8 +226,16 @@ class PostMetadataCollectionViewModel(
 
     private fun createObservableCollection(filter: PostListFilter) {
         val postService = selfHostedService.posts()
+        val postTypeService = selfHostedService.postTypes()
+
+        // Get the post type details from cache and convert to PostEndpointType using Rust
+        // This should always succeed if post types were fetched first
+        val postTypeDetails = postTypeService.getBySlug(postTypeSlug)
+            ?: error("Post type '$postTypeSlug' not found in cache. Ensure post types are fetched before creating post collections.")
+        val endpointType = uniffi.wp_api.postTypeDetailsToPostEndpointType(postTypeDetails)
+
         val observable = postService.getObservablePostMetadataCollectionWithEditContext(
-            PostEndpointType.Posts,
+            endpointType,
             filter
         )
 

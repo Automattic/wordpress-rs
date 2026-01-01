@@ -5289,6 +5289,7 @@ name = "wp_mobile"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "futures",
  "log",
  "paste",
  "rand 0.9.2",

@@ -18,7 +18,7 @@ fun SiteScreen(
     onPluginsClicked: () -> Unit,
     onStressTestClicked: () -> Unit,
     onPostCollectionClicked: () -> Unit,
-    onPostMetadataCollectionClicked: () -> Unit
+    onPostTypesClicked: () -> Unit
 ) {
     MaterialTheme {
         Column(
@@ -54,8 +54,8 @@ fun SiteScreen(
                         }
                     }
                     Column {
-                        Button(onClick = onPostMetadataCollectionClicked) {
-                            Text("Post Metadata Collection")
+                        Button(onClick = onPostTypesClicked) {
+                            Text("Post Types")
                         }
                     }
                 }
