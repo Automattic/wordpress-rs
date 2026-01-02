@@ -47,7 +47,7 @@ impl FromSql for EntityType {
     }
 }
 
-/// Fetch state for an entity.
+/// Database representation of entity fetch state.
 ///
 /// Tracks the lifecycle of fetching an entity from the network:
 /// - `Missing`: Not in cache, needs to be fetched
@@ -57,8 +57,9 @@ impl FromSql for EntityType {
 /// - `Failed`: Fetch was attempted but failed
 ///
 /// Stored in database as (state INTEGER, error_message TEXT).
+/// This type represents the database entity, not domain logic.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EntityState {
+pub enum DbEntityState {
     /// Entity is not in cache and not being fetched.
     Missing,
 
@@ -75,7 +76,7 @@ pub enum EntityState {
     Failed { error: String },
 }
 
-impl EntityState {
+impl DbEntityState {
     /// Returns `true` if the entity needs to be fetched.
     ///
     /// This includes `Missing`, `Stale`, and `Failed` states.
@@ -127,7 +128,7 @@ impl EntityState {
     }
 }
 
-impl Default for EntityState {
+impl Default for DbEntityState {
     fn default() -> Self {
         Self::Missing
     }
@@ -163,7 +164,7 @@ impl EntityStateRepository {
         entity_id: i64,
         db_site: &DbSite,
         entity_type: EntityType,
-        state: &EntityState,
+        state: &DbEntityState,
     ) -> Result<(), SqliteDbError> {
         let (state_int, error_message) = state.to_db_representation();
         let sql = format!(
@@ -195,7 +196,7 @@ impl EntityStateRepository {
         entity_ids: &[i64],
         db_site: &DbSite,
         entity_type: EntityType,
-        state: &EntityState,
+        state: &DbEntityState,
     ) -> Result<(), SqliteDbError> {
         if entity_ids.is_empty() {
             return Ok(());
@@ -254,7 +255,7 @@ impl EntityStateRepository {
         entity_id: i64,
         db_site: &DbSite,
         entity_type: EntityType,
-    ) -> Result<Option<EntityState>, SqliteDbError> {
+    ) -> Result<Option<DbEntityState>, SqliteDbError> {
         let sql = format!(
             "SELECT state, error_message FROM {} WHERE entity_id = ?1 AND db_site_id = ?2 AND entity_type = ?3",
             Self::table_name()
@@ -274,7 +275,7 @@ impl EntityStateRepository {
         match result {
             None => Ok(None),
             Some((state_int, error_message)) => {
-                EntityState::from_db_representation(state_int, error_message)
+                DbEntityState::from_db_representation(state_int, error_message)
                     .map(Some)
                     .ok_or_else(|| {
                         SqliteDbError::SqliteError(format!(
@@ -301,8 +302,8 @@ impl EntityStateRepository {
     ///
     /// Returns the number of rows updated.
     pub fn reset_states_on_startup(executor: &impl QueryExecutor) -> Result<usize, SqliteDbError> {
-        let (missing_state, _) = EntityState::Missing.to_db_representation();
-        let (fetching_state, _) = EntityState::Fetching.to_db_representation();
+        let (missing_state, _) = DbEntityState::Missing.to_db_representation();
+        let (fetching_state, _) = DbEntityState::Fetching.to_db_representation();
 
         let sql = format!(
             "UPDATE {} SET state = ?1 WHERE state = ?2",
@@ -349,7 +350,7 @@ mod tests {
             42,
             &db_site,
             EntityType::PostsEditContext,
-            &EntityState::Fetching,
+            &DbEntityState::Fetching,
         )
         .expect("Failed to set initial state");
 
@@ -359,14 +360,14 @@ mod tests {
             42,
             &db_site,
             EntityType::PostsEditContext,
-            &EntityState::Cached,
+            &DbEntityState::Cached,
         )
         .expect("Failed to update state");
 
         let state =
             EntityStateRepository::get_state(&conn, 42, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state");
-        assert_eq!(state, Some(EntityState::Cached));
+        assert_eq!(state, Some(DbEntityState::Cached));
     }
 
     #[test]
@@ -378,7 +379,7 @@ mod tests {
             &[1, 2, 3],
             &db_site,
             EntityType::PostsEditContext,
-            &EntityState::Failed {
+            &DbEntityState::Failed {
                 error: "Batch error".to_string(),
             },
         )
@@ -387,21 +388,21 @@ mod tests {
         assert_eq!(
             EntityStateRepository::get_state(&conn, 1, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state for entity 1"),
-            Some(EntityState::Failed {
+            Some(DbEntityState::Failed {
                 error: "Batch error".to_string()
             })
         );
         assert_eq!(
             EntityStateRepository::get_state(&conn, 2, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state for entity 2"),
-            Some(EntityState::Failed {
+            Some(DbEntityState::Failed {
                 error: "Batch error".to_string()
             })
         );
         assert_eq!(
             EntityStateRepository::get_state(&conn, 3, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state for entity 3"),
-            Some(EntityState::Failed {
+            Some(DbEntityState::Failed {
                 error: "Batch error".to_string()
             })
         );

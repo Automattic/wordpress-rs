@@ -103,7 +103,7 @@ impl PostMetadataCollectionWithEditContext {
     /// This is the primary method for getting collection contents to display.
     ///
     /// # Note
-    /// Data availability is independent of the internal `EntityState`. After an app
+    /// Data availability is independent of the internal `DbEntityState`. After an app
     /// restart, items may have internal state `Missing` but still have cached data
     /// available. This method will return `FetchingWithData`, `Stale`, or `FailedWithData`
     /// variants appropriately when cached data exists.
@@ -117,8 +117,8 @@ impl PostMetadataCollectionWithEditContext {
             return Ok(Vec::new());
         };
 
-        // Load ALL posts from cache - data availability is independent of EntityState.
-        // After app restart, EntityState resets to Missing but data may still be cached.
+        // Load ALL posts from cache - data availability is independent of DbEntityState.
+        // After app restart, DbEntityState resets to Missing but data may still be cached.
         let all_ids: Vec<i64> = items.iter().map(|item| item.id()).collect();
 
         let cached_posts = if all_ids.is_empty() {

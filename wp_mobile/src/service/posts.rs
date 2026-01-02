@@ -9,8 +9,8 @@ use crate::{
     filters::{AnyPostFilter, PostListFilter},
     service::metadata::MetadataService,
     sync::{
-        EntityMetadata, EntityState, EntityStateReader, EntityStateReaderImpl, EntityStateService,
-        MetadataFetchResult, SyncResult, SyncStrategy,
+        DbEntityState, EntityMetadata, EntityStateReader, EntityStateReaderImpl,
+        EntityStateService, MetadataFetchResult, SyncResult, SyncStrategy,
     },
 };
 use std::{collections::HashSet, sync::Arc};
@@ -214,7 +214,7 @@ impl PostService {
         // Filter to only posts currently in Cached state
         let cached_ids: Vec<PostId> = metadata
             .iter()
-            .filter(|m| matches!(state_reader.get(m.id), EntityState::Cached))
+            .filter(|m| matches!(state_reader.get(m.id), DbEntityState::Cached))
             .map(|m| PostId(m.id))
             .collect();
 
@@ -348,7 +348,7 @@ impl PostService {
                 &self.db_site,
                 EntityType::PostsEditContext,
                 &stale_ids,
-                EntityState::Stale,
+                DbEntityState::Stale,
             );
         }
 
@@ -500,7 +500,7 @@ impl PostService {
             &self.db_site,
             EntityType::PostsEditContext,
             &fetchable,
-            EntityState::Fetching,
+            DbEntityState::Fetching,
         );
 
         // Convert back to PostId for the API call
@@ -554,7 +554,7 @@ impl PostService {
                             &self.db_site,
                             EntityType::PostsEditContext,
                             &fetchable,
-                            EntityState::failed(e.to_string()),
+                            DbEntityState::failed(e.to_string()),
                         );
                         return Err(e);
                     }
@@ -567,7 +567,7 @@ impl PostService {
                     &self.db_site,
                     EntityType::PostsEditContext,
                     &fetched_ids,
-                    EntityState::Cached,
+                    DbEntityState::Cached,
                 );
 
                 // Mark posts that were requested but not returned as Failed
@@ -584,7 +584,7 @@ impl PostService {
                         &self.db_site,
                         EntityType::PostsEditContext,
                         &failed_ids,
-                        EntityState::failed("Not found"),
+                        DbEntityState::failed("Not found"),
                     );
                 }
 
@@ -600,7 +600,7 @@ impl PostService {
                     &self.db_site,
                     EntityType::PostsEditContext,
                     &fetchable,
-                    EntityState::failed(e.to_string()),
+                    DbEntityState::failed(e.to_string()),
                 );
                 Err(e.into())
             }
@@ -1181,7 +1181,7 @@ mod tests {
             &post_service_ctx.post_service.db_site,
             EntityType::PostsEditContext,
             test_post.id.0,
-            EntityState::Cached,
+            DbEntityState::Cached,
         );
 
         // Test: Metadata without modified_gmt (None)
@@ -1305,11 +1305,11 @@ mod tests {
             2,
         );
         assert!(
-            matches!(state1, crate::sync::EntityState::Failed { .. }),
+            matches!(state1, crate::sync::DbEntityState::Failed { .. }),
             "Post 1 should be marked as Failed on network error"
         );
         assert!(
-            matches!(state2, crate::sync::EntityState::Failed { .. }),
+            matches!(state2, crate::sync::DbEntityState::Failed { .. }),
             "Post 2 should be marked as Failed on network error"
         );
     }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use wp_mobile_cache::{
     SqliteDbError, WpApiCache,
     db_types::db_site::DbSite,
-    repository::entity_state::{EntityState, EntityStateRepository, EntityType},
+    repository::entity_state::{DbEntityState, EntityStateRepository, EntityType},
 };
 
 /// Read-only access to entity fetch states.
@@ -13,8 +13,8 @@ use wp_mobile_cache::{
 pub trait EntityStateReader: Send + Sync {
     /// Get the current state for an entity.
     ///
-    /// Returns `EntityState::Missing` if the entity has no recorded state.
-    fn get(&self, id: i64) -> EntityState;
+    /// Returns `DbEntityState::Missing` if the entity has no recorded state.
+    fn get(&self, id: i64) -> DbEntityState;
 }
 
 /// Stateless service for tracking entity fetch states.
@@ -39,7 +39,7 @@ impl EntityStateService {
         db_site: &DbSite,
         entity_type: EntityType,
         id: i64,
-        state: EntityState,
+        state: DbEntityState,
     ) {
         Self::save_batch(cache, db_site, entity_type, &[id], state);
     }
@@ -55,7 +55,7 @@ impl EntityStateService {
         db_site: &DbSite,
         entity_type: EntityType,
         ids: &[i64],
-        state: EntityState,
+        state: DbEntityState,
     ) {
         if let Err(e) = cache.execute(|conn| {
             EntityStateRepository::set_state_batch(conn, ids, db_site, entity_type, &state)
@@ -71,18 +71,18 @@ impl EntityStateService {
 
     /// Get the state for a single entity.
     ///
-    /// Returns `EntityState::Missing` if the entity has no recorded state.
+    /// Returns `DbEntityState::Missing` if the entity has no recorded state.
     pub fn get(
         cache: &WpApiCache,
         db_site: &DbSite,
         entity_type: EntityType,
         id: i64,
-    ) -> EntityState {
+    ) -> DbEntityState {
         cache
             .execute(|conn| EntityStateRepository::get_state(conn, id, db_site, entity_type))
             .ok()
             .flatten()
-            .unwrap_or(EntityState::Missing)
+            .unwrap_or(DbEntityState::Missing)
     }
 
     /// Filter IDs to only those that can be fetched (not currently `Fetching`).
@@ -141,7 +141,7 @@ impl EntityStateReaderImpl {
 }
 
 impl EntityStateReader for EntityStateReaderImpl {
-    fn get(&self, id: i64) -> EntityState {
+    fn get(&self, id: i64) -> DbEntityState {
         EntityStateService::get(&self.cache, &self.db_site, self.entity_type, id)
     }
 }
@@ -183,35 +183,35 @@ mod tests {
             &db_site,
             EntityType::PostsEditContext,
             1,
-            EntityState::Missing,
+            DbEntityState::Missing,
         );
         EntityStateService::save(
             &cache,
             &db_site,
             EntityType::PostsEditContext,
             2,
-            EntityState::Fetching,
+            DbEntityState::Fetching,
         );
         EntityStateService::save(
             &cache,
             &db_site,
             EntityType::PostsEditContext,
             3,
-            EntityState::Cached,
+            DbEntityState::Cached,
         );
         EntityStateService::save(
             &cache,
             &db_site,
             EntityType::PostsEditContext,
             4,
-            EntityState::Stale,
+            DbEntityState::Stale,
         );
         EntityStateService::save(
             &cache,
             &db_site,
             EntityType::PostsEditContext,
             5,
-            EntityState::failed("error"),
+            DbEntityState::failed("error"),
         );
         // ID 6 has no state (should be fetchable)
 

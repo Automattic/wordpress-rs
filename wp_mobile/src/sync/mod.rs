@@ -8,7 +8,7 @@
 //! ## Key Types
 //!
 //! - [`EntityMetadata`] - Lightweight metadata (id + optional modified_gmt)
-//! - [`EntityState`] - Fetch state (Missing, Fetching, Cached, Stale, Failed)
+//! - [`DbEntityState`] - Fetch state (Missing, Fetching, Cached, Stale, Failed)
 //! - [`CollectionItem`] - Combines metadata with state
 //! - [`MetadataFetchResult`] - Result of metadata-only fetch
 //! - [`SyncResult`] - Result of sync operation
@@ -44,4 +44,4 @@ pub use list_metadata_reader::{ListInfo, ListMetadataReader};
 pub use metadata_fetch_result::MetadataFetchResult;
 pub use sync_result::SyncResult;
 pub use sync_strategy::SyncStrategy;
-pub use wp_mobile_cache::repository::entity_state::EntityState;
+pub use wp_mobile_cache::repository::entity_state::DbEntityState;

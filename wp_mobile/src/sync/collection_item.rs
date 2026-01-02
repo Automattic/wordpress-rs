@@ -1,4 +1,4 @@
-use super::{EntityMetadata, EntityState};
+use super::{DbEntityState, EntityMetadata};
 
 /// An item in a metadata-driven collection.
 ///
@@ -11,11 +11,11 @@ pub struct CollectionItem {
     pub metadata: EntityMetadata,
 
     /// Current fetch state.
-    pub state: EntityState,
+    pub state: DbEntityState,
 }
 
 impl CollectionItem {
-    pub fn new(metadata: EntityMetadata, state: EntityState) -> Self {
+    pub fn new(metadata: EntityMetadata, state: DbEntityState) -> Self {
         Self { metadata, state }
     }
 
