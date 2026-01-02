@@ -165,11 +165,15 @@ macro_rules! wp_mobile_metadata_item {
             /// - `Stale + no data` → Defensive fallback to Missing
             /// - `Failed + no data` → Show error message
             /// - `Failed + has data` → Show data with error indicator
-            fn from((state, data): ($crate::sync::DbEntityState, Option<$full_entity_type>)) -> Self {
+            fn from(
+                (state, data): ($crate::sync::DbEntityState, Option<$full_entity_type>),
+            ) -> Self {
                 match (state, data) {
                     // Missing state
                     ($crate::sync::DbEntityState::Missing, None) => $state_name::Missing,
-                    ($crate::sync::DbEntityState::Missing, Some(data)) => $state_name::Stale { data },
+                    ($crate::sync::DbEntityState::Missing, Some(data)) => {
+                        $state_name::Stale { data }
+                    }
 
                     // Fetching state
                     ($crate::sync::DbEntityState::Fetching, None) => $state_name::Fetching,
@@ -178,7 +182,9 @@ macro_rules! wp_mobile_metadata_item {
                     }
 
                     // Cached state (should always have data, but handle gracefully)
-                    ($crate::sync::DbEntityState::Cached, Some(data)) => $state_name::Cached { data },
+                    ($crate::sync::DbEntityState::Cached, Some(data)) => {
+                        $state_name::Cached { data }
+                    }
                     ($crate::sync::DbEntityState::Cached, None) => $state_name::Missing,
 
                     // Stale state (should always have data, but handle gracefully)

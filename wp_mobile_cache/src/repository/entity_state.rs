@@ -262,14 +262,11 @@ impl EntityStateRepository {
         );
         let result = executor
             .prepare(&sql)?
-            .query_row(
-                params![entity_id, db_site.row_id.0, entity_type],
-                |row| {
-                    let state_int: i32 = row.get(0)?;
-                    let error_message: Option<String> = row.get(1)?;
-                    Ok((state_int, error_message))
-                },
-            )
+            .query_row(params![entity_id, db_site.row_id.0, entity_type], |row| {
+                let state_int: i32 = row.get(0)?;
+                let error_message: Option<String> = row.get(1)?;
+                Ok((state_int, error_message))
+            })
             .optional()?;
 
         match result {
@@ -291,7 +288,7 @@ impl EntityStateRepository {
     // Cleanup Operations
     // ============================================================
 
-    /// Reset entity states on app startup.
+    /// Clear abandoned fetch operations from previous app session.
     ///
     /// Converts `Fetching` states to `Missing` to prevent stuck loading indicators
     /// while preserving `Cached` states to avoid unnecessary refetching.
@@ -301,7 +298,7 @@ impl EntityStateRepository {
     /// UX by retaining already-fetched data.
     ///
     /// Returns the number of rows updated.
-    pub fn reset_states_on_startup(executor: &impl QueryExecutor) -> Result<usize, SqliteDbError> {
+    pub fn clear_abandoned_fetches(executor: &impl QueryExecutor) -> Result<usize, SqliteDbError> {
         let (missing_state, _) = DbEntityState::Missing.to_db_representation();
         let (fetching_state, _) = DbEntityState::Fetching.to_db_representation();
 
@@ -472,11 +469,16 @@ mod tests {
         let fetchable: Vec<i64> = ids
             .iter()
             .filter(|&&id| {
-                match EntityStateRepository::get_state(&conn, id, &db_site, EntityType::PostsEditContext)
-                    .expect("Failed to get state")
+                match EntityStateRepository::get_state(
+                    &conn,
+                    id,
+                    &db_site,
+                    EntityType::PostsEditContext,
+                )
+                .expect("Failed to get state")
                 {
                     Some(state) => !state.is_fetching(), // Not fetchable if Fetching
-                    None => true,                         // Fetchable if no state
+                    None => true,                        // Fetchable if no state
                 }
             })
             .copied()

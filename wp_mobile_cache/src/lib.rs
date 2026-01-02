@@ -299,13 +299,13 @@ impl WpApiCache {
                 log::warn!("Failed to reset stale fetching states: {}", e);
             }
 
-            // Reset entity states after migrations complete.
+            // Clear abandoned fetch operations after migrations complete.
             // Convert Fetching -> Missing to prevent stuck loading indicators while
             // preserving Cached states to avoid unnecessary refetching.
             if let Err(e) =
-                repository::entity_state::EntityStateRepository::reset_states_on_startup(connection)
+                repository::entity_state::EntityStateRepository::clear_abandoned_fetches(connection)
             {
-                log::warn!("Failed to reset entity states: {}", e);
+                log::warn!("Failed to clear abandoned fetches: {}", e);
             }
 
             Ok(version)

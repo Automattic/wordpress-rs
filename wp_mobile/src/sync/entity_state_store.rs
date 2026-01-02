@@ -145,4 +145,3 @@ impl EntityStateReader for EntityStateReaderImpl {
         EntityStateService::get(&self.cache, &self.db_site, self.entity_type, id)
     }
 }
-
