@@ -141,6 +141,12 @@ impl MetadataCollectionCore {
             return true;
         }
 
+        // Check EntityState - entity state changes should trigger data refresh
+        // (e.g., Fetching -> Failed transition needs to update UI)
+        if hook.table == DbTable::EntityState {
+            return true;
+        }
+
         false
     }
 

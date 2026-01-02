@@ -73,7 +73,7 @@ pub struct PostService {
     api_client: Arc<WpApiClient>,
     cache: Arc<WpApiCache>,
 
-    /// Per-entity fetch state for edit context (memory-only, resets on app restart).
+    /// Per-entity fetch state for edit context (database-backed, resets on app restart).
     /// Each context needs its own state store since the same entity ID can have
     /// different fetch states across contexts.
     state_store_with_edit_context: Arc<EntityStateStore>,
@@ -89,9 +89,13 @@ impl PostService {
 
         Self {
             api_client,
-            db_site,
-            cache,
-            state_store_with_edit_context: Arc::new(EntityStateStore::new()),
+            db_site: db_site.clone(),
+            cache: cache.clone(),
+            state_store_with_edit_context: Arc::new(EntityStateStore::new(
+                cache.clone(),
+                db_site.row_id,
+                wp_mobile_cache::repository::entity_state::EntityType::PostsEditContext,
+            )),
             metadata_service,
         }
     }

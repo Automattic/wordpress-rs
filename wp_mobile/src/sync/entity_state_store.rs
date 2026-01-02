@@ -1,5 +1,9 @@
-use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::Arc;
+
+use wp_mobile_cache::{
+    RowId, WpApiCache,
+    repository::entity_state::{EntityStateRepository, EntityStateValue, EntityType},
+};
 
 use super::EntityState;
 
@@ -16,34 +20,65 @@ pub trait EntityStateReader: Send + Sync {
 
 /// Store for tracking entity fetch states.
 ///
-/// Maps entity IDs to their current fetch state (Missing, Fetching, Cached, etc.).
-/// This is a memory-only store - state resets on app restart.
+/// Stores entity states in the database. Database changes trigger UpdateHook
+/// notifications automatically (via WpApiCache), ensuring observers receive
+/// updates when entities transition between states (e.g., Fetching -> Failed).
 ///
-/// Thread-safe via `RwLock<HashMap>`.
+/// Thread-safe via WpApiCache's internal synchronization.
 pub struct EntityStateStore {
-    states: RwLock<HashMap<i64, EntityState>>,
+    cache: Arc<WpApiCache>,
+    db_site_id: RowId,
+    entity_type: EntityType,
 }
 
 impl EntityStateStore {
-    pub fn new() -> Self {
+    /// Create a new entity state store.
+    ///
+    /// # Arguments
+    /// * `cache` - Database cache for storing states
+    /// * `db_site_id` - Database site ID for this store
+    /// * `entity_type` - Type-safe entity identifier (e.g., EntityType::PostsEditContext)
+    pub fn new(cache: Arc<WpApiCache>, db_site_id: RowId, entity_type: EntityType) -> Self {
         Self {
-            states: RwLock::new(HashMap::new()),
+            cache,
+            db_site_id,
+            entity_type,
         }
     }
 
     /// Set the state for a single entity.
+    ///
+    /// Writes to database, triggering UpdateHook notification to observers.
     pub fn set(&self, id: i64, state: EntityState) {
-        self.states
-            .write()
-            .expect("RwLock poisoned")
-            .insert(id, state);
+        let (state_value, error_msg) = Self::encode_state(&state);
+
+        let _ = self.cache.execute(|conn| {
+            EntityStateRepository::set_state(
+                conn,
+                id,
+                self.db_site_id,
+                self.entity_type,
+                state_value,
+                error_msg.as_deref(),
+            )
+        });
     }
 
     /// Set the state for multiple entities.
+    ///
+    /// Writes to database in batch, triggering UpdateHook notification for each entity.
     pub fn set_batch(&self, ids: &[i64], state: EntityState) {
-        let mut states = self.states.write().expect("RwLock poisoned");
-        ids.iter().for_each(|&id| {
-            states.insert(id, state.clone());
+        let (state_value, error_msg) = Self::encode_state(&state);
+
+        let _ = self.cache.execute(|conn| {
+            EntityStateRepository::set_state_batch(
+                conn,
+                ids,
+                self.db_site_id,
+                self.entity_type,
+                state_value,
+                error_msg.as_deref(),
+            )
         });
     }
 
@@ -51,33 +86,83 @@ impl EntityStateStore {
     ///
     /// Returns IDs where state is `Missing`, `Stale`, `Failed`, or not recorded.
     pub fn filter_fetchable(&self, ids: &[i64]) -> Vec<i64> {
-        let states = self.states.read().expect("RwLock poisoned");
-        ids.iter()
-            .filter(|&&id| states.get(&id).map(|s| !s.is_fetching()).unwrap_or(true))
-            .copied()
-            .collect()
+        self.cache
+            .execute(|conn| {
+                Ok::<Vec<i64>, wp_mobile_cache::SqliteDbError>(
+                    ids.iter()
+                        .filter(|&&id| {
+                            match EntityStateRepository::get_state(
+                                conn,
+                                id,
+                                self.db_site_id,
+                                self.entity_type,
+                            ) {
+                                Ok(Some(EntityStateValue::Fetching)) => false, // Fetching - not fetchable
+                                _ => true, // Everything else is fetchable
+                            }
+                        })
+                        .copied()
+                        .collect(),
+                )
+            })
+            .unwrap_or_else(|e| {
+                log::warn!(
+                    "Failed to check fetchable state for {} IDs, allowing all: {}",
+                    ids.len(),
+                    e
+                );
+                ids.to_vec()
+            })
     }
 
-    /// Clear all state entries.
-    pub fn clear(&self) {
-        self.states.write().expect("RwLock poisoned").clear();
+    /// Encode EntityState to (state_value, error_message) for database storage.
+    fn encode_state(state: &EntityState) -> (EntityStateValue, Option<String>) {
+        match state {
+            EntityState::Missing => (EntityStateValue::Missing, None),
+            EntityState::Fetching => (EntityStateValue::Fetching, None),
+            EntityState::Cached => (EntityStateValue::Cached, None),
+            EntityState::Stale => (EntityStateValue::Stale, None),
+            EntityState::Failed { error } => (EntityStateValue::Failed, Some(error.clone())),
+        }
     }
-}
 
-impl Default for EntityStateStore {
-    fn default() -> Self {
-        Self::new()
+    /// Decode (state_value, error_message) from database to EntityState.
+    fn decode_state(state_value: EntityStateValue, error_message: Option<String>) -> EntityState {
+        match state_value {
+            EntityStateValue::Missing => EntityState::Missing,
+            EntityStateValue::Fetching => EntityState::Fetching,
+            EntityStateValue::Cached => EntityState::Cached,
+            EntityStateValue::Stale => EntityState::Stale,
+            EntityStateValue::Failed => EntityState::Failed {
+                error: error_message.unwrap_or_else(|| "Unknown error".to_string()),
+            },
+        }
     }
 }
 
 impl EntityStateReader for EntityStateStore {
     fn get(&self, id: i64) -> EntityState {
-        self.states
-            .read()
-            .expect("RwLock poisoned")
-            .get(&id)
-            .cloned()
-            .unwrap_or_default()
+        self.cache
+            .execute(|conn| {
+                let state_value =
+                    EntityStateRepository::get_state(conn, id, self.db_site_id, self.entity_type)?;
+                let error_msg = if state_value == Some(EntityStateValue::Failed) {
+                    EntityStateRepository::get_error_message(
+                        conn,
+                        id,
+                        self.db_site_id,
+                        self.entity_type,
+                    )?
+                } else {
+                    None
+                };
+
+                Ok::<EntityState, wp_mobile_cache::SqliteDbError>(match state_value {
+                    Some(state) => Self::decode_state(state, error_msg),
+                    None => EntityState::Missing,
+                })
+            })
+            .unwrap_or(EntityState::Missing)
     }
 }
 
@@ -87,7 +172,11 @@ mod tests {
 
     #[test]
     fn test_filter_fetchable() {
-        let store = EntityStateStore::new();
+        let cache = Arc::new(WpApiCache::new(None).expect("Failed to create WpApiCache"));
+        cache
+            .perform_migrations()
+            .expect("Failed to perform migrations");
+        let store = EntityStateStore::new(cache, RowId(1), EntityType::PostsEditContext);
 
         store.set(1, EntityState::Missing);
         store.set(2, EntityState::Fetching);
