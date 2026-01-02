@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use wp_mobile_cache::{
-    WpApiCache,
+    SqliteDbError, WpApiCache,
     db_types::db_site::DbSite,
     repository::entity_state::{EntityStateRepository, EntityStateValue, EntityType},
 };
@@ -118,7 +118,7 @@ impl EntityStateService {
                     None
                 };
 
-                Ok::<EntityState, wp_mobile_cache::SqliteDbError>(match state_value {
+                Ok::<EntityState, SqliteDbError>(match state_value {
                     Some(state) => Self::decode_state(state, error_msg),
                     None => EntityState::Missing,
                 })
@@ -137,7 +137,7 @@ impl EntityStateService {
     ) -> Vec<i64> {
         cache
             .execute(|conn| {
-                Ok::<Vec<i64>, wp_mobile_cache::SqliteDbError>(
+                Ok::<Vec<i64>, SqliteDbError>(
                     ids.iter()
                         .filter(|&&id| {
                             match EntityStateRepository::get_state(conn, id, db_site, entity_type) {

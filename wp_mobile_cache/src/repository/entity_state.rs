@@ -170,7 +170,7 @@ impl EntityStateRepository {
             );
 
             // Build params: flatten [id, db_site_id, entity_type, state, error_msg] for each entity
-            let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::with_capacity(chunk.len() * 5);
+            let mut params: Vec<Box<dyn ToSql>> = Vec::with_capacity(chunk.len() * 5);
             for &id in chunk {
                 params.push(Box::new(id));
                 params.push(Box::new(db_site.row_id.0));
@@ -180,8 +180,7 @@ impl EntityStateRepository {
             }
 
             // Convert to &[&dyn ToSql] as required by execute
-            let params_refs: Vec<&dyn rusqlite::ToSql> =
-                params.iter().map(|p| p.as_ref()).collect();
+            let params_refs: Vec<&dyn ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
             executor.execute(&sql, params_refs.as_slice())?;
         }

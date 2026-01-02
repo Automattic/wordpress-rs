@@ -1181,7 +1181,7 @@ mod tests {
             &post_service_ctx.post_service.db_site,
             EntityType::PostsEditContext,
             test_post.id.0,
-            crate::sync::EntityState::Cached,
+            EntityState::Cached,
         );
 
         // Test: Metadata without modified_gmt (None)
