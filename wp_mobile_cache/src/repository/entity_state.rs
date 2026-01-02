@@ -407,4 +407,88 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn test_entity_type_values_are_stable() {
+        // IMPORTANT: Changing these values requires a database migration.
+        // These integer values are persisted in the entity_state table.
+        assert_eq!(EntityType::PostsEditContext as i32, 0);
+    }
+
+    #[test]
+    fn test_filter_fetchable_logic() {
+        let (conn, db_site) = setup_test_db();
+
+        // Set various states
+        EntityStateRepository::set_state(
+            &conn,
+            1,
+            &db_site,
+            EntityType::PostsEditContext,
+            &DbEntityState::Missing,
+        )
+        .expect("Failed to set state");
+
+        EntityStateRepository::set_state(
+            &conn,
+            2,
+            &db_site,
+            EntityType::PostsEditContext,
+            &DbEntityState::Fetching,
+        )
+        .expect("Failed to set state");
+
+        EntityStateRepository::set_state(
+            &conn,
+            3,
+            &db_site,
+            EntityType::PostsEditContext,
+            &DbEntityState::Cached,
+        )
+        .expect("Failed to set state");
+
+        EntityStateRepository::set_state(
+            &conn,
+            4,
+            &db_site,
+            EntityType::PostsEditContext,
+            &DbEntityState::Stale,
+        )
+        .expect("Failed to set state");
+
+        EntityStateRepository::set_state(
+            &conn,
+            5,
+            &db_site,
+            EntityType::PostsEditContext,
+            &DbEntityState::failed("error"),
+        )
+        .expect("Failed to set state");
+
+        // ID 6 has no state (should be fetchable)
+
+        // Test fetchable logic: only Fetching state should be non-fetchable
+        let ids = vec![1, 2, 3, 4, 5, 6];
+        let fetchable: Vec<i64> = ids
+            .iter()
+            .filter(|&&id| {
+                match EntityStateRepository::get_state(&conn, id, &db_site, EntityType::PostsEditContext)
+                    .expect("Failed to get state")
+                {
+                    Some(state) => !state.is_fetching(), // Not fetchable if Fetching
+                    None => true,                         // Fetchable if no state
+                }
+            })
+            .copied()
+            .collect();
+
+        // Only Fetching (2) should be excluded - it's already in progress
+        // All others are "fetchable" (not currently being fetched)
+        assert!(fetchable.contains(&1)); // Missing
+        assert!(!fetchable.contains(&2)); // Fetching - excluded (already in progress)
+        assert!(fetchable.contains(&3)); // Cached - fetchable (could re-fetch if needed)
+        assert!(fetchable.contains(&4)); // Stale
+        assert!(fetchable.contains(&5)); // Failed
+        assert!(fetchable.contains(&6)); // Unknown (no state recorded)
+    }
 }
