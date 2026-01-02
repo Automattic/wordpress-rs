@@ -44,25 +44,7 @@ impl EntityStateService {
         id: i64,
         state: EntityState,
     ) {
-        let (state_value, error_msg) = Self::encode_state(&state);
-
-        if let Err(e) = cache.execute(|conn| {
-            EntityStateRepository::set_state(
-                conn,
-                id,
-                db_site,
-                entity_type,
-                state_value,
-                error_msg.as_deref(),
-            )
-        }) {
-            log::warn!(
-                "Failed to set entity state for id={} to {:?}: {} (will be re-evaluated on next sync)",
-                id,
-                state,
-                e
-            );
-        }
+        Self::save_batch(cache, db_site, entity_type, &[id], state);
     }
 
     /// Save the state for multiple entities to the database (batch operation).
