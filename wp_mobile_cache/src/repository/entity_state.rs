@@ -290,23 +290,22 @@ impl EntityStateRepository {
 
     /// Clear abandoned fetch operations from previous app session.
     ///
-    /// Converts `Fetching` states to `Missing` to prevent stuck loading indicators
+    /// Deletes entities in `Fetching` state to prevent stuck loading indicators
     /// while preserving `Cached` states to avoid unnecessary refetching.
     ///
     /// On app restart, all in-flight fetches are abandoned. Rather than clearing
-    /// everything, we selectively reset only the incomplete operations to improve
+    /// everything, we selectively remove only the incomplete operations to improve
     /// UX by retaining already-fetched data.
     ///
-    /// Returns the number of rows updated.
+    /// Deleting (vs updating to Missing) makes the distinction clearer: no state
+    /// in the database means the entity hasn't been tracked yet.
+    ///
+    /// Returns the number of rows deleted.
     pub fn clear_abandoned_fetches(executor: &impl QueryExecutor) -> Result<usize, SqliteDbError> {
-        let (missing_state, _) = DbEntityState::Missing.to_db_representation();
         let (fetching_state, _) = DbEntityState::Fetching.to_db_representation();
 
-        let sql = format!(
-            "UPDATE {} SET state = ?1 WHERE state = ?2",
-            Self::table_name()
-        );
-        executor.execute(&sql, params![missing_state, fetching_state])
+        let sql = format!("DELETE FROM {} WHERE state = ?1", Self::table_name());
+        executor.execute(&sql, params![fetching_state])
     }
 }
 
@@ -465,7 +464,7 @@ mod tests {
         // ID 6 has no state (should be fetchable)
 
         // Test fetchable logic: only Fetching state should be non-fetchable
-        let ids = vec![1, 2, 3, 4, 5, 6];
+        let ids = [1, 2, 3, 4, 5, 6];
         let fetchable: Vec<i64> = ids
             .iter()
             .filter(|&&id| {
