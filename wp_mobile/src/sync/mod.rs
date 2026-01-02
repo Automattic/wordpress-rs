@@ -14,9 +14,9 @@
 //! - [`SyncResult`] - Result of sync operation
 //! - [`SyncStrategy`] - Strategy for list sync (MetadataOnly vs Full)
 //!
-//! ## Store Types
+//! ## Service Types
 //!
-//! - [`EntityStateStore`] - Tracks fetch state per entity (read-write)
+//! - [`EntityStateService`] - Stateless service for entity state operations
 //! - [`EntityStateReader`] - Read-only access to entity states (trait)
 //! - [`ListMetadataReader`] - Read-only access to list metadata (trait)
 //!
@@ -41,7 +41,7 @@ mod sync_strategy;
 pub use collection_item::CollectionItem;
 pub use entity_metadata::EntityMetadata;
 pub use entity_state::EntityState;
-pub use entity_state_store::{EntityStateReader, EntityStateStore};
+pub use entity_state_store::{EntityStateReader, EntityStateReaderImpl, EntityStateService};
 pub use list_metadata_reader::{ListInfo, ListMetadataReader};
 pub use metadata_fetch_result::MetadataFetchResult;
 pub use sync_result::SyncResult;

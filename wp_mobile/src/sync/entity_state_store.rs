@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use wp_mobile_cache::{
-    RowId, WpApiCache,
+    WpApiCache,
+    db_types::db_site::DbSite,
     repository::entity_state::{EntityStateRepository, EntityStateValue, EntityType},
 };
 
@@ -18,46 +19,35 @@ pub trait EntityStateReader: Send + Sync {
     fn get(&self, id: i64) -> EntityState;
 }
 
-/// Store for tracking entity fetch states.
+/// Stateless service for tracking entity fetch states.
 ///
+/// All functions are associated - callers pass dependencies explicitly.
 /// Stores entity states in the database. Database changes trigger UpdateHook
 /// notifications automatically (via WpApiCache), ensuring observers receive
 /// updates when entities transition between states (e.g., Fetching -> Failed).
 ///
 /// Thread-safe via WpApiCache's internal synchronization.
-pub struct EntityStateStore {
-    cache: Arc<WpApiCache>,
-    db_site_id: RowId,
-    entity_type: EntityType,
-}
+pub struct EntityStateService;
 
-impl EntityStateStore {
-    /// Create a new entity state store.
-    ///
-    /// # Arguments
-    /// * `cache` - Database cache for storing states
-    /// * `db_site_id` - Database site ID for this store
-    /// * `entity_type` - Type-safe entity identifier (e.g., EntityType::PostsEditContext)
-    pub fn new(cache: Arc<WpApiCache>, db_site_id: RowId, entity_type: EntityType) -> Self {
-        Self {
-            cache,
-            db_site_id,
-            entity_type,
-        }
-    }
-
+impl EntityStateService {
     /// Set the state for a single entity.
     ///
     /// Writes to database, triggering UpdateHook notification to observers.
-    pub fn set(&self, id: i64, state: EntityState) {
+    pub fn set(
+        cache: &WpApiCache,
+        db_site: &DbSite,
+        entity_type: EntityType,
+        id: i64,
+        state: EntityState,
+    ) {
         let (state_value, error_msg) = Self::encode_state(&state);
 
-        let _ = self.cache.execute(|conn| {
+        let _ = cache.execute(|conn| {
             EntityStateRepository::set_state(
                 conn,
                 id,
-                self.db_site_id,
-                self.entity_type,
+                db_site,
+                entity_type,
                 state_value,
                 error_msg.as_deref(),
             )
@@ -67,26 +57,64 @@ impl EntityStateStore {
     /// Set the state for multiple entities.
     ///
     /// Writes to database in batch, triggering UpdateHook notification for each entity.
-    pub fn set_batch(&self, ids: &[i64], state: EntityState) {
+    pub fn set_batch(
+        cache: &WpApiCache,
+        db_site: &DbSite,
+        entity_type: EntityType,
+        ids: &[i64],
+        state: EntityState,
+    ) {
         let (state_value, error_msg) = Self::encode_state(&state);
 
-        let _ = self.cache.execute(|conn| {
+        let _ = cache.execute(|conn| {
             EntityStateRepository::set_state_batch(
                 conn,
                 ids,
-                self.db_site_id,
-                self.entity_type,
+                db_site,
+                entity_type,
                 state_value,
                 error_msg.as_deref(),
             )
         });
     }
 
+    /// Get the state for a single entity.
+    ///
+    /// Returns `EntityState::Missing` if the entity has no recorded state.
+    pub fn get(
+        cache: &WpApiCache,
+        db_site: &DbSite,
+        entity_type: EntityType,
+        id: i64,
+    ) -> EntityState {
+        cache
+            .execute(|conn| {
+                let state_value =
+                    EntityStateRepository::get_state(conn, id, db_site, entity_type)?;
+                let error_msg = if state_value == Some(EntityStateValue::Failed) {
+                    EntityStateRepository::get_error_message(conn, id, db_site, entity_type)?
+                } else {
+                    None
+                };
+
+                Ok::<EntityState, wp_mobile_cache::SqliteDbError>(match state_value {
+                    Some(state) => Self::decode_state(state, error_msg),
+                    None => EntityState::Missing,
+                })
+            })
+            .unwrap_or(EntityState::Missing)
+    }
+
     /// Filter IDs to only those that can be fetched (not currently `Fetching`).
     ///
     /// Returns IDs where state is `Missing`, `Stale`, `Failed`, or not recorded.
-    pub fn filter_fetchable(&self, ids: &[i64]) -> Vec<i64> {
-        self.cache
+    pub fn filter_fetchable(
+        cache: &WpApiCache,
+        db_site: &DbSite,
+        entity_type: EntityType,
+        ids: &[i64],
+    ) -> Vec<i64> {
+        cache
             .execute(|conn| {
                 Ok::<Vec<i64>, wp_mobile_cache::SqliteDbError>(
                     ids.iter()
@@ -94,8 +122,8 @@ impl EntityStateStore {
                             match EntityStateRepository::get_state(
                                 conn,
                                 id,
-                                self.db_site_id,
-                                self.entity_type,
+                                db_site,
+                                entity_type,
                             ) {
                                 Ok(Some(EntityStateValue::Fetching)) => false, // Fetching - not fetchable
                                 _ => true, // Everything else is fetchable
@@ -116,7 +144,7 @@ impl EntityStateStore {
     }
 
     /// Encode EntityState to (state_value, error_message) for database storage.
-    fn encode_state(state: &EntityState) -> (EntityStateValue, Option<String>) {
+    pub fn encode_state(state: &EntityState) -> (EntityStateValue, Option<String>) {
         match state {
             EntityState::Missing => (EntityStateValue::Missing, None),
             EntityState::Fetching => (EntityStateValue::Fetching, None),
@@ -127,7 +155,7 @@ impl EntityStateStore {
     }
 
     /// Decode (state_value, error_message) from database to EntityState.
-    fn decode_state(state_value: EntityStateValue, error_message: Option<String>) -> EntityState {
+    pub fn decode_state(state_value: EntityStateValue, error_message: Option<String>) -> EntityState {
         match state_value {
             EntityStateValue::Missing => EntityState::Missing,
             EntityStateValue::Fetching => EntityState::Fetching,
@@ -140,52 +168,74 @@ impl EntityStateStore {
     }
 }
 
-impl EntityStateReader for EntityStateStore {
-    fn get(&self, id: i64) -> EntityState {
-        self.cache
-            .execute(|conn| {
-                let state_value =
-                    EntityStateRepository::get_state(conn, id, self.db_site_id, self.entity_type)?;
-                let error_msg = if state_value == Some(EntityStateValue::Failed) {
-                    EntityStateRepository::get_error_message(
-                        conn,
-                        id,
-                        self.db_site_id,
-                        self.entity_type,
-                    )?
-                } else {
-                    None
-                };
+/// Read-only wrapper for entity state access.
+///
+/// Implements EntityStateReader trait by delegating to EntityStateService::get().
+/// This allows collections to read entity states without being able to modify them.
+pub struct EntityStateReaderImpl {
+    cache: Arc<WpApiCache>,
+    db_site: DbSite,
+    entity_type: EntityType,
+}
 
-                Ok::<EntityState, wp_mobile_cache::SqliteDbError>(match state_value {
-                    Some(state) => Self::decode_state(state, error_msg),
-                    None => EntityState::Missing,
-                })
-            })
-            .unwrap_or(EntityState::Missing)
+impl EntityStateReaderImpl {
+    /// Create a new reader for entity states.
+    pub fn new(cache: Arc<WpApiCache>, db_site: DbSite, entity_type: EntityType) -> Self {
+        Self {
+            cache,
+            db_site,
+            entity_type,
+        }
+    }
+}
+
+impl EntityStateReader for EntityStateReaderImpl {
+    fn get(&self, id: i64) -> EntityState {
+        EntityStateService::get(&self.cache, &self.db_site, self.entity_type, id)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rusqlite::Connection;
+    use wp_mobile_cache::{
+        MigrationManager,
+        db_types::self_hosted_site::SelfHostedSite,
+        repository::sites::SiteRepository,
+    };
+
+    fn setup_test_db() -> (Arc<WpApiCache>, DbSite) {
+        let mut conn = Connection::open_in_memory().expect("Failed to create in-memory database");
+        let mut mgr = MigrationManager::new(&conn).expect("Failed to create MigrationManager");
+        mgr.perform_migrations()
+            .expect("Failed to perform migrations");
+
+        let site_repo = SiteRepository;
+        let self_hosted_site = SelfHostedSite {
+            url: "https://test.local".to_string(),
+            api_root: "https://test.local/wp-json".to_string(),
+        };
+        let db_site = site_repo
+            .upsert_self_hosted_site(&mut conn, &self_hosted_site)
+            .expect("Site creation should succeed")
+            .db_site;
+
+        (Arc::new(WpApiCache::from(conn)), db_site)
+    }
 
     #[test]
     fn test_filter_fetchable() {
-        let cache = Arc::new(WpApiCache::new(None).expect("Failed to create WpApiCache"));
-        cache
-            .perform_migrations()
-            .expect("Failed to perform migrations");
-        let store = EntityStateStore::new(cache, RowId(1), EntityType::PostsEditContext);
+        let (cache, db_site) = setup_test_db();
 
-        store.set(1, EntityState::Missing);
-        store.set(2, EntityState::Fetching);
-        store.set(3, EntityState::Cached);
-        store.set(4, EntityState::Stale);
-        store.set(5, EntityState::failed("error"));
+        EntityStateService::set(&cache, &db_site, EntityType::PostsEditContext, 1, EntityState::Missing);
+        EntityStateService::set(&cache, &db_site, EntityType::PostsEditContext, 2, EntityState::Fetching);
+        EntityStateService::set(&cache, &db_site, EntityType::PostsEditContext, 3, EntityState::Cached);
+        EntityStateService::set(&cache, &db_site, EntityType::PostsEditContext, 4, EntityState::Stale);
+        EntityStateService::set(&cache, &db_site, EntityType::PostsEditContext, 5, EntityState::failed("error"));
         // ID 6 has no state (should be fetchable)
 
-        let fetchable = store.filter_fetchable(&[1, 2, 3, 4, 5, 6]);
+        let fetchable = EntityStateService::filter_fetchable(&cache, &db_site, EntityType::PostsEditContext, &[1, 2, 3, 4, 5, 6]);
 
         // Only Fetching (2) should be excluded - it's already in progress
         // All others are "fetchable" (not currently being fetched)

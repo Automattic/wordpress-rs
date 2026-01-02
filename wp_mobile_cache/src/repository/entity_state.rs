@@ -1,4 +1,4 @@
-use crate::{DbTable, RowId, SqliteDbError, repository::QueryExecutor};
+use crate::{DbTable, SqliteDbError, db_types::db_site::DbSite, repository::QueryExecutor};
 use rusqlite::{
     OptionalExtension, params,
     types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput},
@@ -108,7 +108,7 @@ impl EntityStateRepository {
     pub fn set_state(
         executor: &impl QueryExecutor,
         entity_id: i64,
-        db_site_id: RowId,
+        db_site: &DbSite,
         entity_type: EntityType,
         state: EntityStateValue,
         error_message: Option<&str>,
@@ -124,7 +124,7 @@ impl EntityStateRepository {
             &sql,
             params![
                 entity_id,
-                db_site_id.0,
+                db_site.row_id.0,
                 entity_type.table_name(),
                 state,
                 error_message
@@ -141,13 +141,13 @@ impl EntityStateRepository {
     pub fn set_state_batch(
         executor: &impl QueryExecutor,
         entity_ids: &[i64],
-        db_site_id: RowId,
+        db_site: &DbSite,
         entity_type: EntityType,
         state: EntityStateValue,
         error_message: Option<&str>,
     ) -> Result<(), SqliteDbError> {
         for &id in entity_ids {
-            Self::set_state(executor, id, db_site_id, entity_type, state, error_message)?;
+            Self::set_state(executor, id, db_site, entity_type, state, error_message)?;
         }
         Ok(())
     }
@@ -162,7 +162,7 @@ impl EntityStateRepository {
     pub fn get_state(
         executor: &impl QueryExecutor,
         entity_id: i64,
-        db_site_id: RowId,
+        db_site: &DbSite,
         entity_type: EntityType,
     ) -> Result<Option<EntityStateValue>, SqliteDbError> {
         let sql = format!(
@@ -172,7 +172,7 @@ impl EntityStateRepository {
         executor
             .prepare(&sql)?
             .query_row(
-                params![entity_id, db_site_id.0, entity_type.table_name()],
+                params![entity_id, db_site.row_id.0, entity_type.table_name()],
                 |row| row.get(0),
             )
             .optional()
@@ -185,7 +185,7 @@ impl EntityStateRepository {
     pub fn get_error_message(
         executor: &impl QueryExecutor,
         entity_id: i64,
-        db_site_id: RowId,
+        db_site: &DbSite,
         entity_type: EntityType,
     ) -> Result<Option<String>, SqliteDbError> {
         let sql = format!(
@@ -195,7 +195,7 @@ impl EntityStateRepository {
         executor
             .prepare(&sql)?
             .query_row(
-                params![entity_id, db_site_id.0, entity_type.table_name()],
+                params![entity_id, db_site.row_id.0, entity_type.table_name()],
                 |row| row.get(0),
             )
             .optional()
@@ -226,24 +226,36 @@ mod tests {
     use crate::MigrationManager;
     use rusqlite::Connection;
 
-    fn setup_test_db() -> Connection {
-        let conn = Connection::open_in_memory().expect("Failed to create in-memory database");
+    use crate::{db_types::self_hosted_site::SelfHostedSite, repository::sites::SiteRepository};
+
+    fn setup_test_db() -> (Connection, DbSite) {
+        let mut conn = Connection::open_in_memory().expect("Failed to create in-memory database");
         let mut mgr = MigrationManager::new(&conn).expect("Failed to create MigrationManager");
         mgr.perform_migrations()
             .expect("Failed to perform migrations");
-        conn
+
+        let site_repo = SiteRepository;
+        let self_hosted_site = SelfHostedSite {
+            url: "https://test.local".to_string(),
+            api_root: "https://test.local/wp-json".to_string(),
+        };
+        let db_site = site_repo
+            .upsert_self_hosted_site(&mut conn, &self_hosted_site)
+            .expect("Site creation should succeed")
+            .db_site;
+
+        (conn, db_site)
     }
 
     #[test]
     fn test_upsert_updates_existing_state() {
-        let conn = setup_test_db();
-        let db_site_id = RowId(1);
+        let (conn, db_site) = setup_test_db();
 
         // Insert initial state
         EntityStateRepository::set_state(
             &conn,
             42,
-            db_site_id,
+            &db_site,
             EntityType::PostsEditContext,
             EntityStateValue::Fetching,
             None,
@@ -254,7 +266,7 @@ mod tests {
         EntityStateRepository::set_state(
             &conn,
             42,
-            db_site_id,
+            &db_site,
             EntityType::PostsEditContext,
             EntityStateValue::Cached,
             None,
@@ -262,21 +274,20 @@ mod tests {
         .expect("Failed to update state");
 
         let state =
-            EntityStateRepository::get_state(&conn, 42, db_site_id, EntityType::PostsEditContext)
+            EntityStateRepository::get_state(&conn, 42, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state");
         assert_eq!(state, Some(EntityStateValue::Cached));
     }
 
     #[test]
     fn test_reset_all_states() {
-        let conn = setup_test_db();
-        let db_site_id = RowId(1);
+        let (conn, db_site) = setup_test_db();
 
         // Insert some states (using PostsEditContext for all since it's the only variant currently)
         EntityStateRepository::set_state(
             &conn,
             1,
-            db_site_id,
+            &db_site,
             EntityType::PostsEditContext,
             EntityStateValue::Fetching,
             None,
@@ -285,7 +296,7 @@ mod tests {
         EntityStateRepository::set_state(
             &conn,
             2,
-            db_site_id,
+            &db_site,
             EntityType::PostsEditContext,
             EntityStateValue::Cached,
             None,
@@ -294,7 +305,7 @@ mod tests {
         EntityStateRepository::set_state(
             &conn,
             3,
-            db_site_id,
+            &db_site,
             EntityType::PostsEditContext,
             EntityStateValue::Fetching,
             None,
@@ -308,17 +319,17 @@ mod tests {
 
         // Verify all gone
         assert_eq!(
-            EntityStateRepository::get_state(&conn, 1, db_site_id, EntityType::PostsEditContext)
+            EntityStateRepository::get_state(&conn, 1, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state for entity 1"),
             None
         );
         assert_eq!(
-            EntityStateRepository::get_state(&conn, 2, db_site_id, EntityType::PostsEditContext)
+            EntityStateRepository::get_state(&conn, 2, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state for entity 2"),
             None
         );
         assert_eq!(
-            EntityStateRepository::get_state(&conn, 3, db_site_id, EntityType::PostsEditContext)
+            EntityStateRepository::get_state(&conn, 3, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state for entity 3"),
             None
         );
@@ -326,13 +337,12 @@ mod tests {
 
     #[test]
     fn test_batch_set() {
-        let conn = setup_test_db();
-        let db_site_id = RowId(1);
+        let (conn, db_site) = setup_test_db();
 
         EntityStateRepository::set_state_batch(
             &conn,
             &[1, 2, 3],
-            db_site_id,
+            &db_site,
             EntityType::PostsEditContext,
             EntityStateValue::Failed,
             Some("Batch error"),
@@ -340,17 +350,17 @@ mod tests {
         .expect("Failed to batch set state");
 
         assert_eq!(
-            EntityStateRepository::get_state(&conn, 1, db_site_id, EntityType::PostsEditContext)
+            EntityStateRepository::get_state(&conn, 1, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state for entity 1"),
             Some(EntityStateValue::Failed)
         );
         assert_eq!(
-            EntityStateRepository::get_state(&conn, 2, db_site_id, EntityType::PostsEditContext)
+            EntityStateRepository::get_state(&conn, 2, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state for entity 2"),
             Some(EntityStateValue::Failed)
         );
         assert_eq!(
-            EntityStateRepository::get_state(&conn, 3, db_site_id, EntityType::PostsEditContext)
+            EntityStateRepository::get_state(&conn, 3, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state for entity 3"),
             Some(EntityStateValue::Failed)
         );
