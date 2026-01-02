@@ -3,6 +3,7 @@ use rusqlite::{
     OptionalExtension, params,
     types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput},
 };
+use std::collections::HashMap;
 
 /// Type-safe identifier for entity collections.
 ///
@@ -93,6 +94,14 @@ impl DbEntityState {
     /// Returns `true` if the entity is cached (fresh or stale).
     pub fn is_cached(&self) -> bool {
         matches!(self, Self::Cached | Self::Stale)
+    }
+
+    /// Returns `true` if the entity can be fetched.
+    ///
+    /// An entity is fetchable if it's not currently being fetched.
+    /// All states except `Fetching` are fetchable.
+    pub fn is_fetchable(&self) -> bool {
+        !self.is_fetching()
     }
 
     /// Create a `Failed` state with the given error message.
@@ -282,6 +291,66 @@ impl EntityStateRepository {
                     })
             }
         }
+    }
+
+    /// Get states for multiple entities (batch operation).
+    ///
+    /// Returns a HashMap mapping entity_id to its state. Entities with no
+    /// recorded state will not appear in the result.
+    ///
+    /// This is more efficient than calling get_state() in a loop.
+    pub fn get_states_batch(
+        executor: &impl QueryExecutor,
+        entity_ids: &[i64],
+        db_site: &DbSite,
+        entity_type: EntityType,
+    ) -> Result<HashMap<i64, DbEntityState>, SqliteDbError> {
+        if entity_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        // Build IN clause: (entity_id IN (?, ?, ?))
+        let placeholders: Vec<String> = (0..entity_ids.len()).map(|_| "?".to_string()).collect();
+        let in_clause = placeholders.join(", ");
+
+        let sql = format!(
+            "SELECT entity_id, state, error_message FROM {} WHERE entity_id IN ({}) AND db_site_id = ? AND entity_type = ?",
+            Self::table_name(),
+            in_clause
+        );
+
+        // Build params: [id1, id2, ..., db_site_id, entity_type]
+        let mut params: Vec<Box<dyn ToSql>> = entity_ids
+            .iter()
+            .map(|&id| Box::new(id) as Box<dyn ToSql>)
+            .collect();
+        params.push(Box::new(db_site.row_id.0));
+        params.push(Box::new(entity_type));
+
+        let params_refs: Vec<&dyn ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
+        let mut stmt = executor.prepare(&sql)?;
+        let rows = stmt.query_map(params_refs.as_slice(), |row| {
+            let entity_id: i64 = row.get(0)?;
+            let state_int: i32 = row.get(1)?;
+            let error_message: Option<String> = row.get(2)?;
+            Ok((entity_id, state_int, error_message))
+        })?;
+
+        let mut result = HashMap::new();
+        for row in rows {
+            let (entity_id, state_int, error_message) = row?;
+            if let Some(state) = DbEntityState::from_db_representation(state_int, error_message) {
+                result.insert(entity_id, state);
+            } else {
+                return Err(SqliteDbError::SqliteError(format!(
+                    "Invalid entity state value {} in database for entity {}",
+                    state_int, entity_id
+                )));
+            }
+        }
+
+        Ok(result)
     }
 
     // ============================================================
@@ -476,8 +545,8 @@ mod tests {
                 )
                 .expect("Failed to get state")
                 {
-                    Some(state) => !state.is_fetching(), // Not fetchable if Fetching
-                    None => true,                        // Fetchable if no state
+                    Some(state) => state.is_fetchable(),
+                    None => true, // Fetchable if no state
                 }
             })
             .copied()

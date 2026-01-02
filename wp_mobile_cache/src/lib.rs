@@ -3,6 +3,7 @@ use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
 use std::sync::Mutex;
 
+use crate::repository::entity_state::EntityStateRepository;
 use crate::repository::list_metadata::ListMetadataRepository;
 
 pub mod context;
@@ -302,9 +303,7 @@ impl WpApiCache {
             // Clear abandoned fetch operations after migrations complete.
             // Deletes Fetching states to prevent stuck loading indicators while
             // preserving Cached states to avoid unnecessary refetching.
-            if let Err(e) =
-                repository::entity_state::EntityStateRepository::clear_abandoned_fetches(connection)
-            {
+            if let Err(e) = EntityStateRepository::clear_abandoned_fetches(connection) {
                 log::warn!("Failed to clear abandoned fetches: {}", e);
             }
 

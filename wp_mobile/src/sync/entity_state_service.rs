@@ -88,6 +88,7 @@ impl EntityStateService {
     /// Filter IDs to only those that can be fetched (not currently `Fetching`).
     ///
     /// Returns IDs where state is `Missing`, `Stale`, `Failed`, or not recorded.
+    /// Uses batch fetch for efficiency.
     pub fn filter_fetchable(
         cache: &WpApiCache,
         db_site: &DbSite,
@@ -96,12 +97,15 @@ impl EntityStateService {
     ) -> Vec<i64> {
         cache
             .execute(|conn| {
+                let states =
+                    EntityStateRepository::get_states_batch(conn, ids, db_site, entity_type)?;
+
                 Ok::<Vec<i64>, SqliteDbError>(
                     ids.iter()
                         .filter(|&&id| {
-                            match EntityStateRepository::get_state(conn, id, db_site, entity_type) {
-                                Ok(Some(state)) => !state.is_fetching(), // Not fetchable if Fetching
-                                _ => true, // Everything else is fetchable
+                            match states.get(&id) {
+                                Some(state) => state.is_fetchable(),
+                                None => true, // No state = fetchable
                             }
                         })
                         .copied()
