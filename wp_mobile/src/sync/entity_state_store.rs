@@ -30,12 +30,14 @@ pub trait EntityStateReader: Send + Sync {
 pub struct EntityStateService;
 
 impl EntityStateService {
-    /// Set the state for a single entity.
+    /// Save the state for a single entity to the database.
     ///
     /// Writes to database, triggering UpdateHook notification to observers.
-    /// Failures are logged but not propagated - state writes are best-effort
-    /// and will be retried on next sync unless there's a persistent DB issue.
-    pub fn set(
+    ///
+    /// **Error handling:** Failures are logged but not propagated. State writes are
+    /// best-effort tracking data that self-heal on the next sync. If the database
+    /// has persistent issues, states will be re-evaluated on next fetch operation.
+    pub fn save(
         cache: &WpApiCache,
         db_site: &DbSite,
         entity_type: EntityType,
@@ -55,7 +57,7 @@ impl EntityStateService {
             )
         }) {
             log::warn!(
-                "Failed to set entity state for id={} to {:?}: {} (will retry on next sync)",
+                "Failed to set entity state for id={} to {:?}: {} (will be re-evaluated on next sync)",
                 id,
                 state,
                 e
@@ -63,12 +65,14 @@ impl EntityStateService {
         }
     }
 
-    /// Set the state for multiple entities.
+    /// Save the state for multiple entities to the database (batch operation).
     ///
     /// Writes to database in batch, triggering UpdateHook notification for each entity.
-    /// Failures are logged but not propagated - state writes are best-effort
-    /// and will be retried on next sync unless there's a persistent DB issue.
-    pub fn set_batch(
+    ///
+    /// **Error handling:** Failures are logged but not propagated. State writes are
+    /// best-effort tracking data that self-heal on the next sync. If the database
+    /// has persistent issues, states will be re-evaluated on next fetch operation.
+    pub fn save_batch(
         cache: &WpApiCache,
         db_site: &DbSite,
         entity_type: EntityType,
@@ -88,7 +92,7 @@ impl EntityStateService {
             )
         }) {
             log::warn!(
-                "Failed to set entity state for {} ids to {:?}: {} (will retry on next sync)",
+                "Failed to set entity state for {} ids to {:?}: {} (will be re-evaluated on next sync)",
                 ids.len(),
                 state,
                 e
@@ -156,7 +160,7 @@ impl EntityStateService {
     }
 
     /// Encode EntityState to (state_value, error_message) for database storage.
-    pub fn encode_state(state: &EntityState) -> (EntityStateValue, Option<String>) {
+    fn encode_state(state: &EntityState) -> (EntityStateValue, Option<String>) {
         match state {
             EntityState::Missing => (EntityStateValue::Missing, None),
             EntityState::Fetching => (EntityStateValue::Fetching, None),
@@ -167,10 +171,7 @@ impl EntityStateService {
     }
 
     /// Decode (state_value, error_message) from database to EntityState.
-    pub fn decode_state(
-        state_value: EntityStateValue,
-        error_message: Option<String>,
-    ) -> EntityState {
+    fn decode_state(state_value: EntityStateValue, error_message: Option<String>) -> EntityState {
         match state_value {
             EntityStateValue::Missing => EntityState::Missing,
             EntityStateValue::Fetching => EntityState::Fetching,
@@ -242,35 +243,35 @@ mod tests {
     fn test_filter_fetchable() {
         let (cache, db_site) = setup_test_db();
 
-        EntityStateService::set(
+        EntityStateService::save(
             &cache,
             &db_site,
             EntityType::PostsEditContext,
             1,
             EntityState::Missing,
         );
-        EntityStateService::set(
+        EntityStateService::save(
             &cache,
             &db_site,
             EntityType::PostsEditContext,
             2,
             EntityState::Fetching,
         );
-        EntityStateService::set(
+        EntityStateService::save(
             &cache,
             &db_site,
             EntityType::PostsEditContext,
             3,
             EntityState::Cached,
         );
-        EntityStateService::set(
+        EntityStateService::save(
             &cache,
             &db_site,
             EntityType::PostsEditContext,
             4,
             EntityState::Stale,
         );
-        EntityStateService::set(
+        EntityStateService::save(
             &cache,
             &db_site,
             EntityType::PostsEditContext,

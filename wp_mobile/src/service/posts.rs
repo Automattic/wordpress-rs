@@ -343,7 +343,7 @@ impl PostService {
                 stale_ids.len()
             );
             // Mark them as stale in state store
-            EntityStateService::set_batch(
+            EntityStateService::save_batch(
                 &self.cache,
                 &self.db_site,
                 EntityType::PostsEditContext,
@@ -495,7 +495,7 @@ impl PostService {
         }
 
         // Mark as fetching
-        EntityStateService::set_batch(
+        EntityStateService::save_batch(
             &self.cache,
             &self.db_site,
             EntityType::PostsEditContext,
@@ -549,7 +549,7 @@ impl PostService {
                     Ok(ids) => ids,
                     Err(e) => {
                         // Database upsert failed - mark all as failed to avoid stuck Fetching state
-                        EntityStateService::set_batch(
+                        EntityStateService::save_batch(
                             &self.cache,
                             &self.db_site,
                             EntityType::PostsEditContext,
@@ -562,7 +562,7 @@ impl PostService {
 
                 // Mark successfully fetched posts as Cached
                 let fetched_ids: Vec<i64> = response.data.iter().map(|p| p.id.0).collect();
-                EntityStateService::set_batch(
+                EntityStateService::save_batch(
                     &self.cache,
                     &self.db_site,
                     EntityType::PostsEditContext,
@@ -579,7 +579,7 @@ impl PostService {
                     .collect();
                 let failed_count = failed_ids.len();
                 if !failed_ids.is_empty() {
-                    EntityStateService::set_batch(
+                    EntityStateService::save_batch(
                         &self.cache,
                         &self.db_site,
                         EntityType::PostsEditContext,
@@ -595,7 +595,7 @@ impl PostService {
             }
             Err(e) => {
                 // Network/API error - mark all as failed
-                EntityStateService::set_batch(
+                EntityStateService::save_batch(
                     &self.cache,
                     &self.db_site,
                     EntityType::PostsEditContext,
@@ -608,9 +608,6 @@ impl PostService {
     }
 
     /// Get read-only access to the entity state reader for edit context.
-    ///
-    /// Used by `MetadataCollection` to read entity states without
-    /// being able to modify them.
     pub fn state_reader_with_edit_context(&self) -> Arc<dyn EntityStateReader> {
         Arc::new(EntityStateReaderImpl::new(
             self.cache.clone(),
@@ -1179,7 +1176,7 @@ mod tests {
     fn test_find_stale_requires_modified_gmt(post_service_ctx: PostServiceTestContext) {
         // Setup: Insert a post and mark it as Cached
         let test_post = insert_test_post(&post_service_ctx);
-        EntityStateService::set(
+        EntityStateService::save(
             &post_service_ctx.post_service.cache,
             &post_service_ctx.post_service.db_site,
             EntityType::PostsEditContext,

@@ -300,10 +300,10 @@ impl WpApiCache {
             }
 
             // Reset entity states after migrations complete.
-            // Entity states are ephemeral and should be cleared on app restart to prevent
-            // stuck "Fetching" states and ensure fresh state tracking.
+            // Convert Fetching -> Missing to prevent stuck loading indicators while
+            // preserving Cached states to avoid unnecessary refetching.
             if let Err(e) =
-                repository::entity_state::EntityStateRepository::reset_all_states(connection)
+                repository::entity_state::EntityStateRepository::reset_states_on_startup(connection)
             {
                 log::warn!("Failed to reset entity states: {}", e);
             }

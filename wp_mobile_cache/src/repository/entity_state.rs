@@ -114,9 +114,9 @@ impl EntityStateRepository {
         error_message: Option<&str>,
     ) -> Result<(), SqliteDbError> {
         let sql = format!(
-            "INSERT INTO {} (entity_id, db_site_id, table_name, state, error_message, updated_at)
+            "INSERT INTO {} (entity_id, db_site_id, entity_type, state, error_message, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))
-             ON CONFLICT(entity_id, db_site_id, table_name)
+             ON CONFLICT(entity_id, db_site_id, entity_type)
              DO UPDATE SET state = ?4, error_message = ?5, updated_at = datetime('now')",
             Self::table_name()
         );
@@ -135,9 +135,8 @@ impl EntityStateRepository {
 
     /// Set state for multiple entities (batch operation).
     ///
-    /// Each state write is independent - partial failures are acceptable since entity
-    /// states don't require atomicity across batches. If one entity fails to update,
-    /// others should still succeed.
+    /// Uses a single SQL INSERT with multiple VALUES for optimal performance.
+    /// Batches are chunked to stay within SQLite's parameter limit (999).
     pub fn set_state_batch(
         executor: &impl QueryExecutor,
         entity_ids: &[i64],
@@ -146,9 +145,47 @@ impl EntityStateRepository {
         state: EntityStateValue,
         error_message: Option<&str>,
     ) -> Result<(), SqliteDbError> {
-        for &id in entity_ids {
-            Self::set_state(executor, id, db_site, entity_type, state, error_message)?;
+        if entity_ids.is_empty() {
+            return Ok(());
         }
+
+        // SQLite has 999 parameter limit. Each row uses 5 params (entity_id, db_site_id,
+        // entity_type, state, error_message), so chunk at 199 rows to stay under limit.
+        const CHUNK_SIZE: usize = 199;
+
+        for chunk in entity_ids.chunks(CHUNK_SIZE) {
+            // Build VALUES clause: (?, ?, ?, ?, ?, datetime('now'))
+            let values_placeholders: Vec<String> = (0..chunk.len())
+                .map(|_| "(?, ?, ?, ?, ?, datetime('now'))".to_string())
+                .collect();
+            let values_clause = values_placeholders.join(", ");
+
+            let sql = format!(
+                "INSERT INTO {} (entity_id, db_site_id, entity_type, state, error_message, updated_at)
+                 VALUES {}
+                 ON CONFLICT(entity_id, db_site_id, entity_type)
+                 DO UPDATE SET state = excluded.state, error_message = excluded.error_message, updated_at = excluded.updated_at",
+                Self::table_name(),
+                values_clause
+            );
+
+            // Build params: flatten [id, db_site_id, entity_type, state, error_msg] for each entity
+            let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::with_capacity(chunk.len() * 5);
+            for &id in chunk {
+                params.push(Box::new(id));
+                params.push(Box::new(db_site.row_id.0));
+                params.push(Box::new(entity_type.table_name().to_string()));
+                params.push(Box::new(state));
+                params.push(Box::new(error_message.map(|s| s.to_string())));
+            }
+
+            // Convert to &[&dyn ToSql] as required by execute
+            let params_refs: Vec<&dyn rusqlite::ToSql> =
+                params.iter().map(|p| p.as_ref()).collect();
+
+            executor.execute(&sql, params_refs.as_slice())?;
+        }
+
         Ok(())
     }
 
@@ -166,7 +203,7 @@ impl EntityStateRepository {
         entity_type: EntityType,
     ) -> Result<Option<EntityStateValue>, SqliteDbError> {
         let sql = format!(
-            "SELECT state FROM {} WHERE entity_id = ?1 AND db_site_id = ?2 AND table_name = ?3",
+            "SELECT state FROM {} WHERE entity_id = ?1 AND db_site_id = ?2 AND entity_type = ?3",
             Self::table_name()
         );
         executor
@@ -189,7 +226,7 @@ impl EntityStateRepository {
         entity_type: EntityType,
     ) -> Result<Option<String>, SqliteDbError> {
         let sql = format!(
-            "SELECT error_message FROM {} WHERE entity_id = ?1 AND db_site_id = ?2 AND table_name = ?3",
+            "SELECT error_message FROM {} WHERE entity_id = ?1 AND db_site_id = ?2 AND entity_type = ?3",
             Self::table_name()
         );
         executor
@@ -217,6 +254,27 @@ impl EntityStateRepository {
     pub fn reset_all_states(executor: &impl QueryExecutor) -> Result<usize, SqliteDbError> {
         let sql = format!("DELETE FROM {}", Self::table_name());
         executor.execute(&sql, params![])
+    }
+
+    /// Reset entity states on app startup.
+    ///
+    /// Converts `Fetching` states to `Missing` to prevent stuck loading indicators
+    /// while preserving `Cached` states to avoid unnecessary refetching.
+    ///
+    /// On app restart, all in-flight fetches are abandoned. Rather than clearing
+    /// everything, we selectively reset only the incomplete operations to improve
+    /// UX by retaining already-fetched data.
+    ///
+    /// Returns the number of rows updated.
+    pub fn reset_states_on_startup(executor: &impl QueryExecutor) -> Result<usize, SqliteDbError> {
+        let sql = format!(
+            "UPDATE {} SET state = ?1 WHERE state = ?2",
+            Self::table_name()
+        );
+        executor.execute(
+            &sql,
+            params![EntityStateValue::Missing, EntityStateValue::Fetching],
+        )
     }
 }
 
