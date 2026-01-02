@@ -112,7 +112,7 @@ impl DbEntityState {
     }
 
     /// Encode EntityState to (state_int, error_message) for database storage.
-    fn to_db_representation(&self) -> (i32, Option<String>) {
+    fn to_db_representation(&self) -> (i64, Option<String>) {
         match self {
             Self::Missing => (0, None),
             Self::Fetching => (1, None),
@@ -123,7 +123,7 @@ impl DbEntityState {
     }
 
     /// Decode (state_int, error_message) from database to EntityState.
-    fn from_db_representation(state_int: i32, error_message: Option<String>) -> Option<Self> {
+    fn from_db_representation(state_int: i64, error_message: Option<String>) -> Option<Self> {
         match state_int {
             0 => Some(Self::Missing),
             1 => Some(Self::Fetching),
@@ -272,7 +272,7 @@ impl EntityStateRepository {
         let result = executor
             .prepare(&sql)?
             .query_row(params![entity_id, db_site.row_id.0, entity_type], |row| {
-                let state_int: i32 = row.get(0)?;
+                let state_int: i64 = row.get(0)?;
                 let error_message: Option<String> = row.get(1)?;
                 Ok((state_int, error_message))
             })
@@ -332,7 +332,7 @@ impl EntityStateRepository {
         let mut stmt = executor.prepare(&sql)?;
         let rows = stmt.query_map(params_refs.as_slice(), |row| {
             let entity_id: i64 = row.get(0)?;
-            let state_int: i32 = row.get(1)?;
+            let state_int: i64 = row.get(1)?;
             let error_message: Option<String> = row.get(2)?;
             Ok((entity_id, state_int, error_message))
         })?;
