@@ -341,7 +341,7 @@ fun StateIndicator(state: PostItemState) {
         is PostItemState.Missing -> Color.Gray
         is PostItemState.Fetching -> Color.Blue
         is PostItemState.FetchingWithData -> Color.Blue
-        is PostItemState.Cached -> Color.Green
+        is PostItemState.Fresh -> Color.Green
         is PostItemState.Stale -> Color.Yellow
         is PostItemState.Failed -> Color.Red
         is PostItemState.FailedWithData -> Color.Red
@@ -359,7 +359,7 @@ fun stateDisplayName(state: PostItemState): String = when (state) {
     is PostItemState.Missing -> "missing"
     is PostItemState.Fetching -> "fetching"
     is PostItemState.FetchingWithData -> "fetching"
-    is PostItemState.Cached -> "cached"
+    is PostItemState.Fresh -> "cached"
     is PostItemState.Stale -> "stale"
     is PostItemState.Failed -> "failed"
     is PostItemState.FailedWithData -> "failed"

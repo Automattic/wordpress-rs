@@ -30,7 +30,7 @@ pub use stateless_collection::StatelessCollection;
 /// - `Missing`: No cached data, needs fetch
 /// - `Fetching`: Fetch in progress, no cached data
 /// - `FetchingWithData { data }`: Fetch in progress, showing cached data
-/// - `Cached { data }`: Fresh cached data
+/// - `Fresh { data }`: Fresh data
 /// - `Stale { data }`: Outdated cached data
 /// - `Failed { error }`: Fetch failed, no cached data
 /// - `FailedWithData { error, data }`: Fetch failed, showing cached data
@@ -58,8 +58,8 @@ macro_rules! wp_mobile_item_state {
             /// Fetch in progress, showing cached data while loading
             FetchingWithData { data: $full_entity_type },
 
-            /// Fresh cached data, no fetch needed
-            Cached { data: $full_entity_type },
+            /// Fresh data, no fetch needed
+            Fresh { data: $full_entity_type },
 
             /// Cached data is outdated, could benefit from refresh
             Stale { data: $full_entity_type },
@@ -93,7 +93,7 @@ macro_rules! wp_mobile_item_state {
 /// - `Missing`: No cached data, needs fetch
 /// - `Fetching`: Fetch in progress, no cached data
 /// - `FetchingWithData { data }`: Fetch in progress, showing cached data
-/// - `Cached { data }`: Fresh cached data
+/// - `Fresh { data }`: Fresh data
 /// - `Stale { data }`: Outdated cached data
 /// - `Failed { error }`: Fetch failed, no cached data
 /// - `FailedWithData { error, data }`: Fetch failed, showing cached data
@@ -182,9 +182,7 @@ macro_rules! wp_mobile_metadata_item {
                     }
 
                     // Fresh state (should always have data, but handle gracefully)
-                    ($crate::sync::DbEntityState::Fresh, Some(data)) => {
-                        $state_name::Cached { data }
-                    }
+                    ($crate::sync::DbEntityState::Fresh, Some(data)) => $state_name::Fresh { data },
                     ($crate::sync::DbEntityState::Fresh, None) => $state_name::Missing,
 
                     // Stale state (should always have data, but handle gracefully)

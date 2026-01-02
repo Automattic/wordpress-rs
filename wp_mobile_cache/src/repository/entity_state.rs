@@ -53,7 +53,7 @@ impl FromSql for EntityType {
 /// Tracks the lifecycle of fetching an entity from the network:
 /// - `Missing`: Not in cache, needs to be fetched
 /// - `Fetching`: Fetch is in progress
-/// - `Cached`: Successfully fetched and in cache
+/// - `Fresh`: Successfully fetched and in cache
 /// - `Stale`: In cache but outdated (e.g., `modified_gmt` mismatch)
 /// - `Failed`: Fetch was attempted but failed
 ///
@@ -81,7 +81,7 @@ impl DbEntityState {
     /// Returns `true` if the entity needs to be fetched.
     ///
     /// This includes `Missing`, `Stale`, and `Failed` states.
-    /// Does not include `Fetching` (already in progress) or `Cached` (up to date).
+    /// Does not include `Fetching` (already in progress) or `Fresh` (up to date).
     pub fn needs_fetch(&self) -> bool {
         matches!(self, Self::Missing | Self::Stale | Self::Failed { .. })
     }
@@ -360,7 +360,7 @@ impl EntityStateRepository {
     /// Clear abandoned fetch operations from previous app session.
     ///
     /// Deletes entities in `Fetching` state to prevent stuck loading indicators
-    /// while preserving `Cached` states to avoid unnecessary refetching.
+    /// while preserving `Fresh` states to avoid unnecessary refetching.
     ///
     /// On app restart, all in-flight fetches are abandoned. Rather than clearing
     /// everything, we selectively remove only the incomplete operations to improve
@@ -556,7 +556,7 @@ mod tests {
         // All others are "fetchable" (not currently being fetched)
         assert!(fetchable.contains(&1)); // Missing
         assert!(!fetchable.contains(&2)); // Fetching - excluded (already in progress)
-        assert!(fetchable.contains(&3)); // Cached - fetchable (could re-fetch if needed)
+        assert!(fetchable.contains(&3)); // Fresh - fetchable (could re-fetch if needed)
         assert!(fetchable.contains(&4)); // Stale
         assert!(fetchable.contains(&5)); // Failed
         assert!(fetchable.contains(&6)); // Unknown (no state recorded)

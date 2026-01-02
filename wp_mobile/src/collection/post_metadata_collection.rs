@@ -48,7 +48,7 @@ crate::wp_mobile_metadata_item!(
 /// let items = collection.load_items()?;
 /// for item in items {
 ///     match item.state {
-///         PostItemState::Cached { data } => { /* show data */ }
+///         PostItemState::Fresh { data } => { /* show data */ }
 ///         PostItemState::Stale { data } => { /* show data, maybe refresh */ }
 ///         PostItemState::FetchingWithData { data } => { /* show data + loading */ }
 ///         PostItemState::FailedWithData { error, data } => { /* show data + error */ }

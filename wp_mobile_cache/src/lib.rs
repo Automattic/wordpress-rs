@@ -302,7 +302,7 @@ impl WpApiCache {
 
             // Clear abandoned fetch operations after migrations complete.
             // Deletes Fetching states to prevent stuck loading indicators while
-            // preserving Cached states to avoid unnecessary refetching.
+            // preserving Fresh states to avoid unnecessary refetching.
             if let Err(e) = EntityStateRepository::clear_abandoned_fetches(connection) {
                 log::warn!("Failed to clear abandoned fetches: {}", e);
             }

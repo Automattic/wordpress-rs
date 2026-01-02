@@ -70,9 +70,9 @@ fun createObservableMetadataCollection(
  * Observable wrapper around a metadata collection that notifies observers when changes occur.
  *
  * This is similar to [ObservableCollection] but designed for the "metadata-first" sync strategy:
- * - Items include fetch state (Missing, Fetching, Cached, Stale, Failed)
+ * - Items include fetch state (Missing, Fetching, Fresh, Stale, Failed)
  * - Sync operations (refresh, loadNextPage) are exposed for explicit control
- * - Data is optional per item (present only when Cached)
+ * - Data is optional per item (present only when Fresh)
  *
  * The metadata collection uses a two-phase sync:
  * 1. Fetch lightweight metadata (id + modified_gmt) to define list structure
@@ -160,7 +160,7 @@ class ObservableMetadataCollection(
      * Each item's `state` is a [PostItemState] sealed class that encodes both
      * sync status and data availability:
      *
-     * - `Cached`: Fresh data, no fetch needed
+     * - `Fresh`: Fresh data, no fetch needed
      * - `Stale`: Outdated data, could benefit from refresh
      * - `FetchingWithData`: Refresh in progress, showing cached data
      * - `FailedWithData`: Fetch failed, showing last known data
