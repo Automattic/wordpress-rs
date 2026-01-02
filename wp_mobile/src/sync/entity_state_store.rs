@@ -33,6 +33,8 @@ impl EntityStateService {
     /// Set the state for a single entity.
     ///
     /// Writes to database, triggering UpdateHook notification to observers.
+    /// Failures are logged but not propagated - state writes are best-effort
+    /// and will be retried on next sync unless there's a persistent DB issue.
     pub fn set(
         cache: &WpApiCache,
         db_site: &DbSite,
@@ -42,7 +44,7 @@ impl EntityStateService {
     ) {
         let (state_value, error_msg) = Self::encode_state(&state);
 
-        let _ = cache.execute(|conn| {
+        if let Err(e) = cache.execute(|conn| {
             EntityStateRepository::set_state(
                 conn,
                 id,
@@ -51,12 +53,21 @@ impl EntityStateService {
                 state_value,
                 error_msg.as_deref(),
             )
-        });
+        }) {
+            log::warn!(
+                "Failed to set entity state for id={} to {:?}: {} (will retry on next sync)",
+                id,
+                state,
+                e
+            );
+        }
     }
 
     /// Set the state for multiple entities.
     ///
     /// Writes to database in batch, triggering UpdateHook notification for each entity.
+    /// Failures are logged but not propagated - state writes are best-effort
+    /// and will be retried on next sync unless there's a persistent DB issue.
     pub fn set_batch(
         cache: &WpApiCache,
         db_site: &DbSite,
@@ -66,7 +77,7 @@ impl EntityStateService {
     ) {
         let (state_value, error_msg) = Self::encode_state(&state);
 
-        let _ = cache.execute(|conn| {
+        if let Err(e) = cache.execute(|conn| {
             EntityStateRepository::set_state_batch(
                 conn,
                 ids,
@@ -75,7 +86,14 @@ impl EntityStateService {
                 state_value,
                 error_msg.as_deref(),
             )
-        });
+        }) {
+            log::warn!(
+                "Failed to set entity state for {} ids to {:?}: {} (will retry on next sync)",
+                ids.len(),
+                state,
+                e
+            );
+        }
     }
 
     /// Get the state for a single entity.
@@ -89,8 +107,7 @@ impl EntityStateService {
     ) -> EntityState {
         cache
             .execute(|conn| {
-                let state_value =
-                    EntityStateRepository::get_state(conn, id, db_site, entity_type)?;
+                let state_value = EntityStateRepository::get_state(conn, id, db_site, entity_type)?;
                 let error_msg = if state_value == Some(EntityStateValue::Failed) {
                     EntityStateRepository::get_error_message(conn, id, db_site, entity_type)?
                 } else {
@@ -119,12 +136,7 @@ impl EntityStateService {
                 Ok::<Vec<i64>, wp_mobile_cache::SqliteDbError>(
                     ids.iter()
                         .filter(|&&id| {
-                            match EntityStateRepository::get_state(
-                                conn,
-                                id,
-                                db_site,
-                                entity_type,
-                            ) {
+                            match EntityStateRepository::get_state(conn, id, db_site, entity_type) {
                                 Ok(Some(EntityStateValue::Fetching)) => false, // Fetching - not fetchable
                                 _ => true, // Everything else is fetchable
                             }
@@ -155,7 +167,10 @@ impl EntityStateService {
     }
 
     /// Decode (state_value, error_message) from database to EntityState.
-    pub fn decode_state(state_value: EntityStateValue, error_message: Option<String>) -> EntityState {
+    pub fn decode_state(
+        state_value: EntityStateValue,
+        error_message: Option<String>,
+    ) -> EntityState {
         match state_value {
             EntityStateValue::Missing => EntityState::Missing,
             EntityStateValue::Fetching => EntityState::Fetching,
@@ -200,8 +215,7 @@ mod tests {
     use super::*;
     use rusqlite::Connection;
     use wp_mobile_cache::{
-        MigrationManager,
-        db_types::self_hosted_site::SelfHostedSite,
+        MigrationManager, db_types::self_hosted_site::SelfHostedSite,
         repository::sites::SiteRepository,
     };
 
@@ -228,14 +242,49 @@ mod tests {
     fn test_filter_fetchable() {
         let (cache, db_site) = setup_test_db();
 
-        EntityStateService::set(&cache, &db_site, EntityType::PostsEditContext, 1, EntityState::Missing);
-        EntityStateService::set(&cache, &db_site, EntityType::PostsEditContext, 2, EntityState::Fetching);
-        EntityStateService::set(&cache, &db_site, EntityType::PostsEditContext, 3, EntityState::Cached);
-        EntityStateService::set(&cache, &db_site, EntityType::PostsEditContext, 4, EntityState::Stale);
-        EntityStateService::set(&cache, &db_site, EntityType::PostsEditContext, 5, EntityState::failed("error"));
+        EntityStateService::set(
+            &cache,
+            &db_site,
+            EntityType::PostsEditContext,
+            1,
+            EntityState::Missing,
+        );
+        EntityStateService::set(
+            &cache,
+            &db_site,
+            EntityType::PostsEditContext,
+            2,
+            EntityState::Fetching,
+        );
+        EntityStateService::set(
+            &cache,
+            &db_site,
+            EntityType::PostsEditContext,
+            3,
+            EntityState::Cached,
+        );
+        EntityStateService::set(
+            &cache,
+            &db_site,
+            EntityType::PostsEditContext,
+            4,
+            EntityState::Stale,
+        );
+        EntityStateService::set(
+            &cache,
+            &db_site,
+            EntityType::PostsEditContext,
+            5,
+            EntityState::failed("error"),
+        );
         // ID 6 has no state (should be fetchable)
 
-        let fetchable = EntityStateService::filter_fetchable(&cache, &db_site, EntityType::PostsEditContext, &[1, 2, 3, 4, 5, 6]);
+        let fetchable = EntityStateService::filter_fetchable(
+            &cache,
+            &db_site,
+            EntityType::PostsEditContext,
+            &[1, 2, 3, 4, 5, 6],
+        );
 
         // Only Fetching (2) should be excluded - it's already in progress
         // All others are "fetchable" (not currently being fetched)

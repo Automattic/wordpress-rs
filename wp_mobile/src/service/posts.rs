@@ -1192,7 +1192,10 @@ mod tests {
 
         let stale_ids = post_service_ctx.post_service.find_stale_posts_by_timestamp(
             &metadata,
-            post_service_ctx.post_service.state_reader_with_edit_context().as_ref(),
+            post_service_ctx
+                .post_service
+                .state_reader_with_edit_context()
+                .as_ref(),
         );
 
         // Assert: No posts should be identified as stale
@@ -1220,7 +1223,10 @@ mod tests {
 
         let stale_ids = post_service_ctx.post_service.find_stale_posts_by_timestamp(
             &metadata,
-            post_service_ctx.post_service.state_reader_with_edit_context().as_ref(),
+            post_service_ctx
+                .post_service
+                .state_reader_with_edit_context()
+                .as_ref(),
         );
 
         // Assert: No posts should be identified as stale (only Cached posts are checked)
