@@ -30,7 +30,7 @@ pub use stateless_collection::StatelessCollection;
 /// - `Missing`: No cached data, needs fetch
 /// - `Fetching`: Fetch in progress, no cached data
 /// - `FetchingWithData { data }`: Fetch in progress, showing cached data
-/// - `Cached { data }`: Fresh cached data
+/// - `Fresh { data }`: Fresh data
 /// - `Stale { data }`: Outdated cached data
 /// - `Failed { error }`: Fetch failed, no cached data
 /// - `FailedWithData { error, data }`: Fetch failed, showing cached data
@@ -58,8 +58,8 @@ macro_rules! wp_mobile_item_state {
             /// Fetch in progress, showing cached data while loading
             FetchingWithData { data: $full_entity_type },
 
-            /// Fresh cached data, no fetch needed
-            Cached { data: $full_entity_type },
+            /// Fresh data, no fetch needed
+            Fresh { data: $full_entity_type },
 
             /// Cached data is outdated, could benefit from refresh
             Stale { data: $full_entity_type },
@@ -93,7 +93,7 @@ macro_rules! wp_mobile_item_state {
 /// - `Missing`: No cached data, needs fetch
 /// - `Fetching`: Fetch in progress, no cached data
 /// - `FetchingWithData { data }`: Fetch in progress, showing cached data
-/// - `Cached { data }`: Fresh cached data
+/// - `Fresh { data }`: Fresh data
 /// - `Stale { data }`: Outdated cached data
 /// - `Failed { error }`: Fetch failed, no cached data
 /// - `FailedWithData { error, data }`: Fetch failed, showing cached data
@@ -148,9 +148,9 @@ macro_rules! wp_mobile_metadata_item {
             pub state: $state_name,
         }
 
-        // Generate From trait: EntityState + data -> ItemState
-        impl From<($crate::sync::EntityState, Option<$full_entity_type>)> for $state_name {
-            /// Convert EntityState + optional cached data into ItemState.
+        // Generate From trait: DbEntityState + data -> ItemState
+        impl From<($crate::sync::DbEntityState, Option<$full_entity_type>)> for $state_name {
+            /// Convert DbEntityState + optional cached data into ItemState.
             ///
             /// This encodes the business logic for how fetch state and data availability
             /// combine into user-facing states:
@@ -159,37 +159,41 @@ macro_rules! wp_mobile_metadata_item {
             /// - `Missing + has data` → Show stale data (app restart scenario)
             /// - `Fetching + no data` → Show loading spinner
             /// - `Fetching + has data` → Show data with loading indicator
-            /// - `Cached + has data` → Show fresh data
-            /// - `Cached + no data` → Defensive fallback to Missing
+            /// - `Fresh + has data` → Show fresh data
+            /// - `Fresh + no data` → Defensive fallback to Missing
             /// - `Stale + has data` → Show outdated data
             /// - `Stale + no data` → Defensive fallback to Missing
             /// - `Failed + no data` → Show error message
             /// - `Failed + has data` → Show data with error indicator
-            fn from((state, data): ($crate::sync::EntityState, Option<$full_entity_type>)) -> Self {
+            fn from(
+                (state, data): ($crate::sync::DbEntityState, Option<$full_entity_type>),
+            ) -> Self {
                 match (state, data) {
                     // Missing state
-                    ($crate::sync::EntityState::Missing, None) => $state_name::Missing,
-                    ($crate::sync::EntityState::Missing, Some(data)) => $state_name::Stale { data },
+                    ($crate::sync::DbEntityState::Missing, None) => $state_name::Missing,
+                    ($crate::sync::DbEntityState::Missing, Some(data)) => {
+                        $state_name::Stale { data }
+                    }
 
                     // Fetching state
-                    ($crate::sync::EntityState::Fetching, None) => $state_name::Fetching,
-                    ($crate::sync::EntityState::Fetching, Some(data)) => {
+                    ($crate::sync::DbEntityState::Fetching, None) => $state_name::Fetching,
+                    ($crate::sync::DbEntityState::Fetching, Some(data)) => {
                         $state_name::FetchingWithData { data }
                     }
 
-                    // Cached state (should always have data, but handle gracefully)
-                    ($crate::sync::EntityState::Cached, Some(data)) => $state_name::Cached { data },
-                    ($crate::sync::EntityState::Cached, None) => $state_name::Missing,
+                    // Fresh state (should always have data, but handle gracefully)
+                    ($crate::sync::DbEntityState::Fresh, Some(data)) => $state_name::Fresh { data },
+                    ($crate::sync::DbEntityState::Fresh, None) => $state_name::Missing,
 
                     // Stale state (should always have data, but handle gracefully)
-                    ($crate::sync::EntityState::Stale, Some(data)) => $state_name::Stale { data },
-                    ($crate::sync::EntityState::Stale, None) => $state_name::Missing,
+                    ($crate::sync::DbEntityState::Stale, Some(data)) => $state_name::Stale { data },
+                    ($crate::sync::DbEntityState::Stale, None) => $state_name::Missing,
 
                     // Failed state
-                    ($crate::sync::EntityState::Failed { error }, None) => {
+                    ($crate::sync::DbEntityState::Failed { error }, None) => {
                         $state_name::Failed { error }
                     }
-                    ($crate::sync::EntityState::Failed { error }, Some(data)) => {
+                    ($crate::sync::DbEntityState::Failed { error }, Some(data)) => {
                         $state_name::FailedWithData { error, data }
                     }
                 }

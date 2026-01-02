@@ -7,19 +7,16 @@ use crate::{
         StatelessCollection, post_collection::PostCollection,
     },
     filters::{AnyPostFilter, PostListFilter},
-    service::metadata::MetadataService,
-    sync::{
-        EntityMetadata, EntityState, EntityStateReader, EntityStateStore, MetadataFetchResult,
-        SyncResult, SyncStrategy,
+    service::{
+        entity_state_service::{EntityStateReader, EntityStateReaderImpl, EntityStateService},
+        metadata::MetadataService,
     },
+    sync::{DbEntityState, EntityMetadata, MetadataFetchResult, SyncResult, SyncStrategy},
 };
 use std::{collections::HashSet, sync::Arc};
 use wp_api::{
     api_client::WpApiClient,
-    posts::{
-        AnyPostWithEditContext, PostId, PostListParams, PostStatus,
-        SparseAnyPostFieldWithEditContext,
-    },
+    posts::{AnyPostWithEditContext, PostId, PostListParams, SparseAnyPostFieldWithEditContext},
     request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_mobile_cache::{
@@ -28,7 +25,7 @@ use wp_mobile_cache::{
     db_types::db_site::DbSite,
     entity::{Entity, EntityId, FullEntity},
     list_metadata::ListKey,
-    repository::posts::PostRepository,
+    repository::{entity_state::EntityType, posts::PostRepository},
 };
 
 /// Maximum number of posts to fetch in a single batch request
@@ -59,11 +56,9 @@ pub(crate) struct FetchStats {
 ///
 /// # Metadata Sync Infrastructure
 ///
-/// The service owns shared stores for metadata-first sync:
-/// - `state_store_with_edit_context`: Tracks fetch state per entity for edit context.
-///   Each context needs its own state store since the same entity ID can have different
-///   fetch states across contexts.
-/// - `metadata_service`: Database-backed list metadata (persists across app restarts).
+/// The service provides access to metadata-first sync infrastructure:
+/// - Entity state tracking via `EntityStateStore` associated functions
+/// - Database-backed list metadata via `metadata_service`
 ///
 /// Collections get read-only access via reader methods. This ensures cross-collection
 /// consistency when multiple collections share the same underlying entities.
@@ -72,11 +67,6 @@ pub struct PostService {
     db_site: Arc<DbSite>,
     api_client: Arc<WpApiClient>,
     cache: Arc<WpApiCache>,
-
-    /// Per-entity fetch state for edit context (memory-only, resets on app restart).
-    /// Each context needs its own state store since the same entity ID can have
-    /// different fetch states across contexts.
-    state_store_with_edit_context: Arc<EntityStateStore>,
 
     /// Database-backed list metadata service.
     /// Persists list structure across app restarts.
@@ -91,7 +81,6 @@ impl PostService {
             api_client,
             db_site,
             cache,
-            state_store_with_edit_context: Arc::new(EntityStateStore::new()),
             metadata_service,
         }
     }
@@ -210,7 +199,7 @@ impl PostService {
     /// Find stale posts by comparing fetched metadata timestamps with cached DB values.
     ///
     /// A post is considered stale if:
-    /// 1. It's currently in `Cached` state in the state store
+    /// 1. It's currently in `Fresh` state in the state store
     /// 2. Its fetched `modified_gmt` differs from the cached `modified_gmt` in the database
     ///
     /// Returns empty vector if no stale posts found or if DB query fails.
@@ -219,10 +208,10 @@ impl PostService {
         metadata: &[EntityMetadata],
         state_reader: &dyn EntityStateReader,
     ) -> Vec<i64> {
-        // Filter to only posts currently in Cached state
+        // Filter to only posts currently in Fresh state
         let cached_ids: Vec<PostId> = metadata
             .iter()
-            .filter(|m| matches!(state_reader.get(m.id), EntityState::Cached))
+            .filter(|m| matches!(state_reader.get(m.id), DbEntityState::Fresh))
             .map(|m| PostId(m.id))
             .collect();
 
@@ -351,8 +340,13 @@ impl PostService {
                 stale_ids.len()
             );
             // Mark them as stale in state store
-            self.state_store_with_edit_context
-                .set_batch(&stale_ids, EntityState::Stale);
+            EntityStateService::save_batch(
+                &self.cache,
+                &self.db_site,
+                EntityType::PostsEditContext,
+                &stale_ids,
+                DbEntityState::Stale,
+            );
         }
 
         // 3. Fetch missing/stale posts (only for Full strategy)
@@ -404,8 +398,13 @@ impl PostService {
         let ids_to_fetch: Vec<PostId> = metadata
             .iter()
             .filter(|m| {
-                let state = self.state_store_with_edit_context.get(m.id);
-                matches!(state, EntityState::Missing | EntityState::Stale)
+                let state = EntityStateService::get(
+                    &self.cache,
+                    &self.db_site,
+                    EntityType::PostsEditContext,
+                    m.id,
+                );
+                state.needs_fetch()
             })
             .map(|m| PostId(m.id))
             .collect();
@@ -451,7 +450,7 @@ impl PostService {
     /// Tracks entity lifecycle through state store:
     /// 1. Filters out IDs already `Fetching` (prevents duplicate requests)
     /// 2. Sets remaining IDs to `Fetching` before API call
-    /// 3. On success: Sets fetched posts to `Cached`, missing posts to `Failed`
+    /// 3. On success: Sets fetched posts to `Fresh`, missing posts to `Failed`
     /// 4. On error: Sets all requested posts to `Failed`
     ///
     /// # Arguments
@@ -478,9 +477,12 @@ impl PostService {
 
         // Convert to raw IDs and filter out already-fetching
         let raw_ids: Vec<i64> = ids.iter().map(|id| id.0).collect();
-        let fetchable = self
-            .state_store_with_edit_context
-            .filter_fetchable(&raw_ids);
+        let fetchable = EntityStateService::filter_fetchable(
+            &self.cache,
+            &self.db_site,
+            EntityType::PostsEditContext,
+            &raw_ids,
+        );
 
         if fetchable.is_empty() {
             return Ok(FetchByIdsResult {
@@ -490,8 +492,13 @@ impl PostService {
         }
 
         // Mark as fetching
-        self.state_store_with_edit_context
-            .set_batch(&fetchable, EntityState::Fetching);
+        EntityStateService::save_batch(
+            &self.cache,
+            &self.db_site,
+            EntityType::PostsEditContext,
+            &fetchable,
+            DbEntityState::Fetching,
+        );
 
         // Convert back to PostId for the API call
         let post_ids: Vec<PostId> = fetchable.iter().map(|&id| PostId(id)).collect();
@@ -500,17 +507,6 @@ impl PostService {
             include: post_ids,
             // Ensure we get all requested posts regardless of default per_page
             per_page: Some(BATCH_FETCH_SIZE as u32),
-            // UI-level decision: Include posts with these statuses when fetching by ID.
-            // WordPress API defaults to 'publish' only, which would filter out drafts/pending/etc.
-            // We exclude 'trash' status because trashed posts aren't shown in normal post lists
-            // (they have their own separate trash view in WordPress admin).
-            status: vec![
-                PostStatus::Publish,
-                PostStatus::Draft,
-                PostStatus::Pending,
-                PostStatus::Private,
-                PostStatus::Future,
-            ],
             ..Default::default()
         };
 
@@ -539,16 +535,26 @@ impl PostService {
                     Ok(ids) => ids,
                     Err(e) => {
                         // Database upsert failed - mark all as failed to avoid stuck Fetching state
-                        self.state_store_with_edit_context
-                            .set_batch(&fetchable, EntityState::failed(e.to_string()));
+                        EntityStateService::save_batch(
+                            &self.cache,
+                            &self.db_site,
+                            EntityType::PostsEditContext,
+                            &fetchable,
+                            DbEntityState::failed(e.to_string()),
+                        );
                         return Err(e);
                     }
                 };
 
-                // Mark successfully fetched posts as Cached
+                // Mark successfully fetched posts as Fresh
                 let fetched_ids: Vec<i64> = response.data.iter().map(|p| p.id.0).collect();
-                self.state_store_with_edit_context
-                    .set_batch(&fetched_ids, EntityState::Cached);
+                EntityStateService::save_batch(
+                    &self.cache,
+                    &self.db_site,
+                    EntityType::PostsEditContext,
+                    &fetched_ids,
+                    DbEntityState::Fresh,
+                );
 
                 // Mark posts that were requested but not returned as Failed
                 let fetched_set: HashSet<i64> = fetched_ids.iter().copied().collect();
@@ -559,8 +565,13 @@ impl PostService {
                     .collect();
                 let failed_count = failed_ids.len();
                 if !failed_ids.is_empty() {
-                    self.state_store_with_edit_context
-                        .set_batch(&failed_ids, EntityState::failed("Not found"));
+                    EntityStateService::save_batch(
+                        &self.cache,
+                        &self.db_site,
+                        EntityType::PostsEditContext,
+                        &failed_ids,
+                        DbEntityState::failed("Not found"),
+                    );
                 }
 
                 Ok(FetchByIdsResult {
@@ -570,19 +581,25 @@ impl PostService {
             }
             Err(e) => {
                 // Network/API error - mark all as failed
-                self.state_store_with_edit_context
-                    .set_batch(&fetchable, EntityState::failed(e.to_string()));
+                EntityStateService::save_batch(
+                    &self.cache,
+                    &self.db_site,
+                    EntityType::PostsEditContext,
+                    &fetchable,
+                    DbEntityState::failed(e.to_string()),
+                );
                 Err(e.into())
             }
         }
     }
 
-    /// Get read-only access to the entity state store for edit context.
-    ///
-    /// Used by `MetadataCollection` to read entity states without
-    /// being able to modify them.
+    /// Get read-only access to the entity state reader for edit context.
     pub fn state_reader_with_edit_context(&self) -> Arc<dyn EntityStateReader> {
-        self.state_store_with_edit_context.clone()
+        Arc::new(EntityStateReaderImpl::new(
+            self.cache.clone(),
+            *self.db_site,
+            EntityType::PostsEditContext,
+        ))
     }
 
     /// Get read-only access to the persistent metadata service.
@@ -1143,12 +1160,15 @@ mod tests {
 
     #[rstest]
     fn test_find_stale_requires_modified_gmt(post_service_ctx: PostServiceTestContext) {
-        // Setup: Insert a post and mark it as Cached
+        // Setup: Insert a post and mark it as Fresh
         let test_post = insert_test_post(&post_service_ctx);
-        post_service_ctx
-            .post_service
-            .state_store_with_edit_context
-            .set(test_post.id.0, crate::sync::EntityState::Cached);
+        EntityStateService::save(
+            &post_service_ctx.post_service.cache,
+            &post_service_ctx.post_service.db_site,
+            EntityType::PostsEditContext,
+            test_post.id.0,
+            DbEntityState::Fresh,
+        );
 
         // Test: Metadata without modified_gmt (None)
         let metadata = vec![EntityMetadata::new(test_post.id.0, None, None, None)];
@@ -1170,7 +1190,7 @@ mod tests {
 
     #[rstest]
     fn test_find_stale_only_checks_cached_posts(post_service_ctx: PostServiceTestContext) {
-        // Setup: Insert a post but don't mark it as Cached (it's Missing by default)
+        // Setup: Insert a post but don't mark it as Fresh (it's Missing by default)
         let test_post = insert_test_post(&post_service_ctx);
         let modified = "2024-01-01T12:00:00Z"
             .parse::<wp_api::prelude::WpGmtDateTime>()
@@ -1192,10 +1212,10 @@ mod tests {
                 .as_ref(),
         );
 
-        // Assert: No posts should be identified as stale (only Cached posts are checked)
+        // Assert: No posts should be identified as stale (only Fresh posts are checked)
         assert!(
             stale_ids.is_empty(),
-            "Only Cached posts should be checked for staleness"
+            "Only Fresh posts should be checked for staleness"
         );
     }
 
@@ -1258,14 +1278,24 @@ mod tests {
         assert!(result.is_err(), "Network error should return Err");
 
         // Assert: Posts should be marked as Failed
-        let state1 = service.state_store_with_edit_context.get(1);
-        let state2 = service.state_store_with_edit_context.get(2);
+        let state1 = EntityStateService::get(
+            &service.cache,
+            &service.db_site,
+            EntityType::PostsEditContext,
+            1,
+        );
+        let state2 = EntityStateService::get(
+            &service.cache,
+            &service.db_site,
+            EntityType::PostsEditContext,
+            2,
+        );
         assert!(
-            matches!(state1, crate::sync::EntityState::Failed { .. }),
+            matches!(state1, crate::sync::DbEntityState::Failed { .. }),
             "Post 1 should be marked as Failed on network error"
         );
         assert!(
-            matches!(state2, crate::sync::EntityState::Failed { .. }),
+            matches!(state2, crate::sync::DbEntityState::Failed { .. }),
             "Post 2 should be marked as Failed on network error"
         );
     }

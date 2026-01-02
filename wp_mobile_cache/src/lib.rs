@@ -3,6 +3,7 @@ use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
 use std::sync::Mutex;
 
+use crate::repository::entity_state::EntityStateRepository;
 use crate::repository::list_metadata::ListMetadataRepository;
 
 pub mod context;
@@ -92,6 +93,8 @@ pub enum DbTable {
     ListMetadataItems,
     /// List metadata sync state (idle, fetching, error)
     ListMetadataState,
+    /// Entity state tracking (missing, fetching, cached, stale, failed)
+    EntityState,
 }
 
 impl DbTable {
@@ -111,6 +114,7 @@ impl DbTable {
             DbTable::ListMetadata => "list_metadata",
             DbTable::ListMetadataItems => "list_metadata_items",
             DbTable::ListMetadataState => "list_metadata_state",
+            DbTable::EntityState => "entity_state",
         }
     }
 }
@@ -143,6 +147,7 @@ impl TryFrom<&str> for DbTable {
             "list_metadata" => Ok(DbTable::ListMetadata),
             "list_metadata_items" => Ok(DbTable::ListMetadataItems),
             "list_metadata_state" => Ok(DbTable::ListMetadataState),
+            "entity_state" => Ok(DbTable::EntityState),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -295,6 +300,13 @@ impl WpApiCache {
                 log::warn!("Failed to reset stale fetching states: {}", e);
             }
 
+            // Clear abandoned fetch operations after migrations complete.
+            // Deletes Fetching states to prevent stuck loading indicators while
+            // preserving Fresh states to avoid unnecessary refetching.
+            if let Err(e) = EntityStateRepository::clear_abandoned_fetches(connection) {
+                log::warn!("Failed to clear abandoned fetches: {}", e);
+            }
+
             Ok(version)
         })
     }
@@ -396,7 +408,7 @@ impl From<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 8] = [
+static MIGRATION_QUERIES: [&str; 9] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -405,6 +417,7 @@ static MIGRATION_QUERIES: [&str; 8] = [
     include_str!("../migrations/0006-create-self-hosted-sites-table.sql"),
     include_str!("../migrations/0007-create-list-metadata-tables.sql"),
     include_str!("../migrations/0008-create-post-types-table.sql"),
+    include_str!("../migrations/0009-create-entity-state-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {

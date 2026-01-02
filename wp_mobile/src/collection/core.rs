@@ -4,7 +4,8 @@ use wp_mobile_cache::{
     list_metadata::{ListKey, ListState},
 };
 
-use crate::sync::{CollectionItem, EntityStateReader, ListInfo, ListMetadataReader};
+use crate::service::entity_state_service::EntityStateReader;
+use crate::sync::{CollectionItem, ListInfo, ListMetadataReader};
 
 /// Core collection infrastructure for metadata-first fetching.
 ///
@@ -138,6 +139,12 @@ impl MetadataCollectionCore {
 
         // Check ListMetadataItems - accept any update to keep this check simple and fast
         if hook.table == DbTable::ListMetadataItems {
+            return true;
+        }
+
+        // Check EntityState - entity state changes should trigger data refresh
+        // (e.g., Fetching -> Failed transition needs to update UI)
+        if hook.table == DbTable::EntityState {
             return true;
         }
 

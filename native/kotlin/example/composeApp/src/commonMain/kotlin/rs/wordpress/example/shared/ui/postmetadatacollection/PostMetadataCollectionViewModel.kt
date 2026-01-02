@@ -81,7 +81,7 @@ data class PostItemDisplayData(
         fun fromCollectionItem(item: PostMetadataCollectionItem): PostItemDisplayData {
             // Extract data from state variants that carry data
             val data = when (val s = item.state) {
-                is PostItemState.Cached -> s.data
+                is PostItemState.Fresh -> s.data
                 is PostItemState.Stale -> s.data
                 is PostItemState.FetchingWithData -> s.data
                 is PostItemState.FailedWithData -> s.data

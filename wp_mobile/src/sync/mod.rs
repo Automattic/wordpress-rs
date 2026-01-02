@@ -8,15 +8,15 @@
 //! ## Key Types
 //!
 //! - [`EntityMetadata`] - Lightweight metadata (id + optional modified_gmt)
-//! - [`EntityState`] - Fetch state (Missing, Fetching, Cached, Stale, Failed)
+//! - [`DbEntityState`] - Fetch state (Missing, Fetching, Fresh, Stale, Failed)
 //! - [`CollectionItem`] - Combines metadata with state
 //! - [`MetadataFetchResult`] - Result of metadata-only fetch
 //! - [`SyncResult`] - Result of sync operation
 //! - [`SyncStrategy`] - Strategy for list sync (MetadataOnly vs Full)
 //!
-//! ## Store Types
+//! ## Service Types
 //!
-//! - [`EntityStateStore`] - Tracks fetch state per entity (read-write)
+//! - [`EntityStateService`] - Stateless service for entity state operations
 //! - [`EntityStateReader`] - Read-only access to entity states (trait)
 //! - [`ListMetadataReader`] - Read-only access to list metadata (trait)
 //!
@@ -31,8 +31,6 @@
 
 mod collection_item;
 mod entity_metadata;
-mod entity_state;
-mod entity_state_store;
 mod list_metadata_reader;
 mod metadata_fetch_result;
 mod sync_result;
@@ -40,9 +38,8 @@ mod sync_strategy;
 
 pub use collection_item::CollectionItem;
 pub use entity_metadata::EntityMetadata;
-pub use entity_state::EntityState;
-pub use entity_state_store::{EntityStateReader, EntityStateStore};
 pub use list_metadata_reader::{ListInfo, ListMetadataReader};
 pub use metadata_fetch_result::MetadataFetchResult;
 pub use sync_result::SyncResult;
 pub use sync_strategy::SyncStrategy;
+pub use wp_mobile_cache::repository::entity_state::DbEntityState;

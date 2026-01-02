@@ -16,7 +16,7 @@ actor Test {
 
     @Test func testMigrationsWork() async throws {
         let migrationsPerformed = try await self.cache.performMigrations()
-        #expect(migrationsPerformed == 8)
+        #expect(migrationsPerformed == 9)
     }
 
     #if !os(Linux)

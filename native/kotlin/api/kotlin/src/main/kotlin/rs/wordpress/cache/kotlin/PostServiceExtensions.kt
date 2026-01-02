@@ -47,7 +47,7 @@ fun PostService.getObservablePostCollectionWithEditContext(
  * Unlike [getObservablePostCollectionWithEditContext] which fetches full data for all items,
  * this collection shows cached items immediately and fetches only what's needed.
  *
- * Items include fetch state (Missing, Fetching, Cached, Stale, Failed) so the UI
+ * Items include fetch state (Missing, Fetching, Fresh, Stale, Failed) so the UI
  * can show appropriate feedback for each item.
  *
  * @param endpointType The post endpoint type (Posts, Pages, or Custom)
