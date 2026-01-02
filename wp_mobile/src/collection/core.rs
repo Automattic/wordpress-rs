@@ -4,7 +4,8 @@ use wp_mobile_cache::{
     list_metadata::{ListKey, ListState},
 };
 
-use crate::sync::{CollectionItem, EntityStateReader, ListInfo, ListMetadataReader};
+use crate::service::entity_state_service::EntityStateReader;
+use crate::sync::{CollectionItem, ListInfo, ListMetadataReader};
 
 /// Core collection infrastructure for metadata-first fetching.
 ///

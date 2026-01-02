@@ -7,11 +7,11 @@ use crate::{
         StatelessCollection, post_collection::PostCollection,
     },
     filters::{AnyPostFilter, PostListFilter},
-    service::metadata::MetadataService,
-    sync::{
-        DbEntityState, EntityMetadata, EntityStateReader, EntityStateReaderImpl,
-        EntityStateService, MetadataFetchResult, SyncResult, SyncStrategy,
+    service::{
+        entity_state_service::{EntityStateReader, EntityStateReaderImpl, EntityStateService},
+        metadata::MetadataService,
     },
+    sync::{DbEntityState, EntityMetadata, MetadataFetchResult, SyncResult, SyncStrategy},
 };
 use std::{collections::HashSet, sync::Arc};
 use wp_api::{
@@ -202,7 +202,7 @@ impl PostService {
     /// Find stale posts by comparing fetched metadata timestamps with cached DB values.
     ///
     /// A post is considered stale if:
-    /// 1. It's currently in `Cached` state in the state store
+    /// 1. It's currently in `Fresh` state in the state store
     /// 2. Its fetched `modified_gmt` differs from the cached `modified_gmt` in the database
     ///
     /// Returns empty vector if no stale posts found or if DB query fails.
@@ -211,10 +211,10 @@ impl PostService {
         metadata: &[EntityMetadata],
         state_reader: &dyn EntityStateReader,
     ) -> Vec<i64> {
-        // Filter to only posts currently in Cached state
+        // Filter to only posts currently in Fresh state
         let cached_ids: Vec<PostId> = metadata
             .iter()
-            .filter(|m| matches!(state_reader.get(m.id), DbEntityState::Cached))
+            .filter(|m| matches!(state_reader.get(m.id), DbEntityState::Fresh))
             .map(|m| PostId(m.id))
             .collect();
 
@@ -453,7 +453,7 @@ impl PostService {
     /// Tracks entity lifecycle through state store:
     /// 1. Filters out IDs already `Fetching` (prevents duplicate requests)
     /// 2. Sets remaining IDs to `Fetching` before API call
-    /// 3. On success: Sets fetched posts to `Cached`, missing posts to `Failed`
+    /// 3. On success: Sets fetched posts to `Fresh`, missing posts to `Failed`
     /// 4. On error: Sets all requested posts to `Failed`
     ///
     /// # Arguments
@@ -560,14 +560,14 @@ impl PostService {
                     }
                 };
 
-                // Mark successfully fetched posts as Cached
+                // Mark successfully fetched posts as Fresh
                 let fetched_ids: Vec<i64> = response.data.iter().map(|p| p.id.0).collect();
                 EntityStateService::save_batch(
                     &self.cache,
                     &self.db_site,
                     EntityType::PostsEditContext,
                     &fetched_ids,
-                    DbEntityState::Cached,
+                    DbEntityState::Fresh,
                 );
 
                 // Mark posts that were requested but not returned as Failed
@@ -1174,14 +1174,14 @@ mod tests {
 
     #[rstest]
     fn test_find_stale_requires_modified_gmt(post_service_ctx: PostServiceTestContext) {
-        // Setup: Insert a post and mark it as Cached
+        // Setup: Insert a post and mark it as Fresh
         let test_post = insert_test_post(&post_service_ctx);
         EntityStateService::save(
             &post_service_ctx.post_service.cache,
             &post_service_ctx.post_service.db_site,
             EntityType::PostsEditContext,
             test_post.id.0,
-            DbEntityState::Cached,
+            DbEntityState::Fresh,
         );
 
         // Test: Metadata without modified_gmt (None)
@@ -1204,7 +1204,7 @@ mod tests {
 
     #[rstest]
     fn test_find_stale_only_checks_cached_posts(post_service_ctx: PostServiceTestContext) {
-        // Setup: Insert a post but don't mark it as Cached (it's Missing by default)
+        // Setup: Insert a post but don't mark it as Fresh (it's Missing by default)
         let test_post = insert_test_post(&post_service_ctx);
         let modified = "2024-01-01T12:00:00Z"
             .parse::<wp_api::prelude::WpGmtDateTime>()
@@ -1226,10 +1226,10 @@ mod tests {
                 .as_ref(),
         );
 
-        // Assert: No posts should be identified as stale (only Cached posts are checked)
+        // Assert: No posts should be identified as stale (only Fresh posts are checked)
         assert!(
             stale_ids.is_empty(),
-            "Only Cached posts should be checked for staleness"
+            "Only Fresh posts should be checked for staleness"
         );
     }
 

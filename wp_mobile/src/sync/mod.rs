@@ -8,7 +8,7 @@
 //! ## Key Types
 //!
 //! - [`EntityMetadata`] - Lightweight metadata (id + optional modified_gmt)
-//! - [`DbEntityState`] - Fetch state (Missing, Fetching, Cached, Stale, Failed)
+//! - [`DbEntityState`] - Fetch state (Missing, Fetching, Fresh, Stale, Failed)
 //! - [`CollectionItem`] - Combines metadata with state
 //! - [`MetadataFetchResult`] - Result of metadata-only fetch
 //! - [`SyncResult`] - Result of sync operation
@@ -31,7 +31,6 @@
 
 mod collection_item;
 mod entity_metadata;
-mod entity_state_service;
 mod list_metadata_reader;
 mod metadata_fetch_result;
 mod sync_result;
@@ -39,7 +38,6 @@ mod sync_strategy;
 
 pub use collection_item::CollectionItem;
 pub use entity_metadata::EntityMetadata;
-pub use entity_state_service::{EntityStateReader, EntityStateReaderImpl, EntityStateService};
 pub use list_metadata_reader::{ListInfo, ListMetadataReader};
 pub use metadata_fetch_result::MetadataFetchResult;
 pub use sync_result::SyncResult;

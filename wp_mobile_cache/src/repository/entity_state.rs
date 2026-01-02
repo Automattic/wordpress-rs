@@ -68,7 +68,7 @@ pub enum DbEntityState {
     Fetching,
 
     /// Entity is in cache and considered fresh.
-    Cached,
+    Fresh,
 
     /// Entity is in cache but outdated (needs re-fetch).
     Stale,
@@ -93,7 +93,7 @@ impl DbEntityState {
 
     /// Returns `true` if the entity is cached (fresh or stale).
     pub fn is_cached(&self) -> bool {
-        matches!(self, Self::Cached | Self::Stale)
+        matches!(self, Self::Fresh | Self::Stale)
     }
 
     /// Returns `true` if the entity can be fetched.
@@ -116,7 +116,7 @@ impl DbEntityState {
         match self {
             Self::Missing => (0, None),
             Self::Fetching => (1, None),
-            Self::Cached => (2, None),
+            Self::Fresh => (2, None),
             Self::Stale => (3, None),
             Self::Failed { error } => (4, Some(error.clone())),
         }
@@ -127,7 +127,7 @@ impl DbEntityState {
         match state_int {
             0 => Some(Self::Missing),
             1 => Some(Self::Fetching),
-            2 => Some(Self::Cached),
+            2 => Some(Self::Fresh),
             3 => Some(Self::Stale),
             4 => Some(Self::Failed {
                 error: error_message.unwrap_or_else(|| "Unknown error".to_string()),
@@ -425,14 +425,14 @@ mod tests {
             42,
             &db_site,
             EntityType::PostsEditContext,
-            &DbEntityState::Cached,
+            &DbEntityState::Fresh,
         )
         .expect("Failed to update state");
 
         let state =
             EntityStateRepository::get_state(&conn, 42, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state");
-        assert_eq!(state, Some(DbEntityState::Cached));
+        assert_eq!(state, Some(DbEntityState::Fresh));
     }
 
     #[test]
@@ -508,7 +508,7 @@ mod tests {
             3,
             &db_site,
             EntityType::PostsEditContext,
-            &DbEntityState::Cached,
+            &DbEntityState::Fresh,
         )
         .expect("Failed to set state");
 

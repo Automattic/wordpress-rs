@@ -3,6 +3,7 @@ use std::sync::Arc;
 use wp_api::prelude::{ApiUrlResolver, WpApiClient, WpApiClientDelegate};
 use wp_mobile_cache::WpApiCache;
 
+pub mod entity_state_service;
 pub mod metadata;
 pub mod mock_post_service;
 pub mod post_types;

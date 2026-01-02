@@ -159,8 +159,8 @@ macro_rules! wp_mobile_metadata_item {
             /// - `Missing + has data` → Show stale data (app restart scenario)
             /// - `Fetching + no data` → Show loading spinner
             /// - `Fetching + has data` → Show data with loading indicator
-            /// - `Cached + has data` → Show fresh data
-            /// - `Cached + no data` → Defensive fallback to Missing
+            /// - `Fresh + has data` → Show fresh data
+            /// - `Fresh + no data` → Defensive fallback to Missing
             /// - `Stale + has data` → Show outdated data
             /// - `Stale + no data` → Defensive fallback to Missing
             /// - `Failed + no data` → Show error message
@@ -181,11 +181,11 @@ macro_rules! wp_mobile_metadata_item {
                         $state_name::FetchingWithData { data }
                     }
 
-                    // Cached state (should always have data, but handle gracefully)
-                    ($crate::sync::DbEntityState::Cached, Some(data)) => {
+                    // Fresh state (should always have data, but handle gracefully)
+                    ($crate::sync::DbEntityState::Fresh, Some(data)) => {
                         $state_name::Cached { data }
                     }
-                    ($crate::sync::DbEntityState::Cached, None) => $state_name::Missing,
+                    ($crate::sync::DbEntityState::Fresh, None) => $state_name::Missing,
 
                     // Stale state (should always have data, but handle gracefully)
                     ($crate::sync::DbEntityState::Stale, Some(data)) => $state_name::Stale { data },
