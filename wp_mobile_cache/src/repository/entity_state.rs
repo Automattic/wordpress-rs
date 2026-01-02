@@ -10,12 +10,12 @@ use std::collections::HashMap;
 /// Each variant represents a specific entity type with its context (e.g., posts in edit context).
 /// This prevents arbitrary strings from being passed and ensures only valid entity types are used.
 ///
-/// Stored as INTEGER in the database via ToSql/FromSql implementations. The repr(i32) ensures
+/// Stored as INTEGER in the database via ToSql/FromSql implementations. The repr(i64) ensures
 /// stable values even if the enum definition order changes.
 ///
 /// **IMPORTANT**: Do not change the integer values - they are persisted in the database.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-#[repr(i32)]
+#[repr(i64)]
 pub enum EntityType {
     /// Posts with edit context (table: posts_edit_context)
     PostsEditContext = 0,
@@ -35,15 +35,15 @@ impl EntityType {
 
 impl ToSql for EntityType {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(*self as i32))
+        Ok(ToSqlOutput::from(*self as i64))
     }
 }
 
 impl FromSql for EntityType {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
-        i32::column_result(value).and_then(|i| match i {
+        i64::column_result(value).and_then(|i| match i {
             0 => Ok(EntityType::PostsEditContext),
-            _ => Err(FromSqlError::OutOfRange(i as i64)),
+            _ => Err(FromSqlError::OutOfRange(i)),
         })
     }
 }
@@ -477,7 +477,7 @@ mod tests {
     fn test_entity_type_values_are_stable() {
         // IMPORTANT: Changing these values requires a database migration.
         // These integer values are persisted in the entity_state table.
-        assert_eq!(EntityType::PostsEditContext as i32, 0);
+        assert_eq!(EntityType::PostsEditContext as i64, 0);
     }
 
     #[test]

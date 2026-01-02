@@ -120,10 +120,10 @@ pub struct DbListMetadataState {
 
 /// Sync state for a list.
 ///
-/// Stored as INTEGER in the database. The repr(i32) ensures stable values
+/// Stored as INTEGER in the database. The repr(i64) ensures stable values
 /// even if the enum definition order changes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, uniffi::Enum)]
-#[repr(i32)]
+#[repr(i64)]
 pub enum ListState {
     /// No sync in progress
     #[default]
@@ -138,13 +138,13 @@ pub enum ListState {
 
 impl ToSql for ListState {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(*self as i32))
+        Ok(ToSqlOutput::from(*self as i64))
     }
 }
 
 impl FromSql for ListState {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
-        i32::column_result(value).and_then(|i| match i {
+        i64::column_result(value).and_then(|i| match i {
             0 => Ok(ListState::Idle),
             1 => Ok(ListState::FetchingFirstPage),
             2 => Ok(ListState::FetchingNextPage),
