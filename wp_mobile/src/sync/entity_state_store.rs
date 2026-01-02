@@ -3,10 +3,8 @@ use std::sync::Arc;
 use wp_mobile_cache::{
     SqliteDbError, WpApiCache,
     db_types::db_site::DbSite,
-    repository::entity_state::{EntityStateRepository, EntityStateValue, EntityType},
+    repository::entity_state::{EntityState, EntityStateRepository, EntityType},
 };
-
-use super::EntityState;
 
 /// Read-only access to entity fetch states.
 ///
@@ -34,9 +32,8 @@ impl EntityStateService {
     ///
     /// Writes to database, triggering UpdateHook notification to observers.
     ///
-    /// **Error handling:** Failures are logged but not propagated. State writes are
-    /// best-effort tracking data that self-heal on the next sync. If the database
-    /// has persistent issues, states will be re-evaluated on next fetch operation.
+    /// **Error handling:** Failures are logged but not propagated since entity states
+    /// are recalculated on each sync operation.
     pub fn save(
         cache: &WpApiCache,
         db_site: &DbSite,
@@ -49,11 +46,10 @@ impl EntityStateService {
 
     /// Save the state for multiple entities to the database (batch operation).
     ///
-    /// Writes to database in batch, triggering UpdateHook notification for each entity.
+    /// Uses a single SQL statement to update multiple entities efficiently.
     ///
-    /// **Error handling:** Failures are logged but not propagated. State writes are
-    /// best-effort tracking data that self-heal on the next sync. If the database
-    /// has persistent issues, states will be re-evaluated on next fetch operation.
+    /// **Error handling:** Failures are logged but not propagated since entity states
+    /// are recalculated on each sync operation.
     pub fn save_batch(
         cache: &WpApiCache,
         db_site: &DbSite,
@@ -61,17 +57,8 @@ impl EntityStateService {
         ids: &[i64],
         state: EntityState,
     ) {
-        let (state_value, error_msg) = Self::encode_state(&state);
-
         if let Err(e) = cache.execute(|conn| {
-            EntityStateRepository::set_state_batch(
-                conn,
-                ids,
-                db_site,
-                entity_type,
-                state_value,
-                error_msg.as_deref(),
-            )
+            EntityStateRepository::set_state_batch(conn, ids, db_site, entity_type, &state)
         }) {
             log::warn!(
                 "Failed to set entity state for {} ids to {:?}: {} (will be re-evaluated on next sync)",
@@ -92,19 +79,9 @@ impl EntityStateService {
         id: i64,
     ) -> EntityState {
         cache
-            .execute(|conn| {
-                let state_value = EntityStateRepository::get_state(conn, id, db_site, entity_type)?;
-                let error_msg = if state_value == Some(EntityStateValue::Failed) {
-                    EntityStateRepository::get_error_message(conn, id, db_site, entity_type)?
-                } else {
-                    None
-                };
-
-                Ok::<EntityState, SqliteDbError>(match state_value {
-                    Some(state) => Self::decode_state(state, error_msg),
-                    None => EntityState::Missing,
-                })
-            })
+            .execute(|conn| EntityStateRepository::get_state(conn, id, db_site, entity_type))
+            .ok()
+            .flatten()
             .unwrap_or(EntityState::Missing)
     }
 
@@ -123,7 +100,7 @@ impl EntityStateService {
                     ids.iter()
                         .filter(|&&id| {
                             match EntityStateRepository::get_state(conn, id, db_site, entity_type) {
-                                Ok(Some(EntityStateValue::Fetching)) => false, // Fetching - not fetchable
+                                Ok(Some(state)) => !state.is_fetching(), // Not fetchable if Fetching
                                 _ => true, // Everything else is fetchable
                             }
                         })
@@ -139,30 +116,6 @@ impl EntityStateService {
                 );
                 ids.to_vec()
             })
-    }
-
-    /// Encode EntityState to (state_value, error_message) for database storage.
-    fn encode_state(state: &EntityState) -> (EntityStateValue, Option<String>) {
-        match state {
-            EntityState::Missing => (EntityStateValue::Missing, None),
-            EntityState::Fetching => (EntityStateValue::Fetching, None),
-            EntityState::Cached => (EntityStateValue::Cached, None),
-            EntityState::Stale => (EntityStateValue::Stale, None),
-            EntityState::Failed { error } => (EntityStateValue::Failed, Some(error.clone())),
-        }
-    }
-
-    /// Decode (state_value, error_message) from database to EntityState.
-    fn decode_state(state_value: EntityStateValue, error_message: Option<String>) -> EntityState {
-        match state_value {
-            EntityStateValue::Missing => EntityState::Missing,
-            EntityStateValue::Fetching => EntityState::Fetching,
-            EntityStateValue::Cached => EntityState::Cached,
-            EntityStateValue::Stale => EntityState::Stale,
-            EntityStateValue::Failed => EntityState::Failed {
-                error: error_message.unwrap_or_else(|| "Unknown error".to_string()),
-            },
-        }
     }
 }
 
