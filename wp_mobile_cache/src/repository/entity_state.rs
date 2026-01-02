@@ -243,19 +243,6 @@ impl EntityStateRepository {
     // Cleanup Operations
     // ============================================================
 
-    /// Reset all entity states by deleting all records.
-    ///
-    /// Entity states are ephemeral - they track in-flight fetch operations.
-    /// On app restart, all fetches are complete/abandoned, so reset everything.
-    ///
-    /// This prevents stuck "Fetching" states and ensures fresh state tracking.
-    ///
-    /// Returns the number of rows deleted.
-    pub fn reset_all_states(executor: &impl QueryExecutor) -> Result<usize, SqliteDbError> {
-        let sql = format!("DELETE FROM {}", Self::table_name());
-        executor.execute(&sql, params![])
-    }
-
     /// Reset entity states on app startup.
     ///
     /// Converts `Fetching` states to `Missing` to prevent stuck loading indicators
@@ -335,62 +322,6 @@ mod tests {
             EntityStateRepository::get_state(&conn, 42, &db_site, EntityType::PostsEditContext)
                 .expect("Failed to get state");
         assert_eq!(state, Some(EntityStateValue::Cached));
-    }
-
-    #[test]
-    fn test_reset_all_states() {
-        let (conn, db_site) = setup_test_db();
-
-        // Insert some states (using PostsEditContext for all since it's the only variant currently)
-        EntityStateRepository::set_state(
-            &conn,
-            1,
-            &db_site,
-            EntityType::PostsEditContext,
-            EntityStateValue::Fetching,
-            None,
-        )
-        .expect("Failed to set state for entity 1");
-        EntityStateRepository::set_state(
-            &conn,
-            2,
-            &db_site,
-            EntityType::PostsEditContext,
-            EntityStateValue::Cached,
-            None,
-        )
-        .expect("Failed to set state for entity 2");
-        EntityStateRepository::set_state(
-            &conn,
-            3,
-            &db_site,
-            EntityType::PostsEditContext,
-            EntityStateValue::Fetching,
-            None,
-        )
-        .expect("Failed to set state for entity 3");
-
-        // Reset all states
-        let count =
-            EntityStateRepository::reset_all_states(&conn).expect("Failed to reset all states");
-        assert_eq!(count, 3);
-
-        // Verify all gone
-        assert_eq!(
-            EntityStateRepository::get_state(&conn, 1, &db_site, EntityType::PostsEditContext)
-                .expect("Failed to get state for entity 1"),
-            None
-        );
-        assert_eq!(
-            EntityStateRepository::get_state(&conn, 2, &db_site, EntityType::PostsEditContext)
-                .expect("Failed to get state for entity 2"),
-            None
-        );
-        assert_eq!(
-            EntityStateRepository::get_state(&conn, 3, &db_site, EntityType::PostsEditContext)
-                .expect("Failed to get state for entity 3"),
-            None
-        );
     }
 
     #[test]
