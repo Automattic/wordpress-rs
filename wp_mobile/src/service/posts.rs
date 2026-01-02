@@ -407,7 +407,7 @@ impl PostService {
                     EntityType::PostsEditContext,
                     m.id,
                 );
-                matches!(state, EntityState::Missing | EntityState::Stale)
+                state.needs_fetch()
             })
             .map(|m| PostId(m.id))
             .collect();
