@@ -9,8 +9,8 @@ use rusqlite::{
 /// Each variant represents a specific entity type with its context (e.g., posts in edit context).
 /// This prevents arbitrary strings from being passed and ensures only valid entity types are used.
 ///
-/// Stored as INTEGER in the database. The repr(i32) ensures stable values even if the enum
-/// definition order changes.
+/// Stored as INTEGER in the database via ToSql/FromSql implementations. The repr(i32) ensures
+/// stable values even if the enum definition order changes.
 ///
 /// **IMPORTANT**: Do not change the integer values - they are persisted in the database.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -21,10 +21,10 @@ pub enum EntityType {
 }
 
 impl EntityType {
-    /// Get the table name associated with this entity type.
+    /// Get a human-readable identifier for this entity type.
     ///
-    /// This is the discriminator used in the entity_state table to separate
-    /// different entity types and contexts.
+    /// Used for logging and debugging. The database stores the integer value
+    /// from the enum, not this string.
     pub fn table_name(self) -> &'static str {
         match self {
             EntityType::PostsEditContext => "posts_edit_context",
@@ -178,7 +178,7 @@ impl EntityStateRepository {
             params![
                 entity_id,
                 db_site.row_id.0,
-                entity_type.table_name(),
+                entity_type,
                 state_int,
                 error_message
             ],
@@ -228,7 +228,7 @@ impl EntityStateRepository {
             for &id in chunk {
                 params.push(Box::new(id));
                 params.push(Box::new(db_site.row_id.0));
-                params.push(Box::new(entity_type.table_name().to_string()));
+                params.push(Box::new(entity_type));
                 params.push(Box::new(state_int));
                 params.push(Box::new(error_message.clone()));
             }
@@ -262,7 +262,7 @@ impl EntityStateRepository {
         let result = executor
             .prepare(&sql)?
             .query_row(
-                params![entity_id, db_site.row_id.0, entity_type.table_name()],
+                params![entity_id, db_site.row_id.0, entity_type],
                 |row| {
                     let state_int: i32 = row.get(0)?;
                     let error_message: Option<String> = row.get(1)?;
