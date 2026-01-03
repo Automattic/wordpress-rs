@@ -16,7 +16,10 @@ use crate::{
 use std::{collections::HashSet, sync::Arc};
 use wp_api::{
     api_client::WpApiClient,
-    posts::{AnyPostWithEditContext, PostId, PostListParams, SparseAnyPostFieldWithEditContext},
+    posts::{
+        AnyPostWithEditContext, PostId, PostListParams, PostStatus,
+        SparseAnyPostFieldWithEditContext,
+    },
     request::endpoint::posts_endpoint::PostEndpointType,
 };
 use wp_mobile_cache::{
@@ -33,11 +36,11 @@ const BATCH_FETCH_SIZE: usize = 100;
 
 // Internal types
 
-/// Result from fetching posts by IDs.
-pub struct FetchByIdsResult {
-    /// Entity IDs of successfully fetched posts
+/// Result from loading posts by IDs.
+pub struct LoadByIdsResult {
+    /// Entity IDs of successfully loaded posts
     pub entity_ids: Vec<EntityId>,
-    /// Number of posts that were requested but failed to fetch
+    /// Number of posts that were requested but failed to load
     pub failed_count: usize,
 }
 
@@ -458,7 +461,7 @@ impl PostService {
     /// * `ids` - Post IDs to load
     ///
     /// # Returns
-    /// - `Ok(FetchByIdsResult)` with entity IDs of loaded posts and failure count
+    /// - `Ok(LoadByIdsResult)` with entity IDs of loaded posts and failure count
     /// - `Err(FetchError)` if network or database error occurs
     ///
     /// # Note
@@ -467,9 +470,9 @@ impl PostService {
         &self,
         endpoint_type: &PostEndpointType,
         ids: Vec<PostId>,
-    ) -> Result<FetchByIdsResult, FetchError> {
+    ) -> Result<LoadByIdsResult, FetchError> {
         if ids.is_empty() {
-            return Ok(FetchByIdsResult {
+            return Ok(LoadByIdsResult {
                 entity_ids: Vec::new(),
                 failed_count: 0,
             });
@@ -485,7 +488,7 @@ impl PostService {
         );
 
         if fetchable.is_empty() {
-            return Ok(FetchByIdsResult {
+            return Ok(LoadByIdsResult {
                 entity_ids: Vec::new(),
                 failed_count: 0,
             });
@@ -507,6 +510,19 @@ impl PostService {
             include: post_ids,
             // Ensure we get all requested posts regardless of default per_page
             per_page: Some(BATCH_FETCH_SIZE as u32),
+            // Request all available post statuses as defined in the WordPress REST API.
+            // See: https://developer.wordpress.org/rest-api/reference/posts/#arguments
+            // The API defaults to 'publish' only, so we must explicitly list all statuses
+            // to fetch posts by ID regardless of their status (drafts, pending, etc.).
+            // Note: 'trash' is not included in the API's allowed status values.
+            // Note: This will not work with custom statuses and may need special handling.
+            status: vec![
+                PostStatus::Publish,
+                PostStatus::Draft,
+                PostStatus::Pending,
+                PostStatus::Private,
+                PostStatus::Future,
+            ],
             ..Default::default()
         };
 
@@ -574,7 +590,7 @@ impl PostService {
                     );
                 }
 
-                Ok(FetchByIdsResult {
+                Ok(LoadByIdsResult {
                     entity_ids,
                     failed_count,
                 })
