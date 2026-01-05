@@ -82,8 +82,19 @@ pub struct WpRoute {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
 pub struct WpEndpoint {
     pub methods: Vec<String>,
-    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
-    pub args: HashMap<String, WpEndpointArg>,
+    pub args: Arc<WpEndpointArgs>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Object)]
+#[serde(transparent)]
+pub struct WpEndpointArgs(serde_json::Value);
+
+impl WpEndpointArgs {
+    pub fn get(&self, arg: &str) -> Option<WpEndpointArg> {
+        let obj = self.0.as_object()?;
+        let value = obj.get(arg)?;
+        serde_json::from_value(value.clone()).ok()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
@@ -465,6 +476,7 @@ mod tests {
     #[case("api-details/test-case-02.json")]
     #[case("api-details/test-case-03.json")]
     #[case("api-details/test-case-04.json")]
+    #[case("api-details/test-case-05.json")]
     fn test_api_details_json(#[case] input: &str) {
         let json = test_json(input).expect("Failed to read test resource");
 

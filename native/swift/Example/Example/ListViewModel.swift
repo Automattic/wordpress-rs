@@ -1,4 +1,5 @@
 import Foundation
+import WordPressApiCache
 import SwiftUI
 import WordPressAPI
 
@@ -13,6 +14,8 @@ protocol ListViewModel {
     var error: MyError? { get set }
 
     func task() async
+
+    func triggerUpdate() async
 }
 
 @Observable class SequenceListViewModel: ListViewModel {
@@ -43,6 +46,10 @@ protocol ListViewModel {
             self.error = MyError(underlyingError: error)
             self.shouldPresentAlert = true
         }
+    }
+
+    func triggerUpdate() async {
+        // Do nothing
     }
 
     func reset() {
@@ -79,6 +86,49 @@ protocol ListViewModel {
         }
 
         self.isLoading = false
+    }
+
+    func triggerUpdate() async {
+        // Do nothing
+    }
+}
+
+@Observable class CollectionListViewModel: ListViewModel {
+
+    typealias CachedResultProvider = @Sendable () async throws -> [ListViewData]
+    typealias FetchedResultsProvider = @Sendable (() async -> Void) async throws -> [ListViewData]
+
+    var listItems: [String: ListViewData] = [:]
+
+    var shouldPresentAlert: Bool = false
+
+    var error: MyError?
+
+    private let cachePromise: CachedResultProvider
+    private let fetchPromise: FetchedResultsProvider
+
+    init(cachedResults: @escaping CachedResultProvider, fetchedResults: @escaping FetchedResultsProvider) {
+        self.cachePromise = cachedResults
+        self.fetchPromise = fetchedResults
+    }
+
+    func task() async {
+        do {
+            for item in try await cachePromise() {
+                self.listItems[item.id] = item
+            }
+
+            for item in try await fetchPromise(self.triggerUpdate) {
+                self.listItems[item.id] = item
+            }
+        } catch {
+            self.error = MyError(underlyingError: error)
+            self.shouldPresentAlert = true
+        }
+    }
+
+    func triggerUpdate() async {
+
     }
 }
 

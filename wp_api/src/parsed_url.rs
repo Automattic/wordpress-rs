@@ -4,7 +4,8 @@ use url::Url;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, uniffi::Object)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, uniffi::Object)]
+#[uniffi::export(Eq, Hash)]
 pub struct ParsedUrl {
     pub inner: Url,
 }

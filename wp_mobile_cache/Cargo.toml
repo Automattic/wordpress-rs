@@ -5,9 +5,11 @@ edition = "2024"
 
 [features]
 default = ["rusqlite/bundled"]
+test-helpers = ["dep:chrono", "dep:integration_test_credentials", "dep:rstest"]
 
 [dependencies]
-rusqlite = { version = "0.37.0", features = ["hooks"] }
+log = { workspace = true }
+rusqlite = { workspace = true, features = ["hooks"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -17,4 +19,17 @@ wp_api = { path = "../wp_api" }
 [dev-dependencies]
 chrono = { workspace = true }
 integration_test_credentials = { path = "../integration_test_credentials" }
-rstest = "0.26"
+rstest = { workspace = true }
+
+# Optional dependencies (enabled via test-helpers feature)
+[dependencies.chrono]
+workspace = true
+optional = true
+
+[dependencies.integration_test_credentials]
+path = "../integration_test_credentials"
+optional = true
+
+[dependencies.rstest]
+optional = true
+workspace = true

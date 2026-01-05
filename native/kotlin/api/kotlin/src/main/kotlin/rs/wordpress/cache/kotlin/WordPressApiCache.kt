@@ -1,59 +1,26 @@
 package rs.wordpress.cache.kotlin
 
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.withContext
-import uniffi.wp_mobile_cache.DatabaseDelegate
-import uniffi.wp_mobile_cache.UpdateHook
 import uniffi.wp_mobile_cache.WpApiCache
 import java.nio.file.Path
-import java.util.concurrent.Executors
-
-class WordPressApiCacheLoggingDelegate : DatabaseDelegate {
-    override fun didUpdate(updateHook: UpdateHook) {
-        println("Received update: $updateHook")
-    }
-}
-
-class WordPressApiCacheDelegate(
-    private val callback: (updateHook: UpdateHook) -> Unit
-) : DatabaseDelegate {
-
-    override fun didUpdate(updateHook: UpdateHook) {
-        callback(updateHook)
-    }
-}
 
 class WordPressApiCache {
-    private val cache: WpApiCache
-    private val internalDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-    private val delegate: DatabaseDelegate?
+    val cache: WpApiCache
 
     // Creates a new in-memory cache
-    constructor(delegate: WordPressApiCacheDelegate? = null) : this(":memory:", delegate)
+    constructor() : this(":memory:")
 
     // Creates a new cache at the specified file system URL
-    constructor(path: Path, delegate: WordPressApiCacheDelegate? = null) : this(
-        path.toString(),
-        delegate
-    )
+    constructor(path: Path) : this(path.toString())
 
     // Creates a new cache at the specified path
-    constructor(string: String, delegate: WordPressApiCacheDelegate? = null) {
+    constructor(string: String) {
         this.cache = WpApiCache(string)
-        this.delegate = delegate
+
+        // Automatically register DatabaseChangeNotifier to enable ObservableEntity support
+        this.cache.startListeningForUpdates(DatabaseChangeNotifier)
     }
 
-    suspend fun performMigrations(): Int = withContext(internalDispatcher) {
-        cache.performMigrations().toInt()
-    }
-
-    fun startListeningForUpdates() {
-        if (this.delegate != null) {
-            this.cache.startListeningForUpdates(this.delegate)
-        }
-    }
-
-    fun stopListeningForUpdates() {
-        this.cache.stopListeningForUpdates()
+    fun performMigrations(): Int {
+        return cache.performMigrations().toInt()
     }
 }

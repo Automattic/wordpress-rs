@@ -30,7 +30,7 @@ class WelcomeActivity : ComponentActivity() {
 
     private fun authenticateSite(url: String) {
         val success = runBlocking {
-            when (val apiDiscoveryResult = WpLoginClient().apiDiscovery(url)) {
+            when (val apiDiscoveryResult = WpLoginClient(emptyList()).apiDiscovery(url)) {
                 is ApiDiscoveryResult.Success -> apiDiscoveryResult.success
                 else -> throw IllegalStateException("Api discovery should succeed for the example app")
             }

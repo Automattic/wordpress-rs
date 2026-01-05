@@ -1,4 +1,5 @@
 import Foundation
+import WordPressApiCache
 @preconcurrency import WordPressAPIInternal
 
 #if os(Linux)
@@ -16,6 +17,8 @@ public actor WordPressAPI {
     }
 
     private let apiUrlResolver: ApiUrlResolver
+    private let urlSession: URLSession
+
     let requestExecutor: SafeRequestExecutor
     private let apiClientDelegate: WpApiClientDelegate
     package let requestBuilder: UniffiWpApiClient
@@ -122,12 +125,14 @@ public actor WordPressAPI {
     }
 
     init(
+        urlSession: URLSession = .shared,
         apiUrlResolver: ApiUrlResolver,
         authenticationProvider: WpAuthenticationProvider,
         executor: SafeRequestExecutor,
         middlewarePipeline: MiddlewarePipeline,
         appNotifier: WpAppNotifier?
     ) {
+        self.urlSession = urlSession
         self.apiUrlResolver = apiUrlResolver
         self.apiClientDelegate = WpApiClientDelegate(
             authProvider: authenticationProvider,
@@ -140,6 +145,22 @@ public actor WordPressAPI {
             delegate: self.apiClientDelegate
         )
         self.requestExecutor = executor
+    }
+
+    public func asSelfHostedService() throws -> WpSelfHostedService {
+        let cache = try WpApiCache(path: nil)
+        _ = try cache.performMigrations()
+        cache.startListeningForUpdates(delegate: DatabaseChangeNotifier.shared)
+
+        let resolvedUrl = apiUrlResolver.resolve(namespace: "", endpointSegments: [])
+
+        return try WpSelfHostedService(
+            siteUrl: resolvedUrl.asURL().deletingLastPathComponent().absoluteString,
+            apiRoot: resolvedUrl.asURL().absoluteString,
+            apiUrlResolver: apiUrlResolver,
+            delegate: apiClientDelegate,
+            cache: cache
+        )
     }
 
     public var users: UsersRequestExecutor {

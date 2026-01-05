@@ -25,7 +25,7 @@ import kotlin.test.assertContains
 
 @Execution(ExecutionMode.CONCURRENT)
 class ApiUrlDiscoveryTest {
-    private val loginClient: WpLoginClient = WpLoginClient()
+    private val loginClient: WpLoginClient = WpLoginClient(emptyList())
 
     @Test
     fun testLocalSite() = runTest {
@@ -186,7 +186,7 @@ class ApiUrlDiscoveryTest {
         val invalid =
             ApiDiscoveryAuthenticationMiddleware(username = "invalid", password = "invalid")
         val client = WpLoginClient(
-            WpRequestExecutor(), WpApiMiddlewarePipeline(middlewares = listOf(invalid))
+            WpRequestExecutor(emptyList()), WpApiMiddlewarePipeline(middlewares = listOf(invalid))
         )
         val reason = client.apiDiscovery("https://basic-auth.wpmt.co")
             .assertFailureFindApiRoot().getRequestExecutionErrorReason()
@@ -204,7 +204,7 @@ class ApiUrlDiscoveryTest {
         )
 
         val client = WpLoginClient(
-            WpRequestExecutor(), WpApiMiddlewarePipeline(middlewares = listOf(valid))
+            WpRequestExecutor(emptyList()), WpApiMiddlewarePipeline(middlewares = listOf(valid))
         )
 
         assertEquals(
@@ -283,7 +283,7 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 17 (with exception)
     fun testInvalidHttpsWithExceptionWorks() = runTest {
-        val httpClient = WpHttpClient.DefaultHttpClient()
+        val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
         val executor = WpRequestExecutor(httpClient)
         httpClient.addAllowedAlternativeNamesForHostname(
             "vanilla.wpmt.co",
@@ -295,6 +295,31 @@ class ApiUrlDiscoveryTest {
             WpLoginClient(requestExecutor = executor).apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
+    }
+
+    @Test
+    fun testAllowedHostnamesDoesNotBreakValidSites() = runTest {
+        val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
+        val executor = WpRequestExecutor(httpClient)
+        val loginClient = WpLoginClient(requestExecutor = executor)
+
+        // First, configure an allowed hostname override for a specific cert/hostname pair
+        httpClient.addAllowedAlternativeNamesForHostname(
+            "vanilla.wpmt.co",
+            listOf("wordpress-1315525-4803651.cloudwaysapps.com")
+        )
+
+        // The override should work
+        assertEquals(
+            "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
+            loginClient.apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
+                .assertSuccess().applicationPasswordsAuthenticationUrl.url()
+        )
+
+        // Other valid SSL sites should still work via fallback to default hostname verification.
+        // google.com uses wildcard/SAN certificates which require proper OkHttp verification.
+        val reason = loginClient.apiDiscovery("https://google.com").assertFailureFindApiRoot()
+        assertInstanceOf(FindApiRootFailure.ProbablyNotAWordPressSite::class.java, reason)
     }
 
     @Test

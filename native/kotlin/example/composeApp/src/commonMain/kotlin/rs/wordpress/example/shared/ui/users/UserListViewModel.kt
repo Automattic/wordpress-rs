@@ -17,7 +17,8 @@ class UserListViewModel(private val authRepository: AuthenticationRepository) {
         authRepository.authenticationForSite(authenticatedSite)?.let {
             apiClient = WpApiClient(
                 wpOrgSiteApiRootUrl = authenticatedSite.apiRootUrl,
-                authProvider = WpAuthenticationProvider.staticWithAuth(it)
+                authProvider = WpAuthenticationProvider.staticWithAuth(it),
+                interceptors = emptyList()
             )
         }
     }

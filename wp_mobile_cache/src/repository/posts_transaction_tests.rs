@@ -34,11 +34,11 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
     let posts = vec![post1, post2, post3];
 
     // Batch upsert should succeed - duplicate is updated
-    let rowids = test_ctx
+    let entity_ids = test_ctx
         .post_repo
         .upsert_batch(&mut test_ctx.conn, &test_ctx.site, &posts)
         .unwrap();
-    assert_eq!(rowids.len(), 3);
+    assert_eq!(entity_ids.len(), 3);
 
     // Verify all 3 posts exist (100, 200 updated, 300)
     let count = test_ctx
@@ -62,7 +62,7 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
         .expect("Failed to select post by post_id")
         .expect("Post should exist");
-    assert_eq!(post200.post.title.rendered, "Updated");
+    assert_eq!(post200.data.post.title.rendered, "Updated");
 
     // Verify post 300 was inserted
     assert!(
@@ -118,7 +118,7 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
         .build();
 
     // Upsert should succeed
-    let rowid = test_ctx
+    let entity_id = test_ctx
         .post_repo
         .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
         .unwrap();
@@ -129,15 +129,18 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id_500)
         .expect("Failed to select post by post_id")
         .expect("Post should exist");
-    assert_eq!(retrieved.post.id, post_id_500);
-    assert_eq!(retrieved.row_id, rowid);
+    assert_eq!(retrieved.data.post.id, post_id_500);
+    assert_eq!(retrieved.data.row_id, entity_id.rowid);
 
     // Verify terms were synced correctly
     assert_eq!(
-        retrieved.post.categories,
+        retrieved.data.post.categories,
         Some(vec![wp_api::terms::TermId(1), wp_api::terms::TermId(2)])
     );
-    assert_eq!(retrieved.post.tags, Some(vec![wp_api::terms::TermId(10)]));
+    assert_eq!(
+        retrieved.data.post.tags,
+        Some(vec![wp_api::terms::TermId(10)])
+    );
 
     // Update the post with different terms
     let updated_post = PostBuilder::minimal()
@@ -159,10 +162,10 @@ fn test_upsert_maintains_consistency_on_success(mut test_ctx: TestContext) {
         .expect("Failed to select post by post_id")
         .expect("Post should exist");
     assert_eq!(
-        retrieved.post.categories,
+        retrieved.data.post.categories,
         Some(vec![wp_api::terms::TermId(3)])
     );
-    assert_eq!(retrieved.post.tags, None);
+    assert_eq!(retrieved.data.post.tags, None);
 
     // Verify old terms are gone (no orphaned relationships)
     // The term_relationships table should only have the new category term

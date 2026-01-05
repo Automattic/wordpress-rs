@@ -208,6 +208,10 @@ test-kotlin-integration:
 	@# Help: Run Kotlin integration tests in test server.
 	docker exec -i wordpress /bin/bash < ./scripts/run-kotlin-integration-tests.sh
 
+runComposeDesktopApp:
+	@# Help: Run the Compose Multiplatform desktop application.
+	cd native/kotlin && ./gradlew :example:composeApp:run
+
 restore-test-server:
 	@# Help: Restore the test server from backup.
 	curl "http://localhost:4000/restore?db=true&plugins=true"

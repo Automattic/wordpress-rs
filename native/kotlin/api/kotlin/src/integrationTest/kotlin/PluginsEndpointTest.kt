@@ -20,14 +20,16 @@ class PluginsEndpointTest {
         testCredentials.apiRootUrl, WpAuthenticationProvider.staticWithUsernameAndPassword(
             username = testCredentials.adminUsername,
             password = testCredentials.adminPassword
-        )
+        ),
+        emptyList()
     )
     private val clientAsSubscriber = WpApiClient(
         testCredentials.apiRootUrl,
         WpAuthenticationProvider.staticWithUsernameAndPassword(
             username = testCredentials.subscriberUsername,
             password = testCredentials.subscriberPassword
-        )
+        ),
+        emptyList()
     )
 
     @Test
