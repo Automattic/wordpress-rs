@@ -43,10 +43,11 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     public init(
         urlSession: URLSession,
         additionalHttpHeadersForAllRequests: [String: String] = [:],
-        userAgent: String = defaultUserAgent(clientSpecificPostfix: UserAgent.postfix)
+        userAgent: String = defaultUserAgent(clientSpecificPostfix: UserAgent.postfix),
+        notifyingDelegate: URLSessionTaskDelegate? = nil
     ) {
         self.session = urlSession
-        self.executorDelegate = RequestExecutorDelegate()
+        self.executorDelegate = RequestExecutorDelegate(delegate: notifyingDelegate)
 
         var headers = additionalHttpHeadersForAllRequests
         if !headers.contains(where: { $0.key.caseInsensitiveCompare("User-Agent") == .orderedSame }) {
@@ -270,19 +271,22 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 }
 
-private final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+private final class RequestExecutorDelegate:
+    NSObject, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
 
     static let didCreateTaskNotification = Notification.Name("RequestExecutorDelegate.didCreateTaskNotification")
 
     private let lock = NSLock()
     private var redirects: [String: [WpRedirect]] = [:]
+    let delegate: URLSessionTaskDelegate?
     // When a site's domain is not included in its SSL certificate's common name and alternative names,
     // URLSession rejects the HTTPs connection. Here we allow the consumers to add additional
     // alternative names.
     // The key is SSL certificate common name.
     private var additionalAlternativeNames: [String: Set<String>] = [:]
 
-    init(redirects: [String: [WpRedirect]] = [:]) {
+    init(delegate: URLSessionTaskDelegate?, redirects: [String: [WpRedirect]] = [:]) {
+        self.delegate = delegate
         self.redirects = redirects
     }
 
@@ -323,9 +327,13 @@ private final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @
     }
     #endif
 
+    #if !os(Linux)
     func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
         NotificationCenter.default.post(name: RequestExecutorDelegate.didCreateTaskNotification, object: task)
+
+        delegate?.urlSession?(session, didCreateTask: task)
     }
+    #endif
 
     func urlSession(
         _ session: URLSession,
@@ -354,6 +362,95 @@ private final class RequestExecutorDelegate: NSObject, URLSessionTaskDelegate, @
         }
 
         return request
+    }
+
+    func urlSession(_ session: URLSession, taskIsWaitingForConnectivity task: URLSessionTask) {
+        #if !os(Linux)
+            delegate?.urlSession?(session, taskIsWaitingForConnectivity: task)
+        #endif
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64,
+        totalBytesExpectedToSend: Int64
+    ) {
+        #if os(Linux)
+            delegate?.urlSession(
+                session,
+                task: task,
+                didSendBodyData: bytesSent,
+                totalBytesSent: totalBytesSent,
+                totalBytesExpectedToSend: totalBytesExpectedToSend
+            )
+        #else
+            delegate?.urlSession?(
+                session,
+                task: task,
+                didSendBodyData: bytesSent,
+                totalBytesSent: totalBytesSent,
+                totalBytesExpectedToSend: totalBytesExpectedToSend
+            )
+        #endif
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceiveInformationalResponse response: HTTPURLResponse
+    ) {
+        #if os(macOS)
+            if #available(macOS 14.0, *) {
+                delegate?.urlSession?(session, task: task, didReceiveInformationalResponse: response)
+            }
+        #elseif os(iOS)
+            if #available(iOS 17.0, *) {
+               delegate?.urlSession?(session, task: task, didReceiveInformationalResponse: response)
+            }
+        #endif
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+        #if os(Linux)
+            delegate?.urlSession(session, task: task, didFinishCollecting: metrics)
+        #else
+            delegate?.urlSession?(session, task: task, didFinishCollecting: metrics)
+        #endif
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+        #if os(Linux)
+            delegate?.urlSession(session, task: task, didCompleteWithError: error)
+        #else
+            delegate?.urlSession?(session, task: task, didCompleteWithError: error)
+        #endif
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        #if os(Linux)
+            (delegate as? URLSessionDataDelegate)?.urlSession(
+                session, dataTask: dataTask, didReceive: response, completionHandler: { _ in })
+        #else
+            (delegate as? URLSessionDataDelegate)?.urlSession?(
+                session, dataTask: dataTask, didReceive: response, completionHandler: { _ in })
+        #endif
+
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        #if os(Linux)
+            (delegate as? URLSessionDataDelegate)?.urlSession(session, dataTask: dataTask, didReceive: data)
+        #else
+            (delegate as? URLSessionDataDelegate)?.urlSession?(session, dataTask: dataTask, didReceive: data)
+        #endif
     }
 }
 
@@ -408,11 +505,33 @@ extension WpNetworkRequest: NetworkRequestContent {
         delegate: URLSessionTaskDelegate?
     ) async throws -> (Data, URLResponse) {
         let request = try buildURLRequest(additionalHeaders: headers)
-        #if os(Linux)
-        return try await session.data(for: request)
-        #else
-        return try await session.data(for: request, delegate: delegate)
-        #endif
+
+        let cancellation = TaskCancellation()
+        return try await withTaskCancellationHandler {
+            let result: Result<(Data, URLResponse), Error> = await withCheckedContinuation { continuation in
+                let task = session.dataTask(with: request, completionHandler: completionHandler(continuation))
+                cancellation.task = task
+
+                // See https://github.com/Automattic/wordpress-rs/pull/1046
+                #if !os(Linux)
+                task.delegate = delegate
+                #endif
+
+                task.resume()
+
+                #if !os(Linux)
+                delegate?.urlSession?(session, didCreateTask: task)
+                #endif
+            }
+
+            if let task = cancellation.task {
+                notifyTaskResult(delegate: delegate, session: session, task: task, result: result)
+            }
+
+            return try result.get()
+        } onCancel: {
+            cancellation.cancel()
+        }
     }
 }
 
@@ -463,22 +582,112 @@ extension WpMultipartFormRequest: NetworkRequestContent {
         let boundery = String(format: "wordpressrs.%08x", Int.random(in: Int.min..<Int.max))
         request.setValue("multipart/form-data; boundary=\(boundery)", forHTTPHeaderField: "Content-Type")
         let body = try form.multipartFormDataStream(boundary: boundery, forceWriteToFile: false)
-
-        #if os(Linux)
-        switch body {
-        case let .inMemory(data):
-            return try await session.upload(for: request, from: data)
-        case let .onDisk(file):
-            return try await session.upload(for: request, fromFile: file)
-        }
-        #else
-        switch body {
-        case let .inMemory(data):
-            return try await session.upload(for: request, from: data, delegate: delegate)
-        case let .onDisk(file):
-            return try await session.upload(for: request, fromFile: file, delegate: delegate)
-        }
-        #endif
+        return try await upload(body: body, with: request, session: session, delegate: delegate)
     }
 
+    private func upload(
+        body: MultipartFormContent,
+        with request: URLRequest,
+        session: URLSession,
+        delegate: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        let cancellation = TaskCancellation()
+        return try await withTaskCancellationHandler {
+            let result: Result<(Data, URLResponse), Error> = await withCheckedContinuation { continuation in
+                let completion = completionHandler(continuation)
+                let task = switch body {
+                    case let .inMemory(data):
+                        session.uploadTask(with: request, from: data, completionHandler: completion)
+                    case let .onDisk(file):
+                        session.uploadTask(with: request, fromFile: file, completionHandler: completion)
+                    }
+                cancellation.task = task
+
+                // See https://github.com/Automattic/wordpress-rs/pull/1046
+                #if !os(Linux)
+                task.delegate = delegate
+                #endif
+
+                task.resume()
+
+                #if !os(Linux)
+                delegate?.urlSession?(session, didCreateTask: task)
+                #endif
+            }
+
+            if let task = cancellation.task {
+                notifyTaskResult(delegate: delegate, session: session, task: task, result: result)
+            }
+
+            return try result.get()
+        } onCancel: {
+            cancellation.cancel()
+        }
+    }
+}
+
+private class TaskCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _task: URLSessionTask?
+
+    var task: URLSessionTask? {
+        get {
+            lock.withLock { _task }
+        }
+        set {
+            lock.withLock { _task = newValue }
+        }
+    }
+
+    func cancel() {
+        lock.withLock {
+            _task?.cancel()
+            _task = nil
+        }
+    }
+}
+
+private func completionHandler(
+    _ continuation: CheckedContinuation<Result<(Data, URLResponse), any Error>, Never>
+) -> @Sendable (Data?, URLResponse?, Error?) -> Void {
+    { (data, response, error) in
+        if let error {
+            continuation.resume(returning: .failure(error))
+        } else {
+            // It's okay to force-unwrap here.
+            // swiftlint:disable:next line_length
+            // https://github.com/swiftlang/swift-corelibs-foundation/blob/swift-6.2.1-RELEASE/Sources/FoundationNetworking/URLSession/URLSession.swift#L743
+            continuation.resume(returning: .success((data!, response!)))
+        }
+    }
+}
+
+private func notifyTaskResult(
+    delegate: URLSessionTaskDelegate?,
+    session: URLSession,
+    task: URLSessionTask,
+    result: Result<(Data, URLResponse), any Error>
+) {
+    if let task = task as? URLSessionDataTask, let delegate = delegate as? URLSessionDataDelegate {
+        if case let .success((data, response)) = result {
+            #if os(Linux)
+                delegate.urlSession(session, dataTask: task, didReceive: response, completionHandler: { _ in })
+                delegate.urlSession(session, dataTask: task, didReceive: data)
+            #else
+                delegate.urlSession?(session, dataTask: task, didReceive: response, completionHandler: { _ in })
+                delegate.urlSession?(session, dataTask: task, didReceive: data)
+            #endif
+        }
+    }
+
+    let error: Error? = if case let .failure(error) = result {
+            error
+        } else {
+            nil
+        }
+    #if os(Linux)
+        delegate?.urlSession(session, task: task, didCompleteWithError: error)
+    #else
+        delegate?.urlSession?(session, task: task, didCompleteWithError: error)
+    #endif
 }
