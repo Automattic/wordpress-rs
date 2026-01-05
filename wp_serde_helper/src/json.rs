@@ -1,4 +1,8 @@
-use serde::{Serialize, Serializer, de::{self, DeserializeOwned}, ser};
+use serde::{
+    Serialize, Serializer,
+    de::{self, DeserializeOwned},
+    ser,
+};
 use std::{fmt, marker::PhantomData};
 
 pub fn serialize_as_json_string<T, S, E>(value: &T, s: S) -> Result<S::Ok, E>

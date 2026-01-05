@@ -1,4 +1,7 @@
-use serde::{Deserialize, de::{self, Unexpected}};
+use serde::{
+    Deserialize,
+    de::{self, Unexpected},
+};
 use std::{fmt, marker::PhantomData};
 
 pub struct DeserializeEmptyVecOrT<T> {

@@ -1,4 +1,7 @@
-use serde::{Deserialize, de::{self, DeserializeOwned, Unexpected}};
+use serde::{
+    Deserialize,
+    de::{self, DeserializeOwned, Unexpected},
+};
 use std::{collections::HashMap, fmt, marker::PhantomData};
 
 struct DeserializeEmptyArrayOrHashMapVisitor<K, V>(PhantomData<(K, V)>);
