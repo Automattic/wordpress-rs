@@ -1,6 +1,9 @@
 use crate::{RowId, SqliteDbError};
 use rusqlite::Connection;
 
+pub mod entity_state;
+pub mod list_metadata;
+pub mod post_types;
 pub mod posts;
 pub mod sites;
 pub mod term_relationships;

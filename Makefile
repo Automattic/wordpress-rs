@@ -169,7 +169,7 @@ test-swift:
 	$(MAKE) test-swift-$(uname)
 
 test-swift-linux:
-	docker exec -w /app -i wordpress make test-swift-linux-in-docker
+	docker exec -w /app -it wordpress make test-swift-linux-in-docker
 
 test-swift-linux-in-docker: swift-linux-library
 	swift test -Xlinker -Ltarget/release/libwordpressFFI-linux -Xlinker -lwp_mobile --no-parallel
@@ -207,6 +207,10 @@ test-rust-integration-wordpress-org-api:
 test-kotlin-integration:
 	@# Help: Run Kotlin integration tests in test server.
 	docker exec -i wordpress /bin/bash < ./scripts/run-kotlin-integration-tests.sh
+
+runComposeDesktopApp:
+	@# Help: Run the Compose Multiplatform desktop application.
+	cd native/kotlin && ./gradlew :example:composeApp:run
 
 restore-test-server:
 	@# Help: Restore the test server from backup.

@@ -67,7 +67,7 @@ pub enum WpApiParamPostsSearchColumn {
 
 impl_as_query_value_from_to_string!(WpApiParamPostsSearchColumn);
 
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(true)]
 pub struct PostListParams {
     /// Current page of the collection.
@@ -517,6 +517,16 @@ pub enum PostStatus {
 }
 
 impl_as_query_value_from_to_string!(PostStatus);
+
+/// Parse a string into a PostStatus.
+///
+/// This is a helper function for platform code that can't access the `FromStr` trait
+/// directly due to UniFFI limitations.
+#[uniffi::export]
+fn parse_post_status(s: &str) -> Option<PostStatus> {
+    use std::str::FromStr;
+    PostStatus::from_str(s).ok()
+}
 
 #[derive(
     Debug,

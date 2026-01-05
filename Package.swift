@@ -18,7 +18,7 @@ var package = Package(
     name: "WordPressAPI",
     platforms: [
         .iOS(.v16),
-        .macOS(.v12),
+        .macOS(.v13),
         .tvOS(.v16),
         .watchOS(.v9)
     ],
@@ -39,7 +39,8 @@ var package = Package(
         .target(
             name: "WordPressAPI",
             dependencies: [
-                .target(name: "WordPressAPIInternal")
+                .target(name: "WordPressAPIInternal"),
+                .target(name: "WordPressApiCache")
             ],
             path: "native/swift/Sources/wordpress-api",
             swiftSettings: [
@@ -72,6 +73,7 @@ var package = Package(
             name: "WordPressAPITests",
             dependencies: [
                 .target(name: "WordPressAPI"),
+                .target(name: "WordPressApiCache"),
                 .target(name: libwordpressFFI.name)
             ],
             path: "native/swift/Tests/wordpress-api",
@@ -84,7 +86,8 @@ var package = Package(
             name: "WordPressApiCacheTests",
             dependencies: [
                 .target(name: "WordPressApiCache"),
-                .target(name: "WordPressAPIInternal")
+                .target(name: "WordPressAPIInternal"),
+                .target(name: "WordPressAPI")
             ],
             path: "native/swift/Tests/wordpress-api-cache"
         ),

@@ -1,0 +1,78 @@
+{
+  "name": "Example WordPress Site",
+  "description": "",
+  "url": "https://example-site.wordpress.test",
+  "home": "https://example-site.wordpress.test",
+  "gmt_offset": 13,
+  "timezone_string": "Pacific/Auckland",
+  "page_for_posts": 0,
+  "page_on_front": 0,
+  "show_on_front": "posts",
+  "namespaces": [
+    "oembed/1.0",
+    "akismet/v1",
+    "jetpack/v4",
+    "tec/tickets/onboarding",
+    "tribe/tickets/v1",
+    "tribe/event-aggregator/v1",
+    "tribe/events/v1",
+    "tribe/views/v2",
+    "tec/v2/onboarding",
+    "tec/v1",
+    "wpcom/v2",
+    "jetpack/v4/stats-app",
+    "wpcom/v3",
+    "jetpack-boost/v1",
+    "my-jetpack/v1",
+    "jetpack/v4/explat",
+    "wp/v2",
+    "wp-site-health/v1",
+    "wp-block-editor/v1",
+    "wp-abilities/v1"
+  ],
+  "authentication": {
+    "application-passwords": {
+      "endpoints": {
+        "authorization": "https://example-site.wordpress.test/wp-admin/authorize-application.php"
+      }
+    }
+  },
+  "routes": {
+    "/tribe/tickets/v1/tickets": {
+      "namespace": "tribe/tickets/v1",
+      "methods": ["GET", "POST"],
+      "endpoints": [
+        {
+          "methods": ["POST"],
+          "ISSUE": "This plugin has a irregular `args` structure. https://github.com/the-events-calendar/event-tickets",
+          "args": [
+            { "required": false },
+            {
+              "description": {
+                "type": "string",
+                "in": "body",
+                "validate_callback": [{}, "is_string_or_empty"],
+                "sanitize_callback": "sanitize_text_field",
+                "default": ""
+              },
+              "required": false
+            }
+          ]
+        }
+      ],
+      "_links": {
+        "self": [
+          {
+            "href": "https://example-site.wordpress.test/wp-json/tribe/tickets/v1/tickets"
+          }
+        ]
+      }
+    }
+  },
+  "site_logo": 0,
+  "site_icon": 0,
+  "site_icon_url": "",
+  "_links": {
+    "help": [{ "href": "https://developer.wordpress.org/rest-api/" }]
+  }
+}

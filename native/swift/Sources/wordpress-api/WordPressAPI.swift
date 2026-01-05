@@ -1,4 +1,5 @@
 import Foundation
+import WordPressApiCache
 @preconcurrency import WordPressAPIInternal
 
 #if os(Linux)
@@ -16,12 +17,15 @@ public final class WordPressAPI: Sendable {
     }
 
     private let apiUrlResolver: ApiUrlResolver
+    private let urlSession: URLSession
+
     let requestExecutor: SafeRequestExecutor
     private let apiClientDelegate: WpApiClientDelegate
     package let requestBuilder: UniffiWpApiClient
 
     public convenience init(
         urlSession: URLSession,
+        notifyingDelegate: URLSessionTaskDelegate? = nil,
         apiRootUrl: ParsedUrl,
         authentication: WpAuthentication,
         middlewarePipeline: MiddlewarePipeline = .default,
@@ -30,7 +34,7 @@ public final class WordPressAPI: Sendable {
         self.init(
             apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: apiRootUrl),
             authenticationProvider: .staticWithAuth(auth: authentication),
-            executor: WpRequestExecutor(urlSession: urlSession),
+            executor: WpRequestExecutor(urlSession: urlSession, notifyingDelegate: notifyingDelegate),
             middlewarePipeline: middlewarePipeline,
             appNotifier: appNotifier
         )
@@ -54,6 +58,7 @@ public final class WordPressAPI: Sendable {
 
     public convenience init(
         urlSession: URLSession,
+        notifyingDelegate: URLSessionTaskDelegate? = nil,
         apiUrlResolver: ApiUrlResolver,
         authenticationProvider: WpAuthenticationProvider,
         middlewarePipeline: MiddlewarePipeline = .default,
@@ -62,7 +67,7 @@ public final class WordPressAPI: Sendable {
         self.init(
             apiUrlResolver: apiUrlResolver,
             authenticationProvider: authenticationProvider,
-            executor: WpRequestExecutor(urlSession: urlSession),
+            executor: WpRequestExecutor(urlSession: urlSession, notifyingDelegate: notifyingDelegate),
             middlewarePipeline: middlewarePipeline,
             appNotifier: appNotifier
         )
@@ -70,6 +75,7 @@ public final class WordPressAPI: Sendable {
 
     public convenience init(
         urlSession: URLSession,
+        notifyingDelegate: URLSessionTaskDelegate? = nil,
         siteUrl: String,
         apiRootUrl: ParsedUrl,
         username: String,
@@ -77,7 +83,7 @@ public final class WordPressAPI: Sendable {
         middlewarePipeline: MiddlewarePipeline = .default,
         appNotifier: WpAppNotifier? = nil
     ) {
-        let executor = WpRequestExecutor(urlSession: urlSession)
+        let executor = WpRequestExecutor(urlSession: urlSession, notifyingDelegate: notifyingDelegate)
         let provider = CookiesNonceAuthenticationProvider.withSiteUrl(
             url: siteUrl,
             username: username,
@@ -95,13 +101,14 @@ public final class WordPressAPI: Sendable {
 
     public convenience init(
         urlSession: URLSession,
+        notifyingDelegate: URLSessionTaskDelegate? = nil,
         details: AutoDiscoveryAttemptSuccess,
         username: String,
         password: String,
         middlewarePipeline: MiddlewarePipeline = .default,
         appNotifier: WpAppNotifier? = nil
     ) {
-        let executor = WpRequestExecutor(urlSession: urlSession)
+        let executor = WpRequestExecutor(urlSession: urlSession, notifyingDelegate: notifyingDelegate)
         let provider = CookiesNonceAuthenticationProvider(
             username: username,
             password: password,
@@ -118,12 +125,14 @@ public final class WordPressAPI: Sendable {
     }
 
     init(
+        urlSession: URLSession = .shared,
         apiUrlResolver: ApiUrlResolver,
         authenticationProvider: WpAuthenticationProvider,
         executor: SafeRequestExecutor,
         middlewarePipeline: MiddlewarePipeline,
         appNotifier: WpAppNotifier?
     ) {
+        self.urlSession = urlSession
         self.apiUrlResolver = apiUrlResolver
         self.apiClientDelegate = WpApiClientDelegate(
             authProvider: authenticationProvider,
@@ -136,6 +145,22 @@ public final class WordPressAPI: Sendable {
             delegate: self.apiClientDelegate
         )
         self.requestExecutor = executor
+    }
+
+    public func asSelfHostedService() throws -> WpSelfHostedService {
+        let cache = try WpApiCache(path: nil)
+        _ = try cache.performMigrations()
+        cache.startListeningForUpdates(delegate: DatabaseChangeNotifier.shared)
+
+        let resolvedUrl = apiUrlResolver.resolve(namespace: "", endpointSegments: [])
+
+        return try WpSelfHostedService(
+            siteUrl: resolvedUrl.asURL().deletingLastPathComponent().absoluteString,
+            apiRoot: resolvedUrl.asURL().absoluteString,
+            apiUrlResolver: apiUrlResolver,
+            delegate: apiClientDelegate,
+            cache: cache
+        )
     }
 
     public var users: UsersRequestExecutor {

@@ -2,13 +2,13 @@ use crate::{OptionFromStr, date::WpGmtDateTime, impl_as_query_value_from_to_stri
 use std::{borrow::Cow, collections::HashMap, str::FromStr};
 use url::{UrlQuery, form_urlencoded};
 
-pub(crate) type QueryPairs<'a> = form_urlencoded::Serializer<'a, UrlQuery<'a>>;
+pub type QueryPairs<'a> = form_urlencoded::Serializer<'a, UrlQuery<'a>>;
 
 pub(crate) trait AppendUrlQueryPairs {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs);
 }
 
-pub(crate) trait QueryPairsExtension {
+pub trait QueryPairsExtension {
     fn append_query_value_pair<'a, T>(&mut self, key: impl Into<&'a str>, value: &T) -> &mut Self
     where
         T: AsQueryValue;

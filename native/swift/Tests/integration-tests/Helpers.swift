@@ -22,10 +22,11 @@ extension TestCredentials {
 }
 
 extension WordPressAPI {
-    static func admin() -> WordPressAPI {
+    static func admin(notifyingDelegate: URLSessionTaskDelegate? = nil) -> WordPressAPI {
         let credentials = TestCredentials.instance()
         return WordPressAPI(
             urlSession: .init(configuration: .ephemeral),
+            notifyingDelegate: notifyingDelegate,
             apiRootUrl: credentials.apiRootURL,
             authentication: credentials.adminAuthentication
         )
