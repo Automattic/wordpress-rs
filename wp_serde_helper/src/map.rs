@@ -4,6 +4,30 @@ use serde::{
 };
 use std::{collections::HashMap, fmt, marker::PhantomData};
 
+/// Deserialize a `HashMap` that may be represented as an empty JSON array.
+///
+/// Some APIs return `[]` instead of `{}` when a map is empty. This function
+/// handles both representations, returning an empty `HashMap` for `[]` and
+/// deserializing normally for JSON objects.
+///
+/// Accepts:
+/// - Empty JSON array `[]` → empty `HashMap`
+/// - JSON object `{...}` → `HashMap` with deserialized key-value pairs
+///
+/// # Errors
+///
+/// Returns an error for non-empty arrays, `null`, strings, numbers, or booleans.
+pub fn deserialize_empty_array_or_hashmap<'de, D, K, V>(
+    deserializer: D,
+) -> Result<HashMap<K, V>, D::Error>
+where
+    D: de::Deserializer<'de>,
+    K: DeserializeOwned + std::hash::Hash + Eq,
+    V: DeserializeOwned,
+{
+    deserializer.deserialize_any(DeserializeEmptyArrayOrHashMapVisitor::<K, V>(PhantomData))
+}
+
 struct DeserializeEmptyArrayOrHashMapVisitor<K, V>(PhantomData<(K, V)>);
 
 impl<'de, K, V> de::Visitor<'de> for DeserializeEmptyArrayOrHashMapVisitor<K, V>
@@ -38,17 +62,6 @@ where
     }
 }
 
-pub fn deserialize_empty_array_or_hashmap<'de, D, K, V>(
-    deserializer: D,
-) -> Result<HashMap<K, V>, D::Error>
-where
-    D: de::Deserializer<'de>,
-    K: DeserializeOwned + std::hash::Hash + Eq,
-    V: DeserializeOwned,
-{
-    deserializer.deserialize_any(DeserializeEmptyArrayOrHashMapVisitor::<K, V>(PhantomData))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,6 +92,43 @@ mod tests {
         #[case] expected_result: HashMap<String, String>,
     ) {
         let wrapper: HashMapWrapper =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, wrapper.map);
+    }
+
+    #[rstest]
+    #[case(r#"{"map": ["not", "empty"]}"#)]
+    #[case(r#"{"map": null}"#)]
+    fn test_deserialize_empty_array_or_hashmap_errors(#[case] test_case: &str) {
+        let result: Result<HashMapWrapper, serde_json::Error> = serde_json::from_str(test_case);
+        assert!(result.is_err(), "The deserializer should emit an error");
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct HashMapWithIntValues {
+        #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+        pub map: HashMap<String, i64>,
+    }
+
+    #[rstest]
+    #[case(r#"{"map": []}"#, HashMap::new())]
+    #[case(r#"{"map": {"count": 42}}"#, {
+        let mut map = HashMap::new();
+        map.insert("count".to_string(), 42);
+        map
+    })]
+    #[case(r#"{"map": {"a": 1, "b": -5, "c": 0}}"#, {
+        let mut map = HashMap::new();
+        map.insert("a".to_string(), 1);
+        map.insert("b".to_string(), -5);
+        map.insert("c".to_string(), 0);
+        map
+    })]
+    fn test_deserialize_empty_array_or_hashmap_with_int_values(
+        #[case] test_case: &str,
+        #[case] expected_result: HashMap<String, i64>,
+    ) {
+        let wrapper: HashMapWithIntValues =
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, wrapper.map);
     }

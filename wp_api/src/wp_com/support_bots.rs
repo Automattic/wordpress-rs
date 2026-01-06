@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::collections::HashMap;
 use wp_derive::WpDeriveParamsField;
-use wp_serde_helper::deserialize_empty_vec_or_none;
+use wp_serde_helper::deserialize_empty_vec_as_none;
 
 use super::WpComSiteId;
 
@@ -122,7 +122,7 @@ pub struct UserMessageContext {
     pub wpcom_user_id: UserId,
     pub wpcom_user_name: String,
     pub user_paid_support_eligibility: UserPaidSupportEligibility,
-    #[serde(deserialize_with = "deserialize_empty_vec_or_none")]
+    #[serde(deserialize_with = "deserialize_empty_vec_as_none")]
     pub plan: Option<UserPaidSupportPlan>,
     pub products: Vec<String>,
     pub plan_interface: bool,

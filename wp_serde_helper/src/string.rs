@@ -1,135 +1,95 @@
-use serde::{
-    Deserialize, Deserializer,
-    de::{self, Unexpected},
-};
-use std::fmt;
+use serde::{Deserialize, Deserializer, de};
 
-struct DeserializeFalseOrStringVisitor;
-
-impl de::Visitor<'_> for DeserializeFalseOrStringVisitor {
-    type Value = Option<String>;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("Boolean `false` or a string")
-    }
-
-    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        if v {
-            Err(E::invalid_value(Unexpected::Bool(v), &self))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        if v.to_lowercase().trim() == "false" {
-            return Ok(None);
-        }
-
-        Ok(Some(v.to_string()))
-    }
-}
-
+/// Deserialize a value that can be either a boolean `false` or a string.
+///
+/// Returns `None` if the value is:
+/// - Boolean `false`
+/// - The string `"false"` (case-insensitive, whitespace-trimmed)
+///
+/// Returns `Some(String)` for any other string value.
 pub fn deserialize_false_or_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    deserializer.deserialize_any(DeserializeFalseOrStringVisitor)
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum FalseOrString {
+        Bool(bool),
+        String(String),
+    }
+
+    match FalseOrString::deserialize(deserializer)? {
+        FalseOrString::Bool(false) => Ok(None),
+        FalseOrString::Bool(true) => Err(de::Error::custom(
+            "expected boolean `false` or a string, got `true`",
+        )),
+        FalseOrString::String(s) if s.to_lowercase().trim() == "false" => Ok(None),
+        FalseOrString::String(s) => Ok(Some(s)),
+    }
 }
 
+/// Deserialize a string, treating empty or whitespace-only strings as `None`.
+///
+/// Returns `None` if the string is empty or contains only whitespace characters.
+/// Returns `Some(String)` for any non-empty string (preserving the original value).
 pub fn deserialize_empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    deserializer.deserialize_any(DeserializeEmptyStringAsNoneVisitor)
-}
-
-struct DeserializeEmptyStringAsNoneVisitor;
-
-impl<'de> de::Visitor<'de> for DeserializeEmptyStringAsNoneVisitor {
-    type Value = Option<String>;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("String")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        if v.trim().is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(v.to_string()))
-        }
+    let s = String::deserialize(deserializer)?;
+    if s.trim().is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(s))
     }
 }
 
+/// Deserialize a value that can be either a single string or an array of strings.
+///
+/// - A single string `"foo"` becomes `vec!["foo"]`
+/// - An array `["foo", "bar"]` becomes `vec!["foo", "bar"]`
+/// - An empty array `[]` becomes `vec![]`
+///
+/// # Errors
+///
+/// Returns an error if the value is `null` or any other non-string/non-array type.
+/// Use [`deserialize_string_vec_or_string_as_option`] if `null` should be accepted.
 pub fn deserialize_string_vec_or_string<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    if let Some(vec) = deserialize_string_vec_or_string_as_option(deserializer)? {
-        Ok(vec)
-    } else {
-        Err(serde::de::Error::custom(
-            "Expected a string or vector of strings",
-        ))
-    }
+    deserialize_string_vec_or_string_as_option(deserializer)?
+        .ok_or_else(|| de::Error::custom("expected a string or vector of strings"))
 }
 
+/// Deserialize an optional value that can be a single string, an array of strings, or null.
+///
+/// - A single string `"foo"` becomes `Some(vec!["foo"])`
+/// - An array `["foo", "bar"]` becomes `Some(vec!["foo", "bar"])`
+/// - An empty array `[]` becomes `Some(vec![])`
+/// - `null` becomes `None`
+///
+/// # Errors
+///
+/// Returns an error for non-string/non-array/non-null types (boolean, number, object).
 pub fn deserialize_string_vec_or_string_as_option<'de, D>(
     deserializer: D,
 ) -> Result<Option<Vec<String>>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    deserializer.deserialize_any(DeserializeStringVecOrStringAsOptionVisitor)
-}
-
-struct DeserializeStringVecOrStringAsOptionVisitor;
-
-impl<'de> de::Visitor<'de> for DeserializeStringVecOrStringAsOptionVisitor {
-    type Value = Option<Vec<String>>;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("string or a vector of strings")
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrVec {
+        Null,
+        String(String),
+        Vec(Vec<String>),
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Some(vec![v.to_string()]))
-    }
-
-    fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::SeqAccess<'de>,
-    {
-        Ok(Some(Deserialize::deserialize(
-            de::value::SeqAccessDeserializer::new(seq),
-        )?))
-    }
-
-    fn visit_unit<E>(self) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(None)
-    }
-
-    fn visit_none<E>(self) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(None)
+    match StringOrVec::deserialize(deserializer)? {
+        StringOrVec::Null => Ok(None),
+        StringOrVec::String(s) => Ok(Some(vec![s])),
+        StringOrVec::Vec(v) => Ok(Some(v)),
     }
 }
 
@@ -197,5 +157,47 @@ mod tests {
         let option_string_vec_or_string: OptionStringVecOrString =
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, option_string_vec_or_string.string);
+    }
+
+    #[rstest]
+    #[case(
+        r#"{"value": true}"#,
+        r#"expected boolean `false` or a string, got `true` at line 1 column 15"#
+    )]
+    fn test_deserialize_false_or_string_errors(
+        #[case] test_case: &str,
+        #[case] expected_error_message: &str,
+    ) {
+        let string_or_bool: Result<StringOrBool, serde_json::Error> =
+            serde_json::from_str(test_case);
+        assert!(
+            string_or_bool.is_err(),
+            "The deserializer should emit an error"
+        );
+        assert_eq!(
+            string_or_bool.err().unwrap().to_string(),
+            expected_error_message
+        );
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct EmptyStringAsNone {
+        #[serde(deserialize_with = "deserialize_empty_string_as_none")]
+        pub value: Option<String>,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": "foo"}"#, Some("foo".to_string()))]
+    #[case(r#"{"value": "hello world"}"#, Some("hello world".to_string()))]
+    #[case(r#"{"value": ""}"#, None)]
+    #[case(r#"{"value": "   "}"#, None)]
+    #[case(r#"{"value": "\t\n"}"#, None)]
+    fn test_deserialize_empty_string_as_none(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<String>,
+    ) {
+        let empty_string_as_none: EmptyStringAsNone =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, empty_string_as_none.value);
     }
 }
