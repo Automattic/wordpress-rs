@@ -477,6 +477,7 @@ pub struct SparsePostExcerpt {
 
 #[derive(Debug, PartialEq, Eq, Serialize, WpDeserialize, uniffi::Record)]
 pub struct PostMeta {
+    #[serde(default)]
     #[serde(deserialize_with = "deserialize_from_string_of_json_array")]
     #[serde(serialize_with = "serialize_as_json_string")]
     pub footnotes: Option<Vec<PostFootnote>>,
@@ -725,6 +726,26 @@ mod tests {
         #[case] expected_mapped_field_name: &str,
     ) {
         assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
+    }
+
+    #[rstest]
+    #[case(r#"{}"#)]
+    #[case(r#"{"footnotes": ""}"#)]
+    #[case(r#"{"other": "values"}"#)]
+    fn test_meta_without_footnotes(#[case] json_data: &str) {
+        let meta: PostMeta = serde_json::from_str(json_data).unwrap();
+        assert_eq!(meta.footnotes, None);
+    }
+
+    #[test]
+    fn test_meta_footnotes() {
+        let json_data = r#"{"footnotes": "[{\"content\":\"some_content\",\"id\":\"some_id\"}]"}"#;
+        let meta: PostMeta = serde_json::from_str(json_data).unwrap();
+        let footnotes = meta.footnotes.unwrap();
+
+        assert_eq!(footnotes.len(), 1);
+        assert_eq!(footnotes[0].id, "some_id");
+        assert_eq!(footnotes[0].content, "some_content");
     }
 
     fn expected_query_pairs_for_post_list_params_with_all_fields() -> String {
