@@ -177,7 +177,7 @@ fn create_minimal_post() -> AnyPostWithEditContext {
         slug: "minimal-post".to_string(),
         status: PostStatus::Publish,
         post_type: "post".to_string(),
-        password: "".to_string(),
+        password: Some("".to_string()),
         permalink_template: None,
         generated_slug: None,
         title: PostTitleWithEditContext {
@@ -221,7 +221,7 @@ fn create_full_post() -> AnyPostWithEditContext {
         slug: "full-post".to_string(),
         status: PostStatus::Draft,
         post_type: "post".to_string(),
-        password: "secret".to_string(),
+        password: Some("secret".to_string()),
         permalink_template: Some("https://example.com/%postname%/".to_string()),
         generated_slug: Some("full-post-123".to_string()),
         title: PostTitleWithEditContext {

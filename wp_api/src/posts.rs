@@ -380,6 +380,7 @@ pub struct SparseAnyPost {
     #[WpContext(edit, embed, view)]
     pub post_type: Option<String>,
     #[WpContext(edit)]
+    #[WpContextualOption]
     pub password: Option<String>,
     #[WpContext(edit)]
     #[WpContextualOption]

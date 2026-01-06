@@ -196,7 +196,7 @@ generate_update_test!(
     password,
     "new_password".to_string(),
     |updated_page, updated_page_from_wp_cli| {
-        assert_eq!(updated_page.password, "new_password");
+        assert_eq!(updated_page.password, Some("new_password".to_string()));
         assert_eq!(updated_page_from_wp_cli.password, "new_password");
     }
 );

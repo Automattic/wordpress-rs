@@ -142,7 +142,7 @@ fn create_test_post(
         slug: slug.to_string(),
         status: PostStatus::Publish,
         post_type: "post".to_string(),
-        password: "".to_string(),
+        password: Some("".to_string()),
         permalink_template: None,
         generated_slug: None,
         title: PostTitleWithEditContext {

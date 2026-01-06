@@ -753,7 +753,7 @@ impl PostRepository<EditContext> {
                     ":slug": post.slug,
                     ":status": post.status.to_string(),
                     ":post_type": post.post_type,
-                    ":password": post.password,
+                    ":password": post.password.clone().unwrap_or_default(),
                     ":template": post.template,
                     ":permalink_template": post.permalink_template,
                     ":generated_slug": post.generated_slug,
