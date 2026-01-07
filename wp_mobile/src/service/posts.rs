@@ -1026,7 +1026,10 @@ mod tests {
         /// Assert that a retrieved post matches the expected values
         fn assert_matches(&self, post: &AnyPostWithEditContext) {
             assert_eq!(post.id, self.id);
-            assert_eq!(post.title.rendered, self.title);
+            assert_eq!(
+                post.title.as_ref().map(|t| t.rendered.clone()),
+                Some(self.title.to_string())
+            );
             assert_eq!(post.slug, self.slug);
         }
     }

@@ -18,7 +18,10 @@ async fn create_post_with_just_title() {
             ..Default::default()
         },
         |created_post, post_from_wp_cli| {
-            assert_eq!(created_post.title.raw, Some("foo".to_string()));
+            assert_eq!(
+                created_post.title.and_then(|t| t.raw),
+                Some("foo".to_string())
+            );
             assert_eq!(post_from_wp_cli.title, "foo");
         },
     )
@@ -43,7 +46,10 @@ async fn create_post_with_title_and_meta() {
             let meta = created_post.meta.unwrap();
             let footnotes = meta.footnotes.unwrap();
             let footnote = footnotes.first().unwrap();
-            assert_eq!(created_post.title.raw, Some("foo".to_string()));
+            assert_eq!(
+                created_post.title.and_then(|t| t.raw),
+                Some("foo".to_string())
+            );
             assert_eq!(post_from_wp_cli.title, "foo");
             assert_eq!(footnote.id, "bar");
             assert_eq!(footnote.content, "baz");
@@ -95,7 +101,10 @@ async fn create_post_with_title_content_and_excerpt() {
             ..Default::default()
         },
         |created_post, post_from_wp_cli| {
-            assert_eq!(created_post.title.raw, Some("foo".to_string()));
+            assert_eq!(
+                created_post.title.and_then(|t| t.raw),
+                Some("foo".to_string())
+            );
             assert_eq!(post_from_wp_cli.title, "foo");
             assert_eq!(created_post.content.raw, Some("bar".to_string()));
             assert_eq!(post_from_wp_cli.content, "bar");
@@ -202,7 +211,10 @@ generate_update_test!(
     title,
     "new_title".to_string(),
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.title.raw, Some("new_title".to_string()));
+        assert_eq!(
+            updated_post.title.and_then(|t| t.raw),
+            Some("new_title".to_string())
+        );
         assert_eq!(updated_post_from_wp_cli.title, "new_title");
     }
 );

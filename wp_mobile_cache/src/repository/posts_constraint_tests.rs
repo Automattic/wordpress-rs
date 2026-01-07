@@ -56,7 +56,10 @@ fn test_duplicate_post_id_in_same_site_updates_on_upsert(mut test_ctx: TestConte
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, post_id)
         .expect("Failed to select post by post_id")
         .expect("Post should exist");
-    assert_eq!(retrieved.data.post.title.rendered, "Updated Title");
+    assert_eq!(
+        retrieved.data.post.title.map(|t| t.rendered),
+        Some("Updated Title".to_string())
+    );
 }
 
 #[rstest]

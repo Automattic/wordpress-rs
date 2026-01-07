@@ -102,8 +102,10 @@ impl PostBuilder {
 
     /// Set the post title.
     pub fn with_title(mut self, title: &str) -> Self {
-        self.post.title.rendered = title.to_string();
-        self.post.title.raw = Some(title.to_string());
+        self.post.title = Some(PostTitleWithEditContext {
+            raw: Some(title.to_string()),
+            rendered: title.to_string(),
+        });
         self
     }
 
@@ -180,10 +182,10 @@ fn create_minimal_post() -> AnyPostWithEditContext {
         password: Some("".to_string()),
         permalink_template: None,
         generated_slug: None,
-        title: PostTitleWithEditContext {
+        title: Some(PostTitleWithEditContext {
             raw: None,
             rendered: "Minimal Post".to_string(),
-        },
+        }),
         content: PostContentWithEditContext {
             raw: None,
             rendered: "<p>Content</p>".to_string(),
@@ -224,10 +226,10 @@ fn create_full_post() -> AnyPostWithEditContext {
         password: Some("secret".to_string()),
         permalink_template: Some("https://example.com/%postname%/".to_string()),
         generated_slug: Some("full-post-123".to_string()),
-        title: PostTitleWithEditContext {
+        title: Some(PostTitleWithEditContext {
             raw: Some("Full Post Title".to_string()),
             rendered: "Full Post Title".to_string(),
-        },
+        }),
         content: PostContentWithEditContext {
             raw: Some("<!-- wp:paragraph --><p>Content</p><!-- /wp:paragraph -->".to_string()),
             rendered: "<p>Content</p>".to_string(),

@@ -62,7 +62,10 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
         .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
         .expect("Failed to select post by post_id")
         .expect("Post should exist");
-    assert_eq!(post200.data.post.title.rendered, "Updated");
+    assert_eq!(
+        post200.data.post.title.map(|t| t.rendered),
+        Some("Updated".to_string())
+    );
 
     // Verify post 300 was inserted
     assert!(
