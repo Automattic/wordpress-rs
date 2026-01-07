@@ -470,10 +470,17 @@ impl PostContext for EditContext {
             password: row.get("password")?,
             permalink_template: row.get("permalink_template")?,
             generated_slug: row.get("generated_slug")?,
-            title: Some(PostTitleWithEditContext {
-                raw: row.get("title_raw")?,
-                rendered: row.get("title_rendered")?,
-            }),
+            title: {
+                let title_rendered: Option<String> = row.get("title_rendered")?;
+                if let Some(rendered) = title_rendered {
+                    Some(PostTitleWithEditContext {
+                        raw: row.get("title_raw")?,
+                        rendered,
+                    })
+                } else {
+                    None
+                }
+            },
             content: PostContentWithEditContext {
                 raw: row.get("content_raw")?,
                 rendered: row.get("content_rendered")?,
@@ -555,9 +562,10 @@ impl PostContext for ViewContext {
             slug: row.get("slug")?,
             status: parse_enum(row, "status")?,
             post_type: row.get("post_type")?,
-            title: Some(PostTitleWithViewContext {
-                rendered: row.get("title_rendered")?,
-            }),
+            title: {
+                let title_rendered: Option<String> = row.get("title_rendered")?;
+                title_rendered.map(|rendered| PostTitleWithViewContext { rendered })
+            },
             content: PostContentWithViewContext {
                 rendered: row.get("content_rendered")?,
                 protected: row.get("content_protected")?,
@@ -629,9 +637,10 @@ impl PostContext for EmbedContext {
             link: row.get("link")?,
             slug: row.get("slug")?,
             post_type: row.get("post_type")?,
-            title: Some(PostTitleWithEmbedContext {
-                rendered: row.get("title_rendered")?,
-            }),
+            title: {
+                let title_rendered: Option<String> = row.get("title_rendered")?;
+                title_rendered.map(|rendered| PostTitleWithEmbedContext { rendered })
+            },
             author: get_optional_id(row, "author")?,
             excerpt: {
                 let excerpt_rendered: Option<String> = row.get("excerpt_rendered")?;
@@ -743,7 +752,7 @@ impl PostRepository<EditContext> {
                     ":slug": post.slug,
                     ":status": post.status.to_string(),
                     ":post_type": post.post_type,
-                    ":password": post.password.clone().unwrap_or_default(),
+                    ":password": post.password.clone(),
                     ":template": post.template,
                     ":permalink_template": post.permalink_template,
                     ":generated_slug": post.generated_slug,
@@ -759,7 +768,7 @@ impl PostRepository<EditContext> {
                     ":guid_raw": post.guid.raw,
                     ":guid_rendered": post.guid.rendered,
                     ":title_raw": post.title.as_ref().and_then(|t| t.raw.clone()),
-                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()).unwrap_or_default(),
+                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()),
                     ":content_raw": post.content.raw,
                     ":content_rendered": post.content.rendered,
                     ":content_protected": post.content.protected,
@@ -894,7 +903,7 @@ impl PostRepository<ViewContext> {
                     ":format": post.format.as_ref().map(|f| f.to_string()),
                     ":meta": serialize_value_to_json(&post.meta)?,
                     ":guid_rendered": post.guid.rendered,
-                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()).unwrap_or_default(),
+                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()),
                     ":content_rendered": post.content.rendered,
                     ":content_protected": post.content.protected,
                     ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
@@ -995,7 +1004,7 @@ impl PostRepository<EmbedContext> {
                     ":link": post.link,
                     ":slug": post.slug,
                     ":post_type": post.post_type,
-                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()).unwrap_or_default(),
+                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()),
                     ":author": post.author.map(|u| u.0),
                     ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
                     ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
@@ -1058,25 +1067,7 @@ mod tests {
         assert_eq!(retrieved.data.row_id, entity_id.rowid);
         assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
         assert_recent_timestamp(&retrieved.data.last_fetched_at);
-
-        // The 'password' and 'title_rendered' columns in the SQLite database are stored as empty
-        // strings when null. Here we adjust the retrieved post to match the original for the full
-        // post comparison at the end.
-        let mut retrieved_post = retrieved.data.post;
-        if original_post.password.is_none() {
-            assert_eq!(retrieved_post.password, Some("".to_string()));
-
-            retrieved_post.password = None;
-        }
-        if original_post.title.is_none() {
-            assert_eq!(
-                retrieved_post.title.map(|t| t.rendered),
-                Some("".to_string())
-            );
-
-            retrieved_post.title = None;
-        }
-        assert_eq!(retrieved_post, original_post);
+        assert_eq!(retrieved.data.post, original_post);
     }
 
     #[rstest]
