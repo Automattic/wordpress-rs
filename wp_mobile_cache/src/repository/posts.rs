@@ -1192,7 +1192,25 @@ mod tests {
         assert_eq!(retrieved.data.row_id, entity_id.rowid);
         assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
         assert_recent_timestamp(&retrieved.data.last_fetched_at);
-        assert_eq!(retrieved.data.post, original_post);
+
+        // The 'password' and 'title_rendered' columns in the SQLite database are stored as empty
+        // strings when null. Here we adjust the retrieved post to match the original for the full
+        // post comparison at the end.
+        let mut retrieved_post = retrieved.data.post;
+        if original_post.password.is_none() {
+            assert_eq!(retrieved_post.password, Some("".to_string()));
+
+            retrieved_post.password = None;
+        }
+        if original_post.title.is_none() {
+            assert_eq!(
+                retrieved_post.title.map(|t| t.rendered),
+                Some("".to_string())
+            );
+
+            retrieved_post.title = None;
+        }
+        assert_eq!(retrieved_post, original_post);
     }
 
     #[rstest]
