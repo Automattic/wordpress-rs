@@ -67,8 +67,10 @@ fn stress_test_batch_update(
         let _result = cache.execute(|conn| {
             if let Some(full_entity) = repo.select_by_entity_id(conn, entity_id)? {
                 let mut post = full_entity.data.post;
-                post.title.rendered =
-                    format!("Updated Post {} (batch #{})", post.id.0, current_count);
+                if let Some(ref mut title) = post.title {
+                    title.rendered =
+                        format!("Updated Post {} (batch #{})", post.id.0, current_count);
+                }
                 post.content.rendered =
                     format!("<p>Content updated at batch #{}</p>", current_count);
 
@@ -145,10 +147,10 @@ fn create_test_post(
         password: Some("".to_string()),
         permalink_template: None,
         generated_slug: None,
-        title: PostTitleWithEditContext {
+        title: Some(PostTitleWithEditContext {
             raw: None,
             rendered: title.to_string(),
-        },
+        }),
         content: PostContentWithEditContext {
             raw: None,
             rendered: content.to_string(),
@@ -255,7 +257,9 @@ impl MockPostService {
                     })?
                     .data
                     .post;
-                post.title.rendered = new_title;
+                if let Some(ref mut title) = post.title {
+                    title.rendered = new_title;
+                }
                 repo.upsert(conn, &self.db_site, &post)?;
                 Ok::<_, wp_mobile_cache::SqliteDbError>(())
             })
@@ -338,8 +342,12 @@ impl MockPostService {
                         // Read and update in a single atomic operation
                         if let Some(full_entity) = repo.select_by_entity_id(conn, entity_id)? {
                             let mut post = full_entity.data.post;
-                            post.title.rendered =
-                                format!("Updated Post {} (update #{})", post.id.0, current_count);
+                            if let Some(ref mut title) = post.title {
+                                title.rendered = format!(
+                                    "Updated Post {} (update #{})",
+                                    post.id.0, current_count
+                                );
+                            }
                             repo.upsert(conn, &db_site, &post)?;
                         }
                         Ok::<_, wp_mobile_cache::SqliteDbError>(())

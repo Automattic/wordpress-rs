@@ -389,7 +389,7 @@ pub struct SparseAnyPost {
     #[WpContextualOption]
     pub generated_slug: Option<String>,
     #[WpContext(edit, embed, view)]
-    #[WpContextualField]
+    #[WpContextualField(option)]
     pub title: Option<SparsePostTitle>,
     #[WpContext(edit, view)]
     #[WpContextualField]

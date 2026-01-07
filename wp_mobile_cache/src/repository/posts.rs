@@ -476,10 +476,10 @@ impl PostContext for EditContext {
             password: row.get_column(Password)?,
             permalink_template: row.get_column(PermalinkTemplate)?,
             generated_slug: row.get_column(GeneratedSlug)?,
-            title: PostTitleWithEditContext {
+            title: Some(PostTitleWithEditContext {
                 raw: row.get_column(TitleRaw)?,
                 rendered: row.get_column(TitleRendered)?,
-            },
+            }),
             content: PostContentWithEditContext {
                 raw: row.get_column(ContentRaw)?,
                 rendered: row.get_column(ContentRendered)?,
@@ -563,9 +563,9 @@ impl PostContext for ViewContext {
             slug: row.get_column(Slug)?,
             status: parse_enum(row, Status)?,
             post_type: row.get_column(PostType)?,
-            title: PostTitleWithViewContext {
+            title: Some(PostTitleWithViewContext {
                 rendered: row.get_column(TitleRendered)?,
-            },
+            }),
             content: PostContentWithViewContext {
                 rendered: row.get_column(ContentRendered)?,
                 protected: row.get_column(ContentProtected)?,
@@ -639,9 +639,9 @@ impl PostContext for EmbedContext {
             link: row.get_column(Link)?,
             slug: row.get_column(Slug)?,
             post_type: row.get_column(PostType)?,
-            title: PostTitleWithEmbedContext {
+            title: Some(PostTitleWithEmbedContext {
                 rendered: row.get_column(TitleRendered)?,
-            },
+            }),
             author: get_optional_id(row, Author)?,
             excerpt: {
                 let excerpt_rendered: Option<String> = row.get_column(ExcerptRendered)?;
@@ -768,8 +768,8 @@ impl PostRepository<EditContext> {
                     ":meta": serialize_value_to_json(&post.meta)?,
                     ":guid_raw": post.guid.raw,
                     ":guid_rendered": post.guid.rendered,
-                    ":title_raw": post.title.raw,
-                    ":title_rendered": post.title.rendered,
+                    ":title_raw": post.title.as_ref().and_then(|t| t.raw.clone()),
+                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()).unwrap_or_default(),
                     ":content_raw": post.content.raw,
                     ":content_rendered": post.content.rendered,
                     ":content_protected": post.content.protected,
@@ -904,7 +904,7 @@ impl PostRepository<ViewContext> {
                     ":format": post.format.as_ref().map(|f| f.to_string()),
                     ":meta": serialize_value_to_json(&post.meta)?,
                     ":guid_rendered": post.guid.rendered,
-                    ":title_rendered": post.title.rendered,
+                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()).unwrap_or_default(),
                     ":content_rendered": post.content.rendered,
                     ":content_protected": post.content.protected,
                     ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
@@ -1005,7 +1005,7 @@ impl PostRepository<EmbedContext> {
                     ":link": post.link,
                     ":slug": post.slug,
                     ":post_type": post.post_type,
-                    ":title_rendered": post.title.rendered,
+                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()).unwrap_or_default(),
                     ":author": post.author.map(|u| u.0),
                     ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
                     ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
