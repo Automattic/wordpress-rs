@@ -15,6 +15,8 @@ pub enum PostBuilderInitialState {
     Minimal,
     /// Fully populated post with all optional fields set
     Full,
+    /// Custom post type with specific characteristics (e.g., jetpack-social-note)
+    Custom,
 }
 
 /// Builder for creating test posts with automatic ID management.
@@ -57,6 +59,7 @@ impl PostBuilder {
         let mut post = match initial_state {
             PostBuilderInitialState::Minimal => create_minimal_post(),
             PostBuilderInitialState::Full => create_full_post(),
+            PostBuilderInitialState::Custom => create_custom_post(),
         };
         post.id = PostId(id);
         Self { post }
@@ -74,6 +77,13 @@ impl PostBuilder {
     /// Useful for testing complete post serialization/deserialization.
     pub fn full() -> Self {
         Self::new(PostBuilderInitialState::Full)
+    }
+
+    /// Create a custom post builder with custom post type characteristics.
+    ///
+    /// Useful for testing custom post types like jetpack-social-note.
+    pub fn custom() -> Self {
+        Self::new(PostBuilderInitialState::Custom)
     }
 
     /// Set a specific post ID (overrides auto-increment).
@@ -264,5 +274,50 @@ fn create_full_post() -> AnyPostWithEditContext {
         tags: Some(vec![TermId(10), TermId(20)]),
         parent: Some(PostId(5)),
         menu_order: Some(3),
+    }
+}
+
+fn create_custom_post() -> AnyPostWithEditContext {
+    AnyPostWithEditContext {
+        id: PostId(42),
+        date: "2024-01-15T10:30:00".to_string(),
+        date_gmt: "2024-01-15T10:30:00Z".parse().unwrap(),
+        guid: PostGuidWithEditContext {
+            raw: Some("https://example.com/?p=42".to_string()),
+            rendered: "https://example.com/?p=42".to_string(),
+        },
+        link: "https://example.com/full-post".to_string(),
+        modified: "2024-01-16T14:20:00".to_string(),
+        modified_gmt: "2024-01-16T14:20:00Z".parse().unwrap(),
+        slug: "1000".to_string(),
+        status: PostStatus::Draft,
+        post_type: "jetpack-social-note".to_string(),
+        password: None,
+        permalink_template: None,
+        generated_slug: None,
+        title: None,
+        content: PostContentWithEditContext {
+            raw: Some("<!-- wp:paragraph --><p>Content</p><!-- /wp:paragraph -->".to_string()),
+            rendered: "<p>Content</p>".to_string(),
+            protected: Some(false),
+            block_version: Some(1),
+        },
+        author: None,
+        excerpt: Some(SparsePostExcerpt {
+            raw: Some("Excerpt raw".to_string()),
+            rendered: Some("<p>Excerpt</p>".to_string()),
+            protected: Some(false),
+        }),
+        featured_media: Some(MediaId(100)),
+        comment_status: Some(wp_api::posts::PostCommentStatus::Open),
+        ping_status: Some(wp_api::posts::PostPingStatus::Closed),
+        format: None,
+        meta: None,
+        sticky: None,
+        template: "".to_string(),
+        categories: None,
+        tags: None,
+        parent: None,
+        menu_order: None,
     }
 }

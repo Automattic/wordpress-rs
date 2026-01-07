@@ -1173,6 +1173,7 @@ mod tests {
     #[rstest]
     #[case(PostBuilder::minimal().build())]
     #[case(PostBuilder::full().build())]
+    #[case(PostBuilder::custom().build())]
     fn test_round_trip(mut test_ctx: TestContext, #[case] original_post: AnyPostWithEditContext) {
         // Insert into database using repository
         let entity_id = test_ctx
