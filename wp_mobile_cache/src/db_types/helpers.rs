@@ -1,52 +1,45 @@
-use crate::{
-    SqliteDbError,
-    db_types::row_ext::{ColumnIndex, RowExt},
-};
+use crate::SqliteDbError;
 use rusqlite::Row;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Helper to get a required ID wrapper type (e.g., PostId, UserId) from a row.
-pub fn get_id<T, C>(row: &Row, column: C) -> Result<T, SqliteDbError>
+pub fn get_id<T>(row: &Row, column: &str) -> Result<T, SqliteDbError>
 where
     T: From<i64>,
-    C: ColumnIndex,
 {
-    let id: i64 = row.get_column(column)?;
+    let id: i64 = row.get(column)?;
     Ok(id.into())
 }
 
 /// Helper to get an optional ID wrapper type from a row.
-pub fn get_optional_id<T, C>(row: &Row, column: C) -> Result<Option<T>, SqliteDbError>
+pub fn get_optional_id<T>(row: &Row, column: &str) -> Result<Option<T>, SqliteDbError>
 where
     T: From<i64>,
-    C: ColumnIndex,
 {
-    let id: Option<i64> = row.get_column(column)?;
+    let id: Option<i64> = row.get(column)?;
     Ok(id.map(Into::into))
 }
 
 /// Helper to parse a required enum from a string column.
-pub fn parse_enum<T, C>(row: &Row, column: C) -> Result<T, SqliteDbError>
+pub fn parse_enum<T>(row: &Row, column: &str) -> Result<T, SqliteDbError>
 where
     T: FromStr,
     T::Err: std::fmt::Display,
-    C: ColumnIndex,
 {
-    let value_str: String = row.get_column(column)?;
+    let value_str: String = row.get(column)?;
     value_str
         .parse()
         .map_err(|e| SqliteDbError::SqliteError(format!("Failed to parse enum: {}", e)))
 }
 
 /// Helper to parse an optional enum from a string column.
-pub fn parse_optional_enum<T, C>(row: &Row, column: C) -> Result<Option<T>, SqliteDbError>
+pub fn parse_optional_enum<T>(row: &Row, column: &str) -> Result<Option<T>, SqliteDbError>
 where
     T: FromStr,
     T::Err: std::fmt::Display,
-    C: ColumnIndex,
 {
-    let value_str: Option<String> = row.get_column(column)?;
+    let value_str: Option<String> = row.get(column)?;
     value_str
         .map(|s| s.parse())
         .transpose()
@@ -114,13 +107,12 @@ pub fn bool_to_integer(value: Option<bool>) -> Option<i64> {
 }
 
 /// Helper to parse a required DateTime-like type from a string column.
-pub fn parse_datetime<T, C>(row: &Row, column: C) -> Result<T, SqliteDbError>
+pub fn parse_datetime<T>(row: &Row, column: &str) -> Result<T, SqliteDbError>
 where
     T: FromStr,
     T::Err: std::fmt::Display,
-    C: ColumnIndex,
 {
-    let datetime_str: String = row.get_column(column)?;
+    let datetime_str: String = row.get(column)?;
     datetime_str
         .parse()
         .map_err(|e| SqliteDbError::SqliteError(format!("Failed to parse datetime: {}", e)))

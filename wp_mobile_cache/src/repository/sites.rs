@@ -2,8 +2,7 @@ use crate::{
     DbTable, RowId, SqliteDbError,
     db_types::{
         db_site::{DbSite, DbSiteType},
-        row_ext::RowExt,
-        self_hosted_site::{DbSelfHostedSite, DbSelfHostedSiteColumn, SelfHostedSite},
+        self_hosted_site::{DbSelfHostedSite, SelfHostedSite},
     },
     entity::{EntityId, FullEntity},
     repository::{QueryExecutor, TransactionManager},
@@ -100,9 +99,9 @@ impl SiteRepository {
         let db_self_hosted_site = stmt
             .query_row([entity_id.db_site.mapped_site_id], |row| {
                 Ok(DbSelfHostedSite {
-                    row_id: row.get_column(DbSelfHostedSiteColumn::Rowid)?,
-                    url: row.get_column(DbSelfHostedSiteColumn::Url)?,
-                    api_root: row.get_column(DbSelfHostedSiteColumn::ApiRoot)?,
+                    row_id: row.get("rowid")?,
+                    url: row.get("url")?,
+                    api_root: row.get("api_root")?,
                 })
             })
             .optional()
@@ -133,9 +132,9 @@ impl SiteRepository {
         let self_hosted_site: Option<DbSelfHostedSite> = stmt
             .query_row([url], |row| {
                 Ok(DbSelfHostedSite {
-                    row_id: row.get_column(DbSelfHostedSiteColumn::Rowid)?,
-                    url: row.get_column(DbSelfHostedSiteColumn::Url)?,
-                    api_root: row.get_column(DbSelfHostedSiteColumn::ApiRoot)?,
+                    row_id: row.get("rowid")?,
+                    url: row.get("url")?,
+                    api_root: row.get("api_root")?,
                 })
             })
             .optional()
@@ -264,10 +263,7 @@ impl SiteRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        MigrationManager, db_types::row_ext::ColumnIndex, entity::EntityId,
-        test_fixtures::get_table_column_names,
-    };
+    use crate::{MigrationManager, entity::EntityId};
     use rstest::*;
     use rusqlite::Connection;
 
@@ -280,23 +276,6 @@ mod tests {
             .perform_migrations()
             .expect("All migrations should succeed");
         conn
-    }
-
-    /// Verify that DbSelfHostedSiteColumn enum values match the actual database schema.
-    /// This test protects against column reordering in migrations breaking the positional index mapping.
-    #[rstest]
-    fn test_self_hosted_site_column_enum_matches_schema(test_conn: Connection) {
-        use DbSelfHostedSiteColumn::*;
-
-        let columns = get_table_column_names(&test_conn, "self_hosted_sites");
-
-        // Verify each enum value maps to the correct column name
-        assert_eq!(columns[Rowid.as_index()], "rowid");
-        assert_eq!(columns[Url.as_index()], "url");
-        assert_eq!(columns[ApiRoot.as_index()], "api_root");
-
-        // Verify total column count matches
-        assert_eq!(columns.len(), ApiRoot.as_index() + 1);
     }
 
     #[rstest]

@@ -585,11 +585,7 @@ pub struct ListMetadataHeaderUpdate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db_types::db_list_metadata::{
-        ListMetadataColumn, ListMetadataItemColumn, ListMetadataStateColumn,
-    };
-    use crate::db_types::row_ext::ColumnIndex;
-    use crate::test_fixtures::{TestContext, get_table_column_names, test_ctx};
+    use crate::test_fixtures::{TestContext, test_ctx};
     use rstest::*;
 
     const TEST_PER_PAGE: i64 = 25;
@@ -726,74 +722,6 @@ mod tests {
         )
         .expect("should succeed");
         assert_eq!(count, 0);
-    }
-
-    /// Verify that ListMetadataColumn enum values match the actual database schema.
-    /// This test protects against column reordering in migrations breaking the positional index mapping.
-    #[rstest]
-    fn test_list_metadata_column_enum_matches_schema(test_ctx: TestContext) {
-        use ListMetadataColumn::*;
-
-        let columns = get_table_column_names(
-            &test_ctx.conn,
-            ListMetadataRepository::header_table().table_name(),
-        );
-
-        // Verify each enum value maps to the correct column name
-        assert_eq!(columns[Rowid.as_index()], "rowid");
-        assert_eq!(columns[DbSiteId.as_index()], "db_site_id");
-        assert_eq!(columns[Key.as_index()], "key");
-        assert_eq!(columns[TotalPages.as_index()], "total_pages");
-        assert_eq!(columns[TotalItems.as_index()], "total_items");
-        assert_eq!(columns[CurrentPage.as_index()], "current_page");
-        assert_eq!(columns[PerPage.as_index()], "per_page");
-        assert_eq!(
-            columns[LastFirstPageFetchedAt.as_index()],
-            "last_first_page_fetched_at"
-        );
-        assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
-        assert_eq!(columns[Version.as_index()], "version");
-
-        assert_eq!(columns.len(), Version.as_index() + 1);
-    }
-
-    /// Verify that ListMetadataItemColumn enum values match the actual database schema.
-    #[rstest]
-    fn test_list_metadata_items_column_enum_matches_schema(test_ctx: TestContext) {
-        use ListMetadataItemColumn::*;
-
-        let columns = get_table_column_names(
-            &test_ctx.conn,
-            ListMetadataRepository::items_table().table_name(),
-        );
-
-        assert_eq!(columns[Rowid.as_index()], "rowid");
-        assert_eq!(columns[ListMetadataId.as_index()], "list_metadata_id");
-        assert_eq!(columns[EntityId.as_index()], "entity_id");
-        assert_eq!(columns[ModifiedGmt.as_index()], "modified_gmt");
-        assert_eq!(columns[Parent.as_index()], "parent");
-        assert_eq!(columns[MenuOrder.as_index()], "menu_order");
-
-        assert_eq!(columns.len(), MenuOrder.as_index() + 1);
-    }
-
-    /// Verify that ListMetadataStateColumn enum values match the actual database schema.
-    #[rstest]
-    fn test_list_metadata_state_column_enum_matches_schema(test_ctx: TestContext) {
-        use ListMetadataStateColumn::*;
-
-        let columns = get_table_column_names(
-            &test_ctx.conn,
-            ListMetadataRepository::state_table().table_name(),
-        );
-
-        assert_eq!(columns[Rowid.as_index()], "rowid");
-        assert_eq!(columns[ListMetadataId.as_index()], "list_metadata_id");
-        assert_eq!(columns[State.as_index()], "state");
-        assert_eq!(columns[ErrorMessage.as_index()], "error_message");
-        assert_eq!(columns[UpdatedAt.as_index()], "updated_at");
-
-        assert_eq!(columns.len(), UpdatedAt.as_index() + 1);
     }
 
     // ============================================================

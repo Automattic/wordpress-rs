@@ -7,11 +7,7 @@ use crate::{
             bool_to_integer, deserialize_json_value, get_id, get_optional_id, integer_to_bool,
             parse_datetime, parse_enum, parse_optional_enum, serialize_value_to_json,
         },
-        posts::{
-            DbAnyPostWithEditContext, DbAnyPostWithEmbedContext, DbAnyPostWithViewContext,
-            PostEditContextColumn, PostEmbedContextColumn, PostViewContextColumn,
-        },
-        row_ext::RowExt,
+        posts::{DbAnyPostWithEditContext, DbAnyPostWithEmbedContext, DbAnyPostWithViewContext},
     },
     entity::{EntityId, FullEntity},
     repository::{
@@ -450,77 +446,75 @@ impl PostContext for EditContext {
     where
         F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>,
     {
-        use PostEditContextColumn::*;
-
-        let row_id: RowId = row.get_column(Rowid)?;
-        let db_site_id: RowId = row.get_column(PostEditContextColumn::DbSiteId)?;
+        let row_id: RowId = row.get("rowid")?;
+        let db_site_id: RowId = row.get("db_site_id")?;
 
         // EditContext uses term relationships (categories and tags)
         let term_relationships = fetch_terms()?;
         let (categories, tags) = extract_categories_and_tags(term_relationships);
 
         let post = AnyPostWithEditContext {
-            id: get_id(row, Id)?,
-            date: row.get_column(Date)?,
-            date_gmt: parse_datetime(row, DateGmt)?,
+            id: get_id(row, "id")?,
+            date: row.get("date")?,
+            date_gmt: parse_datetime(row, "date_gmt")?,
             guid: PostGuidWithEditContext {
-                raw: row.get_column(GuidRaw)?,
-                rendered: row.get_column(GuidRendered)?,
+                raw: row.get("guid_raw")?,
+                rendered: row.get("guid_rendered")?,
             },
-            link: row.get_column(Link)?,
-            modified: row.get_column(Modified)?,
-            modified_gmt: parse_datetime(row, ModifiedGmt)?,
-            slug: row.get_column(Slug)?,
-            status: parse_enum(row, Status)?,
-            post_type: row.get_column(PostType)?,
-            password: row.get_column(Password)?,
-            permalink_template: row.get_column(PermalinkTemplate)?,
-            generated_slug: row.get_column(GeneratedSlug)?,
+            link: row.get("link")?,
+            modified: row.get("modified")?,
+            modified_gmt: parse_datetime(row, "modified_gmt")?,
+            slug: row.get("slug")?,
+            status: parse_enum(row, "status")?,
+            post_type: row.get("post_type")?,
+            password: row.get("password")?,
+            permalink_template: row.get("permalink_template")?,
+            generated_slug: row.get("generated_slug")?,
             title: Some(PostTitleWithEditContext {
-                raw: row.get_column(TitleRaw)?,
-                rendered: row.get_column(TitleRendered)?,
+                raw: row.get("title_raw")?,
+                rendered: row.get("title_rendered")?,
             }),
             content: PostContentWithEditContext {
-                raw: row.get_column(ContentRaw)?,
-                rendered: row.get_column(ContentRendered)?,
-                protected: row.get_column(ContentProtected)?,
-                block_version: row.get_column(ContentBlockVersion)?,
+                raw: row.get("content_raw")?,
+                rendered: row.get("content_rendered")?,
+                protected: row.get("content_protected")?,
+                block_version: row.get("content_block_version")?,
             },
-            author: get_optional_id(row, Author)?,
+            author: get_optional_id(row, "author")?,
             excerpt: {
-                let excerpt_rendered: Option<String> = row.get_column(ExcerptRendered)?;
+                let excerpt_rendered: Option<String> = row.get("excerpt_rendered")?;
                 if excerpt_rendered.is_some() {
                     Some(SparsePostExcerpt {
-                        raw: row.get_column(ExcerptRaw)?,
+                        raw: row.get("excerpt_raw")?,
                         rendered: excerpt_rendered,
-                        protected: row.get_column(ExcerptProtected)?,
+                        protected: row.get("excerpt_protected")?,
                     })
                 } else {
                     None
                 }
             },
-            featured_media: get_optional_id(row, FeaturedMedia)?,
-            comment_status: parse_optional_enum(row, CommentStatus)?,
-            ping_status: parse_optional_enum(row, PingStatus)?,
-            format: parse_optional_enum(row, Format)?,
-            meta: deserialize_json_value(row.get_column(Meta)?)?,
-            sticky: integer_to_bool(row.get_column(Sticky)?),
-            template: row.get_column(Template)?,
+            featured_media: get_optional_id(row, "featured_media")?,
+            comment_status: parse_optional_enum(row, "comment_status")?,
+            ping_status: parse_optional_enum(row, "ping_status")?,
+            format: parse_optional_enum(row, "format")?,
+            meta: deserialize_json_value(row.get("meta")?)?,
+            sticky: integer_to_bool(row.get("sticky")?),
+            template: row.get("template")?,
             categories: if categories.is_empty() {
                 None
             } else {
                 Some(categories)
             },
             tags: if tags.is_empty() { None } else { Some(tags) },
-            parent: get_optional_id(row, Parent)?,
-            menu_order: row.get_column(MenuOrder)?,
+            parent: get_optional_id(row, "parent")?,
+            menu_order: row.get("menu_order")?,
         };
 
         Ok(DbAnyPostWithEditContext {
             row_id,
             db_site_id,
             post,
-            last_fetched_at: row.get_column(LastFetchedAt)?,
+            last_fetched_at: row.get("last_fetched_at")?,
         })
     }
 
@@ -541,70 +535,68 @@ impl PostContext for ViewContext {
     where
         F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>,
     {
-        use PostViewContextColumn::*;
-
-        let row_id: RowId = row.get_column(Rowid)?;
-        let db_site_id: RowId = row.get_column(PostViewContextColumn::DbSiteId)?;
+        let row_id: RowId = row.get("rowid")?;
+        let db_site_id: RowId = row.get("db_site_id")?;
 
         // ViewContext uses term relationships (categories and tags)
         let term_relationships = fetch_terms()?;
         let (categories, tags) = extract_categories_and_tags(term_relationships);
 
         let post = AnyPostWithViewContext {
-            id: get_id(row, Id)?,
-            date: row.get_column(Date)?,
-            date_gmt: parse_datetime(row, DateGmt)?,
+            id: get_id(row, "id")?,
+            date: row.get("date")?,
+            date_gmt: parse_datetime(row, "date_gmt")?,
             guid: PostGuidWithViewContext {
-                rendered: row.get_column(GuidRendered)?,
+                rendered: row.get("guid_rendered")?,
             },
-            link: row.get_column(Link)?,
-            modified: row.get_column(Modified)?,
-            modified_gmt: parse_datetime(row, ModifiedGmt)?,
-            slug: row.get_column(Slug)?,
-            status: parse_enum(row, Status)?,
-            post_type: row.get_column(PostType)?,
+            link: row.get("link")?,
+            modified: row.get("modified")?,
+            modified_gmt: parse_datetime(row, "modified_gmt")?,
+            slug: row.get("slug")?,
+            status: parse_enum(row, "status")?,
+            post_type: row.get("post_type")?,
             title: Some(PostTitleWithViewContext {
-                rendered: row.get_column(TitleRendered)?,
+                rendered: row.get("title_rendered")?,
             }),
             content: PostContentWithViewContext {
-                rendered: row.get_column(ContentRendered)?,
-                protected: row.get_column(ContentProtected)?,
+                rendered: row.get("content_rendered")?,
+                protected: row.get("content_protected")?,
             },
-            author: get_optional_id(row, Author)?,
+            author: get_optional_id(row, "author")?,
             excerpt: {
-                let excerpt_rendered: Option<String> = row.get_column(ExcerptRendered)?;
+                let excerpt_rendered: Option<String> = row.get("excerpt_rendered")?;
                 if excerpt_rendered.is_some() {
                     Some(SparsePostExcerpt {
-                        raw: row.get_column(ExcerptRaw)?,
+                        raw: row.get("excerpt_raw")?,
                         rendered: excerpt_rendered,
-                        protected: row.get_column(ExcerptProtected)?,
+                        protected: row.get("excerpt_protected")?,
                     })
                 } else {
                     None
                 }
             },
-            featured_media: get_optional_id(row, FeaturedMedia)?,
-            comment_status: parse_optional_enum(row, CommentStatus)?,
-            ping_status: parse_optional_enum(row, PingStatus)?,
-            format: parse_optional_enum(row, Format)?,
-            meta: deserialize_json_value(row.get_column(Meta)?)?,
-            sticky: integer_to_bool(row.get_column(Sticky)?),
-            template: row.get_column(Template)?,
+            featured_media: get_optional_id(row, "featured_media")?,
+            comment_status: parse_optional_enum(row, "comment_status")?,
+            ping_status: parse_optional_enum(row, "ping_status")?,
+            format: parse_optional_enum(row, "format")?,
+            meta: deserialize_json_value(row.get("meta")?)?,
+            sticky: integer_to_bool(row.get("sticky")?),
+            template: row.get("template")?,
             categories: if categories.is_empty() {
                 None
             } else {
                 Some(categories)
             },
             tags: if tags.is_empty() { None } else { Some(tags) },
-            parent: get_optional_id(row, Parent)?,
-            menu_order: row.get_column(MenuOrder)?,
+            parent: get_optional_id(row, "parent")?,
+            menu_order: row.get("menu_order")?,
         };
 
         Ok(DbAnyPostWithViewContext {
             row_id,
             db_site_id,
             post,
-            last_fetched_at: row.get_column(LastFetchedAt)?,
+            last_fetched_at: row.get("last_fetched_at")?,
         })
     }
 
@@ -625,44 +617,42 @@ impl PostContext for EmbedContext {
     where
         F: FnOnce() -> Result<Vec<DbTermRelationship>, SqliteDbError>,
     {
-        use PostEmbedContextColumn::*;
-
-        let row_id: RowId = row.get_column(Rowid)?;
-        let db_site_id: RowId = row.get_column(PostEmbedContextColumn::DbSiteId)?;
+        let row_id: RowId = row.get("rowid")?;
+        let db_site_id: RowId = row.get("db_site_id")?;
 
         // EmbedContext does not use term relationships (no categories/tags in embed context)
         // The fetch_terms closure is never called, avoiding unnecessary database queries
 
         let post = AnyPostWithEmbedContext {
-            id: get_id(row, Id)?,
-            date: row.get_column(Date)?,
-            link: row.get_column(Link)?,
-            slug: row.get_column(Slug)?,
-            post_type: row.get_column(PostType)?,
+            id: get_id(row, "id")?,
+            date: row.get("date")?,
+            link: row.get("link")?,
+            slug: row.get("slug")?,
+            post_type: row.get("post_type")?,
             title: Some(PostTitleWithEmbedContext {
-                rendered: row.get_column(TitleRendered)?,
+                rendered: row.get("title_rendered")?,
             }),
-            author: get_optional_id(row, Author)?,
+            author: get_optional_id(row, "author")?,
             excerpt: {
-                let excerpt_rendered: Option<String> = row.get_column(ExcerptRendered)?;
+                let excerpt_rendered: Option<String> = row.get("excerpt_rendered")?;
                 if excerpt_rendered.is_some() {
                     Some(SparsePostExcerpt {
-                        raw: row.get_column(ExcerptRaw)?,
+                        raw: row.get("excerpt_raw")?,
                         rendered: excerpt_rendered,
-                        protected: row.get_column(ExcerptProtected)?,
+                        protected: row.get("excerpt_protected")?,
                     })
                 } else {
                     None
                 }
             },
-            featured_media: get_optional_id(row, FeaturedMedia)?,
+            featured_media: get_optional_id(row, "featured_media")?,
         };
 
         Ok(DbAnyPostWithEmbedContext {
             row_id,
             db_site_id,
             post,
-            last_fetched_at: row.get_column(LastFetchedAt)?,
+            last_fetched_at: row.get("last_fetched_at")?,
         })
     }
 
@@ -1040,135 +1030,11 @@ impl PostRepository<EmbedContext> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db_types::posts::{
-        PostEditContextColumn, PostEmbedContextColumn, PostViewContextColumn,
-    };
-    use crate::db_types::row_ext::ColumnIndex;
     use crate::test_fixtures::{
-        TestContext, assert_recent_timestamp, get_table_column_names, posts::PostBuilder, test_ctx,
+        TestContext, assert_recent_timestamp, posts::PostBuilder, test_ctx,
     };
     use rstest::*;
     use wp_api::posts::{AnyPostWithEditContext, PostStatus};
-
-    /// Verify that PostEditContextColumn enum values match the actual database schema.
-    /// This test protects against column reordering in migrations breaking the positional index mapping.
-    #[rstest]
-    fn test_post_edit_context_column_enum_matches_schema(test_ctx: TestContext) {
-        use PostEditContextColumn::*;
-
-        let columns = get_table_column_names(&test_ctx.conn, "posts_edit_context");
-
-        // Verify each enum value maps to the correct column name
-        assert_eq!(columns[Rowid.as_index()], "rowid");
-        assert_eq!(columns[DbSiteId.as_index()], "db_site_id");
-        assert_eq!(columns[Id.as_index()], "id");
-        assert_eq!(columns[Date.as_index()], "date");
-        assert_eq!(columns[DateGmt.as_index()], "date_gmt");
-        assert_eq!(columns[Link.as_index()], "link");
-        assert_eq!(columns[Modified.as_index()], "modified");
-        assert_eq!(columns[ModifiedGmt.as_index()], "modified_gmt");
-        assert_eq!(columns[Slug.as_index()], "slug");
-        assert_eq!(columns[Status.as_index()], "status");
-        assert_eq!(columns[PostType.as_index()], "post_type");
-        assert_eq!(columns[Password.as_index()], "password");
-        assert_eq!(columns[Template.as_index()], "template");
-        assert_eq!(columns[PermalinkTemplate.as_index()], "permalink_template");
-        assert_eq!(columns[GeneratedSlug.as_index()], "generated_slug");
-        assert_eq!(columns[Author.as_index()], "author");
-        assert_eq!(columns[FeaturedMedia.as_index()], "featured_media");
-        assert_eq!(columns[Sticky.as_index()], "sticky");
-        assert_eq!(columns[Parent.as_index()], "parent");
-        assert_eq!(columns[MenuOrder.as_index()], "menu_order");
-        assert_eq!(columns[CommentStatus.as_index()], "comment_status");
-        assert_eq!(columns[PingStatus.as_index()], "ping_status");
-        assert_eq!(columns[Format.as_index()], "format");
-        assert_eq!(columns[Meta.as_index()], "meta");
-        assert_eq!(columns[GuidRaw.as_index()], "guid_raw");
-        assert_eq!(columns[GuidRendered.as_index()], "guid_rendered");
-        assert_eq!(columns[TitleRaw.as_index()], "title_raw");
-        assert_eq!(columns[TitleRendered.as_index()], "title_rendered");
-        assert_eq!(columns[ContentRaw.as_index()], "content_raw");
-        assert_eq!(columns[ContentRendered.as_index()], "content_rendered");
-        assert_eq!(columns[ContentProtected.as_index()], "content_protected");
-        assert_eq!(
-            columns[ContentBlockVersion.as_index()],
-            "content_block_version"
-        );
-        assert_eq!(columns[ExcerptRaw.as_index()], "excerpt_raw");
-        assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
-        assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
-        assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
-
-        // Verify total column count matches
-        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
-    }
-
-    /// Verify that PostViewContextColumn enum values match the actual database schema.
-    /// This test protects against column reordering in migrations breaking the positional index mapping.
-    #[rstest]
-    fn test_post_view_context_column_enum_matches_schema(test_ctx: TestContext) {
-        use PostViewContextColumn::*;
-
-        let columns = get_table_column_names(&test_ctx.conn, "posts_view_context");
-
-        assert_eq!(columns[Rowid.as_index()], "rowid");
-        assert_eq!(columns[DbSiteId.as_index()], "db_site_id");
-        assert_eq!(columns[Id.as_index()], "id");
-        assert_eq!(columns[Date.as_index()], "date");
-        assert_eq!(columns[DateGmt.as_index()], "date_gmt");
-        assert_eq!(columns[Link.as_index()], "link");
-        assert_eq!(columns[Modified.as_index()], "modified");
-        assert_eq!(columns[ModifiedGmt.as_index()], "modified_gmt");
-        assert_eq!(columns[Slug.as_index()], "slug");
-        assert_eq!(columns[Status.as_index()], "status");
-        assert_eq!(columns[PostType.as_index()], "post_type");
-        assert_eq!(columns[Template.as_index()], "template");
-        assert_eq!(columns[Author.as_index()], "author");
-        assert_eq!(columns[FeaturedMedia.as_index()], "featured_media");
-        assert_eq!(columns[Sticky.as_index()], "sticky");
-        assert_eq!(columns[Parent.as_index()], "parent");
-        assert_eq!(columns[MenuOrder.as_index()], "menu_order");
-        assert_eq!(columns[CommentStatus.as_index()], "comment_status");
-        assert_eq!(columns[PingStatus.as_index()], "ping_status");
-        assert_eq!(columns[Format.as_index()], "format");
-        assert_eq!(columns[Meta.as_index()], "meta");
-        assert_eq!(columns[GuidRendered.as_index()], "guid_rendered");
-        assert_eq!(columns[TitleRendered.as_index()], "title_rendered");
-        assert_eq!(columns[ContentRendered.as_index()], "content_rendered");
-        assert_eq!(columns[ContentProtected.as_index()], "content_protected");
-        assert_eq!(columns[ExcerptRaw.as_index()], "excerpt_raw");
-        assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
-        assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
-        assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
-
-        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
-    }
-
-    /// Verify that PostEmbedContextColumn enum values match the actual database schema.
-    /// This test protects against column reordering in migrations breaking the positional index mapping.
-    #[rstest]
-    fn test_post_embed_context_column_enum_matches_schema(test_ctx: TestContext) {
-        use PostEmbedContextColumn::*;
-
-        let columns = get_table_column_names(&test_ctx.conn, "posts_embed_context");
-
-        assert_eq!(columns[Rowid.as_index()], "rowid");
-        assert_eq!(columns[DbSiteId.as_index()], "db_site_id");
-        assert_eq!(columns[Id.as_index()], "id");
-        assert_eq!(columns[Date.as_index()], "date");
-        assert_eq!(columns[Link.as_index()], "link");
-        assert_eq!(columns[Slug.as_index()], "slug");
-        assert_eq!(columns[PostType.as_index()], "post_type");
-        assert_eq!(columns[TitleRendered.as_index()], "title_rendered");
-        assert_eq!(columns[Author.as_index()], "author");
-        assert_eq!(columns[ExcerptRaw.as_index()], "excerpt_raw");
-        assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
-        assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
-        assert_eq!(columns[FeaturedMedia.as_index()], "featured_media");
-        assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
-
-        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
-    }
 
     #[rstest]
     #[case(PostBuilder::minimal().build())]

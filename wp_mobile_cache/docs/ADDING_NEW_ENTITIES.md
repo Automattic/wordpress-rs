@@ -8,7 +8,7 @@ WordPress REST API returns different fields based on the `context` parameter (`e
 
 **Architecture:**
 - `context.rs` - Generic `IsContext` trait and context marker types (EditContext, ViewContext, EmbedContext)
-- `db_types/{entity}/` - Column enums and wrapper structs (types only, no logic)
+- `db_types/{entity}/` - Database wrapper structs (types only, no logic)
 - `repository/{entity}.rs` - Entity-specific trait definitions and all database operations
 
 Use the existing `posts` implementation in `src/repository/posts.rs` as the primary reference.
@@ -35,7 +35,7 @@ When adding a new entity type (e.g., implementing cache support for comments):
 1. **Create type definitions** in `src/db_types/comments/`:
    - `mod.rs` - Re-exports
    - `edit.rs`, `view.rs`, `embed.rs` - One file per context
-   - Each file contains: column enum (matching SQL table order) + database wrapper struct
+   - Each file contains database wrapper struct only
 
 2. **Define entity-specific trait and implement database logic** in `src/repository/comments.rs`:
    - Define `CommentContext` trait extending `IsContext` with associated types and row mapping method
@@ -62,7 +62,7 @@ When adding a new entity type (e.g., implementing cache support for comments):
 
 ## Key Design Decisions
 
-**Column enum ordering**: Column indexes in the enum must match the exact order in SQL `CREATE TABLE` statements and all `SELECT *` queries. Add PRAGMA-based integration tests to verify this (see `test_post_edit_context_column_enum_matches_schema` in `repository/posts.rs` for reference).
+**Column access**: Use string-based column names (e.g., `row.get("column_name")`) in `from_row()` implementations. This decouples Rust code from SQL column ordering, allowing columns to be reordered in migrations without breaking existing code.
 
 **Lazy data loading**: If your entity requires optional related data (e.g., posts use term relationships for categories/tags), use `FnOnce()` closures in the trait method. This allows contexts that don't need the data to avoid unnecessary database queries by simply not calling the closure. See `PostContext::from_row_with_terms` for an example.
 
@@ -77,5 +77,5 @@ When adding a new entity type (e.g., implementing cache support for comments):
 See `src/repository/posts.rs` for a complete working example including:
 - Context trait implementations with lazy closure pattern
 - Generic repository with context-specific methods
-- PRAGMA tests for column schema verification
+- String-based column access in `from_row()` implementations
 - Comprehensive test coverage
