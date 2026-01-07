@@ -15,7 +15,7 @@ actor Test {
     }
 
     @Test func testMigrationsWork() async throws {
-        let migrationsPerformed = try await self.cache.performMigrations()
+        let migrationsPerformed = try self.cache.performMigrations()
         #expect(migrationsPerformed == 9)
     }
 
