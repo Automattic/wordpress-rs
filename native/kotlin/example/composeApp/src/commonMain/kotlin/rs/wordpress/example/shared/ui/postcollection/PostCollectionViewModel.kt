@@ -176,7 +176,7 @@ class PostCollectionViewModel(
                 val postDataList = allPosts.map { fullEntity ->
                     PostDisplayData(
                         entityId = fullEntity.entityId,
-                        title = fullEntity.data.title.rendered,
+                        title = fullEntity.data.title?.rendered ?: "<no-title>",
                         contentPreview = fullEntity.data.content.rendered.take(100),
                         status = fullEntity.data.status.toString(),
                         date = fullEntity.data.date,
