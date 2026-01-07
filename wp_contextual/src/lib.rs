@@ -249,6 +249,47 @@
 //!
 //! ---
 //!
+//! Sometimes, you may want a contextual field to remain optional even in the generated types.
+//! For this, use `#[WpContextualField(option)]`:
+//!
+//! ```
+//! # use wp_contextual::WpContextual;
+//! #[derive(WpContextual)]
+//! pub struct SparsePost {
+//!     #[WpContext(edit, embed, view)]
+//!     pub id: Option<u32>,
+//!     #[WpContext(edit)]
+//!     #[WpContextualField(option)]
+//!     pub title: Option<SparsePostTitle>,
+//! }
+//! # #[derive(Debug, serde::Serialize, serde::Deserialize, uniffi::Record, WpContextual)]
+//! # pub struct SparsePostTitle {
+//! #     #[WpContext(edit)]
+//! #     pub rendered: Option<String>,
+//! # }
+//! # // We need this line because `WpContextual` implements `crate::SparseField`
+//! # trait SparseField { fn as_mapped_field_name(&self) -> &str; }
+//! # // We need these 2 lines for UniFFI
+//! # uniffi::setup_scaffolding!();
+//! # fn main() {}
+//! ```
+//!
+//! This will generate:
+//!
+//! ```
+//! pub struct PostWithEditContext {
+//!     pub id: u32,
+//!     pub title: Option<PostTitleWithEditContext>,
+//! }
+//! # struct PostTitleWithEditContext {}
+//! ```
+//!
+//! Notice that `title` remains `Option<...>` in the generated type, unlike regular
+//! `#[WpContextualField]` which would unwrap the Option. This is useful when a nested
+//! contextual field may not always be present in the API response.
+//!
+//! ---
+//!
 //! In some instances, we might need a field to be included in contextual types, but still be an
 //! `Option`. In these cases, `WpContextualOption` attribute can be used:
 //!
@@ -392,6 +433,9 @@ mod wp_contextual;
 ///   [`WpContextual`] type. This will tell the compiler to replace the given `Option<SparseBaz>`
 ///   type with the appropriate contextual type: `BazWithEditContext`, `BazWithEmbedContext` or
 ///   `BazWithViewContext`.
+/// * `[WpContextualField(option)]` is like `[WpContextualField]` but keeps the `Option` wrapper
+///   in the generated types. This is useful when a nested contextual field may not always be
+///   present in the API response.
 /// * `[WpContextualOption]` is used to tell the compiler to keep the field's `Option` type.
 /// * `[WpContextualExcludeFromFields]` is used to exclude a field from the generated field enums
 ///   (`SparseFooFieldWithEditContext`, etc.) while still including it in the contextual types.
