@@ -1,0 +1,5 @@
+error: form_urlencoded = true requires `params` type
+ --> tests/fail/form_urlencoded_missing_params.rs:3:7
+  |
+3 |     #[post(url = "/test", output = TestOutput, form_urlencoded = true)]
+  |       ^^^^

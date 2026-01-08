@@ -26,6 +26,7 @@ pub struct ParsedVariantAttribute {
     pub filter_by: Option<FilterByType>,
     pub available_contexts: Vec<WpContext>,
     pub multipart: bool,
+    pub form_urlencoded: bool,
 }
 
 impl ParsedVariantAttribute {
@@ -37,6 +38,7 @@ impl ParsedVariantAttribute {
         filter_by: Option<Vec<TokenTree>>,
         available_contexts: Vec<WpContext>,
         multipart: bool,
+        form_urlencoded: bool,
     ) -> Result<Self, ItemVariantAttributeParseError> {
         let non_empty_token_tree_or_none =
             |tokens: Option<Vec<TokenTree>>| -> Option<Vec<TokenTree>> {
@@ -56,6 +58,10 @@ impl ParsedVariantAttribute {
             return Err(ItemVariantAttributeParseError::ContextualPagedRequiresParamsType);
         }
 
+        if form_urlencoded && params_type.is_none() {
+            return Err(ItemVariantAttributeParseError::FormUrlencodedRequiresParams);
+        }
+
         Ok(Self {
             request_type,
             url_parts,
@@ -66,6 +72,7 @@ impl ParsedVariantAttribute {
             }),
             available_contexts,
             multipart,
+            form_urlencoded,
         })
     }
 
@@ -342,6 +349,7 @@ impl Parse for ParsedVariantAttribute {
         let mut filter_by_tokens = None;
         let mut available_contexts_tokens = None;
         let mut multipart_tokens = None;
+        let mut form_urlencoded_tokens = None;
 
         for (ident, tokens) in pair_vec.into_iter() {
             match ident.to_string().as_str() {
@@ -351,6 +359,7 @@ impl Parse for ParsedVariantAttribute {
                 "filter_by" => filter_by_tokens = Some(tokens),
                 "available_contexts" => available_contexts_tokens = Some(tokens),
                 "multipart" => multipart_tokens = Some(tokens),
+                "form_urlencoded" => form_urlencoded_tokens = Some(tokens),
                 _ => {
                     return Err(ItemVariantAttributeParseError::ExpectingKeyValuePairs
                         .into_syn_error(meta_list_span));
@@ -391,6 +400,8 @@ impl Parse for ParsedVariantAttribute {
         )?;
         let multipart =
             ParsedVariantAttribute::parse_bool_flag(multipart_tokens.as_ref(), input.span())?;
+        let form_urlencoded =
+            ParsedVariantAttribute::parse_bool_flag(form_urlencoded_tokens.as_ref(), input.span())?;
 
         ParsedVariantAttribute::new(
             request_type,
@@ -400,6 +411,7 @@ impl Parse for ParsedVariantAttribute {
             filter_by_tokens,
             available_contexts,
             multipart,
+            form_urlencoded,
         )
         .map_err(|e| e.into_syn_error(meta_list_span))
     }
@@ -409,6 +421,8 @@ impl Parse for ParsedVariantAttribute {
 enum ItemVariantAttributeParseError {
     #[error("#[contextual_paged(params = ?)] is missing `params` type")]
     ContextualPagedRequiresParamsType,
+    #[error("form_urlencoded = true requires `params` type")]
+    FormUrlencodedRequiresParams,
     #[error("Missing variant attribute")]
     MissingAttr,
     #[error("Only a single attribute is supported")]
@@ -538,5 +552,32 @@ mod tests {
             syn::parse_str(r#"#[post(url = "/test", output = TestOutput, multipart = false)]"#)
                 .unwrap();
         assert!(!parsed.multipart);
+    }
+
+    #[test]
+    fn test_form_urlencoded_flag_default() {
+        let parsed: ParsedVariantAttribute =
+            syn::parse_str(r#"#[post(url = "/test", output = TestOutput)]"#).unwrap();
+        assert!(!parsed.form_urlencoded);
+    }
+
+    #[test]
+    fn test_form_urlencoded_flag_true() {
+        let parsed: ParsedVariantAttribute =
+            syn::parse_str(
+                r#"#[post(url = "/test", params = &TestParams, output = TestOutput, form_urlencoded = true)]"#,
+            )
+            .unwrap();
+        assert!(parsed.form_urlencoded);
+    }
+
+    #[test]
+    fn test_form_urlencoded_flag_false() {
+        let parsed: ParsedVariantAttribute =
+            syn::parse_str(
+                r#"#[post(url = "/test", output = TestOutput, form_urlencoded = false)]"#,
+            )
+            .unwrap();
+        assert!(!parsed.form_urlencoded);
     }
 }
