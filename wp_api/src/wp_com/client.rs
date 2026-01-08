@@ -5,6 +5,7 @@ use super::endpoint::{
     },
     me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
+    site_info_endpoint::{SiteInfoRequestBuilder, SiteInfoRequestExecutor},
     subscribers_endpoint::{SubscribersRequestBuilder, SubscribersRequestExecutor},
     support_bots_endpoint::{SupportBotsRequestBuilder, SupportBotsRequestExecutor},
     support_eligibility_endpoint::{
@@ -30,6 +31,7 @@ pub struct WpComApiRequestBuilder {
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
     me: Arc<MeRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
+    site_info: Arc<SiteInfoRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
     support_bots: Arc<SupportBotsRequestBuilder>,
@@ -48,6 +50,7 @@ impl WpComApiRequestBuilder {
             jetpack_connection,
             me,
             oauth2,
+            site_info,
             sites,
             subscribers,
             support_bots,
@@ -77,6 +80,7 @@ pub struct WpComApiClient {
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
     me: Arc<MeRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
+    site_info: Arc<SiteInfoRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
     support_bots: Arc<SupportBotsRequestExecutor>,
@@ -96,6 +100,7 @@ impl WpComApiClient {
             jetpack_connection,
             me,
             oauth2,
+            site_info,
             sites,
             subscribers,
             support_bots,
@@ -108,6 +113,7 @@ api_client_generate_endpoint_impl!(WpComApi, followers);
 api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
 api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
+api_client_generate_endpoint_impl!(WpComApi, site_info);
 api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);

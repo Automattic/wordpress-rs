@@ -9,6 +9,7 @@ pub mod followers;
 pub mod jetpack_connection;
 pub mod me;
 pub mod oauth2;
+pub mod site_info;
 pub mod sites;
 pub mod subscribers;
 pub mod support_bots;
