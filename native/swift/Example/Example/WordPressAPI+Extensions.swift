@@ -28,3 +28,17 @@ extension WordPressAPI {
         }
     }
 }
+
+extension WPComApiClient {
+    static var globalInstance: WPComApiClient {
+        get async throws {
+            let loginManager = await LoginManager()
+
+            guard let loginCredentials = try await loginManager.getLoginCredentials() else {
+                throw CocoaError(.xpcConnectionInvalid)
+            }
+
+            return WPComApiClient(authentication: loginCredentials)
+        }
+    }
+}

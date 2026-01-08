@@ -1,0 +1,7 @@
+{
+  "access_token": "B56F74C1-541D-48D9-8165-6ED3BCD41988",
+  "token_type": "bearer",
+  "blog_id": "123456",
+  "blog_url": "http://example.wordpress.com",
+  "scope": ""
+}

@@ -1,1 +1,6 @@
-{"client_id":"11","user_id":"1234567890","blog_id":null,"scope":"global"}
+{
+  "client_id": "11",
+  "user_id": "1234567890",
+  "blog_id": null,
+  "scope": "global"
+}
