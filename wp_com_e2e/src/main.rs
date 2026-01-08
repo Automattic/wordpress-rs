@@ -5,6 +5,7 @@ use std::{sync::Arc, time::Duration};
 use wp_api::{prelude::*, wp_com::client::WpComApiClient};
 
 mod me_tests;
+mod site_info_tests;
 mod sites_tests;
 mod support_bot_tests;
 mod support_eligibility_test;
@@ -89,6 +90,7 @@ async fn run_tests(
     allow_writes: bool,
 ) -> Result<(), anyhow::Error> {
     me_tests::me_test(client, token.clone()).await?;
+    site_info_tests::site_info_test(client).await?;
     sites_tests::sites_test(client).await?;
     support_bot_tests::support_bots_test(client, allow_writes).await?;
     support_eligibility_test::support_eligibility_test(client).await?;
