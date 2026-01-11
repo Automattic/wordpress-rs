@@ -38,4 +38,8 @@ public class WPComApiClient {
     public var supportTickets: SupportTicketsRequestExecutor {
         internalClient.supportTickets()
     }
+
+    public var siteInfo: SiteInfoRequestExecutor {
+        internalClient.siteInfo()
+    }
 }

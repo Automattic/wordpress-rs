@@ -267,6 +267,8 @@ public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiCli
 
 // MARK: - WordPress.com
 
+public typealias SiteInfoResponse = WordPressAPIInternal.SiteInfoResponse
+
 // MARK: OAuth2
 public typealias TokenValidationParameters = WordPressAPIInternal.TokenValidationParameters
 
