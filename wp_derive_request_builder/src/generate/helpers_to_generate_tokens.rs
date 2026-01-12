@@ -400,6 +400,7 @@ pub fn fn_body_build_request_from_url(
     params_type: Option<&ParamsType>,
     request_type: RequestType,
     multipart: bool,
+    form_urlencoded: bool,
 ) -> TokenStream {
     match request_type {
         RequestType::ContextualGet | RequestType::ContextualPaged | RequestType::Get => quote! {
@@ -417,6 +418,16 @@ pub fn fn_body_build_request_from_url(
                 } else {
                     quote! {
                         compile_error!("multipart POST requires params")
+                    }
+                }
+            } else if form_urlencoded {
+                if params_type.is_some() {
+                    quote! {
+                        self.inner.post_form_urlencoded(url, params)
+                    }
+                } else {
+                    quote! {
+                        compile_error!("form_urlencoded POST requires params")
                     }
                 }
             } else if params_type.is_some() {
@@ -1092,17 +1103,25 @@ mod tests {
     }
 
     #[rstest]
-    #[case(None, RequestType::ContextualGet, false, "self . inner . get (url)")]
+    #[case(
+        None,
+        RequestType::ContextualGet,
+        false,
+        false,
+        "self . inner . get (url)"
+    )]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
         false,
+        false,
         "self . inner . get (url)"
     )]
-    #[case(None, RequestType::Delete, false, "self . inner . delete (url)")]
+    #[case(None, RequestType::Delete, false, false, "self . inner . delete (url)")]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::Delete,
+        false,
         false,
         "self . inner . delete (url)"
     )]
@@ -1110,11 +1129,13 @@ mod tests {
         None,
         RequestType::Post,
         false,
+        false,
         "self . inner . post (url , None :: < & () >)"
     )]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::Post,
+        false,
         false,
         "self . inner . post (url , Some (params))"
     )]
@@ -1122,16 +1143,31 @@ mod tests {
         referenced_params_type("UserListParams"),
         RequestType::Post,
         true,
+        false,
         "self . inner . post_multipart (url , params)"
+    )]
+    #[case(
+        referenced_params_type("UserListParams"),
+        RequestType::Post,
+        false,
+        true,
+        "self . inner . post_form_urlencoded (url , params)"
     )]
     fn test_fn_body_build_request_from_url(
         #[case] params: Option<ParamsType>,
         #[case] request_type: RequestType,
         #[case] multipart: bool,
+        #[case] form_urlencoded: bool,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_body_build_request_from_url(params.as_ref(), request_type, multipart).to_string(),
+            fn_body_build_request_from_url(
+                params.as_ref(),
+                request_type,
+                multipart,
+                form_urlencoded
+            )
+            .to_string(),
             expected_str
         );
     }

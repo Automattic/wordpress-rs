@@ -1,17 +1,17 @@
 import Foundation
 import WordPressAPIInternal
 
-public actor WordPressApiCache {
+public final class WordPressApiCache {
 
     let cache: WpApiCache
 
     /// Creates a new in-memory cache
-    public init() throws {
+    public convenience init() throws {
         try self.init(path: ":memory:")
     }
 
     /// Creates a new cache at the specified file system URL
-    public init(url: URL) throws {
+    public convenience init(url: URL) throws {
         try self.init(path: url.absoluteString)
     }
 
@@ -20,7 +20,7 @@ public actor WordPressApiCache {
         self.cache = try WpApiCache(path: path)
     }
 
-    public func performMigrations() async throws -> Int64 {
+    public func performMigrations() throws -> Int64 {
         try self.cache.performMigrations()
     }
 
