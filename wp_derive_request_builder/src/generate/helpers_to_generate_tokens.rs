@@ -1103,7 +1103,13 @@ mod tests {
     }
 
     #[rstest]
-    #[case(None, RequestType::ContextualGet, false, false, "self . inner . get (url)")]
+    #[case(
+        None,
+        RequestType::ContextualGet,
+        false,
+        false,
+        "self . inner . get (url)"
+    )]
     #[case(
         referenced_params_type("UserListParams"),
         RequestType::ContextualGet,
@@ -1155,7 +1161,13 @@ mod tests {
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_body_build_request_from_url(params.as_ref(), request_type, multipart, form_urlencoded).to_string(),
+            fn_body_build_request_from_url(
+                params.as_ref(),
+                request_type,
+                multipart,
+                form_urlencoded
+            )
+            .to_string(),
             expected_str
         );
     }

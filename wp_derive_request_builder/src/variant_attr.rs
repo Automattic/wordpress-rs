@@ -30,6 +30,7 @@ pub struct ParsedVariantAttribute {
 }
 
 impl ParsedVariantAttribute {
+    #[allow(clippy::too_many_arguments)] // Override Clippy here, because this is a macro not a directly-called method
     fn new(
         request_type: RequestType,
         url_parts: Vec<UrlPart>,
@@ -573,11 +574,10 @@ mod tests {
 
     #[test]
     fn test_form_urlencoded_flag_false() {
-        let parsed: ParsedVariantAttribute =
-            syn::parse_str(
-                r#"#[post(url = "/test", output = TestOutput, form_urlencoded = false)]"#,
-            )
-            .unwrap();
+        let parsed: ParsedVariantAttribute = syn::parse_str(
+            r#"#[post(url = "/test", output = TestOutput, form_urlencoded = false)]"#,
+        )
+        .unwrap();
         assert!(!parsed.form_urlencoded);
     }
 }
