@@ -146,7 +146,7 @@ extension SiteSettingsWithEditContext {
 
 extension AnyPostWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.slug, title: self.title.rendered, subtitle: self.slug, fields: [:])
+        ListViewData(id: self.slug, title: self.title?.rendered ?? "<no-title>", subtitle: self.slug, fields: [:])
     }
 }
 

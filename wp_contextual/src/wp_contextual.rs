@@ -173,7 +173,12 @@ fn parse_fields(
                         .expect("Already validated that there is only one segment");
                     let segment_ident = &path_segment.ident;
                     if is_wp_contextual_field_ident(segment_ident) {
-                        return Ok(WpParsedAttr::ParsedWpContextualField);
+                        let keep_option = if let syn::Meta::List(meta_list) = &attr.meta {
+                            parse_wp_contextual_field_option(meta_list.tokens.clone())?
+                        } else {
+                            false
+                        };
+                        return Ok(WpParsedAttr::ParsedWpContextualField { keep_option });
                     }
                     if is_wp_contextual_option_ident(segment_ident) {
                         return Ok(WpParsedAttr::ParsedWpContextualOption);
@@ -204,10 +209,10 @@ fn parse_fields(
         .collect::<Result<Vec<WpParsedField>, syn::Error>>()?;
 
     let assert_has_wp_context_attribute_if_it_has_given_attribute =
-        |attribute_to_check: WpParsedAttr, error_type: WpContextualParseError| {
+        |attribute_predicate: fn(&WpParsedAttr) -> bool, error_type: WpContextualParseError| {
             if let Some(pf) = parsed_fields
                 .iter()
-                .filter(|pf| pf.parsed_attrs.contains(&attribute_to_check))
+                .filter(|pf| pf.parsed_attrs.iter().any(attribute_predicate))
                 .find(|pf| {
                     !pf.parsed_attrs.iter().any(|pf| match pf {
                         WpParsedAttr::ParsedWpContext { contexts } => !contexts.is_empty(),
@@ -224,14 +229,14 @@ fn parse_fields(
     // Check if there are any fields that has #[WpContextualField] attribute,
     // but not the #[WpContext] attribute
     assert_has_wp_context_attribute_if_it_has_given_attribute(
-        WpParsedAttr::ParsedWpContextualField,
+        |attr| matches!(attr, WpParsedAttr::ParsedWpContextualField { .. }),
         WpContextualParseError::WpContextualFieldWithoutWpContext,
     )?;
 
-    // Check if there are any fields that has #[WpContextualField] attribute,
+    // Check if there are any fields that has #[WpContextualOption] attribute,
     // but not the #[WpContext] attribute
     assert_has_wp_context_attribute_if_it_has_given_attribute(
-        WpParsedAttr::ParsedWpContextualOption,
+        |attr| matches!(attr, WpParsedAttr::ParsedWpContextualOption),
         WpContextualParseError::WpContextualOptionWithoutWpContext,
     )?;
 
@@ -241,7 +246,8 @@ fn parse_fields(
     // it.
     if let Some(pf) = parsed_fields.iter().find(|pf| {
         pf.parsed_attrs
-            .contains(&WpParsedAttr::ParsedWpContextualField)
+            .iter()
+            .any(|attr| matches!(attr, WpParsedAttr::ParsedWpContextualField { .. }))
             && pf
                 .parsed_attrs
                 .contains(&WpParsedAttr::ParsedWpContextualOption)
@@ -402,6 +408,7 @@ fn generate_integration_test_helper(
 struct GeneratedContextualField {
     field: syn::Field,
     is_wp_contextual_option: bool,
+    is_wp_contextual_field_keep_option: bool,
     is_wp_contextual_exclude_from_fields: bool,
 }
 
@@ -437,14 +444,27 @@ impl GeneratedContextualField {
                     .parsed_attrs
                     .contains(&WpParsedAttr::ParsedWpContextualExcludeFromFields);
 
+                let is_wp_contextual_field_keep_option = pf
+                    .parsed_attrs
+                    .iter()
+                    .find_map(|attr| {
+                        if let WpParsedAttr::ParsedWpContextualField { keep_option } = attr {
+                            Some(*keep_option)
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(false);
+
                 let new_type = if is_wp_contextual_option {
                     f.ty.clone()
                 } else {
-                    let mut new_type = if should_extract_option {
-                        extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone())
-                    } else {
-                        f.ty.clone()
-                    };
+                    let mut new_type =
+                        if should_extract_option && !is_wp_contextual_field_keep_option {
+                            extract_inner_type_of_option(&f.ty).unwrap_or(f.ty.clone())
+                        } else {
+                            f.ty.clone()
+                        };
                     if f.attrs.iter().any(|attr| {
                         attr.path()
                             .segments
@@ -483,6 +503,7 @@ impl GeneratedContextualField {
                 Ok(Self {
                     field: new_field,
                     is_wp_contextual_option,
+                    is_wp_contextual_field_keep_option,
                     is_wp_contextual_exclude_from_fields,
                 })
             })
@@ -783,6 +804,38 @@ fn parse_contexts_from_tokens(
         .collect::<Result<Vec<WpContextAttr>, syn::Error>>()
 }
 
+// Parses the tokens inside #[WpContextualField(option)] to check if "option" is present.
+// Returns true if "option" is found, false for empty tokens.
+// Returns error for any other token.
+fn parse_wp_contextual_field_option(tokens: proc_macro2::TokenStream) -> Result<bool, syn::Error> {
+    let mut has_option = false;
+    for t in tokens.into_iter() {
+        match t {
+            proc_macro2::TokenTree::Ident(ident) => {
+                if ident == "option" {
+                    has_option = true;
+                } else {
+                    return Err(
+                        WpContextualParseAttrError::UnexpectedWpContextualFieldIdent {
+                            input: ident.to_string(),
+                        }
+                        .into_syn_error(ident.span()),
+                    );
+                }
+            }
+            proc_macro2::TokenTree::Punct(_) | proc_macro2::TokenTree::Group(_) => {
+                return Err(WpContextualParseAttrError::UnexpectedToken.into_syn_error(t.span()));
+            }
+            proc_macro2::TokenTree::Literal(l) => {
+                return Err(
+                    WpContextualParseAttrError::UnexpectedLiteralToken.into_syn_error(l.span())
+                );
+            }
+        }
+    }
+    Ok(has_option)
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct WpParsedField {
     field: syn::Field,
@@ -791,7 +844,7 @@ struct WpParsedField {
 
 #[derive(Debug, PartialEq, Eq)]
 enum WpParsedAttr {
-    ParsedWpContextualField,
+    ParsedWpContextualField { keep_option: bool },
     ParsedWpContextualOption,
     ParsedWpContextualExcludeFromFields,
     ParsedWpContext { contexts: Vec<WpContextAttr> },
@@ -897,6 +950,8 @@ enum WpContextualParseAttrError {
     UnexpectedPunct,
     #[error("Expected 'edit', 'embed' or 'view', found '{}'", input)]
     UnexpectedWpContextIdent { input: String },
+    #[error("Expected 'option', found '{}'", input)]
+    UnexpectedWpContextualFieldIdent { input: String },
     // syn::Meta::Path or syn::Meta::NameValue
     #[error("Expected #[WpContext(edit, embed, view)]. Did you forget to add context types?")]
     MissingWpContextMeta,

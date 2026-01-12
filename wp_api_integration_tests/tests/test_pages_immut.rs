@@ -107,8 +107,8 @@ async fn retrieve_password_protected_with_edit_context() {
         .assert_response()
         .data;
     assert_eq!(
-        page.title.rendered,
-        test_credentials.password_protected_page_title
+        page.title.map(|t| t.rendered),
+        Some(test_credentials.password_protected_page_title.to_string()),
     );
 }
 
@@ -133,8 +133,8 @@ async fn retrieve_password_protected_with_embed_context() {
         .assert_response()
         .data;
     assert_eq!(
-        page.title.rendered,
-        test_credentials.password_protected_page_title
+        page.title.map(|t| t.rendered),
+        Some(test_credentials.password_protected_page_title.to_string())
     );
 }
 
@@ -159,8 +159,8 @@ async fn retrieve_password_protected_with_view_context() {
         .assert_response()
         .data;
     assert_eq!(
-        page.title.rendered,
-        test_credentials.password_protected_page_title
+        page.title.map(|t| t.rendered),
+        Some(test_credentials.password_protected_page_title.to_string())
     );
 }
 
