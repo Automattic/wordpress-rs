@@ -70,7 +70,7 @@ class MediaEndpointTest {
                 params = MediaCreateParams(title = title, filePath = "test_media.jpg")
             )
         }.assertSuccessAndRetrieveData().data
-        assertEquals(title, response.title.rendered)
+        assertEquals(title, response.title?.rendered)
         restoreTestServer()
     }
 
@@ -112,7 +112,7 @@ class MediaEndpointTest {
         }.assertSuccessAndRetrieveData().data
 
         // Verify upload was successful
-        assertEquals(title, response.title.rendered)
+        assertEquals(title, response.title?.rendered)
 
         // Verify progress reporting worked
         assert(uploadStarted) { "Upload should have started" }

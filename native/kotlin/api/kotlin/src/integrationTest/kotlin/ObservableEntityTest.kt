@@ -48,7 +48,7 @@ class ObservableEntityTest {
 
         // Verify data was actually updated
         val fullEntity = observableEntity.loadData()!!
-        assertEquals("Updated Title", fullEntity.data.title.rendered)
+        assertEquals("Updated Title", fullEntity.data.title?.rendered)
     }
 
     @Test
