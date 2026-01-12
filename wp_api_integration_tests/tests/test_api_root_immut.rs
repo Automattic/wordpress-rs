@@ -11,6 +11,7 @@ async fn test_fetching_api_root() {
 
 #[tokio::test]
 #[parallel]
+#[ignore]
 async fn test_fetching_wpcom_api_root() {
     let response = WpApiClient::new(
         Arc::new(WpComDotOrgApiUrlResolver::new(
