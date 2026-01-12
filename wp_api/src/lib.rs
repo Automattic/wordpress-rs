@@ -240,6 +240,7 @@ macro_rules! generate {
 }
 
 #[uniffi::export]
+#[allow(unused_variables)] // The app_id is only used on Apple platforms.
 pub fn setup_logger(app_id: String) {
     #[cfg(debug_assertions)]
     let log_level = log::LevelFilter::Debug;
