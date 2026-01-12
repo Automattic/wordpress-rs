@@ -145,6 +145,28 @@ impl InnerRequestBuilder {
         }
     }
 
+    pub fn post_form_urlencoded<T>(&self, url: ApiEndpointUrl, params: &T) -> WpNetworkRequest
+    where
+        T: ?Sized + Serialize,
+    {
+        let mut header_map = self.header_map_for_post_request();
+        header_map.inner.insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/x-www-form-urlencoded"),
+        );
+
+        WpNetworkRequest {
+            uuid: Uuid::new_v4().into(),
+            retry_count: 0,
+            method: RequestMethod::POST,
+            url: url.into(),
+            header_map: header_map.into(),
+            body: serde_urlencoded::to_string(params)
+                .ok()
+                .map(|s| Arc::new(WpNetworkRequestBody::new(s.into_bytes()))),
+        }
+    }
+
     fn header_map(&self) -> WpNetworkHeaderMap {
         let mut header_map = HeaderMap::new();
         header_map.insert(
@@ -1059,6 +1081,7 @@ pub mod user_agent {
 mod tests {
     use super::*;
     use chrono::Utc;
+    use endpoint::ApiEndpointUrl;
     use rstest::*;
     use std::ops::Add;
     use std::time::Duration;
@@ -1354,5 +1377,253 @@ mod tests {
                 .collect::<Vec<&str>>(),
             values
         );
+    }
+
+    fn test_url() -> ApiEndpointUrl {
+        ApiEndpointUrl::new(Url::parse("https://example.com/api/endpoint").unwrap())
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_content_type() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            key: String,
+        }
+
+        let params = TestParams {
+            key: "value".to_string(),
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        let content_type = request
+            .header_map
+            .inner
+            .get(http::header::CONTENT_TYPE)
+            .expect("Content-Type header should be set");
+        assert_eq!(
+            content_type.to_str().unwrap(),
+            "application/x-www-form-urlencoded"
+        );
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_body() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            foo: String,
+            bar: String,
+        }
+
+        let params = TestParams {
+            foo: "hello".to_string(),
+            bar: "world".to_string(),
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        let body = request.body.expect("Body should be set");
+        let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
+        assert_eq!(body_str, "foo=hello&bar=world");
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_special_characters() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            url: String,
+            data: String,
+        }
+
+        let params = TestParams {
+            url: "https://example.com/path?query=1".to_string(),
+            data: "a&b=c".to_string(),
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        let body = request.body.expect("Body should be set");
+        let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
+        assert_eq!(
+            body_str,
+            "url=https%3A%2F%2Fexample.com%2Fpath%3Fquery%3D1&data=a%26b%3Dc"
+        );
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_method() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            key: String,
+        }
+
+        let params = TestParams {
+            key: "value".to_string(),
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        assert_eq!(request.method, RequestMethod::POST);
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_numeric_types() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            large_number: u64,
+            negative: i32,
+        }
+
+        let params = TestParams {
+            large_number: 12345678901234,
+            negative: -42,
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        let body = request.body.expect("Body should be set");
+        let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
+        assert_eq!(body_str, "large_number=12345678901234&negative=-42");
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_spaces() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            message: String,
+        }
+
+        let params = TestParams {
+            message: "hello world".to_string(),
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        let body = request.body.expect("Body should be set");
+        let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
+        // serde_urlencoded uses + for spaces (application/x-www-form-urlencoded standard)
+        assert_eq!(body_str, "message=hello+world");
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_unicode() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            text: String,
+        }
+
+        let params = TestParams {
+            text: "日本語".to_string(),
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        let body = request.body.expect("Body should be set");
+        let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
+        assert_eq!(body_str, "text=%E6%97%A5%E6%9C%AC%E8%AA%9E");
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_empty_string() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            empty: String,
+            filled: String,
+        }
+
+        let params = TestParams {
+            empty: "".to_string(),
+            filled: "value".to_string(),
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        let body = request.body.expect("Body should be set");
+        let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
+        assert_eq!(body_str, "empty=&filled=value");
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_optional_none_skipped() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            required: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            optional: Option<String>,
+        }
+
+        let params = TestParams {
+            required: "value".to_string(),
+            optional: None,
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        let body = request.body.expect("Body should be set");
+        let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
+        assert_eq!(body_str, "required=value");
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_optional_some_included() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            required: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            optional: Option<String>,
+        }
+
+        let params = TestParams {
+            required: "value".to_string(),
+            optional: Some("present".to_string()),
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        let body = request.body.expect("Body should be set");
+        let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
+        assert_eq!(body_str, "required=value&optional=present");
+    }
+
+    #[test]
+    fn test_post_form_urlencoded_boolean() {
+        let builder = InnerRequestBuilder::new(WpAuthenticationProvider::none().into());
+
+        #[derive(Serialize)]
+        struct TestParams {
+            enabled: bool,
+            disabled: bool,
+        }
+
+        let params = TestParams {
+            enabled: true,
+            disabled: false,
+        };
+
+        let request = builder.post_form_urlencoded(test_url(), &params);
+
+        let body = request.body.expect("Body should be set");
+        let body_str = String::from_utf8(body.inner.clone()).expect("Body should be valid UTF-8");
+        assert_eq!(body_str, "enabled=true&disabled=false");
     }
 }
