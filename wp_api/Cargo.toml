@@ -24,6 +24,7 @@ hyper = { workspace = true, optional = true }
 hyper-util = { workspace = true, optional = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
+log = { workspace = true }
 url = { workspace = true }
 parse_link_header = { workspace = true }
 paste = { workspace = true }
@@ -57,3 +58,9 @@ tokio = { workspace = true, features = [ "full" ] }
 
 [build-dependencies]
 uniffi = { workspace = true , features = [ "build", "cli" ] }
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
+oslog = { workspace = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = { workspace = true }
