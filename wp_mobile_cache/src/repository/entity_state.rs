@@ -59,9 +59,10 @@ impl FromSql for EntityType {
 ///
 /// Stored in database as (state INTEGER, error_message TEXT).
 /// This type represents the database entity, not domain logic.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum DbEntityState {
     /// Entity is not in cache and not being fetched.
+    #[default]
     Missing,
 
     /// Fetch is currently in progress.
@@ -134,12 +135,6 @@ impl DbEntityState {
             }),
             _ => None,
         }
-    }
-}
-
-impl Default for DbEntityState {
-    fn default() -> Self {
-        Self::Missing
     }
 }
 

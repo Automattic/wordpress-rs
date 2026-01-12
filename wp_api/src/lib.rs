@@ -239,6 +239,34 @@ macro_rules! generate {
     }};
 }
 
+#[uniffi::export]
+#[allow(unused_variables)] // The app_id is only used on Apple platforms.
+pub fn setup_logger(app_id: String) {
+    #[cfg(debug_assertions)]
+    let log_level = log::LevelFilter::Debug;
+    #[cfg(not(debug_assertions))]
+    let log_level = log::LevelFilter::Warn;
+
+    #[cfg(target_vendor = "apple")]
+    {
+        match oslog::OsLogger::new(&app_id).level_filter(log_level).init() {
+            Ok(_) => println!("Logger initialized successfully."),
+            Err(e) => println!("Failed to initialize logger: {e}"),
+        }
+    }
+
+    #[cfg(target_os = "android")]
+    {
+        android_logger::init_once(android_logger::Config::default().with_max_level(log_level));
+        println!("Logger initialized successfully.");
+    }
+
+    #[cfg(not(any(target_vendor = "apple", target_os = "android")))]
+    {
+        println!("Logger not configured for this platform.");
+    }
+}
+
 uniffi::setup_scaffolding!();
 
 #[cfg(test)]
