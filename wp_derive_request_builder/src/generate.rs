@@ -294,6 +294,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
                 params_type.as_ref(),
                 variant.attr.request_type,
                 variant.attr.multipart,
+                variant.attr.form_urlencoded,
             );
             let return_type = if variant.attr.multipart {
                 static_wp_multipart_form_request_type
