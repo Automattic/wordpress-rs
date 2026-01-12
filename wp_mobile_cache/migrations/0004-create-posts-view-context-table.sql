@@ -36,7 +36,7 @@ CREATE TABLE `posts_view_context` (
   `guid_rendered` TEXT NOT NULL,
 
   -- Nested: title (only rendered field in view context)
-  `title_rendered` TEXT NOT NULL,
+  `title_rendered` TEXT,
 
   -- Nested: content (only rendered and protected fields in view context)
   `content_rendered` TEXT NOT NULL,

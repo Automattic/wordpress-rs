@@ -15,7 +15,7 @@ CREATE TABLE `posts_edit_context` (
   `slug` TEXT NOT NULL,
   `status` TEXT NOT NULL,
   `post_type` TEXT NOT NULL,
-  `password` TEXT NOT NULL,
+  `password` TEXT,
   `template` TEXT NOT NULL,
 
   -- Top-level optional fields
@@ -41,7 +41,7 @@ CREATE TABLE `posts_edit_context` (
 
   -- Nested: title (title is non-optional, but title.raw is optional)
   `title_raw` TEXT,
-  `title_rendered` TEXT NOT NULL,
+  `title_rendered` TEXT,
 
   -- Nested: content (content is non-optional, but some fields are optional)
   `content_raw` TEXT,

@@ -13,7 +13,7 @@ CREATE TABLE `posts_embed_context` (
   `post_type` TEXT NOT NULL,
 
   -- Nested: title (only rendered field in embed context)
-  `title_rendered` TEXT NOT NULL,
+  `title_rendered` TEXT,
 
   -- Top-level optional fields
   `author` INTEGER,
