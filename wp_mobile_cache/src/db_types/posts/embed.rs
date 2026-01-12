@@ -13,13 +13,13 @@ pub(crate) enum PostEmbedContextColumn {
     Link = 4,
     Slug = 5,
     PostType = 6,
-    TitleRendered = 7,
-    Author = 8,
-    ExcerptRaw = 9,
-    ExcerptRendered = 10,
-    ExcerptProtected = 11,
-    FeaturedMedia = 12,
-    LastFetchedAt = 13,
+    Author = 7,
+    ExcerptRaw = 8,
+    ExcerptRendered = 9,
+    ExcerptProtected = 10,
+    FeaturedMedia = 11,
+    LastFetchedAt = 12,
+    TitleRendered = 13,
 }
 
 impl ColumnIndex for PostEmbedContextColumn {

@@ -28,13 +28,13 @@ pub(crate) enum PostViewContextColumn {
     Format = 19,
     Meta = 20,
     GuidRendered = 21,
-    TitleRendered = 22,
-    ContentRendered = 23,
-    ContentProtected = 24,
-    ExcerptRaw = 25,
-    ExcerptRendered = 26,
-    ExcerptProtected = 27,
-    LastFetchedAt = 28,
+    ContentRendered = 22,
+    ContentProtected = 23,
+    ExcerptRaw = 24,
+    ExcerptRendered = 25,
+    ExcerptProtected = 26,
+    LastFetchedAt = 27,
+    TitleRendered = 28,
 }
 
 impl ColumnIndex for PostViewContextColumn {

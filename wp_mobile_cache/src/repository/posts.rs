@@ -476,10 +476,13 @@ impl PostContext for EditContext {
             password: row.get_column(Password)?,
             permalink_template: row.get_column(PermalinkTemplate)?,
             generated_slug: row.get_column(GeneratedSlug)?,
-            title: Some(PostTitleWithEditContext {
-                raw: row.get_column(TitleRaw)?,
-                rendered: row.get_column(TitleRendered)?,
-            }),
+            title: {
+                let title_rendered: Option<String> = row.get_column(TitleRendered)?;
+                title_rendered.map(|rendered| PostTitleWithEditContext {
+                    raw: row.get_column(TitleRaw).ok().flatten(),
+                    rendered,
+                })
+            },
             content: PostContentWithEditContext {
                 raw: row.get_column(ContentRaw)?,
                 rendered: row.get_column(ContentRendered)?,
@@ -563,9 +566,10 @@ impl PostContext for ViewContext {
             slug: row.get_column(Slug)?,
             status: parse_enum(row, Status)?,
             post_type: row.get_column(PostType)?,
-            title: Some(PostTitleWithViewContext {
-                rendered: row.get_column(TitleRendered)?,
-            }),
+            title: {
+                let title_rendered: Option<String> = row.get_column(TitleRendered)?;
+                title_rendered.map(|rendered| PostTitleWithViewContext { rendered })
+            },
             content: PostContentWithViewContext {
                 rendered: row.get_column(ContentRendered)?,
                 protected: row.get_column(ContentProtected)?,
@@ -753,7 +757,7 @@ impl PostRepository<EditContext> {
                     ":slug": post.slug,
                     ":status": post.status.to_string(),
                     ":post_type": post.post_type,
-                    ":password": post.password.clone().unwrap_or_default(),
+                    ":password": post.password.clone(),
                     ":template": post.template,
                     ":permalink_template": post.permalink_template,
                     ":generated_slug": post.generated_slug,
@@ -769,7 +773,7 @@ impl PostRepository<EditContext> {
                     ":guid_raw": post.guid.raw,
                     ":guid_rendered": post.guid.rendered,
                     ":title_raw": post.title.as_ref().and_then(|t| t.raw.clone()),
-                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()).unwrap_or_default(),
+                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()),
                     ":content_raw": post.content.raw,
                     ":content_rendered": post.content.rendered,
                     ":content_protected": post.content.protected,
@@ -904,7 +908,7 @@ impl PostRepository<ViewContext> {
                     ":format": post.format.as_ref().map(|f| f.to_string()),
                     ":meta": serialize_value_to_json(&post.meta)?,
                     ":guid_rendered": post.guid.rendered,
-                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()).unwrap_or_default(),
+                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()),
                     ":content_rendered": post.content.rendered,
                     ":content_protected": post.content.protected,
                     ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
@@ -1005,7 +1009,7 @@ impl PostRepository<EmbedContext> {
                     ":link": post.link,
                     ":slug": post.slug,
                     ":post_type": post.post_type,
-                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()).unwrap_or_default(),
+                    ":title_rendered": post.title.as_ref().map(|t| t.rendered.clone()),
                     ":author": post.author.map(|u| u.0),
                     ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
                     ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
@@ -1100,7 +1104,8 @@ mod tests {
         assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
 
         // Verify total column count matches
-        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
+        // Note: After migration 0010, password and title_rendered were moved to the end
+        assert_eq!(columns.len(), Password.as_index() + 1);
     }
 
     /// Verify that PostViewContextColumn enum values match the actual database schema.
@@ -1140,8 +1145,11 @@ mod tests {
         assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
         assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
         assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
+        assert_eq!(columns[TitleRendered.as_index()], "title_rendered");
 
-        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
+        // Verify total column count matches
+        // Note: After migration 0010, title_rendered was moved to the end
+        assert_eq!(columns.len(), TitleRendered.as_index() + 1);
     }
 
     /// Verify that PostEmbedContextColumn enum values match the actual database schema.
@@ -1166,8 +1174,11 @@ mod tests {
         assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
         assert_eq!(columns[FeaturedMedia.as_index()], "featured_media");
         assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
+        assert_eq!(columns[TitleRendered.as_index()], "title_rendered");
 
-        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
+        // Verify total column count matches
+        // Note: After migration 0010, title_rendered was moved to the end
+        assert_eq!(columns.len(), TitleRendered.as_index() + 1);
     }
 
     #[rstest]
@@ -1192,25 +1203,7 @@ mod tests {
         assert_eq!(retrieved.data.row_id, entity_id.rowid);
         assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
         assert_recent_timestamp(&retrieved.data.last_fetched_at);
-
-        // The 'password' and 'title_rendered' columns in the SQLite database are stored as empty
-        // strings when null. Here we adjust the retrieved post to match the original for the full
-        // post comparison at the end.
-        let mut retrieved_post = retrieved.data.post;
-        if original_post.password.is_none() {
-            assert_eq!(retrieved_post.password, Some("".to_string()));
-
-            retrieved_post.password = None;
-        }
-        if original_post.title.is_none() {
-            assert_eq!(
-                retrieved_post.title.map(|t| t.rendered),
-                Some("".to_string())
-            );
-
-            retrieved_post.title = None;
-        }
-        assert_eq!(retrieved_post, original_post);
+        assert_eq!(retrieved.data.post, original_post);
     }
 
     #[rstest]

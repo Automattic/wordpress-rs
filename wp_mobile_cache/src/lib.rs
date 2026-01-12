@@ -408,7 +408,7 @@ impl From<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 9] = [
+static MIGRATION_QUERIES: [&str; 10] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -418,6 +418,7 @@ static MIGRATION_QUERIES: [&str; 9] = [
     include_str!("../migrations/0007-create-list-metadata-tables.sql"),
     include_str!("../migrations/0008-create-post-types-table.sql"),
     include_str!("../migrations/0009-create-entity-state-table.sql"),
+    include_str!("../migrations/0010-make-title-and-password-nullable.sql"),
 ];
 
 pub struct MigrationManager<'a> {
