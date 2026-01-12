@@ -53,10 +53,6 @@ struct LoginView: View {
                         .padding(.horizontal)
                 }
             })
-
-            Button(action: self.startLoginWithWPCom, label: {
-                Text("Sign in with WordPress.com")
-            })
         }
     }
 
@@ -89,46 +85,6 @@ struct LoginView: View {
         }
     }
 
-    func startLoginWithWPCom() {
-
-        self.loginTask = Task {
-
-            do {
-                let redirectUri = URL(string: "x-wordpress-app://oauth2-callback")!
-
-                let url = WPComApiClient.OAuth2.build_token_request_url(
-                    clientId: 11,
-                    redirectUri: redirectUri,
-                    scope: ["global"]
-                )
-
-                let callbackUrl = try await self.webAuthenticationSession.authenticate(
-                    using: url,
-                    callbackURLScheme: "x-wordpress-app"
-                )
-
-                let code = try WPComApiClient.OAuth2.parse_token_response(url: callbackUrl)
-
-                let client = WPComApiClient(authentication: .none)
-
-                let requestParams = TokenRequestParameters(
-                    clientId: ProcessInfo.processInfo.environment["WPCOM_CLIENT_ID"]!,
-                    clientSecret: ProcessInfo.processInfo.environment["WPCOM_CLIENT_SECRET"]!,
-                    code: code,
-                    grantType: "code",
-                    redirectUri: redirectUri.absoluteString
-                )
-
-                let response = try await client.oauth2.requestToken(params: requestParams)
-
-                debugPrint(response)
-
-            } catch(let error) {
-                debugPrint(error.localizedDescription)
-            }
-        }
-    }
-
     private func handleLoginError(_ error: Error) {
         self.isLoggingIn = false
         self.loginError = error.localizedDescription
@@ -137,5 +93,5 @@ struct LoginView: View {
 
 #Preview {
     LoginView()
-        .environmentObject(LoginManager())
+        .environmentObject(LoginManager.shared)
 }

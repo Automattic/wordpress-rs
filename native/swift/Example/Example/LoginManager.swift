@@ -1,9 +1,11 @@
 import Foundation
 import WordPressAPI
+import AuthenticationServices
 
 @MainActor
-class LoginManager: NSObject, ObservableObject {
+final class LoginManager: ObservableObject {
 
+    public static let shared = LoginManager()
 
     private let wpcomClientId = ProcessInfo.processInfo.environment["WPCOM_CLIENT_ID"] ?? ""
     private let wpcomClientSecret = ProcessInfo.processInfo.environment["WPCOM_CLIENT_SECRET"] ?? ""
@@ -23,9 +25,11 @@ class LoginManager: NSObject, ObservableObject {
     @Published
     var isLoggedInToWpCom: Bool = false
 
-    override init() {
-        super.init()
+    private var wpComLoginTask: Task<Void, Never>? = nil
+
+    private init() {
         self.isLoggedIn = hasStoredLoginCredentials()
+        self.isLoggedInToWpCom = hasStoredWpComLoginCredentials()
     }
 
     public func getApiRootUrl() -> String? {
@@ -52,6 +56,14 @@ class LoginManager: NSObject, ObservableObject {
         }
     }
 
+    public func hasStoredWpComLoginCredentials() -> Bool {
+        do {
+            return try Keychain.lookupForWPCom() != nil
+        } catch {
+            return false
+        }
+    }
+
     public func setLoginCredentials(to newValue: WpApiApplicationPasswordDetails, apiRootURL: URL) async throws {
         setApiRootUrl(to: apiRootURL.absoluteString)
         try Keychain.store(username: newValue.userLogin, password: newValue.password, for: apiRootURL.absoluteString)
@@ -71,13 +83,14 @@ class LoginManager: NSObject, ObservableObject {
         return keychainItem
     }
 
-    public func setWpComLoginCredentials(to newValue: String) async throws {
+    public func setWpComLoginCredentials(to newValue: String) throws {
         try Keychain.storeForWpCom(token: newValue)
-        isLoggedInToWpCom = true
+        self.objectWillChange.send()
+        self.isLoggedInToWpCom = true
     }
 
     public func getWpComLoginCredentials() throws -> WpAuthentication? {
-        guard let token = try Keychain.lookup(for: "wordpress.com") else {
+        guard let token = try Keychain.lookupForWPCom() else {
             return nil
         }
 
@@ -91,6 +104,12 @@ class LoginManager: NSObject, ObservableObject {
             self.objectWillChange.send()
             self.isLoggedIn = false
         }
+    }
+
+    public func logoutWpCom() throws {
+        try Keychain.clearCredentials(for: "wordpress.com")
+        self.objectWillChange.send()
+        self.isLoggedInToWpCom = false
     }
 }
 
@@ -181,7 +200,7 @@ struct Keychain {
         return WpAuthentication(username: username, password: password)
     }
 
-    static func lookupForWpcom() async throws -> WpAuthentication? {
+    static func lookupForWPCom() throws -> WpAuthentication? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassInternetPassword,
             kSecAttrServer as String: "wordpress.com",
@@ -213,5 +232,17 @@ struct Keychain {
 
     static func hasCredentials(for server: String) throws -> Bool {
         try lookup(for: server) != nil
+    }
+
+    static func clearCredentials(for server: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassInternetPassword,
+            kSecAttrServer as String: server
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainError.unhandledError(status: status)
+        }
     }
 }

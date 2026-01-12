@@ -5,15 +5,13 @@ extension WordPressAPI {
 
     static var globalInstance: WordPressAPI {
         get async throws {
-            let loginManager = await LoginManager()
-
-            guard let defaultSiteUrl = await loginManager.getApiRootUrl() else {
+            guard let defaultSiteUrl = await LoginManager.shared.getApiRootUrl() else {
                 throw CocoaError(.validationMissingMandatoryProperty)
             }
 
             let apiRootUrl = try ParsedUrl.parse(input: defaultSiteUrl)
 
-            guard let loginCredentials = try await loginManager.getLoginCredentials() else {
+            guard let loginCredentials = try await LoginManager.shared.getLoginCredentials() else {
                 throw CocoaError(.xpcConnectionInvalid)
             }
 
@@ -32,13 +30,16 @@ extension WordPressAPI {
 extension WPComApiClient {
     static var globalInstance: WPComApiClient {
         get async throws {
-            let loginManager = await LoginManager()
-
-            guard let loginCredentials = try await loginManager.getLoginCredentials() else {
-                throw CocoaError(.xpcConnectionInvalid)
+            guard let loginCredentials = try await LoginManager.shared.getWpComLoginCredentials() else {
+                preconditionFailure("Don't access `globalInstance` unless you're logged into WP.com")
             }
 
-            return WPComApiClient(authentication: loginCredentials)
+            return WPComApiClient(
+                authentication: loginCredentials,
+                middlewarePipeline: MiddlewarePipeline(middlewares: [
+                    DebugMiddleware()
+                ])
+            )
         }
     }
 }
