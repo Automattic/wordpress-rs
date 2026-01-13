@@ -4,7 +4,7 @@ import WordPressAPIInternal
 public final class WPComApiClient: Sendable {
 
     public struct OAuth2 {
-        public static func build_token_request_url(
+        public static func buildTokenRequestUrl(
             clientId: UInt64,
             redirectUri: URL,
             responseType: String = "code",
@@ -12,7 +12,7 @@ public final class WPComApiClient: Sendable {
             state: String = UUID().uuidString,
             blog: UInt64? = nil
         ) -> URL {
-            buildTokenRequestUrl(
+            WordPressAPIInternal.buildTokenRequestUrl(
                 clientId: String(clientId),
                 redirectUri: redirectUri.absoluteString,
                 responseType: responseType,
@@ -22,7 +22,7 @@ public final class WPComApiClient: Sendable {
             ).asURL()
         }
 
-        public static func parse_token_response(url: URL) throws -> String {
+        public static func parseTokenResponse(url: URL) throws -> String {
             try extractCodeFromAuthorizationUrl(response: url.absoluteString)
         }
     }

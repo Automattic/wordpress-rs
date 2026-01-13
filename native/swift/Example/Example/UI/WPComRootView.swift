@@ -63,7 +63,7 @@ struct WPComRootView: View {
             do {
                 let redirectUri = URL(string: "x-wordpress-app://oauth2-callback")!
 
-                let url = WPComApiClient.OAuth2.build_token_request_url(
+                let url = WPComApiClient.OAuth2.buildTokenRequestUrl(
                     clientId: 11,
                     redirectUri: redirectUri,
                     scope: ["global"]
@@ -74,7 +74,7 @@ struct WPComRootView: View {
                     callbackURLScheme: "x-wordpress-app"
                 )
 
-                let code = try WPComApiClient.OAuth2.parse_token_response(url: callbackUrl)
+                let code = try WPComApiClient.OAuth2.parseTokenResponse(url: callbackUrl)
 
                 let client = WPComApiClient(
                     authentication: .none,
