@@ -440,6 +440,21 @@ impl<'a> MigrationManager<'a> {
     }
 
     pub fn perform_migrations(&mut self) -> SqliteResult<i64> {
+        self.connection.execute("BEGIN EXCLUSIVE", ())?;
+
+        match self.migrate() {
+            Ok(count) => {
+                self.connection.execute("COMMIT", ())?;
+                Ok(count)
+            }
+            Err(e) => {
+                let _ = self.connection.execute("ROLLBACK", ());
+                Err(e)
+            }
+        }
+    }
+
+    fn migrate(&mut self) -> SqliteResult<i64> {
         if !self.has_migrations_table()? {
             self.create_migrations_table()?;
         }
