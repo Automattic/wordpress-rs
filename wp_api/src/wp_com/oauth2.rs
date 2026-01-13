@@ -25,13 +25,13 @@ impl From<url::ParseError> for AuthorizationCodeExtractionError {
 
 #[derive(Debug, Serialize, uniffi::Record)]
 pub struct TokenValidationParameters {
-    pub client_id: String,
+    pub client_id: u64,
     pub token: String,
 }
 
 impl AppendUrlQueryPairs for TokenValidationParameters {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut.append_pair("client_id", &self.client_id);
+        query_pairs_mut.append_pair("client_id", &self.client_id.to_string());
         query_pairs_mut.append_pair("token", &self.token);
     }
 }
@@ -64,6 +64,7 @@ pub struct TokenRequestParameters {
     pub client_id: u64,
     pub client_secret: String,
     pub code: String,
+    #[uniffi(default = "authorization_code")]
     pub grant_type: String,
     pub redirect_uri: String,
 }
@@ -117,9 +118,8 @@ pub struct TokenRequestResponse {
 /// A `ParsedUrl` containing the authorization URL to open in the user's browser.
 #[uniffi::export]
 pub fn build_token_request_url(
-    client_id: &str,
+    client_id: u64,
     redirect_uri: &str,
-    response_type: &str,
     scope: &str,
     state: &str,
     blog: Option<u64>,
@@ -129,9 +129,9 @@ pub fn build_token_request_url(
 
     {
         url.query_pairs_mut()
-            .append_pair("client_id", client_id)
+            .append_pair("client_id", &client_id.to_string())
             .append_pair("redirect_uri", redirect_uri)
-            .append_pair("response_type", response_type)
+            .append_pair("response_type", "code")
             .append_pair("scope", scope)
             .append_pair("state", state);
 
@@ -183,7 +183,7 @@ mod tests {
             .expect("Failed to parse url");
 
         let params = TokenValidationParameters {
-            client_id: "11".to_string(),
+            client_id: 11,
             token: "test_token".to_string(),
         };
 
@@ -252,7 +252,6 @@ mod tests {
         let url = build_token_request_url(
             "12345",
             "https://yourapp.com/callback",
-            "code",
             "posts media",
             "abc123xyz",
             None,
@@ -271,7 +270,6 @@ mod tests {
         let url = build_token_request_url(
             "12345",
             "https://yourapp.com/callback",
-            "code",
             "posts media",
             "abc123xyz",
             Some(67890),
@@ -290,7 +288,6 @@ mod tests {
         let url = build_token_request_url(
             "12345",
             "https://yourapp.com/callback",
-            "code",
             "global",
             "abc123xyz",
             None,

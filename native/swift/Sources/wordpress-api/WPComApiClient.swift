@@ -7,15 +7,13 @@ public final class WPComApiClient: Sendable {
         public static func buildTokenRequestUrl(
             clientId: UInt64,
             redirectUri: URL,
-            responseType: String = "code",
             scope: [String],
             state: String = UUID().uuidString,
             blog: UInt64? = nil
         ) -> URL {
             WordPressAPIInternal.buildTokenRequestUrl(
-                clientId: String(clientId),
+                clientId: clientId,
                 redirectUri: redirectUri.absoluteString,
-                responseType: responseType,
                 scope: scope.joined(separator: ","),
                 state: state,
                 blog: blog
