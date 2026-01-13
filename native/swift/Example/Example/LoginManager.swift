@@ -25,7 +25,7 @@ final class LoginManager: ObservableObject {
     @Published
     var isLoggedInToWpCom: Bool = false
 
-    private var wpComLoginTask: Task<Void, Never>? = nil
+    private var wpComLoginTask: Task<Void, Never>?
 
     private init() {
         self.isLoggedIn = hasStoredLoginCredentials()
