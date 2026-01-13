@@ -147,19 +147,14 @@ public final class WordPressAPI: Sendable {
         self.requestExecutor = executor
     }
 
-    public func asSelfHostedService() throws -> WpSelfHostedService {
-        let cache = try WpApiCache(path: nil)
-        _ = try cache.performMigrations()
-        cache.startListeningForUpdates(delegate: DatabaseChangeNotifier.shared)
-
-        let resolvedUrl = apiUrlResolver.resolve(namespace: "", endpointSegments: [])
-
+    public func createSelfHostedService(cache: WordPressApiCache) throws -> WpSelfHostedService {
+        let apiURL = apiUrlResolver.resolve(namespace: "", endpointSegments: []).asURL()
         return try WpSelfHostedService(
-            siteUrl: resolvedUrl.asURL().deletingLastPathComponent().absoluteString,
-            apiRoot: resolvedUrl.asURL().absoluteString,
+            siteUrl: apiURL.deletingLastPathComponent().absoluteString,
+            apiRoot: apiURL.absoluteString,
             apiUrlResolver: apiUrlResolver,
             delegate: apiClientDelegate,
-            cache: cache
+            cache: cache.cache
         )
     }
 
