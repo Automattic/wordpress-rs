@@ -613,4 +613,89 @@ mod tests {
         assert!(!does_sqlite_support_returning("invalid"));
         assert!(!does_sqlite_support_returning(""));
     }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
+    async fn test_concurrent_migrations_race_condition() {
+        let db_path = "/tmp/wp_cache_race_test.db";
+        let _ = std::fs::remove_file(db_path);
+
+        let num_tasks = 10;
+        let mut tasks = vec![];
+
+        for task_id in 0..num_tasks {
+            let task = tokio::spawn(async move {
+                let cache = WpApiCache::new(Some(db_path.to_string())).unwrap();
+                let result = cache.perform_migrations();
+
+                (task_id, result)
+            });
+
+            tasks.push(task);
+        }
+
+        let results: Vec<(usize, Result<i64, SqliteDbError>)> = futures::future::join_all(tasks)
+            .await
+            .into_iter()
+            .map(|r| r.unwrap())
+            .collect();
+
+        let mut error_count = 0;
+
+        for (task_id, result) in &results {
+            match result {
+                Ok(migrations_run) => {
+                    println!(
+                        "Task {} succeeded, ran {} migrations",
+                        task_id, migrations_run
+                    );
+                }
+                Err(e) => {
+                    println!("Task {} failed with error: {}", task_id, e);
+                    error_count += 1;
+                }
+            }
+        }
+
+        let migrations_run_counts: Vec<i64> = results
+            .iter()
+            .filter_map(|(_, result)| result.as_ref().ok())
+            .copied()
+            .collect();
+        let full_migration_count = migrations_run_counts
+            .iter()
+            .filter(|&&count| count == MIGRATION_QUERIES.len() as i64)
+            .count();
+        let zero_migration_count = migrations_run_counts
+            .iter()
+            .filter(|&&count| count == 0)
+            .count();
+
+        assert_eq!(
+            full_migration_count,
+            1,
+            "Expected exactly one task to run all {} migrations, but {} tasks did",
+            MIGRATION_QUERIES.len(),
+            full_migration_count
+        );
+        assert_eq!(
+            zero_migration_count,
+            migrations_run_counts.len() - 1,
+            "Expected {} tasks to run zero migrations, but {} tasks did",
+            migrations_run_counts.len() - 1,
+            zero_migration_count
+        );
+
+        let final_cache = WpApiCache::new(Some(db_path.to_string())).unwrap();
+        let migration_count = final_cache.execute(|conn| {
+            let mut stmt = conn.prepare("SELECT COUNT(*) FROM _migrations").unwrap();
+            stmt.query_row([], |row| row.get::<_, i64>(0))
+        });
+
+        assert_eq!(migration_count.unwrap(), MIGRATION_QUERIES.len() as i64);
+        assert_eq!(
+            error_count, 0,
+            "Race condition detected: {} tasks failed",
+            error_count
+        );
+    }
 }
