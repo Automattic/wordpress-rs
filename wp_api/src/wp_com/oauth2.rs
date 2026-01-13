@@ -13,8 +13,8 @@ pub enum AuthorizationCodeExtractionError {
     InvalidUrl { reason: String },
     #[error("Missing 'code' parameter in authorization URL")]
     MissingCode,
-    #[error("{message}")]
-    Error { message: String, code: String },
+    #[error("{reason}")]
+    Error { reason: String, code: String },
 }
 
 #[derive(Debug, Serialize, uniffi::Record)]
@@ -178,7 +178,7 @@ pub fn parse_authorization_url(
         && let Some(error_description) = value_from_query_pairs("error_description", &url)
     {
         return Err(AuthorizationCodeExtractionError::Error {
-            message: error_description.clone(),
+            reason: error_description.clone(),
             code: error_code.clone(),
         });
     }
@@ -370,9 +370,9 @@ mod tests {
         let result = parse_authorization_url(url);
 
         match result {
-            Err(AuthorizationCodeExtractionError::Error { message, code }) => {
+            Err(AuthorizationCodeExtractionError::Error { reason, code }) => {
                 assert_eq!(code, "access_denied");
-                assert_eq!(message, "The user denied the request");
+                assert_eq!(reason, "The user denied the request");
             }
             _ => panic!("Expected Error variant"),
         }
