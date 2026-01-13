@@ -74,7 +74,7 @@ struct WPComRootView: View {
                     callbackURLScheme: "x-wordpress-app"
                 )
 
-                let code = try WPComApiClient.OAuth2.parseTokenResponse(url: callbackUrl)
+                let tokenResponse = try WPComApiClient.OAuth2.parseTokenResponse(url: callbackUrl)
 
                 let client = WPComApiClient(
                     authentication: .none,
@@ -84,8 +84,7 @@ struct WPComRootView: View {
                 let requestParams = TokenRequestParameters(
                     clientId: UInt64(ProcessInfo.processInfo.environment["WPCOM_CLIENT_ID"]!)!,
                     clientSecret: ProcessInfo.processInfo.environment["WPCOM_CLIENT_SECRET"]!,
-                    code: code,
-                    grantType: "authorization_code",
+                    code: tokenResponse.code,
                     redirectUri: redirectUri.absoluteString
                 )
 

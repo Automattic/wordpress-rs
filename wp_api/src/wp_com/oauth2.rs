@@ -13,6 +13,14 @@ pub enum AuthorizationCodeExtractionError {
     InvalidUrl { reason: String },
     #[error("Missing 'code' parameter in authorization URL")]
     MissingCode,
+    #[error("{message}")]
+    Error { message: String, code: String },
+}
+
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct AuthorizationCodeExtractionResult {
+    pub code: String,
+    pub state: Option<String>,
 }
 
 impl From<url::ParseError> for AuthorizationCodeExtractionError {
@@ -144,7 +152,7 @@ pub fn build_token_request_url(
     ParsedUrl::new(url)
 }
 
-/// Extracts the authorization code from an OAuth2 callback URL.
+/// Parses the authorization code from an OAuth2 callback URL.
 ///
 /// After the user authorizes your application, WordPress.com redirects them back to your
 /// `redirect_uri` with an authorization code in the query parameters. This function extracts
@@ -161,14 +169,33 @@ pub fn build_token_request_url(
 /// * `Err(AuthorizationCodeExtractionError::InvalidUrl)` - If the URL cannot be parsed
 /// * `Err(AuthorizationCodeExtractionError::MissingCode)` - If the `code` parameter is not present
 #[uniffi::export]
-pub fn extract_code_from_authorization_url(
+pub fn parse_authorization_url(
     response: String,
-) -> Result<String, AuthorizationCodeExtractionError> {
+) -> Result<AuthorizationCodeExtractionResult, AuthorizationCodeExtractionError> {
     let url = Url::parse(&response)?;
+
+    if let Some(error_code) = value_from_query_pairs("error", &url) {
+        if let Some(error_description) = value_from_query_pairs("error_description", &url) {
+            return Err(AuthorizationCodeExtractionError::Error {
+                message: error_description.clone(),
+                code: error_code.clone(),
+            });
+        }
+    }
+
+    let state = value_from_query_pairs("state", &url);
+
+    if let Some(code) = value_from_query_pairs("code", &url) {
+        return Ok(AuthorizationCodeExtractionResult { code, state });
+    } else {
+        return Err(AuthorizationCodeExtractionError::MissingCode);
+    }
+}
+
+fn value_from_query_pairs(key: &str, url: &Url) -> Option<String> {
     url.query_pairs()
-        .find(|(key, _)| key == "code")
+        .find(|(k, _)| k == &key)
         .map(|(_, value)| value.into_owned())
-        .ok_or(AuthorizationCodeExtractionError::MissingCode)
 }
 
 #[cfg(test)]
@@ -302,23 +329,23 @@ mod tests {
     #[test]
     fn test_extract_code_from_authorization_url_success() {
         let url = "https://yourapp.com/callback?code=abc123&state=xyz789".to_string();
-        let result = extract_code_from_authorization_url(url);
+        let result = parse_authorization_url(url);
 
-        assert_eq!(result.unwrap(), "abc123");
+        assert_eq!(result.expect("Result should be Ok").code, "abc123");
     }
 
     #[test]
     fn test_extract_code_from_authorization_url_with_other_params() {
         let url = "https://yourapp.com/callback?state=xyz789&code=secret_code&foo=bar".to_string();
-        let result = extract_code_from_authorization_url(url);
+        let result = parse_authorization_url(url);
 
-        assert_eq!(result.unwrap(), "secret_code");
+        assert_eq!(result.unwrap().code, "secret_code");
     }
 
     #[test]
     fn test_extract_code_from_authorization_url_missing_code() {
         let url = "https://yourapp.com/callback?state=xyz789".to_string();
-        let result = extract_code_from_authorization_url(url);
+        let result = parse_authorization_url(url);
 
         assert!(matches!(
             result,
@@ -329,12 +356,57 @@ mod tests {
     #[test]
     fn test_extract_code_from_authorization_url_invalid_url() {
         let url = "not a valid url".to_string();
-        let result = extract_code_from_authorization_url(url);
+        let result = parse_authorization_url(url);
 
         assert!(matches!(
             result,
             Err(AuthorizationCodeExtractionError::InvalidUrl { .. })
         ));
+    }
+
+    #[test]
+    fn test_parse_authorization_url_with_error() {
+        let url = "https://yourapp.com/callback?error=access_denied&error_description=The+user+denied+the+request".to_string();
+        let result = parse_authorization_url(url);
+
+        match result {
+            Err(AuthorizationCodeExtractionError::Error { message, code }) => {
+                assert_eq!(code, "access_denied");
+                assert_eq!(message, "The user denied the request");
+            }
+            _ => panic!("Expected Error variant"),
+        }
+    }
+
+    #[test]
+    fn test_parse_authorization_url_with_error_only_code() {
+        // When error is present but error_description is missing, it should still be MissingCode
+        // because the error handling only triggers when both are present
+        let url = "https://yourapp.com/callback?error=access_denied".to_string();
+        let result = parse_authorization_url(url);
+
+        assert!(matches!(
+            result,
+            Err(AuthorizationCodeExtractionError::MissingCode)
+        ));
+    }
+
+    #[test]
+    fn test_parse_authorization_url_extracts_state() {
+        let url = "https://yourapp.com/callback?code=abc123&state=my_state_value".to_string();
+        let result = parse_authorization_url(url).expect("Should succeed");
+
+        assert_eq!(result.code, "abc123");
+        assert_eq!(result.state, Some("my_state_value".to_string()));
+    }
+
+    #[test]
+    fn test_parse_authorization_url_without_state() {
+        let url = "https://yourapp.com/callback?code=abc123".to_string();
+        let result = parse_authorization_url(url).expect("Should succeed");
+
+        assert_eq!(result.code, "abc123");
+        assert_eq!(result.state, None);
     }
 
     #[test]

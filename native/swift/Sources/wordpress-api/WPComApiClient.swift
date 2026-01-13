@@ -20,8 +20,8 @@ public final class WPComApiClient: Sendable {
             ).asURL()
         }
 
-        public static func parseTokenResponse(url: URL) throws -> String {
-            try extractCodeFromAuthorizationUrl(response: url.absoluteString)
+        public static func parseTokenResponse(url: URL) throws -> AuthorizationCodeExtractionResult {
+            try WordPressAPIInternal.parseAuthorizationUrl(response: url.absoluteString)
         }
     }
 
