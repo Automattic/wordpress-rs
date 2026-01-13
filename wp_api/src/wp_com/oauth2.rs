@@ -174,27 +174,27 @@ pub fn parse_authorization_url(
 ) -> Result<AuthorizationCodeExtractionResult, AuthorizationCodeExtractionError> {
     let url = Url::parse(&response)?;
 
-    if let Some(error_code) = value_from_query_pairs("error", &url) {
-        if let Some(error_description) = value_from_query_pairs("error_description", &url) {
-            return Err(AuthorizationCodeExtractionError::Error {
-                message: error_description.clone(),
-                code: error_code.clone(),
-            });
-        }
+    if let Some(error_code) = value_from_query_pairs("error", &url)
+        && let Some(error_description) = value_from_query_pairs("error_description", &url)
+    {
+        return Err(AuthorizationCodeExtractionError::Error {
+            message: error_description.clone(),
+            code: error_code.clone(),
+        });
     }
 
     let state = value_from_query_pairs("state", &url);
 
     if let Some(code) = value_from_query_pairs("code", &url) {
-        return Ok(AuthorizationCodeExtractionResult { code, state });
+        Ok(AuthorizationCodeExtractionResult { code, state })
     } else {
-        return Err(AuthorizationCodeExtractionError::MissingCode);
+        Err(AuthorizationCodeExtractionError::MissingCode)
     }
 }
 
 fn value_from_query_pairs(key: &str, url: &Url) -> Option<String> {
     url.query_pairs()
-        .find(|(k, _)| k == &key)
+        .find(|(k, _)| k == key)
         .map(|(_, value)| value.into_owned())
 }
 
