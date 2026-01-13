@@ -136,6 +136,8 @@ public typealias PostsRequestListWithEditContextResponse = WordPressAPIInternal.
 public typealias PostsRequestListWithViewContextResponse = WordPressAPIInternal.PostsRequestListWithViewContextResponse
 public typealias PostsRequestListWithEmbedContextResponse = WordPressAPIInternal.PostsRequestListWithEmbedContextResponse
 
+extension AnyPostWithEditContext: Identifiable {}
+
 // MARK: – Revisions
 public typealias SparseAnyRevision = WordPressAPIInternal.SparseAnyPostRevision
 public typealias RevisionWithEditContext = WordPressAPIInternal.AnyPostRevisionWithEditContext
