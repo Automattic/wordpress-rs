@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn test_build_token_request_url_authorization_code_flow() {
         let url = build_token_request_url(
-            "12345",
+            12345,
             "https://yourapp.com/callback",
             "posts media",
             "abc123xyz",
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn test_build_token_request_url_with_blog() {
         let url = build_token_request_url(
-            "12345",
+            12345,
             "https://yourapp.com/callback",
             "posts media",
             "abc123xyz",
@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn test_build_token_request_url_global_scope() {
         let url = build_token_request_url(
-            "12345",
+            12345,
             "https://yourapp.com/callback",
             "global",
             "abc123xyz",
