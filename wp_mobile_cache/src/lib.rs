@@ -552,6 +552,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_migration_works() {
+        let cache = WpApiCache::new(None).unwrap();
+        let migrations_run = cache.perform_migrations().unwrap();
+        assert_eq!(migrations_run, MIGRATION_QUERIES.len() as i64);
+    }
+
+    #[test]
     fn test_migration_numbering_should_be_sequential() {
         let connection = Connection::open_in_memory().unwrap();
         let mut migration_manager = MigrationManager::new(&connection).unwrap();
