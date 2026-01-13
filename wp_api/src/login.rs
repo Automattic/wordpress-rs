@@ -12,6 +12,7 @@ use wp_serde_helper::{
 };
 
 const KEY_APPLICATION_PASSWORDS: &str = "application-passwords";
+const KEY_OAUTH2: &str = "oauth2";
 
 pub mod login_client;
 pub mod nonce;
@@ -141,6 +142,15 @@ impl WpApiDetails {
             .find_application_passwords_authentication_url()
     }
 
+    /// Does the site use OAuth2?
+    pub fn has_oauth2(&self) -> bool {
+        self.authentication.has_oauth2()
+    }
+
+    pub fn find_oauth2_endpoints(&self) -> Option<OAuth2Endpoints> {
+        self.authentication.find_oauth2_endpoints()
+    }
+
     /// Does the site URL (as defined by the site itself, not by user input) use HTTPS?
     pub fn uses_https(&self) -> bool {
         self.url.starts_with("https://")
@@ -236,14 +246,30 @@ impl KnownAuthenticationBlockingPlugin {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
-pub struct WpRestApiAuthenticationScheme {
-    pub endpoints: Option<WpRestApiAuthenticationEndpoint>,
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum WpRestApiAuthenticationScheme {
+    ApplicationPassword(WpRestApiApplicationPasswordAuthenticationScheme),
+    OAuth2(WpRestApiOAuth2AuthenticationScheme),
+    /// Catch-all for unknown authentication schemes (e.g., oauth1)
+    Unknown(serde_json::Value),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
-pub struct WpRestApiAuthenticationEndpoint {
+pub struct WpRestApiApplicationPasswordAuthenticationScheme {
+    pub endpoints: WpRestApiAuthorizationEndpoint
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
+pub struct WpRestApiAuthorizationEndpoint {
     pub authorization: String,
+}
+
+/// OAuth2 authentication scheme with authorization and token endpoints.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
+pub struct WpRestApiOAuth2AuthenticationScheme {
+    pub authorize: String,
+    pub token: String,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
@@ -294,14 +320,48 @@ impl WpApiDetailsAuthenticationMap {
     pub fn find_application_passwords_authentication_url(&self) -> Option<String> {
         self.0
             .get(KEY_APPLICATION_PASSWORDS)
-            .and_then(|auth_scheme| {
-                auth_scheme
-                    .endpoints
-                    .as_ref()
-                    .map(|e| e.authorization.clone())
+            .and_then(|auth_scheme| match auth_scheme {
+                WpRestApiAuthenticationScheme::ApplicationPassword(auth_scheme) => {
+                    Some(auth_scheme.endpoints.authorization.clone())
+                }
+                _ => None,
+            })
+    }
+
+    pub fn has_oauth2(&self) -> bool {
+        self.0.contains_key(KEY_OAUTH2)
+    }
+
+    pub fn find_oauth2_endpoints(&self) -> Option<OAuth2Endpoints> {
+        self.0
+            .get(KEY_OAUTH2)
+            .and_then(|auth_scheme| match auth_scheme {
+                WpRestApiAuthenticationScheme::OAuth2(auth_scheme) => {
+                    Some(OAuth2Endpoints {
+                        authorization_url: auth_scheme.authorize.clone(),
+                        token_url: auth_scheme.token.clone()
+                    })
+                }
+                _ => None,
             })
     }
 }
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
+pub struct OAuth2Endpoints {
+    pub authorization_url: String,
+    pub token_url: String,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
+pub struct OAuth2Client {
+    pub client_id: String,
+    pub client_secret: String,
+    pub redirectUri: String,
+    pub scope: String,
+    pub state: Option<String>,
+}
+
 
 /// Return a URL to be used in application password authentication.
 ///
@@ -439,6 +499,82 @@ mod tests {
         test_parse_wp_api_details_authentication_map_helper(json);
     }
 
+    #[test]
+    fn test_parse_wp_api_details_authentication_map_application_passwords_and_oauth2() {
+        let json = r#"{
+        "authentication": {
+                "oauth2": {
+                    "authorize": "http://localhost/oauth/authorize",
+                    "token": "http://localhost/oauth/token",
+                    "me": "http://localhost/oauth/me",
+                    "version": "2.0",
+                    "software": "WP OAuth Server"
+                },
+                "application-passwords": {
+                    "endpoints": {
+                        "authorization": "http://localhost/wp-admin/authorize-application.php"
+                    }
+                }
+            }
+        }"#;
+        let result = serde_json::from_str::<WpApiDetailsAuthenticationMapWrapper>(json);
+        assert!(
+            result.is_ok(),
+            "Failed to parse json as `WpApiDetailsAuthenticationMap`"
+        );
+        let auth_map = result.expect("Already verified result is Ok").authentication;
+
+        // Verify application passwords URL
+        assert_eq!(
+            auth_map.find_application_passwords_authentication_url(),
+            Some("http://localhost/wp-admin/authorize-application.php".to_string())
+        );
+
+        // Verify OAuth2 endpoints
+        assert!(auth_map.has_oauth2());
+        let oauth2_endpoints = auth_map.find_oauth2_endpoints();
+        assert!(oauth2_endpoints.is_some());
+        let endpoints = oauth2_endpoints.unwrap();
+        assert_eq!(endpoints.authorization_url, "http://localhost/oauth/authorize");
+        assert_eq!(endpoints.token_url, "http://localhost/oauth/token");
+    }
+
+    #[test]
+    fn test_find_oauth2_endpoints_returns_none_when_missing() {
+        let json = r#"{
+            "authentication": {
+                "application-passwords": {
+                    "endpoints": {
+                        "authorization": "http://localhost/wp-admin/authorize-application.php"
+                    }
+                }
+            }
+        }"#;
+        let result = serde_json::from_str::<WpApiDetailsAuthenticationMapWrapper>(json)
+            .expect("Failed to parse json");
+        assert!(!result.authentication.has_oauth2());
+        assert!(result.authentication.find_oauth2_endpoints().is_none());
+    }
+
+    #[test]
+    fn test_find_oauth2_endpoints_only() {
+        let json = r#"{
+            "authentication": {
+                "oauth2": {
+                    "authorize": "https://example.com/oauth/authorize",
+                    "token": "https://example.com/oauth/token"
+                }
+            }
+        }"#;
+        let result = serde_json::from_str::<WpApiDetailsAuthenticationMapWrapper>(json)
+            .expect("Failed to parse json");
+        assert!(result.authentication.has_oauth2());
+        let endpoints = result.authentication.find_oauth2_endpoints().unwrap();
+        assert_eq!(endpoints.authorization_url, "https://example.com/oauth/authorize");
+        assert_eq!(endpoints.token_url, "https://example.com/oauth/token");
+    }
+
+
     fn test_parse_wp_api_details_authentication_map_helper(json: &str) {
         let result = serde_json::from_str::<WpApiDetailsAuthenticationMapWrapper>(json);
         assert!(
@@ -477,6 +613,8 @@ mod tests {
     #[case("api-details/test-case-03.json")]
     #[case("api-details/test-case-04.json")]
     #[case("api-details/test-case-05.json")]
+    #[case("api-details/test-case-06.json")]
+    #[case("api-details/test-case-07.json")]
     fn test_api_details_json(#[case] input: &str) {
         let json = test_json(input).expect("Failed to read test resource");
 
