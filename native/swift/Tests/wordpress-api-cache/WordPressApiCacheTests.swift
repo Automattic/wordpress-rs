@@ -14,7 +14,7 @@ struct WordPressApiCacheTests {
                 confirmation()
             }
 
-            let _ = mockService.generateAndInsertPosts(count: 10)
+            _ = mockService.generateAndInsertPosts(count: 10)
         }
     }
 
@@ -23,14 +23,14 @@ struct WordPressApiCacheTests {
 
         await confirmation(expectedCount: 0) { confirmation in
             cache.startListeningForUpdates()
-            let _ = mockService.generateAndInsertPosts(count: 10)
+            _ = mockService.generateAndInsertPosts(count: 10)
             cache.stopListeningForUpdates()
 
             _ = cache.addDatabaseUpdatesObserver { _ in
                 confirmation()
             }
 
-            let _ = mockService.generateAndInsertPosts(count: 20)
+            _ = mockService.generateAndInsertPosts(count: 20)
         }
     }
 
@@ -44,7 +44,7 @@ struct WordPressApiCacheTests {
 
             cache.startListeningForUpdates()
 
-            let _ = mockService.generateAndInsertPosts(count: 10)
+            _ = mockService.generateAndInsertPosts(count: 10)
         }
     }
 
@@ -53,7 +53,7 @@ struct WordPressApiCacheTests {
 
         await confirmation(expectedCount: 20) { confirmation in
             cache.startListeningForUpdates()
-            let _ = mockService.generateAndInsertPosts(count: 10)
+            _ = mockService.generateAndInsertPosts(count: 10)
             cache.stopListeningForUpdates()
 
             cache.startListeningForUpdates()
@@ -61,7 +61,7 @@ struct WordPressApiCacheTests {
                 confirmation()
             }
 
-            let _ = mockService.generateAndInsertPosts(count: 20)
+            _ = mockService.generateAndInsertPosts(count: 20)
         }
     }
 
@@ -73,12 +73,12 @@ struct WordPressApiCacheTests {
                 confirmation()
             }
 
-            let _ = mockService.generateAndInsertPosts(count: 5)
+            _ = mockService.generateAndInsertPosts(count: 5)
 
             // The changes below should not be sent to the observer.
             cache = nil
             try await Task.sleep(for: .seconds(1))
-            let _ = mockService.generateAndInsertPosts(count: 10)
+            _ = mockService.generateAndInsertPosts(count: 10)
         }
     }
 
@@ -117,7 +117,7 @@ struct WordPressApiCacheTests {
             return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
 
-        let _ = mockService.generateAndInsertPosts(count: 10)
+        _ = mockService.generateAndInsertPosts(count: 10)
 
         cache = nil
         await #expect(numberOfUpdates.value == 10)
@@ -138,7 +138,7 @@ struct WordPressApiCacheTests {
         let numberOfUpdates2 = Task { [unowned cache] in
             return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
-        let _ = mockService.generateAndInsertPosts(count: 10)
+        _ = mockService.generateAndInsertPosts(count: 10)
 
         cache = nil
         await #expect(numberOfUpdates0.value == 10)
@@ -163,9 +163,9 @@ struct WordPressApiCacheTests {
         let numberOfUpdates2 = Task { [unowned cache2] in
             return await cache2!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
-        let _ = mockService0.generateAndInsertPosts(count: 10)
-        let _ = mockService1.generateAndInsertPosts(count: 20)
-        let _ = mockService2.generateAndInsertPosts(count: 30)
+        _ = mockService0.generateAndInsertPosts(count: 10)
+        _ = mockService1.generateAndInsertPosts(count: 20)
+        _ = mockService2.generateAndInsertPosts(count: 30)
 
         cache0 = nil
         cache1 = nil

@@ -42,7 +42,11 @@ public final class WordPressApiCache: Sendable {
     }
 
     public func addDatabaseUpdatesObserver(_ body: @Sendable @escaping (UpdateHook) -> Void) -> NSObjectProtocol {
-        NotificationCenter.default.addObserver(forName: UpdateHookBroadcaster.notification, object: broadcaster, queue: nil) {
+        NotificationCenter.default.addObserver(
+            forName: UpdateHookBroadcaster.notification,
+            object: broadcaster,
+            queue: nil
+        ) {
             guard let notification = UpdateHookNotification(from: $0) else { return }
             body(notification.hook)
         }
