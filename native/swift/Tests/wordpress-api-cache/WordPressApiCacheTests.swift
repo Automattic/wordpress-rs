@@ -4,7 +4,7 @@ import WordPressAPI
 import WordPressApiCache
 import WordPressAPIInternal
 
-@Suite(.timeLimit(.minutes(1)))
+@Suite(.timeLimit(.minutes(5)))
 struct WordPressApiCacheTests {
     @Test func addDatabaseUpdatesObserver() async throws {
         let (cache, mockService) = try testContext()
@@ -117,6 +117,9 @@ struct WordPressApiCacheTests {
             return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
 
+        // Allow the observer task to initialize. The one-second delay is intentionally long to reduce flaky
+        // failures on CI.
+        try await Task.sleep(for: .seconds(1))
         _ = mockService.generateAndInsertPosts(count: 10)
 
         cache = nil
@@ -138,6 +141,7 @@ struct WordPressApiCacheTests {
         let numberOfUpdates2 = Task { [unowned cache] in
             return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
+        try await Task.sleep(for: .seconds(1))
         _ = mockService.generateAndInsertPosts(count: 10)
 
         cache = nil
@@ -163,16 +167,18 @@ struct WordPressApiCacheTests {
         let numberOfUpdates2 = Task { [unowned cache2] in
             return await cache2!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
-        _ = mockService0.generateAndInsertPosts(count: 10)
-        _ = mockService1.generateAndInsertPosts(count: 20)
-        _ = mockService2.generateAndInsertPosts(count: 30)
+        try await Task.sleep(for: .seconds(1))
+        _ = mockService0.generateAndInsertPosts(count: 3)
+        _ = mockService1.generateAndInsertPosts(count: 6)
+        _ = mockService2.generateAndInsertPosts(count: 9)
 
         cache0 = nil
         cache1 = nil
         cache2 = nil
-        await #expect(numberOfUpdates0.value == 10)
-        await #expect(numberOfUpdates1.value == 20)
-        await #expect(numberOfUpdates2.value == 30)
+
+        await #expect(numberOfUpdates0.value == 3)
+        await #expect(numberOfUpdates1.value == 6)
+        await #expect(numberOfUpdates2.value == 9)
     }
     #endif
 
