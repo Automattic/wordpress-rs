@@ -8,6 +8,6 @@ generate_immutable_records = true
 ffi_module_name = "libwordpressFFI"
 ffi_module_filename = "wp_mobile_uniffi"
 generate_module_map = false
-generate_immutable_records = true
+generate_immutable_records = false
 experimental_sendable_value_types = true
 omit_localized_error_conformance = true
