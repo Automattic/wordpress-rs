@@ -5,6 +5,7 @@ pub use rstest::*;
 pub use serial_test::{parallel, serial};
 use url::Url;
 use wp_api::{EmptyAppNotifier, prelude::*, reqwest_request_executor::ReqwestRequestExecutor};
+pub use wp_api_integration_tests::backend::{Backend, RestoreServer};
 use wp_mobile::service::WpSelfHostedService;
 use wp_mobile_cache::WpApiCache;
 
@@ -34,6 +35,7 @@ pub fn api_client_delegate() -> WpApiClientDelegate {
 }
 
 pub struct TestContext {
+    pub api: WpApiClient,
     pub service: WpSelfHostedService,
     pub cache: Arc<WpApiCache>,
 }
@@ -53,7 +55,13 @@ pub fn create_test_context() -> TestContext {
     )
     .expect("Failed to create WpSelfHostedService");
 
-    TestContext { service, cache }
+    let api = WpApiClient::new(test_site_api_url_resolver(), api_client_delegate());
+
+    TestContext {
+        api,
+        service,
+        cache,
+    }
 }
 
 pub fn create_test_context_with_site(
@@ -87,11 +95,17 @@ pub fn create_test_context_with_site(
     let service = WpSelfHostedService::new(
         site_url.to_string(),
         api_root,
-        api_url_resolver,
-        delegate,
+        api_url_resolver.clone(),
+        delegate.clone(),
         cache.clone(),
     )
     .expect("Failed to create WpSelfHostedService");
 
-    TestContext { service, cache }
+    let api = WpApiClient::new(api_url_resolver.clone(), delegate.clone());
+
+    TestContext {
+        api,
+        service,
+        cache,
+    }
 }

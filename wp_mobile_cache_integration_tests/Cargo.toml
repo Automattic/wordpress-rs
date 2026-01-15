@@ -12,5 +12,6 @@ serial_test = { workspace = true }
 tokio = { workspace = true, features = [ "full" ] }
 url = { workspace = true }
 wp_api = { path = "../wp_api", features = [ "integration-tests", "reqwest-request-executor" ] }
+wp_api_integration_tests = { path = "../wp_api_integration_tests" }
 wp_mobile = { path = "../wp_mobile", features = [ "reqwest-request-executor" ] }
 wp_mobile_cache = { path = "../wp_mobile_cache" }
