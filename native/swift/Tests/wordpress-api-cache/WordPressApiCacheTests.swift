@@ -4,60 +4,98 @@ import WordPressAPI
 import WordPressApiCache
 import WordPressAPIInternal
 
-actor Test {
+#if canImport(Combine)
+import Combine
+#endif
 
-    private var cache: WordPressApiCache
-    private var changeCount = 0
-    private let executor = WpRequestExecutor(urlSession: .shared)
+// Most of the test functions test against the Combine API `databaseUpdatesPublisher`,
+// because the Combine observer is synchronous, which is much easier to work with in
+// unit tests. Unlike the `AsyncSequence` API, the order of execution is much more
+// predictable.
+@Suite(.timeLimit(.minutes(5)))
+struct WordPressApiCacheTests {
+    @Test func addDatabaseUpdatesObserver() async throws {
+        let (cache, mockService) = try testContext()
 
-    init() throws {
-        self.cache = try WordPressApiCache()
+        await confirmation(expectedCount: 10) { confirmation in
+            _ = cache.addDatabaseUpdatesObserver { _ in
+                confirmation()
+            }
+
+            _ = mockService.generateAndInsertPosts(count: 10)
+        }
     }
 
-    @Test func testMigrationsWork() async throws {
-        let migrationsPerformed = try self.cache.performMigrations()
-        #expect(migrationsPerformed == 9)
+    @Test func noUpdatesAfterStop() async throws {
+        let (cache, mockService) = try testContext(listingForUpdates: false)
+
+        await confirmation(expectedCount: 0) { confirmation in
+            cache.startListeningForUpdates()
+            _ = mockService.generateAndInsertPosts(count: 10)
+            cache.stopListeningForUpdates()
+
+            _ = cache.addDatabaseUpdatesObserver { _ in
+                confirmation()
+            }
+
+            _ = mockService.generateAndInsertPosts(count: 20)
+        }
     }
 
-    #if !os(Linux)
-    @Test func testBackgroundUpdateNotificationsWork() async throws {
+    @Test func observeBeforeStart() async throws {
+        let (cache, mockService) = try testContext(listingForUpdates: false)
 
-        let cache = try WpApiCache(path: ":memory:")
-        _ = try cache.performMigrations()
-        cache.startListeningForUpdates(delegate: DatabaseChangeNotifier.shared)
+        await confirmation(expectedCount: 10) { confirmation in
+            _ = cache.addDatabaseUpdatesObserver { _ in
+                confirmation()
+            }
 
-        let mockService = MockPostService(
-            cache: cache,
-            siteUrl: "https://vanilla.wpmt.co",
-            apiRoot: "https://vanilla.wpmt.co/wp-json"
-        )
+            cache.startListeningForUpdates()
 
-        let delegate = WpApiClientDelegate(
-            authProvider: .none(),
-            requestExecutor: executor,
-            middlewarePipeline: MiddlewarePipeline(middlewares: []),
-            appNotifier: MockAppNotifier()
-        )
+            _ = mockService.generateAndInsertPosts(count: 10)
+        }
+    }
 
-        let apiUrl = try ParsedUrl.parse(input: "https://content-heavy.wpmt.co/wp-json")
-        let service = try WpSelfHostedService(
-            siteUrl: "https://content-heavy.wpmt.co",
-            apiRoot: "https://content-heavy.wpmt.co/wp-json",
-            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: apiUrl),
-            delegate: delegate,
-            cache: cache
-        )
+    @Test func observeAfterResume() async throws {
+        let (cache, mockService) = try testContext(listingForUpdates: false)
 
-        let publishedPosts = service.posts().getAllPostsWithEditContext()
+        await confirmation(expectedCount: 20) { confirmation in
+            cache.startListeningForUpdates()
+            _ = mockService.generateAndInsertPosts(count: 10)
+            cache.stopListeningForUpdates()
 
-//        DatabaseChangeNotifier.shared.startObserving(publishedPosts) { hook in
-//            debugPrint("Published Posts changed: \(hook.table) \(hook.rowId) \(hook.action)")
-//        }
+            cache.startListeningForUpdates()
+            _ = cache.addDatabaseUpdatesObserver { _ in
+                confirmation()
+            }
+
+            _ = mockService.generateAndInsertPosts(count: 20)
+        }
+    }
+
+    @Test func afterCacheDeallocated() async throws {
+        var (cache, mockService): (WordPressApiCache?, MockPostService) = try testContext()
+
+        try await confirmation(expectedCount: 5) { confirmation in
+            _ = cache?.addDatabaseUpdatesObserver { _ in
+                confirmation()
+            }
+
+            _ = mockService.generateAndInsertPosts(count: 5)
+
+            // The changes below should not be sent to the observer.
+            cache = nil
+            try await Task.sleep(for: .seconds(1))
+            _ = mockService.generateAndInsertPosts(count: 10)
+        }
+    }
+
+    @Test func stressTest() async throws {
+        let (_, mockService) = try testContext()
 
         let ids = mockService.generateAndInsertPosts(count: 10_000)
 
-        try await withThrowingTaskGroup { group in
-
+        await withThrowingTaskGroup { group in
             for _ in 0...10 {
                 group.addTask {
                     _ = mockService.startComprehensiveStressTest(
@@ -74,51 +112,95 @@ actor Test {
                     )
                 }
             }
+        }
+    }
 
+    #if !os(Linux)
+    @Test func updatesReceived() async throws {
+        let (cache, mockService) = try testContext()
+
+        await confirmation(expectedCount: 10) { confirmation in
+            let cancellable = cache.databaseUpdatesPublisher().sink { _ in
+                confirmation()
+            }
+
+            _ = mockService.generateAndInsertPosts(count: 10)
+
+            cancellable.cancel()
+        }
+    }
+
+    // When multiple observers listen to a single `WordPressApiCache` instance, all observers receive updates.
+    @Test func multipleObservers() async throws {
+        let (cache, mockService) = try testContext()
+
+        // Starts multiple tasks to listen for database updates in the background.
+        await confirmation(expectedCount: 30) { confirmation in
+            var cancellables = Set<AnyCancellable>()
+            cache.databaseUpdatesPublisher().sink { _ in confirmation() }.store(in: &cancellables)
+            cache.databaseUpdatesPublisher().sink { _ in confirmation() }.store(in: &cancellables)
+            cache.databaseUpdatesPublisher().sink { _ in confirmation() }.store(in: &cancellables)
+
+            _ = mockService.generateAndInsertPosts(count: 10)
+        }
+    }
+
+    // Each observer is only notified when its specific `WordPressApiCache` instance is updated.
+    @Test func observingMultipleCaches() async throws {
+        let (cache0, mockService0) = try testContext()
+        let (cache1, mockService1) = try testContext()
+        let (cache2, mockService2) = try testContext()
+
+        await withTaskGroup { group in
             group.addTask {
-                if #available(macOS 15.0, *) {
-                    for try await values in DatabaseChangeNotifier.shared.startObserving(publishedPosts).map({ _ in
-                        try await publishedPosts.loadData()
-                    }) {
-                        print("Received update hook: \(values.count)")
+                await confirmation(expectedCount: 3) { confirmation in
+                    let cancellable = cache0.databaseUpdatesPublisher().sink { _ in
+                        confirmation()
                     }
-                } else {
-                    // Fallback on earlier versions
+
+                    _ = mockService0.generateAndInsertPosts(count: 3)
+                    cancellable.cancel()
                 }
             }
-
-//            group.addTask {
-//                while(!Task.isCancelled) {
-//                    try await Task.sleep(for: .seconds(1))
-//                    let count = try await publishedPosts.loadData().count
-//                    debugPrint(count)
-//                }
-//            }
-
             group.addTask {
-                try await Task.sleep(for: .seconds(10))
-                debugPrint("About to stop observing collection")
-                DatabaseChangeNotifier.shared.stopObserving(publishedPosts)
+                await confirmation(expectedCount: 6) { confirmation in
+                    let cancellable = cache1.databaseUpdatesPublisher().sink { _ in
+                        confirmation()
+                    }
+
+                    _ = mockService1.generateAndInsertPosts(count: 6)
+                    cancellable.cancel()
+                }
             }
+            group.addTask {
+                await confirmation(expectedCount: 9) { confirmation in
+                    let cancellable = cache2.databaseUpdatesPublisher().sink { _ in
+                        confirmation()
+                    }
 
-            try await Task {
-                try await Task.sleep(for: .seconds(90))
-            }.value
-
-            group.cancelAll()
+                    _ = mockService2.generateAndInsertPosts(count: 9)
+                    cancellable.cancel()
+                }
+            }
         }
-
-        debugPrint("Done!")
     }
     #endif
 
-    func incrementChangeCount() {
-        self.changeCount += 1
-    }
-}
+    private func testContext(listingForUpdates: Bool = true) throws -> (WordPressApiCache, MockPostService) {
+        let cache: WordPressApiCache = try WordPressApiCache()
+        _ = try cache.performMigrations()
 
-final class MockAppNotifier: WpAppNotifier {
-    func requestedWithInvalidAuthentication(requestUrl: String) async {
-        // no-op
+        if listingForUpdates {
+            cache.startListeningForUpdates()
+        }
+
+        let siteURL = "https://\(UUID().uuidString).example.com"
+        let mockService = MockPostService(
+            cache: cache.cache,
+            siteUrl: siteURL,
+            apiRoot: "\(siteURL)/wp-json"
+        )
+
+        return (cache, mockService)
     }
 }
