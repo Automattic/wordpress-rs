@@ -18,7 +18,7 @@ macro_rules! wp_mobile_entity {
     ($id_type:ident, $t_type:ty) => {
         paste::paste! {
             // FullEntity wrapper - pairs data with EntityId for UniFFI
-            #[derive(uniffi::Record)]
+            #[derive(uniffi::Record, Debug)]
             pub struct [<Full $id_type>] {
                 pub entity_id: wp_mobile_cache::entity::EntityId,
                 pub data: $t_type,
