@@ -4,6 +4,14 @@ import WordPressAPI
 import WordPressApiCache
 import WordPressAPIInternal
 
+#if canImport(Combine)
+import Combine
+#endif
+
+// Most of the test functions test against the Combine API `databaseUpdatesPublisher`,
+// because the Combine observer is synchronous, which is much easier to work with in
+// unit tests. Unlike the `AsyncSequence` API, the order of execution is much more
+// predictable.
 @Suite(.timeLimit(.minutes(5)))
 struct WordPressApiCacheTests {
     @Test func addDatabaseUpdatesObserver() async throws {
@@ -109,7 +117,7 @@ struct WordPressApiCacheTests {
 
     #if !os(Linux)
     @Test func updatesReceived() async throws {
-        let (cache, mockService): (WordPressApiCache, MockPostService) = try testContext()
+        let (cache, mockService) = try testContext()
 
         await confirmation(expectedCount: 10) { confirmation in
             let cancellable = cache.databaseUpdatesPublisher().sink { _ in
@@ -124,57 +132,57 @@ struct WordPressApiCacheTests {
 
     // When multiple observers listen to a single `WordPressApiCache` instance, all observers receive updates.
     @Test func multipleObservers() async throws {
-        var (cache, mockService): (WordPressApiCache?, MockPostService) = try testContext()
+        let (cache, mockService) = try testContext()
 
-        // Starts multiple tasks to listen for database updates in the background. The tasks complete when `cache`
-        // is deallocated.
-        let numberOfUpdates0 = await Task.started { [unowned cache] in
-            return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
-        }
-        let numberOfUpdates1 = await Task.started { [unowned cache] in
-            return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
-        }
-        let numberOfUpdates2 = await Task.started { [unowned cache] in
-            return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
-        }
+        // Starts multiple tasks to listen for database updates in the background.
+        await confirmation(expectedCount: 30) { confirmation in
+            var cancellables = Set<AnyCancellable>()
+            cache.databaseUpdatesPublisher().sink { _ in confirmation() }.store(in: &cancellables)
+            cache.databaseUpdatesPublisher().sink { _ in confirmation() }.store(in: &cancellables)
+            cache.databaseUpdatesPublisher().sink { _ in confirmation() }.store(in: &cancellables)
 
-        _ = mockService.generateAndInsertPosts(count: 10)
-
-        cache = nil
-        await #expect(numberOfUpdates0.value == 10)
-        await #expect(numberOfUpdates1.value == 10)
-        await #expect(numberOfUpdates2.value == 10)
+            _ = mockService.generateAndInsertPosts(count: 10)
+        }
     }
 
     // Each observer is only notified when its specific `WordPressApiCache` instance is updated.
     @Test func observingMultipleCaches() async throws {
-        var (cache0, mockService0): (WordPressApiCache?, MockPostService) = try testContext()
-        var (cache1, mockService1): (WordPressApiCache?, MockPostService) = try testContext()
-        var (cache2, mockService2): (WordPressApiCache?, MockPostService) = try testContext()
+        let (cache0, mockService0) = try testContext()
+        let (cache1, mockService1) = try testContext()
+        let (cache2, mockService2) = try testContext()
 
-        // Starts multiple tasks to listen for database updates in the background. The tasks complete when `cache`
-        // is deallocated.
-        let numberOfUpdates0 = await Task.started { [unowned cache0] in
-            return await cache0!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
+        await withTaskGroup { group in
+            group.addTask {
+                await confirmation(expectedCount: 3) { confirmation in
+                    let cancellable = cache0.databaseUpdatesPublisher().sink { _ in
+                        confirmation()
+                    }
+
+                    _ = mockService0.generateAndInsertPosts(count: 3)
+                    cancellable.cancel()
+                }
+            }
+            group.addTask {
+                await confirmation(expectedCount: 6) { confirmation in
+                    let cancellable = cache1.databaseUpdatesPublisher().sink { _ in
+                        confirmation()
+                    }
+
+                    _ = mockService1.generateAndInsertPosts(count: 6)
+                    cancellable.cancel()
+                }
+            }
+            group.addTask {
+                await confirmation(expectedCount: 9) { confirmation in
+                    let cancellable = cache2.databaseUpdatesPublisher().sink { _ in
+                        confirmation()
+                    }
+
+                    _ = mockService2.generateAndInsertPosts(count: 9)
+                    cancellable.cancel()
+                }
+            }
         }
-        let numberOfUpdates1 = await Task.started { [unowned cache1] in
-            return await cache1!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
-        }
-        let numberOfUpdates2 = await Task.started { [unowned cache2] in
-            return await cache2!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
-        }
-
-        _ = mockService0.generateAndInsertPosts(count: 3)
-        _ = mockService1.generateAndInsertPosts(count: 6)
-        _ = mockService2.generateAndInsertPosts(count: 9)
-
-        cache0 = nil
-        cache1 = nil
-        cache2 = nil
-
-        await #expect(numberOfUpdates0.value == 3)
-        await #expect(numberOfUpdates1.value == 6)
-        await #expect(numberOfUpdates2.value == 9)
     }
     #endif
 
@@ -194,37 +202,5 @@ struct WordPressApiCacheTests {
         )
 
         return (cache, mockService)
-    }
-}
-
-private actor TaskStartedSignal {
-    private var started = false
-
-    func markAsStarted() {
-        started = true
-    }
-
-    func isStarted() -> Bool {
-        started
-    }
-}
-
-private extension Task where Failure == Never {
-    // This function waits for the operation to start. It's useful for coordinating multiple async function calls.
-    static func started(operation: sending @escaping () async -> Success) async  -> Task<Success, Failure> {
-        let signal = TaskStartedSignal()
-
-        let task = Task<Success, Failure> {
-            await signal.markAsStarted()
-            return await operation()
-        }
-
-        while await !signal.isStarted() {
-            try? await Task<Never, Never>.sleep(for: .milliseconds(10))
-        }
-
-        try? await Task<Never, Never>.sleep(for: .milliseconds(500))
-
-        return task
     }
 }
