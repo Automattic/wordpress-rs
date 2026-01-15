@@ -349,7 +349,7 @@ impl ListMetadataRepository {
         items.chunks(BATCH_SIZE).try_for_each(|chunk| {
             let placeholders = vec!["(?, ?, ?, ?, ?)"; chunk.len()].join(", ");
             let sql = format!(
-                "INSERT INTO {} (list_metadata_id, entity_id, modified_gmt, parent, menu_order) VALUES {}",
+                "INSERT OR REPLACE INTO {} (list_metadata_id, entity_id, modified_gmt, parent, menu_order) VALUES {}",
                 Self::items_table().table_name(),
                 placeholders
             );
