@@ -109,21 +109,17 @@ struct WordPressApiCacheTests {
 
     #if !os(Linux)
     @Test func updatesReceived() async throws {
-        var (cache, mockService): (WordPressApiCache?, MockPostService) = try testContext()
+        let (cache, mockService): (WordPressApiCache, MockPostService) = try testContext()
 
-        // Starts a Task to listen for database updates in the background. The Task completes when `cache`
-        // is deallocated.
-        let numberOfUpdates = Task { [unowned cache] in
-            return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
+        await confirmation(expectedCount: 10) { confirmation in
+            let cancellable = cache.databaseUpdatesPublisher().sink { _ in
+                confirmation()
+            }
+
+            _ = mockService.generateAndInsertPosts(count: 10)
+
+            cancellable.cancel()
         }
-
-        // Allow the observer task to initialize. The one-second delay is intentionally long to reduce flaky
-        // failures on CI.
-        try await Task.sleep(for: .seconds(1))
-        _ = mockService.generateAndInsertPosts(count: 10)
-
-        cache = nil
-        await #expect(numberOfUpdates.value == 10)
     }
 
     // When multiple observers listen to a single `WordPressApiCache` instance, all observers receive updates.
@@ -132,16 +128,16 @@ struct WordPressApiCacheTests {
 
         // Starts multiple tasks to listen for database updates in the background. The tasks complete when `cache`
         // is deallocated.
-        let numberOfUpdates0 = Task { [unowned cache] in
+        let numberOfUpdates0 = await Task.started { [unowned cache] in
             return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
-        let numberOfUpdates1 = Task { [unowned cache] in
+        let numberOfUpdates1 = await Task.started { [unowned cache] in
             return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
-        let numberOfUpdates2 = Task { [unowned cache] in
+        let numberOfUpdates2 = await Task.started { [unowned cache] in
             return await cache!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
-        try await Task.sleep(for: .seconds(1))
+
         _ = mockService.generateAndInsertPosts(count: 10)
 
         cache = nil
@@ -158,16 +154,16 @@ struct WordPressApiCacheTests {
 
         // Starts multiple tasks to listen for database updates in the background. The tasks complete when `cache`
         // is deallocated.
-        let numberOfUpdates0 = Task { [unowned cache0] in
+        let numberOfUpdates0 = await Task.started { [unowned cache0] in
             return await cache0!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
-        let numberOfUpdates1 = Task { [unowned cache1] in
+        let numberOfUpdates1 = await Task.started { [unowned cache1] in
             return await cache1!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
-        let numberOfUpdates2 = Task { [unowned cache2] in
+        let numberOfUpdates2 = await Task.started { [unowned cache2] in
             return await cache2!.databaseUpdatesPublisher().values.reduce(0) { counter, _ in counter + 1 }
         }
-        try await Task.sleep(for: .seconds(1))
+
         _ = mockService0.generateAndInsertPosts(count: 3)
         _ = mockService1.generateAndInsertPosts(count: 6)
         _ = mockService2.generateAndInsertPosts(count: 9)
@@ -198,5 +194,37 @@ struct WordPressApiCacheTests {
         )
 
         return (cache, mockService)
+    }
+}
+
+private actor TaskStartedSignal {
+    private var started = false
+
+    func markAsStarted() {
+        started = true
+    }
+
+    func isStarted() -> Bool {
+        started
+    }
+}
+
+private extension Task where Failure == Never {
+    // This function waits for the operation to start. It's useful for coordinating multiple async function calls.
+    static func started(operation: sending @escaping () async -> Success) async  -> Task<Success, Failure> {
+        let signal = TaskStartedSignal()
+
+        let task = Task<Success, Failure> {
+            await signal.markAsStarted()
+            return await operation()
+        }
+
+        while await !signal.isStarted() {
+            try? await Task<Never, Never>.sleep(for: .milliseconds(10))
+        }
+
+        try? await Task<Never, Never>.sleep(for: .milliseconds(500))
+
+        return task
     }
 }
