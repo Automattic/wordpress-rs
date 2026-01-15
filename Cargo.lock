@@ -5382,6 +5382,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "wp_mobile_cache_integration_tests"
+version = "0.1.0"
+dependencies = [
+ "integration_test_credentials",
+ "reqwest",
+ "rstest",
+ "serial_test",
+ "tokio",
+ "url",
+ "wp_api",
+ "wp_mobile",
+ "wp_mobile_cache",
+]
+
+[[package]]
 name = "wp_rs_web"
 version = "0.1.0"
 dependencies = [

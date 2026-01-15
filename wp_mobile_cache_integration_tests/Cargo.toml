@@ -1,0 +1,16 @@
+[package]
+name = "wp_mobile_cache_integration_tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+integration_test_credentials = { path = "../integration_test_credentials" }
+reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate" ] }
+rstest = { workspace = true }
+serial_test = { workspace = true }
+tokio = { workspace = true, features = [ "full" ] }
+url = { workspace = true }
+wp_api = { path = "../wp_api", features = [ "integration-tests", "reqwest-request-executor" ] }
+wp_mobile = { path = "../wp_mobile", features = [ "reqwest-request-executor" ] }
+wp_mobile_cache = { path = "../wp_mobile_cache" }
