@@ -30,7 +30,7 @@ async fn test(form: Form<TestForm<'_>>) -> Template {
     println!("Testing {}", form.value);
 
     match login_client
-        .api_discovery(form.value.to_string())
+        .api_discovery(form.value.to_string(), None)
         .await
         .combined_result()
     {

@@ -178,7 +178,7 @@ async fn perform_api_discovery(
 ) -> SimplifiedDiscoveryResult {
     println!("Testing {url}");
     match login_client
-        .api_discovery(url.clone())
+        .api_discovery(url.clone(), None)
         .await
         .combined_result()
     {
@@ -333,7 +333,7 @@ impl SiteApiType {
                 let login_client =
                     WpLoginClient::new_with_default_middleware_pipeline(request_executor.clone());
                 match login_client
-                    .api_discovery(url.clone())
+                    .api_discovery(url.clone(), None)
                     .await
                     .combined_result()
                     .cloned()

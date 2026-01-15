@@ -457,7 +457,7 @@ async fn discovery_helper(
         Arc::new(WpApiMiddlewarePipeline { middlewares }),
     );
     client
-        .api_discovery(site_url.to_string())
+        .api_discovery(site_url.to_string(), None)
         .await
         .combined_result()
         .map(|success| {
@@ -476,7 +476,7 @@ async fn xmlrpc_url(site_url: &str) -> Result<ParsedUrl, XmlrpcDiscoveryError> {
             middlewares: vec![],
         }),
     );
-    let result = client.api_discovery(site_url.to_string()).await;
+    let result = client.api_discovery(site_url.to_string(), None).await;
     let success = result.combined_result().unwrap();
-    client.xmlrpc_discovery(success.clone()).await
+    client.xmlrpc_discovery(success.clone(), None).await
 }

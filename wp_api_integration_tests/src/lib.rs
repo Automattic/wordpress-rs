@@ -117,7 +117,7 @@ pub async fn api_client_with_account_credentials(
         Arc::new(WpApiMiddlewarePipeline::default()),
     );
     let discovery_result = login_client
-        .api_discovery(TestCredentials::instance().site_url.to_string())
+        .api_discovery(TestCredentials::instance().site_url.to_string(), None)
         .await;
     let details = discovery_result
         .combined_result()
