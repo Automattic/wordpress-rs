@@ -207,6 +207,12 @@ struct ExampleApp: App {
                 .map(\.asListViewData)
         }, category: .navigation))
 
+        baseData.append(RootListData(name: "Themes", callback: {
+            try await WordPressAPI.globalInstance.themes.listWithEditContext(params: ThemeListParams())
+                .data
+                .map(\.asListViewData)
+        }, category: .system))
+
         baseData.append(RootListData(name: "Menu Items", sequence: {
             let sequence = try await WordPressAPI.globalInstance.navMenuItems
                 .sequenceWithEditContext(params: NavMenuItemListParams())

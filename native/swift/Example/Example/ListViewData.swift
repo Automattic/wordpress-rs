@@ -207,6 +207,17 @@ extension MenuLocationWithEditContext: ListViewDataConvertable {
     }
 }
 
+extension ThemeWithEditContext: ListViewDataConvertable {
+    var asListViewData: ListViewData {
+        ListViewData(
+            id: self.name.rendered,
+            title: self.name.rendered,
+            subtitle: "\(self.status) " + self.version,
+            fields: [:]
+        )
+    }
+}
+
 extension [AnyPostWithEditContext] {
     func asListViewData() -> [ListViewData] {
         self.map { $0.asListViewData }

@@ -214,6 +214,10 @@ public final class WordPressAPI: Sendable {
         self.requestBuilder.terms()
     }
 
+    public var themes: ThemesRequestExecutor {
+        self.requestBuilder.themes()
+    }
+
     public var blockEditor: WpBlockEditorRequestExecutor {
         self.requestBuilder.wpBlockEditor()
     }
