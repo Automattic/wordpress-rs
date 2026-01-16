@@ -274,6 +274,7 @@ public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiCli
 
 // MARK: OAuth2
 public typealias TokenValidationParameters = WordPressAPIInternal.TokenValidationParameters
+public typealias TokenRequestParameters = WordPressAPIInternal.TokenRequestParameters
 
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams

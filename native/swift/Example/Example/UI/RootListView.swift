@@ -10,13 +10,14 @@ struct RootListView: View {
     var body: some View {
         List {
             ForEach(RootListData.Category.allCases) { category in
-                Section(category.name) {
-                    ForEach(items[category] ?? []) { item in
-                        RootListViewItem(item: item)
+                if let items = items[category] {
+                    Section(category.name) {
+                        ForEach(items) { item in
+                            RootListViewItem(item: item)
+                        }
                     }
                 }
             }
-
         }
     }
 }
@@ -112,6 +113,10 @@ enum RootListData: Identifiable, Sendable {
     }
 
     init(name: String, callback: @escaping TaskListViewModel.FetchDataTask, category: Category) {
+        self = .callback(name, callback, category)
+    }
+
+    init(name: String, category: Category, callback: @escaping TaskListViewModel.FetchDataTask) {
         self = .callback(name, callback, category)
     }
 

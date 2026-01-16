@@ -11,7 +11,7 @@ pub async fn me_test(client: &WpComApiClient, token: String) -> anyhow::Result<(
         client
             .oauth2()
             .fetch_info(&TokenValidationParameters {
-                client_id: client_id.to_string(),
+                client_id,
                 token: token.clone(),
             })
             .await?;

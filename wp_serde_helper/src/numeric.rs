@@ -88,6 +88,26 @@ where
     deserialize_u64_or_none(deserializer).map(|opt| opt.filter(|&v| v != 0))
 }
 
+/// Deserialize an optional `u64` from a string, treating `0` as `None`.
+///
+/// Accepts:
+/// - `"0"` → `None`
+/// - `"1"` → `Some(1)`
+/// - `0` → `None`
+/// - `1` → `Some(1)`
+///
+/// # Errors
+///
+/// Returns an error non-strings or negative numbers.
+pub fn deserialize_u64_or_none_with_zero_as_none_from_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_u64_or_string(deserializer).map(|v| if v == 0 { None } else { Some(v) })
+}
+
 /// Deserialize an optional `u64`, treating `false`, `null`, and negative numbers as `None`.
 ///
 /// Accepts:
@@ -374,6 +394,56 @@ mod tests {
         let u64_or_none: Result<U64OrNoneWithZeroAsNone, serde_json::Error> =
             serde_json::from_str(test_case);
         assert!(u64_or_none.is_err(), "The serializer should emit an error");
+        assert_eq!(
+            u64_or_none.err().unwrap().to_string(),
+            expected_error_message
+        );
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct U64OrNoneWithZeroAsNoneFromString {
+        #[serde(deserialize_with = "deserialize_u64_or_none_with_zero_as_none_from_string")]
+        pub u64: Option<u64>,
+    }
+
+    #[rstest]
+    #[case(r#"{"u64": "1"}"#, Some(1))]
+    #[case(r#"{"u64": 1}"#, Some(1))]
+    #[case(r#"{"u64": "0"}"#, None)]
+    #[case(r#"{"u64": 0}"#, None)]
+    #[case(r#"{"u64": "42"}"#, Some(42))]
+    fn test_deserialize_u64_or_none_with_zero_as_none_from_string(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<u64>,
+    ) {
+        let u64_or_none: U64OrNoneWithZeroAsNoneFromString =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, u64_or_none.u64);
+    }
+
+    #[rstest]
+    #[case(
+        r#"{"u64": "abc"}"#,
+        r#"invalid value: string "abc", expected u64 or a string at line 1 column 13"#
+    )]
+    #[case(
+        r#"{"u64": "-1"}"#,
+        r#"invalid value: string "-1", expected u64 or a string at line 1 column 12"#
+    )]
+    #[case(
+        r#"{"u64": true}"#,
+        r#"invalid type: boolean `true`, expected u64 or a string at line 1 column 12"#
+    )]
+    fn test_deserialize_u64_or_none_with_zero_as_none_from_string_errors(
+        #[case] test_case: &str,
+        #[case] expected_error_message: &str,
+    ) {
+        let u64_or_none: Result<U64OrNoneWithZeroAsNoneFromString, serde_json::Error> =
+            serde_json::from_str(test_case);
+        assert!(
+            u64_or_none.is_err(),
+            "The deserializer should emit an error"
+        );
         assert_eq!(
             u64_or_none.err().unwrap().to_string(),
             expected_error_message

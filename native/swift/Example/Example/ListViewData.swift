@@ -11,6 +11,20 @@ struct ListViewData: Identifiable, Comparable, Hashable {
     static func < (lhs: ListViewData, rhs: ListViewData) -> Bool {
         lhs.title < rhs.title
     }
+
+    init(id: String, title: String, subtitle: String, fields: [String: String]) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.fields = fields
+    }
+
+    init(key: String, value: String) {
+        self.id = key
+        self.title = key
+        self.subtitle = value
+        self.fields = [:]
+    }
 }
 
 protocol ListViewDataConvertable {

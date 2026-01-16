@@ -39,21 +39,21 @@ struct LoginView: View {
             .autocorrectionDisabled()
             .textInputAutocapitalization(.never)
             #endif
-
-            HStack {
+        }
+        .padding()
+        .toolbar {
+            Button(action: self.startLogin, label: {
                 if isLoggingIn {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .controlSize(.small)
                         .padding()
                 } else {
-                    Button(action: self.startLogin, label: {
-                        Text("Sign In")
-                    })
+                    Text("Sign In")
+                        .padding(.horizontal)
                 }
-            }
+            })
         }
-        .padding()
     }
 
     func startLogin() {
@@ -89,4 +89,9 @@ struct LoginView: View {
         self.isLoggingIn = false
         self.loginError = error.localizedDescription
     }
+}
+
+#Preview {
+    LoginView()
+        .environmentObject(LoginManager.shared)
 }
