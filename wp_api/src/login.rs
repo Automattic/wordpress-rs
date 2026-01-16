@@ -257,7 +257,7 @@ pub enum WpRestApiAuthenticationScheme {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
 pub struct WpRestApiApplicationPasswordAuthenticationScheme {
-    pub endpoints: WpRestApiAuthorizationEndpoint
+    pub endpoints: WpRestApiAuthorizationEndpoint,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
@@ -336,12 +336,10 @@ impl WpApiDetailsAuthenticationMap {
         self.0
             .get(KEY_OAUTH2)
             .and_then(|auth_scheme| match auth_scheme {
-                WpRestApiAuthenticationScheme::OAuth2(auth_scheme) => {
-                    Some(OAuth2Endpoints {
-                        authorization_url: auth_scheme.authorize.clone(),
-                        token_url: auth_scheme.token.clone()
-                    })
-                }
+                WpRestApiAuthenticationScheme::OAuth2(auth_scheme) => Some(OAuth2Endpoints {
+                    authorization_url: auth_scheme.authorize.clone(),
+                    token_url: auth_scheme.token.clone(),
+                }),
                 _ => None,
             })
     }
@@ -357,11 +355,11 @@ pub struct OAuth2Endpoints {
 pub struct OAuth2Client {
     pub client_id: String,
     pub client_secret: String,
-    pub redirectUri: String,
+    #[serde(rename = "redirectUri")]
+    pub redirect_uri: String,
     pub scope: String,
     pub state: Option<String>,
 }
-
 
 /// Return a URL to be used in application password authentication.
 ///
@@ -522,7 +520,9 @@ mod tests {
             result.is_ok(),
             "Failed to parse json as `WpApiDetailsAuthenticationMap`"
         );
-        let auth_map = result.expect("Already verified result is Ok").authentication;
+        let auth_map = result
+            .expect("Already verified result is Ok")
+            .authentication;
 
         // Verify application passwords URL
         assert_eq!(
@@ -535,7 +535,10 @@ mod tests {
         let oauth2_endpoints = auth_map.find_oauth2_endpoints();
         assert!(oauth2_endpoints.is_some());
         let endpoints = oauth2_endpoints.unwrap();
-        assert_eq!(endpoints.authorization_url, "http://localhost/oauth/authorize");
+        assert_eq!(
+            endpoints.authorization_url,
+            "http://localhost/oauth/authorize"
+        );
         assert_eq!(endpoints.token_url, "http://localhost/oauth/token");
     }
 
@@ -570,10 +573,12 @@ mod tests {
             .expect("Failed to parse json");
         assert!(result.authentication.has_oauth2());
         let endpoints = result.authentication.find_oauth2_endpoints().unwrap();
-        assert_eq!(endpoints.authorization_url, "https://example.com/oauth/authorize");
+        assert_eq!(
+            endpoints.authorization_url,
+            "https://example.com/oauth/authorize"
+        );
         assert_eq!(endpoints.token_url, "https://example.com/oauth/token");
     }
-
 
     fn test_parse_wp_api_details_authentication_map_helper(json: &str) {
         let result = serde_json::from_str::<WpApiDetailsAuthenticationMapWrapper>(json);
