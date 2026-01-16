@@ -69,17 +69,12 @@ struct SelfHostedService: Sendable {
             .filter { $0.supports.map.keys.contains(allOf: [.title, .author, .customFields]) }
 
         for type in postTypes {
-            let collection = try await WordPressAPI.globalInstance
-                .asSelfHostedService()
-                .posts()
-                .createPostCollectionWithEditContext(filter: AnyPostFilter())
-
-            let sequence = DatabaseChangeNotifier.shared.startObserving(collection).map { _ in
-                try await collection.loadData().map { $0.data.asListViewData }
-            }
-
             baseData.append(RootListData(name: type.name, sequence: {
-                ListViewSequence(underlyingSequence: sequence)
+                let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(
+                    type: PostEndpointType.custom(type.restBase),
+                    params: postListParams
+                )
+                return ListViewSequence(underlyingSequence: sequence)
             }, category: .posts))
         }
 
