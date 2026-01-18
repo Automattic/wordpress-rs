@@ -199,13 +199,6 @@ pub enum BoolOrString {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
 #[serde(untagged)]
-pub enum BoolOrVecString {
-    Bool(bool),
-    VecString(Vec<String>),
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
-#[serde(untagged)]
 pub enum IntegerOrString {
     Integer(i64),
     String(String),
