@@ -10,9 +10,9 @@ pub struct StatsVisitsParams {
     /// The number of time units to return.
     #[uniffi(default = None)]
     pub quantity: Option<u32>,
-    /// The date to query stats for (format: YYYY-MM-DD).
+    /// The end date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub date: Option<String>,
+    pub end_date: Option<String>,
     /// The locale for the response.
     #[uniffi(default = None)]
     pub locale: Option<String>,
@@ -23,7 +23,7 @@ impl AppendUrlQueryPairs for StatsVisitsParams {
         query_pairs_mut
             .append_option_query_value_pair("unit", self.unit.as_ref())
             .append_option_query_value_pair("quantity", self.quantity.as_ref())
-            .append_option_query_value_pair("date", self.date.as_ref())
+            .append_option_query_value_pair("date", self.end_date.as_ref())
             .append_option_query_value_pair("locale", self.locale.as_ref());
     }
 }
@@ -83,7 +83,7 @@ mod tests {
         let params = StatsVisitsParams {
             unit: Some("hour".to_string()),
             quantity: Some(24),
-            date: Some("2025-01-15".to_string()),
+            end_date: Some("2025-01-15".to_string()),
             locale: Some("en".to_string()),
         };
 
@@ -105,7 +105,7 @@ mod tests {
         let params = StatsVisitsParams {
             unit: Some("day".to_string()),
             quantity: Some(7),
-            date: None,
+            end_date: None,
             locale: None,
         };
 
