@@ -125,7 +125,19 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.fields.is_empty());
-        assert!(!response.data.is_empty());
+        assert_eq!(response.date, "2026-01-18 00:00:00");
+        assert_eq!(response.unit, "hour");
+        assert_eq!(
+            response.fields,
+            vec!["period", "views", "visitors", "likes", "reblogs", "comments", "posts"]
+        );
+        assert_eq!(response.data.len(), 24);
+
+        // Verify first data row
+        let first_row = &response.data[0];
+        assert_eq!(first_row.len(), 7);
+        assert_eq!(first_row[0].as_string(), Some(&"2026-01-17 01:00:00".to_string()));
+        assert_eq!(first_row[1].as_number(), Some(9));
+        assert!(first_row[2].is_null());
     }
 }
