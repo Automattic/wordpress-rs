@@ -10,6 +10,7 @@ pub mod jetpack_connection;
 pub mod me;
 pub mod oauth2;
 pub mod sites;
+pub mod stats_visits;
 pub mod subscribers;
 pub mod support_bots;
 pub mod support_eligibility;
