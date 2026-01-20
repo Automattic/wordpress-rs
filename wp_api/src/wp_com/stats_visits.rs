@@ -1,12 +1,45 @@
-use crate::url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension};
+use crate::{
+    impl_as_query_value_from_to_string,
+    url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+};
 use serde::{Deserialize, Serialize};
+
+/// The time unit for grouping visits.
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum StatsVisitsUnit {
+    #[default]
+    Day,
+    Hour,
+    Week,
+    Month,
+    Year,
+}
+
+impl_as_query_value_from_to_string!(StatsVisitsUnit);
 
 /// Parameters for the stats visits endpoint.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct StatsVisitsParams {
-    /// The time unit for grouping visits (e.g., "hour", "day", "week", "month", "year").
+    /// The time unit for grouping visits.
     #[uniffi(default = None)]
-    pub unit: Option<String>,
+    pub unit: Option<StatsVisitsUnit>,
     /// The number of time units to return.
     #[uniffi(default = None)]
     pub quantity: Option<u32>,
@@ -46,7 +79,7 @@ pub struct StatsVisitsResponse {
 #[serde(untagged)]
 pub enum StatsVisitsDataValue {
     String(String),
-    Number(i64),
+    Number(u64),
     Null,
 }
 
@@ -58,7 +91,7 @@ impl StatsVisitsDataValue {
         }
     }
 
-    pub fn as_number(&self) -> Option<i64> {
+    pub fn as_number(&self) -> Option<u64> {
         match self {
             StatsVisitsDataValue::Number(n) => Some(*n),
             _ => None,
@@ -81,7 +114,7 @@ mod tests {
                 .expect("Failed to parse url");
 
         let params = StatsVisitsParams {
-            unit: Some("hour".to_string()),
+            unit: Some(StatsVisitsUnit::Hour),
             quantity: Some(24),
             end_date: Some("2025-01-15".to_string()),
             locale: Some("en".to_string()),
@@ -103,7 +136,7 @@ mod tests {
                 .expect("Failed to parse url");
 
         let params = StatsVisitsParams {
-            unit: Some("day".to_string()),
+            unit: Some(StatsVisitsUnit::Day),
             quantity: Some(7),
             end_date: None,
             locale: None,
