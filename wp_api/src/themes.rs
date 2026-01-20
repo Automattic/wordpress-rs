@@ -1,5 +1,5 @@
 use crate::{
-    BoolOrVecString, impl_as_query_value_from_to_string,
+    JsonValue, impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -81,7 +81,15 @@ pub struct SparseTheme {
     pub template_uri: Option<String>,
     #[WpContext(edit, embed, view)]
     #[WpContextualOption]
-    pub theme_supports: Option<HashMap<ThemeSupports, BoolOrVecString>>,
+    pub theme_supports: Option<HashMap<ThemeSupports, ThemeSupportsData>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, uniffi::Enum)]
+#[serde(untagged)]
+pub enum ThemeSupportsData {
+    Bool(bool),
+    VecString(Vec<String>),
+    Json(JsonValue),
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
@@ -189,4 +197,35 @@ pub enum ThemeSupports {
     WpBlockStyles,
     #[serde(untagged)]
     Custom(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+    use std::io::Read;
+
+    #[rstest]
+    #[case("active-01.json", 1)]
+    fn test_theme_response_parsing(#[case] path: &str, #[case] expected_count: usize) {
+        let json = test_json(path).expect("Failed to read JSON file");
+        let value: Vec<SparseTheme> = serde_json::from_slice(&json).expect("Failed to parse JSON");
+        assert_eq!(value.len(), expected_count);
+    }
+
+    fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
+        let mut file_path = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
+        file_path.push("wp_api");
+        file_path.push("tests");
+        file_path.push("themes");
+        file_path.push(input);
+
+        let mut f = std::fs::File::open(file_path)?;
+        let mut buffer = Vec::new();
+
+        // read the whole file
+        f.read_to_end(&mut buffer)?;
+
+        Ok(buffer)
+    }
 }

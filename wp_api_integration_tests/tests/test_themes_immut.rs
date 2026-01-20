@@ -1,6 +1,7 @@
 use wp_api::themes::{
     SparseThemeFieldWithEditContext, SparseThemeFieldWithEmbedContext,
     SparseThemeFieldWithViewContext, ThemeListParams, ThemeStatus, ThemeStylesheet, ThemeSupports,
+    ThemeSupportsData,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -87,7 +88,7 @@ async fn retrieve_theme_supports_is_a_bool() {
             .expect(
                 "'twentytwentyfour' theme's 'theme_supports' field includes 'block-templates' type"
             ),
-        wp_api::BoolOrVecString::Bool(true)
+        ThemeSupportsData::Bool(true)
     ));
 }
 
@@ -106,7 +107,7 @@ async fn retrieve_theme_supports_is_a_vec_string() {
             .expect("'twentytwentyfour' theme includes the 'theme_supports' field")
             .get(&ThemeSupports::Html5)
             .expect("'twentytwentyfour' theme's 'theme_supports' field includes 'html5' type"),
-        wp_api::BoolOrVecString::VecString(_)
+        ThemeSupportsData::VecString(_)
     ));
 }
 
