@@ -99,4 +99,8 @@ public final class WPComApiClient: Sendable {
     public var supportTickets: SupportTicketsRequestExecutor {
         internalClient.supportTickets()
     }
+
+    public var statsVisits: StatsVisitsRequestExecutor {
+        internalClient.statsVisits()
+    }
 }
