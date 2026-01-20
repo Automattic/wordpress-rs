@@ -62,7 +62,7 @@ impl AppendUrlQueryPairs for StatsVisitsParams {
 }
 
 /// Response from the stats visits endpoint.
-#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Hash, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitsResponse {
     /// The date for the stats query.
     pub date: String,
@@ -74,8 +74,114 @@ pub struct StatsVisitsResponse {
     pub data: Vec<Vec<StatsVisitsDataValue>>,
 }
 
+#[uniffi::export]
+pub fn get_stats_visits_data(response: &StatsVisitsResponse) -> Vec<StatsVisitsDataPoint> {
+    get_stats_data("views", response)
+        .into_iter()
+        .map(|(period, visits)| StatsVisitsDataPoint { period, visits })
+        .collect()
+}
+
+#[uniffi::export]
+pub fn get_stats_visitors_data(response: &StatsVisitsResponse) -> Vec<StatsVisitorsDataPoint> {
+    get_stats_data("visitors", response)
+        .into_iter()
+        .map(|(period, visitors)| StatsVisitorsDataPoint { period, visitors })
+        .collect()
+}
+
+#[uniffi::export]
+pub fn get_stats_likes_data(response: &StatsVisitsResponse) -> Vec<StatsLikesDataPoint> {
+    get_stats_data("likes", response)
+        .into_iter()
+        .map(|(period, likes)| StatsLikesDataPoint { period, likes })
+        .collect()
+}
+
+#[uniffi::export]
+pub fn get_stats_reblogs_data(response: &StatsVisitsResponse) -> Vec<StatsReblogsDataPoint> {
+    get_stats_data("reblogs", response)
+        .into_iter()
+        .map(|(period, reblogs)| StatsReblogsDataPoint { period, reblogs })
+        .collect()
+}
+
+#[uniffi::export]
+pub fn get_stats_comments_data(response: &StatsVisitsResponse) -> Vec<StatsCommentsDataPoint> {
+    get_stats_data("comments", response)
+        .into_iter()
+        .map(|(period, comments)| StatsCommentsDataPoint { period, comments })
+        .collect()
+}
+
+#[uniffi::export]
+pub fn get_stats_posts_data(response: &StatsVisitsResponse) -> Vec<StatsPostsDataPoint> {
+    get_stats_data("posts", response)
+        .into_iter()
+        .map(|(period, posts)| StatsPostsDataPoint { period, posts })
+        .collect()
+}
+
+fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(String, u64)> {
+    let field_index = response
+        .fields
+        .iter()
+        .position(|field| field == handle)
+        .unwrap();
+
+    response
+        .data
+        .iter()
+        .filter_map(|row| {
+            if let Some(period) = row[0].as_string()
+                && let Some(value) = row[field_index].as_number()
+            {
+                return Some((period.clone(), value));
+            }
+
+            None
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+pub struct StatsVisitsDataPoint {
+    pub period: String,
+    pub visits: u64,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+pub struct StatsVisitorsDataPoint {
+    pub period: String,
+    pub visitors: u64,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+pub struct StatsLikesDataPoint {
+    pub period: String,
+    pub likes: u64,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+pub struct StatsReblogsDataPoint {
+    pub period: String,
+    pub reblogs: u64,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+pub struct StatsCommentsDataPoint {
+    pub period: String,
+    pub comments: u64,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+pub struct StatsPostsDataPoint {
+    pub period: String,
+    pub posts: u64,
+}
+
 /// A value in the stats visits data array (can be string, number, or null).
-#[derive(Debug, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum StatsVisitsDataValue {
     String(String),
@@ -177,5 +283,220 @@ mod tests {
         );
         assert_eq!(first_row[1].as_number(), Some(9));
         assert!(first_row[2].is_null());
+    }
+
+    #[test]
+    fn test_get_stats_visits_data_hourly() {
+        let json_file_path = "tests/wpcom/stats_visits/visits-01.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsVisitsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let data_points = get_stats_visits_data(&response);
+
+        assert_eq!(data_points.len(), 24);
+        assert_eq!(
+            data_points[0],
+            StatsVisitsDataPoint {
+                period: "2026-01-17 01:00:00".to_string(),
+                visits: 9,
+            }
+        );
+        assert_eq!(
+            data_points[21],
+            StatsVisitsDataPoint {
+                period: "2026-01-17 22:00:00".to_string(),
+                visits: 27,
+            }
+        );
+        assert_eq!(
+            data_points[23],
+            StatsVisitsDataPoint {
+                period: "2026-01-18 00:00:00".to_string(),
+                visits: 4,
+            }
+        );
+    }
+
+    #[test]
+    fn test_get_stats_visits_data_daily() {
+        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsVisitsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let data_points = get_stats_visits_data(&response);
+
+        assert_eq!(data_points.len(), 30);
+        assert_eq!(
+            data_points[0],
+            StatsVisitsDataPoint {
+                period: "2025-12-21".to_string(),
+                visits: 67,
+            }
+        );
+        assert_eq!(
+            data_points[20],
+            StatsVisitsDataPoint {
+                period: "2026-01-10".to_string(),
+                visits: 57,
+            }
+        );
+        assert_eq!(
+            data_points[29],
+            StatsVisitsDataPoint {
+                period: "2026-01-19".to_string(),
+                visits: 50,
+            }
+        );
+    }
+
+    #[test]
+    fn test_get_stats_visits_data_empty_response() {
+        let response = StatsVisitsResponse {
+            date: "2026-01-19".to_string(),
+            unit: "day".to_string(),
+            fields: vec![
+                "period".to_string(),
+                "views".to_string(),
+                "visitors".to_string(),
+            ],
+            data: vec![],
+        };
+
+        let data_points = get_stats_visits_data(&response);
+
+        assert!(data_points.is_empty());
+    }
+
+    #[test]
+    fn test_get_stats_visitors_data_with_nulls() {
+        // visits-01.json has null visitors values
+        let json_file_path = "tests/wpcom/stats_visits/visits-01.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsVisitsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let data_points = get_stats_visitors_data(&response);
+
+        // All visitors are null, so no data points should be returned
+        assert!(data_points.is_empty());
+    }
+
+    #[test]
+    fn test_get_stats_visitors_data_daily() {
+        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsVisitsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let data_points = get_stats_visitors_data(&response);
+
+        assert_eq!(data_points.len(), 30);
+        assert_eq!(
+            data_points[0],
+            StatsVisitorsDataPoint {
+                period: "2025-12-21".to_string(),
+                visitors: 60,
+            }
+        );
+        assert_eq!(
+            data_points[20],
+            StatsVisitorsDataPoint {
+                period: "2026-01-10".to_string(),
+                visitors: 50,
+            }
+        );
+        assert_eq!(
+            data_points[29],
+            StatsVisitorsDataPoint {
+                period: "2026-01-19".to_string(),
+                visitors: 47,
+            }
+        );
+    }
+
+    #[test]
+    fn test_get_stats_likes_data_daily() {
+        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsVisitsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let data_points = get_stats_likes_data(&response);
+
+        assert_eq!(data_points.len(), 30);
+        // Most likes are 0, but 2026-01-05 has 1 like
+        assert_eq!(
+            data_points[0],
+            StatsLikesDataPoint {
+                period: "2025-12-21".to_string(),
+                likes: 0,
+            }
+        );
+        assert_eq!(
+            data_points[15],
+            StatsLikesDataPoint {
+                period: "2026-01-05".to_string(),
+                likes: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn test_get_stats_reblogs_data_daily() {
+        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsVisitsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let data_points = get_stats_reblogs_data(&response);
+
+        assert_eq!(data_points.len(), 30);
+        assert_eq!(
+            data_points[0],
+            StatsReblogsDataPoint {
+                period: "2025-12-21".to_string(),
+                reblogs: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn test_get_stats_comments_data_daily() {
+        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsVisitsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let data_points = get_stats_comments_data(&response);
+
+        assert_eq!(data_points.len(), 30);
+        assert_eq!(
+            data_points[0],
+            StatsCommentsDataPoint {
+                period: "2025-12-21".to_string(),
+                comments: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn test_get_stats_posts_data_daily() {
+        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsVisitsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let data_points = get_stats_posts_data(&response);
+
+        assert_eq!(data_points.len(), 30);
+        assert_eq!(
+            data_points[0],
+            StatsPostsDataPoint {
+                period: "2025-12-21".to_string(),
+                posts: 0,
+            }
+        );
     }
 }

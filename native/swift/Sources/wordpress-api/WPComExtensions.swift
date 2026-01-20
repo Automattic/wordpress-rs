@@ -25,3 +25,29 @@ public extension SupportAttachment {
         getAttachmentDimensions(attachment: self)
     }
 }
+
+public extension StatsVisitsResponse {
+    var statsVisitsData: [StatsVisitsDataPoint] {
+        getStatsVisitsData(response: self)
+    }
+
+    var statsVisitorsData: [StatsVisitorsDataPoint] {
+        getStatsVisitorsData(response: self)
+    }
+
+    var statsLikesData: [StatsLikesDataPoint] {
+        getStatsLikesData(response: self)
+    }
+
+    var statsReblogsData: [StatsReblogsDataPoint] {
+        getStatsReblogsData(response: self)
+    }
+
+    var statsCommentsData: [StatsCommentsDataPoint] {
+        getStatsCommentsData(response: self)
+    }
+
+    var statsPostsData: [StatsPostsDataPoint] {
+        getStatsPostsData(response: self)
+    }
+}
