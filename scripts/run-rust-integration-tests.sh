@@ -4,4 +4,4 @@
 cd /app
 
 # Run the test suite
-cargo test -p wp_api_integration_tests --no-fail-fast
+cargo test -p wp_api_integration_tests -p wp_mobile_cache_integration_tests --no-fail-fast
