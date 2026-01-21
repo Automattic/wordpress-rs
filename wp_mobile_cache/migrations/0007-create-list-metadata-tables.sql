@@ -29,7 +29,7 @@ CREATE TABLE `list_metadata_items` (
 ) STRICT;
 
 CREATE INDEX idx_list_metadata_items_list ON list_metadata_items(list_metadata_id);
-CREATE INDEX idx_list_metadata_items_entity ON list_metadata_items(list_metadata_id, entity_id);
+CREATE UNIQUE INDEX idx_list_metadata_items_entity ON list_metadata_items(list_metadata_id, entity_id);
 
 -- Table 3: Sync state (FK to list_metadata, not duplicating key)
 CREATE TABLE `list_metadata_state` (

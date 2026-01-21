@@ -47,7 +47,7 @@ macro_rules! wp_mobile_item_state {
         /// This enum provides type-safe representation of item state with associated data.
         /// Data presence is encoded in the variant itself, eliminating the need for
         /// separate `state` and `data` fields.
-        #[derive(uniffi::Enum)]
+        #[derive(uniffi::Enum, Debug)]
         pub enum $state_name {
             /// No cached data available, needs fetch
             Missing,
@@ -127,7 +127,7 @@ macro_rules! wp_mobile_metadata_item {
         /// making them available immediately without waiting for full entity data
         /// to be fetched. This enables building hierarchical views (like page trees)
         /// as soon as the list structure is known.
-        #[derive(uniffi::Record)]
+        #[derive(uniffi::Record, Debug)]
         pub struct $item_name {
             /// The entity ID
             pub id: i64,
