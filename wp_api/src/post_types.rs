@@ -223,3 +223,17 @@ pub struct PostTypeVisibility {
     pub show_in_nav_menus: bool,
     pub show_ui: bool,
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn parse_response() {
+        // Newspack Newsletters custom post type returns `"has_archive": "newsletter"`.
+        let data = include_str!("../tests/post_types/newspack-newsletter-3.27.0.json");
+        let parsed: PostTypesResponseWithEditContext =
+            serde_json::from_str(data).expect("Failed to parse post types response");
+        assert_eq!(parsed.post_types.len(), 2);
+    }
+}
