@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use wp_api::{
-    JsonValue,
+    BoolOrString, JsonValue,
     post_types::{
         PostTypeCapabilities, PostTypeDetailsWithEditContext, PostTypeLabels, PostTypeSupports,
         PostTypeSupportsMap, PostTypeVisibility,
@@ -96,7 +96,7 @@ impl PostTypeBuilder {
                     (PostTypeSupports::Editor, JsonValue::Bool(true)),
                 ]),
             },
-            has_archive: false,
+            has_archive: BoolOrString::Bool(false),
             taxonomies: vec![],
             rest_base: slug.to_string(),
             rest_namespace: "wp/v2".to_string(),

@@ -190,7 +190,7 @@ impl TryFrom<BoolOrString> for WpResponseString {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, uniffi::Enum)]
 #[serde(untagged)]
 pub enum BoolOrString {
     Bool(bool),

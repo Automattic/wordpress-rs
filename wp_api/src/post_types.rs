@@ -1,5 +1,5 @@
 use crate::request::endpoint::posts_endpoint::PostEndpointType;
-use crate::{JsonValue, impl_as_query_value_from_to_string};
+use crate::{BoolOrString, JsonValue, impl_as_query_value_from_to_string};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -89,7 +89,7 @@ pub struct SparsePostTypeDetails {
     #[WpContext(edit)]
     pub supports: Option<PostTypeSupportsMap>,
     #[WpContext(edit, view)]
-    pub has_archive: Option<bool>,
+    pub has_archive: Option<BoolOrString>,
     #[WpContext(edit, view)]
     pub taxonomies: Option<Vec<String>>,
     #[WpContext(edit, embed, view)]
@@ -222,4 +222,18 @@ pub enum PostTypeSupports {
 pub struct PostTypeVisibility {
     pub show_in_nav_menus: bool,
     pub show_ui: bool,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn parse_response() {
+        // Newspack Newsletters custom post type returns `"has_archive": "newsletter"`.
+        let data = include_str!("../tests/post_types/newspack-newsletter-3.27.0.json");
+        let parsed: PostTypesResponseWithEditContext =
+            serde_json::from_str(data).expect("Failed to parse post types response");
+        assert_eq!(parsed.post_types.len(), 2);
+    }
 }
