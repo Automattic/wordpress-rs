@@ -1,5 +1,5 @@
 use crate::request::endpoint::posts_endpoint::PostEndpointType;
-use crate::{JsonValue, impl_as_query_value_from_to_string};
+use crate::{BoolOrString, JsonValue, impl_as_query_value_from_to_string};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -89,7 +89,7 @@ pub struct SparsePostTypeDetails {
     #[WpContext(edit)]
     pub supports: Option<PostTypeSupportsMap>,
     #[WpContext(edit, view)]
-    pub has_archive: Option<bool>,
+    pub has_archive: Option<BoolOrString>,
     #[WpContext(edit, view)]
     pub taxonomies: Option<Vec<String>>,
     #[WpContext(edit, embed, view)]
