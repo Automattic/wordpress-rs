@@ -49,6 +49,9 @@ pub struct StatsTopPostsParams {
     /// The maximum number of top posts to return.
     #[uniffi(default = None)]
     pub max: Option<u32>,
+    /// The number of periods to include in the response.
+    #[uniffi(default = None)]
+    pub num: Option<u32>,
 }
 
 impl AppendUrlQueryPairs for StatsTopPostsParams {
@@ -57,7 +60,8 @@ impl AppendUrlQueryPairs for StatsTopPostsParams {
             .append_option_query_value_pair("period", self.period.as_ref())
             .append_option_query_value_pair("start_date", self.start_date.as_ref())
             .append_option_query_value_pair("date", self.date.as_ref())
-            .append_option_query_value_pair("max", self.max.as_ref());
+            .append_option_query_value_pair("max", self.max.as_ref())
+            .append_option_query_value_pair("num", self.num.as_ref());
     }
 }
 
@@ -156,6 +160,7 @@ mod tests {
             start_date: Some("2026-01-26".to_string()),
             date: Some("2026-01-26".to_string()),
             max: Some(10),
+            num: Some(30),
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -163,7 +168,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&start_date=2026-01-26&date=2026-01-26&max=10"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&start_date=2026-01-26&date=2026-01-26&max=10&num=30"
         );
     }
 
@@ -179,6 +184,7 @@ mod tests {
             start_date: None,
             date: Some("2026-01-19".to_string()),
             max: None,
+            num: None,
         };
 
         let mut query_pairs = url.query_pairs_mut();
