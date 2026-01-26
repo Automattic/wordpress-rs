@@ -188,6 +188,22 @@ impl<C: PostTypeContext> PostTypeRepository<C> {
         })
         .collect()
     }
+
+    /// Delete all post types for a given site.
+    ///
+    /// Returns the number of rows deleted.
+    pub fn delete_all(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+    ) -> Result<usize, SqliteDbError> {
+        let sql = format!("DELETE FROM {} WHERE db_site_id = ?", Self::table_name());
+
+        let mut stmt = executor.prepare(&sql)?;
+        let deleted = stmt.execute([site.row_id.0])?;
+
+        Ok(deleted)
+    }
 }
 
 #[cfg(test)]
