@@ -78,7 +78,7 @@ class PostCollectionViewModel(
      */
     fun setFilter(status: String?) {
         // Parse the string status to PostStatus using the helper function
-        val postStatus = status?.let { uniffi.wp_api.parsePostStatus(it) }
+        val postStatus = status?.let { uniffi.wp_api.postStatusFromString(it) }
         val newFilter = AnyPostFilter(status = postStatus)
 
         // Update state: new filter, reset page, clear fetch results

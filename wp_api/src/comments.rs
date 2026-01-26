@@ -464,8 +464,10 @@ fn comment_status_from_string(value: String) -> CommentStatus {
 }
 
 #[uniffi::export]
-fn comment_status_to_string(status: CommentStatus) -> String {
-    status.to_string()
+impl CommentStatus {
+    pub fn as_string(&self) -> String {
+        self.to_string()
+    }
 }
 
 #[uniffi::export]
@@ -474,8 +476,10 @@ fn comment_type_from_string(value: String) -> CommentType {
 }
 
 #[uniffi::export]
-fn comment_type_to_string(comment_type: CommentType) -> String {
-    comment_type.to_string()
+impl CommentType {
+    pub fn as_string(&self) -> String {
+        self.to_string()
+    }
 }
 
 #[cfg(test)]

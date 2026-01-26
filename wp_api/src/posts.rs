@@ -523,11 +523,18 @@ impl_as_query_value_from_to_string!(PostStatus);
 /// Parse a string into a PostStatus.
 ///
 /// This is a helper function for platform code that can't access the `FromStr` trait
-/// directly due to UniFFI limitations.
+/// directly due to UniFFI limitations. Unknown values are returned as `Custom`.
 #[uniffi::export]
-fn parse_post_status(s: &str) -> Option<PostStatus> {
+fn post_status_from_string(s: String) -> PostStatus {
     use std::str::FromStr;
-    PostStatus::from_str(s).ok()
+    PostStatus::from_str(&s).unwrap_or(PostStatus::Custom(s))
+}
+
+#[uniffi::export]
+impl PostStatus {
+    pub fn as_string(&self) -> String {
+        self.to_string()
+    }
 }
 
 #[derive(

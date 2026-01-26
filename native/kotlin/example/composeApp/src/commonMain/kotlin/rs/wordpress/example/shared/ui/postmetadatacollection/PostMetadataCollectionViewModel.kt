@@ -138,7 +138,7 @@ class PostMetadataCollectionViewModel(
      * Change the filter and load persisted state from database
      */
     fun setFilter(status: String?) {
-        val postStatus = status?.let { uniffi.wp_api.parsePostStatus(it) }
+        val postStatus = status?.let { uniffi.wp_api.postStatusFromString(it) }
         val newFilter = PostListFilter(
             status = if (postStatus != null) listOf(postStatus) else emptyList()
         )

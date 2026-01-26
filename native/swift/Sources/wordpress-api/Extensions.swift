@@ -49,7 +49,7 @@ public extension CommentStatus {
     }
 
     var rawValue: String {
-        commentStatusToString(status: self)
+        self.asString()
     }
 }
 
@@ -65,7 +65,7 @@ public extension CommentType {
     }
 
     var rawValue: String {
-        commentTypeToString(commentType: self)
+        self.asString()
     }
 }
 
@@ -81,7 +81,7 @@ public extension UserRole {
     }
 
     var rawValue: String {
-        userRoleToString(role: self)
+        self.asString()
     }
 }
 
@@ -97,7 +97,7 @@ public extension UserCapability {
     }
 
     var rawValue: String {
-        userCapabilityToString(capability: self)
+        self.asString()
     }
 }
 

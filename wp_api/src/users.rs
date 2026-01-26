@@ -265,8 +265,10 @@ fn user_capability_from_string(value: String) -> UserCapability {
 }
 
 #[uniffi::export]
-fn user_capability_to_string(capability: UserCapability) -> String {
-    capability.to_string()
+impl UserCapability {
+    pub fn as_string(&self) -> String {
+        self.to_string()
+    }
 }
 
 #[derive(
@@ -303,8 +305,10 @@ fn user_role_from_string(value: String) -> UserRole {
 }
 
 #[uniffi::export]
-fn user_role_to_string(role: UserRole) -> String {
-    role.to_string()
+impl UserRole {
+    pub fn as_string(&self) -> String {
+        self.to_string()
+    }
 }
 
 impl_as_query_value_from_to_string!(UserRole);
