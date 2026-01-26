@@ -80,7 +80,7 @@ pub struct StatsTopPostsDayData {
     /// The total number of views for this day.
     pub total_views: u64,
     /// IDs that were dropped from the results.
-    pub dropped_ids: Vec<i64>,
+    pub dropped_ids: Vec<u64>,
     /// Views from other posts not included in the list.
     pub other_views: u64,
 }
@@ -89,7 +89,7 @@ pub struct StatsTopPostsDayData {
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsTopPostsPostView {
     /// The post ID.
-    pub id: i64,
+    pub id: u64,
     /// The URL of the post.
     pub href: String,
     /// The publication date of the post (can be null for homepage).
