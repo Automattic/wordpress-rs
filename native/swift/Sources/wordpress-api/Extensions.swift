@@ -49,7 +49,7 @@ public extension CommentStatus {
     }
 
     var rawValue: String {
-        self.asString()
+        self.description
     }
 }
 
@@ -65,7 +65,7 @@ public extension CommentType {
     }
 
     var rawValue: String {
-        self.asString()
+        self.description
     }
 }
 
@@ -81,7 +81,7 @@ public extension UserRole {
     }
 
     var rawValue: String {
-        self.asString()
+        self.description
     }
 }
 
@@ -97,7 +97,7 @@ public extension UserCapability {
     }
 
     var rawValue: String {
-        self.asString()
+        self.description
     }
 }
 
@@ -113,7 +113,7 @@ public extension PostType {
     }
 
     var rawValue: String {
-        self.asString()
+        self.description
     }
 }
 

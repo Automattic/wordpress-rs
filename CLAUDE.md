@@ -24,9 +24,13 @@ cargo test -p wp_api_integration_tests --test '{file_name}'
 # Run linting and format checks
 cargo fmt --all -- --check
 cargo clippy --tests --all-targets --all-features -- -D warnings
+swiftlint --strict
 
 # Generate API documentation
 cargo doc --no-deps --all-features
+
+# Generate Swift bindings (use this to verify UniFFI changes work correctly)
+make xcframework
 ```
 
 ## Architecture
