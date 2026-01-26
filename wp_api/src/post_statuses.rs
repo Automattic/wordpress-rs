@@ -42,6 +42,7 @@ pub struct SparsePostStatus {
 #[derive(
     Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record,
 )]
+#[uniffi::export(Display)]
 #[serde(transparent)]
 pub struct PostStatusSlug {
     pub slug: String,

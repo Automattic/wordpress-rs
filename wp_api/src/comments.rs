@@ -55,6 +55,7 @@ wp_content_i64_id!(CommentId);
     strum_macros::EnumString,
     strum_macros::Display,
 )]
+#[uniffi::export(Display)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum CommentType {
@@ -443,6 +444,7 @@ pub enum CommentAuthorAvatarUrlSize {
     strum_macros::EnumString,
     strum_macros::Display,
 )]
+#[uniffi::export(Display)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum CommentStatus {
@@ -464,22 +466,8 @@ fn comment_status_from_string(value: String) -> CommentStatus {
 }
 
 #[uniffi::export]
-impl CommentStatus {
-    pub fn as_string(&self) -> String {
-        self.to_string()
-    }
-}
-
-#[uniffi::export]
 fn comment_type_from_string(value: String) -> CommentType {
     CommentType::from_str(value.as_str()).unwrap_or(CommentType::Custom(value))
-}
-
-#[uniffi::export]
-impl CommentType {
-    pub fn as_string(&self) -> String {
-        self.to_string()
-    }
 }
 
 #[cfg(test)]

@@ -262,7 +262,9 @@ mod tests {
             "https://example.com/attachments/token/token1/?name=sample-image-1.jpg"
         );
 
-        let dimensions = conversation.messages[0].attachments[0].dimensions().unwrap();
+        let dimensions = conversation.messages[0].attachments[0]
+            .dimensions()
+            .unwrap();
 
         assert_eq!(dimensions.width, 1000);
         assert_eq!(dimensions.height, 800);
@@ -281,7 +283,9 @@ mod tests {
             "https://example.com/attachments/token/token2/?name=sample-image-2.jpg"
         );
 
-        let dimensions = conversation.messages[0].attachments[1].dimensions().unwrap();
+        let dimensions = conversation.messages[0].attachments[1]
+            .dimensions()
+            .unwrap();
         assert_eq!(dimensions.width, 2000);
         assert_eq!(dimensions.height, 1600);
     }

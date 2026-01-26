@@ -20,6 +20,7 @@ use wp_serde_helper::deserialize_empty_array_or_hashmap;
     strum_macros::EnumString,
     strum_macros::Display,
 )]
+#[uniffi::export(Display)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum PostType {
@@ -43,13 +44,6 @@ impl_as_query_value_from_to_string!(PostType);
 #[uniffi::export]
 fn post_type_from_string(value: String) -> PostType {
     PostType::from_str(value.as_str()).unwrap_or(PostType::Custom(value))
-}
-
-#[uniffi::export]
-impl PostType {
-    pub fn as_string(&self) -> String {
-        self.to_string()
-    }
 }
 
 #[uniffi::export]

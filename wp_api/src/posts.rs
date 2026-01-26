@@ -504,6 +504,7 @@ pub struct PostFootnote {
     strum_macros::EnumString,
     strum_macros::Display,
 )]
+#[uniffi::export(Display)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum PostStatus {
@@ -528,13 +529,6 @@ impl_as_query_value_from_to_string!(PostStatus);
 fn post_status_from_string(s: String) -> PostStatus {
     use std::str::FromStr;
     PostStatus::from_str(&s).unwrap_or(PostStatus::Custom(s))
-}
-
-#[uniffi::export]
-impl PostStatus {
-    pub fn as_string(&self) -> String {
-        self.to_string()
-    }
 }
 
 #[derive(

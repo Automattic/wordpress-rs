@@ -187,6 +187,7 @@ pub struct UserListParams {
     strum_macros::EnumString,
     strum_macros::Display,
 )]
+#[uniffi::export(Display)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum UserCapability {
@@ -264,13 +265,6 @@ fn user_capability_from_string(value: String) -> UserCapability {
     UserCapability::from_str(value.as_str()).unwrap_or(UserCapability::Custom(value))
 }
 
-#[uniffi::export]
-impl UserCapability {
-    pub fn as_string(&self) -> String {
-        self.to_string()
-    }
-}
-
 #[derive(
     Debug,
     Clone,
@@ -285,6 +279,7 @@ impl UserCapability {
     strum_macros::EnumString,
     strum_macros::Display,
 )]
+#[uniffi::export(Display)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum UserRole {
@@ -302,13 +297,6 @@ pub enum UserRole {
 #[uniffi::export]
 fn user_role_from_string(value: String) -> UserRole {
     UserRole::from_str(value.as_str()).unwrap_or(UserRole::Custom(value))
-}
-
-#[uniffi::export]
-impl UserRole {
-    pub fn as_string(&self) -> String {
-        self.to_string()
-    }
 }
 
 impl_as_query_value_from_to_string!(UserRole);
