@@ -232,7 +232,7 @@ class PostMetadataCollectionViewModel(
         // This should always succeed if post types were fetched first
         val postTypeDetails = postTypeService.getBySlug(postTypeSlug)
             ?: error("Post type '$postTypeSlug' not found in cache. Ensure post types are fetched before creating post collections.")
-        val endpointType = uniffi.wp_api.postTypeDetailsToPostEndpointType(postTypeDetails)
+        val endpointType = postTypeDetails.toPostEndpointType()
 
         val observable = postService.getObservablePostMetadataCollectionWithEditContext(
             endpointType,

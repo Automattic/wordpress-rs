@@ -46,18 +46,20 @@ fn post_type_from_string(value: String) -> PostType {
 }
 
 #[uniffi::export]
-fn post_type_to_string(post_type: PostType) -> String {
-    post_type.to_string()
+impl PostType {
+    pub fn as_string(&self) -> String {
+        self.to_string()
+    }
 }
 
 #[uniffi::export]
-fn post_type_details_to_post_endpoint_type(
-    post_type_details: &PostTypeDetailsWithEditContext,
-) -> PostEndpointType {
-    match post_type_details.rest_base.as_str() {
-        "posts" => PostEndpointType::Posts,
-        "pages" => PostEndpointType::Pages,
-        other => PostEndpointType::Custom(other.to_string()),
+impl PostTypeDetailsWithEditContext {
+    pub fn to_post_endpoint_type(&self) -> PostEndpointType {
+        match self.rest_base.as_str() {
+            "posts" => PostEndpointType::Posts,
+            "pages" => PostEndpointType::Pages,
+            other => PostEndpointType::Custom(other.to_string()),
+        }
     }
 }
 
@@ -112,6 +114,7 @@ pub struct PostTypeSupportsMap {
     pub map: HashMap<PostTypeSupports, JsonValue>,
 }
 
+#[uniffi::export]
 impl PostTypeSupportsMap {
     /// Check if the post type supports a specific feature by checking if the key is present.
     ///
@@ -120,18 +123,9 @@ impl PostTypeSupportsMap {
     /// when not supported. The value can also be an object with additional configuration (e.g.,
     /// `editor` may have nested settings). We assume that if a key is present, the feature is
     /// supported, regardless of the actual value.
-    pub fn supports(&self, feature: &PostTypeSupports) -> bool {
-        self.map.contains_key(feature)
+    pub fn supports(&self, feature: PostTypeSupports) -> bool {
+        self.map.contains_key(&feature)
     }
-}
-
-/// Check if a post type supports a specific feature by checking if the key is present.
-///
-/// Note: This only checks for key presence, not the associated value. See
-/// `PostTypeSupportsMap::supports` for details on this assumption.
-#[uniffi::export]
-fn post_type_supports(supports_map: &PostTypeSupportsMap, feature: PostTypeSupports) -> bool {
-    supports_map.supports(&feature)
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]

@@ -113,7 +113,7 @@ public extension PostType {
     }
 
     var rawValue: String {
-        postTypeToString(postType: self)
+        self.asString()
     }
 }
 
@@ -124,11 +124,7 @@ extension PostType: ExpressibleByStringLiteral {
 }
 
 public extension PostTypeSupportsMap {
-    func supports(_ feature: PostTypeSupports) -> Bool {
-        postTypeSupports(supportsMap: self, feature: feature)
-    }
-
     func supports(_ feature: String) -> Bool {
-        postTypeSupports(supportsMap: self, feature: .custom(feature))
+        self.supports(feature: .custom(feature))
     }
 }
