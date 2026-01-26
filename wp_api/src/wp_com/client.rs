@@ -5,6 +5,7 @@ use super::endpoint::{
     },
     me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
+    stats_referrers_endpoint::{StatsReferrersRequestBuilder, StatsReferrersRequestExecutor},
     stats_top_posts_endpoint::{StatsTopPostsRequestBuilder, StatsTopPostsRequestExecutor},
     stats_visits_endpoint::{StatsVisitsRequestBuilder, StatsVisitsRequestExecutor},
     subscribers_endpoint::{SubscribersRequestBuilder, SubscribersRequestExecutor},
@@ -35,6 +36,7 @@ pub struct WpComApiRequestBuilder {
     me: Arc<MeRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
+    stats_referrers: Arc<StatsReferrersRequestBuilder>,
     stats_top_posts: Arc<StatsTopPostsRequestBuilder>,
     stats_visits: Arc<StatsVisitsRequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
@@ -56,6 +58,7 @@ impl WpComApiRequestBuilder {
             me,
             oauth2,
             sites,
+            stats_referrers,
             stats_top_posts,
             stats_visits,
             subscribers,
@@ -88,6 +91,7 @@ pub struct WpComApiClient {
     me: Arc<MeRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
+    stats_referrers: Arc<StatsReferrersRequestExecutor>,
     stats_top_posts: Arc<StatsTopPostsRequestExecutor>,
     stats_visits: Arc<StatsVisitsRequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
@@ -110,6 +114,7 @@ impl WpComApiClient {
             me,
             oauth2,
             sites,
+            stats_referrers,
             stats_top_posts,
             stats_visits,
             subscribers,
@@ -125,6 +130,7 @@ api_client_generate_endpoint_impl!(WpComApi, languages);
 api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, sites);
+api_client_generate_endpoint_impl!(WpComApi, stats_referrers);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_posts);
 api_client_generate_endpoint_impl!(WpComApi, stats_visits);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);
