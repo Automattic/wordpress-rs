@@ -50,11 +50,13 @@ impl PostTypeService {
         // Extract the HashMap from the response
         let post_types_map = response.data.post_types;
 
-        // Upsert each post type to the database
+        // Delete all existing post types and insert new ones
         let entity_ids = self
             .cache
             .execute(|conn| {
                 let repo = PostTypeRepository::<EditContext>::new();
+
+                repo.delete_all(conn, &self.db_site)?;
 
                 post_types_map
                     .iter()
