@@ -1,123 +1,120 @@
 {
     "date": "2026-01-25",
-    "days": {
-        "2026-01-19": {
-            "postviews": [
-                {
-                    "id": 269,
-                    "href": "https://fieldguide.automattic.com/the-chaos-theory/",
-                    "date": "2009-09-04 07:56:46",
-                    "title": "Welcome to Automattic",
-                    "type": "page",
-                    "status": "publish",
-                    "public": true,
-                    "views": 417,
-                    "video_play": false
-                },
-                {
-                    "id": 0,
-                    "href": "https://fieldguide.automattic.com/",
-                    "date": null,
-                    "title": "Home page / Archives",
-                    "type": "homepage",
-                    "status": null,
-                    "public": false,
-                    "views": 244,
-                    "video_play": false
-                },
-                {
-                    "id": 265324,
-                    "href": "https://fieldguide.automattic.com/expense-guidelines/travel-guidelines/",
-                    "date": "2025-04-26 00:07:04",
-                    "title": "Travel Guidelines",
-                    "type": "page",
-                    "status": "publish",
-                    "public": true,
-                    "views": 58,
-                    "video_play": false
-                },
-                {
-                    "id": 24362,
-                    "href": "https://fieldguide.automattic.com/expense-guidelines/",
-                    "date": "2015-12-10 23:10:39",
-                    "title": "Expense Guidelines",
-                    "type": "page",
-                    "status": "publish",
-                    "public": true,
-                    "views": 42,
-                    "video_play": false
-                },
-                {
-                    "id": 275671,
-                    "href": "https://fieldguide.automattic.com/getting-started-with-claude-code-a-comprehensive-tutorial/",
-                    "date": "2025-09-22 21:29:37",
-                    "title": "Getting Started with Claude Code: A Comprehensive Tutorial",
-                    "type": "page",
-                    "status": "publish",
-                    "public": true,
-                    "views": 38,
-                    "video_play": false
-                },
-                {
-                    "id": 198942,
-                    "href": "https://fieldguide.automattic.com/github-enterprise-for-automattic/",
-                    "date": "2023-03-27 15:06:00",
-                    "title": "GitHub Enterprise for Automattic",
-                    "type": "page",
-                    "status": "publish",
-                    "public": true,
-                    "views": 35,
-                    "video_play": false
-                },
-                {
-                    "id": 280301,
-                    "href": "https://fieldguide.automattic.com/librechat/",
-                    "date": "2025-12-12 06:02:54",
-                    "title": "LibreChat",
-                    "type": "page",
-                    "status": "publish",
-                    "public": true,
-                    "views": 34,
-                    "video_play": false
-                },
-                {
-                    "id": 278875,
-                    "href": "https://fieldguide.automattic.com/ai-tools-and-resources/",
-                    "date": "2025-11-20 10:07:03",
-                    "title": "AI Tools & Resource Hub",
-                    "type": "page",
-                    "status": "publish",
-                    "public": true,
-                    "views": 31,
-                    "video_play": false
-                },
-                {
-                    "id": 53972,
-                    "href": "https://fieldguide.automattic.com/expense-guidelines/travel-guidelines/travel-upgrades/",
-                    "date": "2018-06-22 21:44:42",
-                    "title": "Travel Upgrade",
-                    "type": "page",
-                    "status": "publish",
-                    "public": true,
-                    "views": 30,
-                    "video_play": false
-                },
-                {
-                    "id": 209990,
-                    "href": "https://fieldguide.automattic.com/travel-flight-delays-disruptions/",
-                    "date": "2023-08-10 23:27:27",
-                    "title": "Travel - Flight Delays & Disruptions",
-                    "type": "page",
-                    "status": "publish",
-                    "public": true,
-                    "views": 27,
-                    "video_play": false
-                }
-            ],
-            "total_views": 2996,
-            "dropped_ids": [],
-            "other_views": 2040
-        }
-    },
-    "period": "week"
+    "period": "week",
+    "summary": {
+        "postviews": [
+            {
+                "id": 269,
+                "href": "https://fieldguide.automattic.com/the-chaos-theory/",
+                "date": "2009-09-04 07:56:46",
+                "title": "Welcome to Automattic",
+                "type": "page",
+                "status": "publish",
+                "public": true,
+                "views": 417,
+                "video_play": false
+            },
+            {
+                "id": 0,
+                "href": "https://fieldguide.automattic.com/",
+                "date": null,
+                "title": "Home page / Archives",
+                "type": "homepage",
+                "status": null,
+                "public": false,
+                "views": 244,
+                "video_play": false
+            },
+            {
+                "id": 265324,
+                "href": "https://fieldguide.automattic.com/expense-guidelines/travel-guidelines/",
+                "date": "2025-04-26 00:07:04",
+                "title": "Travel Guidelines",
+                "type": "page",
+                "status": "publish",
+                "public": true,
+                "views": 58,
+                "video_play": false
+            },
+            {
+                "id": 24362,
+                "href": "https://fieldguide.automattic.com/expense-guidelines/",
+                "date": "2015-12-10 23:10:39",
+                "title": "Expense Guidelines",
+                "type": "page",
+                "status": "publish",
+                "public": true,
+                "views": 42,
+                "video_play": false
+            },
+            {
+                "id": 275671,
+                "href": "https://fieldguide.automattic.com/getting-started-with-claude-code-a-comprehensive-tutorial/",
+                "date": "2025-09-22 21:29:37",
+                "title": "Getting Started with Claude Code: A Comprehensive Tutorial",
+                "type": "page",
+                "status": "publish",
+                "public": true,
+                "views": 38,
+                "video_play": false
+            },
+            {
+                "id": 198942,
+                "href": "https://fieldguide.automattic.com/github-enterprise-for-automattic/",
+                "date": "2023-03-27 15:06:00",
+                "title": "GitHub Enterprise for Automattic",
+                "type": "page",
+                "status": "publish",
+                "public": true,
+                "views": 35,
+                "video_play": false
+            },
+            {
+                "id": 280301,
+                "href": "https://fieldguide.automattic.com/librechat/",
+                "date": "2025-12-12 06:02:54",
+                "title": "LibreChat",
+                "type": "page",
+                "status": "publish",
+                "public": true,
+                "views": 34,
+                "video_play": false
+            },
+            {
+                "id": 278875,
+                "href": "https://fieldguide.automattic.com/ai-tools-and-resources/",
+                "date": "2025-11-20 10:07:03",
+                "title": "AI Tools & Resource Hub",
+                "type": "page",
+                "status": "publish",
+                "public": true,
+                "views": 31,
+                "video_play": false
+            },
+            {
+                "id": 53972,
+                "href": "https://fieldguide.automattic.com/expense-guidelines/travel-guidelines/travel-upgrades/",
+                "date": "2018-06-22 21:44:42",
+                "title": "Travel Upgrade",
+                "type": "page",
+                "status": "publish",
+                "public": true,
+                "views": 30,
+                "video_play": false
+            },
+            {
+                "id": 209990,
+                "href": "https://fieldguide.automattic.com/travel-flight-delays-disruptions/",
+                "date": "2023-08-10 23:27:27",
+                "title": "Travel - Flight Delays & Disruptions",
+                "type": "page",
+                "status": "publish",
+                "public": true,
+                "views": 27,
+                "video_play": false
+            }
+        ],
+        "total_views": 2996,
+        "dropped_ids": []
+    }
 }

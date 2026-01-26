@@ -3,7 +3,6 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// The time period for grouping top posts.
 #[derive(
@@ -61,7 +60,9 @@ impl AppendUrlQueryPairs for StatsTopPostsParams {
             .append_option_query_value_pair("start_date", self.start_date.as_ref())
             .append_option_query_value_pair("date", self.date.as_ref())
             .append_option_query_value_pair("max", self.max.as_ref())
-            .append_option_query_value_pair("num", self.num.as_ref());
+            .append_option_query_value_pair("num", self.num.as_ref())
+            .append_query_value_pair("summarize", &1u32)
+            .append_query_value_pair("skip_archives", &1u32);
     }
 }
 
@@ -70,10 +71,21 @@ impl AppendUrlQueryPairs for StatsTopPostsParams {
 pub struct StatsTopPostsResponse {
     /// The date for the stats query.
     pub date: String,
-    /// The stats data grouped by day.
-    pub days: HashMap<String, StatsTopPostsDayData>,
     /// The time period used for grouping.
     pub period: String,
+    /// Summary data with aggregated post views.
+    pub summary: StatsTopPostsSummaryData,
+}
+
+/// Summary data with aggregated post views.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct StatsTopPostsSummaryData {
+    /// The list of post views.
+    pub postviews: Vec<StatsTopPostsPostView>,
+    /// The total number of views.
+    pub total_views: u64,
+    /// IDs that were dropped from the results.
+    pub dropped_ids: Vec<u64>,
 }
 
 /// Stats data for a single day.
@@ -113,35 +125,24 @@ pub struct StatsTopPostsPostView {
     pub video_play: bool,
 }
 
-/// Returns all post views from all days in the response.
+/// Returns all post views from the summary.
 #[uniffi::export]
 pub fn get_stats_top_posts_all_post_views(
     response: &StatsTopPostsResponse,
 ) -> Vec<StatsTopPostsPostView> {
-    response
-        .days
-        .values()
-        .flat_map(|day_data| day_data.postviews.clone())
-        .collect()
+    response.summary.postviews.clone()
 }
 
-/// Returns post views for a specific date.
-#[uniffi::export]
-pub fn get_stats_top_posts_for_date(
-    response: &StatsTopPostsResponse,
-    date: &str,
-) -> Option<StatsTopPostsDayData> {
-    response.days.get(date).cloned()
-}
-
-/// Returns the total views across all days.
+/// Returns the total views from the summary.
 #[uniffi::export]
 pub fn get_stats_top_posts_total_views(response: &StatsTopPostsResponse) -> u64 {
-    response
-        .days
-        .values()
-        .map(|day_data| day_data.total_views)
-        .sum()
+    response.summary.total_views
+}
+
+/// Returns the summary data.
+#[uniffi::export]
+pub fn get_stats_top_posts_summary(response: &StatsTopPostsResponse) -> StatsTopPostsSummaryData {
+    response.summary.clone()
 }
 
 #[cfg(test)]
@@ -168,7 +169,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&start_date=2026-01-26&date=2026-01-26&max=10&num=30"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&start_date=2026-01-26&date=2026-01-26&max=10&num=30&summarize=1&skip_archives=1"
         );
     }
 
@@ -192,7 +193,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=week&date=2026-01-19"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=week&date=2026-01-19&summarize=1&skip_archives=1"
         );
     }
 
@@ -205,16 +206,12 @@ mod tests {
 
         assert_eq!(response.date, "2026-01-25");
         assert_eq!(response.period, "week");
-        assert!(response.days.contains_key("2026-01-19"));
-
-        let day_data = response.days.get("2026-01-19").unwrap();
-        assert_eq!(day_data.total_views, 2996);
-        assert_eq!(day_data.other_views, 2040);
-        assert!(day_data.dropped_ids.is_empty());
-        assert_eq!(day_data.postviews.len(), 10);
+        assert_eq!(response.summary.total_views, 2996);
+        assert!(response.summary.dropped_ids.is_empty());
+        assert_eq!(response.summary.postviews.len(), 10);
 
         // Verify first post view
-        let first_post = &day_data.postviews[0];
+        let first_post = &response.summary.postviews[0];
         assert_eq!(first_post.id, 269);
         assert_eq!(first_post.title, "Welcome to Automattic");
         assert_eq!(first_post.post_type, "page");
@@ -231,10 +228,9 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let day_data = response.days.get("2026-01-19").unwrap();
-
         // Find homepage entry (id: 0, type: homepage, date: null, status: null)
-        let homepage = day_data
+        let homepage = response
+            .summary
             .postviews
             .iter()
             .find(|p| p.post_type == "homepage")
@@ -261,22 +257,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_stats_top_posts_for_date() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-01.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsTopPostsResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        let day_data = get_stats_top_posts_for_date(&response, "2026-01-19");
-        assert!(day_data.is_some());
-        let day_data = day_data.unwrap();
-        assert_eq!(day_data.total_views, 2996);
-
-        let missing_data = get_stats_top_posts_for_date(&response, "2026-01-20");
-        assert!(missing_data.is_none());
-    }
-
-    #[test]
     fn test_get_stats_top_posts_total_views() {
         let json_file_path = "tests/wpcom/stats_top_posts/top-posts-01.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
@@ -288,17 +268,15 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_top_posts_empty_response() {
-        let response = StatsTopPostsResponse {
-            date: "2026-01-26".to_string(),
-            days: HashMap::new(),
-            period: "day".to_string(),
-        };
+    fn test_get_stats_top_posts_summary() {
+        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-01.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopPostsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let all_posts = get_stats_top_posts_all_post_views(&response);
-        assert!(all_posts.is_empty());
-
-        let total = get_stats_top_posts_total_views(&response);
-        assert_eq!(total, 0);
+        let summary = get_stats_top_posts_summary(&response);
+        assert_eq!(summary.total_views, 2996);
+        assert!(summary.dropped_ids.is_empty());
+        assert_eq!(summary.postviews.len(), 10);
     }
 }

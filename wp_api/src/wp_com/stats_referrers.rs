@@ -3,7 +3,6 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// The time period for grouping referrers.
 #[derive(
@@ -61,7 +60,9 @@ impl AppendUrlQueryPairs for StatsReferrersParams {
             .append_option_query_value_pair("date", self.date.as_ref())
             .append_option_query_value_pair("start_date", self.start_date.as_ref())
             .append_option_query_value_pair("max", self.max.as_ref())
-            .append_option_query_value_pair("num", self.num.as_ref());
+            .append_option_query_value_pair("num", self.num.as_ref())
+            .append_query_value_pair("summarize", &1u32)
+            .append_query_value_pair("skip_archives", &1u32);
     }
 }
 
@@ -70,20 +71,20 @@ impl AppendUrlQueryPairs for StatsReferrersParams {
 pub struct StatsReferrersResponse {
     /// The date for the stats query.
     pub date: String,
-    /// The stats data grouped by day.
-    pub days: HashMap<String, StatsReferrersDayData>,
     /// The time period used for grouping.
     pub period: String,
+    /// Summary data with aggregated referrer groups.
+    pub summary: StatsReferrersSummaryData,
 }
 
-/// Stats data for a single day.
+/// Summary data with aggregated referrer groups.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
-pub struct StatsReferrersDayData {
-    /// The list of referrer groups for this day.
+pub struct StatsReferrersSummaryData {
+    /// The list of referrer groups.
     pub groups: Vec<StatsReferrersGroup>,
     /// Views from other referrers not included in the list.
     pub other_views: u64,
-    /// The total number of views for this day.
+    /// The total number of views.
     pub total_views: u64,
 }
 
@@ -175,35 +176,24 @@ pub struct StatsReferrersFollowParams {
     pub is_following: Option<bool>,
 }
 
-/// Returns all referrer groups from all days in the response.
+/// Returns all referrer groups from the summary.
 #[uniffi::export]
 pub fn get_stats_referrers_all_groups(
     response: &StatsReferrersResponse,
 ) -> Vec<StatsReferrersGroup> {
-    response
-        .days
-        .values()
-        .flat_map(|day_data| day_data.groups.clone())
-        .collect()
+    response.summary.groups.clone()
 }
 
-/// Returns referrer data for a specific date.
-#[uniffi::export]
-pub fn get_stats_referrers_for_date(
-    response: &StatsReferrersResponse,
-    date: &str,
-) -> Option<StatsReferrersDayData> {
-    response.days.get(date).cloned()
-}
-
-/// Returns the total views across all days.
+/// Returns the total views from the summary.
 #[uniffi::export]
 pub fn get_stats_referrers_total_views(response: &StatsReferrersResponse) -> u64 {
-    response
-        .days
-        .values()
-        .map(|day_data| day_data.total_views)
-        .sum()
+    response.summary.total_views
+}
+
+/// Returns the summary data.
+#[uniffi::export]
+pub fn get_stats_referrers_summary(response: &StatsReferrersResponse) -> StatsReferrersSummaryData {
+    response.summary.clone()
 }
 
 #[cfg(test)]
@@ -230,7 +220,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/referrers?period=day&date=2026-01-26&start_date=2026-01-26&max=10&num=30"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/referrers?period=day&date=2026-01-26&start_date=2026-01-26&max=10&num=30&summarize=1&skip_archives=1"
         );
     }
 
@@ -254,7 +244,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/referrers?period=week&date=2026-01-19"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/referrers?period=week&date=2026-01-19&summarize=1&skip_archives=1"
         );
     }
 
@@ -267,15 +257,12 @@ mod tests {
 
         assert_eq!(response.date, "2026-01-26");
         assert_eq!(response.period, "day");
-        assert!(response.days.contains_key("2026-01-26"));
-
-        let day_data = response.days.get("2026-01-26").unwrap();
-        assert_eq!(day_data.total_views, 22);
-        assert_eq!(day_data.other_views, 0);
-        assert_eq!(day_data.groups.len(), 6);
+        assert_eq!(response.summary.total_views, 22);
+        assert_eq!(response.summary.other_views, 0);
+        assert_eq!(response.summary.groups.len(), 6);
 
         // Verify first group (WordPress.com Reader)
-        let first_group = &day_data.groups[0];
+        let first_group = &response.summary.groups[0];
         assert_eq!(first_group.group, "WordPress.com Reader");
         assert_eq!(first_group.name, "WordPress.com Reader");
         assert_eq!(
@@ -301,10 +288,9 @@ mod tests {
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let day_data = response.days.get("2026-01-26").unwrap();
-
         // Find Search Engines group (has detailed results array)
-        let search_engines = day_data
+        let search_engines = response
+            .summary
             .groups
             .iter()
             .find(|g| g.group == "Search Engines")
@@ -333,10 +319,9 @@ mod tests {
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let day_data = response.days.get("2026-01-26").unwrap();
-
         // Find group with follow_data (dotcom.wordpress.com)
-        let dotcom_group = day_data
+        let dotcom_group = response
+            .summary
             .groups
             .iter()
             .find(|g| g.group == "dotcom.wordpress.com")
@@ -367,22 +352,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_stats_referrers_for_date() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-01.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsReferrersResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        let day_data = get_stats_referrers_for_date(&response, "2026-01-26");
-        assert!(day_data.is_some());
-        let day_data = day_data.unwrap();
-        assert_eq!(day_data.total_views, 22);
-
-        let missing_data = get_stats_referrers_for_date(&response, "2026-01-27");
-        assert!(missing_data.is_none());
-    }
-
-    #[test]
     fn test_get_stats_referrers_total_views() {
         let json_file_path = "tests/wpcom/stats_referrers/referrers-01.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
@@ -394,17 +363,15 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_referrers_empty_response() {
-        let response = StatsReferrersResponse {
-            date: "2026-01-26".to_string(),
-            days: HashMap::new(),
-            period: "day".to_string(),
-        };
+    fn test_get_stats_referrers_summary() {
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-01.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsReferrersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let all_groups = get_stats_referrers_all_groups(&response);
-        assert!(all_groups.is_empty());
-
-        let total = get_stats_referrers_total_views(&response);
-        assert_eq!(total, 0);
+        let summary = get_stats_referrers_summary(&response);
+        assert_eq!(summary.total_views, 22);
+        assert_eq!(summary.other_views, 0);
+        assert_eq!(summary.groups.len(), 6);
     }
 }
