@@ -145,23 +145,25 @@ pub struct AttachmentDimensions {
 }
 
 #[uniffi::export]
-pub fn get_attachment_dimensions(attachment: &SupportAttachment) -> Option<AttachmentDimensions> {
-    let metadata = &attachment.metadata;
+impl SupportAttachment {
+    pub fn dimensions(&self) -> Option<AttachmentDimensions> {
+        let metadata = &self.metadata;
 
-    let width = metadata
-        .get(&AttachmentMetadataKey::Width)
-        .and_then(|v| v.get_number());
-    let height = metadata
-        .get(&AttachmentMetadataKey::Height)
-        .and_then(|v| v.get_number());
+        let width = metadata
+            .get(&AttachmentMetadataKey::Width)
+            .and_then(|v| v.get_number());
+        let height = metadata
+            .get(&AttachmentMetadataKey::Height)
+            .and_then(|v| v.get_number());
 
-    if let Some(width) = width
-        && let Some(height) = height
-    {
-        return Some(AttachmentDimensions { width, height });
+        if let Some(width) = width
+            && let Some(height) = height
+        {
+            return Some(AttachmentDimensions { width, height });
+        }
+
+        None
     }
-
-    None
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
@@ -260,8 +262,9 @@ mod tests {
             "https://example.com/attachments/token/token1/?name=sample-image-1.jpg"
         );
 
-        let dimensions =
-            get_attachment_dimensions(&conversation.messages[0].attachments[0]).unwrap();
+        let dimensions = conversation.messages[0].attachments[0]
+            .dimensions()
+            .unwrap();
 
         assert_eq!(dimensions.width, 1000);
         assert_eq!(dimensions.height, 800);
@@ -280,8 +283,9 @@ mod tests {
             "https://example.com/attachments/token/token2/?name=sample-image-2.jpg"
         );
 
-        let dimensions =
-            get_attachment_dimensions(&conversation.messages[0].attachments[1]).unwrap();
+        let dimensions = conversation.messages[0].attachments[1]
+            .dimensions()
+            .unwrap();
         assert_eq!(dimensions.width, 2000);
         assert_eq!(dimensions.height, 1600);
     }

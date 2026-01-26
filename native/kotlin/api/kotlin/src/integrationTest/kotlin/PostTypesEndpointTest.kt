@@ -6,7 +6,6 @@ import uniffi.wp_api.PostType
 import uniffi.wp_api.PostTypeCapabilities
 import uniffi.wp_api.PostTypeSupports
 import uniffi.wp_api.WpErrorCode
-import uniffi.wp_api.postTypeSupports
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -27,7 +26,7 @@ class PostTypesEndpointTest {
         val postTypesPost = client.request { requestBuilder ->
             requestBuilder.postTypes().retrieveWithEditContext(PostType.Post)
         }.assertSuccessAndRetrieveData().data
-        assert(postTypeSupports(postTypesPost.supports, PostTypeSupports.Title))
+        assert(postTypesPost.supports.supports(PostTypeSupports.Title))
         assertFalse(postTypesPost.capabilities[PostTypeCapabilities.EditPosts]!!.isEmpty())
     }
 

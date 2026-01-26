@@ -75,51 +75,48 @@ pub struct StatsVisitsResponse {
 }
 
 #[uniffi::export]
-pub fn get_stats_visits_data(response: &StatsVisitsResponse) -> Vec<StatsVisitsDataPoint> {
-    get_stats_data("views", response)
-        .into_iter()
-        .map(|(period, visits)| StatsVisitsDataPoint { period, visits })
-        .collect()
-}
+impl StatsVisitsResponse {
+    pub fn visits_data(&self) -> Vec<StatsVisitsDataPoint> {
+        get_stats_data("views", self)
+            .into_iter()
+            .map(|(period, visits)| StatsVisitsDataPoint { period, visits })
+            .collect()
+    }
 
-#[uniffi::export]
-pub fn get_stats_visitors_data(response: &StatsVisitsResponse) -> Vec<StatsVisitorsDataPoint> {
-    get_stats_data("visitors", response)
-        .into_iter()
-        .map(|(period, visitors)| StatsVisitorsDataPoint { period, visitors })
-        .collect()
-}
+    pub fn visitors_data(&self) -> Vec<StatsVisitorsDataPoint> {
+        get_stats_data("visitors", self)
+            .into_iter()
+            .map(|(period, visitors)| StatsVisitorsDataPoint { period, visitors })
+            .collect()
+    }
 
-#[uniffi::export]
-pub fn get_stats_likes_data(response: &StatsVisitsResponse) -> Vec<StatsLikesDataPoint> {
-    get_stats_data("likes", response)
-        .into_iter()
-        .map(|(period, likes)| StatsLikesDataPoint { period, likes })
-        .collect()
-}
+    pub fn likes_data(&self) -> Vec<StatsLikesDataPoint> {
+        get_stats_data("likes", self)
+            .into_iter()
+            .map(|(period, likes)| StatsLikesDataPoint { period, likes })
+            .collect()
+    }
 
-#[uniffi::export]
-pub fn get_stats_reblogs_data(response: &StatsVisitsResponse) -> Vec<StatsReblogsDataPoint> {
-    get_stats_data("reblogs", response)
-        .into_iter()
-        .map(|(period, reblogs)| StatsReblogsDataPoint { period, reblogs })
-        .collect()
-}
+    pub fn reblogs_data(&self) -> Vec<StatsReblogsDataPoint> {
+        get_stats_data("reblogs", self)
+            .into_iter()
+            .map(|(period, reblogs)| StatsReblogsDataPoint { period, reblogs })
+            .collect()
+    }
 
-#[uniffi::export]
-pub fn get_stats_comments_data(response: &StatsVisitsResponse) -> Vec<StatsCommentsDataPoint> {
-    get_stats_data("comments", response)
-        .into_iter()
-        .map(|(period, comments)| StatsCommentsDataPoint { period, comments })
-        .collect()
-}
+    pub fn comments_data(&self) -> Vec<StatsCommentsDataPoint> {
+        get_stats_data("comments", self)
+            .into_iter()
+            .map(|(period, comments)| StatsCommentsDataPoint { period, comments })
+            .collect()
+    }
 
-#[uniffi::export]
-pub fn get_stats_posts_data(response: &StatsVisitsResponse) -> Vec<StatsPostsDataPoint> {
-    get_stats_data("posts", response)
-        .into_iter()
-        .map(|(period, posts)| StatsPostsDataPoint { period, posts })
-        .collect()
+    pub fn posts_data(&self) -> Vec<StatsPostsDataPoint> {
+        get_stats_data("posts", self)
+            .into_iter()
+            .map(|(period, posts)| StatsPostsDataPoint { period, posts })
+            .collect()
+    }
 }
 
 fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(String, u64)> {
@@ -292,7 +289,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let data_points = get_stats_visits_data(&response);
+        let data_points = response.visits_data();
 
         assert_eq!(data_points.len(), 24);
         assert_eq!(
@@ -325,7 +322,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let data_points = get_stats_visits_data(&response);
+        let data_points = response.visits_data();
 
         assert_eq!(data_points.len(), 30);
         assert_eq!(
@@ -364,7 +361,7 @@ mod tests {
             data: vec![],
         };
 
-        let data_points = get_stats_visits_data(&response);
+        let data_points = response.visits_data();
 
         assert!(data_points.is_empty());
     }
@@ -377,7 +374,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let data_points = get_stats_visitors_data(&response);
+        let data_points = response.visitors_data();
 
         // All visitors are null, so no data points should be returned
         assert!(data_points.is_empty());
@@ -390,7 +387,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let data_points = get_stats_visitors_data(&response);
+        let data_points = response.visitors_data();
 
         assert_eq!(data_points.len(), 30);
         assert_eq!(
@@ -423,7 +420,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let data_points = get_stats_likes_data(&response);
+        let data_points = response.likes_data();
 
         assert_eq!(data_points.len(), 30);
         // Most likes are 0, but 2026-01-05 has 1 like
@@ -450,7 +447,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let data_points = get_stats_reblogs_data(&response);
+        let data_points = response.reblogs_data();
 
         assert_eq!(data_points.len(), 30);
         assert_eq!(
@@ -469,7 +466,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let data_points = get_stats_comments_data(&response);
+        let data_points = response.comments_data();
 
         assert_eq!(data_points.len(), 30);
         assert_eq!(
@@ -488,7 +485,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let data_points = get_stats_posts_data(&response);
+        let data_points = response.posts_data();
 
         assert_eq!(data_points.len(), 30);
         assert_eq!(

@@ -49,7 +49,7 @@ public extension CommentStatus {
     }
 
     var rawValue: String {
-        commentStatusToString(status: self)
+        self.description
     }
 }
 
@@ -65,7 +65,7 @@ public extension CommentType {
     }
 
     var rawValue: String {
-        commentTypeToString(commentType: self)
+        self.description
     }
 }
 
@@ -81,7 +81,7 @@ public extension UserRole {
     }
 
     var rawValue: String {
-        userRoleToString(role: self)
+        self.description
     }
 }
 
@@ -97,7 +97,7 @@ public extension UserCapability {
     }
 
     var rawValue: String {
-        userCapabilityToString(capability: self)
+        self.description
     }
 }
 
@@ -113,7 +113,7 @@ public extension PostType {
     }
 
     var rawValue: String {
-        postTypeToString(postType: self)
+        self.description
     }
 }
 
@@ -124,11 +124,7 @@ extension PostType: ExpressibleByStringLiteral {
 }
 
 public extension PostTypeSupportsMap {
-    func supports(_ feature: PostTypeSupports) -> Bool {
-        postTypeSupports(supportsMap: self, feature: feature)
-    }
-
     func supports(_ feature: String) -> Bool {
-        postTypeSupports(supportsMap: self, feature: .custom(feature))
+        self.supports(feature: .custom(feature))
     }
 }

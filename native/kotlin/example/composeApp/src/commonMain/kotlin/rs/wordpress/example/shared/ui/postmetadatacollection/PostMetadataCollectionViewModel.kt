@@ -138,7 +138,7 @@ class PostMetadataCollectionViewModel(
      * Change the filter and load persisted state from database
      */
     fun setFilter(status: String?) {
-        val postStatus = status?.let { uniffi.wp_api.parsePostStatus(it) }
+        val postStatus = status?.let { uniffi.wp_api.postStatusFromString(it) }
         val newFilter = PostListFilter(
             status = if (postStatus != null) listOf(postStatus) else emptyList()
         )
@@ -232,7 +232,7 @@ class PostMetadataCollectionViewModel(
         // This should always succeed if post types were fetched first
         val postTypeDetails = postTypeService.getBySlug(postTypeSlug)
             ?: error("Post type '$postTypeSlug' not found in cache. Ensure post types are fetched before creating post collections.")
-        val endpointType = uniffi.wp_api.postTypeDetailsToPostEndpointType(postTypeDetails)
+        val endpointType = postTypeDetails.toPostEndpointType()
 
         val observable = postService.getObservablePostMetadataCollectionWithEditContext(
             endpointType,
