@@ -19,4 +19,3 @@ public extension BotConversation {
         return false
     }
 }
-

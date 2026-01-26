@@ -24,7 +24,7 @@ cargo test -p wp_api_integration_tests --test '{file_name}'
 # Run linting and format checks
 cargo fmt --all -- --check
 cargo clippy --tests --all-targets --all-features -- -D warnings
-swiftlint --strict
+swift package plugin swiftlint --strict
 
 # Generate API documentation
 cargo doc --no-deps --all-features
