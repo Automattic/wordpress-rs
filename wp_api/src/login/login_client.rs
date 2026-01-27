@@ -13,8 +13,8 @@ use crate::{
     middleware::{PerformsRequests, WpApiMiddlewarePipeline},
     parsed_url::ParsedUrl,
     request::{
-        RequestExecutor, RequestMethod, ResponseBodyType, WpNetworkHeaderMap, WpNetworkRequest,
-        WpNetworkRequestBody, WpNetworkResponse,
+        RequestContext, RequestExecutor, RequestMethod, ResponseBodyType, WpNetworkHeaderMap,
+        WpNetworkRequest, WpNetworkRequestBody, WpNetworkResponse,
         endpoint::{WP_JSON_PATH_SEGMENTS, WpEndpointUrl},
     },
 };
@@ -42,9 +42,10 @@ impl UniffiWpLoginClient {
     async fn api_discovery(
         &self,
         site_url: String,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
         self.inner
-            .api_discovery(site_url)
+            .api_discovery(site_url, context)
             .await
             .combined_result()
             .cloned()
@@ -77,13 +78,16 @@ impl WpLoginClient {
         )
     }
 
-    pub async fn api_discovery(&self, site_url: String) -> AutoDiscoveryResult {
-        let attempts = futures::future::join_all(
-            url_discovery::construct_attempts(site_url)
-                .into_iter()
-                .map(|attempt| async { self.attempt_api_discovery(attempt).await }),
-        )
-        .await;
+    pub async fn api_discovery(
+        &self,
+        site_url: String,
+        context: Option<Arc<RequestContext>>,
+    ) -> AutoDiscoveryResult {
+        let attempts =
+            futures::future::join_all(url_discovery::construct_attempts(site_url).into_iter().map(
+                |attempt| async { self.attempt_api_discovery(attempt, context.clone()).await },
+            ))
+            .await;
         AutoDiscoveryResult {
             attempts: attempts.into_iter().map(|r| (r.attempt_type, r)).collect(),
         }
@@ -92,6 +96,7 @@ impl WpLoginClient {
     async fn attempt_api_discovery(
         &self,
         attempt: AutoDiscoveryAttempt,
+        context: Option<Arc<RequestContext>>,
     ) -> AutoDiscoveryAttemptResult {
         let parsed_site_url: Arc<ParsedUrl> = match ParsedUrl::parse(&attempt.attempt_site_url) {
             Ok(u) => u,
@@ -101,12 +106,15 @@ impl WpLoginClient {
         }
         .into();
 
-        match self.find_api_root_url(Arc::clone(&parsed_site_url)).await {
+        match self
+            .find_api_root_url(Arc::clone(&parsed_site_url), context.clone())
+            .await
+        {
             Ok(api_root_url) => AutoDiscoveryAttemptResult {
                 attempt_type: attempt.attempt_type,
                 attempt_site_url: attempt.attempt_site_url,
                 api_discovery_result: self
-                    .fetch_and_parse_api_root(Arc::clone(&parsed_site_url), &api_root_url)
+                    .fetch_and_parse_api_root(Arc::clone(&parsed_site_url), &api_root_url, context)
                     .await
                     .map_err(|fetch_and_parse_api_root_failure| {
                         AutoDiscoveryAttemptFailure::from_fetch_and_parse_api_root_failure(
@@ -140,6 +148,7 @@ impl WpLoginClient {
                     .fetch_and_parse_api_root(
                         Arc::clone(&parsed_site_url),
                         &ApiRootUrl(Arc::clone(&root_wp_json_url)),
+                        context,
                     )
                     .await
                 {
@@ -193,8 +202,9 @@ impl WpLoginClient {
         &self,
         parsed_site_url: Arc<ParsedUrl>,
         api_root_url: &ApiRootUrl,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<AutoDiscoveryAttemptSuccess, FetchAndParseApiRootFailure> {
-        let fetch_api_details_response = match self.fetch_api_root(api_root_url).await {
+        let fetch_api_details_response = match self.fetch_api_root(api_root_url, context).await {
             Ok(r) => r,
             Err(error) => return Err(FetchAndParseApiRootFailure::FetchApiRoot { error }),
         };
@@ -251,9 +261,10 @@ impl WpLoginClient {
     async fn find_api_root_url(
         &self,
         parsed_site_url: Arc<ParsedUrl>,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<ApiRootUrl, FindApiRootFailure> {
         let response = self
-            .fetch_homepage(Arc::clone(&parsed_site_url))
+            .fetch_homepage(Arc::clone(&parsed_site_url), context)
             .await
             .map_err(|error| FindApiRootFailure::FetchHomepage { error })?;
         // First check if we can find and parse the api root from the link header
@@ -288,6 +299,7 @@ impl WpLoginClient {
     async fn fetch_api_root(
         &self,
         api_root_url: &ApiRootUrl,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         self.perform(
             WpNetworkRequest {
@@ -299,7 +311,7 @@ impl WpLoginClient {
                 body: None,
             }
             .into(),
-            None,
+            context,
         )
         .await
     }
@@ -316,6 +328,7 @@ impl WpLoginClient {
     async fn fetch_homepage(
         &self,
         parsed_site_url: Arc<ParsedUrl>,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         self.perform(
             WpNetworkRequest {
@@ -327,7 +340,7 @@ impl WpLoginClient {
                 body: None,
             }
             .into(),
-            None,
+            context,
         )
         .await
     }
@@ -363,10 +376,14 @@ impl WpLoginClient {
     pub async fn xmlrpc_discovery(
         &self,
         details: AutoDiscoveryAttemptSuccess,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<ParsedUrl, XmlrpcDiscoveryError> {
         let mut candidates: Vec<ParsedUrl> = vec![];
         // Prioritize discovered XML-RPC URL if it's available from the site.
-        if let Ok(url) = self.xmlrpc_from_rsd(&details.parsed_site_url).await {
+        if let Ok(url) = self
+            .xmlrpc_from_rsd(&details.parsed_site_url, context.clone())
+            .await
+        {
             candidates.push(url);
         }
         // Fallback to the default XML-RPC URL.
@@ -381,7 +398,7 @@ impl WpLoginClient {
         let mut failures: Vec<XmlrpcDiscoveryError> = vec![];
         for candidate in candidates {
             match self
-                .validate_xmlrpc_url(&candidate, &details.api_details)
+                .validate_xmlrpc_url(&candidate, &details.api_details, context.clone())
                 .await
             {
                 Ok(_) => return Ok(candidate),
@@ -402,6 +419,7 @@ impl WpLoginClient {
         &self,
         url: &ParsedUrl,
         api_details: &WpApiDetails,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<(), XmlrpcDiscoveryError> {
         let response = self.perform(
             WpNetworkRequest {
@@ -413,7 +431,7 @@ impl WpLoginClient {
                 body: Some(Arc::new(WpNetworkRequestBody::new(r#"<?xml version="1.0"?><methodCall><methodName>system.listMethods</methodName></methodCall>"#.as_bytes().to_vec()))),
             }
             .into(),
-            None,
+            context,
         )
         .await
         // It's very likely xml-rpc is blocked by the hosting provider (the request has not reached to WordPress),
@@ -440,6 +458,7 @@ impl WpLoginClient {
     async fn xmlrpc_from_rsd(
         &self,
         parsed_site_url: &ParsedUrl,
+        context: Option<Arc<RequestContext>>,
     ) -> Result<ParsedUrl, XmlrpcDiscoveryError> {
         let response = self
             .perform(
@@ -452,7 +471,7 @@ impl WpLoginClient {
                     body: None,
                 }
                 .into(),
-                None,
+                context.clone(),
             )
             .await
             .map_err(|error| XmlrpcDiscoveryError::FetchHomepage { error })?;
@@ -471,7 +490,7 @@ impl WpLoginClient {
                     body: None,
                 }
                 .into(),
-                None,
+                context,
             )
             .await
             .map_err(|_| XmlrpcDiscoveryError::Disabled {

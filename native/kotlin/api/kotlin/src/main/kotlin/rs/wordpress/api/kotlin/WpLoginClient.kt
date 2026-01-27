@@ -37,7 +37,7 @@ class WpLoginClient @JvmOverloads constructor(
         siteUrl: String
     ): ApiDiscoveryResult = withContext(dispatcher) {
         try {
-            val success = internalClient.apiDiscovery(siteUrl)
+            val success = internalClient.apiDiscovery(siteUrl, null)
             ApiDiscoveryResult.Success(success)
         } catch (exception: AutoDiscoveryAttemptFailure) {
             when (exception) {

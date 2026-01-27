@@ -156,7 +156,7 @@ impl CookiesNonceAuthenticationProvider {
 
         let client =
             WpLoginClient::new_with_default_middleware_pipeline(self.request_executor.clone());
-        let result = client.api_discovery(self.site_url.clone()).await;
+        let result = client.api_discovery(self.site_url.clone(), None).await;
         let details = match result.combined_result() {
             Ok(details) => details.clone(),
             Err(err) => {

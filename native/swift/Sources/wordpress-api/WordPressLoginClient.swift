@@ -36,7 +36,26 @@ public final class WordPressLoginClient: @unchecked Sendable {
     public func details(
         ofSite proposedSiteUrl: String
     ) async throws -> AutoDiscoveryAttemptSuccess {
-        try await client.apiDiscovery(siteUrl: proposedSiteUrl)
+        let context = RequestContext()
+        return try await withTaskCancellationHandler {
+            let result = try await client.apiDiscovery(siteUrl: proposedSiteUrl, context: context)
+
+            // The API discovery process looks something like this:
+            // 1. Send a few requests to find the potential API root, which is typically the `/wp-json` URL.
+            // 2. Getting site details:
+            //    a) Send requests to the API root found in step 1 to get details.
+            //    b) If step 1 fails, send requests to a hard-coded `/wp-json` path to get details.
+            //
+            // When cancellation happens too early at step 1, the process continues and will most likely
+            // find a successful result using the hard-coded `wp-json` URL.
+            //
+            // Here we manually check cancellation to make sure an error is returned when cancelled.
+            try Task.checkCancellation()
+
+            return result
+        } onCancel: {
+            requestExecutor.cancel(context: context)
+        }
     }
 
     /// Uses the proposed site URL to scan the website it points to and find the Application Passwords login URL
@@ -45,7 +64,7 @@ public final class WordPressLoginClient: @unchecked Sendable {
         forSite proposedSiteUrl: String
     ) async throws -> ParsedUrl {
         // All sites should have some form of authentication we can use
-        try await client.apiDiscovery(siteUrl: proposedSiteUrl).applicationPasswordsAuthenticationUrl
+        try await details(ofSite: proposedSiteUrl).applicationPasswordsAuthenticationUrl
     }
 
     /// Uses the proposed site URL to scan the website it points to and find the Application Passwords login URL,
@@ -58,7 +77,7 @@ public final class WordPressLoginClient: @unchecked Sendable {
         forSite proposedSiteUrl: String,
         application: Application
     ) async throws -> URL {
-        try await client.apiDiscovery(siteUrl: proposedSiteUrl).loginURL(for: application)
+        try await details(ofSite: proposedSiteUrl).loginURL(for: application)
     }
 
     /// Convert the callback URL into a set of authentication credentials

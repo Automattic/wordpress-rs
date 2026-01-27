@@ -300,6 +300,26 @@ class LoginTests {
         _ = try await self.client.findLoginUrl(forSite: "https://vanilla1.wpmt.co")
     }
 
+    @Test("Cancel API discovery process")
+    func testCancellation() async throws {
+        let task = Task { [client] in
+            let success = try await client.details(ofSite: "https://vanilla.wpmt.co")
+            Issue.record("The function should throw. \(success)")
+        }
+
+        await #expect(
+            performing: {
+                try await Task.sleep(for: .milliseconds(800))
+                task.cancel()
+
+                try await task.value
+            },
+            throws: { error in
+                error is AutoDiscoveryAttemptFailure || error is CancellationError
+            },
+        )
+    }
+
     private func getApplicationPasswordsNotSupportedReason(
         from error: any Error
     ) throws -> ApplicationPasswordsNotSupportedReason? {
