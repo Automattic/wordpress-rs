@@ -56,10 +56,10 @@ pub struct StatsTopPostsParams {
     #[uniffi(default = None)]
     pub locale: Option<String>,
     /// Whether to return a summary of the data.
-    #[uniffi(default = None)]
+    #[uniffi(default = Some(true))]
     pub summarize: Option<bool>,
     /// Whether to skip archives in the response.
-    #[uniffi(default = None)]
+    #[uniffi(default = Some(true))]
     pub skip_archives: Option<bool>,
 }
 
@@ -244,6 +244,8 @@ mod tests {
         let params = StatsTopPostsParams {
             period: Some(StatsTopPostsPeriod::Day),
             date: Some("2026-01-26".to_string()),
+            summarize: None,
+            skip_archives: None,
             ..Default::default()
         };
 
