@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use crate::url_query::{AppendUrlQueryPairs, QueryPairs};
 use serde::{Deserialize, Serialize};
 
+/// This file is optimized for really fast code, not to be pretty. Between the compiler
+/// and the tests, we shouldn't have to worry about half-implemented language codes.
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WpComRemoteLanguage {
     pub id: u16,
