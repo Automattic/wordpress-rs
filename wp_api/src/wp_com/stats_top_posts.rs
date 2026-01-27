@@ -72,10 +72,7 @@ impl AppendUrlQueryPairs for StatsTopPostsParams {
             .append_option_query_value_pair("max", self.max.as_ref())
             .append_option_query_value_pair("num", self.num.as_ref())
             .append_option_query_value_pair("locale", self.locale.as_ref())
-            .append_option_query_value_pair(
-                "summarize",
-                self.summarize.map(|b| b as u32).as_ref(),
-            )
+            .append_option_query_value_pair("summarize", self.summarize.map(|b| b as u32).as_ref())
             .append_option_query_value_pair(
                 "skip_archives",
                 self.skip_archives.map(|b| b as u32).as_ref(),
@@ -304,7 +301,10 @@ mod tests {
         assert_eq!(response.date, "2026-01-25");
         assert_eq!(response.period, Some("week".to_string()));
 
-        let summary = response.summary.as_ref().expect("Summary should be present");
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
         assert_eq!(summary.total_views, 2996);
         assert!(summary.dropped_ids.is_empty());
         assert_eq!(summary.postviews.len(), 10);
@@ -328,7 +328,10 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         // Find homepage entry (id: 0, type: homepage, date: null, status: null)
-        let summary = response.summary.as_ref().expect("Summary should be present");
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
         let homepage = summary
             .postviews
             .iter()
@@ -350,8 +353,8 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let all_posts = get_stats_top_posts_all_post_views(&response)
-            .expect("Summary should be present");
+        let all_posts =
+            get_stats_top_posts_all_post_views(&response).expect("Summary should be present");
 
         assert_eq!(all_posts.len(), 10);
     }
@@ -363,8 +366,7 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let total = get_stats_top_posts_total_views(&response)
-            .expect("Summary should be present");
+        let total = get_stats_top_posts_total_views(&response).expect("Summary should be present");
         assert_eq!(total, 2996);
     }
 
@@ -375,8 +377,7 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let summary = get_stats_top_posts_summary(&response)
-            .expect("Summary should be present");
+        let summary = get_stats_top_posts_summary(&response).expect("Summary should be present");
         assert_eq!(summary.total_views, 2996);
         assert!(summary.dropped_ids.is_empty());
         assert_eq!(summary.postviews.len(), 10);
