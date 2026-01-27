@@ -152,6 +152,7 @@ pub fn get_stats_top_posts_summary(response: &StatsTopPostsResponse) -> StatsTop
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::*;
 
     #[test]
     fn test_stats_top_posts_params_serialization() {
@@ -203,8 +204,19 @@ mod tests {
         );
     }
 
+    #[rstest]
+    #[case("tests/wpcom/stats_top_posts/top-posts-01.json")]
+    fn test_stats_top_posts_response_deserialization(#[case] json_file_path: &str) {
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopPostsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(!response.date.is_empty());
+        assert!(!response.period.is_empty());
+    }
+
     #[test]
-    fn test_stats_top_posts_response_deserialization() {
+    fn test_stats_top_posts_response_deserialization_top_posts_01() {
         let json_file_path = "tests/wpcom/stats_top_posts/top-posts-01.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopPostsResponse =

@@ -203,6 +203,7 @@ pub fn get_stats_referrers_summary(response: &StatsReferrersResponse) -> StatsRe
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::*;
 
     #[test]
     fn test_stats_referrers_params_serialization() {
@@ -254,8 +255,19 @@ mod tests {
         );
     }
 
+    #[rstest]
+    #[case("tests/wpcom/stats_referrers/referrers-01.json")]
+    fn test_stats_referrers_response_deserialization(#[case] json_file_path: &str) {
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsReferrersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(!response.date.is_empty());
+        assert!(!response.period.is_empty());
+    }
+
     #[test]
-    fn test_stats_referrers_response_deserialization() {
+    fn test_stats_referrers_response_deserialization_referrers_01() {
         let json_file_path = "tests/wpcom/stats_referrers/referrers-01.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsReferrersResponse =
