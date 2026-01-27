@@ -51,6 +51,9 @@ pub struct StatsReferrersParams {
     /// The number of periods to include in the response.
     #[uniffi(default = None)]
     pub num: Option<u32>,
+    /// The locale for the response.
+    #[uniffi(default = None)]
+    pub locale: Option<String>,
 }
 
 impl AppendUrlQueryPairs for StatsReferrersParams {
@@ -61,6 +64,7 @@ impl AppendUrlQueryPairs for StatsReferrersParams {
             .append_option_query_value_pair("start_date", self.start_date.as_ref())
             .append_option_query_value_pair("max", self.max.as_ref())
             .append_option_query_value_pair("num", self.num.as_ref())
+            .append_option_query_value_pair("locale", self.locale.as_ref())
             .append_query_value_pair("summarize", &1u32)
             .append_query_value_pair("skip_archives", &1u32);
     }
@@ -213,6 +217,7 @@ mod tests {
             start_date: Some("2026-01-26".to_string()),
             max: Some(10),
             num: Some(30),
+            locale: Some("en".to_string()),
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -220,7 +225,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/referrers?period=day&date=2026-01-26&start_date=2026-01-26&max=10&num=30&summarize=1&skip_archives=1"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/referrers?period=day&date=2026-01-26&start_date=2026-01-26&max=10&num=30&locale=en&summarize=1&skip_archives=1"
         );
     }
 
@@ -237,6 +242,7 @@ mod tests {
             start_date: None,
             max: None,
             num: None,
+            locale: None,
         };
 
         let mut query_pairs = url.query_pairs_mut();
