@@ -185,6 +185,76 @@ pub enum WPComLanguage {
     DutchBelgium = 906,
 }
 
+// UniFFI-exported instance methods for WPComLanguage
+// Note: Static/constructor methods are exposed as standalone functions below
+// since UniFFI doesn't support constructors on enums
+#[uniffi::export]
+impl WPComLanguage {
+    /// Returns the language slug (e.g., "en", "es", "pt-br")
+    pub fn slug(&self) -> String {
+        self.slug_str().to_string()
+    }
+
+    /// Returns the display name in the native language
+    pub fn name(&self) -> String {
+        self.name_str().to_string()
+    }
+
+    /// Returns the WordPress locale code (e.g., "en_US", "es_ES")
+    /// Returns an empty string if no WordPress locale is available
+    pub fn wp_locale(&self) -> String {
+        self.wp_locale_str().to_string()
+    }
+
+    /// Returns the UN M.49 territory codes associated with this language
+    pub fn territories(&self) -> Vec<String> {
+        self.territories_slice()
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    /// Returns the popularity rank if this is a popular language
+    /// Returns None if the language is not marked as popular
+    pub fn popular_rank(&self) -> Option<u8> {
+        self.popular_rank_internal()
+    }
+
+    /// Returns the parent locale slug if this is a variant
+    pub fn parent_locale_slug(&self) -> Option<String> {
+        self.parent_locale_slug_str().map(|s| s.to_string())
+    }
+
+    /// Returns the numeric language ID as used by WordPress.com
+    pub fn language_id(&self) -> u16 {
+        *self as u16
+    }
+}
+
+/// Lookup a WPComLanguage by its numeric ID
+#[uniffi::export]
+pub fn wp_com_language_from_id(id: u16) -> Option<WPComLanguage> {
+    WPComLanguage::from_id(id)
+}
+
+/// Lookup a WPComLanguage by its slug (e.g., "en", "pt-br")
+#[uniffi::export]
+pub fn wp_com_language_from_slug(slug: String) -> Option<WPComLanguage> {
+    WPComLanguage::from_slug(&slug)
+}
+
+/// Returns all available languages
+#[uniffi::export]
+pub fn wp_com_language_all() -> Vec<WPComLanguage> {
+    WPComLanguage::all()
+}
+
+/// Returns only the popular languages, sorted by popularity rank
+#[uniffi::export]
+pub fn wp_com_language_popular() -> Vec<WPComLanguage> {
+    WPComLanguage::popular()
+}
+
 impl WPComLanguage {
     /// Lookup a language by its numeric ID (discriminant)
     pub fn from_id(id: u16) -> Option<Self> {
@@ -504,8 +574,8 @@ impl WPComLanguage {
         }
     }
 
-    /// Returns the language slug (e.g., "en", "es", "pt-br")
-    pub fn slug(&self) -> &'static str {
+    /// Returns the language slug (e.g., "en", "es", "pt-br") as a static string reference
+    pub fn slug_str(&self) -> &'static str {
         match self {
             Self::English => "en",
             Self::Afrikaans => "af",
@@ -659,8 +729,8 @@ impl WPComLanguage {
         }
     }
 
-    /// Returns the display name in the native language
-    pub fn name(&self) -> &'static str {
+    /// Returns the display name in the native language as a static string reference
+    pub fn name_str(&self) -> &'static str {
         match self {
             Self::English => "English",
             Self::Afrikaans => "Afrikaans",
@@ -814,9 +884,9 @@ impl WPComLanguage {
         }
     }
 
-    /// Returns the WordPress locale code (e.g., "en_US", "es_ES")
+    /// Returns the WordPress locale code (e.g., "en_US", "es_ES") as a static string reference
     /// Returns an empty string if no WordPress locale is available
-    pub fn wp_locale(&self) -> &'static str {
+    pub fn wp_locale_str(&self) -> &'static str {
         match self {
             Self::English => "en_US",
             Self::Afrikaans => "af",
@@ -970,8 +1040,8 @@ impl WPComLanguage {
         }
     }
 
-    /// Returns the UN M.49 territory codes associated with this language
-    pub fn territories(&self) -> &'static [&'static str] {
+    /// Returns the UN M.49 territory codes associated with this language as a static slice
+    pub fn territories_slice(&self) -> &'static [&'static str] {
         match self {
             Self::English => &["019"],
             Self::Afrikaans => &["002"],
@@ -1125,9 +1195,9 @@ impl WPComLanguage {
         }
     }
 
-    /// Returns the popularity rank if this is a popular language
+    /// Returns the popularity rank if this is a popular language (internal method)
     /// Returns None if the language is not marked as popular
-    pub fn popular_rank(&self) -> Option<u8> {
+    fn popular_rank_internal(&self) -> Option<u8> {
         match self {
             Self::English => Some(1),
             Self::Spanish => Some(2),
@@ -1150,8 +1220,8 @@ impl WPComLanguage {
         }
     }
 
-    /// Returns the parent locale slug if this is a variant
-    pub fn parent_locale_slug(&self) -> Option<&'static str> {
+    /// Returns the parent locale slug if this is a variant as a static string reference
+    pub fn parent_locale_slug_str(&self) -> Option<&'static str> {
         match self {
             Self::FrenchSwitzerland => Some("fr"),
             Self::FrenchCanada => Some("fr"),
@@ -1166,11 +1236,6 @@ impl WPComLanguage {
             Self::DutchBelgium => Some("nl"),
             _ => None,
         }
-    }
-
-    /// Returns the numeric language ID as used by WordPress.com
-    pub fn language_id(&self) -> u16 {
-        *self as u16
     }
 
     /// Returns all available languages
@@ -1355,7 +1420,7 @@ mod tests {
         assert_eq!(english.slug(), "en");
         assert_eq!(english.name(), "English");
         assert_eq!(english.wp_locale(), "en_US");
-        assert_eq!(english.territories(), &["019"]);
+        assert_eq!(english.territories(), vec!["019"]);
         assert_eq!(english.popular_rank(), Some(1));
         assert_eq!(english.parent_locale_slug(), None);
     }
@@ -1364,7 +1429,7 @@ mod tests {
     fn test_variant_with_parent() {
         let german_formal = WPComLanguage::GermanFormal;
         assert_eq!(german_formal.slug(), "de_formal");
-        assert_eq!(german_formal.parent_locale_slug(), Some("de"));
+        assert_eq!(german_formal.parent_locale_slug(), Some("de".to_string()));
     }
 
     #[test]
@@ -1459,7 +1524,7 @@ mod tests {
         for lang in WPComLanguage::all() {
             let slug = lang.slug();
             assert_eq!(
-                WPComLanguage::from_slug(slug),
+                WPComLanguage::from_slug(&slug),
                 Some(lang),
                 "Failed to lookup language by slug: {:?} (slug: {})",
                 lang,
