@@ -54,6 +54,12 @@ pub struct StatsTopPostsParams {
     /// The locale for the response.
     #[uniffi(default = None)]
     pub locale: Option<String>,
+    /// Whether to return a summary of the data.
+    #[uniffi(default = None)]
+    pub summarize: Option<bool>,
+    /// Whether to skip archives in the response.
+    #[uniffi(default = None)]
+    pub skip_archives: Option<bool>,
 }
 
 impl AppendUrlQueryPairs for StatsTopPostsParams {
@@ -65,8 +71,14 @@ impl AppendUrlQueryPairs for StatsTopPostsParams {
             .append_option_query_value_pair("max", self.max.as_ref())
             .append_option_query_value_pair("num", self.num.as_ref())
             .append_option_query_value_pair("locale", self.locale.as_ref())
-            .append_query_value_pair("summarize", &1u32)
-            .append_query_value_pair("skip_archives", &1u32);
+            .append_option_query_value_pair(
+                "summarize",
+                self.summarize.map(|b| b as u32).as_ref(),
+            )
+            .append_option_query_value_pair(
+                "skip_archives",
+                self.skip_archives.map(|b| b as u32).as_ref(),
+            );
     }
 }
 
@@ -168,6 +180,8 @@ mod tests {
             max: Some(10),
             num: Some(30),
             locale: Some("en".to_string()),
+            summarize: Some(true),
+            skip_archives: Some(true),
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -193,6 +207,8 @@ mod tests {
             max: None,
             num: None,
             locale: None,
+            summarize: Some(true),
+            skip_archives: Some(true),
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -201,6 +217,51 @@ mod tests {
         assert_eq!(
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=week&date=2026-01-19&summarize=1&skip_archives=1"
+        );
+    }
+
+    #[test]
+    fn test_stats_top_posts_params_without_summarize_and_skip_archives() {
+        let mut url = url::Url::parse(
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts",
+        )
+        .expect("Failed to parse url");
+
+        let params = StatsTopPostsParams {
+            period: Some(StatsTopPostsPeriod::Day),
+            date: Some("2026-01-26".to_string()),
+            ..Default::default()
+        };
+
+        let mut query_pairs = url.query_pairs_mut();
+        params.append_query_pairs(&mut query_pairs);
+
+        assert_eq!(
+            query_pairs.finish().as_str(),
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&date=2026-01-26"
+        );
+    }
+
+    #[test]
+    fn test_stats_top_posts_params_with_false_values() {
+        let mut url = url::Url::parse(
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts",
+        )
+        .expect("Failed to parse url");
+
+        let params = StatsTopPostsParams {
+            period: Some(StatsTopPostsPeriod::Day),
+            summarize: Some(false),
+            skip_archives: Some(false),
+            ..Default::default()
+        };
+
+        let mut query_pairs = url.query_pairs_mut();
+        params.append_query_pairs(&mut query_pairs);
+
+        assert_eq!(
+            query_pairs.finish().as_str(),
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&summarize=0&skip_archives=0"
         );
     }
 
