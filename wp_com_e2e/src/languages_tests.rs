@@ -44,7 +44,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                             slug,
                             language.id,
                             wpcom_language.language_id()
-                        ));
+                        )
+                        .into());
                     }
 
                     if wpcom_language.display_name() != language.name {
@@ -53,7 +54,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                             slug,
                             language.name,
                             wpcom_language.display_name()
-                        ));
+                        )
+                        .into());
                     }
                 }
 
@@ -70,7 +72,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                             slug,
                             language.language_id(),
                             remote_language.id
-                        ));
+                        )
+                        .into());
                     }
 
                     // Verify popularity rank consistency
@@ -79,19 +82,22 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                             return Err(format!(
                                 "Popularity rank mismatch for {}: expected {}, got {}",
                                 slug, remote, local
-                            ));
+                            )
+                            .into());
                         }
                         (Some(_), None) => {
                             return Err(format!(
                                 "Local language {} is popular but remote is not",
                                 slug
-                            ));
+                            )
+                            .into());
                         }
                         (None, Some(_)) => {
                             return Err(format!(
                                 "Remote language {} is popular but local is not",
                                 slug
-                            ));
+                            )
+                            .into());
                         }
                         _ => {}
                     }

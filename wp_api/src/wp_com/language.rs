@@ -199,7 +199,7 @@ impl WPComLanguage {
     }
 
     /// Returns the display name in the native language
-    pub fn name(&self) -> String {
+    pub fn display_name(&self) -> String {
         self.name_str().to_string()
     }
 
@@ -1421,7 +1421,7 @@ mod tests {
     fn test_language_metadata() {
         let english = WPComLanguage::English;
         assert_eq!(english.slug(), "en");
-        assert_eq!(english.name(), "English");
+        assert_eq!(english.display_name(), "English");
         assert_eq!(english.wp_locale(), "en_US");
         assert_eq!(english.territories(), vec!["019"]);
         assert_eq!(english.popular_rank(), Some(1));
