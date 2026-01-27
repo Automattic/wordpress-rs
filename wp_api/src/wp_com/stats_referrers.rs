@@ -3,6 +3,7 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// The time period for grouping referrers.
 #[derive(
@@ -83,14 +84,20 @@ impl AppendUrlQueryPairs for StatsReferrersParams {
 }
 
 /// Response from the stats referrers endpoint.
+///
+/// The response structure varies based on the `summarize` parameter:
+/// - When `summarize=1`: Contains `summary` field with aggregated data
+/// - When `summarize` is not set: Contains `days` field with per-day data
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsReferrersResponse {
     /// The date for the stats query.
     pub date: String,
-    /// The time period used for grouping.
-    pub period: String,
-    /// Summary data with aggregated referrer groups.
-    pub summary: StatsReferrersSummaryData,
+    /// The time period used for grouping (present when summarize=1).
+    pub period: Option<String>,
+    /// Summary data with aggregated referrer groups (present when summarize=1).
+    pub summary: Option<StatsReferrersSummaryData>,
+    /// Per-day stats data keyed by date string (present when summarize is not set).
+    pub days: Option<HashMap<String, StatsReferrersDayData>>,
 }
 
 /// Summary data with aggregated referrer groups.
@@ -101,6 +108,17 @@ pub struct StatsReferrersSummaryData {
     /// Views from other referrers not included in the list.
     pub other_views: u64,
     /// The total number of views.
+    pub total_views: u64,
+}
+
+/// Stats data for a single day.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct StatsReferrersDayData {
+    /// The list of referrer groups for this day.
+    pub groups: Vec<StatsReferrersGroup>,
+    /// Views from other referrers not included in the list.
+    pub other_views: u64,
+    /// The total number of views for this day.
     pub total_views: u64,
 }
 
@@ -192,24 +210,34 @@ pub struct StatsReferrersFollowParams {
     pub is_following: Option<bool>,
 }
 
-/// Returns all referrer groups from the summary.
+/// Returns all referrer groups from the summary (when summarize=1 was used).
 #[uniffi::export]
 pub fn get_stats_referrers_all_groups(
     response: &StatsReferrersResponse,
-) -> Vec<StatsReferrersGroup> {
-    response.summary.groups.clone()
+) -> Option<Vec<StatsReferrersGroup>> {
+    response.summary.as_ref().map(|s| s.groups.clone())
 }
 
-/// Returns the total views from the summary.
+/// Returns the total views from the summary (when summarize=1 was used).
 #[uniffi::export]
-pub fn get_stats_referrers_total_views(response: &StatsReferrersResponse) -> u64 {
-    response.summary.total_views
+pub fn get_stats_referrers_total_views(response: &StatsReferrersResponse) -> Option<u64> {
+    response.summary.as_ref().map(|s| s.total_views)
 }
 
-/// Returns the summary data.
+/// Returns the summary data (when summarize=1 was used).
 #[uniffi::export]
-pub fn get_stats_referrers_summary(response: &StatsReferrersResponse) -> StatsReferrersSummaryData {
+pub fn get_stats_referrers_summary(
+    response: &StatsReferrersResponse,
+) -> Option<StatsReferrersSummaryData> {
     response.summary.clone()
+}
+
+/// Returns the days data (when summarize is not set).
+#[uniffi::export]
+pub fn get_stats_referrers_days(
+    response: &StatsReferrersResponse,
+) -> Option<HashMap<String, StatsReferrersDayData>> {
+    response.days.clone()
 }
 
 #[cfg(test)]
@@ -324,7 +352,8 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         assert!(!response.date.is_empty());
-        assert!(!response.period.is_empty());
+        assert!(response.period.is_some());
+        assert!(!response.period.as_ref().unwrap().is_empty());
     }
 
     #[test]
@@ -335,13 +364,15 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         assert_eq!(response.date, "2026-01-26");
-        assert_eq!(response.period, "day");
-        assert_eq!(response.summary.total_views, 22);
-        assert_eq!(response.summary.other_views, 0);
-        assert_eq!(response.summary.groups.len(), 6);
+        assert_eq!(response.period, Some("day".to_string()));
+
+        let summary = response.summary.as_ref().expect("Summary should be present");
+        assert_eq!(summary.total_views, 22);
+        assert_eq!(summary.other_views, 0);
+        assert_eq!(summary.groups.len(), 6);
 
         // Verify first group (WordPress.com Reader)
-        let first_group = &response.summary.groups[0];
+        let first_group = &summary.groups[0];
         assert_eq!(first_group.group, "WordPress.com Reader");
         assert_eq!(first_group.name, "WordPress.com Reader");
         assert_eq!(
@@ -368,8 +399,8 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         // Find Search Engines group (has detailed results array)
-        let search_engines = response
-            .summary
+        let summary = response.summary.as_ref().expect("Summary should be present");
+        let search_engines = summary
             .groups
             .iter()
             .find(|g| g.group == "Search Engines")
@@ -398,9 +429,9 @@ mod tests {
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
+        let summary = response.summary.as_ref().expect("Summary should be present");
         // Find group with follow_data (dotcom.wordpress.com)
-        let dotcom_group = response
-            .summary
+        let dotcom_group = summary
             .groups
             .iter()
             .find(|g| g.group == "dotcom.wordpress.com")
@@ -425,7 +456,8 @@ mod tests {
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let all_groups = get_stats_referrers_all_groups(&response);
+        let all_groups = get_stats_referrers_all_groups(&response)
+            .expect("Summary should be present");
 
         assert_eq!(all_groups.len(), 6);
     }
@@ -437,7 +469,8 @@ mod tests {
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let total = get_stats_referrers_total_views(&response);
+        let total = get_stats_referrers_total_views(&response)
+            .expect("Summary should be present");
         assert_eq!(total, 22);
     }
 
@@ -448,9 +481,79 @@ mod tests {
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let summary = get_stats_referrers_summary(&response);
+        let summary = get_stats_referrers_summary(&response)
+            .expect("Summary should be present");
         assert_eq!(summary.total_views, 22);
         assert_eq!(summary.other_views, 0);
         assert_eq!(summary.groups.len(), 6);
+    }
+
+    #[rstest]
+    #[case("tests/wpcom/stats_referrers/referrers-02-days.json")]
+    fn test_stats_referrers_response_deserialization_days(#[case] json_file_path: &str) {
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsReferrersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(!response.date.is_empty());
+        assert!(response.summary.is_none());
+        assert!(response.days.is_some());
+    }
+
+    #[test]
+    fn test_stats_referrers_response_deserialization_days_02() {
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-02-days.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsReferrersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(response.date, "2026-01-26");
+        assert!(response.period.is_none());
+        assert!(response.summary.is_none());
+
+        let days = response.days.as_ref().expect("Days should be present");
+        assert_eq!(days.len(), 2);
+
+        // Verify first day
+        let day1 = days.get("2026-01-26").expect("2026-01-26 should exist");
+        assert_eq!(day1.total_views, 13);
+        assert_eq!(day1.other_views, 2);
+        assert_eq!(day1.groups.len(), 2);
+
+        // Verify first group of first day
+        let first_group = &day1.groups[0];
+        assert_eq!(first_group.group, "WordPress.com Reader");
+        assert_eq!(first_group.total, 8);
+
+        // Verify second day
+        let day2 = days.get("2026-01-25").expect("2026-01-25 should exist");
+        assert_eq!(day2.total_views, 5);
+        assert_eq!(day2.other_views, 0);
+        assert_eq!(day2.groups.len(), 1);
+    }
+
+    #[test]
+    fn test_get_stats_referrers_days() {
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-02-days.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsReferrersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let days = get_stats_referrers_days(&response).expect("Days should be present");
+        assert_eq!(days.len(), 2);
+        assert!(days.contains_key("2026-01-26"));
+        assert!(days.contains_key("2026-01-25"));
+    }
+
+    #[test]
+    fn test_stats_referrers_summary_is_none_for_days_response() {
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-02-days.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsReferrersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(get_stats_referrers_summary(&response).is_none());
+        assert!(get_stats_referrers_all_groups(&response).is_none());
+        assert!(get_stats_referrers_total_views(&response).is_none());
     }
 }

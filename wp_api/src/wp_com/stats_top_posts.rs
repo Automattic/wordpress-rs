@@ -3,6 +3,7 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// The time period for grouping top posts.
 #[derive(
@@ -83,14 +84,20 @@ impl AppendUrlQueryPairs for StatsTopPostsParams {
 }
 
 /// Response from the stats top posts endpoint.
+///
+/// The response structure varies based on the `summarize` parameter:
+/// - When `summarize=1`: Contains `summary` field with aggregated data
+/// - When `summarize` is not set: Contains `days` field with per-day data
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsTopPostsResponse {
     /// The date for the stats query.
     pub date: String,
-    /// The time period used for grouping.
-    pub period: String,
-    /// Summary data with aggregated post views.
-    pub summary: StatsTopPostsSummaryData,
+    /// The time period used for grouping (present when summarize=1).
+    pub period: Option<String>,
+    /// Summary data with aggregated post views (present when summarize=1).
+    pub summary: Option<StatsTopPostsSummaryData>,
+    /// Per-day stats data keyed by date string (present when summarize is not set).
+    pub days: Option<HashMap<String, StatsTopPostsDayData>>,
 }
 
 /// Summary data with aggregated post views.
@@ -141,24 +148,34 @@ pub struct StatsTopPostsPostView {
     pub video_play: bool,
 }
 
-/// Returns all post views from the summary.
+/// Returns all post views from the summary (when summarize=1 was used).
 #[uniffi::export]
 pub fn get_stats_top_posts_all_post_views(
     response: &StatsTopPostsResponse,
-) -> Vec<StatsTopPostsPostView> {
-    response.summary.postviews.clone()
+) -> Option<Vec<StatsTopPostsPostView>> {
+    response.summary.as_ref().map(|s| s.postviews.clone())
 }
 
-/// Returns the total views from the summary.
+/// Returns the total views from the summary (when summarize=1 was used).
 #[uniffi::export]
-pub fn get_stats_top_posts_total_views(response: &StatsTopPostsResponse) -> u64 {
-    response.summary.total_views
+pub fn get_stats_top_posts_total_views(response: &StatsTopPostsResponse) -> Option<u64> {
+    response.summary.as_ref().map(|s| s.total_views)
 }
 
-/// Returns the summary data.
+/// Returns the summary data (when summarize=1 was used).
 #[uniffi::export]
-pub fn get_stats_top_posts_summary(response: &StatsTopPostsResponse) -> StatsTopPostsSummaryData {
+pub fn get_stats_top_posts_summary(
+    response: &StatsTopPostsResponse,
+) -> Option<StatsTopPostsSummaryData> {
     response.summary.clone()
+}
+
+/// Returns the days data (when summarize is not set).
+#[uniffi::export]
+pub fn get_stats_top_posts_days(
+    response: &StatsTopPostsResponse,
+) -> Option<HashMap<String, StatsTopPostsDayData>> {
+    response.days.clone()
 }
 
 #[cfg(test)]
@@ -273,7 +290,8 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         assert!(!response.date.is_empty());
-        assert!(!response.period.is_empty());
+        assert!(response.period.is_some());
+        assert!(!response.period.as_ref().unwrap().is_empty());
     }
 
     #[test]
@@ -284,13 +302,15 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         assert_eq!(response.date, "2026-01-25");
-        assert_eq!(response.period, "week");
-        assert_eq!(response.summary.total_views, 2996);
-        assert!(response.summary.dropped_ids.is_empty());
-        assert_eq!(response.summary.postviews.len(), 10);
+        assert_eq!(response.period, Some("week".to_string()));
+
+        let summary = response.summary.as_ref().expect("Summary should be present");
+        assert_eq!(summary.total_views, 2996);
+        assert!(summary.dropped_ids.is_empty());
+        assert_eq!(summary.postviews.len(), 10);
 
         // Verify first post view
-        let first_post = &response.summary.postviews[0];
+        let first_post = &summary.postviews[0];
         assert_eq!(first_post.id, 269);
         assert_eq!(first_post.title, "Welcome to Automattic");
         assert_eq!(first_post.post_type, "page");
@@ -308,8 +328,8 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         // Find homepage entry (id: 0, type: homepage, date: null, status: null)
-        let homepage = response
-            .summary
+        let summary = response.summary.as_ref().expect("Summary should be present");
+        let homepage = summary
             .postviews
             .iter()
             .find(|p| p.post_type == "homepage")
@@ -330,7 +350,8 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let all_posts = get_stats_top_posts_all_post_views(&response);
+        let all_posts = get_stats_top_posts_all_post_views(&response)
+            .expect("Summary should be present");
 
         assert_eq!(all_posts.len(), 10);
     }
@@ -342,7 +363,8 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let total = get_stats_top_posts_total_views(&response);
+        let total = get_stats_top_posts_total_views(&response)
+            .expect("Summary should be present");
         assert_eq!(total, 2996);
     }
 
@@ -353,9 +375,82 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        let summary = get_stats_top_posts_summary(&response);
+        let summary = get_stats_top_posts_summary(&response)
+            .expect("Summary should be present");
         assert_eq!(summary.total_views, 2996);
         assert!(summary.dropped_ids.is_empty());
         assert_eq!(summary.postviews.len(), 10);
+    }
+
+    #[rstest]
+    #[case("tests/wpcom/stats_top_posts/top-posts-02-days.json")]
+    fn test_stats_top_posts_response_deserialization_days(#[case] json_file_path: &str) {
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopPostsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(!response.date.is_empty());
+        assert!(response.summary.is_none());
+        assert!(response.days.is_some());
+    }
+
+    #[test]
+    fn test_stats_top_posts_response_deserialization_days_02() {
+        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-02-days.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopPostsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(response.date, "2026-01-26");
+        assert!(response.period.is_none());
+        assert!(response.summary.is_none());
+
+        let days = response.days.as_ref().expect("Days should be present");
+        assert_eq!(days.len(), 2);
+
+        // Verify first day
+        let day1 = days.get("2026-01-26").expect("2026-01-26 should exist");
+        assert_eq!(day1.total_views, 220);
+        assert_eq!(day1.other_views, 10);
+        assert!(day1.dropped_ids.is_empty());
+        assert_eq!(day1.postviews.len(), 3);
+
+        // Verify first post view of first day
+        let first_post = &day1.postviews[0];
+        assert_eq!(first_post.id, 269);
+        assert_eq!(first_post.title, "Welcome to Automattic");
+        assert_eq!(first_post.views, 150);
+
+        // Verify second day
+        let day2 = days.get("2026-01-25").expect("2026-01-25 should exist");
+        assert_eq!(day2.total_views, 180);
+        assert_eq!(day2.other_views, 60);
+        assert_eq!(day2.dropped_ids, vec![12345]);
+        assert_eq!(day2.postviews.len(), 1);
+    }
+
+    #[test]
+    fn test_get_stats_top_posts_days() {
+        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-02-days.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopPostsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let days = get_stats_top_posts_days(&response).expect("Days should be present");
+        assert_eq!(days.len(), 2);
+        assert!(days.contains_key("2026-01-26"));
+        assert!(days.contains_key("2026-01-25"));
+    }
+
+    #[test]
+    fn test_stats_top_posts_summary_is_none_for_days_response() {
+        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-02-days.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopPostsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(get_stats_top_posts_summary(&response).is_none());
+        assert!(get_stats_top_posts_all_post_views(&response).is_none());
+        assert!(get_stats_top_posts_total_views(&response).is_none());
     }
 }
