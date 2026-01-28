@@ -2,7 +2,7 @@ use crate::{
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
 /// The time period for grouping referrers.
@@ -133,6 +133,8 @@ pub struct StatsReferrersGroup {
     /// The total number of views from this referrer.
     pub total: u64,
     /// Follow data for WordPress.com sites (optional).
+    /// The API can return `null`, `false`, or an object for this field.
+    #[serde(default, deserialize_with = "deserialize_follow_data")]
     pub follow_data: Option<StatsReferrersFollowData>,
     /// The results data (can be simple views or detailed referrer list).
     pub results: StatsReferrersResults,
@@ -176,6 +178,30 @@ pub struct StatsReferrersFollowData {
     /// The type of follow action.
     #[serde(rename = "type")]
     pub follow_type: Option<String>,
+}
+
+/// Deserializes follow_data which can be null, false, or an object.
+/// The API sometimes returns `false` instead of `null` when follow data is not available.
+fn deserialize_follow_data<'de, D>(
+    deserializer: D,
+) -> Result<Option<StatsReferrersFollowData>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    #[allow(clippy::large_enum_variant)]
+    enum FollowDataOrBool {
+        Data(StatsReferrersFollowData),
+        #[allow(dead_code)]
+        Bool(bool),
+        Null,
+    }
+
+    match FollowDataOrBool::deserialize(deserializer)? {
+        FollowDataOrBool::Data(data) => Ok(Some(data)),
+        FollowDataOrBool::Bool(_) | FollowDataOrBool::Null => Ok(None),
+    }
 }
 
 /// Parameters for following a referrer site.
@@ -345,6 +371,8 @@ mod tests {
 
     #[rstest]
     #[case("tests/wpcom/stats_referrers/referrers-01.json")]
+    #[case("tests/wpcom/stats_referrers/referrers-03-follow-data-false.json")]
+    #[case("tests/wpcom/stats_referrers/referrers-04-real-response.json")]
     fn test_stats_referrers_response_deserialization(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsReferrersResponse =
@@ -561,5 +589,36 @@ mod tests {
         assert!(get_stats_referrers_summary(&response).is_none());
         assert!(get_stats_referrers_all_groups(&response).is_none());
         assert!(get_stats_referrers_total_views(&response).is_none());
+    }
+
+    #[test]
+    fn test_stats_referrers_follow_data_as_false() {
+        // The API can return `false` instead of `null` for follow_data
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-03-follow-data-false.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsReferrersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with follow_data: false");
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert_eq!(summary.groups.len(), 2);
+
+        // First group has follow_data: null
+        let first_group = &summary.groups[0];
+        assert_eq!(first_group.group, "WordPress.com Reader");
+        assert!(
+            first_group.follow_data.is_none(),
+            "follow_data: null should be deserialized as None"
+        );
+
+        // Second group has follow_data: false
+        let second_group = &summary.groups[1];
+        assert_eq!(second_group.group, "domainsuniversity.wordpress.com");
+        assert!(
+            second_group.follow_data.is_none(),
+            "follow_data: false should be deserialized as None"
+        );
     }
 }
