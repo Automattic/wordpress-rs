@@ -51,16 +51,17 @@ impl WpComDotOrgApiUrlResolver {
 
 #[uniffi::export]
 impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
+    fn can_resolve(&self, namespace: String) -> bool {
+        WpNamespace::iter().any(|n| n.namespace_value() == namespace)
+    }
+
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
-        {
-            if !WpNamespace::iter().any(|n| n.namespace_value() == namespace) {
-                panic!(
-                    "`WpComDotOrgApiUrlResolver` doesn't support the namespace `{}`. The supported namespaces are: {:?}",
-                    namespace,
-                    WpNamespace::iter()
-                );
-            }
-        }
+        assert!(
+            self.can_resolve(namespace.clone()),
+            "`WpComDotOrgApiUrlResolver` doesn't support the namespace `{}`. The supported namespaces are: {:?}",
+            namespace,
+            WpNamespace::iter()
+        );
 
         // The API root endpoint needs special handling for WordPress.com
         if namespace == WpNamespace::None.namespace_value() && endpoint_segments.is_empty() {
@@ -105,14 +106,15 @@ impl Default for WpComApiClientInternalUrlResolver {
 }
 
 impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
+    fn can_resolve(&self, namespace: String) -> bool {
+        !WpNamespace::iter().any(|n| n.namespace_value() == namespace)
+    }
+
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
-        {
-            if WpNamespace::iter().any(|n| n.namespace_value() == namespace) {
-                panic!(
-                    "`WpComApiClient` doesn't support the namespace `{namespace}`. Try using `WpApiClient` instead.",
-                );
-            }
-        }
+        assert!(
+            self.can_resolve(namespace.clone()),
+            "`WpComApiClient` doesn't support the namespace `{namespace}`. Try using `WpApiClient` instead.",
+        );
         Arc::new(
             self.base_url
                 .by_extending_and_splitting_by_forward_slash(

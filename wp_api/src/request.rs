@@ -7,7 +7,7 @@ use crate::{
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use endpoint::{
-    ApiEndpointUrl, ApiUrlResolver,
+    ApiEndpointUrl, ApiUrlResolver, AsNamespace, WpNamespace,
     application_passwords_endpoint::{
         ApplicationPasswordsRequestBuilder,
         ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
@@ -945,6 +945,10 @@ pub async fn fetch_authentication_state(
     api_url_resolver: Arc<dyn ApiUrlResolver>,
     authentication_provider: Arc<WpAuthenticationProvider>,
 ) -> Result<AuthenticationState, WpApiError> {
+    if !api_url_resolver.can_resolve(WpNamespace::WpV2.namespace_value().to_string()) {
+        return Ok(AuthenticationState::Unauthorized);
+    }
+
     let request =
         ApplicationPasswordsRequestBuilder::new(api_url_resolver, authentication_provider)
             .retrieve_current_with_edit_context()

@@ -118,6 +118,8 @@ impl AsNamespace for WpNamespace {
 
 #[uniffi::export(with_foreign)]
 pub trait ApiUrlResolver: Send + Sync {
+    fn can_resolve(&self, namespace: String) -> bool;
+
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl>;
 }
 
@@ -140,6 +142,10 @@ impl WpOrgSiteApiUrlResolver {
 
 #[uniffi::export]
 impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
+    fn can_resolve(&self, _namespace: String) -> bool {
+        true
+    }
+
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
         Arc::new(
             self.api_root_url
