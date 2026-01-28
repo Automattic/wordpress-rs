@@ -372,5 +372,4 @@ mod tests {
         assert_eq!(day2.dropped_ids, vec![12345]);
         assert_eq!(day2.postviews.len(), 1);
     }
-
 }
