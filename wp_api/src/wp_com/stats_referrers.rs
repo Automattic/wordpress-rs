@@ -241,36 +241,6 @@ pub struct StatsReferrersFollowParams {
     pub is_following: Option<bool>,
 }
 
-/// Returns all referrer groups from the summary (when summarize=1 was used).
-#[uniffi::export]
-pub fn get_stats_referrers_all_groups(
-    response: &StatsReferrersResponse,
-) -> Option<Vec<StatsReferrersGroup>> {
-    response.summary.as_ref().map(|s| s.groups.clone())
-}
-
-/// Returns the total views from the summary (when summarize=1 was used).
-#[uniffi::export]
-pub fn get_stats_referrers_total_views(response: &StatsReferrersResponse) -> Option<u64> {
-    response.summary.as_ref().map(|s| s.total_views)
-}
-
-/// Returns the summary data (when summarize=1 was used).
-#[uniffi::export]
-pub fn get_stats_referrers_summary(
-    response: &StatsReferrersResponse,
-) -> Option<StatsReferrersSummaryData> {
-    response.summary.clone()
-}
-
-/// Returns the days data (when summarize is not set).
-#[uniffi::export]
-pub fn get_stats_referrers_days(
-    response: &StatsReferrersResponse,
-) -> Option<HashMap<String, StatsReferrersDayData>> {
-    response.days.clone()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -493,43 +463,6 @@ mod tests {
         assert_eq!(params.is_following, Some(true));
     }
 
-    #[test]
-    fn test_get_stats_referrers_all_groups() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-01.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsReferrersResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        let all_groups =
-            get_stats_referrers_all_groups(&response).expect("Summary should be present");
-
-        assert_eq!(all_groups.len(), 6);
-    }
-
-    #[test]
-    fn test_get_stats_referrers_total_views() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-01.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsReferrersResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        let total = get_stats_referrers_total_views(&response).expect("Summary should be present");
-        assert_eq!(total, 22);
-    }
-
-    #[test]
-    fn test_get_stats_referrers_summary() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-01.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsReferrersResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        let summary = get_stats_referrers_summary(&response).expect("Summary should be present");
-        assert_eq!(summary.total_views, 22);
-        assert_eq!(summary.other_views, 0);
-        assert_eq!(summary.groups.len(), 6);
-    }
-
     #[rstest]
     #[case("tests/wpcom/stats_referrers/referrers-02-days.json")]
     fn test_stats_referrers_response_deserialization_days(#[case] json_file_path: &str) {
@@ -572,31 +505,6 @@ mod tests {
         assert_eq!(day2.total_views, 5);
         assert_eq!(day2.other_views, 0);
         assert_eq!(day2.groups.len(), 1);
-    }
-
-    #[test]
-    fn test_get_stats_referrers_days() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-02-days.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsReferrersResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        let days = get_stats_referrers_days(&response).expect("Days should be present");
-        assert_eq!(days.len(), 2);
-        assert!(days.contains_key("2026-01-26"));
-        assert!(days.contains_key("2026-01-25"));
-    }
-
-    #[test]
-    fn test_stats_referrers_summary_is_none_for_days_response() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-02-days.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsReferrersResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        assert!(get_stats_referrers_summary(&response).is_none());
-        assert!(get_stats_referrers_all_groups(&response).is_none());
-        assert!(get_stats_referrers_total_views(&response).is_none());
     }
 
     #[test]

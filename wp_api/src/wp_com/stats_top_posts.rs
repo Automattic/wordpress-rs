@@ -153,36 +153,6 @@ pub struct StatsTopPostsPostView {
     pub video_play: bool,
 }
 
-/// Returns all post views from the summary (when summarize=1 was used).
-#[uniffi::export]
-pub fn get_stats_top_posts_all_post_views(
-    response: &StatsTopPostsResponse,
-) -> Option<Vec<StatsTopPostsPostView>> {
-    response.summary.as_ref().map(|s| s.postviews.clone())
-}
-
-/// Returns the total views from the summary (when summarize=1 was used).
-#[uniffi::export]
-pub fn get_stats_top_posts_total_views(response: &StatsTopPostsResponse) -> Option<u64> {
-    response.summary.as_ref().map(|s| s.total_views)
-}
-
-/// Returns the summary data (when summarize=1 was used).
-#[uniffi::export]
-pub fn get_stats_top_posts_summary(
-    response: &StatsTopPostsResponse,
-) -> Option<StatsTopPostsSummaryData> {
-    response.summary.clone()
-}
-
-/// Returns the days data (when summarize is not set).
-#[uniffi::export]
-pub fn get_stats_top_posts_days(
-    response: &StatsTopPostsResponse,
-) -> Option<HashMap<String, StatsTopPostsDayData>> {
-    response.days.clone()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -356,43 +326,6 @@ mod tests {
         assert_eq!(homepage.views, 244);
     }
 
-    #[test]
-    fn test_get_stats_top_posts_all_post_views() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-01.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsTopPostsResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        let all_posts =
-            get_stats_top_posts_all_post_views(&response).expect("Summary should be present");
-
-        assert_eq!(all_posts.len(), 10);
-    }
-
-    #[test]
-    fn test_get_stats_top_posts_total_views() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-01.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsTopPostsResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        let total = get_stats_top_posts_total_views(&response).expect("Summary should be present");
-        assert_eq!(total, 2996);
-    }
-
-    #[test]
-    fn test_get_stats_top_posts_summary() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-01.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsTopPostsResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        let summary = get_stats_top_posts_summary(&response).expect("Summary should be present");
-        assert_eq!(summary.total_views, 2996);
-        assert!(summary.dropped_ids.is_empty());
-        assert_eq!(summary.postviews.len(), 10);
-    }
-
     #[rstest]
     #[case("tests/wpcom/stats_top_posts/top-posts-02-days.json")]
     fn test_stats_top_posts_response_deserialization_days(#[case] json_file_path: &str) {
@@ -440,28 +373,4 @@ mod tests {
         assert_eq!(day2.postviews.len(), 1);
     }
 
-    #[test]
-    fn test_get_stats_top_posts_days() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-02-days.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsTopPostsResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        let days = get_stats_top_posts_days(&response).expect("Days should be present");
-        assert_eq!(days.len(), 2);
-        assert!(days.contains_key("2026-01-26"));
-        assert!(days.contains_key("2026-01-25"));
-    }
-
-    #[test]
-    fn test_stats_top_posts_summary_is_none_for_days_response() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-02-days.json";
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsTopPostsResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        assert!(get_stats_top_posts_summary(&response).is_none());
-        assert!(get_stats_top_posts_all_post_views(&response).is_none());
-        assert!(get_stats_top_posts_total_views(&response).is_none());
-    }
 }
