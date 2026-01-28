@@ -56,9 +56,17 @@ pub struct StatsReferrersParams {
     #[uniffi(default = None)]
     pub locale: Option<String>,
     /// Whether to return a summary of the data.
+    ///
+    /// - `Some(true)` (default): Response contains `summary` field with aggregated data
+    /// - `Some(false)`: Response contains `days` field with per-day breakdown
+    /// - `None`: Parameter is not sent to the API
     #[uniffi(default = Some(true))]
     pub summarize: Option<bool>,
-    /// Whether to skip archives in the response.
+    /// Whether to skip archive pages (date-based archives, category archives, etc.) in the response.
+    ///
+    /// - `Some(true)` (default): Archive pages are excluded from results
+    /// - `Some(false)`: Archive pages are included in results
+    /// - `None`: Parameter is not sent to the API
     #[uniffi(default = Some(true))]
     pub skip_archives: Option<bool>,
 }
