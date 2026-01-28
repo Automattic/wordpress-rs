@@ -131,21 +131,21 @@ pub struct StatsReferrersDayData {
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsReferrersGroup {
     /// The group identifier.
-    pub group: String,
+    pub group: Option<String>,
     /// The display name of the referrer.
-    pub name: String,
+    pub name: Option<String>,
     /// The URL of the referrer (optional for some groups like Search Engines).
     pub url: Option<String>,
     /// The icon URL for the referrer.
     pub icon: Option<String>,
     /// The total number of views from this referrer.
-    pub total: u64,
+    pub total: Option<u64>,
     /// Follow data for WordPress.com sites (optional).
     /// The API can return `null`, `false`, or an object for this field.
     #[serde(default, deserialize_with = "deserialize_follow_data")]
     pub follow_data: Option<StatsReferrersFollowData>,
     /// The results data (can be simple views or detailed referrer list).
-    pub results: StatsReferrersResults,
+    pub results: Option<StatsReferrersResults>,
 }
 
 /// Results can be either a simple views object or a list of detailed referrers.
@@ -162,20 +162,20 @@ pub enum StatsReferrersResults {
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsReferrersViewsResult {
     /// The number of views.
-    pub views: u64,
+    pub views: Option<u64>,
 }
 
 /// Detailed referrer result (used in groups like Search Engines).
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsReferrersDetailedResult {
     /// The name of the specific referrer.
-    pub name: String,
+    pub name: Option<String>,
     /// The URL of the referrer.
     pub url: Option<String>,
     /// The icon URL for the referrer.
     pub icon: Option<String>,
     /// The number of views from this referrer.
-    pub views: u64,
+    pub views: Option<u64>,
 }
 
 /// Follow data for WordPress.com sites.
@@ -381,19 +381,19 @@ mod tests {
 
         // Verify first group (WordPress.com Reader)
         let first_group = &summary.groups[0];
-        assert_eq!(first_group.group, "WordPress.com Reader");
-        assert_eq!(first_group.name, "WordPress.com Reader");
+        assert_eq!(first_group.group, Some("WordPress.com Reader".to_string()));
+        assert_eq!(first_group.name, Some("WordPress.com Reader".to_string()));
         assert_eq!(
             first_group.url,
             Some("https://wordpress.com/reader/".to_string())
         );
-        assert_eq!(first_group.total, 12);
+        assert_eq!(first_group.total, Some(12));
         assert!(first_group.follow_data.is_none());
 
         // Check simple views result
         match &first_group.results {
-            StatsReferrersResults::Views(views) => {
-                assert_eq!(views.views, 12);
+            Some(StatsReferrersResults::Views(views)) => {
+                assert_eq!(views.views, Some(12));
             }
             _ => panic!("Expected Views result"),
         }
@@ -414,20 +414,20 @@ mod tests {
         let search_engines = summary
             .groups
             .iter()
-            .find(|g| g.group == "Search Engines")
+            .find(|g| g.group == Some("Search Engines".to_string()))
             .expect("Search Engines group should exist");
 
-        assert_eq!(search_engines.name, "Search Engines");
+        assert_eq!(search_engines.name, Some("Search Engines".to_string()));
         assert!(search_engines.url.is_none());
-        assert_eq!(search_engines.total, 1);
+        assert_eq!(search_engines.total, Some(1));
 
         // Check detailed results
         match &search_engines.results {
-            StatsReferrersResults::Referrers(referrers) => {
+            Some(StatsReferrersResults::Referrers(referrers)) => {
                 assert_eq!(referrers.len(), 1);
-                assert_eq!(referrers[0].name, "Google Search");
+                assert_eq!(referrers[0].name, Some("Google Search".to_string()));
                 assert_eq!(referrers[0].url, Some("http://www.google.com/".to_string()));
-                assert_eq!(referrers[0].views, 1);
+                assert_eq!(referrers[0].views, Some(1));
             }
             _ => panic!("Expected Referrers result"),
         }
@@ -448,7 +448,7 @@ mod tests {
         let dotcom_group = summary
             .groups
             .iter()
-            .find(|g| g.group == "dotcom.wordpress.com")
+            .find(|g| g.group == Some("dotcom.wordpress.com".to_string()))
             .expect("dotcom.wordpress.com group should exist");
 
         assert!(dotcom_group.follow_data.is_some());
@@ -497,8 +497,8 @@ mod tests {
 
         // Verify first group of first day
         let first_group = &day1.groups[0];
-        assert_eq!(first_group.group, "WordPress.com Reader");
-        assert_eq!(first_group.total, 8);
+        assert_eq!(first_group.group, Some("WordPress.com Reader".to_string()));
+        assert_eq!(first_group.total, Some(8));
 
         // Verify second day
         let day2 = days.get("2026-01-25").expect("2026-01-25 should exist");
@@ -523,7 +523,7 @@ mod tests {
 
         // First group has follow_data: null
         let first_group = &summary.groups[0];
-        assert_eq!(first_group.group, "WordPress.com Reader");
+        assert_eq!(first_group.group, Some("WordPress.com Reader".to_string()));
         assert!(
             first_group.follow_data.is_none(),
             "follow_data: null should be deserialized as None"
@@ -531,10 +531,89 @@ mod tests {
 
         // Second group has follow_data: false
         let second_group = &summary.groups[1];
-        assert_eq!(second_group.group, "domainsuniversity.wordpress.com");
+        assert_eq!(second_group.group, Some("domainsuniversity.wordpress.com".to_string()));
         assert!(
             second_group.follow_data.is_none(),
             "follow_data: false should be deserialized as None"
         );
+    }
+
+    #[test]
+    fn test_stats_referrers_with_null_values() {
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-05-with-nulls.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsReferrersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with null values");
+
+        assert_eq!(response.date, "2026-01-28");
+        assert_eq!(response.period, Some("day".to_string()));
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert_eq!(summary.total_views, 160);
+        assert_eq!(summary.groups.len(), 4);
+
+        // First group: all nullable fields are null
+        let all_nulls = &summary.groups[0];
+        assert!(all_nulls.group.is_none());
+        assert!(all_nulls.name.is_none());
+        assert!(all_nulls.url.is_none());
+        assert!(all_nulls.icon.is_none());
+        assert!(all_nulls.total.is_none());
+        assert!(all_nulls.follow_data.is_none());
+        assert!(all_nulls.results.is_none());
+
+        // Second group: all fields have values with Views result
+        let with_views = &summary.groups[1];
+        assert_eq!(with_views.group, Some("WordPress.com Reader".to_string()));
+        assert_eq!(with_views.name, Some("WordPress.com Reader".to_string()));
+        assert_eq!(with_views.url, Some("https://wordpress.com/reader/".to_string()));
+        assert_eq!(with_views.icon, Some("https://example.com/icon.png".to_string()));
+        assert_eq!(with_views.total, Some(100));
+        match &with_views.results {
+            Some(StatsReferrersResults::Views(views)) => {
+                assert_eq!(views.views, Some(100));
+            }
+            _ => panic!("Expected Views result"),
+        }
+
+        // Third group: Search Engines with Referrers array containing nulls
+        let search_engines = &summary.groups[2];
+        assert_eq!(search_engines.group, Some("Search Engines".to_string()));
+        assert_eq!(search_engines.total, Some(50));
+        match &search_engines.results {
+            Some(StatsReferrersResults::Referrers(referrers)) => {
+                assert_eq!(referrers.len(), 2);
+
+                // First referrer: all nulls
+                let null_referrer = &referrers[0];
+                assert!(null_referrer.name.is_none());
+                assert!(null_referrer.url.is_none());
+                assert!(null_referrer.icon.is_none());
+                assert!(null_referrer.views.is_none());
+
+                // Second referrer: all values
+                let google = &referrers[1];
+                assert_eq!(google.name, Some("Google Search".to_string()));
+                assert_eq!(google.url, Some("http://www.google.com/".to_string()));
+                assert_eq!(google.icon, Some("https://example.com/google.png".to_string()));
+                assert_eq!(google.views, Some(25));
+            }
+            _ => panic!("Expected Referrers result"),
+        }
+
+        // Fourth group: partial nulls with views result containing null
+        let partial = &summary.groups[3];
+        assert_eq!(partial.group, Some("partial.example.com".to_string()));
+        assert!(partial.name.is_none());
+        assert_eq!(partial.total, Some(10));
+        match &partial.results {
+            Some(StatsReferrersResults::Views(views)) => {
+                assert!(views.views.is_none());
+            }
+            _ => panic!("Expected Views result"),
+        }
     }
 }

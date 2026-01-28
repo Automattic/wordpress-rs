@@ -134,23 +134,23 @@ pub struct StatsTopPostsDayData {
 pub struct StatsTopPostsPostView {
     /// The post ID.
     pub id: u64,
-    /// The URL of the post.
-    pub href: String,
+    /// The URL of the post (can be null for homepage).
+    pub href: Option<String>,
     /// The publication date of the post (can be null for homepage).
     pub date: Option<String>,
     /// The title of the post.
-    pub title: String,
+    pub title: Option<String>,
     /// The type of the content (post, page, homepage, etc.).
     #[serde(rename = "type")]
-    pub post_type: String,
+    pub post_type: Option<String>,
     /// The publication status (can be null for homepage).
     pub status: Option<String>,
     /// Whether the post is public.
-    pub public: bool,
+    pub public: Option<bool>,
     /// The number of views.
-    pub views: u64,
+    pub views: Option<u64>,
     /// Whether this is a video play.
-    pub video_play: bool,
+    pub video_play: Option<bool>,
 }
 
 #[cfg(test)]
@@ -292,12 +292,12 @@ mod tests {
         // Verify first post view
         let first_post = &summary.postviews[0];
         assert_eq!(first_post.id, 269);
-        assert_eq!(first_post.title, "Welcome to Automattic");
-        assert_eq!(first_post.post_type, "page");
+        assert_eq!(first_post.title, Some("Welcome to Automattic".to_string()));
+        assert_eq!(first_post.post_type, Some("page".to_string()));
         assert_eq!(first_post.status, Some("publish".to_string()));
-        assert!(first_post.public);
-        assert_eq!(first_post.views, 417);
-        assert!(!first_post.video_play);
+        assert_eq!(first_post.public, Some(true));
+        assert_eq!(first_post.views, Some(417));
+        assert_eq!(first_post.video_play, Some(false));
     }
 
     #[test]
@@ -315,15 +315,16 @@ mod tests {
         let homepage = summary
             .postviews
             .iter()
-            .find(|p| p.post_type == "homepage")
+            .find(|p| p.post_type == Some("homepage".to_string()))
             .expect("Homepage entry should exist");
 
         assert_eq!(homepage.id, 0);
-        assert_eq!(homepage.title, "Home page / Archives");
+        assert_eq!(homepage.title, Some("Home page / Archives".to_string()));
+        assert!(homepage.href.is_none());
         assert!(homepage.date.is_none());
         assert!(homepage.status.is_none());
-        assert!(!homepage.public);
-        assert_eq!(homepage.views, 244);
+        assert_eq!(homepage.public, Some(false));
+        assert_eq!(homepage.views, Some(244));
     }
 
     #[rstest]
@@ -362,8 +363,8 @@ mod tests {
         // Verify first post view of first day
         let first_post = &day1.postviews[0];
         assert_eq!(first_post.id, 269);
-        assert_eq!(first_post.title, "Welcome to Automattic");
-        assert_eq!(first_post.views, 150);
+        assert_eq!(first_post.title, Some("Welcome to Automattic".to_string()));
+        assert_eq!(first_post.views, Some(150));
 
         // Verify second day
         let day2 = days.get("2026-01-25").expect("2026-01-25 should exist");
@@ -371,5 +372,59 @@ mod tests {
         assert_eq!(day2.other_views, 60);
         assert_eq!(day2.dropped_ids, vec![12345]);
         assert_eq!(day2.postviews.len(), 1);
+    }
+
+    #[test]
+    fn test_stats_top_posts_with_null_values() {
+        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-03-with-nulls.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopPostsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with null values");
+
+        assert_eq!(response.date, "2026-01-28");
+        assert_eq!(response.period, Some("day".to_string()));
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert_eq!(summary.total_views, 150);
+        assert_eq!(summary.postviews.len(), 3);
+
+        // First entry: all nullable fields are null
+        let all_nulls = &summary.postviews[0];
+        assert_eq!(all_nulls.id, 0);
+        assert!(all_nulls.href.is_none());
+        assert!(all_nulls.date.is_none());
+        assert!(all_nulls.title.is_none());
+        assert!(all_nulls.post_type.is_none());
+        assert!(all_nulls.status.is_none());
+        assert!(all_nulls.public.is_none());
+        assert!(all_nulls.views.is_none());
+        assert!(all_nulls.video_play.is_none());
+
+        // Second entry: all fields have values
+        let all_values = &summary.postviews[1];
+        assert_eq!(all_values.id, 123);
+        assert_eq!(all_values.href, Some("https://example.com/post".to_string()));
+        assert_eq!(all_values.date, Some("2026-01-28 10:00:00".to_string()));
+        assert_eq!(all_values.title, Some("A Post With All Fields".to_string()));
+        assert_eq!(all_values.post_type, Some("post".to_string()));
+        assert_eq!(all_values.status, Some("publish".to_string()));
+        assert_eq!(all_values.public, Some(true));
+        assert_eq!(all_values.views, Some(100));
+        assert_eq!(all_values.video_play, Some(false));
+
+        // Third entry: mixed null and non-null values
+        let partial_nulls = &summary.postviews[2];
+        assert_eq!(partial_nulls.id, 456);
+        assert!(partial_nulls.href.is_none());
+        assert!(partial_nulls.date.is_none());
+        assert_eq!(partial_nulls.title, Some("Partial Null Post".to_string()));
+        assert_eq!(partial_nulls.post_type, Some("post".to_string()));
+        assert!(partial_nulls.status.is_none());
+        assert_eq!(partial_nulls.public, Some(false));
+        assert_eq!(partial_nulls.views, Some(50));
+        assert!(partial_nulls.video_play.is_none());
     }
 }
