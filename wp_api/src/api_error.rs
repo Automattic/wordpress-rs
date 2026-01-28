@@ -67,6 +67,20 @@ pub enum WpApiError {
     },
 }
 
+impl WpApiError {
+    pub fn status_code(&self) -> Option<u16> {
+        match self {
+            WpApiError::InvalidHttpStatusCode { status_code }
+            | WpApiError::UnknownError { status_code, .. }
+            | WpApiError::WpError { status_code, .. } => Some(*status_code),
+            WpApiError::RequestExecutionFailed { status_code, .. } => *status_code,
+            WpApiError::MediaFileNotFound { .. }
+            | WpApiError::ResponseParsingError { .. }
+            | WpApiError::SiteUrlParsingError { .. } => None,
+        }
+    }
+}
+
 impl MaybeWpError for WpApiError {
     fn wp_error_code(&self) -> Option<&WpErrorCode> {
         match self {
