@@ -531,7 +531,10 @@ mod tests {
 
         // Second group has follow_data: false
         let second_group = &summary.groups[1];
-        assert_eq!(second_group.group, Some("domainsuniversity.wordpress.com".to_string()));
+        assert_eq!(
+            second_group.group,
+            Some("domainsuniversity.wordpress.com".to_string())
+        );
         assert!(
             second_group.follow_data.is_none(),
             "follow_data: false should be deserialized as None"
@@ -569,8 +572,14 @@ mod tests {
         let with_views = &summary.groups[1];
         assert_eq!(with_views.group, Some("WordPress.com Reader".to_string()));
         assert_eq!(with_views.name, Some("WordPress.com Reader".to_string()));
-        assert_eq!(with_views.url, Some("https://wordpress.com/reader/".to_string()));
-        assert_eq!(with_views.icon, Some("https://example.com/icon.png".to_string()));
+        assert_eq!(
+            with_views.url,
+            Some("https://wordpress.com/reader/".to_string())
+        );
+        assert_eq!(
+            with_views.icon,
+            Some("https://example.com/icon.png".to_string())
+        );
         assert_eq!(with_views.total, Some(100));
         match &with_views.results {
             Some(StatsReferrersResults::Views(views)) => {
@@ -598,7 +607,10 @@ mod tests {
                 let google = &referrers[1];
                 assert_eq!(google.name, Some("Google Search".to_string()));
                 assert_eq!(google.url, Some("http://www.google.com/".to_string()));
-                assert_eq!(google.icon, Some("https://example.com/google.png".to_string()));
+                assert_eq!(
+                    google.icon,
+                    Some("https://example.com/google.png".to_string())
+                );
                 assert_eq!(google.views, Some(25));
             }
             _ => panic!("Expected Referrers result"),

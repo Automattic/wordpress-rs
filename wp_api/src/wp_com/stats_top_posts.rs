@@ -408,7 +408,10 @@ mod tests {
         // Second entry: all fields have values
         let all_values = &summary.postviews[1];
         assert_eq!(all_values.id, 123);
-        assert_eq!(all_values.href, Some("https://example.com/post".to_string()));
+        assert_eq!(
+            all_values.href,
+            Some("https://example.com/post".to_string())
+        );
         assert_eq!(all_values.date, Some("2026-01-28 10:00:00".to_string()));
         assert_eq!(all_values.title, Some("A Post With All Fields".to_string()));
         assert_eq!(all_values.post_type, Some("post".to_string()));
@@ -446,6 +449,9 @@ mod tests {
             .expect("Summary should be present");
         assert_eq!(summary.total_views, 0);
         assert!(summary.postviews.is_empty());
-        assert!(summary.dropped_ids.is_empty(), "dropped_ids should default to empty vec");
+        assert!(
+            summary.dropped_ids.is_empty(),
+            "dropped_ids should default to empty vec"
+        );
     }
 }
