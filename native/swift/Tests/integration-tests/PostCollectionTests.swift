@@ -45,6 +45,31 @@ struct PostCollectionTests {
         await #expect(draftCollectionUpdates.value.count == 0)
     }
 
+    @Test
+    func minimalUpdates() async throws {
+        let (cache, service) = try testContext()
+
+        let collection = service
+            .posts()
+            .createPostMetadataCollectionWithEditContext(
+                endpointType: .posts,
+                filter: .init(status: [.draft]),
+                perPage: 10
+            )
+        let updates: Task<[UpdateHook], Never> = Task {
+            await cache.databaseUpdatesPublisher()
+                .filter { [collection] in collection.isRelevantUpdate(hook: $0) }
+                .timeout(1, scheduler: DispatchQueue.main)
+                .values
+                .reduce(into: []) { $0.append($1) }
+        }
+
+        _ = try await collection.refresh()
+
+        // TODO: What's the reasonable amount of updates for the `refresh` call?
+        await #expect(updates.value.count < 5)
+    }
+
     private func testContext() throws -> (WordPressApiCache, WpSelfHostedService) {
         let cache: WordPressApiCache = try WordPressApiCache()
         _ = try cache.performMigrations()
