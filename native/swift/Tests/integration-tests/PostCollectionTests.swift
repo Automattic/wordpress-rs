@@ -9,10 +9,7 @@ import WordPressAPIInternal
 struct PostCollectionTests {
     let api = WordPressAPI.admin()
 
-    /// Verifies that refreshing one post collection does not trigger updates on unrelated collections.
-    ///
-    /// Given two unrelated post collections—one for draft posts and one for published posts—this test
-    /// ensures that refreshing one collection does not cause updates on the other collection.
+    /// Reproduces an issue where refreshing one post collection trigger updates on an unrelated collection.
     @Test
     func updateShouldBeIsolated() async throws {
         let (cache, service) = try testContext()
@@ -45,6 +42,7 @@ struct PostCollectionTests {
         await #expect(draftCollectionUpdates.value.count == 0)
     }
 
+    /// Reproduces an issue where refreshing a post collection sends way too many updates.
     @Test
     func minimalUpdates() async throws {
         let (cache, service) = try testContext()
