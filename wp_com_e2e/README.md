@@ -14,18 +14,12 @@ Set the `WP_COM_API_KEY` environment variable with a valid WordPress.com OAuth2 
 export WP_COM_API_KEY=your_token_here
 ```
 
-## Building
-
-```bash
-cargo build -p wp_com_e2e
-```
-
 ## Usage
 
 ### Run read-only tests (default)
 
 ```bash
-./target/debug/wp_com_e2e
+cargo run -p wp_com_e2e
 ```
 
 By default, only read-only tests run. Write tests (creating conversations, tickets, etc.) are marked as "ignored" and skipped.
@@ -33,45 +27,45 @@ By default, only read-only tests run. Write tests (creating conversations, ticke
 ### Run all tests including writes
 
 ```bash
-./target/debug/wp_com_e2e --include-ignored
+cargo run -p wp_com_e2e -- --include-ignored
 ```
 
 ### Run only write tests
 
 ```bash
-./target/debug/wp_com_e2e --ignored
+cargo run -p wp_com_e2e -- --ignored
 ```
 
 ### List all tests
 
 ```bash
-./target/debug/wp_com_e2e --list
+cargo run -p wp_com_e2e -- --list
 ```
 
 ### Filter tests by name
 
 ```bash
 # Run all sites tests
-./target/debug/wp_com_e2e sites
+cargo run -p wp_com_e2e -- sites
 
 # Run a specific test
-./target/debug/wp_com_e2e "me::get_user_info"
+cargo run -p wp_com_e2e -- "me::get_user_info"
 
 # Run tests matching a pattern
-./target/debug/wp_com_e2e support_bots
+cargo run -p wp_com_e2e -- support_bots
 ```
 
 ### Other options
 
 ```bash
 # Show help
-./target/debug/wp_com_e2e --help
+cargo run -p wp_com_e2e -- --help
 
 # Run tests with exact name match
-./target/debug/wp_com_e2e --exact "me::get_user_info"
+cargo run -p wp_com_e2e -- --exact "me::get_user_info"
 
 # Disable output capture (show test output)
-./target/debug/wp_com_e2e --nocapture
+cargo run -p wp_com_e2e -- --nocapture
 ```
 
 ## Test Modules
