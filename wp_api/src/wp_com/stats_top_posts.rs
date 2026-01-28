@@ -112,7 +112,8 @@ pub struct StatsTopPostsSummaryData {
     pub postviews: Vec<StatsTopPostsPostView>,
     /// The total number of views.
     pub total_views: u64,
-    /// IDs that were dropped from the results.
+    /// IDs that were dropped from the results (may be absent from API response).
+    #[serde(default)]
     pub dropped_ids: Vec<u64>,
 }
 
@@ -123,7 +124,8 @@ pub struct StatsTopPostsDayData {
     pub postviews: Vec<StatsTopPostsPostView>,
     /// The total number of views for this day.
     pub total_views: u64,
-    /// IDs that were dropped from the results.
+    /// IDs that were dropped from the results (may be absent from API response).
+    #[serde(default)]
     pub dropped_ids: Vec<u64>,
     /// Views from other posts not included in the list.
     pub other_views: u64,
@@ -426,5 +428,24 @@ mod tests {
         assert_eq!(partial_nulls.public, Some(false));
         assert_eq!(partial_nulls.views, Some(50));
         assert!(partial_nulls.video_play.is_none());
+    }
+
+    #[test]
+    fn test_stats_top_posts_empty_response_missing_dropped_ids() {
+        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-04-empty-response.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopPostsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with missing dropped_ids");
+
+        assert_eq!(response.date, "2026-01-28");
+        assert_eq!(response.period, Some("day".to_string()));
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert_eq!(summary.total_views, 0);
+        assert!(summary.postviews.is_empty());
+        assert!(summary.dropped_ids.is_empty(), "dropped_ids should default to empty vec");
     }
 }
