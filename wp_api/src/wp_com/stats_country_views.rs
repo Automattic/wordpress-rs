@@ -35,7 +35,7 @@ pub enum StatsCountryViewsPeriod {
 impl_as_query_value_from_to_string!(StatsCountryViewsPeriod);
 
 /// Parameters for the stats country views endpoint.
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, uniffi::Record)]
 pub struct StatsCountryViewsParams {
     /// The time period for grouping stats.
     #[uniffi(default = None)]
@@ -60,10 +60,28 @@ pub struct StatsCountryViewsParams {
     pub locale: Option<String>,
     /// Whether to return a summary of the data.
     ///
-    /// - `Some(true)`: Response contains `summary` field with aggregated data
-    /// - `Some(false)` or `None`: Response contains `days` field with per-day breakdown
-    #[uniffi(default = None)]
+    /// - `Some(true)` (summarize=1): Response contains `summary` field with aggregated country
+    ///   views across all requested periods. The `days` field will be absent.
+    /// - `Some(false)` (summarize=0, default): Response contains `days` field with a per-day
+    ///   breakdown of country views, where each day is keyed by its date string. The `summary`
+    ///   field will be absent.
+    #[uniffi(default = Some(false))]
     pub summarize: Option<bool>,
+}
+
+impl Default for StatsCountryViewsParams {
+    fn default() -> Self {
+        Self {
+            period: None,
+            date: None,
+            start_date: None,
+            max: None,
+            num: None,
+            days: None,
+            locale: None,
+            summarize: Some(false),
+        }
+    }
 }
 
 impl AppendUrlQueryPairs for StatsCountryViewsParams {
@@ -194,9 +212,10 @@ mod tests {
         let mut query_pairs = url.query_pairs_mut();
         params.append_query_pairs(&mut query_pairs);
 
+        // Default summarize is Some(false), which serializes to summarize=0
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-23&locale=en_US"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-23&locale=en_US&summarize=0"
         );
     }
 
