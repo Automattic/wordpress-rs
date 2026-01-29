@@ -221,3 +221,26 @@ WordPress REST API returns specific error codes that need to be handled and test
 ## Development Tips
 
 - Platform bindings are generated automatically - don't edit generated files directly
+
+## PR Description Format
+
+When writing PR descriptions, follow this format:
+
+```markdown
+## Description
+
+[Brief description of what this PR changes and why]
+
+## Changes
+
+[List the key changes made in this PR]
+
+## Test plan
+
+[Add test plan here]
+```
+
+**Format Rules:**
+- Always output PR descriptions as raw markdown inside a code block so users can copy them directly
+- Use bullet points or numbered lists for changes
+- Add a note placeholder for the test plan section
