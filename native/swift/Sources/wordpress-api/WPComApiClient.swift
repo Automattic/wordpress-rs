@@ -76,6 +76,10 @@ public final class WPComApiClient: Sendable {
         internalClient.me()
     }
 
+    public var languages: LanguagesRequestExecutor {
+        internalClient.languages()
+    }
+
     public var oauth2: Oauth2RequestExecutor {
         internalClient.oauth2()
     }

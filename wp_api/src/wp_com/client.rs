@@ -21,6 +21,7 @@ use crate::{
     request::endpoint::ApiUrlResolver,
     wp_com::endpoint::{
         WpComApiClientInternalUrlResolver,
+        languages_endpoint::{LanguagesRequestBuilder, LanguagesRequestExecutor},
         sites_endpoint::{SitesRequestBuilder, SitesRequestExecutor},
     },
 };
@@ -29,6 +30,7 @@ use std::sync::Arc;
 pub struct WpComApiRequestBuilder {
     followers: Arc<FollowersRequestBuilder>,
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
+    languages: Arc<LanguagesRequestBuilder>,
     me: Arc<MeRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
@@ -48,6 +50,7 @@ impl WpComApiRequestBuilder {
             auth_provider;
             followers,
             jetpack_connection,
+            languages,
             me,
             oauth2,
             sites,
@@ -78,6 +81,7 @@ impl UniffiWpComApiClient {
 pub struct WpComApiClient {
     followers: Arc<FollowersRequestExecutor>,
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
+    languages: Arc<LanguagesRequestExecutor>,
     me: Arc<MeRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
@@ -98,6 +102,7 @@ impl WpComApiClient {
             delegate;
             followers,
             jetpack_connection,
+            languages,
             me,
             oauth2,
             sites,
@@ -111,6 +116,7 @@ impl WpComApiClient {
 }
 api_client_generate_endpoint_impl!(WpComApi, followers);
 api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
+api_client_generate_endpoint_impl!(WpComApi, languages);
 api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, sites);

@@ -3,6 +3,7 @@ use std::env;
 use std::sync::Arc;
 
 mod context;
+mod languages_tests;
 mod me_tests;
 mod sites_tests;
 mod support_bot_tests;
@@ -25,6 +26,7 @@ fn main() {
 
 fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut tests = vec![];
+    tests.extend(languages_tests::tests(Arc::clone(&ctx)));
     tests.extend(me_tests::tests(Arc::clone(&ctx)));
     tests.extend(sites_tests::tests(Arc::clone(&ctx)));
     tests.extend(support_bot_tests::tests(Arc::clone(&ctx)));
