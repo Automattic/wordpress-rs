@@ -1,6 +1,7 @@
 use crate::{
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+    wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -54,7 +55,7 @@ pub struct StatsTopPostsParams {
     pub num: Option<u32>,
     /// The locale for the response.
     #[uniffi(default = None)]
-    pub locale: Option<String>,
+    pub locale: Option<WPComLanguage>,
     /// Whether to return a summary of the data.
     ///
     /// - `true` (default): Response contains `summary` field with aggregated data
