@@ -6,14 +6,10 @@ edition = "2024"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-clap = { workspace = true, features = ["derive", "env"] }
-colored = { workspace = true }
-csv = { workspace = true }
-futures = { workspace = true }
+libtest-mimic = "0.8"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-tokio-stream = { workspace = true }
 uuid = { workspace = true }
 wp_api = { path = "../wp_api", features = [ "reqwest-request-executor" ] }
 

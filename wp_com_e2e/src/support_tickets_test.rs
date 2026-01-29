@@ -1,83 +1,127 @@
+use libtest_mimic::Trial;
+use std::sync::Arc;
 use uuid::Uuid;
-use wp_api::wp_com::{
-    client::WpComApiClient,
-    support_tickets::{
-        AddMessageToSupportConversationParams, ConversationId, CreateSupportTicketParams,
-        SupportConversation,
-    },
+
+use wp_api::wp_com::support_tickets::{
+    AddMessageToSupportConversationParams, CreateSupportTicketParams,
 };
 
-pub async fn support_tickets_test(
-    client: &WpComApiClient,
-    allow_writes: bool,
-) -> anyhow::Result<()> {
-    println!("== Support Tickets Test ==");
+use crate::context::TestContext;
 
-    let conversations = client
-        .support_tickets()
-        .get_support_conversation_list()
-        .await?
-        .data;
+pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
+    let mut trials = vec![];
 
-    println!(
-        "✅ Fetch Conversation List: Found {} conversations",
-        conversations.len()
-    );
-
-    for conversation in conversations {
-        if let Err(e) = client
+    // Pre-fetch conversations during test collection
+    let conversations_result = ctx.runtime.block_on(async {
+        ctx.client
             .support_tickets()
-            .get_support_conversation(&conversation.id)
+            .get_support_conversation_list()
             .await
-        {
-            println!("❌ Fetch Conversation: {} Error: {}", conversation.id, e);
-            return Err(e.into());
-        } else {
-            println!("✅ Fetch Conversation: {}", conversation.id);
+    });
+
+    trials.push(Trial::test("support_tickets::list_conversations", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                ctx.client
+                    .support_tickets()
+                    .get_support_conversation_list()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                Ok(())
+            })
+        }
+    }));
+
+    if let Ok(response) = conversations_result {
+        for conversation in response.data {
+            let conversation_id = conversation.id;
+            trials.push(Trial::test(
+                format!("support_tickets::get_conversation::{}", conversation_id),
+                {
+                    let ctx = Arc::clone(&ctx);
+                    move || {
+                        ctx.runtime.block_on(async {
+                            ctx.client
+                                .support_tickets()
+                                .get_support_conversation(&conversation_id)
+                                .await
+                                .map_err(|e| e.to_string())?;
+                            Ok(())
+                        })
+                    }
+                },
+            ));
         }
     }
 
-    if allow_writes {
-        let new_conversation = create_conversation(client).await?;
-        add_message_to_conversation(client, new_conversation.id).await?;
-    }
-
-    Ok(())
-}
-
-async fn create_conversation(client: &WpComApiClient) -> anyhow::Result<SupportConversation> {
-    let new_conversation = client
-        .support_tickets()
-        .create_support_ticket(&CreateSupportTicketParams {
-            subject: "Mobile Support Test Message".to_string(),
-            message: "This is a test – it can be deleted without replying.".to_string(),
-            application: "jetpack".to_string(),
-            wpcom_site_id: None,
-            tags: vec!["jetpack_mobile".to_string(), "test".to_string()],
-            attachments: vec![],
-            encrypted_log_ids: vec![Uuid::new_v4().to_string()],
+    // Write tests - marked as ignored (run with --ignored or --include-ignored)
+    trials.push(
+        Trial::test("support_tickets::create_ticket", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    ctx.client
+                        .support_tickets()
+                        .create_support_ticket(&CreateSupportTicketParams {
+                            subject: "Mobile Support Test Message".to_string(),
+                            message: "This is a test – it can be deleted without replying."
+                                .to_string(),
+                            application: "jetpack".to_string(),
+                            wpcom_site_id: None,
+                            tags: vec!["jetpack_mobile".to_string(), "test".to_string()],
+                            attachments: vec![],
+                            encrypted_log_ids: vec![Uuid::new_v4().to_string()],
+                        })
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    Ok(())
+                })
+            }
         })
-        .await?
-        .data;
-    println!("✅ Create Conversation");
+        .with_ignored_flag(true),
+    );
 
-    Ok(new_conversation)
-}
+    trials.push(
+        Trial::test("support_tickets::create_and_add_message", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // Create a new ticket
+                    let new_conversation = ctx
+                        .client
+                        .support_tickets()
+                        .create_support_ticket(&CreateSupportTicketParams {
+                            subject: "Mobile Support Test Message".to_string(),
+                            message: "This is a test – it can be deleted without replying."
+                                .to_string(),
+                            application: "jetpack".to_string(),
+                            wpcom_site_id: None,
+                            tags: vec!["jetpack_mobile".to_string(), "test".to_string()],
+                            attachments: vec![],
+                            encrypted_log_ids: vec![Uuid::new_v4().to_string()],
+                        })
+                        .await
+                        .map_err(|e| e.to_string())?;
 
-async fn add_message_to_conversation(
-    client: &WpComApiClient,
-    conversation_id: ConversationId,
-) -> anyhow::Result<()> {
-    client
-        .support_tickets()
-        .add_message_to_support_conversation(
-            &conversation_id,
-            &AddMessageToSupportConversationParams {
-                message: "Test Message".to_string(),
-                attachments: vec![],
-            },
-        )
-        .await?;
-    println!("✅ Add Message to Conversation");
-    Ok(())
+                    // Add a message to the conversation
+                    ctx.client
+                        .support_tickets()
+                        .add_message_to_support_conversation(
+                            &new_conversation.data.id,
+                            &AddMessageToSupportConversationParams {
+                                message: "Test Message".to_string(),
+                                attachments: vec![],
+                            },
+                        )
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    Ok(())
+                })
+            }
+        })
+        .with_ignored_flag(true),
+    );
+
+    trials
 }

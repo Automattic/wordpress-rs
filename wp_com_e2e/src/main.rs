@@ -1,97 +1,34 @@
-use anyhow::Result;
-use async_trait::async_trait;
-use clap::{Parser, Subcommand};
-use std::{sync::Arc, time::Duration};
-use wp_api::{prelude::*, wp_com::client::WpComApiClient};
+use libtest_mimic::{Arguments, Trial, run};
+use std::env;
+use std::sync::Arc;
 
+mod context;
 mod me_tests;
 mod sites_tests;
 mod support_bot_tests;
 mod support_eligibility_test;
 mod support_tickets_test;
 
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
+use context::TestContext;
+
+fn main() {
+    let token =
+        env::var("WP_COM_API_KEY").expect("WP_COM_API_KEY environment variable must be set");
+
+    let args = Arguments::from_args();
+    let ctx = Arc::new(TestContext::new(token));
+
+    let tests = collect_tests(Arc::clone(&ctx));
+
+    run(&args, tests).exit();
 }
 
-#[derive(Subcommand)]
-enum Commands {
-    Test {
-        #[arg(short = 'w', long = "allow-writes", default_value_t = false)]
-        allow_writes: bool,
-
-        #[arg(short = 't', long = "token", env = "WP_COM_API_KEY")]
-        token: String,
-    },
-}
-
-#[derive(Debug)]
-pub struct EmptyAppNotifier;
-
-#[async_trait]
-impl WpAppNotifier for EmptyAppNotifier {
-    async fn requested_with_invalid_authentication(&self, _request_url: String) {
-        // no-op
-    }
-}
-
-#[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
-    let cli = Cli::parse();
-
-    match cli.command {
-        Commands::Test {
-            token,
-            allow_writes,
-        } => {
-            // Writes to bots can take a while, so we need to increase the timeout
-            let test_timeout = if allow_writes {
-                Duration::from_secs(60)
-            } else {
-                Duration::from_secs(20)
-            };
-
-            let delegate = WpApiClientDelegate {
-                auth_provider: WpAuthenticationProvider::static_with_auth(
-                    WpAuthentication::Bearer {
-                        token: token.clone(),
-                    },
-                )
-                .into(),
-                request_executor: Arc::new(ReqwestRequestExecutor::new(false, test_timeout)),
-                middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
-                app_notifier: Arc::new(EmptyAppNotifier),
-            };
-
-            let client = WpComApiClient::new(delegate);
-
-            println!("== Running Tests ==");
-
-            if let Err(err) = run_tests(&client, token.clone(), allow_writes).await {
-                eprintln!("ERROR: {}", err);
-                err.chain()
-                    .skip(1)
-                    .for_each(|cause| eprintln!("because: {}", cause));
-                std::process::exit(1);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-async fn run_tests(
-    client: &WpComApiClient,
-    token: String,
-    allow_writes: bool,
-) -> Result<(), anyhow::Error> {
-    me_tests::me_test(client, token.clone()).await?;
-    sites_tests::sites_test(client).await?;
-    support_bot_tests::support_bots_test(client, allow_writes).await?;
-    support_eligibility_test::support_eligibility_test(client).await?;
-    support_tickets_test::support_tickets_test(client, allow_writes).await?;
-    Ok(())
+fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
+    let mut tests = vec![];
+    tests.extend(me_tests::tests(Arc::clone(&ctx)));
+    tests.extend(sites_tests::tests(Arc::clone(&ctx)));
+    tests.extend(support_bot_tests::tests(Arc::clone(&ctx)));
+    tests.extend(support_eligibility_test::tests(Arc::clone(&ctx)));
+    tests.extend(support_tickets_test::tests(Arc::clone(&ctx)));
+    tests
 }

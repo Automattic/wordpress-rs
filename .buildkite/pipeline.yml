@@ -17,7 +17,7 @@ common_params:
     # - '6.4'
     # - '6.5'
     # - '6.6'
-    - '6.8.1'
+    - "6.8.1"
 
 steps:
   #
@@ -255,7 +255,7 @@ steps:
         matrix: *wordpress_version_matrix
         plugins:
           - $CI_TOOLKIT
-          - $TEST_COLLECTOR :
+          - $TEST_COLLECTOR:
               files: "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
               format: "junit"
         artifact_paths:
@@ -266,6 +266,20 @@ steps:
         env:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix: *wordpress_version_matrix
+
+      - label: ":wordpress: WordPress.com e2e Tests"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+
+          echo "--- 🧪 Run e2e Tests"
+          cargo run --bin wp_com_e2e
+        agents:
+          queue: android
 
   - label: ":rocket: Publish Swift release $NEW_VERSION"
     command: .buildkite/release.sh $NEW_VERSION
