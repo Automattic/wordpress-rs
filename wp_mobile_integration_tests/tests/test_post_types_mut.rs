@@ -1,7 +1,7 @@
 use wp_api::plugins::{
     PluginCreateParams, PluginStatus, PluginUpdateParams, PluginWpOrgDirectorySlug,
 };
-use wp_mobile_cache_integration_tests::*;
+use wp_mobile_integration_tests::*;
 
 #[tokio::test]
 #[serial]
