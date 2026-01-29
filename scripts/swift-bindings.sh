@@ -20,11 +20,14 @@ cargo run --release --quiet --bin wp_uniffi_bindgen generate \
     --no-format \
     --language swift
 
-function patch_wp_api {
-    error_types=$(grep -r "impl WpSupportsLocalization for" wp_api/src | grep -o "for [A-Za-z0-9]*" | cut -d' ' -f2)
+function generate_localized_error_extension {
+    local package_name=$1
+    local swift_binding=$2
+
+    error_types=$(grep -r "impl WpSupportsLocalization for" "${package_name}/src" | grep -o "for [A-Za-z0-9]*" | cut -d' ' -f2)
 
     for error_type in $error_types; do
-        cat <<EOF >> "$1"
+        cat <<EOF >> "$swift_binding"
 
 extension $error_type: LocalizedError {
     public var errorDescription: String? {
@@ -34,19 +37,23 @@ extension $error_type: LocalizedError {
 }
 EOF
     done
+}
+
+function patch_wp_api {
+    local swift_binding=$1
+    generate_localized_error_extension wp_api "$swift_binding"
 
     # Use sed to replace `import SQLite3` with the wrapped version
   sed -i.bak 's/^import SQLite3$/#if canImport(SQLite3)\
 import SQLite3\
-#endif/' $swift_binding
+#endif/' "$swift_binding"
+}
+
+function patch_wp_mobile {
+    generate_localized_error_extension wp_mobile "$1"
 }
 
 for swift_binding in "$output_dir"/*.swift; do
-    options=("-i")
-    if [[ $(uname) == "Darwin" ]]; then
-        options+=("")
-    fi
-
     basename=$(basename "$swift_binding" .swift)
     if [ "$(type -t "patch_$basename")" = "function" ]; then
         "patch_$basename" "$swift_binding"
