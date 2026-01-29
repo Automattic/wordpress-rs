@@ -42,10 +42,6 @@ import SQLite3\
 }
 
 for swift_binding in "$output_dir"/*.swift; do
-    options=("-i")
-    if [[ $(uname) == "Darwin" ]]; then
-        options+=("")
-    fi
 
     basename=$(basename "$swift_binding" .swift)
     if [ "$(type -t "patch_$basename")" = "function" ]; then
