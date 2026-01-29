@@ -72,3 +72,5 @@ parse_api_root_failure_reason_server_fatal_error = Your server encountered an un
 parse_api_root_failure_reason_wordfence_blocking_access = Wordfence is blocking access to the site's API. Please check your Wordfence configuration.
 
 already_logged_in = You are already logged in as {$username}.
+
+database_generic_message = There was a problem loading your data.

@@ -5355,6 +5355,8 @@ dependencies = [
  "uniffi",
  "url",
  "wp_api",
+ "wp_localization",
+ "wp_localization_macro",
  "wp_mobile_cache",
 ]
 
