@@ -351,6 +351,7 @@ mod tests {
     #[case("tests/wpcom/stats_referrers/referrers-01.json")]
     #[case("tests/wpcom/stats_referrers/referrers-03-follow-data-false.json")]
     #[case("tests/wpcom/stats_referrers/referrers-04-real-response.json")]
+    #[case("tests/wpcom/stats_referrers/referrers-05-with-nulls.json")]
     fn test_stats_referrers_response_deserialization(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsReferrersResponse =
@@ -359,6 +360,12 @@ mod tests {
         assert!(!response.date.is_empty());
         assert!(response.period.is_some());
         assert!(!response.period.as_ref().unwrap().is_empty());
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert!(!summary.groups.is_empty());
     }
 
     #[test]
@@ -556,6 +563,7 @@ mod tests {
             .as_ref()
             .expect("Summary should be present");
         assert_eq!(summary.total_views, 160);
+        assert_eq!(summary.other_views, 0);
         assert_eq!(summary.groups.len(), 4);
 
         // First group: all nullable fields are null

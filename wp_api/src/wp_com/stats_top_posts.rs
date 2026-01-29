@@ -263,6 +263,8 @@ mod tests {
 
     #[rstest]
     #[case("tests/wpcom/stats_top_posts/top-posts-01.json")]
+    #[case("tests/wpcom/stats_top_posts/top-posts-03-with-nulls.json")]
+    #[case("tests/wpcom/stats_top_posts/top-posts-04-empty-response.json")]
     fn test_stats_top_posts_response_deserialization(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopPostsResponse =
@@ -271,6 +273,11 @@ mod tests {
         assert!(!response.date.is_empty());
         assert!(response.period.is_some());
         assert!(!response.period.as_ref().unwrap().is_empty());
+
+        response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
     }
 
     #[test]
