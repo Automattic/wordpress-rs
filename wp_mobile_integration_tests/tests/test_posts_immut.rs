@@ -95,7 +95,8 @@ async fn test_fetch_all_posts_with_any_status() {
     for item in &items {
         assert!(
             matches!(item.state, PostItemState::Fresh { .. }),
-            "all items should be Fresh after refresh"
+            "all items should be Fresh after refresh: {:?}",
+            item.state
         );
     }
 }
