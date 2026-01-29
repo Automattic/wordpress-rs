@@ -18,7 +18,9 @@ impl From<wp_mobile_cache::SqliteDbError> for CollectionError {
 impl WpSupportsLocalization for CollectionError {
     fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
-            CollectionError::DatabaseError { .. } => WpMessages::database_generic_message(),
+            CollectionError::DatabaseError { err_message } => {
+                WpMessages::database_generic_message(err_message)
+            }
         }
     }
 }

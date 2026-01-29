@@ -73,4 +73,4 @@ parse_api_root_failure_reason_wordfence_blocking_access = Wordfence is blocking 
 
 already_logged_in = You are already logged in as {$username}.
 
-database_generic_message = There was a problem loading your data.
+database_generic_message = There was a problem loading your data: {$reason}.

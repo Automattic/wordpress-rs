@@ -42,7 +42,9 @@ impl WpSupportsLocalization for FetchError {
     fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
             FetchError::Api(api_err) => api_err.message_bundle(),
-            FetchError::Database { .. } => WpMessages::database_generic_message(),
+            FetchError::Database { err_message } => {
+                WpMessages::database_generic_message(err_message)
+            }
         }
     }
 }
