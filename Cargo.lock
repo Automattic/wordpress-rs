@@ -5391,7 +5391,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wp_mobile_cache_integration_tests"
+name = "wp_mobile_integration_tests"
 version = "0.1.0"
 dependencies = [
  "integration_test_credentials",
