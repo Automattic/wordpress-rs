@@ -5,6 +5,9 @@ use super::endpoint::{
     },
     me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
+    stats_country_views_endpoint::{
+        StatsCountryViewsRequestBuilder, StatsCountryViewsRequestExecutor,
+    },
     stats_visits_endpoint::{StatsVisitsRequestBuilder, StatsVisitsRequestExecutor},
     subscribers_endpoint::{SubscribersRequestBuilder, SubscribersRequestExecutor},
     support_bots_endpoint::{SupportBotsRequestBuilder, SupportBotsRequestExecutor},
@@ -32,6 +35,7 @@ pub struct WpComApiRequestBuilder {
     me: Arc<MeRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
+    stats_country_views: Arc<StatsCountryViewsRequestBuilder>,
     stats_visits: Arc<StatsVisitsRequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
     support_bots: Arc<SupportBotsRequestBuilder>,
@@ -51,6 +55,7 @@ impl WpComApiRequestBuilder {
             me,
             oauth2,
             sites,
+            stats_country_views,
             stats_visits,
             subscribers,
             support_bots,
@@ -81,6 +86,7 @@ pub struct WpComApiClient {
     me: Arc<MeRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
+    stats_country_views: Arc<StatsCountryViewsRequestExecutor>,
     stats_visits: Arc<StatsVisitsRequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
     support_bots: Arc<SupportBotsRequestExecutor>,
@@ -101,6 +107,7 @@ impl WpComApiClient {
             me,
             oauth2,
             sites,
+            stats_country_views,
             stats_visits,
             subscribers,
             support_bots,
@@ -114,6 +121,7 @@ api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
 api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, sites);
+api_client_generate_endpoint_impl!(WpComApi, stats_country_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_visits);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);
