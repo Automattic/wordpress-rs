@@ -224,23 +224,8 @@ WordPress REST API returns specific error codes that need to be handled and test
 
 ## PR Description Format
 
-When writing PR descriptions, follow this format:
-
-```markdown
-## Description
-
-[Brief description of what this PR changes and why]
-
-## Changes
-
-[List the key changes made in this PR]
-
-## Test plan
-
-[Add test plan here]
-```
+When writing PR descriptions, use the template in `.github/PULL_REQUEST_TEMPLATE.md` as the base format.
 
 **Format Rules:**
 - Always output PR descriptions as raw markdown inside a code block so users can copy them directly
 - Use bullet points or numbered lists for changes
-- Add a note placeholder for the test plan section
