@@ -4,6 +4,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use wp_serde_helper::deserialize_option_empty_array_or_hashmap;
 
 /// The time period for grouping country views.
 #[derive(
@@ -108,7 +109,11 @@ pub struct StatsCountryViewsResponse {
     /// The date for the stats query.
     pub date: String,
     /// Country information keyed by country code.
-    #[serde(rename = "country-info")]
+    /// Can be `null`, an empty array `[]`, or a map of country codes to info.
+    #[serde(
+        rename = "country-info",
+        deserialize_with = "deserialize_option_empty_array_or_hashmap"
+    )]
     pub country_info: Option<HashMap<String, StatsCountryInfo>>,
     /// Summary data with aggregated country views (present when summarize=1).
     pub summary: Option<StatsCountryViewsSummaryData>,
@@ -269,6 +274,7 @@ mod tests {
     #[case("tests/wpcom/stats_country_views/country-views-02-days.json")]
     #[case("tests/wpcom/stats_country_views/country-views-03-with-nulls.json")]
     #[case("tests/wpcom/stats_country_views/country-views-04-empty.json")]
+    #[case("tests/wpcom/stats_country_views/country-views-05-empty-null.json")]
     fn test_stats_country_views_response_deserialization(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsCountryViewsResponse =
