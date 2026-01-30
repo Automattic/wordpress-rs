@@ -347,25 +347,68 @@ mod tests {
         );
     }
 
+    /// Tests deserialization of all stats referrers JSON fixtures.
+    ///
+    /// The `expect_summary` parameter indicates whether the response uses summarize=1
+    /// (has `summary` and `period` fields) or summarize=0 (has `days` field instead).
     #[rstest]
-    #[case("tests/wpcom/stats_referrers/referrers-01.json")]
-    #[case("tests/wpcom/stats_referrers/referrers-03-follow-data-false.json")]
-    #[case("tests/wpcom/stats_referrers/referrers-04-real-response.json")]
-    #[case("tests/wpcom/stats_referrers/referrers-05-with-nulls.json")]
-    fn test_stats_referrers_response_deserialization(#[case] json_file_path: &str) {
+    #[case("tests/wpcom/stats_referrers/referrers-01.json", true)]
+    #[case("tests/wpcom/stats_referrers/referrers-02-days.json", false)]
+    #[case(
+        "tests/wpcom/stats_referrers/referrers-03-follow-data-false.json",
+        true
+    )]
+    #[case("tests/wpcom/stats_referrers/referrers-04-real-response.json", true)]
+    #[case("tests/wpcom/stats_referrers/referrers-05-with-nulls.json", true)]
+    fn test_stats_referrers_response_deserialization(
+        #[case] json_file_path: &str,
+        #[case] expect_summary: bool,
+    ) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
+        // Common assertion: date is always present
         assert!(!response.date.is_empty());
-        assert!(response.period.is_some());
-        assert!(!response.period.as_ref().unwrap().is_empty());
 
-        let summary = response
-            .summary
-            .as_ref()
-            .expect("Summary should be present");
-        assert!(!summary.groups.is_empty());
+        if expect_summary {
+            // summarize=1 response: has period and summary, no days
+            assert!(
+                response.period.is_some(),
+                "Expected period for summarized response"
+            );
+            assert!(!response.period.as_ref().unwrap().is_empty());
+            assert!(
+                response.days.is_none(),
+                "Summarized response should not have days"
+            );
+
+            let summary = response
+                .summary
+                .as_ref()
+                .expect("Summary should be present for summarized response");
+            assert!(!summary.groups.is_empty());
+        } else {
+            // summarize=0 response: has days, no period or summary
+            assert!(
+                response.period.is_none(),
+                "Days response should not have period"
+            );
+            assert!(
+                response.summary.is_none(),
+                "Days response should not have summary"
+            );
+
+            let days = response
+                .days
+                .as_ref()
+                .expect("Days should be present for non-summarized response");
+            assert!(!days.is_empty());
+            // Verify each day has data
+            for day_data in days.values() {
+                assert!(!day_data.groups.is_empty() || day_data.total_views == 0);
+            }
+        }
     }
 
     #[test]
@@ -468,18 +511,6 @@ mod tests {
         assert_eq!(params.site_id, Some(19734));
         assert_eq!(params.blog_title, Some("Dotcom P2".to_string()));
         assert_eq!(params.is_following, Some(true));
-    }
-
-    #[rstest]
-    #[case("tests/wpcom/stats_referrers/referrers-02-days.json")]
-    fn test_stats_referrers_response_deserialization_days(#[case] json_file_path: &str) {
-        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: StatsReferrersResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        assert!(!response.date.is_empty());
-        assert!(response.summary.is_none());
-        assert!(response.days.is_some());
     }
 
     #[test]
