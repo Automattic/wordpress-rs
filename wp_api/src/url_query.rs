@@ -124,14 +124,49 @@ impl<'a> UrlQueryPairsMap<'a> {
     }
 
     pub(crate) fn get_csv<'b, T: FromStr>(&self, key: impl Into<&'b str>) -> Vec<T> {
-        self.inner
-            .get(key.into())
-            .and_then(|v| {
-                v.split(',')
-                    .map(|s| T::from_str(s).ok())
-                    .collect::<Option<Vec<_>>>()
-            })
-            .unwrap_or_default()
+        // If the `key` exists as a regular CSV value, parse and return it.
+        let key = key.into();
+        let result = self.inner.get(key).and_then(|v| {
+            v.split(',')
+                .map(|s| T::from_str(s).ok())
+                .collect::<Option<Vec<_>>>()
+        });
+        if let Some(values) = result {
+            return values;
+        }
+
+        // Otherwise, try to get values from PHP-style array parameters: `foo[0]=a&foo[1]=b`.
+        self.get_php_array_values(key)
+    }
+
+    /// Retrieves values from PHP-style array query parameters.
+    ///
+    /// WordPress uses PHP's `http_build_query` to generate pagination Link headers.
+    /// When an array parameter like `status=["draft", "publish"]` is serialized,
+    /// PHP produces `status[0]=draft&status[1]=publish` instead of `status=draft,publish`.
+    ///
+    /// This function handles that format by looking up `key[0]`, `key[1]`, etc.
+    /// in sequence, stopping when a gap is encountered.
+    ///
+    /// See:
+    /// - <https://github.com/WordPress/wordpress-develop/blob/6.9.0/src/wp-includes/functions.php#L1064>
+    /// - <https://www.php.net/manual/en/function.http-build-query.php>
+    fn get_php_array_values<T: FromStr>(&self, key: &str) -> Vec<T> {
+        let mut result = Vec::new();
+        let mut index = 0;
+        loop {
+            let array_key = format!("{key}[{index}]");
+            match self.inner.get(array_key.as_str()) {
+                Some(v) => {
+                    if let Ok(parsed) = T::from_str(v) {
+                        result.push(parsed);
+                    }
+                    index += 1;
+                }
+                None => break,
+            }
+        }
+        result
     }
 
     pub(crate) fn get_wp_date_time<'b>(&self, key: impl Into<&'b str>) -> Option<WpGmtDateTime> {
@@ -254,5 +289,76 @@ mod tests {
         url.query_pairs_mut()
             .append_vec_query_value_pair(key, &value);
         assert_eq!(url.query(), Some(expected_str));
+    }
+
+    #[test]
+    fn test_get_csv_with_regular_csv_value() {
+        let mut pairs = HashMap::new();
+        pairs.insert(Cow::Borrowed("status"), Cow::Borrowed("draft,publish"));
+        pairs.insert(Cow::Borrowed("page"), Cow::Borrowed("1"));
+
+        let map = UrlQueryPairsMap::new(pairs);
+        let statuses: Vec<String> = map.get_csv("status");
+        assert_eq!(statuses, vec!["draft".to_string(), "publish".to_string()]);
+    }
+
+    #[test]
+    fn test_get_csv_with_php_array_single_value() {
+        let mut pairs = HashMap::new();
+        pairs.insert(Cow::Borrowed("status[0]"), Cow::Borrowed("any"));
+        pairs.insert(Cow::Borrowed("page"), Cow::Borrowed("2"));
+
+        let map = UrlQueryPairsMap::new(pairs);
+        let statuses: Vec<String> = map.get_csv("status");
+        assert_eq!(statuses, vec!["any".to_string()]);
+        assert_eq!(map.get::<u32>("page"), Some(2));
+    }
+
+    #[test]
+    fn test_get_csv_with_php_array_multiple_values() {
+        let mut pairs = HashMap::new();
+        pairs.insert(Cow::Borrowed("status[0]"), Cow::Borrowed("draft"));
+        pairs.insert(Cow::Borrowed("status[1]"), Cow::Borrowed("publish"));
+        pairs.insert(Cow::Borrowed("page"), Cow::Borrowed("1"));
+
+        let map = UrlQueryPairsMap::new(pairs);
+        let statuses: Vec<String> = map.get_csv("status");
+        assert_eq!(statuses, vec!["draft".to_string(), "publish".to_string()]);
+    }
+
+    #[test]
+    fn test_get_csv_with_php_array_stops_at_gap() {
+        let mut pairs = HashMap::new();
+        pairs.insert(Cow::Borrowed("status[0]"), Cow::Borrowed("draft"));
+        pairs.insert(Cow::Borrowed("status[2]"), Cow::Borrowed("publish"));
+
+        let map = UrlQueryPairsMap::new(pairs);
+        let statuses: Vec<String> = map.get_csv("status");
+        assert_eq!(statuses, vec!["draft".to_string()]);
+    }
+
+    #[test]
+    fn test_get_csv_prefers_regular_key_over_php_array() {
+        let mut pairs = HashMap::new();
+        pairs.insert(Cow::Borrowed("status"), Cow::Borrowed("private"));
+        pairs.insert(Cow::Borrowed("status[0]"), Cow::Borrowed("draft"));
+
+        let map = UrlQueryPairsMap::new(pairs);
+        let statuses: Vec<String> = map.get_csv("status");
+        assert_eq!(statuses, vec!["private".to_string()]);
+    }
+
+    #[test]
+    fn test_get_csv_with_php_array_from_url() {
+        let url =
+            Url::parse("http://localhost/wp-json/wp/v2/posts?status%5B0%5D=any&per_page=60&page=2")
+                .unwrap();
+        let pairs: HashMap<_, _> = url.query_pairs().into_iter().collect();
+        let map = UrlQueryPairsMap::new(pairs);
+
+        let statuses: Vec<String> = map.get_csv("status");
+        assert_eq!(statuses, vec!["any".to_string()]);
+        assert_eq!(map.get::<u32>("page"), Some(2));
+        assert_eq!(map.get::<u32>("per_page"), Some(60));
     }
 }
