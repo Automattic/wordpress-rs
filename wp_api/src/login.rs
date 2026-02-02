@@ -1,6 +1,6 @@
 use crate::{
     JsonValue, login::url_discovery::is_local_dev_environment_url, parsed_url::ParsedUrl,
-    uuid::WpUuid,
+    plugins::PluginSlug, uuid::WpUuid,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str, sync::Arc};
@@ -160,14 +160,24 @@ impl WpApiDetails {
     pub fn has_application_password_blocking_plugin(&self) -> bool {
         KnownAuthenticationBlockingPlugin::application_passwords()
             .iter()
-            .any(|plugin| self.namespaces.contains(&plugin.namespace))
+            .any(|plugin| {
+                plugin
+                    .namespace
+                    .as_ref()
+                    .is_some_and(|ns| self.namespaces.contains(ns))
+            })
     }
 
     /// Returns a list of plugins that might be responsible for disabling application passwords.
     pub fn application_password_blocking_plugins(&self) -> Vec<KnownAuthenticationBlockingPlugin> {
         KnownAuthenticationBlockingPlugin::application_passwords()
             .iter()
-            .filter(|plugin| self.namespaces.contains(&plugin.namespace))
+            .filter(|plugin| {
+                plugin
+                    .namespace
+                    .as_ref()
+                    .is_some_and(|ns| self.namespaces.contains(ns))
+            })
             .cloned()
             .collect()
     }
@@ -176,7 +186,12 @@ impl WpApiDetails {
     pub fn xmlrpc_blocking_plugins(&self) -> Vec<KnownAuthenticationBlockingPlugin> {
         KnownAuthenticationBlockingPlugin::xmlrpc()
             .iter()
-            .filter(|plugin| self.namespaces.contains(&plugin.namespace))
+            .filter(|plugin| {
+                plugin
+                    .namespace
+                    .as_ref()
+                    .is_some_and(|ns| self.namespaces.contains(ns))
+            })
             .cloned()
             .collect()
     }
@@ -207,8 +222,10 @@ impl WpApiDetails {
 pub struct KnownAuthenticationBlockingPlugin {
     /// The name of the plugin.
     pub name: String,
+    /// The plugin's slug. For example: "wordfence/wordfence"
+    pub slug: PluginSlug,
     /// The plugin's REST API namespace.
-    pub namespace: String,
+    pub namespace: Option<String>,
     /// A URL to the plugin's support page, where users can find help.
     pub support_url: String,
 }
@@ -218,32 +235,68 @@ impl KnownAuthenticationBlockingPlugin {
         vec![
             Self {
                 name: "Wordfence".to_string(),
-                namespace: "wordfence/v1".to_string(),
+                slug: PluginSlug::from("wordfence/wordfence"),
+                namespace: Some("wordfence/v1".to_string()),
                 // TODO: Ensure this is correct with the WordFence folks
                 support_url: "https://www.wordfence.com/support/".to_string(),
             },
             Self {
                 name: "Hostinger Tools".to_string(),
-                namespace: "hostinger-tools-plugin/v1".to_string(),
+                slug: PluginSlug::from("hostinger-tools/hostinger-tools"),
+                namespace: Some("hostinger-tools-plugin/v1".to_string()),
                 // TODO: Ensure this is correct with the Hostinger folks
                 support_url: "https://wordpress.org/support/plugin/hostinger/".to_string(),
             },
             Self {
                 name: "FluentAuth".to_string(),
-                namespace: "fluent-auth".to_string(),
+                slug: PluginSlug::from("fluent-security/fluent-security"),
+                namespace: Some("fluent-auth".to_string()),
                 // TODO: Ensure this is correct with the FluentAuth folks
                 support_url: "https://wordpress.org/support/plugin/fluent-security/".to_string(),
+            },
+            Self {
+                name: "Disable XML-RPC".to_string(),
+                slug: PluginSlug::from("disable-xml-rpc/disable-xml-rpc"),
+                namespace: None,
+                support_url: "https://wordpress.org/plugins/disable-xml-rpc/".to_string(),
+            },
+            Self {
+                name: "Disable XML-RPC-API".to_string(),
+                slug: PluginSlug::from("disable-xml-rpc-api/disable-xml-rpc-api"),
+                namespace: None,
+                support_url: "https://wordpress.org/plugins/disable-xml-rpc-api/".to_string(),
+            },
+            Self {
+                name: "Loginizer".to_string(),
+                slug: PluginSlug::from("loginizer/loginizer"),
+                namespace: None,
+                support_url: "https://wordpress.org/support/plugin/loginizer/".to_string(),
+            },
+            Self {
+                name: "Really Simple Security".to_string(),
+                slug: PluginSlug::from("really-simple-ssl/rlrsssl-really-simple-ssl"),
+                namespace: None,
+                support_url: "https://wordpress.org/support/plugin/really-simple-ssl/".to_string(),
             },
         ]
     }
 
     fn application_passwords() -> Vec<Self> {
+        let names = ["Wordfence", "Hostinger Tools", "FluentAuth"];
         Self::all()
+            .into_iter()
+            .filter(|plugin| names.contains(&plugin.name.as_str()))
+            .collect()
     }
 
     fn xmlrpc() -> Vec<Self> {
         Self::all()
     }
+}
+
+#[uniffi::export]
+fn xmlrpc_blocking_plugins() -> Vec<KnownAuthenticationBlockingPlugin> {
+    KnownAuthenticationBlockingPlugin::xmlrpc()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
