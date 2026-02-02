@@ -156,7 +156,7 @@ async fn trash_post() {
     assert!(trashed_post.is_some(), "Can't find the trashed post");
     assert_eq!(
         trashed_post.unwrap().post_status,
-        "trash",
+        PostStatus::Trash.to_string(),
         "Post wasn't trashed"
     );
 
@@ -428,6 +428,7 @@ generate_update_post_status_test!(Draft);
 generate_update_post_status_test!(Pending);
 generate_update_post_status_test!(Private);
 generate_update_post_status_test!(Publish);
+generate_update_post_status_test!(Trash);
 
 generate_update_post_format_test!(Standard);
 generate_update_post_format_test!(Aside);
