@@ -229,6 +229,38 @@ async fn paginate_list_posts_with_edit_context(#[case] params: PostListParams) {
 #[tokio::test]
 #[rstest]
 #[parallel]
+#[case(PostListParams { per_page: Some(60), ..Default::default() })]
+#[case(PostListParams { per_page: Some(60), status: vec![PostStatus::Custom("any".to_string())], ..Default::default() })]
+async fn paginate_list_all_posts(#[case] params: PostListParams) {
+    // The `per_page` parameter is a magic number between published posts and draft posts total.
+
+    let client = api_client();
+    let mut all_posts = Vec::new();
+    let mut current_params = params;
+
+    loop {
+        let response = client
+            .posts()
+            .list_with_edit_context(&PostEndpointType::Posts, &current_params)
+            .await
+            .assert_response();
+
+        let total_posts = response.header_map.wp_total().unwrap();
+        all_posts.extend(response.data);
+
+        match response.next_page_params {
+            Some(next_params) => current_params = next_params,
+            None => {
+                assert_eq!(all_posts.len(), total_posts as usize);
+                break;
+            }
+        }
+    }
+}
+
+#[tokio::test]
+#[rstest]
+#[parallel]
 #[case(PostEndpointType::Posts)]
 #[case(PostEndpointType::Pages)]
 // This test ensures that we can list & parse the given post type with default params
