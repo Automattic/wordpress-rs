@@ -1,6 +1,7 @@
 use crate::{
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+    wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -35,7 +36,7 @@ pub enum StatsTopPostsPeriod {
 impl_as_query_value_from_to_string!(StatsTopPostsPeriod);
 
 /// Parameters for the stats top posts endpoint.
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+#[derive(Debug, PartialEq, Eq, uniffi::Record)]
 pub struct StatsTopPostsParams {
     /// The time period for grouping stats.
     #[uniffi(default = None)]
@@ -54,14 +55,14 @@ pub struct StatsTopPostsParams {
     pub num: Option<u32>,
     /// The locale for the response.
     #[uniffi(default = None)]
-    pub locale: Option<String>,
+    pub locale: Option<WPComLanguage>,
     /// Whether to return a summary of the data.
     ///
-    /// - `Some(true)` (default): Response contains `summary` field with aggregated data
-    /// - `Some(false)`: Response contains `days` field with per-day breakdown
+    /// - `true` (default): Response contains `summary` field with aggregated data
+    /// - `false`: Response contains `days` field with per-day breakdown
     /// - `None`: Parameter is not sent to the API
-    #[uniffi(default = Some(true))]
-    pub summarize: Option<bool>,
+    #[uniffi(default = true)]
+    pub summarize: bool,
     /// Whether to skip archive pages (date-based archives, category archives, etc.) in the response.
     ///
     /// - `Some(true)` (default): Archive pages are excluded from results
@@ -69,6 +70,21 @@ pub struct StatsTopPostsParams {
     /// - `None`: Parameter is not sent to the API
     #[uniffi(default = Some(true))]
     pub skip_archives: Option<bool>,
+}
+
+impl Default for StatsTopPostsParams {
+    fn default() -> Self {
+        Self {
+            period: None,
+            start_date: None,
+            date: None,
+            max: None,
+            num: None,
+            locale: None,
+            summarize: true,
+            skip_archives: Some(true),
+        }
+    }
 }
 
 impl AppendUrlQueryPairs for StatsTopPostsParams {
@@ -80,7 +96,7 @@ impl AppendUrlQueryPairs for StatsTopPostsParams {
             .append_option_query_value_pair("max", self.max.as_ref())
             .append_option_query_value_pair("num", self.num.as_ref())
             .append_option_query_value_pair("locale", self.locale.as_ref())
-            .append_option_query_value_pair("summarize", self.summarize.map(|b| b as u32).as_ref())
+            .append_query_value_pair("summarize", &(self.summarize as u32))
             .append_option_query_value_pair(
                 "skip_archives",
                 self.skip_archives.map(|b| b as u32).as_ref(),
@@ -173,8 +189,8 @@ mod tests {
             date: Some("2026-01-26".to_string()),
             max: Some(10),
             num: Some(30),
-            locale: Some("en".to_string()),
-            summarize: Some(true),
+            locale: Some(WPComLanguage::English),
+            summarize: true,
             skip_archives: Some(true),
         };
 
@@ -201,7 +217,7 @@ mod tests {
             max: None,
             num: None,
             locale: None,
-            summarize: Some(true),
+            summarize: true,
             skip_archives: Some(true),
         };
 
@@ -224,7 +240,7 @@ mod tests {
         let params = StatsTopPostsParams {
             period: Some(StatsTopPostsPeriod::Day),
             date: Some("2026-01-26".to_string()),
-            summarize: None,
+            summarize: false,
             skip_archives: None,
             ..Default::default()
         };
@@ -234,7 +250,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&date=2026-01-26"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&date=2026-01-26&summarize=0"
         );
     }
 
@@ -247,7 +263,7 @@ mod tests {
 
         let params = StatsTopPostsParams {
             period: Some(StatsTopPostsPeriod::Day),
-            summarize: Some(false),
+            summarize: false,
             skip_archives: Some(false),
             ..Default::default()
         };
