@@ -278,9 +278,9 @@ mod tests {
     }
 
     #[rstest]
-    #[case("tests/wpcom/stats_top_posts/top-posts-weekly-summary.json")]
-    #[case("tests/wpcom/stats_top_posts/top-posts-with-nulls.json")]
-    #[case("tests/wpcom/stats_top_posts/top-posts-empty-response.json")]
+    #[case("tests/wpcom/stats_top_posts/summarized-01-week.json")]
+    #[case("tests/wpcom/stats_top_posts/summarized-02-day-with-nulls.json")]
+    #[case("tests/wpcom/stats_top_posts/summarized-03-day-empty-response.json")]
     fn test_stats_top_posts_response_deserialization(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopPostsResponse =
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn test_stats_top_posts_response_deserialization_weekly_summary() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-weekly-summary.json";
+        let json_file_path = "tests/wpcom/stats_top_posts/summarized-01-week.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn test_stats_top_posts_homepage_entry() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-weekly-summary.json";
+        let json_file_path = "tests/wpcom/stats_top_posts/summarized-01-week.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -353,7 +353,7 @@ mod tests {
     }
 
     #[rstest]
-    #[case("tests/wpcom/stats_top_posts/top-posts-days.json")]
+    #[case("tests/wpcom/stats_top_posts/no-summary-01.json")]
     fn test_stats_top_posts_response_deserialization_days(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopPostsResponse =
@@ -366,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_stats_top_posts_response_deserialization_days_details() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-days.json";
+        let json_file_path = "tests/wpcom/stats_top_posts/no-summary-01.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -401,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_stats_top_posts_with_null_values() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-with-nulls.json";
+        let json_file_path = "tests/wpcom/stats_top_posts/summarized-02-day-with-nulls.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with null values");
@@ -458,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_stats_top_posts_empty_response_missing_dropped_ids() {
-        let json_file_path = "tests/wpcom/stats_top_posts/top-posts-empty-response.json";
+        let json_file_path = "tests/wpcom/stats_top_posts/summarized-03-day-empty-response.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with missing dropped_ids");
