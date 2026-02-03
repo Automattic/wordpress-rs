@@ -424,11 +424,13 @@ async fn update_status_to_future() {
 }
 
 // See `update_status_to_future` test case for `PostStatus::Future`
+// Note: `PostStatus::Trash` is not tested here because WordPress doesn't allow setting
+// a post's status to "trash" via the update endpoint. Use the trash endpoint instead
+// (tested in `trash_post` test).
 generate_update_post_status_test!(Draft);
 generate_update_post_status_test!(Pending);
 generate_update_post_status_test!(Private);
 generate_update_post_status_test!(Publish);
-generate_update_post_status_test!(Trash);
 
 generate_update_post_format_test!(Standard);
 generate_update_post_format_test!(Aside);
