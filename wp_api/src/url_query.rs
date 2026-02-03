@@ -371,4 +371,24 @@ mod tests {
         assert_eq!(map.get::<u32>("page"), Some(2));
         assert_eq!(map.get::<u32>("per_page"), Some(60));
     }
+
+    #[test]
+    fn test_get_csv_with_php_array_from_url_with_shuffled_indices() {
+        let url = Url::parse(
+            "http://localhost/wp-json/wp/v2/posts?status%5B4%5D=pending&status%5B0%5D=draft&status%5B2%5D=publish&per_page=60&page=2",
+        )
+        .unwrap();
+        let pairs: HashMap<_, _> = url.query_pairs().into_iter().collect();
+        let map = UrlQueryPairsMap::new(pairs);
+
+        let statuses: Vec<String> = map.get_csv("status");
+        assert_eq!(
+            statuses,
+            vec![
+                "draft".to_string(),
+                "publish".to_string(),
+                "pending".to_string()
+            ]
+        );
+    }
 }
