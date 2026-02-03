@@ -145,28 +145,30 @@ impl<'a> UrlQueryPairsMap<'a> {
     /// When an array parameter like `status=["draft", "publish"]` is serialized,
     /// PHP produces `status[0]=draft&status[1]=publish` instead of `status=draft,publish`.
     ///
-    /// This function handles that format by looking up `key[0]`, `key[1]`, etc.
-    /// in sequence, stopping when a gap is encountered.
+    /// This function handles that format by scanning all keys matching `key[$int]`,
+    /// where `$int` is any valid integer. Non-sequential indices are supported.
     ///
     /// See:
     /// - <https://github.com/WordPress/wordpress-develop/blob/6.9.0/src/wp-includes/functions.php#L1064>
     /// - <https://www.php.net/manual/en/function.http-build-query.php>
     fn get_php_array_values<T: FromStr>(&self, key: &str) -> Vec<T> {
-        let mut result = Vec::new();
-        let mut index = 0;
-        loop {
-            let array_key = format!("{key}[{index}]");
-            match self.inner.get(array_key.as_str()) {
-                Some(v) => {
-                    if let Ok(parsed) = T::from_str(v) {
-                        result.push(parsed);
-                    }
-                    index += 1;
+        let mut indexed_values: Vec<(i64, T)> = self
+            .inner
+            .iter()
+            .filter_map(|(k, v)| {
+                let k_str = k.as_ref();
+                let open_bracket = k_str.find('[')?;
+                let close_bracket = k_str.find(']')?;
+                if &k_str[..open_bracket] != key || close_bracket != k_str.len() - 1 {
+                    return None;
                 }
-                None => break,
-            }
-        }
-        result
+                let index: i64 = k_str[open_bracket + 1..close_bracket].parse().ok()?;
+                let parsed = T::from_str(v).ok()?;
+                Some((index, parsed))
+            })
+            .collect();
+        indexed_values.sort_by_key(|(index, _)| *index);
+        indexed_values.into_iter().map(|(_, v)| v).collect()
     }
 
     pub(crate) fn get_wp_date_time<'b>(&self, key: impl Into<&'b str>) -> Option<WpGmtDateTime> {
@@ -327,14 +329,22 @@ mod tests {
     }
 
     #[test]
-    fn test_get_csv_with_php_array_stops_at_gap() {
+    fn test_get_csv_with_php_array_with_gaps() {
         let mut pairs = HashMap::new();
         pairs.insert(Cow::Borrowed("status[0]"), Cow::Borrowed("draft"));
         pairs.insert(Cow::Borrowed("status[2]"), Cow::Borrowed("publish"));
+        pairs.insert(Cow::Borrowed("status[4]"), Cow::Borrowed("trash"));
 
         let map = UrlQueryPairsMap::new(pairs);
         let statuses: Vec<String> = map.get_csv("status");
-        assert_eq!(statuses, vec!["draft".to_string()]);
+        assert_eq!(
+            statuses,
+            vec![
+                "draft".to_string(),
+                "publish".to_string(),
+                "trash".to_string()
+            ]
+        );
     }
 
     #[test]
