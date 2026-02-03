@@ -96,7 +96,7 @@ impl AppendUrlQueryPairs for StatsTopPostsParams {
             .append_option_query_value_pair("max", self.max.as_ref())
             .append_option_query_value_pair("num", self.num.as_ref())
             .append_option_query_value_pair("locale", self.locale.as_ref())
-            .append_if_true("summarize", self.summarize)
+            .append_query_value_pair("summarize", &(self.summarize as u32))
             .append_option_query_value_pair(
                 "skip_archives",
                 self.skip_archives.map(|b| b as u32).as_ref(),
@@ -250,7 +250,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&date=2026-01-26"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&date=2026-01-26&summarize=0"
         );
     }
 
@@ -273,7 +273,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&skip_archives=0"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-posts?period=day&summarize=0&skip_archives=0"
         );
     }
 
