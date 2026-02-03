@@ -352,14 +352,11 @@ mod tests {
     /// The `expect_summary` parameter indicates whether the response uses summarize=1
     /// (has `summary` and `period` fields) or summarize=0 (has `days` field instead).
     #[rstest]
-    #[case("tests/wpcom/stats_referrers/referrers-01.json", true)]
-    #[case("tests/wpcom/stats_referrers/referrers-02-days.json", false)]
-    #[case(
-        "tests/wpcom/stats_referrers/referrers-03-follow-data-false.json",
-        true
-    )]
-    #[case("tests/wpcom/stats_referrers/referrers-04-real-response.json", true)]
-    #[case("tests/wpcom/stats_referrers/referrers-05-with-nulls.json", true)]
+    #[case("tests/wpcom/stats_referrers/referrers-summary.json", true)]
+    #[case("tests/wpcom/stats_referrers/referrers-days.json", false)]
+    #[case("tests/wpcom/stats_referrers/referrers-follow-data-false.json", true)]
+    #[case("tests/wpcom/stats_referrers/referrers-summary-many-groups.json", true)]
+    #[case("tests/wpcom/stats_referrers/referrers-with-nulls.json", true)]
     fn test_stats_referrers_response_deserialization(
         #[case] json_file_path: &str,
         #[case] expect_summary: bool,
@@ -412,8 +409,8 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_referrers_response_deserialization_referrers_01() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-01.json";
+    fn test_stats_referrers_response_deserialization_summary() {
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-summary.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -451,7 +448,7 @@ mod tests {
 
     #[test]
     fn test_stats_referrers_search_engines_group() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-01.json";
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-summary.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -485,7 +482,7 @@ mod tests {
 
     #[test]
     fn test_stats_referrers_with_follow_data() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-01.json";
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-summary.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -514,8 +511,8 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_referrers_response_deserialization_days_02() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-02-days.json";
+    fn test_stats_referrers_response_deserialization_days() {
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-days.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -548,7 +545,7 @@ mod tests {
     #[test]
     fn test_stats_referrers_follow_data_as_false() {
         // The API can return `false` instead of `null` for follow_data
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-03-follow-data-false.json";
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-follow-data-false.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with follow_data: false");
@@ -581,7 +578,7 @@ mod tests {
 
     #[test]
     fn test_stats_referrers_with_null_values() {
-        let json_file_path = "tests/wpcom/stats_referrers/referrers-05-with-nulls.json";
+        let json_file_path = "tests/wpcom/stats_referrers/referrers-with-nulls.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with null values");

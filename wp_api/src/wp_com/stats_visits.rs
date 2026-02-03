@@ -256,8 +256,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case("tests/wpcom/stats_visits/visits-01.json")]
-    #[case("tests/wpcom/stats_visits/visits-02.json")]
+    #[case("tests/wpcom/stats_visits/visits-hourly-with-nulls.json")]
+    #[case("tests/wpcom/stats_visits/visits-daily.json")]
     fn test_stats_visits_response_deserialization(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsVisitsResponse =
@@ -269,8 +269,8 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_visits_response_deserialization_visits_01() {
-        let json_file_path = "tests/wpcom/stats_visits/visits-01.json";
+    fn test_stats_visits_response_deserialization_hourly_with_nulls() {
+        let json_file_path = "tests/wpcom/stats_visits/visits-hourly-with-nulls.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn test_get_stats_visits_data_hourly() {
-        let json_file_path = "tests/wpcom/stats_visits/visits-01.json";
+        let json_file_path = "tests/wpcom/stats_visits/visits-hourly-with-nulls.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn test_get_stats_visits_data_daily() {
-        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let json_file_path = "tests/wpcom/stats_visits/visits-daily.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -382,8 +382,8 @@ mod tests {
 
     #[test]
     fn test_get_stats_visitors_data_with_nulls() {
-        // visits-01.json has null visitors values
-        let json_file_path = "tests/wpcom/stats_visits/visits-01.json";
+        // visits-hourly-with-nulls.json has null visitors values
+        let json_file_path = "tests/wpcom/stats_visits/visits-hourly-with-nulls.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_get_stats_visitors_data_daily() {
-        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let json_file_path = "tests/wpcom/stats_visits/visits-daily.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -429,7 +429,7 @@ mod tests {
 
     #[test]
     fn test_get_stats_likes_data_daily() {
-        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let json_file_path = "tests/wpcom/stats_visits/visits-daily.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -456,7 +456,7 @@ mod tests {
 
     #[test]
     fn test_get_stats_reblogs_data_daily() {
-        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let json_file_path = "tests/wpcom/stats_visits/visits-daily.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -475,7 +475,7 @@ mod tests {
 
     #[test]
     fn test_get_stats_comments_data_daily() {
-        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let json_file_path = "tests/wpcom/stats_visits/visits-daily.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -494,7 +494,7 @@ mod tests {
 
     #[test]
     fn test_get_stats_posts_data_daily() {
-        let json_file_path = "tests/wpcom/stats_visits/visits-02.json";
+        let json_file_path = "tests/wpcom/stats_visits/visits-daily.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
