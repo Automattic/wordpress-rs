@@ -1,0 +1,32 @@
+{
+    "date": "2026-01-28",
+    "period": "day",
+    "summary": {
+        "groups": [
+            {
+                "group": "WordPress.com Reader",
+                "name": "WordPress.com Reader",
+                "url": "https://wordpress.com/reader/",
+                "icon": "https://secure.gravatar.com/blavatar/c5ba929e1803dd1d2865d53b671e5d0a1f64071ecd9d720d7377dce63fdab0a2?s=48",
+                "total": 10,
+                "follow_data": null,
+                "results": {
+                    "views": 10
+                }
+            },
+            {
+                "group": "domainsuniversity.wordpress.com",
+                "name": "domainsuniversity.wordpress.com",
+                "url": "https://domainsuniversity.wordpress.com/",
+                "icon": null,
+                "total": 3,
+                "follow_data": false,
+                "results": {
+                    "views": 3
+                }
+            }
+        ],
+        "other_views": 0,
+        "total_views": 13
+    }
+}

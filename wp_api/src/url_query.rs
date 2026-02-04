@@ -26,6 +26,21 @@ pub trait QueryPairsExtension {
     ) -> &mut Self
     where
         T: AsQueryValue;
+    /// Conditionally appends a boolean parameter as `key=1` only when true.
+    ///
+    /// This is useful for API parameters where:
+    /// - `true` means "enable this option" and should be sent as `key=1`
+    /// - `false` means "use server default" and should not be sent at all
+    ///
+    /// Unlike `append_query_value_pair` which always appends, this method
+    /// only modifies the query string when the value is true.
+    ///
+    /// # Example
+    /// ```ignore
+    /// query_pairs.append_if_true("summarize", true);  // appends "summarize=1"
+    /// query_pairs.append_if_true("summarize", false); // appends nothing
+    /// ```
+    fn append_if_true<'a>(&mut self, key: impl Into<&'a str>, value: bool) -> &mut Self;
 }
 
 impl QueryPairsExtension for QueryPairs<'_> {
@@ -67,6 +82,13 @@ impl QueryPairsExtension for QueryPairs<'_> {
             });
             csv.pop(); // remove the last ','
             self.append_pair(key.into(), &csv);
+        }
+        self
+    }
+
+    fn append_if_true<'a>(&mut self, key: impl Into<&'a str>, value: bool) -> &mut Self {
+        if value {
+            self.append_pair(key.into(), "1");
         }
         self
     }
