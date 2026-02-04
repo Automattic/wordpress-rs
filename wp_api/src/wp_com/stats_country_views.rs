@@ -270,18 +270,51 @@ mod tests {
         );
     }
 
+    /// Tests deserialization of all stats country views JSON fixtures.
+    ///
+    /// The `expect_summary` parameter indicates whether the response uses summarize=1
+    /// (has `summary` field) or summarize=0 (has `days` field instead).
     #[rstest]
-    #[case("tests/wpcom/stats_country_views/summarized-01-day.json")]
-    #[case("tests/wpcom/stats_country_views/no-summary-01.json")]
-    #[case("tests/wpcom/stats_country_views/summarized-02-day-with-nulls.json")]
-    #[case("tests/wpcom/stats_country_views/summarized-03-day-empty-response.json")]
-    #[case("tests/wpcom/stats_country_views/summarized-04-day-empty-null.json")]
-    fn test_stats_country_views_response_deserialization(#[case] json_file_path: &str) {
+    #[case("tests/wpcom/stats_country_views/summarized-01-day.json", true)]
+    #[case("tests/wpcom/stats_country_views/no-summary-01.json", false)]
+    #[case("tests/wpcom/stats_country_views/summarized-02-day-with-nulls.json", true)]
+    #[case("tests/wpcom/stats_country_views/summarized-03-day-empty-response.json", true)]
+    #[case("tests/wpcom/stats_country_views/summarized-04-day-empty-null.json", true)]
+    fn test_stats_country_views_response_deserialization(
+        #[case] json_file_path: &str,
+        #[case] expect_summary: bool,
+    ) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsCountryViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
+        // Common assertion: date is always present
         assert!(!response.date.is_empty());
+
+        if expect_summary {
+            // summarize=1 response: has summary, no days
+            assert!(
+                response.days.is_none(),
+                "Summarized response should not have days"
+            );
+
+            response
+                .summary
+                .as_ref()
+                .expect("Summary should be present for summarized response");
+        } else {
+            // summarize=0 response: has days, no summary
+            assert!(
+                response.summary.is_none(),
+                "Days response should not have summary"
+            );
+
+            let days = response
+                .days
+                .as_ref()
+                .expect("Days should be present for non-summarized response");
+            assert!(!days.is_empty());
+        }
     }
 
     #[test]
