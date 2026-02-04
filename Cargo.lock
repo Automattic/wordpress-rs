@@ -5237,6 +5237,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "integration_test_credentials",
  "libtest-mimic",
  "serde",
  "serde_json",

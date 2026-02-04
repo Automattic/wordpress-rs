@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::url_query::{AppendUrlQueryPairs, QueryPairs};
+use crate::url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension};
 use serde::{Deserialize, Serialize};
 
 /// This file is optimized for really fast code, not to be pretty. Between the compiler
@@ -27,9 +27,7 @@ pub struct LanguagesGetParams {
 
 impl AppendUrlQueryPairs for LanguagesGetParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        if let Some(locale) = &self.locale {
-            query_pairs_mut.append_pair("_locale", locale.slug_str());
-        }
+        query_pairs_mut.append_option_query_value_pair("_locale", self.locale.as_ref());
     }
 }
 
@@ -1402,6 +1400,15 @@ impl WPComLanguage {
         languages.retain(|lang| lang.popular_rank().is_some());
         languages.sort_by_key(|lang| lang.popular_rank());
         languages
+    }
+}
+
+/// Enables `WPComLanguage` to be used with `append_option_query_value_pair` and similar
+/// query parameter helper methods. Returns the language slug (e.g., "en", "es", "pt-br")
+/// which is the format expected by WordPress.com API endpoints.
+impl AsQueryValue for WPComLanguage {
+    fn as_query_value(&self) -> impl AsRef<str> {
+        self.slug_str()
     }
 }
 

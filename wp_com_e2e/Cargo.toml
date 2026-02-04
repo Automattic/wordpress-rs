@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+integration_test_credentials = { path = "../integration_test_credentials" }
 libtest-mimic = "0.8"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
