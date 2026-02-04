@@ -277,9 +277,18 @@ mod tests {
     #[rstest]
     #[case("tests/wpcom/stats_country_views/summarized-01-day.json", true)]
     #[case("tests/wpcom/stats_country_views/no-summary-01.json", false)]
-    #[case("tests/wpcom/stats_country_views/summarized-02-day-with-nulls.json", true)]
-    #[case("tests/wpcom/stats_country_views/summarized-03-day-empty-response.json", true)]
-    #[case("tests/wpcom/stats_country_views/summarized-04-day-empty-null.json", true)]
+    #[case(
+        "tests/wpcom/stats_country_views/summarized-02-day-with-nulls.json",
+        true
+    )]
+    #[case(
+        "tests/wpcom/stats_country_views/summarized-03-day-empty-response.json",
+        true
+    )]
+    #[case(
+        "tests/wpcom/stats_country_views/summarized-04-day-empty-null.json",
+        true
+    )]
     fn test_stats_country_views_response_deserialization(
         #[case] json_file_path: &str,
         #[case] expect_summary: bool,
@@ -449,7 +458,8 @@ mod tests {
 
     #[test]
     fn test_stats_country_views_empty_response() {
-        let json_file_path = "tests/wpcom/stats_country_views/summarized-03-day-empty-response.json";
+        let json_file_path =
+            "tests/wpcom/stats_country_views/summarized-03-day-empty-response.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsCountryViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with empty response");
