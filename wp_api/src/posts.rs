@@ -514,6 +514,7 @@ pub enum PostStatus {
     Private,
     #[default]
     Publish,
+    Trash,
     #[serde(untagged)]
     #[strum(default)]
     Custom(String),
