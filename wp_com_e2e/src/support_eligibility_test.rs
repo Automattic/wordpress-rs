@@ -1,12 +1,20 @@
-use wp_api::wp_com::client::WpComApiClient;
+use libtest_mimic::Trial;
+use std::sync::Arc;
 
-pub async fn support_eligibility_test(client: &WpComApiClient) -> anyhow::Result<()> {
-    println!("== Support Eligibility Test ==");
-    client
-        .support_eligibility()
-        .get_support_eligibility()
-        .await?;
-    println!("✅ Get Support Eligibility");
+use crate::context::TestContext;
 
-    Ok(())
+pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
+    vec![Trial::test("support_eligibility::get", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                ctx.client
+                    .support_eligibility()
+                    .get_support_eligibility()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                Ok(())
+            })
+        }
+    })]
 }

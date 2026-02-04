@@ -1,0 +1,63 @@
+{
+    "date": "2026-01-26",
+    "days": {
+        "2026-01-26": {
+            "postviews": [
+                {
+                    "id": 269,
+                    "href": "https://fieldguide.automattic.com/the-chaos-theory/",
+                    "date": "2009-09-04 07:56:46",
+                    "title": "Welcome to Automattic",
+                    "type": "page",
+                    "status": "publish",
+                    "public": true,
+                    "views": 150,
+                    "video_play": false
+                },
+                {
+                    "id": 3973,
+                    "href": "https://fieldguide.automattic.com/my-computers/computer-purchases/",
+                    "date": "2011-06-22 06:51:23",
+                    "title": "Computer & Monitor Purchase Guidelines",
+                    "type": "page",
+                    "status": "publish",
+                    "public": true,
+                    "views": 20,
+                    "video_play": false
+                },
+                {
+                    "id": 0,
+                    "href": "https://fieldguide.automattic.com/",
+                    "date": null,
+                    "title": "Home page / Archives",
+                    "type": "homepage",
+                    "status": null,
+                    "public": false,
+                    "views": 50,
+                    "video_play": false
+                }
+            ],
+            "total_views": 220,
+            "dropped_ids": [],
+            "other_views": 10
+        },
+        "2026-01-25": {
+            "postviews": [
+                {
+                    "id": 269,
+                    "href": "https://fieldguide.automattic.com/the-chaos-theory/",
+                    "date": "2009-09-04 07:56:46",
+                    "title": "Welcome to Automattic",
+                    "type": "page",
+                    "status": "publish",
+                    "public": true,
+                    "views": 120,
+                    "video_play": false
+                }
+            ],
+            "total_views": 180,
+            "dropped_ids": [12345],
+            "other_views": 60
+        }
+    }
+}

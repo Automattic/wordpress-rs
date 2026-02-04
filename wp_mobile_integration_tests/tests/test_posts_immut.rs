@@ -3,7 +3,7 @@ use wp_api::prelude::*;
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_mobile::collection::PostItemState;
 use wp_mobile::filters::PostListFilter;
-use wp_mobile_cache_integration_tests::*;
+use wp_mobile_integration_tests::*;
 
 #[tokio::test]
 #[parallel]
@@ -95,7 +95,8 @@ async fn test_fetch_all_posts_with_any_status() {
     for item in &items {
         assert!(
             matches!(item.state, PostItemState::Fresh { .. }),
-            "all items should be Fresh after refresh"
+            "all items should be Fresh after refresh: {:?}",
+            item.state
         );
     }
 }

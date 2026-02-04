@@ -276,6 +276,10 @@ public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiCli
 public typealias TokenValidationParameters = WordPressAPIInternal.TokenValidationParameters
 public typealias TokenRequestParameters = WordPressAPIInternal.TokenRequestParameters
 
+// MARK: Languages
+public typealias WPComLanguage = WordPressAPIInternal.WpComLanguage
+public typealias LanguagesGetParams = WordPressAPIInternal.LanguagesGetParams
+
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams
 public typealias SubscriberImportJobsListParams = WordPressAPIInternal.SubscriberImportJobsListParams

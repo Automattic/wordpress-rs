@@ -1,22 +1,46 @@
-use wp_api::wp_com::{client::WpComApiClient, oauth2::TokenValidationParameters};
+use libtest_mimic::Trial;
+use std::sync::Arc;
+use wp_api::wp_com::oauth2::TokenValidationParameters;
 
-pub async fn me_test(client: &WpComApiClient, token: String) -> anyhow::Result<()> {
-    println!("== Current User Info Test ==");
+use crate::context::TestContext;
 
-    let user_info = client.me().get().await?.data;
-    println!("✅ Get Current User Info");
+pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
+    let mut trials = vec![];
 
-    if let Some(client_id) = user_info.token_client_id {
-        println!("== OAuth 2 Token Test ==");
-        client
-            .oauth2()
-            .fetch_info(&TokenValidationParameters {
-                client_id,
-                token: token.clone(),
+    // Pre-fetch user info to determine if we can run OAuth2 test
+    let user_info = ctx.runtime.block_on(async { ctx.client.me().get().await });
+
+    trials.push(Trial::test("me::get_user_info", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                ctx.client.me().get().await.map_err(|e| e.to_string())?;
+                Ok(())
             })
-            .await?;
-        println!("✅ Get OAuth 2 Token Info");
+        }
+    }));
+
+    // Only add OAuth2 test if we have a client_id
+    if let Ok(response) = user_info
+        && let Some(client_id) = response.data.token_client_id
+    {
+        trials.push(Trial::test("me::oauth2_token_info", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    ctx.client
+                        .oauth2()
+                        .fetch_info(&TokenValidationParameters {
+                            client_id,
+                            token: ctx.token.clone(),
+                        })
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    Ok(())
+                })
+            }
+        }));
     }
 
-    Ok(())
+    trials
 }

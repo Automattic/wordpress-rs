@@ -1,0 +1,43 @@
+{
+    "date": "2026-01-28",
+    "period": "day",
+    "summary": {
+        "postviews": [
+            {
+                "id": 0,
+                "href": null,
+                "date": null,
+                "title": null,
+                "type": null,
+                "status": null,
+                "public": null,
+                "views": null,
+                "video_play": null
+            },
+            {
+                "id": 123,
+                "href": "https://example.com/post",
+                "date": "2026-01-28 10:00:00",
+                "title": "A Post With All Fields",
+                "type": "post",
+                "status": "publish",
+                "public": true,
+                "views": 100,
+                "video_play": false
+            },
+            {
+                "id": 456,
+                "href": null,
+                "date": null,
+                "title": "Partial Null Post",
+                "type": "post",
+                "status": null,
+                "public": false,
+                "views": 50,
+                "video_play": null
+            }
+        ],
+        "total_views": 150,
+        "dropped_ids": []
+    }
+}

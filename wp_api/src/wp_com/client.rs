@@ -8,6 +8,8 @@ use super::endpoint::{
     stats_country_views_endpoint::{
         StatsCountryViewsRequestBuilder, StatsCountryViewsRequestExecutor,
     },
+    stats_referrers_endpoint::{StatsReferrersRequestBuilder, StatsReferrersRequestExecutor},
+    stats_top_posts_endpoint::{StatsTopPostsRequestBuilder, StatsTopPostsRequestExecutor},
     stats_visits_endpoint::{StatsVisitsRequestBuilder, StatsVisitsRequestExecutor},
     subscribers_endpoint::{SubscribersRequestBuilder, SubscribersRequestExecutor},
     support_bots_endpoint::{SupportBotsRequestBuilder, SupportBotsRequestExecutor},
@@ -24,6 +26,7 @@ use crate::{
     request::endpoint::ApiUrlResolver,
     wp_com::endpoint::{
         WpComApiClientInternalUrlResolver,
+        languages_endpoint::{LanguagesRequestBuilder, LanguagesRequestExecutor},
         sites_endpoint::{SitesRequestBuilder, SitesRequestExecutor},
     },
 };
@@ -32,10 +35,13 @@ use std::sync::Arc;
 pub struct WpComApiRequestBuilder {
     followers: Arc<FollowersRequestBuilder>,
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
+    languages: Arc<LanguagesRequestBuilder>,
     me: Arc<MeRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
     stats_country_views: Arc<StatsCountryViewsRequestBuilder>,
+    stats_referrers: Arc<StatsReferrersRequestBuilder>,
+    stats_top_posts: Arc<StatsTopPostsRequestBuilder>,
     stats_visits: Arc<StatsVisitsRequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
     support_bots: Arc<SupportBotsRequestBuilder>,
@@ -52,10 +58,13 @@ impl WpComApiRequestBuilder {
             auth_provider;
             followers,
             jetpack_connection,
+            languages,
             me,
             oauth2,
             sites,
             stats_country_views,
+            stats_referrers,
+            stats_top_posts,
             stats_visits,
             subscribers,
             support_bots,
@@ -83,10 +92,13 @@ impl UniffiWpComApiClient {
 pub struct WpComApiClient {
     followers: Arc<FollowersRequestExecutor>,
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
+    languages: Arc<LanguagesRequestExecutor>,
     me: Arc<MeRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
     stats_country_views: Arc<StatsCountryViewsRequestExecutor>,
+    stats_referrers: Arc<StatsReferrersRequestExecutor>,
+    stats_top_posts: Arc<StatsTopPostsRequestExecutor>,
     stats_visits: Arc<StatsVisitsRequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
     support_bots: Arc<SupportBotsRequestExecutor>,
@@ -104,10 +116,13 @@ impl WpComApiClient {
             delegate;
             followers,
             jetpack_connection,
+            languages,
             me,
             oauth2,
             sites,
             stats_country_views,
+            stats_referrers,
+            stats_top_posts,
             stats_visits,
             subscribers,
             support_bots,
@@ -118,10 +133,13 @@ impl WpComApiClient {
 }
 api_client_generate_endpoint_impl!(WpComApi, followers);
 api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
+api_client_generate_endpoint_impl!(WpComApi, languages);
 api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_country_views);
+api_client_generate_endpoint_impl!(WpComApi, stats_referrers);
+api_client_generate_endpoint_impl!(WpComApi, stats_top_posts);
 api_client_generate_endpoint_impl!(WpComApi, stats_visits);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);
