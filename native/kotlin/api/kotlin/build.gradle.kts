@@ -41,6 +41,7 @@ testing {
                 implementation(project())
 
                 implementation(libs.okhttp)
+                implementation(libs.okhttp.mockwebserver)
                 implementation(libs.okhttp.tls)
                 implementation(rootProject.libs.kotlin.test)
                 implementation(rootProject.libs.kotlinx.coroutines.test)
