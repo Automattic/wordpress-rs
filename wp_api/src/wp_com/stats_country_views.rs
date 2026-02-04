@@ -1,6 +1,7 @@
 use crate::{
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+    wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -58,7 +59,7 @@ pub struct StatsCountryViewsParams {
     pub days: Option<u32>,
     /// The locale for the response.
     #[uniffi(default = None)]
-    pub locale: Option<String>,
+    pub locale: Option<WPComLanguage>,
     /// Whether to return a summary of the data.
     ///
     /// - `Some(true)` (summarize=1): Response contains `summary` field with aggregated country
@@ -186,7 +187,7 @@ mod tests {
             max: Some(10),
             num: Some(1),
             days: Some(1),
-            locale: Some("en_US".to_string()),
+            locale: Some(WPComLanguage::English),
             summarize: Some(true),
         };
 
@@ -195,7 +196,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-29&max=10&num=1&days=1&locale=en_US&summarize=1"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-29&max=10&num=1&days=1&locale=en&summarize=1"
         );
     }
 
@@ -210,7 +211,7 @@ mod tests {
             period: Some(StatsCountryViewsPeriod::Day),
             date: Some("2026-01-29".to_string()),
             start_date: Some("2026-01-23".to_string()),
-            locale: Some("en_US".to_string()),
+            locale: Some(WPComLanguage::English),
             ..Default::default()
         };
 
@@ -220,7 +221,7 @@ mod tests {
         // Default summarize is Some(false), which serializes to summarize=0
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-23&locale=en_US&summarize=0"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-23&locale=en&summarize=0"
         );
     }
 
