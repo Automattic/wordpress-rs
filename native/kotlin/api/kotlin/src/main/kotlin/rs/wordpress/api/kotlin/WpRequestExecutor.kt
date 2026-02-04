@@ -28,6 +28,7 @@ import uniffi.wp_api.parseCertificate
 import java.io.File
 import java.net.ConnectException
 import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLPeerUnverifiedException
@@ -190,6 +191,8 @@ class WpRequestExecutor @JvmOverloads constructor(
                     reason = "Connection failed: ${e.localizedMessage}"
                 )
             )
+        } catch (e: SocketTimeoutException) {
+            throw requestExecutionFailedWith(RequestExecutionErrorReason.HttpTimeoutError)
         } catch (e: Exception) {
             throw requestExecutionFailedWith(
                 RequestExecutionErrorReason.GenericError(
