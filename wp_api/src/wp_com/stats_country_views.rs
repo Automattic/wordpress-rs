@@ -271,11 +271,11 @@ mod tests {
     }
 
     #[rstest]
-    #[case("tests/wpcom/stats_country_views/country-views-01-summary.json")]
-    #[case("tests/wpcom/stats_country_views/country-views-02-days.json")]
-    #[case("tests/wpcom/stats_country_views/country-views-03-with-nulls.json")]
-    #[case("tests/wpcom/stats_country_views/country-views-04-empty.json")]
-    #[case("tests/wpcom/stats_country_views/country-views-05-empty-null.json")]
+    #[case("tests/wpcom/stats_country_views/summarized-01-day.json")]
+    #[case("tests/wpcom/stats_country_views/no-summary-01.json")]
+    #[case("tests/wpcom/stats_country_views/summarized-02-day-with-nulls.json")]
+    #[case("tests/wpcom/stats_country_views/summarized-03-day-empty-response.json")]
+    #[case("tests/wpcom/stats_country_views/summarized-04-day-empty-null.json")]
     fn test_stats_country_views_response_deserialization(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsCountryViewsResponse =
@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn test_stats_country_views_response_deserialization_summary_01() {
-        let json_file_path = "tests/wpcom/stats_country_views/country-views-01-summary.json";
+        let json_file_path = "tests/wpcom/stats_country_views/summarized-01-day.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsCountryViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -324,8 +324,8 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_country_views_response_deserialization_days_02() {
-        let json_file_path = "tests/wpcom/stats_country_views/country-views-02-days.json";
+    fn test_stats_country_views_response_deserialization_no_summary_01() {
+        let json_file_path = "tests/wpcom/stats_country_views/no-summary-01.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsCountryViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn test_stats_country_views_with_null_values() {
-        let json_file_path = "tests/wpcom/stats_country_views/country-views-03-with-nulls.json";
+        let json_file_path = "tests/wpcom/stats_country_views/summarized-02-day-with-nulls.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsCountryViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with null values");
@@ -416,7 +416,7 @@ mod tests {
 
     #[test]
     fn test_stats_country_views_empty_response() {
-        let json_file_path = "tests/wpcom/stats_country_views/country-views-04-empty.json";
+        let json_file_path = "tests/wpcom/stats_country_views/summarized-03-day-empty-response.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsCountryViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with empty response");
