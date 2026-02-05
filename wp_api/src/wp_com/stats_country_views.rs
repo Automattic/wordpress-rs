@@ -62,13 +62,13 @@ pub struct StatsCountryViewsParams {
     pub locale: Option<WPComLanguage>,
     /// Whether to return a summary of the data.
     ///
-    /// - `Some(true)` (summarize=1): Response contains `summary` field with aggregated country
+    /// - `true` (default): Response contains `summary` field with aggregated country
     ///   views across all requested periods. The `days` field will be absent.
-    /// - `Some(false)` (summarize=0, default): Response contains `days` field with a per-day
+    /// - `false`: Response contains `days` field with a per-day
     ///   breakdown of country views, where each day is keyed by its date string. The `summary`
     ///   field will be absent.
-    #[uniffi(default = Some(false))]
-    pub summarize: Option<bool>,
+    #[uniffi(default = true)]
+    pub summarize: bool,
 }
 
 impl Default for StatsCountryViewsParams {
@@ -81,7 +81,7 @@ impl Default for StatsCountryViewsParams {
             num: None,
             days: None,
             locale: None,
-            summarize: Some(false),
+            summarize: true,
         }
     }
 }
@@ -96,7 +96,7 @@ impl AppendUrlQueryPairs for StatsCountryViewsParams {
             .append_option_query_value_pair("num", self.num.as_ref())
             .append_option_query_value_pair("days", self.days.as_ref())
             .append_option_query_value_pair("locale", self.locale.as_ref())
-            .append_option_query_value_pair("summarize", self.summarize.map(|b| b as u32).as_ref());
+            .append_query_value_pair("summarize", &(self.summarize as u32));
     }
 }
 
@@ -188,7 +188,7 @@ mod tests {
             num: Some(1),
             days: Some(1),
             locale: Some(WPComLanguage::English),
-            summarize: Some(true),
+            summarize: true,
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -218,33 +218,10 @@ mod tests {
         let mut query_pairs = url.query_pairs_mut();
         params.append_query_pairs(&mut query_pairs);
 
-        // Default summarize is Some(false), which serializes to summarize=0
+        // Default summarize is true, which serializes to summarize=1
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-23&locale=en&summarize=0"
-        );
-    }
-
-    #[test]
-    fn test_stats_country_views_params_without_summarize() {
-        let mut url = url::Url::parse(
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views",
-        )
-        .expect("Failed to parse url");
-
-        let params = StatsCountryViewsParams {
-            period: Some(StatsCountryViewsPeriod::Day),
-            date: Some("2026-01-29".to_string()),
-            summarize: None,
-            ..Default::default()
-        };
-
-        let mut query_pairs = url.query_pairs_mut();
-        params.append_query_pairs(&mut query_pairs);
-
-        assert_eq!(
-            query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-23&locale=en&summarize=1"
         );
     }
 
@@ -257,7 +234,7 @@ mod tests {
 
         let params = StatsCountryViewsParams {
             period: Some(StatsCountryViewsPeriod::Day),
-            summarize: Some(false),
+            summarize: false,
             ..Default::default()
         };
 
