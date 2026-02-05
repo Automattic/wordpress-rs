@@ -192,6 +192,16 @@ impl WpApiDetails {
             .is_ok_and(|parsed_url| is_local_dev_environment_url(&parsed_url))
     }
 
+    /// Returns the site home URL as a string.
+    pub fn home_url_string(&self) -> String {
+        self.home.clone()
+    }
+
+    /// Returns the site GMT offset.
+    pub fn gmt_offset(&self) -> Option<f64> {
+        self.gmt_offset
+    }
+
     /// Returns `true` if the site has routes matching the given namespace.
     pub fn has_namespace(&self, namespace: String) -> bool {
         self.namespaces.contains(&namespace)

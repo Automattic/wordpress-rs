@@ -10,6 +10,7 @@ use crate::{
     wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use wp_contextual::WpContextual;
 use wp_derive::WpDeriveParamsField;
 
@@ -280,6 +281,13 @@ pub enum NavMenuItemType {
 }
 
 impl_as_query_value_from_to_string!(NavMenuItemType);
+
+/// Converts a string to a `NavMenuItemType` enum value.
+/// Returns `NavMenuItemType::Custom` if the string doesn't match any known variant.
+#[uniffi::export]
+fn nav_menu_item_type_from_string(value: String) -> NavMenuItemType {
+    NavMenuItemType::from_str(value.as_str()).unwrap_or(NavMenuItemType::Custom)
+}
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 pub struct SparseNavMenuItem {
