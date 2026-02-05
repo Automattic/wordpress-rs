@@ -11,6 +11,7 @@ pub mod language;
 pub mod me;
 pub mod oauth2;
 pub mod sites;
+pub mod stats_city_views;
 pub mod stats_country_views;
 pub mod stats_referrers;
 pub mod stats_region_views;

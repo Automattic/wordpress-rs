@@ -13,6 +13,7 @@ pub mod languages_endpoint;
 pub mod me_endpoint;
 pub mod oauth2;
 pub mod sites_endpoint;
+pub mod stats_city_views_endpoint;
 pub mod stats_country_views_endpoint;
 pub mod stats_referrers_endpoint;
 pub mod stats_region_views_endpoint;
