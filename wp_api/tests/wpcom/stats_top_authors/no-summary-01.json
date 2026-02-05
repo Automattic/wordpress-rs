@@ -1,0 +1,133 @@
+{
+    "date": "2026-02-05",
+    "days": {
+        "2026-02-05": {
+            "authors": [
+                {
+                    "name": "Jane Developer",
+                    "avatar": "https://0.gravatar.com/avatar/abc123def456?s=64&d=mm&r=G",
+                    "views": 450,
+                    "posts": [
+                        {
+                            "id": 12345,
+                            "title": "Getting Started with WordPress REST API",
+                            "url": "https://example.com/getting-started-rest-api",
+                            "views": 300
+                        },
+                        {
+                            "id": 12346,
+                            "title": "Advanced API Authentication",
+                            "url": "https://example.com/advanced-api-auth",
+                            "views": 150
+                        }
+                    ],
+                    "follow_data": {
+                        "type": "wpcom",
+                        "params": {
+                            "feed_id": 98765,
+                            "blog_id": 9288856
+                        }
+                    },
+                    "author_id": 1001,
+                    "other_views": 0
+                },
+                {
+                    "name": "John Writer",
+                    "avatar": "https://0.gravatar.com/avatar/789xyz?s=64&d=mm&r=G",
+                    "views": 280,
+                    "posts": [
+                        {
+                            "id": 12350,
+                            "title": "Content Strategy Best Practices",
+                            "url": "https://example.com/content-strategy",
+                            "views": 280
+                        }
+                    ],
+                    "follow_data": {
+                        "type": "wpcom",
+                        "params": {
+                            "feed_id": 98766,
+                            "blog_id": 9288856
+                        }
+                    },
+                    "author_id": 1002,
+                    "other_views": 0
+                }
+            ]
+        },
+        "2026-02-04": {
+            "authors": [
+                {
+                    "name": "Jane Developer",
+                    "avatar": "https://0.gravatar.com/avatar/abc123def456?s=64&d=mm&r=G",
+                    "views": 380,
+                    "posts": [
+                        {
+                            "id": 12345,
+                            "title": "Getting Started with WordPress REST API",
+                            "url": "https://example.com/getting-started-rest-api",
+                            "views": 250
+                        },
+                        {
+                            "id": 12347,
+                            "title": "Building Custom Endpoints",
+                            "url": "https://example.com/custom-endpoints",
+                            "views": 130
+                        }
+                    ],
+                    "follow_data": {
+                        "type": "wpcom",
+                        "params": {
+                            "feed_id": 98765,
+                            "blog_id": 9288856
+                        }
+                    },
+                    "author_id": 1001,
+                    "other_views": 0
+                },
+                {
+                    "name": "Alice Engineer",
+                    "avatar": "https://0.gravatar.com/avatar/engineer123?s=64&d=mm&r=G",
+                    "views": 210,
+                    "posts": [
+                        {
+                            "id": 12360,
+                            "title": "Debugging WordPress Plugins",
+                            "url": "https://example.com/debugging-plugins",
+                            "views": 210
+                        }
+                    ],
+                    "follow_data": {
+                        "type": "wpcom",
+                        "params": {
+                            "feed_id": 98767,
+                            "blog_id": 9288856
+                        }
+                    },
+                    "author_id": 1003,
+                    "other_views": 0
+                }
+            ]
+        },
+        "2026-02-03": {
+            "authors": [
+                {
+                    "name": "John Writer",
+                    "avatar": "https://0.gravatar.com/avatar/789xyz?s=64&d=mm&r=G",
+                    "views": 195,
+                    "posts": [
+                        {
+                            "id": 12351,
+                            "title": "SEO Fundamentals",
+                            "url": "https://example.com/seo-fundamentals",
+                            "views": 195
+                        }
+                    ],
+                    "follow_data": null,
+                    "author_id": 1002,
+                    "other_views": 0
+                }
+            ]
+        }
+    }
+}

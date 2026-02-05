@@ -13,6 +13,7 @@ pub mod oauth2;
 pub mod sites;
 pub mod stats_country_views;
 pub mod stats_referrers;
+pub mod stats_top_authors;
 pub mod stats_top_posts;
 pub mod stats_visits;
 pub mod subscribers;
