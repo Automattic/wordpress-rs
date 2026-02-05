@@ -54,26 +54,23 @@ impl WpComApiRequestBuilder {
         let api_url_resolver: Arc<dyn ApiUrlResolver> =
             Arc::new(WpComApiClientInternalUrlResolver::default());
         api_client_generate_request_builder!(
-                    api_url_resolver,
-                    auth_provider;
-                    followers,
-                    jetpack_connection,
-                    languages,
-                    me,
-                    oauth2,
-                    sites,
-        <<<<<<< HEAD
-                    stats_referrers,
-                    stats_top_posts,
-        =======
-                    stats_country_views,
-        >>>>>>> a97ec178 (Wiring the endpoint to the client API)
-                    stats_visits,
-                    subscribers,
-                    support_bots,
-                    support_eligibility,
-                    support_tickets
-                )
+            api_url_resolver,
+            auth_provider;
+            followers,
+            jetpack_connection,
+            languages,
+            me,
+            oauth2,
+            sites,
+            stats_country_views,
+            stats_referrers,
+            stats_top_posts,
+            stats_visits,
+            subscribers,
+            support_bots,
+            support_eligibility,
+            support_tickets
+        )
     }
 }
 
