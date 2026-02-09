@@ -3,7 +3,7 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::language::WPComLanguage,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
 /// The time period for grouping top authors stats.
@@ -135,6 +135,7 @@ pub struct StatsTopAuthorsAuthor {
     #[serde(default)]
     pub posts: Vec<StatsTopAuthorsPost>,
     /// Follow data for the author.
+    #[serde(default, deserialize_with = "deserialize_follow_data")]
     pub follow_data: Option<StatsTopAuthorsFollowData>,
     /// The author's user ID.
     pub author_id: Option<u64>,
@@ -172,6 +173,28 @@ pub struct StatsTopAuthorsFollowParams {
     pub feed_id: Option<u64>,
     /// The blog ID.
     pub blog_id: Option<u64>,
+}
+
+fn deserialize_follow_data<'de, D>(
+    deserializer: D,
+) -> Result<Option<StatsTopAuthorsFollowData>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    #[allow(clippy::large_enum_variant)]
+    enum FollowDataOrBool {
+        Data(StatsTopAuthorsFollowData),
+        #[allow(dead_code)]
+        Bool(bool),
+        Null,
+    }
+
+    match FollowDataOrBool::deserialize(deserializer)? {
+        FollowDataOrBool::Data(data) => Ok(Some(data)),
+        FollowDataOrBool::Bool(_) | FollowDataOrBool::Null => Ok(None),
+    }
 }
 
 #[cfg(test)]
@@ -271,6 +294,8 @@ mod tests {
     #[case("tests/wpcom/stats_top_authors/summarized-02-week.json")]
     #[case("tests/wpcom/stats_top_authors/summarized-03-day-empty-response.json")]
     #[case("tests/wpcom/stats_top_authors/summarized-04-day-with-nulls.json")]
+    #[case("tests/wpcom/stats_top_authors/summarized-05-day-with-false-follow-data.json")]
+    #[case("tests/wpcom/stats_top_authors/summarized-06-day-mixed-follow-data.json")]
     fn test_stats_top_authors_response_deserialization_summary(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopAuthorsResponse =
@@ -428,5 +453,106 @@ mod tests {
 
         assert!(partial_author.author_id.is_none());
         assert_eq!(partial_author.other_views, Some(0));
+    }
+
+    #[test]
+    fn test_stats_top_authors_with_false_follow_data() {
+        let json_file_path =
+            "tests/wpcom/stats_top_authors/summarized-05-day-with-false-follow-data.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopAuthorsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with false follow_data");
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert_eq!(summary.authors.len(), 2);
+
+        // First author: has follow_data as a struct
+        let author_with_follow = &summary.authors[0];
+        assert_eq!(author_with_follow.name, "Author With Follow Data");
+        assert!(author_with_follow.follow_data.is_some());
+
+        // Second author: has follow_data as `false`, should deserialize as None
+        let author_with_false = &summary.authors[1];
+        assert_eq!(author_with_false.name, "Author With False Follow Data");
+        assert!(author_with_false.follow_data.is_none());
+    }
+
+    #[test]
+    fn test_stats_top_authors_mixed_follow_data() {
+        let json_file_path =
+            "tests/wpcom/stats_top_authors/summarized-06-day-mixed-follow-data.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopAuthorsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with mixed follow_data");
+
+        assert_eq!(response.date, "2026-02-02");
+        assert_eq!(response.period, Some("day".to_string()));
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert_eq!(summary.authors.len(), 36);
+
+        // Authors with follow_data as struct (e.g., first author "Kristian Vitozev")
+        let kristian = &summary.authors[0];
+        assert_eq!(kristian.name, "Kristian Vitozev");
+        assert_eq!(kristian.views, 11);
+        assert_eq!(kristian.posts.len(), 6);
+        assert_eq!(kristian.author_id, Some(44380618));
+        let follow_data = kristian
+            .follow_data
+            .as_ref()
+            .expect("Kristian should have follow_data");
+        assert_eq!(follow_data.follow_type, Some("follow".to_string()));
+
+        // Authors with follow_data as `false` should deserialize as None
+        // "Anna" (index 2), "synora10" (index 4), "Curtis" (index 11),
+        // "Drew H." (index 15), "Jason Kytros" (index 18), "Jordan" (index 21),
+        // "Lindsey Romero" (index 25), "Raul Arevalo" (index 31),
+        // "Stephen C." (index 32), "toncijajic" (index 35 - last)
+        let authors_with_false_follow_data = [
+            (2, "Anna"),
+            (4, "synora10"),
+            (10, "Curtis"),
+            (14, "Drew H."),
+            (17, "Jason Kytros"),
+            (20, "Jordan"),
+            (23, "Lindsey Romero"),
+            (29, "Raul Arevalo"),
+            (30, "Stephen C."),
+            (35, "toncijajic"),
+        ];
+        for (index, name) in authors_with_false_follow_data {
+            let author = &summary.authors[index];
+            assert_eq!(author.name, name);
+            assert!(
+                author.follow_data.is_none(),
+                "Expected follow_data to be None for '{}' at index {}",
+                name,
+                index
+            );
+        }
+
+        // Verify authors with struct follow_data still parse correctly
+        let authors_with_struct_follow_data = [
+            (0, "Kristian Vitozev"),
+            (1, "tsmjs"),
+            (3, "Fernando P\u{00e9}rez"),
+            (5, "Aagam Shah"),
+        ];
+        for (index, name) in authors_with_struct_follow_data {
+            let author = &summary.authors[index];
+            assert_eq!(author.name, name);
+            assert!(
+                author.follow_data.is_some(),
+                "Expected follow_data to be Some for '{}' at index {}",
+                name,
+                index
+            );
+        }
     }
 }
