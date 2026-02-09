@@ -1,0 +1,36 @@
+{
+    "date": "2026-02-05",
+    "period": "day",
+    "summary": {
+        "authors": [
+            {
+                "name": "Null Author",
+                "avatar": null,
+                "views": 100,
+                "posts": [],
+                "follow_data": null,
+                "author_id": 2001,
+                "other_views": null
+            },
+            {
+                "name": "Partial Author",
+                "avatar": "https://0.gravatar.com/avatar/partial?s=64&d=mm&r=G",
+                "views": 50,
+                "posts": [
+                    {
+                        "id": 99999,
+                        "title": null,
+                        "url": null,
+                        "views": 50
+                    }
+                ],
+                "follow_data": {
+                    "type": null,
+                    "params": null
+                },
+                "author_id": null,
+                "other_views": 0
+            }
+        ]
+    }
+}

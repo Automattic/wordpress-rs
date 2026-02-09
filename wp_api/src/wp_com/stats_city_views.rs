@@ -261,6 +261,12 @@ mod tests {
     #[rstest]
     #[case("tests/wpcom/stats_city_views/summarized-01-day.json", true)]
     #[case("tests/wpcom/stats_city_views/no-summary-01.json", false)]
+    #[case("tests/wpcom/stats_city_views/summarized-02-day-with-nulls.json", true)]
+    #[case(
+        "tests/wpcom/stats_city_views/summarized-03-day-empty-response.json",
+        true
+    )]
+    #[case("tests/wpcom/stats_city_views/summarized-04-day-empty-null.json", true)]
     fn test_stats_city_views_response_deserialization(
         #[case] json_file_path: &str,
         #[case] expect_summary: bool,
@@ -381,6 +387,93 @@ mod tests {
             .expect("Country info should be present");
         assert!(country_info.contains_key("US"));
         assert!(country_info.contains_key("ES"));
+    }
+
+    #[test]
+    fn test_stats_city_views_with_null_values() {
+        let json_file_path = "tests/wpcom/stats_city_views/summarized-02-day-with-nulls.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsCityViewsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with null values");
+
+        assert_eq!(response.date, "2026-02-05");
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert_eq!(summary.views.len(), 3);
+
+        // First entry: all nullable fields are null (including coordinates)
+        let all_nulls = &summary.views[0];
+        assert!(all_nulls.location.is_none());
+        assert!(all_nulls.views.is_none());
+        assert!(all_nulls.country_code.is_none());
+        assert!(all_nulls.coordinates.is_none());
+
+        // Second entry: all fields have values
+        let all_values = &summary.views[1];
+        assert_eq!(all_values.location, Some("Seattle".to_string()));
+        assert_eq!(all_values.views, Some(100));
+        assert_eq!(all_values.country_code, Some("US".to_string()));
+        let coords = all_values
+            .coordinates
+            .as_ref()
+            .expect("Coordinates should be present");
+        assert_eq!(coords.latitude, "47.604309");
+        assert_eq!(coords.longitude, "-122.329845");
+
+        // Third entry: mixed null and non-null values, null coordinates
+        let partial_nulls = &summary.views[2];
+        assert!(partial_nulls.location.is_none());
+        assert_eq!(partial_nulls.views, Some(50));
+        assert_eq!(partial_nulls.country_code, Some("XX".to_string()));
+        assert!(partial_nulls.coordinates.is_none());
+
+        // Verify country info with nulls
+        let country_info = response
+            .country_info
+            .as_ref()
+            .expect("Country info should be present");
+
+        // Entry with all nulls
+        let null_info = country_info
+            .get("XX")
+            .expect("XX info should exist with nulls");
+        assert!(null_info.flag_icon.is_none());
+        assert!(null_info.flat_flag_icon.is_none());
+        assert!(null_info.country_full.is_none());
+        assert!(null_info.map_region.is_none());
+
+        // Entry with all values
+        let us_info = country_info.get("US").expect("US info should exist");
+        assert!(us_info.flag_icon.is_some());
+        assert!(us_info.flat_flag_icon.is_some());
+        assert_eq!(us_info.country_full, Some("United States".to_string()));
+        assert_eq!(us_info.map_region, Some("021".to_string()));
+    }
+
+    #[test]
+    fn test_stats_city_views_empty_response() {
+        let json_file_path = "tests/wpcom/stats_city_views/summarized-03-day-empty-response.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsCityViewsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with empty response");
+
+        assert_eq!(response.date, "2026-02-05");
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert!(summary.views.is_empty());
+        assert_eq!(summary.other_views, 0);
+        assert_eq!(summary.total_views, 0);
+
+        // country_info can be null or empty
+        assert!(
+            response.country_info.is_none() || response.country_info.as_ref().unwrap().is_empty()
+        );
     }
 
     #[test]

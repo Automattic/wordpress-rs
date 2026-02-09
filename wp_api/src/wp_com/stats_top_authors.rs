@@ -269,6 +269,8 @@ mod tests {
     #[rstest]
     #[case("tests/wpcom/stats_top_authors/summarized-01-day.json")]
     #[case("tests/wpcom/stats_top_authors/summarized-02-week.json")]
+    #[case("tests/wpcom/stats_top_authors/summarized-03-day-empty-response.json")]
+    #[case("tests/wpcom/stats_top_authors/summarized-04-day-with-nulls.json")]
     fn test_stats_top_authors_response_deserialization_summary(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsTopAuthorsResponse =
@@ -365,5 +367,66 @@ mod tests {
 
         let follow_data = author_with_follow.follow_data.as_ref().unwrap();
         assert!(follow_data.follow_type.is_some());
+    }
+
+    #[test]
+    fn test_stats_top_authors_empty_response() {
+        let json_file_path = "tests/wpcom/stats_top_authors/summarized-03-day-empty-response.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopAuthorsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with empty response");
+
+        assert_eq!(response.date, "2026-02-05");
+        assert_eq!(response.period, Some("day".to_string()));
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert!(summary.authors.is_empty());
+    }
+
+    #[test]
+    fn test_stats_top_authors_with_null_values() {
+        let json_file_path = "tests/wpcom/stats_top_authors/summarized-04-day-with-nulls.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsTopAuthorsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with null values");
+
+        assert_eq!(response.date, "2026-02-05");
+
+        let summary = response
+            .summary
+            .as_ref()
+            .expect("Summary should be present");
+        assert_eq!(summary.authors.len(), 2);
+
+        // First author: null avatar, null follow_data, null other_views, empty posts
+        let null_author = &summary.authors[0];
+        assert_eq!(null_author.name, "Null Author");
+        assert!(null_author.avatar.is_none());
+        assert_eq!(null_author.views, 100);
+        assert!(null_author.posts.is_empty());
+        assert!(null_author.follow_data.is_none());
+        assert!(null_author.other_views.is_none());
+
+        // Second author: has avatar, follow_data with null fields, post with null title/url
+        let partial_author = &summary.authors[1];
+        assert_eq!(partial_author.name, "Partial Author");
+        assert!(partial_author.avatar.is_some());
+        assert_eq!(partial_author.views, 50);
+        assert_eq!(partial_author.posts.len(), 1);
+        assert!(partial_author.posts[0].title.is_none());
+        assert!(partial_author.posts[0].url.is_none());
+
+        let follow_data = partial_author
+            .follow_data
+            .as_ref()
+            .expect("Follow data should be present");
+        assert!(follow_data.follow_type.is_none());
+        assert!(follow_data.params.is_none());
+
+        assert!(partial_author.author_id.is_none());
+        assert_eq!(partial_author.other_views, Some(0));
     }
 }
