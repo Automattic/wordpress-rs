@@ -77,6 +77,20 @@ pub struct JetpackConnectionUser {
     pub is_connected: bool,
     pub is_master: bool,
     pub blog_id: Option<WpComSiteId>,
+    #[serde(default, deserialize_with = "wp_serde_helper::treat_error_as_none")]
+    pub wpcom_user: Option<JetpackWpComUser>,
+}
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct JetpackWpComUser {
+    #[serde(rename = "ID")]
+    pub id: i64,
+    pub login: String,
+    pub email: String,
+    pub display_name: String,
+    pub site_count: i64,
+    #[serde(default, deserialize_with = "wp_serde_helper::deserialize_false_or_string")]
+    pub avatar: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
@@ -353,10 +367,54 @@ mod test {
         let connection_data = serde_json::from_str::<JetpackConnectionData>(json).unwrap();
         assert_eq!(connection_data.current_user.id, UserId(2));
         assert_eq!(connection_data.current_user.username, "other");
+        assert!(connection_data.current_user.wpcom_user.is_none());
         assert_eq!(
             connection_data.current_user.blog_id,
             Some(WpComSiteId(2416127))
         );
         assert_eq!(connection_data.connection_owner, Some("demo".to_string()));
+    }
+
+    #[test]
+    fn test_parsing_connection_data_with_wpcom_user() {
+        let json = r#"
+        {
+            "currentUser": {
+                "isConnected": true,
+                "isMaster": true,
+                "username": "testuser",
+                "id": 1,
+                "blogId": 12345678,
+                "wpcomUser": {
+                    "ID": 98765432,
+                    "login": "testlogin",
+                    "email": "test@example.com",
+                    "display_name": "Test User",
+                    "text_direction": "ltr",
+                    "site_count": 5,
+                    "jetpack_connect": "",
+                    "color_scheme": "classic-dark",
+                    "sidebar_collapsed": false,
+                    "user_locale": "en",
+                    "user_currency": "USD",
+                    "avatar": "https://secure.gravatar.com/avatar/abc123?s=64&d=mm&r=g"
+                },
+                "gravatar": "https://secure.gravatar.com/avatar/def456?s=96&d=mm&r=g",
+                "permissions": {}
+            },
+            "connectionOwner": "testuser"
+        }
+        "#;
+        let connection_data = serde_json::from_str::<JetpackConnectionData>(json).unwrap();
+        let wpcom_user = connection_data.current_user.wpcom_user.unwrap();
+        assert_eq!(wpcom_user.id, 98765432);
+        assert_eq!(wpcom_user.login, "testlogin");
+        assert_eq!(wpcom_user.email, "test@example.com");
+        assert_eq!(wpcom_user.display_name, "Test User");
+        assert_eq!(wpcom_user.site_count, 5);
+        assert_eq!(
+            wpcom_user.avatar,
+            Some("https://secure.gravatar.com/avatar/abc123?s=64&d=mm&r=g".to_string())
+        );
     }
 }

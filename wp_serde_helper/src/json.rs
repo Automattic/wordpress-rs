@@ -1,9 +1,18 @@
 use serde::{
-    Serialize, Serializer,
+    Deserialize, Serialize, Serializer,
     de::{self, DeserializeOwned},
     ser,
 };
 use std::{fmt, marker::PhantomData};
+
+pub fn treat_error_as_none<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: DeserializeOwned,
+    D: de::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value(value).ok())
+}
 
 /// Serialize a value as a JSON string embedded within the parent JSON structure.
 ///
@@ -165,5 +174,45 @@ mod tests {
     fn test_deserialize_from_string_of_json_array_errors(#[case] test_case: &str) {
         let result: Result<StringOfJsonArray, serde_json::Error> = serde_json::from_str(test_case);
         assert!(result.is_err(), "The deserializer should emit an error");
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct TreatErrorAsNone {
+        #[serde(default, deserialize_with = "treat_error_as_none")]
+        inner: Option<Inner>,
+    }
+
+    #[test]
+    fn test_treat_error_as_none_success() {
+        let json = r#"{"inner": {"name": "test", "value": 42}}"#;
+        let result: TreatErrorAsNone = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            result.inner,
+            Some(Inner {
+                name: "test".to_string(),
+                value: 42
+            })
+        );
+    }
+
+    #[test]
+    fn test_treat_error_as_none_missing_field() {
+        let json = r#"{"inner": {"name": "test"}}"#;
+        let result: TreatErrorAsNone = serde_json::from_str(json).unwrap();
+        assert_eq!(result.inner, None);
+    }
+
+    #[test]
+    fn test_treat_error_as_none_wrong_type() {
+        let json = r#"{"inner": {"name": 123, "value": 42}}"#;
+        let result: TreatErrorAsNone = serde_json::from_str(json).unwrap();
+        assert_eq!(result.inner, None);
+    }
+
+    #[test]
+    fn test_treat_error_as_none_empty_object() {
+        let json = r#"{"inner": {}}"#;
+        let result: TreatErrorAsNone = serde_json::from_str(json).unwrap();
+        assert_eq!(result.inner, None);
     }
 }
