@@ -25,6 +25,8 @@ val desktopResourcesPath = layout.buildDirectory.dir("desktopResources")
 val copyDesktopAppResources = tasks.register<Copy>("copyDesktopAppResources") {
     dependsOn(rootProject.tasks.named("copyDesktopJniLibs"))
     dependsOn(rootProject.tasks.named("copyTestCredentials"))
+    dependsOn(rootProject.tasks.named("copyTestMedia"))
+    dependsOn(rootProject.tasks.named("copySampleJSON"))
     from(rootProject.ext.get("jniLibsPath"))
     from(rootProject.ext.get("generatedTestResourcesPath"))
     into(desktopResourcesPath)
@@ -89,6 +91,7 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
     }
     buildTypes {
