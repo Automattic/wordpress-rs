@@ -170,7 +170,7 @@ class WpRequestExecutor @JvmOverloads constructor(
 
             return call.execute().use { response ->
                 WpNetworkResponse(
-                    body = response.body?.bytes() ?: ByteArray(0),
+                    body = response.body.bytes(),
                     statusCode = response.code.toUShort(),
                     responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
                     requestUrl = requestUrl,
