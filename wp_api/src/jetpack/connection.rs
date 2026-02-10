@@ -89,7 +89,10 @@ pub struct JetpackWpComUser {
     pub email: String,
     pub display_name: String,
     pub site_count: i64,
-    #[serde(default, deserialize_with = "wp_serde_helper::deserialize_false_or_string")]
+    #[serde(
+        default,
+        deserialize_with = "wp_serde_helper::deserialize_false_or_string"
+    )]
     pub avatar: Option<String>,
 }
 
