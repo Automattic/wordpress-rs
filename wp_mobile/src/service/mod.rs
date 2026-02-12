@@ -1,7 +1,10 @@
 use crate::service::{post_types::PostTypeService, posts::PostService, sites::SiteService};
 use std::sync::Arc;
-use wp_api::prelude::{ApiUrlResolver, WpApiClient, WpApiClientDelegate};
-use wp_mobile_cache::WpApiCache;
+use wp_api::prelude::{
+    ApiUrlResolver, ParsedUrl, WpApiClient, WpApiClientDelegate, WpOrgSiteApiUrlResolver,
+};
+use wp_api::wp_com::{WpComBaseUrl, WpComSiteId, endpoint::WpComDotOrgApiUrlResolver};
+use wp_mobile_cache::{WpApiCache, db_types::db_site::DbSite};
 
 pub mod entity_state_service;
 pub mod metadata;
@@ -15,6 +18,9 @@ pub enum WpServiceError {
     #[error("Database error: {err_message}")]
     DatabaseError { err_message: String },
 
+    #[error("Invalid URL: {err_message}")]
+    InvalidUrl { err_message: String },
+
     #[error("Site not found in cache")]
     SiteNotFound,
 }
@@ -27,44 +33,27 @@ impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {
     }
 }
 
-/// Service for self-hosted WordPress sites
+/// Service for a WordPress site
 ///
 /// This service coordinates between the API client and cache for a specific
-/// self-hosted WordPress site. It provides access to domain-specific services
-/// like PostService, PostTypeService, CommentService, etc.
+/// WordPress site (self-hosted or WordPress.com). It provides access to
+/// domain-specific services like PostService, PostTypeService, etc.
 #[derive(uniffi::Object)]
-pub struct WpSelfHostedService {
+pub struct WpService {
     posts: Arc<PostService>,
     post_types: Arc<PostTypeService>,
     sites: Arc<SiteService>,
 }
 
-#[uniffi::export]
-impl WpSelfHostedService {
-    /// Create a new service for a self-hosted WordPress site
-    ///
-    /// This will look up the site in the cache or create it if it doesn't exist.
-    ///
-    /// # Arguments
-    /// * `site_url` - The base site URL (e.g., "https://example.com")
-    /// * `api_root` - The API root URL (e.g., "https://example.com/wp-json")
-    /// * `api_url_resolver` - URL resolver for building API endpoint URLs
-    /// * `delegate` - API client delegate with auth provider, request executor, etc.
-    /// * `cache` - The cache instance for database operations
-    #[uniffi::constructor]
-    pub fn new(
-        site_url: String,
-        api_root: String,
+impl WpService {
+    fn build_services(
         api_url_resolver: Arc<dyn ApiUrlResolver>,
         delegate: WpApiClientDelegate,
         cache: Arc<WpApiCache>,
-    ) -> Result<Self, WpServiceError> {
+        db_site: DbSite,
+        site_service: Arc<SiteService>,
+    ) -> Self {
         let api_client = Arc::new(WpApiClient::new(api_url_resolver, delegate));
-
-        // Get or create the DbSite
-        let db_site =
-            SiteService::get_or_create_self_hosted_site(cache.clone(), site_url, api_root)?;
-
         let db_site_arc = Arc::new(db_site);
 
         let posts = Arc::new(PostService::new(
@@ -72,18 +61,79 @@ impl WpSelfHostedService {
             db_site_arc.clone(),
             cache.clone(),
         ));
-        let post_types = Arc::new(PostTypeService::new(
-            api_client,
-            db_site_arc.clone(),
-            cache.clone(),
-        ));
-        let sites = Arc::new(SiteService::new(cache, db_site));
+        let post_types = Arc::new(PostTypeService::new(api_client, db_site_arc, cache));
 
-        Ok(Self {
+        Self {
             posts,
             post_types,
+            sites: site_service,
+        }
+    }
+}
+
+#[uniffi::export]
+impl WpService {
+    /// Create a new service for a self-hosted WordPress site
+    ///
+    /// This will look up the site in the cache or create it if it doesn't exist.
+    ///
+    /// # Arguments
+    /// * `site_url` - The base site URL (e.g., "https://example.com")
+    /// * `api_root` - The API root URL (e.g., "https://example.com/wp-json")
+    /// * `delegate` - API client delegate with auth provider, request executor, etc.
+    /// * `cache` - The cache instance for database operations
+    #[uniffi::constructor(name = "selfHosted")]
+    pub fn new_self_hosted(
+        site_url: String,
+        api_root: String,
+        delegate: WpApiClientDelegate,
+        cache: Arc<WpApiCache>,
+    ) -> Result<Self, WpServiceError> {
+        let api_root_url =
+            ParsedUrl::parse(&api_root).map_err(|e| WpServiceError::InvalidUrl {
+                err_message: e.to_string(),
+            })?;
+        let api_url_resolver: Arc<dyn ApiUrlResolver> =
+            Arc::new(WpOrgSiteApiUrlResolver::new(Arc::new(api_root_url)));
+        let db_site =
+            SiteService::get_or_create_self_hosted_site(cache.clone(), site_url, api_root)?;
+        let sites = Arc::new(SiteService::new(cache.clone(), db_site));
+        Ok(Self::build_services(
+            api_url_resolver,
+            delegate,
+            cache,
+            db_site,
             sites,
-        })
+        ))
+    }
+
+    /// Create a new service for a WordPress.com site
+    ///
+    /// This will look up the site in the cache or create it if it doesn't exist.
+    ///
+    /// # Arguments
+    /// * `site_id` - The WordPress.com site ID
+    /// * `delegate` - API client delegate with auth provider, request executor, etc.
+    /// * `cache` - The cache instance for database operations
+    #[uniffi::constructor(name = "wordpressCom")]
+    pub fn new_wordpress_com(
+        site_id: WpComSiteId,
+        delegate: WpApiClientDelegate,
+        cache: Arc<WpApiCache>,
+    ) -> Result<Self, WpServiceError> {
+        let api_url_resolver: Arc<dyn ApiUrlResolver> = Arc::new(WpComDotOrgApiUrlResolver::new(
+            site_id.to_string(),
+            WpComBaseUrl::default(),
+        ));
+        let db_site = SiteService::get_or_create_wordpress_com_site(cache.clone(), site_id)?;
+        let sites = Arc::new(SiteService::new(cache.clone(), db_site));
+        Ok(Self::build_services(
+            api_url_resolver,
+            delegate,
+            cache,
+            db_site,
+            sites,
+        ))
     }
 
     /// Get the post service for this WordPress site
