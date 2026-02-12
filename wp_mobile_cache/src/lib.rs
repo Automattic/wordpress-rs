@@ -95,6 +95,8 @@ pub enum DbTable {
     ListMetadataState,
     /// Entity state tracking (missing, fetching, cached, stale, failed)
     EntityState,
+    /// WordPress.com sites
+    WordPressComSites,
 }
 
 impl DbTable {
@@ -115,6 +117,7 @@ impl DbTable {
             DbTable::ListMetadataItems => "list_metadata_items",
             DbTable::ListMetadataState => "list_metadata_state",
             DbTable::EntityState => "entity_state",
+            DbTable::WordPressComSites => "wordpress_com_sites",
         }
     }
 }
@@ -148,6 +151,7 @@ impl TryFrom<&str> for DbTable {
             "list_metadata_items" => Ok(DbTable::ListMetadataItems),
             "list_metadata_state" => Ok(DbTable::ListMetadataState),
             "entity_state" => Ok(DbTable::EntityState),
+            "wordpress_com_sites" => Ok(DbTable::WordPressComSites),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -408,7 +412,7 @@ impl From<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 9] = [
+static MIGRATION_QUERIES: [&str; 10] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -418,6 +422,7 @@ static MIGRATION_QUERIES: [&str; 9] = [
     include_str!("../migrations/0007-create-list-metadata-tables.sql"),
     include_str!("../migrations/0008-create-post-types-table.sql"),
     include_str!("../migrations/0009-create-entity-state-table.sql"),
+    include_str!("../migrations/0010-create-wordpress-com-sites-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {

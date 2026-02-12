@@ -4,12 +4,14 @@ use crate::{
         db_site::{DbSite, DbSiteType},
         row_ext::RowExt,
         self_hosted_site::{DbSelfHostedSite, DbSelfHostedSiteColumn, SelfHostedSite},
+        wordpress_com_site::{DbWordPressComSite, DbWordPressComSiteColumn, WordPressComSite},
     },
     entity::{EntityId, FullEntity},
     repository::{QueryExecutor, TransactionManager},
 };
 use rusqlite::OptionalExtension;
 use std::sync::Arc;
+use wp_api::wp_com::WpComSiteId;
 
 pub struct SiteRepository;
 
@@ -227,7 +229,11 @@ impl SiteRepository {
                 tx.execute(&sql, [site.mapped_site_id])?;
             }
             DbSiteType::WordPressCom => {
-                panic!("WordPress.com site deletion is not yet implemented")
+                let sql = format!(
+                    "DELETE FROM {} WHERE rowid = ?",
+                    DbTable::WordPressComSites.table_name()
+                );
+                tx.execute(&sql, [site.mapped_site_id])?;
             }
         };
 
@@ -259,13 +265,192 @@ impl SiteRepository {
             None => Ok(false),
         }
     }
+
+    /// Upsert a WordPress.com site and return its EntityId (atomic transaction).
+    ///
+    /// If a site with the given site_id already exists, reuses it. Otherwise creates a new one.
+    /// Uses SQLite's RETURNING clause to get the inserted/updated rowid.
+    pub fn upsert_wordpress_com_site(
+        &self,
+        transaction_manager: &mut impl TransactionManager,
+        site: &WordPressComSite,
+    ) -> Result<EntityId, SqliteDbError> {
+        let tx = transaction_manager.transaction()?;
+
+        let wp_com_site_id: RowId = {
+            let sql = format!(
+                "INSERT INTO {} (site_id) VALUES (?)
+                 ON CONFLICT(site_id) DO UPDATE SET site_id = excluded.site_id
+                 RETURNING rowid",
+                DbTable::WordPressComSites.table_name()
+            );
+
+            let mut stmt = tx.prepare(&sql)?;
+            stmt.query_row([site.site_id.0], |row| row.get(0))
+                .map_err(SqliteDbError::from)?
+        };
+
+        let site_id: RowId = {
+            let sql = format!(
+                "INSERT INTO {} (site_type, mapped_site_id) VALUES (?, ?)
+                 ON CONFLICT(site_type, mapped_site_id) DO UPDATE SET
+                    site_type = excluded.site_type
+                 RETURNING rowid",
+                DbTable::DbSites.table_name()
+            );
+
+            let mut stmt = tx.prepare(&sql)?;
+            stmt.query_row((DbSiteType::WordPressCom, wp_com_site_id), |row| row.get(0))
+                .map_err(SqliteDbError::from)?
+        };
+
+        let db_site = DbSite {
+            row_id: site_id,
+            site_type: DbSiteType::WordPressCom,
+            mapped_site_id: wp_com_site_id,
+        };
+
+        tx.commit().map_err(SqliteDbError::from)?;
+        Ok(EntityId::new(
+            db_site,
+            DbTable::WordPressComSites,
+            wp_com_site_id,
+        ))
+    }
+
+    /// Select a WordPress.com site by its EntityId.
+    ///
+    /// Returns the site data paired with its EntityId.
+    /// Returns an error if the EntityId's table name doesn't match "wordpress_com_sites".
+    /// Returns None if the site doesn't exist or isn't a WordPress.com site.
+    pub fn select_wordpress_com_site(
+        &self,
+        executor: &impl QueryExecutor,
+        entity_id: &EntityId,
+    ) -> Result<Option<FullEntity<DbWordPressComSite>>, SqliteDbError> {
+        entity_id.validate_table(DbTable::WordPressComSites)?;
+
+        if entity_id.db_site.site_type != DbSiteType::WordPressCom {
+            return Ok(None);
+        }
+
+        let sql = format!(
+            "SELECT * FROM {} WHERE rowid = ?",
+            DbTable::WordPressComSites.table_name()
+        );
+        let mut stmt = executor.prepare(&sql)?;
+
+        let db_wp_com_site = stmt
+            .query_row([entity_id.db_site.mapped_site_id], |row| {
+                Ok(DbWordPressComSite {
+                    row_id: row.get_column(DbWordPressComSiteColumn::Rowid)?,
+                    site_id: WpComSiteId(row.get_column(DbWordPressComSiteColumn::SiteId)?),
+                })
+            })
+            .optional()
+            .map_err(SqliteDbError::from)?;
+
+        Ok(db_wp_com_site.map(|db_wp_com_site| {
+            let entity_id = Arc::new(*entity_id);
+            FullEntity::new(entity_id, db_wp_com_site)
+        }))
+    }
+
+    /// Select a WordPress.com site by site_id.
+    ///
+    /// Returns the site data (DbSite and DbWordPressComSite) paired with its EntityId.
+    pub fn select_wordpress_com_site_by_site_id(
+        &self,
+        executor: &impl QueryExecutor,
+        site_id: WpComSiteId,
+    ) -> Result<Option<FullEntity<(DbSite, DbWordPressComSite)>>, SqliteDbError> {
+        let sql = format!(
+            "SELECT * FROM {} WHERE site_id = ?",
+            DbTable::WordPressComSites.table_name()
+        );
+        let mut stmt = executor.prepare(&sql)?;
+
+        let wp_com_site: Option<DbWordPressComSite> = stmt
+            .query_row([site_id.0], |row| {
+                Ok(DbWordPressComSite {
+                    row_id: row.get_column(DbWordPressComSiteColumn::Rowid)?,
+                    site_id: WpComSiteId(row.get_column(DbWordPressComSiteColumn::SiteId)?),
+                })
+            })
+            .optional()
+            .map_err(SqliteDbError::from)?;
+
+        let Some(wp_com_site) = wp_com_site else {
+            return Ok(None);
+        };
+
+        let sql = format!(
+            "SELECT rowid, site_type, mapped_site_id FROM {}
+             WHERE site_type = ? AND mapped_site_id = ?",
+            DbTable::DbSites.table_name()
+        );
+        let mut stmt = executor.prepare(&sql)?;
+
+        let db_site: Option<DbSite> = stmt
+            .query_row((DbSiteType::WordPressCom, wp_com_site.row_id), |row| {
+                Ok(DbSite {
+                    row_id: row.get(0)?,
+                    site_type: row.get(1)?,
+                    mapped_site_id: row.get(2)?,
+                })
+            })
+            .optional()
+            .map_err(SqliteDbError::from)?;
+
+        Ok(db_site.map(|db_site| {
+            let entity_id = Arc::new(EntityId::new(
+                db_site,
+                DbTable::WordPressComSites,
+                wp_com_site.row_id,
+            ));
+            FullEntity::new(entity_id, (db_site, wp_com_site))
+        }))
+    }
+
+    /// Delete a WordPress.com site by site_id (convenience wrapper).
+    ///
+    /// Returns `true` if a site was deleted, `false` if no site with that site_id exists.
+    pub fn delete_wordpress_com_site_by_site_id(
+        &self,
+        transaction_manager: &mut impl TransactionManager,
+        site_id: WpComSiteId,
+    ) -> Result<bool, SqliteDbError> {
+        let site_data = self.select_wordpress_com_site_by_site_id(transaction_manager, site_id)?;
+
+        match site_data {
+            Some(full_entity) => self.delete_site(transaction_manager, &full_entity.data.0),
+            None => Ok(false),
+        }
+    }
+
+    /// Count all WordPress.com sites in the database.
+    ///
+    /// This is primarily useful for testing to verify database state.
+    pub fn count_all_wordpress_com_sites(
+        &self,
+        executor: &impl QueryExecutor,
+    ) -> Result<usize, SqliteDbError> {
+        let sql = format!(
+            "SELECT COUNT(*) FROM {}",
+            DbTable::WordPressComSites.table_name()
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let count: i64 = stmt.query_row([], |row| row.get(0))?;
+        Ok(count as usize)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        MigrationManager, db_types::row_ext::ColumnIndex, entity::EntityId,
+        MigrationManager, db_types::row_ext::ColumnIndex,
+        db_types::wordpress_com_site::DbWordPressComSiteColumn, entity::EntityId,
         test_fixtures::get_table_column_names,
     };
     use rstest::*;
@@ -666,5 +851,248 @@ mod tests {
             .delete_self_hosted_site_by_url(&mut test_conn, "https://non-existent.com")
             .expect("Failed to delete site by URL");
         assert!(!deleted, "Should return false when site doesn't exist");
+    }
+
+    // WordPress.com site tests
+
+    #[rstest]
+    fn test_wordpress_com_site_column_enum_matches_schema(test_conn: Connection) {
+        use DbWordPressComSiteColumn::*;
+
+        let columns = get_table_column_names(&test_conn, "wordpress_com_sites");
+
+        assert_eq!(columns[Rowid.as_index()], "rowid");
+        assert_eq!(columns[SiteId.as_index()], "site_id");
+
+        assert_eq!(columns.len(), SiteId.as_index() + 1);
+    }
+
+    #[rstest]
+    fn test_upsert_wordpress_com_site_inserts_new_site(mut test_conn: Connection) {
+        let repo = SiteRepository;
+        let site = WordPressComSite {
+            site_id: WpComSiteId(12345),
+        };
+
+        let entity_id = repo
+            .upsert_wordpress_com_site(&mut test_conn, &site)
+            .expect("Failed to upsert site");
+
+        assert_eq!(entity_id.table, DbTable::WordPressComSites);
+        assert_eq!(entity_id.db_site.site_type, DbSiteType::WordPressCom);
+        assert_eq!(entity_id.db_site.mapped_site_id, entity_id.rowid);
+    }
+
+    #[rstest]
+    fn test_upsert_wordpress_com_site_does_not_create_duplicates(mut test_conn: Connection) {
+        let repo = SiteRepository;
+        let site = WordPressComSite {
+            site_id: WpComSiteId(12345),
+        };
+
+        let entity_id1 = repo
+            .upsert_wordpress_com_site(&mut test_conn, &site)
+            .expect("First upsert failed");
+        let entity_id2 = repo
+            .upsert_wordpress_com_site(&mut test_conn, &site)
+            .expect("Second upsert failed");
+        let entity_id3 = repo
+            .upsert_wordpress_com_site(&mut test_conn, &site)
+            .expect("Third upsert failed");
+
+        assert_eq!(entity_id1, entity_id2);
+        assert_eq!(entity_id2, entity_id3);
+
+        let count = repo
+            .count_all_db_sites(&test_conn)
+            .expect("Failed to count db_sites");
+        assert_eq!(
+            count, 1,
+            "Multiple upserts should not create duplicate sites table entries"
+        );
+    }
+
+    #[rstest]
+    fn test_select_wordpress_com_site_by_entity_id(mut test_conn: Connection) {
+        let repo = SiteRepository;
+        let site = WordPressComSite {
+            site_id: WpComSiteId(12345),
+        };
+
+        let entity_id = repo
+            .upsert_wordpress_com_site(&mut test_conn, &site)
+            .expect("Failed to upsert site");
+
+        let retrieved = repo
+            .select_wordpress_com_site(&test_conn, &entity_id)
+            .expect("Failed to select site")
+            .expect("Site should exist");
+
+        assert_eq!(retrieved.data.site_id, site.site_id);
+    }
+
+    #[rstest]
+    fn test_select_wordpress_com_site_returns_none_for_wrong_site_type(test_conn: Connection) {
+        let repo = SiteRepository;
+
+        let non_wp_com_site = DbSite {
+            row_id: RowId(999),
+            site_type: DbSiteType::SelfHosted,
+            mapped_site_id: RowId(999),
+        };
+
+        let entity_id = EntityId::new(non_wp_com_site, DbTable::WordPressComSites, RowId(999));
+
+        let result = repo
+            .select_wordpress_com_site(&test_conn, &entity_id)
+            .expect("Query should succeed");
+
+        assert_eq!(
+            result, None,
+            "Should return None for non-WordPressCom site type"
+        );
+    }
+
+    #[rstest]
+    fn test_select_wordpress_com_site_by_site_id(mut test_conn: Connection) {
+        let repo = SiteRepository;
+        let site = WordPressComSite {
+            site_id: WpComSiteId(12345),
+        };
+
+        let entity_id = repo
+            .upsert_wordpress_com_site(&mut test_conn, &site)
+            .expect("Failed to upsert site");
+
+        let retrieved = repo
+            .select_wordpress_com_site_by_site_id(&test_conn, site.site_id)
+            .expect("Failed to select site")
+            .expect("Site should exist");
+
+        assert_eq!(retrieved.entity_id.as_ref(), &entity_id);
+        assert_eq!(retrieved.data.0, entity_id.db_site);
+        assert_eq!(retrieved.data.1.site_id, site.site_id);
+    }
+
+    #[rstest]
+    fn test_select_wordpress_com_site_by_site_id_returns_none_for_non_existent(
+        test_conn: Connection,
+    ) {
+        let repo = SiteRepository;
+
+        let result = repo
+            .select_wordpress_com_site_by_site_id(&test_conn, WpComSiteId(99999))
+            .expect("Query should succeed");
+
+        assert_eq!(result, None, "Should return None for non-existent site_id");
+    }
+
+    #[rstest]
+    fn test_delete_wordpress_com_site_removes_both_tables(mut test_conn: Connection) {
+        let repo = SiteRepository;
+        let site = WordPressComSite {
+            site_id: WpComSiteId(12345),
+        };
+
+        let entity_id = repo
+            .upsert_wordpress_com_site(&mut test_conn, &site)
+            .expect("Failed to upsert site");
+
+        let count_sites = repo
+            .count_all_db_sites(&test_conn)
+            .expect("Failed to count db_sites");
+        let count_wp_com = repo
+            .count_all_wordpress_com_sites(&test_conn)
+            .expect("Failed to count wordpress_com_sites");
+        assert_eq!(count_sites, 1);
+        assert_eq!(count_wp_com, 1);
+
+        let deleted = repo
+            .delete_site(&mut test_conn, &entity_id.db_site)
+            .expect("Failed to delete site");
+        assert!(deleted, "Should return true when site is deleted");
+
+        let count_sites_after = repo
+            .count_all_db_sites(&test_conn)
+            .expect("Failed to count db_sites after delete");
+        let count_wp_com_after = repo
+            .count_all_wordpress_com_sites(&test_conn)
+            .expect("Failed to count wordpress_com_sites after delete");
+        assert_eq!(
+            count_sites_after, 0,
+            "Site should be deleted from sites table"
+        );
+        assert_eq!(
+            count_wp_com_after, 0,
+            "Site should be deleted from wordpress_com_sites table"
+        );
+    }
+
+    #[rstest]
+    fn test_delete_wordpress_com_site_by_site_id(mut test_conn: Connection) {
+        let repo = SiteRepository;
+        let site_id = WpComSiteId(12345);
+        let site = WordPressComSite { site_id };
+
+        repo.upsert_wordpress_com_site(&mut test_conn, &site)
+            .expect("Failed to upsert site");
+
+        let deleted = repo
+            .delete_wordpress_com_site_by_site_id(&mut test_conn, site_id)
+            .expect("Failed to delete site by site_id");
+        assert!(deleted, "Should return true when site is deleted");
+
+        let after_delete = repo
+            .select_wordpress_com_site_by_site_id(&test_conn, site_id)
+            .expect("Failed to select site");
+        assert_eq!(after_delete, None, "Site should be deleted");
+    }
+
+    #[rstest]
+    fn test_delete_wordpress_com_site_by_site_id_returns_false_for_non_existent(
+        mut test_conn: Connection,
+    ) {
+        let repo = SiteRepository;
+
+        let deleted = repo
+            .delete_wordpress_com_site_by_site_id(&mut test_conn, WpComSiteId(99999))
+            .expect("Failed to delete site by site_id");
+        assert!(!deleted, "Should return false when site doesn't exist");
+    }
+
+    #[rstest]
+    fn test_self_hosted_and_wordpress_com_sites_can_coexist(mut test_conn: Connection) {
+        let repo = SiteRepository;
+
+        let self_hosted = SelfHostedSite {
+            url: "https://example.com".to_string(),
+            api_root: "https://example.com/wp-json".to_string(),
+        };
+        let wp_com = WordPressComSite {
+            site_id: WpComSiteId(12345),
+        };
+
+        let self_hosted_id = repo
+            .upsert_self_hosted_site(&mut test_conn, &self_hosted)
+            .expect("Failed to upsert self-hosted site");
+        let wp_com_id = repo
+            .upsert_wordpress_com_site(&mut test_conn, &wp_com)
+            .expect("Failed to upsert WP.com site");
+
+        assert_ne!(self_hosted_id, wp_com_id);
+
+        let count = repo
+            .count_all_db_sites(&test_conn)
+            .expect("Failed to count db_sites");
+        assert_eq!(count, 2, "Both sites should exist");
+
+        let count_self_hosted = repo
+            .count_all_self_hosted_sites(&test_conn)
+            .expect("Failed to count self_hosted_sites");
+        let count_wp_com = repo
+            .count_all_wordpress_com_sites(&test_conn)
+            .expect("Failed to count wordpress_com_sites");
+        assert_eq!(count_self_hosted, 1);
+        assert_eq!(count_wp_com, 1);
     }
 }
