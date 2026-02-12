@@ -1,11 +1,18 @@
 use async_trait::async_trait;
+use integration_test_credentials::WpComTestCredentials;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
-use wp_api::{prelude::*, wp_com::client::WpComApiClient};
+use wp_api::{
+    prelude::*,
+    wp_com::{WpComSiteId, client::WpComApiClient},
+};
+use wp_mobile::service::WpService;
+use wp_mobile_cache::WpApiCache;
 
 pub struct TestContext {
     pub client: WpComApiClient,
+    pub service: WpService,
     pub token: String,
     pub runtime: Runtime,
 }
@@ -34,10 +41,21 @@ impl TestContext {
             app_notifier: Arc::new(EmptyAppNotifier),
         };
 
-        let client = WpComApiClient::new(delegate);
+        let client = WpComApiClient::new(delegate.clone());
+
+        let site_id = WpComTestCredentials::instance().site_id;
+
+        let cache = Arc::new(WpApiCache::new(None).expect("Failed to create in-memory cache"));
+        cache
+            .perform_migrations()
+            .expect("Migrations should succeed");
+
+        let service = WpService::new_wordpress_com(WpComSiteId(site_id), delegate, cache.clone())
+            .expect("Failed to create WpService");
 
         Self {
             client,
+            service,
             token,
             runtime,
         }

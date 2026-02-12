@@ -13,6 +13,7 @@ mod stats_top_posts_tests;
 mod support_bot_tests;
 mod support_eligibility_test;
 mod support_tickets_test;
+mod wp_service_tests;
 
 use context::TestContext;
 
@@ -46,5 +47,6 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(support_eligibility_test::tests(Arc::clone(&ctx)));
     tests.extend(support_tickets_test::tests(Arc::clone(&ctx)));
     tests.extend(stats_top_posts_tests::tests(Arc::clone(&ctx)));
+    tests.extend(wp_service_tests::tests(Arc::clone(&ctx)));
     tests
 }
