@@ -82,6 +82,9 @@ pub struct SparseTheme {
     #[WpContext(edit, embed, view)]
     #[WpContextualOption]
     pub theme_supports: Option<HashMap<ThemeSupports, ThemeSupportsData>>,
+    #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
+    pub default_template_types: Option<Vec<ThemeDefaultTemplateType>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, uniffi::Enum)]
@@ -90,6 +93,13 @@ pub enum ThemeSupportsData {
     Bool(bool),
     VecString(Vec<String>),
     Json(JsonValue),
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ThemeDefaultTemplateType {
+    pub title: String,
+    pub description: String,
+    pub slug: String,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
