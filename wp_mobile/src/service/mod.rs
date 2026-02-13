@@ -89,10 +89,9 @@ impl WpService {
         delegate: WpApiClientDelegate,
         cache: Arc<WpApiCache>,
     ) -> Result<Self, WpServiceError> {
-        let api_root_url =
-            ParsedUrl::parse(&api_root).map_err(|e| WpServiceError::InvalidUrl {
-                err_message: e.to_string(),
-            })?;
+        let api_root_url = ParsedUrl::parse(&api_root).map_err(|e| WpServiceError::InvalidUrl {
+            err_message: e.to_string(),
+        })?;
         let api_url_resolver: Arc<dyn ApiUrlResolver> =
             Arc::new(WpOrgSiteApiUrlResolver::new(Arc::new(api_root_url)));
         let db_site =
