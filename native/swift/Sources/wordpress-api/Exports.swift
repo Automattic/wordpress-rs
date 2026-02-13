@@ -32,7 +32,7 @@ public typealias UserCapability = WordPressAPIInternal.UserCapability
 public typealias UserRole = WordPressAPIInternal.UserRole
 
 // MARK: - Service Layer
-public typealias WpSelfHostedService = WordPressAPIInternal.WpSelfHostedService
+public typealias WpService = WordPressAPIInternal.WpService
 public typealias AnyPostFilter = WordPressAPIInternal.AnyPostFilter
 public typealias WpApiCache = WordPressAPIInternal.WpApiCache
 
