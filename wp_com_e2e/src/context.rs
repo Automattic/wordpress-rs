@@ -44,6 +44,8 @@ impl TestContext {
         let client = WpComApiClient::new(delegate.clone());
 
         let site_id = WpComTestCredentials::instance().site_id;
+        // Use a test site on the test account used in CI.
+        let site_id = if site_id == 0 { 229889220 } else { site_id };
 
         let cache = Arc::new(WpApiCache::new(None).expect("Failed to create in-memory cache"));
         cache
