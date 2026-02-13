@@ -14,7 +14,7 @@ import rs.wordpress.cache.kotlin.getObservablePostCollectionWithEditContext
 import uniffi.wp_mobile.AnyPostFilter
 import uniffi.wp_mobile.MockPostService
 import uniffi.wp_mobile.StressTestHandle
-import uniffi.wp_mobile.WpSelfHostedService
+import uniffi.wp_mobile.WpService
 import kotlin.math.roundToInt
 
 data class PerformanceMetrics(
@@ -28,7 +28,7 @@ data class PerformanceMetrics(
 
 class StressTestViewModel(
     private val mockPostService: MockPostService,
-    private val selfHostedService: WpSelfHostedService,
+    private val selfHostedService: WpService,
     private val cache: WordPressApiCache
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

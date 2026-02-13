@@ -2,15 +2,13 @@ package rs.wordpress.api.kotlin
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.UserId
 import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
-import uniffi.wp_api.WpOrgSiteApiUrlResolver
 import uniffi.wp_mobile.MockPostService
-import uniffi.wp_mobile.WpSelfHostedService
+import uniffi.wp_mobile.WpService
 import rs.wordpress.cache.kotlin.WordPressApiCache
 
 const val FIRST_USER_ID: UserId = 1
@@ -32,7 +30,7 @@ fun defaultApiClient(): WpApiClient {
 }
 
 data class TestServiceContext(
-    val service: WpSelfHostedService,
+    val service: WpService,
     val mockPostService: MockPostService
 )
 
@@ -54,10 +52,9 @@ fun createTestServiceContext(): TestServiceContext {
     val siteUrl = apiRootUrl.removeSuffix("/wp-json")
 
     // Create self-hosted service
-    val service = WpSelfHostedService(
+    val service = WpService.selfHosted(
         siteUrl = siteUrl,
         apiRoot = apiRootUrl,
-        apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(apiRootUrl)),
         delegate = WpApiClientDelegate(
             authProvider,
             requestExecutor = WpRequestExecutor(emptyList()),

@@ -15,7 +15,7 @@ import uniffi.wp_mobile.AnyPostFilter
 import uniffi.wp_mobile.FetchResult
 import uniffi.wp_mobile.FullEntityAnyPostWithEditContext
 import uniffi.wp_mobile.PostCollectionWithEditContext
-import uniffi.wp_mobile.WpSelfHostedService
+import uniffi.wp_mobile.WpService
 
 /**
  * UI state for the post collection screen
@@ -50,7 +50,7 @@ data class CollectionState(
 }
 
 class PostCollectionViewModel(
-    private val selfHostedService: WpSelfHostedService
+    private val selfHostedService: WpService
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 

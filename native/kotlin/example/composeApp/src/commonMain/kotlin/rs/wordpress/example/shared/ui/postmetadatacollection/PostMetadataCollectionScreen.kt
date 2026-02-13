@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.koinInject
 import uniffi.wp_mobile.PostItemState
-import uniffi.wp_mobile.WpSelfHostedService
+import uniffi.wp_mobile.WpService
 import uniffi.wp_mobile_cache.ListState
 
 @Composable
@@ -44,7 +44,7 @@ import uniffi.wp_mobile_cache.ListState
 fun PostMetadataCollectionScreen(
     postTypeSlug: String = "post",
     viewModel: PostMetadataCollectionViewModel = run {
-        val service = koinInject<WpSelfHostedService>()
+        val service = koinInject<WpService>()
         PostMetadataCollectionViewModel(service, postTypeSlug)
     },
     onBackClicked: (() -> Unit)? = null
