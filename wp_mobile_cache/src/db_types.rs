@@ -6,3 +6,4 @@ pub mod post_types;
 pub mod posts;
 pub mod row_ext;
 pub mod self_hosted_site;
+pub mod wordpress_com_site;

@@ -14,13 +14,12 @@ import rs.wordpress.example.shared.ui.posttypes.PostTypesViewModel
 import rs.wordpress.example.shared.ui.stresstest.StressTestViewModel
 import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
-import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAuthenticationProvider
-import uniffi.wp_api.WpOrgSiteApiUrlResolver
 import uniffi.wp_mobile.MockPostService
-import uniffi.wp_mobile.WpSelfHostedService
+import uniffi.wp_mobile.SiteInfo
+import uniffi.wp_mobile.WpService
 import java.io.File
 
 val authModule = module {
@@ -52,15 +51,20 @@ val cacheModule = module {
 val mockServiceModule = module {
     single {
         val cache = get<WordPressApiCache>()
-        val selfHostedService = get<WpSelfHostedService>()
+        val wpService = get<WpService>()
 
-        // Use the exact same site_url and api_root as WpSelfHostedService
-        val siteInfo = selfHostedService.sites().getCurrentSiteInfo()
+        // Use the exact same site_url and api_root as WpService
+        val siteInfo = wpService.sites().getCurrentSiteInfo()
+
+        val (siteUrl, apiRoot) = when (siteInfo) {
+            is SiteInfo.SelfHosted -> siteInfo.siteUrl to siteInfo.apiRoot
+            is SiteInfo.WordPressCom -> error("MockPostService requires a self-hosted site")
+        }
 
         MockPostService(
             cache.cache,
-            siteInfo.siteUrl,
-            siteInfo.apiRoot
+            siteUrl,
+            apiRoot
         )
     }
 }
@@ -83,12 +87,9 @@ val selfHostedServiceModule = module {
         val siteUrl = localTestSiteUrl().siteUrl
         val apiRoot = "$siteUrl/wp-json"
 
-        WpSelfHostedService(
+        WpService.selfHosted(
             siteUrl = siteUrl,
             apiRoot = apiRoot,
-            apiUrlResolver = WpOrgSiteApiUrlResolver(
-                apiRootUrl = ParsedUrl.parse(apiRoot)
-            ),
             delegate = WpApiClientDelegate(
                 authProvider,
                 requestExecutor = WpRequestExecutor(emptyList()),

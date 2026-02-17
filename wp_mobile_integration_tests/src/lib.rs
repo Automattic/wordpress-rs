@@ -6,7 +6,7 @@ pub use serial_test::{parallel, serial};
 use url::Url;
 use wp_api::{EmptyAppNotifier, prelude::*, reqwest_request_executor::ReqwestRequestExecutor};
 pub use wp_api_integration_tests::backend::{Backend, RestoreServer};
-use wp_mobile::service::WpSelfHostedService;
+use wp_mobile::service::WpService;
 use wp_mobile_cache::WpApiCache;
 
 pub fn test_site_url() -> ParsedUrl {
@@ -36,7 +36,7 @@ pub fn api_client_delegate() -> WpApiClientDelegate {
 
 pub struct TestContext {
     pub api: WpApiClient,
-    pub service: WpSelfHostedService,
+    pub service: WpService,
     pub cache: Arc<WpApiCache>,
 }
 
@@ -46,14 +46,13 @@ pub fn create_test_context() -> TestContext {
         .perform_migrations()
         .expect("Migrations should succeed");
 
-    let service = WpSelfHostedService::new(
+    let service = WpService::new_self_hosted(
         TestCredentials::instance().site_url.to_string(),
         test_site_url().to_string(),
-        test_site_api_url_resolver(),
         api_client_delegate(),
         cache.clone(),
     )
-    .expect("Failed to create WpSelfHostedService");
+    .expect("Failed to create WpService");
 
     let api = WpApiClient::new(test_site_api_url_resolver(), api_client_delegate());
 
@@ -92,14 +91,13 @@ pub fn create_test_context_with_site(
         .perform_migrations()
         .expect("Migrations should succeed");
 
-    let service = WpSelfHostedService::new(
+    let service = WpService::new_self_hosted(
         site_url.to_string(),
         api_root,
-        api_url_resolver.clone(),
         delegate.clone(),
         cache.clone(),
     )
-    .expect("Failed to create WpSelfHostedService");
+    .expect("Failed to create WpService");
 
     let api = WpApiClient::new(api_url_resolver.clone(), delegate.clone());
 

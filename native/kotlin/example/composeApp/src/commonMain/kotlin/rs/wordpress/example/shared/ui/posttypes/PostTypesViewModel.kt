@@ -12,7 +12,7 @@ import rs.wordpress.cache.kotlin.ObservableCollection
 import rs.wordpress.cache.kotlin.getObservablePostTypeCollectionWithEditContext
 import uniffi.wp_mobile.FullEntityPostTypeDetailsWithEditContext
 import uniffi.wp_mobile.PostTypeCollectionWithEditContext
-import uniffi.wp_mobile.WpSelfHostedService
+import uniffi.wp_mobile.WpService
 
 /**
  * UI state for the post types screen
@@ -48,7 +48,7 @@ data class PostTypeDisplayData(
 }
 
 class PostTypesViewModel(
-    private val selfHostedService: WpSelfHostedService
+    private val selfHostedService: WpService
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 

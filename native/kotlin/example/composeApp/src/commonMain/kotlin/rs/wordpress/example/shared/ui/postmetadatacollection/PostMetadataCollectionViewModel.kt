@@ -18,7 +18,7 @@ import uniffi.wp_mobile.PostItemState
 import uniffi.wp_mobile.PostListFilter
 import uniffi.wp_mobile.PostMetadataCollectionItem
 import uniffi.wp_mobile.SyncResult
-import uniffi.wp_mobile.WpSelfHostedService
+import uniffi.wp_mobile.WpService
 import uniffi.wp_mobile_cache.ListState
 
 /**
@@ -111,7 +111,7 @@ data class PostItemDisplayData(
 }
 
 class PostMetadataCollectionViewModel(
-    private val selfHostedService: WpSelfHostedService,
+    private val selfHostedService: WpService,
     private val postTypeSlug: String = "post"
 ) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

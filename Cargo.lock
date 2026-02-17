@@ -5452,6 +5452,8 @@ dependencies = [
  "tokio",
  "uuid",
  "wp_api",
+ "wp_mobile",
+ "wp_mobile_cache",
 ]
 
 [[package]]
