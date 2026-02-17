@@ -4,7 +4,7 @@
 //! without requiring the full API client stack. It should be removed once proper
 //! data insertion is available through the API client.
 
-use rand::Rng;
+use rand::RngExt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
