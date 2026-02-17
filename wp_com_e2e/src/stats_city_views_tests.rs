@@ -1,11 +1,25 @@
 use libtest_mimic::Trial;
 use std::sync::Arc;
 use wp_api::{
-    api_error::WpApiError,
+    api_error::{RequestExecutionErrorReason, WpApiError},
     wp_com::{sites::SitesListParams, stats_city_views::StatsCityViewsParams},
 };
 
 use crate::context::TestContext;
+
+fn is_not_authorized(err: &WpApiError) -> bool {
+    matches!(
+        err,
+        WpApiError::UnknownError { response, .. } if response.contains("unauthorized")
+    ) || matches!(
+        err,
+        WpApiError::RequestExecutionFailed {
+            reason: RequestExecutionErrorReason::HttpForbiddenError { .. }
+                | RequestExecutionErrorReason::HttpAuthenticationRejectedError { .. },
+            ..
+        }
+    )
+}
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut trials = vec![];
@@ -16,61 +30,72 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
     if let Ok(response) = sites_result {
         let sites = response.data.sites;
-        let site_ids: Vec<_> = sites.iter().map(|s| s.id).collect();
 
         // City-level location views require a WP.com plan with access to
         // region-specific stats. The test account contains a mix of sites:
         // some with premium plans (where the endpoint returns city view data)
         // and some without (where the API returns an "unauthorized" error).
         //
-        // Instead of testing each site individually (which would fail for
-        // non-premium sites), we validate that the full set of sites produces
-        // at least one successful response AND at least one "unauthorized"
-        // error, confirming both code paths are exercised.
-        trials.push(Trial::test(
-            "city_views::get_stats_city_views".to_string(),
-            {
-                let ctx = Arc::clone(&ctx);
-                move || {
-                    let mut has_success = false;
-                    let mut has_unauthorized = false;
+        // We preflight each site to determine authorization, marking
+        // unauthorized sites as ignored so they appear in test output
+        // without causing failures.
+        let mut has_authorized_site = false;
+        let mut has_unauthorized_site = false;
 
-                    for site_id in &site_ids {
-                        let result = ctx.runtime.block_on(async {
-                            ctx.client
-                                .stats_city_views()
-                                .get_stats_city_views(site_id, &StatsCityViewsParams::default())
-                                .await
-                        });
+        for site in &sites {
+            let site_id = site.id;
 
-                        match &result {
-                            Ok(_) => has_success = true,
-                            Err(WpApiError::UnknownError { response, .. })
-                                if response.contains("unauthorized") =>
-                            {
-                                has_unauthorized = true;
-                            }
+            // Preflight the request to determine if this site is authorized.
+            let preflight = ctx.runtime.block_on(async {
+                ctx.client
+                    .stats_city_views()
+                    .get_stats_city_views(&site_id, &StatsCityViewsParams::default())
+                    .await
+            });
+
+            let is_ignored = preflight.as_ref().is_err_and(is_not_authorized);
+            if is_ignored {
+                has_unauthorized_site = true;
+            } else {
+                has_authorized_site = true;
+            }
+
+            trials.push(
+                Trial::test(
+                    format!("city_views::get_stats_city_views::{site_id}"),
+                    {
+                        move || match preflight {
+                            Ok(_) => Ok(()),
+                            Err(e) if is_not_authorized(&e) => Ok(()),
                             Err(e) => {
-                                return Err(
-                                    format!("Unexpected error for site {site_id}: {e:?}").into()
-                                );
+                                Err(format!("Unexpected error for site {site_id}: {e:?}").into())
                             }
                         }
-                    }
+                    },
+                )
+                .with_ignored_flag(is_ignored),
+            );
+        }
 
-                    if !has_success {
-                        return Err(
-                            "Expected at least one site with premium access to return city views"
-                                .into(),
-                        );
-                    }
-                    if !has_unauthorized {
-                        return Err(
-                            "Expected at least one non-premium site to return unauthorized".into(),
-                        );
-                    }
-
+        trials.push(Trial::test(
+            "city_views::at_least_one_site_authorized".to_string(),
+            move || {
+                if has_authorized_site {
                     Ok(())
+                } else {
+                    Err("Expected at least one site with premium access to return city views"
+                        .into())
+                }
+            },
+        ));
+
+        trials.push(Trial::test(
+            "city_views::at_least_one_site_unauthorized".to_string(),
+            move || {
+                if has_unauthorized_site {
+                    Ok(())
+                } else {
+                    Err("Expected at least one non-premium site to return unauthorized".into())
                 }
             },
         ));
