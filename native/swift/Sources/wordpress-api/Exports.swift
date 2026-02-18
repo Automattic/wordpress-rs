@@ -42,6 +42,7 @@ public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApp
 public typealias WpAuthentication = WordPressAPIInternal.WpAuthentication
 public typealias SSLCertificateInfo = WordPressAPIInternal.SslCertificateInfo
 public typealias AutoDiscoveryAttemptSuccess = WordPressAPIInternal.AutoDiscoveryAttemptSuccess
+public typealias DiscoveredAuthenticationMechanism = WordPressAPIInternal.DiscoveredAuthenticationMechanism
 public typealias WpDynamicAuthenticationProvider = WordPressAPIInternal.WpDynamicAuthenticationProvider
 
 // MARK: - Errors

@@ -6,7 +6,8 @@ use rocket::{
 use rocket_dyn_templates::{Template, context};
 use std::sync::Arc;
 use wp_api::{
-    login::login_client::WpLoginClient, reqwest_request_executor::ReqwestRequestExecutor,
+    login::{login_client::WpLoginClient, url_discovery::DiscoveredAuthenticationMechanism},
+    reqwest_request_executor::ReqwestRequestExecutor,
 };
 
 #[macro_use]
@@ -34,21 +35,21 @@ async fn test(form: Form<TestForm<'_>>) -> Template {
         .await
         .combined_result()
     {
-        Ok(success) => {
-            let auth_url = success
-                .api_details
-                .find_application_passwords_authentication_url()
-                .expect("Already confirmed auto discovery was successful");
-
-            Template::render(
-                "results",
-                context! {
-                    value: form.value,
-                    application_passwords_authentication_url: linkify_text(&auth_url, false),
-                    is_error: false
-                },
-            )
-        }
+        Ok(success) => match &success.authentication {
+            DiscoveredAuthenticationMechanism::ApplicationPasswords { authentication_url } => {
+                Template::render(
+                    "results",
+                    context! {
+                        value: form.value,
+                        application_passwords_authentication_url: linkify_text(&authentication_url.to_string(), false),
+                        is_error: false
+                    },
+                )
+            }
+            DiscoveredAuthenticationMechanism::OAuth2 { .. } => {
+                unimplemented!("OAuth2 login not yet supported in web tool")
+            }
+        },
         Err(error) => Template::render(
             "results",
             context! {

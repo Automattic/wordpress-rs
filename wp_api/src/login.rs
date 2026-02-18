@@ -355,7 +355,7 @@ impl WpApiDetailsAuthenticationMap {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
 pub struct OAuth2Endpoints {
     pub authorization_url: String,
     pub token_url: String,

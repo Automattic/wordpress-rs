@@ -461,10 +461,9 @@ async fn discovery_helper(
         .await
         .combined_result()
         .map(|success| {
-            success
-                .api_details
-                .find_application_passwords_authentication_url()
-                .expect("If the discovery is successful, authentication url has to be `Some`")
+            wp_api::login::url_discovery::application_passwords_url(&success.authentication)
+                .expect("Self-hosted test sites should use application passwords")
+                .url()
         })
         .map_err(|e| e.clone())
 }
