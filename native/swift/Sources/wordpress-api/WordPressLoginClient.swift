@@ -63,8 +63,13 @@ public final class WordPressLoginClient: @unchecked Sendable {
     public func findLoginUrl(
         forSite proposedSiteUrl: String
     ) async throws -> ParsedUrl {
-        // All sites should have some form of authentication we can use
-        try await details(ofSite: proposedSiteUrl).applicationPasswordsAuthenticationUrl
+        let success = try await details(ofSite: proposedSiteUrl)
+        switch success.authentication {
+        case .applicationPasswords(let authenticationUrl):
+            return authenticationUrl
+        case .oAuth2:
+            fatalError("OAuth2 login not yet supported")
+        }
     }
 
     /// Uses the proposed site URL to scan the website it points to and find the Application Passwords login URL,
@@ -106,13 +111,20 @@ public final class WordPressLoginClient: @unchecked Sendable {
 extension AutoDiscoveryAttemptSuccess {
 
     public func loginURL(for application: Application) -> URL {
-        createApplicationPasswordAuthenticationUrl(
-            loginUrl: applicationPasswordsAuthenticationUrl,
-            appName: application.name,
-            appId: application.id,
-            successUrl: application.successCallbackUrl,
-            rejectUrl: application.failureCallbackUrl
-        ).asURL()
+        switch authentication {
+        case .applicationPasswords(let authenticationUrl):
+            return createApplicationPasswordAuthenticationUrl(
+                loginUrl: authenticationUrl,
+                appName: application.name,
+                appId: application.id,
+                successUrl: application.successCallbackUrl,
+                rejectUrl: application.failureCallbackUrl
+            ).asURL()
+        case .oAuth2(let oauthConfiguration):
+            
+
+            fatalError("OAuth2 login not yet supported")
+        }
     }
 }
 
