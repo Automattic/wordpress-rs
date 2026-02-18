@@ -58,4 +58,6 @@ pub struct WpComTestCredentials {
     pub wp_com_subscriber_user_id: i64,
     pub email_subscriber_subscription_id: u64,
     pub comment_id: i64,
+    pub client_id: u64,
+    pub client_secret: &'static str,
 }

@@ -88,7 +88,7 @@ public typealias PluginWpOrgDirectoryCategory = WordPressAPIInternal.WordPressOr
 public typealias PluginInformation = WordPressAPIInternal.PluginInformation
 public typealias UpdateCheckPluginInfo = WordPressAPIInternal.UpdateCheckPluginInfo
 
-// MARK: – Application Passwords
+// MARK: – Application Passwords
 
 public typealias SparseApplicationPassword = WordPressAPIInternal.SparseApplicationPassword
 public typealias ApplicationPasswordWithEditContext = WordPressAPIInternal.ApplicationPasswordWithEditContext
@@ -100,7 +100,7 @@ public typealias ApplicationPasswordsRequestExecutor = WordPressAPIInternal.Appl
 public typealias SiteHealthTest = WordPressAPIInternal.WpSiteHealthTest
 public typealias SiteHealthDirectorySizes = WordPressAPIInternal.WpSiteHealthDirectorySizes
 
-// MARK: – Post Types
+// MARK: – Post Types
 public typealias PostType = WordPressAPIInternal.PostType
 public typealias SparsePostType = WordPressAPIInternal.SparsePostTypeDetails
 public typealias PostTypeWithEditContext = WordPressAPIInternal.PostTypeDetailsWithEditContext
@@ -138,7 +138,7 @@ public typealias PostsRequestListWithEmbedContextResponse = WordPressAPIInternal
 
 extension AnyPostWithEditContext: Identifiable {}
 
-// MARK: – Revisions
+// MARK: – Revisions
 public typealias SparseAnyRevision = WordPressAPIInternal.SparseAnyPostRevision
 public typealias RevisionWithEditContext = WordPressAPIInternal.AnyPostRevisionWithEditContext
 public typealias RevisionWithViewContext = WordPressAPIInternal.AnyPostRevisionWithViewContext
@@ -248,13 +248,13 @@ public typealias MenuLocationWithEditContext = WordPressAPIInternal.MenuLocation
 public typealias MenuLocationWithViewContext = WordPressAPIInternal.MenuLocationWithViewContext
 public typealias MenuLocationWithEmbedContext = WordPressAPIInternal.MenuLocationWithEmbedContext
 
-// MARK: – Site Settings
+// MARK: – Site Settings
 public typealias SparseSiteSettings = WordPressAPIInternal.SparseSiteSettings
 public typealias SiteSettingsWithEditContext = WordPressAPIInternal.SiteSettingsWithEditContext
 public typealias SiteSettingsWithViewContext = WordPressAPIInternal.SiteSettingsWithViewContext
 public typealias SiteSettingsWithEmbedContext = WordPressAPIInternal.SiteSettingsWithEmbedContext
 
-// MARK: – Site Settings
+// MARK: – Site Settings
 public typealias SiteSettingsRequestExecutor = WordPressAPIInternal.SiteSettingsRequestExecutor
 
 // MARK: – Site Health Tests
