@@ -1,6 +1,34 @@
 import Foundation
 import WordPressAPI
-import AuthenticationServices
+
+struct WPComOAuthCredentials {
+    let clientId: UInt64
+    let clientSecret: String
+
+    static func load() -> WPComOAuthCredentials? {
+        return fromCredentialsFile()
+    }
+
+    private static func fromCredentialsFile() -> WPComOAuthCredentials? {
+        guard let credentialsURL = Bundle.main.url(forResource: "wp_com_test_credentials", withExtension: "json") else {
+            return nil
+        }
+
+        guard
+            let data = try? Data(contentsOf: credentialsURL),
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let clientId = json["client_id"] as? UInt64,
+            clientId != 0,
+            let clientSecret = json["client_secret"] as? String,
+            !clientSecret.isEmpty
+        else {
+            return nil
+        }
+
+        return WPComOAuthCredentials(clientId: clientId, clientSecret: clientSecret)
+    }
+
+}
 
 @MainActor
 final class LoginManager: ObservableObject {
@@ -8,17 +36,7 @@ final class LoginManager: ObservableObject {
     private let accountsRoot = URL.applicationSupportDirectory
     private let accountStore: AccountRepository
 
-    private let wpcomClientId = ProcessInfo.processInfo.environment["WPCOM_CLIENT_ID"] ?? ""
-    private let wpcomClientSecret = ProcessInfo.processInfo.environment["WPCOM_CLIENT_SECRET"] ?? ""
-
-    public var wpcomLoginUrl: URL {
-        URL(string: "https://public-api.wordpress.com/oauth2/authorize")!.appending(queryItems: [
-            URLQueryItem(name: "redirect_uri", value: "x-wordpress-app://oauth2-callback"),
-            URLQueryItem(name: "client_id", value: wpcomClientId),
-            URLQueryItem(name: "client_secret", value: wpcomClientSecret),
-            URLQueryItem(name: "response_type", value: "code")
-        ])
-    }
+    public let wpComOAuthCredentials = WPComOAuthCredentials.load()
 
     @Published
     var isLoggedIn: Bool = false

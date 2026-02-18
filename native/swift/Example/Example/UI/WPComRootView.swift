@@ -47,7 +47,7 @@ struct WPComRootView: View {
                     debugPrint(error.localizedDescription)
                 }
             }
-        } else {
+        } else if loginManager.wpComOAuthCredentials != nil {
             ContentUnavailableView {
                 Text("Not logged in")
             } actions: {
@@ -56,16 +56,24 @@ struct WPComRootView: View {
                         .padding(.horizontal)
                 }).buttonStyle(.borderedProminent)
             }
+        } else {
+            ContentUnavailableView {
+                Text("WordPress.com credentials not configured")
+            } description: {
+                Text("Add a wp_com_test_credentials.json file to the repository root and rebuild.")
+            }
         }
     }
 
     private func loginToWPCom() {
+        guard let credentials = loginManager.wpComOAuthCredentials else { return }
+
         Task {
             do {
                 let redirectUri = URL(string: "x-wordpress-app://oauth2-callback")!
 
                 let url = WPComApiClient.OAuth2.buildTokenRequestUrl(
-                    clientId: 11,
+                    clientId: credentials.clientId,
                     redirectUri: redirectUri,
                     scope: ["global"]
                 )
@@ -83,8 +91,8 @@ struct WPComRootView: View {
                 )
 
                 let requestParams = TokenRequestParameters(
-                    clientId: UInt64(ProcessInfo.processInfo.environment["WPCOM_CLIENT_ID"]!)!,
-                    clientSecret: ProcessInfo.processInfo.environment["WPCOM_CLIENT_SECRET"]!,
+                    clientId: credentials.clientId,
+                    clientSecret: credentials.clientSecret,
                     code: tokenResponse.code,
                     redirectUri: redirectUri.absoluteString
                 )
