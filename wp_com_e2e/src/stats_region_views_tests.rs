@@ -50,6 +50,12 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                             {
                                 has_unauthorized = true;
                             }
+                            Err(WpApiError::RequestExecutionFailed {
+                                status_code: Some(403),
+                                ..
+                            }) => {
+                                has_unauthorized = true;
+                            }
                             Err(e) => {
                                 return Err(
                                     format!("Unexpected error for site {site_id}: {e:?}").into()
