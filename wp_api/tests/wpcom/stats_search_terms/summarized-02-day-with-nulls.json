@@ -1,0 +1,19 @@
+{
+    "date": "2026-02-18",
+    "period": "day",
+    "summary": {
+        "search_terms": [
+            {
+                "term": null,
+                "views": null
+            },
+            {
+                "term": "example query",
+                "views": 10
+            }
+        ],
+        "encrypted_search_terms": 5,
+        "other_search_terms": 0,
+        "total_search_terms": 15
+    }
+}

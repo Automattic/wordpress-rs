@@ -23,6 +23,9 @@ use super::endpoint::{
     stats_region_views_endpoint::{
         StatsRegionViewsRequestBuilder, StatsRegionViewsRequestExecutor,
     },
+    stats_search_terms_endpoint::{
+        StatsSearchTermsRequestBuilder, StatsSearchTermsRequestExecutor,
+    },
     stats_top_authors_endpoint::{StatsTopAuthorsRequestBuilder, StatsTopAuthorsRequestExecutor},
     stats_top_posts_endpoint::{StatsTopPostsRequestBuilder, StatsTopPostsRequestExecutor},
     stats_visits_endpoint::{StatsVisitsRequestBuilder, StatsVisitsRequestExecutor},
@@ -62,6 +65,7 @@ pub struct WpComApiRequestBuilder {
     stats_devices_screensize: Arc<StatsDevicesScreensizeRequestBuilder>,
     stats_referrers: Arc<StatsReferrersRequestBuilder>,
     stats_region_views: Arc<StatsRegionViewsRequestBuilder>,
+    stats_search_terms: Arc<StatsSearchTermsRequestBuilder>,
     stats_top_authors: Arc<StatsTopAuthorsRequestBuilder>,
     stats_top_posts: Arc<StatsTopPostsRequestBuilder>,
     stats_visits: Arc<StatsVisitsRequestBuilder>,
@@ -92,6 +96,7 @@ impl WpComApiRequestBuilder {
             stats_devices_screensize,
             stats_referrers,
             stats_region_views,
+            stats_search_terms,
             stats_top_authors,
             stats_top_posts,
             stats_visits,
@@ -133,6 +138,7 @@ pub struct WpComApiClient {
     stats_devices_screensize: Arc<StatsDevicesScreensizeRequestExecutor>,
     stats_referrers: Arc<StatsReferrersRequestExecutor>,
     stats_region_views: Arc<StatsRegionViewsRequestExecutor>,
+    stats_search_terms: Arc<StatsSearchTermsRequestExecutor>,
     stats_top_authors: Arc<StatsTopAuthorsRequestExecutor>,
     stats_top_posts: Arc<StatsTopPostsRequestExecutor>,
     stats_visits: Arc<StatsVisitsRequestExecutor>,
@@ -164,6 +170,7 @@ impl WpComApiClient {
             stats_devices_screensize,
             stats_referrers,
             stats_region_views,
+            stats_search_terms,
             stats_top_authors,
             stats_top_posts,
             stats_visits,
@@ -188,6 +195,7 @@ api_client_generate_endpoint_impl!(WpComApi, stats_devices_platform);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_screensize);
 api_client_generate_endpoint_impl!(WpComApi, stats_referrers);
 api_client_generate_endpoint_impl!(WpComApi, stats_region_views);
+api_client_generate_endpoint_impl!(WpComApi, stats_search_terms);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_authors);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_posts);
 api_client_generate_endpoint_impl!(WpComApi, stats_visits);

@@ -21,6 +21,7 @@ pub mod stats_devices_platform_endpoint;
 pub mod stats_devices_screensize_endpoint;
 pub mod stats_referrers_endpoint;
 pub mod stats_region_views_endpoint;
+pub mod stats_search_terms_endpoint;
 pub mod stats_top_authors_endpoint;
 pub mod stats_top_posts_endpoint;
 pub mod stats_visits_endpoint;

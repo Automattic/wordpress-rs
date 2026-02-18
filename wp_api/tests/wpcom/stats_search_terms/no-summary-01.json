@@ -1,0 +1,23 @@
+{
+    "date": "2026-02-18",
+    "period": "day",
+    "days": {
+        "2026-02-18": {
+            "search_terms": [],
+            "encrypted_search_terms": 0,
+            "other_search_terms": 0,
+            "total_search_terms": 0
+        },
+        "2026-02-17": {
+            "search_terms": [
+                {
+                    "term": "example search",
+                    "views": 5
+                }
+            ],
+            "encrypted_search_terms": 2,
+            "other_search_terms": 1,
+            "total_search_terms": 8
+        }
+    }
+}

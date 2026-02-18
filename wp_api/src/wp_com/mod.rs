@@ -17,6 +17,7 @@ pub mod stats_country_views;
 pub mod stats_devices;
 pub mod stats_referrers;
 pub mod stats_region_views;
+pub mod stats_search_terms;
 pub mod stats_top_authors;
 pub mod stats_top_posts;
 pub mod stats_visits;
