@@ -1,0 +1,110 @@
+{
+    "date": "2026-02-05",
+    "period": "week",
+    "summary": {
+        "authors": [
+            {
+                "name": "Jane Developer",
+                "avatar": "https://0.gravatar.com/avatar/abc123def456?s=64&d=mm&r=G",
+                "views": 5420,
+                "posts": [
+                    {
+                        "id": 12345,
+                        "title": "Getting Started with WordPress REST API",
+                        "url": "https://example.com/getting-started-rest-api",
+                        "views": 2800
+                    },
+                    {
+                        "id": 12346,
+                        "title": "Advanced API Authentication",
+                        "url": "https://example.com/advanced-api-auth",
+                        "views": 1450
+                    },
+                    {
+                        "id": 12347,
+                        "title": "Building Custom Endpoints",
+                        "url": "https://example.com/custom-endpoints",
+                        "views": 870
+                    },
+                    {
+                        "id": 12348,
+                        "title": "API Rate Limiting Strategies",
+                        "url": "https://example.com/rate-limiting",
+                        "views": 300
+                    }
+                ],
+                "follow_data": {
+                    "type": "wpcom",
+                    "params": {
+                        "feed_id": 98765,
+                        "blog_id": 9288856
+                    }
+                },
+                "author_id": 1001,
+                "other_views": 120
+            },
+            {
+                "name": "John Writer",
+                "avatar": "https://0.gravatar.com/avatar/789xyz?s=64&d=mm&r=G",
+                "views": 3250,
+                "posts": [
+                    {
+                        "id": 12350,
+                        "title": "Content Strategy Best Practices",
+                        "url": "https://example.com/content-strategy",
+                        "views": 1800
+                    },
+                    {
+                        "id": 12351,
+                        "title": "SEO Fundamentals",
+                        "url": "https://example.com/seo-fundamentals",
+                        "views": 950
+                    },
+                    {
+                        "id": 12352,
+                        "title": "Writing for the Web",
+                        "url": "https://example.com/writing-web",
+                        "views": 500
+                    }
+                ],
+                "follow_data": {
+                    "type": "wpcom",
+                    "params": {
+                        "feed_id": 98766,
+                        "blog_id": 9288856
+                    }
+                },
+                "author_id": 1002,
+                "other_views": 85
+            },
+            {
+                "name": "Alice Engineer",
+                "avatar": "https://0.gravatar.com/avatar/engineer123?s=64&d=mm&r=G",
+                "views": 2100,
+                "posts": [
+                    {
+                        "id": 12360,
+                        "title": "Debugging WordPress Plugins",
+                        "url": "https://example.com/debugging-plugins",
+                        "views": 1200
+                    },
+                    {
+                        "id": 12361,
+                        "title": "Performance Optimization Tips",
+                        "url": "https://example.com/performance-tips",
+                        "views": 900
+                    }
+                ],
+                "follow_data": {
+                    "type": "wpcom",
+                    "params": {
+                        "feed_id": 98767,
+                        "blog_id": 9288856
+                    }
+                },
+                "author_id": 1003,
+                "other_views": 0
+            }
+        ]
+    }
+}

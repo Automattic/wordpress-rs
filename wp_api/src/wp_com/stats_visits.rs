@@ -1,6 +1,7 @@
 use crate::{
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+    wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Serialize};
 
@@ -48,7 +49,7 @@ pub struct StatsVisitsParams {
     pub end_date: Option<String>,
     /// The locale for the response.
     #[uniffi(default = None)]
-    pub locale: Option<String>,
+    pub locale: Option<WPComLanguage>,
 }
 
 impl AppendUrlQueryPairs for StatsVisitsParams {
@@ -221,7 +222,7 @@ mod tests {
             unit: Some(StatsVisitsUnit::Hour),
             quantity: Some(24),
             end_date: Some("2025-01-15".to_string()),
-            locale: Some("en".to_string()),
+            locale: Some(WPComLanguage::English),
         };
 
         let mut query_pairs = url.query_pairs_mut();

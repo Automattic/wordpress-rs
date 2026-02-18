@@ -5,10 +5,15 @@ use super::endpoint::{
     },
     me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
+    stats_city_views_endpoint::{StatsCityViewsRequestBuilder, StatsCityViewsRequestExecutor},
     stats_country_views_endpoint::{
         StatsCountryViewsRequestBuilder, StatsCountryViewsRequestExecutor,
     },
     stats_referrers_endpoint::{StatsReferrersRequestBuilder, StatsReferrersRequestExecutor},
+    stats_region_views_endpoint::{
+        StatsRegionViewsRequestBuilder, StatsRegionViewsRequestExecutor,
+    },
+    stats_top_authors_endpoint::{StatsTopAuthorsRequestBuilder, StatsTopAuthorsRequestExecutor},
     stats_top_posts_endpoint::{StatsTopPostsRequestBuilder, StatsTopPostsRequestExecutor},
     stats_visits_endpoint::{StatsVisitsRequestBuilder, StatsVisitsRequestExecutor},
     subscribers_endpoint::{SubscribersRequestBuilder, SubscribersRequestExecutor},
@@ -39,8 +44,11 @@ pub struct WpComApiRequestBuilder {
     me: Arc<MeRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
+    stats_city_views: Arc<StatsCityViewsRequestBuilder>,
     stats_country_views: Arc<StatsCountryViewsRequestBuilder>,
     stats_referrers: Arc<StatsReferrersRequestBuilder>,
+    stats_region_views: Arc<StatsRegionViewsRequestBuilder>,
+    stats_top_authors: Arc<StatsTopAuthorsRequestBuilder>,
     stats_top_posts: Arc<StatsTopPostsRequestBuilder>,
     stats_visits: Arc<StatsVisitsRequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
@@ -62,8 +70,11 @@ impl WpComApiRequestBuilder {
             me,
             oauth2,
             sites,
+            stats_city_views,
             stats_country_views,
             stats_referrers,
+            stats_region_views,
+            stats_top_authors,
             stats_top_posts,
             stats_visits,
             subscribers,
@@ -96,8 +107,11 @@ pub struct WpComApiClient {
     me: Arc<MeRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
+    stats_city_views: Arc<StatsCityViewsRequestExecutor>,
     stats_country_views: Arc<StatsCountryViewsRequestExecutor>,
     stats_referrers: Arc<StatsReferrersRequestExecutor>,
+    stats_region_views: Arc<StatsRegionViewsRequestExecutor>,
+    stats_top_authors: Arc<StatsTopAuthorsRequestExecutor>,
     stats_top_posts: Arc<StatsTopPostsRequestExecutor>,
     stats_visits: Arc<StatsVisitsRequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
@@ -120,8 +134,11 @@ impl WpComApiClient {
             me,
             oauth2,
             sites,
+            stats_city_views,
             stats_country_views,
             stats_referrers,
+            stats_region_views,
+            stats_top_authors,
             stats_top_posts,
             stats_visits,
             subscribers,
@@ -137,8 +154,11 @@ api_client_generate_endpoint_impl!(WpComApi, languages);
 api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, sites);
+api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_country_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_referrers);
+api_client_generate_endpoint_impl!(WpComApi, stats_region_views);
+api_client_generate_endpoint_impl!(WpComApi, stats_top_authors);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_posts);
 api_client_generate_endpoint_impl!(WpComApi, stats_visits);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);

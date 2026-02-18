@@ -1,0 +1,46 @@
+{
+    "date": "2026-02-09",
+    "period": "day",
+    "summary": {
+        "authors": [
+            {
+                "name": "Author With Follow Data",
+                "avatar": "https://0.gravatar.com/avatar/test?s=64&d=mm&r=G",
+                "views": 50,
+                "posts": [
+                    {
+                        "id": 12345,
+                        "title": "Test Post",
+                        "url": "https://example.com/?p=12345",
+                        "views": 50
+                    }
+                ],
+                "follow_data": {
+                    "type": "follow",
+                    "params": {
+                        "feed_id": 100,
+                        "blog_id": 200
+                    }
+                },
+                "author_id": 3001,
+                "other_views": 0
+            },
+            {
+                "name": "Author With False Follow Data",
+                "avatar": "https://0.gravatar.com/avatar/test2?s=64&d=mm&r=G",
+                "views": 30,
+                "posts": [
+                    {
+                        "id": 67890,
+                        "title": "Another Post",
+                        "url": "https://example.com/?p=67890",
+                        "views": 30
+                    }
+                ],
+                "follow_data": false,
+                "author_id": 3002,
+                "other_views": 0
+            }
+        ]
+    }
+}

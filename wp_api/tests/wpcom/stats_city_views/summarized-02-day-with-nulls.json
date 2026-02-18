@@ -1,0 +1,44 @@
+{
+    "date": "2026-02-05",
+    "country-info": {
+        "US": {
+            "flag_icon": "https://secure.gravatar.com/blavatar/d0c9ee2dfb5087992fc9b2fc36c2d78311887d82934678b3118815d1f240951b?s=48",
+            "flat_flag_icon": "https://secure.gravatar.com/blavatar/c582a850fc3fea67cbf9e88f7755a85870239bcf4138c9cf3a6f7c53e5a658ea?s=48",
+            "country_full": "United States",
+            "map_region": "021"
+        },
+        "XX": {
+            "flag_icon": null,
+            "flat_flag_icon": null,
+            "country_full": null,
+            "map_region": null
+        }
+    },
+    "summary": {
+        "views": [
+            {
+                "location": null,
+                "views": null,
+                "country_code": null,
+                "coordinates": null
+            },
+            {
+                "location": "Seattle",
+                "views": 100,
+                "country_code": "US",
+                "coordinates": {
+                    "latitude": "47.604309",
+                    "longitude": "-122.329845"
+                }
+            },
+            {
+                "location": null,
+                "views": 50,
+                "country_code": "XX",
+                "coordinates": null
+            }
+        ],
+        "other_views": 0,
+        "total_views": 150
+    }
+}
