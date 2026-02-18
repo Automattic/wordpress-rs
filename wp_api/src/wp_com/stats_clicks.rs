@@ -64,11 +64,10 @@ pub struct StatsClicksParams {
     pub summarize: bool,
     /// Whether to skip archive pages (date-based archives, category archives, etc.) in the response.
     ///
-    /// - `Some(true)` (default): Archive pages are excluded from results
-    /// - `Some(false)`: Archive pages are included in results
-    /// - `None`: Parameter is not sent to the API
-    #[uniffi(default = Some(true))]
-    pub skip_archives: Option<bool>,
+    /// - `true` (default): Archive pages are excluded from results
+    /// - `false`: Archive pages are included in results
+    #[uniffi(default = true)]
+    pub skip_archives: bool,
 }
 
 impl Default for StatsClicksParams {
@@ -81,7 +80,7 @@ impl Default for StatsClicksParams {
             num: None,
             locale: None,
             summarize: true,
-            skip_archives: Some(true),
+            skip_archives: true,
         }
     }
 }
@@ -96,10 +95,7 @@ impl AppendUrlQueryPairs for StatsClicksParams {
             .append_option_query_value_pair("num", self.num.as_ref())
             .append_option_query_value_pair("locale", self.locale.as_ref())
             .append_query_value_pair("summarize", &(self.summarize as u32))
-            .append_option_query_value_pair(
-                "skip_archives",
-                self.skip_archives.map(|b| b as u32).as_ref(),
-            );
+            .append_query_value_pair("skip_archives", &(self.skip_archives as u32));
     }
 }
 
@@ -187,7 +183,7 @@ mod tests {
             num: Some(30),
             locale: Some(WPComLanguage::English),
             summarize: true,
-            skip_archives: Some(true),
+            skip_archives: true,
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -213,7 +209,7 @@ mod tests {
             num: None,
             locale: None,
             summarize: true,
-            skip_archives: Some(true),
+            skip_archives: true,
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -226,29 +222,6 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_clicks_params_without_summarize_and_skip_archives() {
-        let mut url =
-            url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/clicks")
-                .expect("Failed to parse url");
-
-        let params = StatsClicksParams {
-            period: Some(StatsClicksPeriod::Day),
-            date: Some("2026-02-18".to_string()),
-            summarize: false,
-            skip_archives: None,
-            ..Default::default()
-        };
-
-        let mut query_pairs = url.query_pairs_mut();
-        params.append_query_pairs(&mut query_pairs);
-
-        assert_eq!(
-            query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/clicks?period=day&date=2026-02-18&summarize=0"
-        );
-    }
-
-    #[test]
     fn test_stats_clicks_params_with_false_values() {
         let mut url =
             url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/clicks")
@@ -257,7 +230,7 @@ mod tests {
         let params = StatsClicksParams {
             period: Some(StatsClicksPeriod::Day),
             summarize: false,
-            skip_archives: Some(false),
+            skip_archives: false,
             ..Default::default()
         };
 
