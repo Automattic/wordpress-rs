@@ -24,6 +24,7 @@ pub mod stats_region_views_endpoint;
 pub mod stats_search_terms_endpoint;
 pub mod stats_top_authors_endpoint;
 pub mod stats_top_posts_endpoint;
+pub mod stats_video_plays_endpoint;
 pub mod stats_visits_endpoint;
 pub mod subscribers_endpoint;
 pub mod support_bots_endpoint;
