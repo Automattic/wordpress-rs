@@ -24,16 +24,16 @@ struct WPComRootView: View {
 
     var body: some View {
         if loginManager.isLoggedInToWpCom {
-            NavigationSplitView {
-                NavigationStack {
-                    if isLoadingInitialData {
-                        ProgressView()
-                    } else {
-                        RootListView(items: rootListItems.grouped)
-                    }
+            NavigationView {
+                if isLoadingInitialData {
+                    ProgressView()
+                } else {
+                    RootListView(items: rootListItems.grouped)
                 }
-            } detail: {
-                Text("Logged in")
+
+                EmptyView()
+
+                Text("Select an item from the sidebar.")
             }
             .toolbar {
                 Button(action: self.logOutOfWPCom) {
