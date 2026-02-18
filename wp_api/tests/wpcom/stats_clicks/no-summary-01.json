@@ -1,0 +1,24 @@
+{
+    "date": "2026-02-18",
+    "days": {
+        "2026-02-18": {
+            "clicks": [],
+            "other_clicks": 0,
+            "total_clicks": 0
+        },
+        "2026-02-11": {
+            "clicks": [
+                {
+                    "icon": "https://secure.gravatar.com/blavatar/example1?s=48",
+                    "url": "https://href.li/?https://example.com/page",
+                    "name": "example.com/page",
+                    "views": 1,
+                    "children": null
+                }
+            ],
+            "other_clicks": 0,
+            "total_clicks": 1
+        }
+    },
+    "period": "day"
+}

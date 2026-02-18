@@ -6,6 +6,7 @@ use super::endpoint::{
     me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
     stats_city_views_endpoint::{StatsCityViewsRequestBuilder, StatsCityViewsRequestExecutor},
+    stats_clicks_endpoint::{StatsClicksRequestBuilder, StatsClicksRequestExecutor},
     stats_country_views_endpoint::{
         StatsCountryViewsRequestBuilder, StatsCountryViewsRequestExecutor,
     },
@@ -54,6 +55,7 @@ pub struct WpComApiRequestBuilder {
     oauth2: Arc<Oauth2RequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
+    stats_clicks: Arc<StatsClicksRequestBuilder>,
     stats_country_views: Arc<StatsCountryViewsRequestBuilder>,
     stats_devices_browser: Arc<StatsDevicesBrowserRequestBuilder>,
     stats_devices_platform: Arc<StatsDevicesPlatformRequestBuilder>,
@@ -83,6 +85,7 @@ impl WpComApiRequestBuilder {
             oauth2,
             sites,
             stats_city_views,
+            stats_clicks,
             stats_country_views,
             stats_devices_browser,
             stats_devices_platform,
@@ -123,6 +126,7 @@ pub struct WpComApiClient {
     oauth2: Arc<Oauth2RequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
+    stats_clicks: Arc<StatsClicksRequestExecutor>,
     stats_country_views: Arc<StatsCountryViewsRequestExecutor>,
     stats_devices_browser: Arc<StatsDevicesBrowserRequestExecutor>,
     stats_devices_platform: Arc<StatsDevicesPlatformRequestExecutor>,
@@ -153,6 +157,7 @@ impl WpComApiClient {
             oauth2,
             sites,
             stats_city_views,
+            stats_clicks,
             stats_country_views,
             stats_devices_browser,
             stats_devices_platform,
@@ -176,6 +181,7 @@ api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
+api_client_generate_endpoint_impl!(WpComApi, stats_clicks);
 api_client_generate_endpoint_impl!(WpComApi, stats_country_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_browser);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_platform);
