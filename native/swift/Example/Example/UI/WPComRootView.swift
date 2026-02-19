@@ -47,7 +47,7 @@ struct WPComRootView: View {
                     debugPrint(error.localizedDescription)
                 }
             }
-        } else if loginManager.wpComOAuthCredentials != nil {
+        } else if loginManager.wpComOAuthConfiguration != nil {
             ContentUnavailableView {
                 Text("Not logged in")
             } actions: {
@@ -66,40 +66,14 @@ struct WPComRootView: View {
     }
 
     private func loginToWPCom() {
-        guard let credentials = loginManager.wpComOAuthCredentials else { return }
+        guard let configuration = loginManager.wpComOAuthConfiguration else { return }
 
         Task {
             do {
-                let redirectUri = URL(string: "x-wordpress-app://oauth2-callback")!
-
-                let url = WPComApiClient.OAuth2.buildTokenRequestUrl(
-                    clientId: credentials.clientId,
-                    redirectUri: redirectUri,
-                    scope: ["global"]
+                try await loginManager.logInToWpCom(
+                        configuration: configuration,
+                        webAuthenticationSession: webAuthenticationSession
                 )
-
-                let callbackUrl = try await webAuthenticationSession.authenticate(
-                    using: url,
-                    callbackURLScheme: "x-wordpress-app"
-                )
-
-                let tokenResponse = try WPComApiClient.OAuth2.parseTokenResponse(url: callbackUrl)
-
-                let client = WPComApiClient(
-                    authentication: .none,
-                    middlewarePipeline: MiddlewarePipeline(middlewares: [DebugMiddleware()])
-                )
-
-                let requestParams = TokenRequestParameters(
-                    clientId: credentials.clientId,
-                    clientSecret: credentials.clientSecret,
-                    code: tokenResponse.code,
-                    redirectUri: redirectUri.absoluteString
-                )
-
-                let response = try await client.oauth2.requestToken(params: requestParams)
-                try self.loginManager.setWpComLoginCredentials(to: response.data.accessToken)
-
             } catch {
                 self.error = error
             }
@@ -107,10 +81,12 @@ struct WPComRootView: View {
     }
 
     private func logOutOfWPCom() {
-        do {
-            try self.loginManager.logoutWpCom()
-        } catch {
-            self.error = error
+        Task {
+            do {
+                try await self.loginManager.logoutWpCom()
+            } catch {
+                self.error = error
+            }
         }
     }
 }

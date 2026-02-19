@@ -276,6 +276,10 @@ public typealias WordPressOrgApiClient = WordPressAPIInternal.WordPressOrgApiCli
 // MARK: OAuth2
 public typealias TokenValidationParameters = WordPressAPIInternal.TokenValidationParameters
 public typealias TokenRequestParameters = WordPressAPIInternal.TokenRequestParameters
+public typealias WpComOauthScope = WordPressAPIInternal.WpComOauthScope
+public typealias OAuth2Configuration = WordPressAPIInternal.OAuth2Configuration
+public typealias OAuth2ConfigurationStore = WordPressAPIInternal.OAuth2ConfigurationStore
+public typealias WpComSiteIdentifier = WordPressAPIInternal.WpComSiteIdentifier
 
 // MARK: Languages
 public typealias WPComLanguage = WordPressAPIInternal.WpComLanguage

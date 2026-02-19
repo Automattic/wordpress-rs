@@ -54,7 +54,7 @@ struct LoginView: View {
                 }
             })
 
-            if loginManager.wpComOAuthCredentials != nil {
+            if loginManager.wpComOAuthConfiguration != nil {
                 Button(action: self.startLoginWithWPCom, label: {
                     Text("Sign in with WordPress.com")
                 })
@@ -76,15 +76,32 @@ struct LoginView: View {
                 )
 
                 let loginClient = WordPressLoginClient(urlSession: .shared)
-                let details = try await loginClient.details(ofSite: url)
+                let siteDetails = try await loginClient.details(ofSite: url)
 
-                let callbackUrl = try await self.webAuthenticationSession.authenticate(
-                    using: details.loginURL(for: application),
-                    callbackURLScheme: "x-wordpress-app"
-                )
+                if let applicationPasswordUrl = siteDetails.authentication.loginURL(for: application) {
+                    let callbackUrl = try await self.webAuthenticationSession.authenticate(
+                        using: applicationPasswordUrl,
+                        callbackURLScheme: "x-wordpress-app"
+                    )
 
-                let loginDetails = try loginClient.credentials(from: callbackUrl)
-                try await loginManager.setLoginCredentials(to: loginDetails, apiRootURL: details.apiRootUrl.asURL())
+                    let loginDetails = try loginClient.credentials(from: callbackUrl)
+                    try await loginManager
+                        .setLoginCredentials(to: loginDetails, apiRootURL: siteDetails.parsedSiteUrl.asURL())
+                }
+
+                if let endpoints = siteDetails.authentication.oauthEndpoints {
+                    if let configuration = loginManager.oauthRegistry.findConfiguration(endpoints: endpoints) {
+                        guard let host = siteDetails.parsedSiteUrl.asURL().host() else {
+                            preconditionFailure("Invalid site details response")
+                        }
+
+                        try await loginManager.logInToWpCom(
+                            configuration: configuration,
+                            webAuthenticationSession: webAuthenticationSession,
+                            blogId: .slug(value: host)
+                        )
+                    }
+                }
             } catch let err {
                 handleLoginError(err)
             }
@@ -92,42 +109,17 @@ struct LoginView: View {
     }
 
     func startLoginWithWPCom() {
-        guard let credentials = loginManager.wpComOAuthCredentials else { return }
+        guard let configuration = loginManager.wpComOAuthConfiguration else { return }
 
         self.loginError = nil
         self.isLoggingIn = true
 
         self.loginTask = Task {
             do {
-                let redirectUri = URL(string: "x-wordpress-app://oauth2-callback")!
-
-                let url = WPComApiClient.OAuth2.buildTokenRequestUrl(
-                    clientId: credentials.clientId,
-                    redirectUri: redirectUri,
-                    scope: ["global"]
+                try await loginManager.logInToWpCom(
+                    configuration: configuration,
+                    webAuthenticationSession: webAuthenticationSession
                 )
-
-                let callbackUrl = try await self.webAuthenticationSession.authenticate(
-                    using: url,
-                    callbackURLScheme: "x-wordpress-app"
-                )
-
-                let tokenResponse = try WPComApiClient.OAuth2.parseTokenResponse(url: callbackUrl)
-
-                let client = WPComApiClient(
-                    authentication: .none,
-                    middlewarePipeline: MiddlewarePipeline(middlewares: [DebugMiddleware()])
-                )
-
-                let requestParams = TokenRequestParameters(
-                    clientId: credentials.clientId,
-                    clientSecret: credentials.clientSecret,
-                    code: tokenResponse.code,
-                    redirectUri: redirectUri.absoluteString
-                )
-
-                let response = try await client.oauth2.requestToken(params: requestParams)
-                try self.loginManager.setWpComLoginCredentials(to: response.data.accessToken)
             } catch {
                 handleLoginError(error)
             }

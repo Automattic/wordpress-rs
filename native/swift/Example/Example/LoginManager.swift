@@ -1,5 +1,8 @@
 import Foundation
 import WordPressAPI
+import AuthenticationServices
+import SwiftUI
+import CryptoKit
 
 struct WPComOAuthCredentials {
     let clientId: UInt64
@@ -36,7 +39,10 @@ final class LoginManager: ObservableObject {
     private let accountsRoot = URL.applicationSupportDirectory
     private let accountStore: AccountRepository
 
-    public let wpComOAuthCredentials = WPComOAuthCredentials.load()
+    private let keychain = Keychain()
+
+    private let wpComOAuthCredentials = WPComOAuthCredentials.load()
+    let wpComOAuthConfiguration: OAuth2Configuration?
 
     @Published
     var isLoggedIn: Bool = false
@@ -56,6 +62,8 @@ final class LoginManager: ObservableObject {
         }
     }
 
+    let oauthRegistry = OAuth2ConfigurationStore()
+
     private var wpComLoginTask: Task<Void, Never>?
 
     init() throws {
@@ -66,6 +74,20 @@ final class LoginManager: ObservableObject {
         let transformer = try SecureEnclavePasswordTransformer()
         #endif
 
+        if let credentials = wpComOAuthCredentials {
+            let configuration = WPComApiClient.oauthConfiguration(
+                clientId: credentials.clientId,
+                clientSecret: credentials.clientSecret,
+                redirectUri: "x-wordpress-app://oauth2-callback",
+                scope: [.auth, .sites, .media, .posts]
+            )
+
+            self.wpComOAuthConfiguration = configuration
+            self.oauthRegistry.addConfiguration(config: configuration)
+        } else {
+            self.wpComOAuthConfiguration = nil
+        }
+
         self.accountStore = try AccountRepository(
             rootPath: accountsRoot.path(percentEncoded: false),
             passwordTransformer: transformer
@@ -74,11 +96,45 @@ final class LoginManager: ObservableObject {
         self.isLoggedInToWpCom = accountStore.hasWpComAccount()
     }
 
+    public func logInToWpCom(
+        configuration: OAuth2Configuration,
+        webAuthenticationSession: WebAuthenticationSession,
+        blogId: WpComSiteIdentifier? = nil
+    ) async throws {
+
+        let state = UUID().uuidString
+
+        let url = configuration.buildTokenRequestUrl(
+            state: state,
+            blog: blogId
+        )
+
+        let callbackUrl = try await webAuthenticationSession.authenticate(
+            using: url.asURL(),
+            callbackURLScheme: "x-wordpress-app"
+        )
+
+        let tokenResponse = try configuration.parseTokenResponse(
+            url: callbackUrl.absoluteString,
+            expectedState: state
+        )
+
+        let client = WPComApiClient(
+            authentication: .none,
+            middlewarePipeline: MiddlewarePipeline(middlewares: [DebugMiddleware()])
+        )
+
+        let requestParams = configuration.buildTokenRequestParameters(code: tokenResponse.code)
+
+        let response = try await client.oauth2.requestToken(params: requestParams)
+        try self.setWpComLoginCredentials(to: response.data.accessToken)
+    }
+
     public func hasStoredLoginCredentials() -> Bool {
         return accountStore.hasSelfHostedAccount()
     }
 
-    public func setLoginCredentials(to newValue: WpApiApplicationPasswordDetails, apiRootURL: URL) async throws {
+    public func setLoginCredentials(to newValue: WpApiApplicationPasswordDetails, apiRootURL: URL) throws {
         _ = try accountStore.store(account: .selfHostedSite(
             id: 42,
             domain: newValue.siteUrl,
