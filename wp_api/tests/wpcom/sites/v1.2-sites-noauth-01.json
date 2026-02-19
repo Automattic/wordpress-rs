@@ -1,0 +1,46 @@
+{
+  "ID": 158030780,
+  "name": "Mobile.blog",
+  "description": "Mobile development at Automattic",
+  "URL": "http://mobile.blog",
+  "jetpack": false,
+  "jetpack_connection": false,
+  "subscribers_count": 72,
+  "locale": false,
+  "icon": {
+    "img": "https://mobiledotblog.wordpress.com/wp-content/uploads/2019/03/mobile-logo.png?w=96",
+    "ico": "https://mobiledotblog.wordpress.com/wp-content/uploads/2019/03/mobile-logo.png?w=96"
+  },
+  "logo": {
+    "id": 0,
+    "sizes": [],
+    "url": ""
+  },
+  "visible": null,
+  "is_private": false,
+  "is_coming_soon": false,
+  "is_following": false,
+  "organization_id": 0,
+  "meta": {
+    "links": {
+      "self": "https://public-api.wordpress.com/rest/v1.2/sites/158030780",
+      "help": "https://public-api.wordpress.com/rest/v1.2/sites/158030780/help",
+      "posts": "https://public-api.wordpress.com/rest/v1.2/sites/158030780/posts/",
+      "comments": "https://public-api.wordpress.com/rest/v1.1/sites/158030780/comments/",
+      "xmlrpc": "https://mobiledotblog.wordpress.com/xmlrpc.php"
+    }
+  },
+  "launch_status": false,
+  "site_migration": {
+    "is_complete": false,
+    "in_progress": false
+  },
+  "is_fse_active": false,
+  "is_fse_eligible": false,
+  "is_core_site_editor_enabled": false,
+  "is_wpcom_atomic": false,
+  "is_wpcom_staging_site": false,
+  "is_deleted": false,
+  "is_a4a_client": false,
+  "is_a4a_dev_site": false
+}

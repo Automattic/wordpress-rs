@@ -1,6 +1,7 @@
 use libtest_mimic::Trial;
 use std::sync::Arc;
 use wp_api::wp_com::sites::SitesListParams;
+use wp_api::wp_com::sites::WpComSiteIdentifier;
 
 use crate::context::TestContext;
 
@@ -31,13 +32,14 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
         for site in &sites {
             let site_id = site.id;
+            let identifier = WpComSiteIdentifier::Id { value: site_id.0 };
             trials.push(Trial::test(format!("sites::get_by_id::{}", site_id), {
                 let ctx = Arc::clone(&ctx);
                 move || {
                     ctx.runtime.block_on(async {
                         ctx.client
                             .sites()
-                            .get_site_by_id(&site_id)
+                            .get_site(&identifier)
                             .await
                             .map_err(|e| e.to_string())?;
                         Ok(())
@@ -53,10 +55,13 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let ctx = Arc::clone(&ctx);
                     let slug = slug.clone();
                     move || {
+                        let identifier = WpComSiteIdentifier::Slug {
+                            value: slug.to_string(),
+                        };
                         ctx.runtime.block_on(async {
                             ctx.client
                                 .sites()
-                                .get_site_by_slug(&slug)
+                                .get_site(&identifier)
                                 .await
                                 .map_err(|e| e.to_string())?;
                             Ok(())
