@@ -372,6 +372,130 @@ async fn test_publish_draft_in_second_page_updates_collection() {
     RestoreServer::db().await;
 }
 
+#[tokio::test]
+#[serial]
+async fn test_publish_draft_in_second_page_without_loading_second_page() {
+    // The test site has 4 draft posts. We use per_page=2 so page 1 has
+    // 2 drafts and page 2 has 2 drafts.
+    //
+    // Unlike `test_publish_draft_in_second_page_updates_collection`, this
+    // test does NOT call `load_next_page()`. Only page 1 is loaded via
+    // `refresh()`. We then publish a draft that lives on page 2 and call
+    // `refresh_post()`.
+    //
+    // 1. Create a draft collection with per_page=2 and call `refresh()` to
+    //    load page 1 only.
+    // 2. Record the current `list_info` (total_items, etc.).
+    // 3. Publish a draft that is NOT on page 1 (i.e., lives on page 2)
+    //    via the REST API.
+    // 4. Call `PostService.refresh_post()` to re-fetch the post from the
+    //    server and update the local cache.
+    //
+    // Expected result: `list_info` should be UNCHANGED because the
+    // published post was never loaded locally — it was on page 2 which
+    // was never fetched. Since the app has no prior knowledge of this
+    // post, it cannot detect the status change. The stale `total_items`
+    // will only be corrected on the next `refresh()` call.
+
+    let ctx = create_test_context();
+
+    let filter = PostListFilter {
+        order: Some(WpApiParamOrder::Desc),
+        orderby: Some(WpApiParamPostsOrderBy::Date),
+        status: vec![PostStatus::Draft],
+        ..Default::default()
+    };
+    let collection = ctx
+        .service
+        .posts()
+        .create_post_metadata_collection_with_edit_context(PostEndpointType::Posts, filter, 2);
+
+    collection.refresh().await.expect("refresh should succeed");
+    assert_eq!(collection.current_page(), Some(1));
+
+    let old_list_info = collection.list_info().expect("list_info should exist");
+    let old_total_items = old_list_info.total_items.expect("total_items should exist");
+    assert!(
+        old_total_items >= 4,
+        "test site should have at least 4 draft posts"
+    );
+
+    let page1_items = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert_eq!(page1_items.len(), 2, "page 1 should have 2 items");
+
+    // We need a draft post that is NOT on page 1. Fetch all drafts via
+    // the API and pick one whose ID doesn't appear in page 1.
+    let page1_ids: Vec<i64> = page1_items.iter().map(|item| item.id).collect();
+    let all_drafts = ctx
+        .api
+        .posts()
+        .list_with_edit_context(
+            &PostEndpointType::Posts,
+            &wp_api::posts::PostListParams {
+                status: vec![PostStatus::Draft],
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("list drafts should succeed");
+    let page2_post = all_drafts
+        .data
+        .iter()
+        .find(|p| !page1_ids.contains(&p.id.0))
+        .expect("should find a draft not on page 1");
+    let published_id = page2_post.id;
+
+    // Publish the draft that lives on page 2
+    ctx.api
+        .posts()
+        .update(
+            &PostEndpointType::Posts,
+            &published_id,
+            &PostUpdateParams {
+                status: Some(PostStatus::Publish),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update should succeed");
+
+    // Refresh the published post so the cache picks up the new data
+    ctx.service
+        .posts()
+        .refresh_post(published_id, &PostEndpointType::Posts)
+        .await
+        .expect("refresh_post should succeed");
+
+    // list_info should be unchanged: the post was never in the local
+    // cache, so no status change was detected and no list metadata was
+    // modified.
+    let new_list_info = collection.list_info().expect("list_info should exist");
+    let new_total_items = new_list_info.total_items.expect("total_items should exist");
+    assert_eq!(
+        new_total_items, old_total_items,
+        "total_items should be unchanged because the published post was never cached locally"
+    );
+
+    // Page 1 items should also be unchanged
+    let updated_items = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert_eq!(
+        updated_items.len(),
+        page1_items.len(),
+        "item count should be unchanged"
+    );
+    for (old, new) in page1_items.iter().zip(updated_items.iter()) {
+        assert_eq!(old.id, new.id, "item IDs should be unchanged");
+    }
+
+    RestoreServer::db().await;
+}
+
 /// A test `DatabaseDelegate` that forwards all hooks to a tokio channel.
 struct HookRecorder {
     sender: mpsc::UnboundedSender<UpdateHook>,
