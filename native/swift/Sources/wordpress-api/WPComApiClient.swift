@@ -7,30 +7,22 @@ import FoundationNetworking
 
 public final class WPComApiClient: Sendable {
 
-    public struct OAuth2 {
-        public static func buildTokenRequestUrl(
-            clientId: UInt64,
-            redirectUri: URL,
-            scope: [String],
-            state: String = UUID().uuidString,
-            blog: UInt64? = nil
-        ) -> URL {
-            WordPressAPIInternal.buildTokenRequestUrl(
-                clientId: clientId,
-                redirectUri: redirectUri.absoluteString,
-                scope: scope.joined(separator: ","),
-                state: state,
-                blog: blog
-            ).asURL()
-        }
-
-        public static func parseTokenResponse(url: URL) throws -> AuthorizationCodeExtractionResult {
-            try WordPressAPIInternal.parseAuthorizationUrl(response: url.absoluteString)
-        }
-    }
-
     private let internalClient: WordPressAPIInternal.UniffiWpComApiClient
     private let delegate: WpApiClientDelegate
+
+    public static func oauthConfiguration(
+        clientId: UInt64,
+        clientSecret: String,
+        redirectUri: String,
+        scope: [WpComOauthScope]
+    ) -> OAuth2Configuration {
+        wordpressComOauth2Configuration(
+            clientId: clientId,
+            clientSecret: clientSecret,
+            redirectUri: redirectUri,
+            scope: scope
+        )
+    }
 
     public init(delegate: WpApiClientDelegate) {
         self.delegate = delegate // We need to retain this ourselves because it's passed to a Rust object
@@ -86,6 +78,10 @@ public final class WPComApiClient: Sendable {
 
     public var jetpackConnection: JetpackConnectionRequestExecutor {
         internalClient.jetpackConnection()
+    }
+
+    public var sites: SitesRequestExecutor {
+        internalClient.sites()
     }
 
     public var subscribers: SubscribersRequestExecutor {
