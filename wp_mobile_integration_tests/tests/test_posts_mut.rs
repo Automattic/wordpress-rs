@@ -1,8 +1,15 @@
-use wp_api::posts::{PostCreateParams, PostStatus, WpApiParamPostsOrderBy};
+use std::sync::Arc;
+use std::time::Duration;
+
+use tokio::sync::mpsc;
+use wp_api::posts::{
+    PostCreateParams, PostId, PostStatus, PostUpdateParams, WpApiParamPostsOrderBy,
+};
 use wp_api::prelude::*;
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_mobile::collection::PostItemState;
 use wp_mobile::filters::PostListFilter;
+use wp_mobile_cache::{DatabaseDelegate, UpdateHook};
 use wp_mobile_integration_tests::*;
 
 #[tokio::test]
@@ -110,4 +117,268 @@ async fn test_load_next_page_with_duplicate_items_all_fresh() {
     }
 
     RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_publish_draft_in_first_page_updates_collection() {
+    // The test site has 4 draft posts. We use per_page=2 so page 1 has 2 drafts.
+    //
+    // 1. Create a draft collection with per_page=2 and call `refresh()` to
+    //    load page 1.
+    // 2. Record the first item's ID and the current `total_items`.
+    // 3. Publish that draft via the REST API.
+    // 4. Call `PostService.refresh_post()` to re-fetch the post from the
+    //    server and update the local cache.
+    // 5. Wait for a relevant DB hook to fire on the collection.
+    //
+    // Expected result: `refresh_post()` writes the updated post (now with
+    // status `Publish`) back into the local SQLite cache, which triggers a
+    // DB hook via `DatabaseDelegate.did_update()`. After the hook,
+    // `total_items` decreases by 1 and the published post no longer appears
+    // in `load_items()`.
+
+    let ctx = create_test_context();
+
+    // Register a hook recorder to capture DB updates
+    let (sender, mut receiver) = mpsc::unbounded_channel::<UpdateHook>();
+    ctx.cache
+        .start_listening_for_updates(Arc::new(HookRecorder { sender }));
+
+    let filter = PostListFilter {
+        order: Some(WpApiParamOrder::Desc),
+        orderby: Some(WpApiParamPostsOrderBy::Date),
+        status: vec![PostStatus::Draft],
+        ..Default::default()
+    };
+    let collection = ctx
+        .service
+        .posts()
+        .create_post_metadata_collection_with_edit_context(PostEndpointType::Posts, filter, 2);
+
+    collection.refresh().await.expect("refresh should succeed");
+    assert_eq!(collection.current_page(), Some(1));
+
+    let old_total_items = collection
+        .list_info()
+        .expect("list_info should exist")
+        .total_items
+        .expect("total_items should exist");
+
+    let items = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert!(!items.is_empty());
+
+    let published_id = items[0].id;
+
+    // Drain any hooks that fired during initial refresh
+    while receiver.try_recv().is_ok() {}
+
+    // Publish the first draft post
+    ctx.api
+        .posts()
+        .update(
+            &PostEndpointType::Posts,
+            &PostId(published_id),
+            &PostUpdateParams {
+                status: Some(PostStatus::Publish),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update should succeed");
+
+    // Refresh the published post so the cache picks up the status change
+    ctx.service
+        .posts()
+        .refresh_post(PostId(published_id), &PostEndpointType::Posts)
+        .await
+        .expect("refresh_post should succeed");
+
+    // Wait for a relevant DB hook to fire
+    let timeout = Duration::from_secs(5);
+    let mut received_relevant_hook = false;
+    let deadline = tokio::time::Instant::now() + timeout;
+    while tokio::time::Instant::now() < deadline {
+        match tokio::time::timeout_at(deadline, receiver.recv()).await {
+            Ok(Some(hook)) if collection.is_relevant_update(&hook) => {
+                received_relevant_hook = true;
+                break;
+            }
+            Ok(Some(_)) => continue, // irrelevant hook, keep waiting
+            _ => break,              // timeout or channel closed
+        }
+    }
+    assert!(
+        received_relevant_hook,
+        "expected a relevant DB hook after publishing draft post {}",
+        published_id
+    );
+
+    let new_total_items = collection
+        .list_info()
+        .expect("list_info should exist")
+        .total_items
+        .expect("total_items should exist");
+    assert_eq!(
+        new_total_items,
+        old_total_items - 1,
+        "total_items should decrease by 1 after publishing a draft"
+    );
+
+    let updated_items = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert!(
+        !updated_items.iter().any(|item| item.id == published_id),
+        "published post {} should not appear in draft collection",
+        published_id
+    );
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_publish_draft_in_second_page_updates_collection() {
+    // The test site has 4 draft posts. We use per_page=2 so page 1 has
+    // 2 drafts and page 2 has 2 drafts.
+    //
+    // 1. Create a draft collection with per_page=2 and call `refresh()` to
+    //    load page 1, then `load_next_page()` to load page 2.
+    // 2. Record the last item's ID (from page 2) and the current `total_items`.
+    // 3. Publish that draft via the REST API.
+    // 4. Call `PostService.refresh_post()` to re-fetch the post from the
+    //    server and update the local cache.
+    // 5. Wait for a relevant DB hook to fire on the collection.
+    //
+    // Expected result: `refresh_post()` writes the updated post (now with
+    // status `Publish`) back into the local SQLite cache, which triggers a
+    // DB hook via `DatabaseDelegate.did_update()`. After the hook,
+    // `total_items` decreases by 1 and the published post no longer appears
+    // in `load_items()`.
+
+    let ctx = create_test_context();
+
+    // Register a hook recorder to capture DB updates
+    let (sender, mut receiver) = mpsc::unbounded_channel::<UpdateHook>();
+    ctx.cache
+        .start_listening_for_updates(Arc::new(HookRecorder { sender }));
+
+    let filter = PostListFilter {
+        order: Some(WpApiParamOrder::Desc),
+        orderby: Some(WpApiParamPostsOrderBy::Date),
+        status: vec![PostStatus::Draft],
+        ..Default::default()
+    };
+    let collection = ctx
+        .service
+        .posts()
+        .create_post_metadata_collection_with_edit_context(PostEndpointType::Posts, filter, 2);
+
+    collection.refresh().await.expect("refresh should succeed");
+    assert_eq!(collection.current_page(), Some(1));
+
+    collection
+        .load_next_page()
+        .await
+        .expect("load_next_page should succeed");
+    assert_eq!(collection.current_page(), Some(2));
+
+    let old_total_items = collection
+        .list_info()
+        .expect("list_info should exist")
+        .total_items
+        .expect("total_items should exist");
+
+    let items = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert!(items.len() > 2, "should have items from both pages");
+
+    // Pick the last item (from page 2)
+    let published_id = items.last().expect("items should not be empty").id;
+
+    // Drain any hooks that fired during initial refresh and load_next_page
+    while receiver.try_recv().is_ok() {}
+
+    // Publish the draft post from page 2
+    ctx.api
+        .posts()
+        .update(
+            &PostEndpointType::Posts,
+            &PostId(published_id),
+            &PostUpdateParams {
+                status: Some(PostStatus::Publish),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update should succeed");
+
+    // Refresh the published post so the cache picks up the status change
+    ctx.service
+        .posts()
+        .refresh_post(PostId(published_id), &PostEndpointType::Posts)
+        .await
+        .expect("refresh_post should succeed");
+
+    // Wait for a relevant DB hook to fire
+    let timeout = Duration::from_secs(5);
+    let mut received_relevant_hook = false;
+    let deadline = tokio::time::Instant::now() + timeout;
+    while tokio::time::Instant::now() < deadline {
+        match tokio::time::timeout_at(deadline, receiver.recv()).await {
+            Ok(Some(hook)) if collection.is_relevant_update(&hook) => {
+                received_relevant_hook = true;
+                break;
+            }
+            Ok(Some(_)) => continue, // irrelevant hook, keep waiting
+            _ => break,              // timeout or channel closed
+        }
+    }
+    assert!(
+        received_relevant_hook,
+        "expected a relevant DB hook after publishing draft post {}",
+        published_id
+    );
+
+    // After the hook, the collection data should be updated
+    let new_total_items = collection
+        .list_info()
+        .expect("list_info should exist")
+        .total_items
+        .expect("total_items should exist");
+    assert_eq!(
+        new_total_items,
+        old_total_items - 1,
+        "total_items should decrease by 1 after publishing a draft"
+    );
+
+    let updated_items = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert!(
+        !updated_items.iter().any(|item| item.id == published_id),
+        "published post {} should not appear in draft collection",
+        published_id
+    );
+
+    RestoreServer::db().await;
+}
+
+/// A test `DatabaseDelegate` that forwards all hooks to a tokio channel.
+struct HookRecorder {
+    sender: mpsc::UnboundedSender<UpdateHook>,
+}
+
+impl DatabaseDelegate for HookRecorder {
+    fn did_update(&self, update_hook: UpdateHook) {
+        let _ = self.sender.send(update_hook);
+    }
 }
