@@ -215,6 +215,7 @@ fn create_minimal_post() -> AnyPostWithEditContext {
         tags: None,
         parent: None,
         menu_order: None,
+        additional_fields: None,
     }
 }
 
@@ -274,6 +275,7 @@ fn create_full_post() -> AnyPostWithEditContext {
         tags: Some(vec![TermId(10), TermId(20)]),
         parent: Some(PostId(5)),
         menu_order: Some(3),
+        additional_fields: None,
     }
 }
 
@@ -319,5 +321,6 @@ fn create_custom_post() -> AnyPostWithEditContext {
         tags: None,
         parent: None,
         menu_order: None,
+        additional_fields: None,
     }
 }

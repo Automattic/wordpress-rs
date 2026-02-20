@@ -1,5 +1,5 @@
 use crate::{
-    UserId, WpApiParamOrder,
+    AnyJson, UserId, WpApiParamOrder,
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     media::MediaId,
@@ -10,6 +10,7 @@ use crate::{
     wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use wp_contextual::WpContextual;
 use wp_derive::{WpDeriveParamsField, WpDeserialize};
 use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
@@ -264,6 +265,11 @@ pub struct PostCreateParams {
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub menu_order: Option<u32>,
+    // Additional fields not explicitly modeled above
+    // (e.g., custom taxonomy term IDs keyed by rest_base).
+    #[uniffi(default = None)]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub additional_fields: Option<Arc<AnyJson>>,
 }
 
 #[derive(Debug, Default, Serialize, uniffi::Record)]
@@ -351,6 +357,11 @@ pub struct PostUpdateParams {
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub menu_order: Option<u32>,
+    // Additional fields not explicitly modeled above
+    // (e.g., custom taxonomy term IDs keyed by rest_base).
+    #[uniffi(default = None)]
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub additional_fields: Option<Arc<AnyJson>>,
 }
 
 wp_content_i64_id!(PostId);
@@ -433,6 +444,13 @@ pub struct SparseAnyPost {
     #[WpContext(edit, view)]
     #[WpContextualOption]
     pub menu_order: Option<u32>,
+    // Captures any additional JSON fields not explicitly modeled above
+    // (e.g., custom taxonomy term ID arrays keyed by rest_base).
+    #[serde(flatten)]
+    #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
+    #[WpContextualExcludeFromFields]
+    pub additional_fields: Option<Arc<AnyJson>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
@@ -642,6 +660,7 @@ mod tests {
         },
     };
     use rstest::*;
+    use std::collections::HashMap;
 
     #[rstest]
     #[case(PostListParams::default(), "")]
@@ -800,5 +819,116 @@ mod tests {
             parent_exclude: vec![PostId(1), PostId(2)],
             menu_order: Some(1),
         }
+    }
+
+    #[test]
+    fn test_post_create_params_serializes_additional_fields() {
+        let additional = AnyJson::from_term_id_map(HashMap::from([(
+            "genres".to_string(),
+            vec![TermId(10), TermId(20)],
+        )]));
+        let params = PostCreateParams {
+            title: Some("Test".to_string()),
+            additional_fields: Some(additional),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&params).unwrap();
+        assert_eq!(json["title"], "Test");
+        assert_eq!(json["genres"], serde_json::json!([10, 20]));
+        // additional_fields key should not appear in the output
+        assert!(json.get("additional_fields").is_none());
+    }
+
+    #[test]
+    fn test_post_create_params_without_additional_fields() {
+        let params = PostCreateParams {
+            title: Some("Test".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&params).unwrap();
+        assert_eq!(json["title"], "Test");
+        assert!(json.get("additional_fields").is_none());
+    }
+
+    #[test]
+    fn test_post_update_params_serializes_additional_fields() {
+        let additional = AnyJson::from_term_id_map(HashMap::from([
+            ("genres".to_string(), vec![TermId(10), TermId(20)]),
+            ("ratings".to_string(), vec![TermId(5)]),
+        ]));
+        let params = PostUpdateParams {
+            additional_fields: Some(additional),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&params).unwrap();
+        assert_eq!(json["genres"], serde_json::json!([10, 20]));
+        assert_eq!(json["ratings"], serde_json::json!([5]));
+        assert!(json.get("additional_fields").is_none());
+    }
+
+    #[test]
+    fn test_post_update_params_without_additional_fields() {
+        let params = PostUpdateParams::default();
+        let json = serde_json::to_value(&params).unwrap();
+        assert!(json.get("additional_fields").is_none());
+        assert!(json.get("genres").is_none());
+    }
+
+    #[test]
+    fn test_deserialize_post_with_additional_fields() {
+        let json = serde_json::json!({
+            "id": 42,
+            "date": "2025-01-01T00:00:00",
+            "date_gmt": "2025-01-01T00:00:00",
+            "guid": {"rendered": "https://example.com/?p=42"},
+            "link": "https://example.com/post",
+            "modified": "2025-01-01T00:00:00",
+            "modified_gmt": "2025-01-01T00:00:00",
+            "slug": "test-post",
+            "status": "publish",
+            "type": "post",
+            "title": {"rendered": "Test Post"},
+            "content": {"rendered": "<p>Hello</p>"},
+            "template": "",
+            "categories": [1, 2],
+            "tags": [5],
+            "genres": [10, 20],
+            "ratings": [3]
+        });
+        let post: AnyPostWithViewContext = serde_json::from_value(json).unwrap();
+        assert_eq!(post.id, PostId(42));
+        let additional = post.additional_fields.unwrap();
+        assert_eq!(
+            additional.term_ids_for_key("genres"),
+            vec![TermId(10), TermId(20)]
+        );
+        assert_eq!(additional.term_ids_for_key("ratings"), vec![TermId(3)]);
+        assert_eq!(additional.term_ids_for_key("nonexistent"), vec![]);
+    }
+
+    #[test]
+    fn test_deserialize_post_without_additional_fields() {
+        let json = serde_json::json!({
+            "id": 42,
+            "date": "2025-01-01T00:00:00",
+            "date_gmt": "2025-01-01T00:00:00",
+            "guid": {"rendered": "https://example.com/?p=42"},
+            "link": "https://example.com/post",
+            "modified": "2025-01-01T00:00:00",
+            "modified_gmt": "2025-01-01T00:00:00",
+            "slug": "test-post",
+            "status": "publish",
+            "type": "post",
+            "title": {"rendered": "Test Post"},
+            "content": {"rendered": "<p>Hello</p>"},
+            "template": "",
+            "categories": [1, 2],
+            "tags": [5]
+        });
+        let post: AnyPostWithViewContext = serde_json::from_value(json).unwrap();
+        assert_eq!(post.id, PostId(42));
+        // With no unknown fields, additional_fields is Some with an empty object
+        let additional = post.additional_fields.unwrap();
+        assert_eq!(additional.term_ids_for_key("genres"), vec![]);
     }
 }

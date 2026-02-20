@@ -22,6 +22,7 @@ use crate::{
 use rusqlite::{OptionalExtension, Row};
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 use wp_api::{
+    AnyJson,
     posts::{
         AnyPostWithEditContext, AnyPostWithEmbedContext, AnyPostWithViewContext,
         PostContentWithEditContext, PostContentWithViewContext, PostGuidWithEditContext,
@@ -517,6 +518,7 @@ impl PostContext for EditContext {
             tags: if tags.is_empty() { None } else { Some(tags) },
             parent: get_optional_id(row, Parent)?,
             menu_order: row.get_column(MenuOrder)?,
+            additional_fields: deserialize_json_value::<AnyJson>(row.get_column(AdditionalFields)?)?.map(Arc::new),
         };
 
         Ok(DbAnyPostWithEditContext {
@@ -602,6 +604,7 @@ impl PostContext for ViewContext {
             tags: if tags.is_empty() { None } else { Some(tags) },
             parent: get_optional_id(row, Parent)?,
             menu_order: row.get_column(MenuOrder)?,
+            additional_fields: deserialize_json_value::<AnyJson>(row.get_column(AdditionalFields)?)?.map(Arc::new),
         };
 
         Ok(DbAnyPostWithViewContext {
@@ -660,6 +663,7 @@ impl PostContext for EmbedContext {
                 }
             },
             featured_media: get_optional_id(row, FeaturedMedia)?,
+            additional_fields: deserialize_json_value::<AnyJson>(row.get_column(AdditionalFields)?)?.map(Arc::new),
         };
 
         Ok(DbAnyPostWithEmbedContext {
@@ -695,14 +699,16 @@ impl PostRepository<EditContext> {
                 sticky, parent, menu_order, comment_status, ping_status, format, meta,
                 guid_raw, guid_rendered, title_raw, title_rendered,
                 content_raw, content_rendered, content_protected, content_block_version,
-                excerpt_raw, excerpt_rendered, excerpt_protected
+                excerpt_raw, excerpt_rendered, excerpt_protected,
+                additional_fields
             ) VALUES (
                 :db_site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
                 :password, :template, :permalink_template, :generated_slug, :author, :featured_media,
                 :sticky, :parent, :menu_order, :comment_status, :ping_status, :format, :meta,
                 :guid_raw, :guid_rendered, :title_raw, :title_rendered,
                 :content_raw, :content_rendered, :content_protected, :content_block_version,
-                :excerpt_raw, :excerpt_rendered, :excerpt_protected
+                :excerpt_raw, :excerpt_rendered, :excerpt_protected,
+                :additional_fields
             )
             ON CONFLICT(db_site_id, id) DO UPDATE SET
                 date = excluded.date,
@@ -737,6 +743,7 @@ impl PostRepository<EditContext> {
                 excerpt_raw = excluded.excerpt_raw,
                 excerpt_rendered = excluded.excerpt_rendered,
                 excerpt_protected = excluded.excerpt_protected,
+                additional_fields = excluded.additional_fields,
                 last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             RETURNING rowid
             "#,
@@ -781,6 +788,7 @@ impl PostRepository<EditContext> {
                     ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
                     ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
                     ":excerpt_protected": post.excerpt.as_ref().and_then(|e| e.protected),
+                    ":additional_fields": serialize_value_to_json(&post.additional_fields)?,
                 },
                 |row| row.get(0),
             )
@@ -842,14 +850,16 @@ impl PostRepository<ViewContext> {
                 comment_status, ping_status, format, meta,
                 guid_rendered, title_rendered,
                 content_rendered, content_protected,
-                excerpt_raw, excerpt_rendered, excerpt_protected
+                excerpt_raw, excerpt_rendered, excerpt_protected,
+                additional_fields
             ) VALUES (
                 :db_site_id, :id, :date, :date_gmt, :link, :modified, :modified_gmt, :slug, :status, :post_type,
                 :template, :author, :featured_media, :sticky, :parent, :menu_order,
                 :comment_status, :ping_status, :format, :meta,
                 :guid_rendered, :title_rendered,
                 :content_rendered, :content_protected,
-                :excerpt_raw, :excerpt_rendered, :excerpt_protected
+                :excerpt_raw, :excerpt_rendered, :excerpt_protected,
+                :additional_fields
             )
             ON CONFLICT(db_site_id, id) DO UPDATE SET
                 date = excluded.date,
@@ -877,6 +887,7 @@ impl PostRepository<ViewContext> {
                 excerpt_raw = excluded.excerpt_raw,
                 excerpt_rendered = excluded.excerpt_rendered,
                 excerpt_protected = excluded.excerpt_protected,
+                additional_fields = excluded.additional_fields,
                 last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             RETURNING rowid
             "#,
@@ -914,6 +925,7 @@ impl PostRepository<ViewContext> {
                     ":excerpt_raw": post.excerpt.as_ref().and_then(|e| e.raw.clone()),
                     ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
                     ":excerpt_protected": post.excerpt.as_ref().and_then(|e| e.protected),
+                    ":additional_fields": serialize_value_to_json(&post.additional_fields)?,
                 },
                 |row| row.get(0),
             )
@@ -975,12 +987,14 @@ impl PostRepository<EmbedContext> {
                 db_site_id, id, date, link, slug, post_type,
                 title_rendered, author,
                 excerpt_raw, excerpt_rendered, excerpt_protected,
-                featured_media
+                featured_media,
+                additional_fields
             ) VALUES (
                 :db_site_id, :id, :date, :link, :slug, :post_type,
                 :title_rendered, :author,
                 :excerpt_raw, :excerpt_rendered, :excerpt_protected,
-                :featured_media
+                :featured_media,
+                :additional_fields
             )
             ON CONFLICT(db_site_id, id) DO UPDATE SET
                 date = excluded.date,
@@ -993,6 +1007,7 @@ impl PostRepository<EmbedContext> {
                 excerpt_rendered = excluded.excerpt_rendered,
                 excerpt_protected = excluded.excerpt_protected,
                 featured_media = excluded.featured_media,
+                additional_fields = excluded.additional_fields,
                 last_fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             RETURNING rowid
             "#,
@@ -1015,6 +1030,7 @@ impl PostRepository<EmbedContext> {
                     ":excerpt_rendered": post.excerpt.as_ref().and_then(|e| e.rendered.clone()),
                     ":excerpt_protected": post.excerpt.as_ref().and_then(|e| e.protected),
                     ":featured_media": post.featured_media.map(|m| m.0),
+                    ":additional_fields": serialize_value_to_json(&post.additional_fields)?,
                 },
                 |row| row.get(0),
             )
@@ -1102,9 +1118,13 @@ mod tests {
         assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
         assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
         assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
+        assert_eq!(
+            columns[AdditionalFields.as_index()],
+            "additional_fields"
+        );
 
         // Verify total column count matches
-        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
+        assert_eq!(columns.len(), AdditionalFields.as_index() + 1);
     }
 
     /// Verify that PostViewContextColumn enum values match the actual database schema.
@@ -1144,8 +1164,12 @@ mod tests {
         assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
         assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
         assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
+        assert_eq!(
+            columns[AdditionalFields.as_index()],
+            "additional_fields"
+        );
 
-        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
+        assert_eq!(columns.len(), AdditionalFields.as_index() + 1);
     }
 
     /// Verify that PostEmbedContextColumn enum values match the actual database schema.
@@ -1170,8 +1194,12 @@ mod tests {
         assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
         assert_eq!(columns[FeaturedMedia.as_index()], "featured_media");
         assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
+        assert_eq!(
+            columns[AdditionalFields.as_index()],
+            "additional_fields"
+        );
 
-        assert_eq!(columns.len(), LastFetchedAt.as_index() + 1);
+        assert_eq!(columns.len(), AdditionalFields.as_index() + 1);
     }
 
     #[rstest]
