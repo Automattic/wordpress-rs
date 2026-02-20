@@ -518,7 +518,10 @@ impl PostContext for EditContext {
             tags: if tags.is_empty() { None } else { Some(tags) },
             parent: get_optional_id(row, Parent)?,
             menu_order: row.get_column(MenuOrder)?,
-            additional_fields: deserialize_json_value::<AnyJson>(row.get_column(AdditionalFields)?)?.map(Arc::new),
+            additional_fields: deserialize_json_value::<AnyJson>(
+                row.get_column(AdditionalFields)?,
+            )?
+            .map(Arc::new),
         };
 
         Ok(DbAnyPostWithEditContext {
@@ -604,7 +607,10 @@ impl PostContext for ViewContext {
             tags: if tags.is_empty() { None } else { Some(tags) },
             parent: get_optional_id(row, Parent)?,
             menu_order: row.get_column(MenuOrder)?,
-            additional_fields: deserialize_json_value::<AnyJson>(row.get_column(AdditionalFields)?)?.map(Arc::new),
+            additional_fields: deserialize_json_value::<AnyJson>(
+                row.get_column(AdditionalFields)?,
+            )?
+            .map(Arc::new),
         };
 
         Ok(DbAnyPostWithViewContext {
@@ -663,7 +669,10 @@ impl PostContext for EmbedContext {
                 }
             },
             featured_media: get_optional_id(row, FeaturedMedia)?,
-            additional_fields: deserialize_json_value::<AnyJson>(row.get_column(AdditionalFields)?)?.map(Arc::new),
+            additional_fields: deserialize_json_value::<AnyJson>(
+                row.get_column(AdditionalFields)?,
+            )?
+            .map(Arc::new),
         };
 
         Ok(DbAnyPostWithEmbedContext {
@@ -1118,10 +1127,7 @@ mod tests {
         assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
         assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
         assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
-        assert_eq!(
-            columns[AdditionalFields.as_index()],
-            "additional_fields"
-        );
+        assert_eq!(columns[AdditionalFields.as_index()], "additional_fields");
 
         // Verify total column count matches
         assert_eq!(columns.len(), AdditionalFields.as_index() + 1);
@@ -1164,10 +1170,7 @@ mod tests {
         assert_eq!(columns[ExcerptRendered.as_index()], "excerpt_rendered");
         assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
         assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
-        assert_eq!(
-            columns[AdditionalFields.as_index()],
-            "additional_fields"
-        );
+        assert_eq!(columns[AdditionalFields.as_index()], "additional_fields");
 
         assert_eq!(columns.len(), AdditionalFields.as_index() + 1);
     }
@@ -1194,10 +1197,7 @@ mod tests {
         assert_eq!(columns[ExcerptProtected.as_index()], "excerpt_protected");
         assert_eq!(columns[FeaturedMedia.as_index()], "featured_media");
         assert_eq!(columns[LastFetchedAt.as_index()], "last_fetched_at");
-        assert_eq!(
-            columns[AdditionalFields.as_index()],
-            "additional_fields"
-        );
+        assert_eq!(columns[AdditionalFields.as_index()], "additional_fields");
 
         assert_eq!(columns.len(), AdditionalFields.as_index() + 1);
     }
