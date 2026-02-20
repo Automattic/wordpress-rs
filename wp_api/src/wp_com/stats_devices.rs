@@ -225,4 +225,40 @@ mod tests {
         assert_eq!(response.top_values.get("tablet"), Some(&0.0));
     }
 
+    /// Tests deserialization of all stats devices browser JSON fixtures.
+    #[rstest]
+    #[case("tests/wpcom/stats_devices_browser/summarized-01-day.json")]
+    #[case("tests/wpcom/stats_devices_browser/no-summary-01.json")]
+    #[case("tests/wpcom/stats_devices_browser/summarized-02-day-empty-response.json")]
+    fn test_stats_devices_browser_response_deserialization(#[case] json_file_path: &str) {
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let _response: StatsDevicesResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+    }
+
+    #[test]
+    fn test_stats_devices_browser_response_deserialization_summary_01() {
+        let json_file_path = "tests/wpcom/stats_devices_browser/summarized-01-day.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsDevicesResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(response.top_values.len(), 5);
+        assert_eq!(response.top_values.get("chrome"), Some(&6431.0));
+        assert_eq!(response.top_values.get("firefox"), Some(&563.0));
+        assert_eq!(response.top_values.get("safari"), Some(&259.0));
+        assert_eq!(response.top_values.get("edge"), Some(&107.0));
+        assert_eq!(response.top_values.get("other"), Some(&13.0));
+    }
+
+    #[test]
+    fn test_stats_devices_browser_empty_response() {
+        let json_file_path =
+            "tests/wpcom/stats_devices_browser/summarized-02-day-empty-response.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsDevicesResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(response.top_values.is_empty());
+    }
 }
