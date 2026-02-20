@@ -261,4 +261,42 @@ mod tests {
 
         assert!(response.top_values.is_empty());
     }
+
+    /// Tests deserialization of all stats devices platform JSON fixtures.
+    #[rstest]
+    #[case("tests/wpcom/stats_devices_platform/summarized-01-day.json")]
+    #[case("tests/wpcom/stats_devices_platform/no-summary-01.json")]
+    #[case("tests/wpcom/stats_devices_platform/summarized-02-day-empty-response.json")]
+    fn test_stats_devices_platform_response_deserialization(#[case] json_file_path: &str) {
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let _response: StatsDevicesResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+    }
+
+    #[test]
+    fn test_stats_devices_platform_response_deserialization_summary_01() {
+        let json_file_path = "tests/wpcom/stats_devices_platform/summarized-01-day.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsDevicesResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(response.top_values.len(), 6);
+        assert_eq!(response.top_values.get("mac"), Some(&6955.0));
+        assert_eq!(response.top_values.get("windows"), Some(&141.0));
+        assert_eq!(response.top_values.get("linux"), Some(&113.0));
+        assert_eq!(response.top_values.get("android"), Some(&82.0));
+        assert_eq!(response.top_values.get("iphone"), Some(&80.0));
+        assert_eq!(response.top_values.get("ipad"), Some(&2.0));
+    }
+
+    #[test]
+    fn test_stats_devices_platform_empty_response() {
+        let json_file_path =
+            "tests/wpcom/stats_devices_platform/summarized-02-day-empty-response.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsDevicesResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(response.top_values.is_empty());
+    }
 }
