@@ -364,6 +364,45 @@ impl<C: PostContext> PostRepository<C> {
             .collect())
     }
 
+    /// Select post statuses for multiple posts by their WordPress post IDs.
+    ///
+    /// This is a lightweight query used for status change detection - it only
+    /// fetches the `id` and `status` columns without loading the full post data.
+    ///
+    /// Returns a HashMap mapping post IDs (as i64) to their cached status strings.
+    /// Posts not found in the cache are simply omitted from the result.
+    pub fn select_statuses_by_ids(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        post_ids: &[i64],
+    ) -> Result<HashMap<i64, String>, SqliteDbError> {
+        if post_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let ids_str = post_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let sql = format!(
+            "SELECT id, status FROM {} WHERE db_site_id = ? AND id IN ({})",
+            Self::table_name(),
+            ids_str
+        );
+
+        let mut stmt = executor.prepare(&sql)?;
+        let rows = stmt.query_map([site.row_id], |row| {
+            let id: i64 = row.get(0)?;
+            let status: String = row.get(1)?;
+            Ok((id, status))
+        })?;
+
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
     /// Delete a post by its EntityId for a given site.
     ///
     /// Returns the number of rows deleted (0 or 1).

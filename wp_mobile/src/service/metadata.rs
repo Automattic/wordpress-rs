@@ -142,6 +142,18 @@ impl MetadataService {
             .map_err(Into::into)
     }
 
+    /// Remove an entity from all lists for this site and update their counts.
+    ///
+    /// Used when a post's status changes, making it potentially invalid for
+    /// lists filtered by the old status.
+    pub fn remove_entity_from_lists(&self, entity_id: i64) {
+        if let Err(e) = self.cache.execute(|conn| {
+            ListMetadataRepository::remove_entity_and_update_counts(conn, &self.db_site, entity_id)
+        }) {
+            log::warn!("Failed to remove entity {} from lists: {}", entity_id, e);
+        }
+    }
+
     // ============================================================
     // Private error handling helpers
     // ============================================================

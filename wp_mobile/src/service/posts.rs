@@ -526,6 +526,18 @@ impl PostService {
             ..Default::default()
         };
 
+        // Read current statuses before upsert (to detect changes)
+        let old_statuses = self
+            .cache
+            .execute(|conn| {
+                PostRepository::<EditContext>::new().select_statuses_by_ids(
+                    conn,
+                    &self.db_site,
+                    &fetchable,
+                )
+            })
+            .unwrap_or_default();
+
         match self
             .api_client
             .posts()
@@ -561,6 +573,16 @@ impl PostService {
                         return Err(e);
                     }
                 };
+
+                // Detect status changes and remove affected posts from list metadata
+                for post in &response.data {
+                    let new_status = post.status.to_string();
+                    if let Some(old_status) = old_statuses.get(&post.id.0)
+                        && *old_status != new_status
+                    {
+                        self.metadata_service.remove_entity_from_lists(post.id.0);
+                    }
+                }
 
                 // Mark successfully fetched posts as Fresh
                 let fetched_ids: Vec<i64> = response.data.iter().map(|p| p.id.0).collect();

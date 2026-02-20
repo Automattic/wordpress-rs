@@ -517,6 +517,70 @@ impl ListMetadataRepository {
         Ok(info)
     }
 
+    /// Remove an entity from all lists for a site and decrement their total_items.
+    ///
+    /// This is used when a post's status changes (e.g., draft → publish), which
+    /// means it may no longer belong in lists that were filtered by the old status.
+    ///
+    /// The method:
+    /// 1. Finds all `list_metadata_items` rows for this entity within the site's lists
+    /// 2. Deletes those rows
+    /// 3. Decrements `total_items` in the corresponding `list_metadata` headers
+    ///
+    /// These writes fire DELETE hooks on `ListMetadataItems` and UPDATE hooks on
+    /// `ListMetadata`, which collection monitors detect via `is_relevant_data_update()`
+    /// and `is_relevant_list_info_update()`.
+    pub fn remove_entity_and_update_counts(
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        entity_id: i64,
+    ) -> Result<(), SqliteDbError> {
+        // Find affected list_metadata IDs
+        let find_sql = format!(
+            "SELECT DISTINCT lmi.list_metadata_id \
+             FROM {} lmi \
+             JOIN {} lm ON lmi.list_metadata_id = lm.rowid \
+             WHERE lm.db_site_id = ? AND lmi.entity_id = ?",
+            Self::items_table().table_name(),
+            Self::header_table().table_name()
+        );
+
+        let mut stmt = executor.prepare(&find_sql)?;
+        let list_ids: Vec<i64> = stmt
+            .query_map(rusqlite::params![site.row_id, entity_id], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if list_ids.is_empty() {
+            return Ok(());
+        }
+
+        let ids_str = list_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        // Delete the entity from those lists
+        let delete_sql = format!(
+            "DELETE FROM {} WHERE list_metadata_id IN ({}) AND entity_id = ?",
+            Self::items_table().table_name(),
+            ids_str
+        );
+        executor.execute(&delete_sql, rusqlite::params![entity_id])?;
+
+        // Decrement total_items for affected lists
+        let update_sql = format!(
+            "UPDATE {} SET total_items = total_items - 1 \
+             WHERE rowid IN ({}) AND total_items IS NOT NULL AND total_items > 0",
+            Self::header_table().table_name(),
+            ids_str
+        );
+        executor.execute(&update_sql, rusqlite::params![])?;
+
+        Ok(())
+    }
+
     /// Reset stale fetching states to Idle.
     ///
     /// If the app terminates while a fetch is in progress, `FetchingFirstPage` and
