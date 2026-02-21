@@ -298,3 +298,12 @@ public typealias AddMessageToSupportConversationParams = WordPressAPIInternal.Ad
 
 // MARK: - Jetpack
 public typealias JetpackConnectionClient = WordPressAPIInternal.JetpackConnectionClient
+
+// MARK: - Persistence
+public typealias Account = WordPressAPIInternal.Account
+public typealias AccountRepository = WordPressAPIInternal.AccountRepository
+public typealias AccountRepositoryError = WordPressAPIInternal.AccountRepositoryError
+public typealias EncryptedPassword = WordPressAPIInternal.EncryptedPassword
+public typealias DecryptedPassword = WordPressAPIInternal.DecryptedPassword
+public typealias PasswordTransformer = WordPressAPIInternal.PasswordTransformer
+public typealias PasswordTransformerError = WordPressAPIInternal.PasswordTransformerError
