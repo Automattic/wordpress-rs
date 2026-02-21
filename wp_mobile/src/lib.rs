@@ -6,6 +6,7 @@ mod cache_key;
 pub mod collection;
 pub mod entity;
 pub mod filters;
+pub mod persistence;
 pub mod service;
 pub mod sync;
 
