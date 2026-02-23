@@ -21,6 +21,14 @@ class UserListViewModel(private val apiClient: WpApiClient) {
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    private val _canLoadMore = MutableStateFlow(false)
+    val canLoadMore: StateFlow<Boolean> = _canLoadMore.asStateFlow()
+
+    private var nextPageParams: UserListParams? = null
+
     init {
         loadUsers()
     }
@@ -31,10 +39,34 @@ class UserListViewModel(private val apiClient: WpApiClient) {
                 requestBuilder.users().listWithEditContext(params = UserListParams())
             }
             when (usersResult) {
-                is WpRequestResult.Success -> _users.value = usersResult.response.data
+                is WpRequestResult.Success -> {
+                    _users.value = usersResult.response.data
+                    nextPageParams = usersResult.response.nextPageParams
+                    _canLoadMore.value = nextPageParams != null
+                }
                 else -> _users.value = emptyList()
             }
             _isLoading.value = false
+        }
+    }
+
+    fun loadMore() {
+        val params = nextPageParams ?: return
+        if (_isLoadingMore.value) return
+        _isLoadingMore.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = apiClient.request { requestBuilder ->
+                requestBuilder.users().listWithEditContext(params)
+            }
+            when (result) {
+                is WpRequestResult.Success -> {
+                    _users.value = _users.value + result.response.data
+                    nextPageParams = result.response.nextPageParams
+                    _canLoadMore.value = nextPageParams != null
+                }
+                else -> {}
+            }
+            _isLoadingMore.value = false
         }
     }
 }

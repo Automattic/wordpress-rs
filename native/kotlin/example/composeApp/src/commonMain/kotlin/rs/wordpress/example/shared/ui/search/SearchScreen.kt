@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -17,7 +18,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.example.shared.ui.components.LoadingIndicator
+import rs.wordpress.example.shared.ui.components.LoadingMoreIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +42,24 @@ fun SearchScreen(
 ) {
     val results by viewModel.results.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val canLoadMore by viewModel.canLoadMore.collectAsState()
     var query by remember { mutableStateOf("") }
+
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val totalItems = listState.layoutInfo.totalItemsCount
+            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            totalItems > 0 && lastVisibleItem >= totalItems - 3
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore, canLoadMore, isLoadingMore) {
+        if (shouldLoadMore && canLoadMore && !isLoadingMore) {
+            viewModel.loadMore()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -69,6 +90,7 @@ fun SearchScreen(
                 LoadingIndicator()
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(results) { result ->
@@ -80,6 +102,9 @@ fun SearchScreen(
                                 Text("${result.objectType}$subtype")
                             }
                         )
+                    }
+                    if (isLoadingMore) {
+                        item { LoadingMoreIndicator() }
                     }
                 }
             }
