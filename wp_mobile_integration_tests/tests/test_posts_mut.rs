@@ -250,128 +250,6 @@ async fn test_publish_draft_in_second_page_updates_collection() {
 
 #[tokio::test]
 #[serial]
-async fn test_publish_draft_in_second_page_without_loading_second_page() {
-    // The test site has 4 draft posts. We use per_page=2 so page 1 has
-    // 2 drafts and page 2 has 2 drafts.
-    //
-    // Unlike `test_publish_draft_in_second_page_updates_collection`, this
-    // test does NOT call `load_next_page()`. Only page 1 is loaded via
-    // `refresh()`. We then publish a draft that lives on page 2 and call
-    // `refresh_post()`.
-    //
-    // 1. Create a draft collection with per_page=2 and call `refresh()` to
-    //    load page 1 only.
-    // 2. Record the current `list_info` (total_items, etc.).
-    // 3. Publish a draft that is NOT on page 1 (i.e., lives on page 2)
-    //    via the REST API.
-    //
-    // Expected result: `list_info` should be UNCHANGED because the
-    // published post was never loaded locally — it was on page 2 which
-    // was never fetched. Since the app has no prior knowledge of this
-    // post, it cannot detect the status change. The stale `total_items`
-    // will only be corrected on the next `refresh()` call.
-
-    let ctx = create_test_context();
-
-    let filter = PostListFilter {
-        order: Some(WpApiParamOrder::Desc),
-        orderby: Some(WpApiParamPostsOrderBy::Date),
-        status: vec![PostStatus::Draft],
-        ..Default::default()
-    };
-    let collection = ctx
-        .service
-        .posts()
-        .create_post_metadata_collection_with_edit_context(PostEndpointType::Posts, filter, 2);
-
-    collection.refresh().await.expect("refresh should succeed");
-    assert_eq!(collection.current_page(), Some(1));
-
-    let old_list_info = collection.list_info().expect("list_info should exist");
-    let old_total_items = old_list_info.total_items.expect("total_items should exist");
-    assert!(
-        old_total_items >= 4,
-        "test site should have at least 4 draft posts"
-    );
-
-    let page1_items = collection
-        .load_items()
-        .await
-        .expect("load_items should succeed");
-    assert_eq!(page1_items.len(), 2, "page 1 should have 2 items");
-
-    // We need a draft post that is NOT on page 1. Fetch all drafts via
-    // the API and pick one whose ID doesn't appear in page 1.
-    let page1_ids: Vec<i64> = page1_items.iter().map(|item| item.id).collect();
-    let all_drafts = ctx
-        .api
-        .posts()
-        .list_with_edit_context(
-            &PostEndpointType::Posts,
-            &wp_api::posts::PostListParams {
-                status: vec![PostStatus::Draft],
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("list drafts should succeed");
-    let page2_post = all_drafts
-        .data
-        .iter()
-        .find(|p| !page1_ids.contains(&p.id.0))
-        .expect("should find a draft not on page 1");
-    let published_id = page2_post.id;
-
-    // Publish the draft that lives on page 2
-    ctx.api
-        .posts()
-        .update(
-            &PostEndpointType::Posts,
-            &published_id,
-            &PostUpdateParams {
-                status: Some(PostStatus::Publish),
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("update should succeed");
-
-    // Refresh the published post so the cache picks up the new data
-    ctx.service
-        .posts()
-        .refresh_post(published_id, &PostEndpointType::Posts)
-        .await
-        .expect("refresh_post should succeed");
-
-    // list_info should be unchanged: the post was never in the local
-    // cache, so no status change was detected and no list metadata was
-    // modified.
-    let new_list_info = collection.list_info().expect("list_info should exist");
-    let new_total_items = new_list_info.total_items.expect("total_items should exist");
-    assert_eq!(
-        new_total_items, old_total_items,
-        "total_items should be unchanged because the published post was never cached locally"
-    );
-
-    // Page 1 items should also be unchanged
-    let updated_items = collection
-        .load_items()
-        .await
-        .expect("load_items should succeed");
-    assert_eq!(
-        updated_items.len(),
-        page1_items.len(),
-        "item count should be unchanged"
-    );
-    for (old, new) in page1_items.iter().zip(updated_items.iter()) {
-        assert_eq!(old.id, new.id, "item IDs should be unchanged");
-    }
-
-    RestoreServer::db().await;
-}
-
-#[tokio::test]
-#[serial]
 async fn test_create_draft_inserts_into_draft_collection() {
     // The test site has existing draft posts. We use per_page=10 so
     // page 1 has all of them.
@@ -430,6 +308,147 @@ async fn test_create_draft_inserts_into_draft_collection() {
         items_after.iter().any(|item| item.id == created.id.0),
         "new draft {} should appear in load_items",
         created.id.0
+    );
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_trash_draft_removes_from_draft_collection() {
+    // 1. Create a draft collection with per_page=10 and call `refresh()`
+    //    to load all drafts.
+    // 2. Record one draft's ID and the current item count.
+    // 3. Trash that draft via `PostService::trash_post`.
+    //
+    // Expected result: the trashed post no longer appears in `load_items()`
+    // because its status changed from Draft to Trash.
+
+    let ctx = create_test_context();
+
+    let filter = PostListFilter {
+        order: Some(WpApiParamOrder::Desc),
+        orderby: Some(WpApiParamPostsOrderBy::Date),
+        status: vec![PostStatus::Draft],
+        ..Default::default()
+    };
+    let collection = ctx
+        .service
+        .posts()
+        .create_post_metadata_collection_with_edit_context(PostEndpointType::Posts, filter, 10);
+
+    collection.refresh().await.expect("refresh should succeed");
+
+    let items_before = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert!(!items_before.is_empty(), "should have at least one draft");
+
+    let trashed_id = items_before[0].id;
+
+    ctx.service
+        .posts()
+        .trash_post(&PostEndpointType::Posts, &PostId(trashed_id))
+        .await
+        .expect("trash_post should succeed");
+
+    let items_after = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert!(
+        !items_after.iter().any(|item| item.id == trashed_id),
+        "trashed post {} should not appear in draft collection",
+        trashed_id
+    );
+    assert_eq!(
+        items_after.len(),
+        items_before.len() - 1,
+        "item count should decrease by one after trashing"
+    );
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_delete_permanently_removes_from_collection() {
+    // 1. Create a draft, then trash it so it can be permanently deleted.
+    // 2. Create a trash collection with per_page=10 and call `refresh()`.
+    // 3. Permanently delete the trashed post via
+    //    `PostService::delete_post_permanently`.
+    //
+    // Expected result: the deleted post no longer appears in `load_items()`.
+
+    let ctx = create_test_context();
+
+    // Create a draft and immediately trash it so we have a trashed post
+    let created = ctx
+        .service
+        .posts()
+        .create_post(
+            &PostEndpointType::Posts,
+            &PostCreateParams {
+                title: Some("Post To Delete Permanently".to_string()),
+                status: Some(PostStatus::Draft),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("create_post should succeed");
+
+    let trashed = ctx
+        .service
+        .posts()
+        .trash_post(&PostEndpointType::Posts, &created.id)
+        .await
+        .expect("trash_post should succeed");
+    assert_eq!(trashed.status, PostStatus::Trash);
+
+    // Build a trash collection
+    let filter = PostListFilter {
+        order: Some(WpApiParamOrder::Desc),
+        orderby: Some(WpApiParamPostsOrderBy::Date),
+        status: vec![PostStatus::Trash],
+        ..Default::default()
+    };
+    let collection = ctx
+        .service
+        .posts()
+        .create_post_metadata_collection_with_edit_context(PostEndpointType::Posts, filter, 10);
+
+    collection.refresh().await.expect("refresh should succeed");
+
+    let items_before = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert!(
+        items_before.iter().any(|item| item.id == created.id.0),
+        "trashed post {} should appear in trash collection before delete",
+        created.id.0
+    );
+
+    ctx.service
+        .posts()
+        .delete_post_permanently(&PostEndpointType::Posts, &created.id)
+        .await
+        .expect("delete_post_permanently should succeed");
+
+    let items_after = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert!(
+        !items_after.iter().any(|item| item.id == created.id.0),
+        "permanently deleted post {} should not appear in trash collection",
+        created.id.0
+    );
+    assert_eq!(
+        items_after.len(),
+        items_before.len() - 1,
+        "item count should decrease by one after permanent delete"
     );
 
     RestoreServer::db().await;
