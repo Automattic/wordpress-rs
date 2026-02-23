@@ -111,6 +111,34 @@ impl ListMetadataRepository {
         }
     }
 
+    /// Check whether a list contains a specific entity ID.
+    ///
+    /// Uses `SELECT EXISTS` to avoid fetching all items when only a
+    /// membership check is needed.
+    pub fn contains_entity(
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key: &ListKey,
+        entity_id: i64,
+    ) -> Result<bool, SqliteDbError> {
+        let sql = format!(
+            "SELECT EXISTS(\
+                SELECT 1 FROM {items} \
+                WHERE list_metadata_id = (\
+                    SELECT rowid FROM {header} WHERE db_site_id = ? AND key = ?\
+                ) AND entity_id = ?\
+            )",
+            items = Self::items_table().table_name(),
+            header = Self::header_table().table_name(),
+        );
+        let mut stmt = executor.prepare(&sql)?;
+        let exists: bool = stmt
+            .query_row(rusqlite::params![site.row_id, key, entity_id], |row| {
+                row.get(0)
+            })?;
+        Ok(exists)
+    }
+
     /// Get all items for a list by ID, ordered by rowid (insertion order = display order).
     ///
     /// Use this when you already have the `list_metadata_id` from a previous call
@@ -451,6 +479,37 @@ impl ListMetadataRepository {
         Self::update_state_by_list_metadata_id(executor, list_metadata_id, state, error_message)
     }
 
+    /// Remove specific items from a list by entity ID.
+    pub fn remove_items_by_entity_ids(
+        executor: &impl QueryExecutor,
+        list_metadata_id: RowId,
+        entity_ids: &[i64],
+    ) -> Result<(), SqliteDbError> {
+        if entity_ids.is_empty() {
+            return Ok(());
+        }
+
+        // Build placeholders for IN clause
+        let placeholders: Vec<_> = (0..entity_ids.len()).map(|_| "?").collect();
+        let sql = format!(
+            "DELETE FROM {} WHERE list_metadata_id = ? AND entity_id IN ({})",
+            Self::items_table().table_name(),
+            placeholders.join(", ")
+        );
+
+        // Build params: [list_metadata_id, entity_id1, entity_id2, ...]
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(list_metadata_id)];
+        params.extend(
+            entity_ids
+                .iter()
+                .map(|id| Box::new(*id) as Box<dyn rusqlite::ToSql>),
+        );
+
+        let param_refs: Vec<_> = params.iter().map(|p| p.as_ref()).collect();
+        executor.execute(&sql, param_refs.as_slice())?;
+        Ok(())
+    }
+
     /// Delete all data for a list (header, items, and state).
     pub fn delete_list(
         executor: &impl QueryExecutor,
@@ -537,9 +596,9 @@ impl ListMetadataRepository {
         executor.execute(
             &sql,
             rusqlite::params![
-                ListState::Idle as i32,
-                ListState::FetchingFirstPage as i32,
-                ListState::FetchingNextPage as i32,
+                ListState::Idle as i64,
+                ListState::FetchingFirstPage as i64,
+                ListState::FetchingNextPage as i64,
             ],
         )
     }

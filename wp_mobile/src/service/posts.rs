@@ -13,12 +13,15 @@ use crate::{
     },
     sync::{DbEntityState, EntityMetadata, MetadataFetchResult, SyncResult, SyncStrategy},
 };
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex, Weak},
+};
 use wp_api::{
     api_client::WpApiClient,
     posts::{
-        AnyPostWithEditContext, PostId, PostListParams, PostStatus,
-        SparseAnyPostFieldWithEditContext,
+        AnyPostWithEditContext, PostCreateParams, PostDeleteResponse, PostId, PostListParams,
+        PostStatus, PostUpdateParams, SparseAnyPostFieldWithEditContext,
     },
     request::endpoint::posts_endpoint::PostEndpointType,
 };
@@ -73,7 +76,12 @@ pub struct PostService {
 
     /// Database-backed list metadata service.
     /// Persists list structure across app restarts.
-    metadata_service: Arc<MetadataService>,
+    pub(crate) metadata_service: Arc<MetadataService>,
+
+    /// Weak references to active metadata collections.
+    /// Used to notify collections directly when posts change,
+    /// bypassing the SQLite update hook → rowid resolution path.
+    collections: Mutex<Vec<Weak<PostMetadataCollectionWithEditContext>>>,
 }
 
 impl PostService {
@@ -85,6 +93,7 @@ impl PostService {
             db_site,
             cache,
             metadata_service,
+            collections: Mutex::new(Vec::new()),
         }
     }
 
@@ -647,6 +656,7 @@ impl PostService {
 
         let repo = PostRepository::<EditContext>::new();
 
+        // TODO: query database for all IDs in one call instead of iterating?
         self.cache.execute(|connection| {
             ids.iter()
                 .map(|&id| repo.select_by_post_id(connection, &self.db_site, PostId(id)))
@@ -782,6 +792,107 @@ impl PostService {
             .map(|_| ())
     }
 
+    /// Create a post via the REST API and cache the result locally.
+    pub async fn create_post(
+        self: &Arc<Self>,
+        endpoint_type: &PostEndpointType,
+        params: &PostCreateParams,
+    ) -> Result<AnyPostWithEditContext, FetchError> {
+        let post = self
+            .api_client
+            .posts()
+            .create(endpoint_type, params)
+            .await?
+            .data;
+
+        self.cache.execute(|conn| {
+            PostRepository::<EditContext>::new()
+                .upsert(conn, &self.db_site, &post)
+                .map_err(|e| FetchError::Database {
+                    err_message: e.to_string(),
+                })
+        })?;
+
+        self.notify_collections(post.id.0);
+        Ok(post)
+    }
+
+    /// Update a post via the REST API and cache the result locally.
+    pub async fn update_post(
+        self: &Arc<Self>,
+        endpoint_type: &PostEndpointType,
+        post_id: &PostId,
+        params: &PostUpdateParams,
+    ) -> Result<AnyPostWithEditContext, FetchError> {
+        let post = self
+            .api_client
+            .posts()
+            .update(endpoint_type, post_id, params)
+            .await?
+            .data;
+
+        self.cache.execute(|conn| {
+            PostRepository::<EditContext>::new()
+                .upsert(conn, &self.db_site, &post)
+                .map_err(|e| FetchError::Database {
+                    err_message: e.to_string(),
+                })
+        })?;
+
+        self.notify_collections(post.id.0);
+        Ok(post)
+    }
+
+    /// Trash a post via the REST API and cache the result locally.
+    ///
+    /// The post still exists after trashing (with status changed to Trash),
+    /// so it is upserted rather than deleted from the cache.
+    pub async fn trash_post(
+        self: &Arc<Self>,
+        endpoint_type: &PostEndpointType,
+        post_id: &PostId,
+    ) -> Result<AnyPostWithEditContext, FetchError> {
+        let post = self
+            .api_client
+            .posts()
+            .trash(endpoint_type, post_id)
+            .await?
+            .data;
+
+        self.cache.execute(|conn| {
+            PostRepository::<EditContext>::new()
+                .upsert(conn, &self.db_site, &post)
+                .map_err(|e| FetchError::Database {
+                    err_message: e.to_string(),
+                })
+        })?;
+
+        self.notify_collections(post.id.0);
+        Ok(post)
+    }
+
+    /// Permanently delete a post via the REST API and remove it from the local cache.
+    pub async fn delete_post_permanently(
+        self: &Arc<Self>,
+        endpoint_type: &PostEndpointType,
+        post_id: &PostId,
+    ) -> Result<PostDeleteResponse, FetchError> {
+        let response = self
+            .api_client
+            .posts()
+            .delete(endpoint_type, post_id)
+            .await?
+            .data;
+
+        self.delete_by_post_id(*post_id)
+            .map_err(|e| FetchError::Database {
+                err_message: e.to_string(),
+            })?;
+
+        self.notify_collections(post_id.0);
+        Ok(response)
+    }
+
     /// Create a filtered post collection with edit context
     ///
     /// Returns a collection that:
@@ -870,7 +981,7 @@ impl PostService {
         endpoint_type: PostEndpointType,
         filter: PostListFilter,
         per_page: u32,
-    ) -> PostMetadataCollectionWithEditContext {
+    ) -> Arc<PostMetadataCollectionWithEditContext> {
         // Generate cache key from filter
         let cache_key = post_list_filter_cache_key(&filter);
         let endpoint_key = endpoint_type_cache_key(&endpoint_type);
@@ -892,7 +1003,19 @@ impl PostService {
             per_page,
         );
 
-        PostMetadataCollectionWithEditContext::new(core, self.clone(), endpoint_type, filter)
+        let collection = Arc::new(PostMetadataCollectionWithEditContext::new(
+            core,
+            self.clone(),
+            endpoint_type,
+            filter,
+        ));
+
+        // Register weak reference for direct notifications
+        if let Ok(mut collections) = self.collections.lock() {
+            collections.push(Arc::downgrade(&collection));
+        }
+
+        collection
     }
 
     /// Get a collection of all posts with edit context for this site.
@@ -930,6 +1053,28 @@ impl PostService {
             }),
         )
         .into()
+    }
+}
+
+impl PostService {
+    /// Notify all active collections about a changed post ID.
+    ///
+    /// Upgrades weak references, prunes dead ones, then calls
+    /// `update_post_membership` on each live collection.
+    fn notify_collections(&self, post_id: i64) {
+        // Collect live Arc refs while pruning dead ones, then release the lock
+        let live_collections: Vec<Arc<PostMetadataCollectionWithEditContext>> = {
+            let mut guard = match self.collections.lock() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            guard.retain(|w| w.strong_count() > 0);
+            guard.iter().filter_map(|w| w.upgrade()).collect()
+        };
+
+        for collection in &live_collections {
+            let _ = collection.update_post_membership(post_id);
+        }
     }
 }
 
