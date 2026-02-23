@@ -10,32 +10,39 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import org.koin.compose.koinInject
+import rs.wordpress.api.kotlin.WpApiClient
+import rs.wordpress.api.kotlin.WpComApiClient
+import rs.wordpress.cache.kotlin.WordPressApiCache
+import rs.wordpress.example.shared.di.createWpApiClient
+import rs.wordpress.example.shared.di.createWpComApiClient
+import rs.wordpress.example.shared.di.createWpService
+import rs.wordpress.example.shared.ui.categories.CategoryListScreen
+import rs.wordpress.example.shared.ui.comments.CommentListScreen
 import rs.wordpress.example.shared.ui.login.LoginScreen
+import rs.wordpress.example.shared.ui.media.MediaListScreen
+import rs.wordpress.example.shared.ui.pages.PageListScreen
 import rs.wordpress.example.shared.ui.plugins.PluginListScreen
-import rs.wordpress.example.shared.ui.plugins.PluginListViewModel
 import rs.wordpress.example.shared.ui.postcollection.PostCollectionScreen
 import rs.wordpress.example.shared.ui.postmetadatacollection.PostMetadataCollectionScreen
 import rs.wordpress.example.shared.ui.posttypes.PostTypesScreen
-import rs.wordpress.api.kotlin.WpComApiClient
-import rs.wordpress.example.shared.di.createWpComApiClient
+import rs.wordpress.example.shared.ui.search.SearchScreen
+import rs.wordpress.example.shared.ui.settings.SiteSettingsScreen
 import rs.wordpress.example.shared.ui.site.SiteScreen
+import rs.wordpress.example.shared.ui.sitehealth.SiteHealthScreen
 import rs.wordpress.example.shared.ui.stresstest.StressTestScreen
+import rs.wordpress.example.shared.ui.tags.TagListScreen
+import rs.wordpress.example.shared.ui.themes.ThemeListScreen
 import rs.wordpress.example.shared.ui.users.UserListScreen
-import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComBotConversationsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComMeScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSiteScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSupportConversationsScreen
-import rs.wordpress.cache.kotlin.WordPressApiCache
-import rs.wordpress.example.shared.di.createWpService
 import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.WpService
 
 @Composable
 fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, authenticateWpCom: (() -> Unit)?) {
-    val userListViewModel = koinInject<UserListViewModel>()
-    val pluginListViewModel = koinInject<PluginListViewModel>()
     val cache = koinInject<WordPressApiCache>()
     val navController = rememberNavController()
 
@@ -44,6 +51,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
     var currentWpService by remember { mutableStateOf<WpService?>(null) }
     var currentAccount by remember { mutableStateOf<Account.SelfHostedSite?>(null) }
     var currentWpComClient by remember { mutableStateOf<WpComApiClient?>(null) }
+    var currentApiClient by remember { mutableStateOf<WpApiClient?>(null) }
 
     MaterialTheme {
         NavHost(navController, startDestination = "welcome") {
@@ -58,8 +66,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
                             is Account.SelfHostedSite -> {
                                 currentAccount = account
                                 currentWpService = createWpService(account, cache)
-                                userListViewModel.setAccount(account)
-                                pluginListViewModel.setAccount(account)
+                                currentApiClient = createWpApiClient(account)
                                 navController.navigate("site")
                             }
                             is Account.WpCom -> {
@@ -83,31 +90,86 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
             }
             composable("site") {
                 SiteScreen(
-                    onUsersClicked = {
-                        navController.navigate("users")
-                    },
-                    onPluginsClicked = {
-                        navController.navigate("plugins")
-                    },
-                    onStressTestClicked = {
-                        navController.navigate("stresstest")
-                    },
-                    onPostCollectionClicked = {
-                        navController.navigate("postcollection")
-                    },
-                    onPostTypesClicked = {
-                        navController.navigate("posttypes")
-                    },
+                    onUsersClicked = { navController.navigate("users") },
+                    onPluginsClicked = { navController.navigate("plugins") },
+                    onStressTestClicked = { navController.navigate("stresstest") },
+                    onPostCollectionClicked = { navController.navigate("postcollection") },
+                    onPostTypesClicked = { navController.navigate("posttypes") },
+                    onCategoriesClicked = { navController.navigate("categories") },
+                    onTagsClicked = { navController.navigate("tags") },
+                    onPagesClicked = { navController.navigate("pages") },
+                    onCommentsClicked = { navController.navigate("comments") },
+                    onMediaClicked = { navController.navigate("media") },
+                    onThemesClicked = { navController.navigate("themes") },
+                    onSiteSettingsClicked = { navController.navigate("sitesettings") },
+                    onSearchClicked = { navController.navigate("search") },
+                    onSiteHealthClicked = { navController.navigate("sitehealth") },
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("users") {
                 UserListScreen(
+                    apiClient = currentApiClient!!,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("plugins") {
                 PluginListScreen(
+                    apiClient = currentApiClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("categories") {
+                CategoryListScreen(
+                    apiClient = currentApiClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("tags") {
+                TagListScreen(
+                    apiClient = currentApiClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("pages") {
+                PageListScreen(
+                    apiClient = currentApiClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("comments") {
+                CommentListScreen(
+                    apiClient = currentApiClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("media") {
+                MediaListScreen(
+                    apiClient = currentApiClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("themes") {
+                ThemeListScreen(
+                    apiClient = currentApiClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("sitesettings") {
+                SiteSettingsScreen(
+                    apiClient = currentApiClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("search") {
+                SearchScreen(
+                    apiClient = currentApiClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("sitehealth") {
+                SiteHealthScreen(
+                    apiClient = currentApiClient!!,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
