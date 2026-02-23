@@ -16,18 +16,22 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import org.koin.compose.koinInject
+import rs.wordpress.api.kotlin.WpApiClient
+import rs.wordpress.example.shared.ui.components.LoadingIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
 fun PluginListScreen(
-    pluginListViewModel: PluginListViewModel = koinInject(),
+    apiClient: WpApiClient,
+    viewModel: PluginListViewModel = remember { PluginListViewModel(apiClient) },
     onBackClicked: () -> Unit = {}
 ) {
-    val plugins by pluginListViewModel.plugins.collectAsState()
+    val plugins by viewModel.plugins.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
     Scaffold(
         topBar = {
@@ -41,14 +45,18 @@ fun PluginListScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(paddingValues)
-        ) {
-            items(plugins) { plugin ->
-                ListItem(
-                    headlineContent = { Text(plugin.name) },
-                    supportingContent = { Text(plugin.author) }
-                )
+        if (isLoading) {
+            LoadingIndicator(modifier = Modifier.padding(paddingValues))
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(paddingValues)
+            ) {
+                items(plugins) { plugin ->
+                    ListItem(
+                        headlineContent = { Text(plugin.name) },
+                        supportingContent = { Text(plugin.author) }
+                    )
+                }
             }
         }
     }
