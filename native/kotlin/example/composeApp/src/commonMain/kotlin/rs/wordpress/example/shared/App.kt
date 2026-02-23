@@ -16,11 +16,17 @@ import rs.wordpress.example.shared.ui.plugins.PluginListViewModel
 import rs.wordpress.example.shared.ui.postcollection.PostCollectionScreen
 import rs.wordpress.example.shared.ui.postmetadatacollection.PostMetadataCollectionScreen
 import rs.wordpress.example.shared.ui.posttypes.PostTypesScreen
+import rs.wordpress.api.kotlin.WpComApiClient
+import rs.wordpress.example.shared.di.createWpComApiClient
 import rs.wordpress.example.shared.ui.site.SiteScreen
 import rs.wordpress.example.shared.ui.stresstest.StressTestScreen
 import rs.wordpress.example.shared.ui.users.UserListScreen
 import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeScreen
+import rs.wordpress.example.shared.ui.wpcom.WpComBotConversationsScreen
+import rs.wordpress.example.shared.ui.wpcom.WpComMeScreen
+import rs.wordpress.example.shared.ui.wpcom.WpComSiteScreen
+import rs.wordpress.example.shared.ui.wpcom.WpComSupportConversationsScreen
 import rs.wordpress.cache.kotlin.WordPressApiCache
 import rs.wordpress.example.shared.di.createWpService
 import uniffi.wp_mobile.Account
@@ -37,6 +43,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
     var currentPostTypeSlug by remember { mutableStateOf("post") }
     var currentWpService by remember { mutableStateOf<WpService?>(null) }
     var currentAccount by remember { mutableStateOf<Account.SelfHostedSite?>(null) }
+    var currentWpComClient by remember { mutableStateOf<WpComApiClient?>(null) }
 
     MaterialTheme {
         NavHost(navController, startDestination = "welcome") {
@@ -47,13 +54,19 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
                         navController.navigate("login")
                     },
                     onSiteClicked = { account ->
-                        if (account is Account.SelfHostedSite) {
-                            currentAccount = account
-                            currentWpService = createWpService(account, cache)
+                        when (account) {
+                            is Account.SelfHostedSite -> {
+                                currentAccount = account
+                                currentWpService = createWpService(account, cache)
+                                userListViewModel.setAccount(account)
+                                pluginListViewModel.setAccount(account)
+                                navController.navigate("site")
+                            }
+                            is Account.WpCom -> {
+                                currentWpComClient = createWpComApiClient(account)
+                                navController.navigate("wpcom_site")
+                            }
                         }
-                        userListViewModel.setAccount(account)
-                        pluginListViewModel.setAccount(account)
-                        navController.navigate("site")
                     }
                 )
             }
@@ -125,6 +138,32 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
                 PostMetadataCollectionScreen(
                     wpService = currentWpService!!,
                     postTypeSlug = currentPostTypeSlug,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("wpcom_site") {
+                WpComSiteScreen(
+                    onMeClicked = { navController.navigate("wpcom_me") },
+                    onSupportConversationsClicked = { navController.navigate("wpcom_support") },
+                    onBotConversationsClicked = { navController.navigate("wpcom_bots") },
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("wpcom_me") {
+                WpComMeScreen(
+                    wpComApiClient = currentWpComClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("wpcom_support") {
+                WpComSupportConversationsScreen(
+                    wpComApiClient = currentWpComClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("wpcom_bots") {
+                WpComBotConversationsScreen(
+                    wpComApiClient = currentWpComClient!!,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
