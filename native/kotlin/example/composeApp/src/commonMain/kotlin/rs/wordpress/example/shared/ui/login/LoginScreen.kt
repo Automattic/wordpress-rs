@@ -49,7 +49,7 @@ fun LoginScreen(authenticateSite: (String) -> Unit, authenticateWpCom: (() -> Un
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxSize().padding(paddingValues),
         ) {
-            var siteUrl by remember { mutableStateOf("vanilla.wpmt.co") }
+            var siteUrl by remember { mutableStateOf("") }
             OutlinedTextField(
                 value = siteUrl,
                 onValueChange = { siteUrl = it },
