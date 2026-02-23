@@ -21,6 +21,14 @@ class CommentListViewModel(private val apiClient: WpApiClient) {
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    private val _canLoadMore = MutableStateFlow(false)
+    val canLoadMore: StateFlow<Boolean> = _canLoadMore.asStateFlow()
+
+    private var nextPageParams: CommentListParams? = null
+
     init {
         loadComments()
     }
@@ -31,10 +39,34 @@ class CommentListViewModel(private val apiClient: WpApiClient) {
                 requestBuilder.comments().listWithEditContext(params = CommentListParams())
             }
             when (result) {
-                is WpRequestResult.Success -> _comments.value = result.response.data
+                is WpRequestResult.Success -> {
+                    _comments.value = result.response.data
+                    nextPageParams = result.response.nextPageParams
+                    _canLoadMore.value = nextPageParams != null
+                }
                 else -> _comments.value = emptyList()
             }
             _isLoading.value = false
+        }
+    }
+
+    fun loadMore() {
+        val params = nextPageParams ?: return
+        if (_isLoadingMore.value) return
+        _isLoadingMore.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = apiClient.request { requestBuilder ->
+                requestBuilder.comments().listWithEditContext(params = params)
+            }
+            when (result) {
+                is WpRequestResult.Success -> {
+                    _comments.value = _comments.value + result.response.data
+                    nextPageParams = result.response.nextPageParams
+                    _canLoadMore.value = nextPageParams != null
+                }
+                else -> {}
+            }
+            _isLoadingMore.value = false
         }
     }
 }

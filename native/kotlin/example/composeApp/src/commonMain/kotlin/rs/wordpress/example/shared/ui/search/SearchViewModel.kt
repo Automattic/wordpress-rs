@@ -21,21 +21,57 @@ class SearchViewModel(private val apiClient: WpApiClient) {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    private val _canLoadMore = MutableStateFlow(false)
+    val canLoadMore: StateFlow<Boolean> = _canLoadMore.asStateFlow()
+
+    private var nextPageParams: SearchListParams? = null
+
     fun search(query: String) {
         if (query.isBlank()) {
             _results.value = emptyList()
+            nextPageParams = null
+            _canLoadMore.value = false
             return
         }
         _isLoading.value = true
+        nextPageParams = null
+        _canLoadMore.value = false
         viewModelScope.launch(Dispatchers.IO) {
             val result = apiClient.request { requestBuilder ->
                 requestBuilder.search().listWithViewContext(params = SearchListParams(search = query))
             }
             when (result) {
-                is WpRequestResult.Success -> _results.value = result.response.data
+                is WpRequestResult.Success -> {
+                    _results.value = result.response.data
+                    nextPageParams = result.response.nextPageParams
+                    _canLoadMore.value = nextPageParams != null
+                }
                 else -> _results.value = emptyList()
             }
             _isLoading.value = false
+        }
+    }
+
+    fun loadMore() {
+        val params = nextPageParams ?: return
+        if (_isLoadingMore.value) return
+        _isLoadingMore.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = apiClient.request { requestBuilder ->
+                requestBuilder.search().listWithViewContext(params = params)
+            }
+            when (result) {
+                is WpRequestResult.Success -> {
+                    _results.value = _results.value + result.response.data
+                    nextPageParams = result.response.nextPageParams
+                    _canLoadMore.value = nextPageParams != null
+                }
+                else -> {}
+            }
+            _isLoadingMore.value = false
         }
     }
 }
