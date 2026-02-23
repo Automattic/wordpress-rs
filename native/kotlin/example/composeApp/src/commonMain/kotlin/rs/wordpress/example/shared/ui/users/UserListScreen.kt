@@ -16,18 +16,22 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import org.koin.compose.koinInject
+import rs.wordpress.api.kotlin.WpApiClient
+import rs.wordpress.example.shared.ui.components.LoadingIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
 fun UserListScreen(
-    userListViewModel: UserListViewModel = koinInject(),
+    apiClient: WpApiClient,
+    viewModel: UserListViewModel = remember { UserListViewModel(apiClient) },
     onBackClicked: () -> Unit = {}
 ) {
-    val users by userListViewModel.users.collectAsState()
+    val users by viewModel.users.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
     Scaffold(
         topBar = {
@@ -41,14 +45,18 @@ fun UserListScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(paddingValues)
-        ) {
-            items(users) { user ->
-                ListItem(
-                    headlineContent = { Text(user.name) },
-                    supportingContent = { Text(user.email) }
-                )
+        if (isLoading) {
+            LoadingIndicator(modifier = Modifier.padding(paddingValues))
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(paddingValues)
+            ) {
+                items(users) { user ->
+                    ListItem(
+                        headlineContent = { Text(user.name) },
+                        supportingContent = { Text(user.email) }
+                    )
+                }
             }
         }
     }
