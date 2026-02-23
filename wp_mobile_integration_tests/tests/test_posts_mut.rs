@@ -153,12 +153,14 @@ async fn test_publish_draft_in_first_page_updates_collection() {
     // Publish the first draft post
     ctx.service
         .posts()
-        .update_post(&PostEndpointType::Posts,
+        .update_post(
+            &PostEndpointType::Posts,
             &PostId(published_id),
             &PostUpdateParams {
                 status: Some(PostStatus::Publish),
                 ..Default::default()
-            })
+            },
+        )
         .await
         .expect("refresh_post should succeed");
 
@@ -220,7 +222,8 @@ async fn test_publish_draft_in_second_page_updates_collection() {
     let published_id = items.last().expect("items should not be empty").id;
 
     // Publish the draft post from page 2
-    ctx.service.posts()
+    ctx.service
+        .posts()
         .update_post(
             &PostEndpointType::Posts,
             &PostId(published_id),
@@ -363,6 +366,71 @@ async fn test_publish_draft_in_second_page_without_loading_second_page() {
     for (old, new) in page1_items.iter().zip(updated_items.iter()) {
         assert_eq!(old.id, new.id, "item IDs should be unchanged");
     }
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_create_draft_inserts_into_draft_collection() {
+    // The test site has existing draft posts. We use per_page=10 so
+    // page 1 has all of them.
+    //
+    // 1. Create a draft collection and call `refresh()` to load page 1.
+    // 2. Record the current item count.
+    // 3. Create a new draft via `PostService::create_post`, which caches
+    //    the post and notifies collections.
+    //
+    // Expected result: the new draft appears in `load_items()`.
+
+    let ctx = create_test_context();
+
+    let filter = PostListFilter {
+        order: Some(WpApiParamOrder::Desc),
+        orderby: Some(WpApiParamPostsOrderBy::Date),
+        status: vec![PostStatus::Draft],
+        ..Default::default()
+    };
+    let collection = ctx
+        .service
+        .posts()
+        .create_post_metadata_collection_with_edit_context(PostEndpointType::Posts, filter, 10);
+
+    collection.refresh().await.expect("refresh should succeed");
+
+    let items_before = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+
+    let created = ctx
+        .service
+        .posts()
+        .create_post(
+            &PostEndpointType::Posts,
+            &PostCreateParams {
+                title: Some("Integration Test Draft".to_string()),
+                status: Some(PostStatus::Draft),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("create_post should succeed");
+
+    let items_after = collection
+        .load_items()
+        .await
+        .expect("load_items should succeed");
+    assert_eq!(
+        items_after.len(),
+        items_before.len() + 1,
+        "creating a draft should add one item to the collection"
+    );
+    assert!(
+        items_after.iter().any(|item| item.id == created.id.0),
+        "new draft {} should appear in load_items",
+        created.id.0
+    );
 
     RestoreServer::db().await;
 }
