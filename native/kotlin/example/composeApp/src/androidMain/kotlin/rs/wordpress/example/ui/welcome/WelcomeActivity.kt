@@ -6,74 +6,170 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import kotlinx.coroutines.runBlocking
+import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import rs.wordpress.api.kotlin.ApiDiscoveryResult
+import rs.wordpress.api.kotlin.WpComApiClient
 import rs.wordpress.api.kotlin.WpLoginClient
-import rs.wordpress.example.shared.App
-import rs.wordpress.example.shared.repository.AuthenticationRepository
-import androidx.core.net.toUri
+import rs.wordpress.api.kotlin.WpRequestResult
 import rs.wordpress.api.kotlin.toURL
+import rs.wordpress.example.WpComCredentials
+import rs.wordpress.example.shared.App
 import uniffi.wp_api.AutoDiscoveryAttemptSuccess
+import uniffi.wp_api.TokenRequestParameters
+import uniffi.wp_api.WpAuthenticationProvider
+import uniffi.wp_api.buildTokenRequestUrl
+import uniffi.wp_api.parseAuthorizationUrl
+import uniffi.wp_mobile.Account
+import uniffi.wp_mobile.AccountRepository
 
 class WelcomeActivity : ComponentActivity() {
-    private val authRepository: AuthenticationRepository by inject()
+    private val accountRepository: AccountRepository by inject()
     private var apiDiscoverySuccess: AutoDiscoveryAttemptSuccess? = null
+    private var wpComOAuthState: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val wpComAuth = if (WpComCredentials.CLIENT_ID != null && WpComCredentials.CLIENT_SECRET != null) {
+            ::authenticateWpCom
+        } else {
+            null
+        }
+
         setContent {
-            App(authenticationEnabled = true, ::authenticateSite)
+            App(authenticationEnabled = true, ::authenticateSite, wpComAuth)
         }
     }
 
     private fun authenticateSite(url: String) {
-        val success = runBlocking {
-            when (val apiDiscoveryResult = WpLoginClient(emptyList()).apiDiscovery(url)) {
+        lifecycleScope.launch {
+            val success = when (val apiDiscoveryResult = WpLoginClient(emptyList()).apiDiscovery(url)) {
                 is ApiDiscoveryResult.Success -> apiDiscoveryResult.success
                 else -> throw IllegalStateException("Api discovery should succeed for the example app")
             }
-        }
-        val uriBuilder = success.applicationPasswordsAuthenticationUrl.url().toUri().buildUpon()
-        apiDiscoverySuccess = success
+            val uriBuilder = success.applicationPasswordsAuthenticationUrl.url().toUri().buildUpon()
+            apiDiscoverySuccess = success
 
-        uriBuilder
-            .appendQueryParameter("app_name", "WordPressRsAndroidExample")
-            .appendQueryParameter("app_id", "00000000-0000-4000-8000-000000000000")
-            .appendQueryParameter("success_url", "wordpressrsexample://authorized")
+            uriBuilder
+                .appendQueryParameter("app_name", "WordPressRsAndroidExample")
+                .appendQueryParameter("app_id", "00000000-0000-4000-8000-000000000000")
+                .appendQueryParameter("success_url", SELF_HOSTED_REDIRECT_URI)
 
-        uriBuilder.build().let { uri ->
-            val i = Intent(Intent.ACTION_VIEW, uri)
-            startActivity(i)
+            uriBuilder.build().let { uri ->
+                val i = Intent(Intent.ACTION_VIEW, uri)
+                startActivity(i)
+            }
         }
+    }
+
+    private fun authenticateWpCom() {
+        val clientId = WpComCredentials.CLIENT_ID!!
+        val state = java.util.UUID.randomUUID().toString()
+        wpComOAuthState = state
+
+        val url = buildTokenRequestUrl(
+            clientId = clientId,
+            redirectUri = WPCOM_REDIRECT_URI,
+            scope = "global",
+            state = state,
+            blog = null
+        )
+
+        val intent = Intent(Intent.ACTION_VIEW, url.url().toUri())
+        startActivity(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
 
-        intent.data?.let {
-            val siteUrl = it.getQueryParameter("site_url")
-            val username = it.getQueryParameter("user_login")
-            val password = it.getQueryParameter("password")
-
-            if (siteUrl != null && username != null && password != null) {
-                val discoverySuccess = apiDiscoverySuccess
-                    ?: throw IllegalStateException("Api discovery has to be successful before authentication")
-                authRepository.addAuthenticatedSite(
-                    discoverySuccess.parsedSiteUrl.toURL(),
-                    discoverySuccess.apiRootUrl.toURL(),
-                    username,
-                    password
-                )
-                onBackPressedDispatcher.onBackPressed()
+        intent.data?.let { uri ->
+            when (uri.host) {
+                "authorized" -> handleSelfHostedCallback(uri)
+                "wpcom-authorized" -> handleWpComCallback(uri)
             }
         }
+    }
+
+    private fun handleSelfHostedCallback(uri: android.net.Uri) {
+        val siteUrl = uri.getQueryParameter("site_url")
+        val username = uri.getQueryParameter("user_login")
+        val password = uri.getQueryParameter("password")
+
+        if (siteUrl != null && username != null && password != null) {
+            val discoverySuccess = apiDiscoverySuccess
+                ?: throw IllegalStateException("Api discovery has to be successful before authentication")
+            accountRepository.store(
+                Account.SelfHostedSite(
+                    id = 0u,
+                    domain = discoverySuccess.parsedSiteUrl.toURL().toString(),
+                    username = username,
+                    password = password,
+                    siteApiRoot = discoverySuccess.apiRootUrl.toURL().toString()
+                )
+            )
+            onBackPressedDispatcher.onBackPressed()
+        }
+    }
+
+    private fun handleWpComCallback(uri: android.net.Uri) {
+        lifecycleScope.launch {
+            try {
+                val result = parseAuthorizationUrl(uri.toString())
+                if (result.state != wpComOAuthState) return@launch
+
+                val clientId = WpComCredentials.CLIENT_ID ?: return@launch
+                val clientSecret = WpComCredentials.CLIENT_SECRET ?: return@launch
+
+                val wpComClient = WpComApiClient(
+                    authProvider = WpAuthenticationProvider.none(),
+                    interceptors = emptyList()
+                )
+
+                val tokenResult = wpComClient.request { client ->
+                    client.oauth2().requestToken(
+                        TokenRequestParameters(
+                            clientId = clientId,
+                            clientSecret = clientSecret,
+                            code = result.code,
+                            redirectUri = WPCOM_REDIRECT_URI
+                        )
+                    )
+                }
+
+                when (tokenResult) {
+                    is WpRequestResult.Success -> {
+                        val tokenResponse = tokenResult.response.data
+                        accountRepository.store(
+                            Account.WpCom(
+                                id = 0u,
+                                username = tokenResponse.blogUrl ?: "WordPress.com",
+                                token = tokenResponse.accessToken,
+                                siteApiRoot = "https://public-api.wordpress.com/wp/v2/sites/${tokenResponse.blogId}"
+                            )
+                        )
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                    else -> {
+                        // Token exchange failed – stay on login screen
+                    }
+                }
+            } catch (_: Exception) {
+                // Authorization URL parsing failed – stay on login screen
+            }
+        }
+    }
+
+    companion object {
+        private const val SELF_HOSTED_REDIRECT_URI = "wordpressrsexample://authorized"
+        private const val WPCOM_REDIRECT_URI = "wordpressrsexample://wpcom-authorized"
     }
 }
 
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    App(authenticationEnabled = false) {}
+    App(authenticationEnabled = false, authenticateSite = {}, authenticateWpCom = null)
 }

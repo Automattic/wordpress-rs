@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,12 +16,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.Button
-import androidx.compose.material.Card
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,43 +40,48 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import org.koin.compose.koinInject
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import uniffi.wp_mobile.PostItemState
 import uniffi.wp_mobile.WpService
 import uniffi.wp_mobile_cache.ListState
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
 fun PostMetadataCollectionScreen(
+    wpService: WpService,
     postTypeSlug: String = "post",
-    viewModel: PostMetadataCollectionViewModel = run {
-        val service = koinInject<WpService>()
-        PostMetadataCollectionViewModel(service, postTypeSlug)
+    viewModel: PostMetadataCollectionViewModel = remember {
+        PostMetadataCollectionViewModel(wpService, postTypeSlug)
     },
     onBackClicked: (() -> Unit)? = null
 ) {
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.onCleared() }
+    }
     val state by viewModel.state.collectAsState()
     val items by viewModel.items.collectAsState()
     val listState = rememberLazyListState()
 
-    MaterialTheme {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-        ) {
-            // Back button (for desktop)
-            if (onBackClicked != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
-                ) {
-                    TextButton(onClick = onBackClicked) {
-                        Text("← Back")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Post Metadata") },
+                navigationIcon = {
+                    if (onBackClicked != null) {
+                        IconButton(onClick = onBackClicked) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp),
+        ) {
             // Filter controls
             FilterControls(
                 currentFilter = state.filterStatusString,
@@ -111,19 +122,19 @@ fun PostMetadataCollectionScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilterControls(
     currentFilter: String?,
     onFilterChange: (String?) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = 2.dp
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "Filter",
-                style = MaterialTheme.typography.subtitle1,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -131,39 +142,22 @@ fun FilterControls(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilterButton(
-                    text = "All",
-                    isSelected = currentFilter == null,
-                    onClick = { onFilterChange(null) }
+                FilterChip(
+                    selected = currentFilter == null,
+                    onClick = { onFilterChange(null) },
+                    label = { Text("All") }
                 )
-                FilterButton(
-                    text = "Drafts",
-                    isSelected = currentFilter?.contains("draft", ignoreCase = true) == true,
-                    onClick = { onFilterChange("draft") }
+                FilterChip(
+                    selected = currentFilter?.contains("draft", ignoreCase = true) == true,
+                    onClick = { onFilterChange("draft") },
+                    label = { Text("Drafts") }
                 )
-                FilterButton(
-                    text = "Published",
-                    isSelected = currentFilter?.contains("publish", ignoreCase = true) == true,
-                    onClick = { onFilterChange("publish") }
+                FilterChip(
+                    selected = currentFilter?.contains("publish", ignoreCase = true) == true,
+                    onClick = { onFilterChange("publish") },
+                    label = { Text("Published") }
                 )
             }
-        }
-    }
-}
-
-@Composable
-fun RowScope.FilterButton(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    if (isSelected) {
-        Button(onClick = onClick, modifier = Modifier.weight(1f)) {
-            Text(text)
-        }
-    } else {
-        TextButton(onClick = onClick, modifier = Modifier.weight(1f)) {
-            Text(text)
         }
     }
 }
@@ -175,9 +169,8 @@ fun InfoCard(
     onRefreshClick: () -> Unit,
     postTypeSlug: String
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = 2.dp
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -188,13 +181,13 @@ fun InfoCard(
                 Column {
                     Text(
                         text = "Metadata Collection",
-                        style = MaterialTheme.typography.subtitle1,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "Post Type: ${postTypeSlug.replaceFirstChar { it.uppercase() }}",
-                        style = MaterialTheme.typography.caption,
-                        color = MaterialTheme.colors.primary
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
                 Button(
@@ -225,7 +218,7 @@ fun InfoCard(
                 SyncStateIndicator(state.syncState)
                 Text(
                     text = syncStateDisplayName(state.syncState),
-                    style = MaterialTheme.typography.body2,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = syncStateColor(state.syncState)
                 )
             }
@@ -235,7 +228,7 @@ fun InfoCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Last sync: ${result.fetchedCount} fetched, ${result.failedCount} failed",
-                    style = MaterialTheme.typography.caption
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
 
@@ -244,8 +237,8 @@ fun InfoCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Error: $error",
-                    style = MaterialTheme.typography.caption,
-                    color = MaterialTheme.colors.error
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
                 )
             }
         }
@@ -254,9 +247,8 @@ fun InfoCard(
 
 @Composable
 fun PostItemCard(item: PostItemDisplayData) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = 2.dp
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -273,26 +265,26 @@ fun PostItemCard(item: PostItemDisplayData) {
                     item.isLoading -> {
                         Text(
                             text = "Loading post ${item.id}...",
-                            style = MaterialTheme.typography.body2,
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     }
                     item.errorMessage != null -> {
                         Text(
                             text = "Post ${item.id}",
-                            style = MaterialTheme.typography.subtitle2,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "Error: ${item.errorMessage}",
-                            style = MaterialTheme.typography.caption,
-                            color = MaterialTheme.colors.error
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                     item.title != null -> {
                         Text(
                             text = item.title,
-                            style = MaterialTheme.typography.subtitle2,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -300,26 +292,26 @@ fun PostItemCard(item: PostItemDisplayData) {
                         item.contentPreview?.let { preview ->
                             Text(
                                 text = preview,
-                                style = MaterialTheme.typography.caption,
+                                style = MaterialTheme.typography.bodySmall,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
                         }
                         item.status?.let { status ->
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = status,
-                                style = MaterialTheme.typography.overline,
-                                color = MaterialTheme.colors.primary
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
                     else -> {
                         Text(
                             text = "Post ${item.id} (${stateDisplayName(item.state)})",
-                            style = MaterialTheme.typography.body2,
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -328,8 +320,8 @@ fun PostItemCard(item: PostItemDisplayData) {
             // ID badge
             Text(
                 text = "#${item.id}",
-                style = MaterialTheme.typography.caption,
-                color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
         }
     }
@@ -395,9 +387,8 @@ fun LoadNextPageCard(
     state: PostMetadataCollectionState,
     onLoadClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = 4.dp
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -417,14 +408,14 @@ fun LoadNextPageCard(
             } else if (state.currentPage != null) {
                 Text(
                     text = "All pages loaded",
-                    style = MaterialTheme.typography.caption,
-                    color = MaterialTheme.colors.primary
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
                 )
             } else {
                 Text(
                     text = "Click Refresh to load posts",
-                    style = MaterialTheme.typography.caption,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
         }

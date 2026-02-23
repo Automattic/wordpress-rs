@@ -1,6 +1,6 @@
 package rs.wordpress.example.shared
 
-import androidx.compose.material.MaterialTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,15 +21,22 @@ import rs.wordpress.example.shared.ui.stresstest.StressTestScreen
 import rs.wordpress.example.shared.ui.users.UserListScreen
 import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeScreen
+import rs.wordpress.cache.kotlin.WordPressApiCache
+import rs.wordpress.example.shared.di.createWpService
+import uniffi.wp_mobile.Account
+import uniffi.wp_mobile.WpService
 
 @Composable
-fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit) {
+fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, authenticateWpCom: (() -> Unit)?) {
     val userListViewModel = koinInject<UserListViewModel>()
     val pluginListViewModel = koinInject<PluginListViewModel>()
+    val cache = koinInject<WordPressApiCache>()
     val navController = rememberNavController()
 
     // State to hold the current post type slug for navigation
     var currentPostTypeSlug by remember { mutableStateOf("post") }
+    var currentWpService by remember { mutableStateOf<WpService?>(null) }
+    var currentAccount by remember { mutableStateOf<Account.SelfHostedSite?>(null) }
 
     MaterialTheme {
         NavHost(navController, startDestination = "welcome") {
@@ -39,16 +46,24 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit) {
                     onLoginClicked = {
                         navController.navigate("login")
                     },
-                    onSiteClicked = { authenticatedSite ->
-                        userListViewModel.setAuthenticatedSite(authenticatedSite)
-                        pluginListViewModel.setAuthenticatedSite(authenticatedSite)
+                    onSiteClicked = { account ->
+                        if (account is Account.SelfHostedSite) {
+                            currentAccount = account
+                            currentWpService = createWpService(account, cache)
+                        }
+                        userListViewModel.setAccount(account)
+                        pluginListViewModel.setAccount(account)
                         navController.navigate("site")
                     }
                 )
             }
             composable("login") {
                 if (authenticationEnabled) {
-                    LoginScreen(authenticateSite)
+                    LoginScreen(
+                        authenticateSite = authenticateSite,
+                        authenticateWpCom = authenticateWpCom,
+                        onBackClicked = { navController.popBackStack() }
+                    )
                 } else {
                     throw IllegalStateException("Authentication is disabled")
                 }
@@ -69,25 +84,36 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit) {
                     },
                     onPostTypesClicked = {
                         navController.navigate("posttypes")
-                    }
+                    },
+                    onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("users") {
-                UserListScreen()
+                UserListScreen(
+                    onBackClicked = { navController.popBackStack() }
+                )
             }
             composable("plugins") {
-                PluginListScreen()
+                PluginListScreen(
+                    onBackClicked = { navController.popBackStack() }
+                )
             }
             composable("stresstest") {
-                StressTestScreen()
+                StressTestScreen(
+                    wpService = currentWpService!!,
+                    account = currentAccount!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
             }
             composable("postcollection") {
                 PostCollectionScreen(
+                    wpService = currentWpService!!,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("posttypes") {
                 PostTypesScreen(
+                    wpService = currentWpService!!,
                     onBackClicked = { navController.popBackStack() },
                     onPostTypeClicked = { postTypeSlug ->
                         currentPostTypeSlug = postTypeSlug
@@ -97,6 +123,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit) {
             }
             composable("postmetadatacollection") {
                 PostMetadataCollectionScreen(
+                    wpService = currentWpService!!,
                     postTypeSlug = currentPostTypeSlug,
                     onBackClicked = { navController.popBackStack() }
                 )
