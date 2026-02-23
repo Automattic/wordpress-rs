@@ -1,11 +1,26 @@
 package rs.wordpress.example.shared.ui.welcome
 
 import androidx.lifecycle.ViewModel
-import rs.wordpress.example.shared.domain.AuthenticatedSite
-import rs.wordpress.example.shared.repository.AuthenticationRepository
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import uniffi.wp_mobile.Account
+import uniffi.wp_mobile.AccountRepository
 
-class WelcomeViewModel(private val authRepository: AuthenticationRepository): ViewModel() {
-    fun getSiteList(): List<AuthenticatedSite> = authRepository.authenticatedSiteList()
+class WelcomeViewModel(private val accountRepository: AccountRepository): ViewModel() {
+    private val _sites = MutableStateFlow<List<Account>>(emptyList())
+    val sites: StateFlow<List<Account>> = _sites.asStateFlow()
 
-    fun onSiteClicked(authenticatedSite: AuthenticatedSite) {}
+    init {
+        refreshSites()
+    }
+
+    fun refreshSites() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _sites.value = accountRepository.all()
+        }
+    }
 }

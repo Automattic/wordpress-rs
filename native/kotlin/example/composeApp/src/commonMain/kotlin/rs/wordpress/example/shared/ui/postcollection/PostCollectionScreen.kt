@@ -2,7 +2,6 @@ package rs.wordpress.example.shared.ui.postcollection
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,12 +11,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.Button
-import androidx.compose.material.Card
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,37 +32,44 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import org.koin.compose.koinInject
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import rs.wordpress.example.shared.ui.components.PostCard
+import uniffi.wp_mobile.WpService
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
 fun PostCollectionScreen(
-    viewModel: PostCollectionViewModel = koinInject(),
+    wpService: WpService,
+    viewModel: PostCollectionViewModel = remember { PostCollectionViewModel(wpService) },
     onBackClicked: (() -> Unit)? = null
 ) {
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.onCleared() }
+    }
     val state by viewModel.state.collectAsState()
     val posts by viewModel.posts.collectAsState()
     val listState = rememberLazyListState()
 
-    MaterialTheme {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-        ) {
-            // Back button (for desktop)
-            if (onBackClicked != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
-                ) {
-                    TextButton(onClick = onBackClicked) {
-                        Text("← Back")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Post Collection") },
+                navigationIcon = {
+                    if (onBackClicked != null) {
+                        IconButton(onClick = onBackClicked) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp),
+        ) {
             // Filter controls
             FilterControls(
                 currentFilter = state.filterStatusString,
@@ -96,20 +109,20 @@ fun PostCollectionScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilterControls(
     currentFilter: String?,
     onFilterChange: (String?) -> Unit
 ) {
     val currentFilterStr = currentFilter ?: ""
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = 2.dp
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "Filter",
-                style = MaterialTheme.typography.subtitle1,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -117,45 +130,22 @@ fun FilterControls(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilterButton(
-                    text = "All",
-                    isSelected = currentFilter == null,
-                    onClick = { onFilterChange(null) }
+                FilterChip(
+                    selected = currentFilter == null,
+                    onClick = { onFilterChange(null) },
+                    label = { Text("All") }
                 )
-                FilterButton(
-                    text = "Drafts",
-                    isSelected = currentFilterStr.contains("draft", ignoreCase = true),
-                    onClick = { onFilterChange("draft") }
+                FilterChip(
+                    selected = currentFilterStr.contains("draft", ignoreCase = true),
+                    onClick = { onFilterChange("draft") },
+                    label = { Text("Drafts") }
                 )
-                FilterButton(
-                    text = "Published",
-                    isSelected = currentFilterStr.contains("publish", ignoreCase = true),
-                    onClick = { onFilterChange("publish") }
+                FilterChip(
+                    selected = currentFilterStr.contains("publish", ignoreCase = true),
+                    onClick = { onFilterChange("publish") },
+                    label = { Text("Published") }
                 )
             }
-        }
-    }
-}
-
-@Composable
-fun RowScope.FilterButton(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    if (isSelected) {
-        Button(
-            onClick = onClick,
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(text)
-        }
-    } else {
-        TextButton(
-            onClick = onClick,
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(text)
         }
     }
 }
@@ -165,14 +155,13 @@ fun InfoCard(
     state: CollectionState,
     postCount: Int
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = 2.dp
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "Collection Info",
-                style = MaterialTheme.typography.subtitle1,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -188,9 +177,8 @@ fun FetchNextPageCard(
     state: CollectionState,
     onFetchClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = 4.dp
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -222,7 +210,7 @@ fun FetchNextPageCard(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "Last Fetch",
-                        style = MaterialTheme.typography.subtitle2,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -237,9 +225,9 @@ fun FetchNextPageCard(
                         if (lastResult.currentPage >= totalPages) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "✓ No more pages",
-                                style = MaterialTheme.typography.caption,
-                                color = MaterialTheme.colors.primary
+                                text = "No more pages",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -251,15 +239,15 @@ fun FetchNextPageCard(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "Fetch Error",
-                        style = MaterialTheme.typography.subtitle2,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colors.error
+                        color = MaterialTheme.colorScheme.error
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = formatFetchError(lastError),
-                        style = MaterialTheme.typography.caption,
-                        color = MaterialTheme.colors.error
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
             }
