@@ -18,19 +18,27 @@ import rs.wordpress.api.kotlin.toURL
 import rs.wordpress.example.WpComCredentials
 import rs.wordpress.example.shared.App
 import uniffi.wp_api.AutoDiscoveryAttemptSuccess
+import uniffi.wp_api.DiscoveredAuthenticationMechanism
+import uniffi.wp_api.OAuth2Configuration
 import uniffi.wp_api.TokenRequestParameters
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpComOauthScope
+import uniffi.wp_api.WpComSiteIdentifier
 import uniffi.wp_api.applicationPasswordsUrl
 import uniffi.wp_api.buildTokenRequestUrl
 import uniffi.wp_api.parseAuthorizationUrl
+import uniffi.wp_api.wordpressComOauth2Configuration
 import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.AccountRepository
+import uniffi.wp_mobile.wordpressComSiteApiRoot
 
 class WelcomeActivity : ComponentActivity() {
     private val accountRepository: AccountRepository by inject()
     private var apiDiscoverySuccess: AutoDiscoveryAttemptSuccess? = null
     private var wpComOAuthState: String? = null
+    private var siteSpecificOAuthConfig: OAuth2Configuration? = null
+    private var siteSpecificOAuthState: String? = null
+    private var discoveredSiteHost: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,18 +63,44 @@ class WelcomeActivity : ComponentActivity() {
 
             apiDiscoverySuccess = success
 
-            val authUrl = applicationPasswordsUrl(success.authentication)
-                ?: throw IllegalStateException("Expected application passwords authentication")
-            val uriBuilder = authUrl.url().toUri().buildUpon()
+            when (success.authentication) {
+                is DiscoveredAuthenticationMechanism.ApplicationPasswords -> {
+                    val authUrl = applicationPasswordsUrl(success.authentication)
+                        ?: throw IllegalStateException("Expected application passwords authentication")
+                    val uriBuilder = authUrl.url().toUri().buildUpon()
 
-            uriBuilder
-                .appendQueryParameter("app_name", "WordPressRsAndroidExample")
-                .appendQueryParameter("app_id", "00000000-0000-4000-8000-000000000000")
-                .appendQueryParameter("success_url", SELF_HOSTED_REDIRECT_URI)
+                    uriBuilder
+                        .appendQueryParameter("app_name", "WordPressRsAndroidExample")
+                        .appendQueryParameter("app_id", "00000000-0000-4000-8000-000000000000")
+                        .appendQueryParameter("success_url", SELF_HOSTED_REDIRECT_URI)
 
-            uriBuilder.build().let { uri ->
-                val i = Intent(Intent.ACTION_VIEW, uri)
-                startActivity(i)
+                    uriBuilder.build().let { uri ->
+                        startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    }
+                }
+                is DiscoveredAuthenticationMechanism.OAuth2 -> {
+                    val clientId = WpComCredentials.CLIENT_ID ?: return@launch
+                    val clientSecret = WpComCredentials.CLIENT_SECRET ?: return@launch
+
+                    val config = wordpressComOauth2Configuration(
+                        clientId = clientId,
+                        clientSecret = clientSecret,
+                        redirectUri = WPCOM_REDIRECT_URI,
+                        scope = listOf(WpComOauthScope.GLOBAL)
+                    )
+                    siteSpecificOAuthConfig = config
+
+                    val host = success.parsedSiteUrl.toURL().toURI().host
+                    discoveredSiteHost = host
+                    val state = java.util.UUID.randomUUID().toString()
+                    siteSpecificOAuthState = state
+
+                    val authUrl = config.buildTokenRequestUrl(
+                        state = state,
+                        blog = WpComSiteIdentifier.Slug(value = host)
+                    )
+                    startActivity(Intent(Intent.ACTION_VIEW, authUrl.url().toUri()))
+                }
             }
         }
     }
@@ -123,43 +157,92 @@ class WelcomeActivity : ComponentActivity() {
     private fun handleWpComCallback(uri: android.net.Uri) {
         lifecycleScope.launch {
             try {
-                val result = parseAuthorizationUrl(uri.toString())
-                if (result.state != wpComOAuthState) return@launch
+                val isSiteSpecific = siteSpecificOAuthState != null
+                val config = siteSpecificOAuthConfig
 
-                val clientId = WpComCredentials.CLIENT_ID ?: return@launch
-                val clientSecret = WpComCredentials.CLIENT_SECRET ?: return@launch
-
-                val wpComClient = WpComApiClient(
-                    authProvider = WpAuthenticationProvider.none(),
-                    interceptors = emptyList()
-                )
-
-                val tokenResult = wpComClient.request { client ->
-                    client.oauth2().requestToken(
-                        TokenRequestParameters(
-                            clientId = clientId,
-                            clientSecret = clientSecret,
-                            code = result.code,
-                            redirectUri = WPCOM_REDIRECT_URI
-                        )
+                if (isSiteSpecific && config != null) {
+                    // Site-specific WP.com OAuth flow (discovered via self-hosted URL)
+                    val result = config.parseTokenResponse(
+                        url = uri.toString(),
+                        expectedState = siteSpecificOAuthState
                     )
-                }
+                    val tokenParams = config.buildTokenRequestParameters(code = result.code)
 
-                when (tokenResult) {
-                    is WpRequestResult.Success -> {
-                        val tokenResponse = tokenResult.response.data
-                        accountRepository.store(
-                            Account.WpCom(
-                                id = 0u,
-                                username = tokenResponse.blogUrl ?: "WordPress.com",
-                                token = tokenResponse.accessToken,
-                                siteApiRoot = "https://public-api.wordpress.com/wp/v2/sites/${tokenResponse.blogId}"
+                    val wpComClient = WpComApiClient(
+                        authProvider = WpAuthenticationProvider.none(),
+                        interceptors = emptyList()
+                    )
+
+                    val tokenResult = wpComClient.request { client ->
+                        client.oauth2().requestToken(tokenParams)
+                    }
+
+                    when (tokenResult) {
+                        is WpRequestResult.Success -> {
+                            val tokenResponse = tokenResult.response.data
+                            val blogId = tokenResponse.blogId
+                                ?: throw IllegalStateException("Expected blog_id in site-specific token response")
+                            val siteUrl = discoveredSiteHost
+                                ?: tokenResponse.blogUrl
+                                ?: "WordPress.com"
+                            accountRepository.store(
+                                Account.SelfHostedSite(
+                                    id = 0u,
+                                    domain = siteUrl,
+                                    username = siteUrl,
+                                    password = tokenResponse.accessToken,
+                                    siteApiRoot = wordpressComSiteApiRoot(blogId)
+                                )
+                            )
+                            siteSpecificOAuthState = null
+                            siteSpecificOAuthConfig = null
+                            discoveredSiteHost = null
+                            onBackPressedDispatcher.onBackPressed()
+                        }
+                        else -> {
+                            // Token exchange failed – stay on login screen
+                        }
+                    }
+                } else {
+                    // Global WP.com OAuth flow
+                    val result = parseAuthorizationUrl(uri.toString())
+                    if (result.state != wpComOAuthState) return@launch
+
+                    val clientId = WpComCredentials.CLIENT_ID ?: return@launch
+                    val clientSecret = WpComCredentials.CLIENT_SECRET ?: return@launch
+
+                    val wpComClient = WpComApiClient(
+                        authProvider = WpAuthenticationProvider.none(),
+                        interceptors = emptyList()
+                    )
+
+                    val tokenResult = wpComClient.request { client ->
+                        client.oauth2().requestToken(
+                            TokenRequestParameters(
+                                clientId = clientId,
+                                clientSecret = clientSecret,
+                                code = result.code,
+                                redirectUri = WPCOM_REDIRECT_URI
                             )
                         )
-                        onBackPressedDispatcher.onBackPressed()
                     }
-                    else -> {
-                        // Token exchange failed – stay on login screen
+
+                    when (tokenResult) {
+                        is WpRequestResult.Success -> {
+                            val tokenResponse = tokenResult.response.data
+                            accountRepository.store(
+                                Account.WpCom(
+                                    id = 0u,
+                                    username = tokenResponse.blogUrl ?: "WordPress.com",
+                                    token = tokenResponse.accessToken,
+                                    siteApiRoot = ""
+                                )
+                            )
+                            onBackPressedDispatcher.onBackPressed()
+                        }
+                        else -> {
+                            // Token exchange failed – stay on login screen
+                        }
                     }
                 }
             } catch (_: Exception) {
