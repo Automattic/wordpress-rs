@@ -20,6 +20,8 @@ import rs.wordpress.example.shared.App
 import uniffi.wp_api.AutoDiscoveryAttemptSuccess
 import uniffi.wp_api.TokenRequestParameters
 import uniffi.wp_api.WpAuthenticationProvider
+import uniffi.wp_api.WpComOauthScope
+import uniffi.wp_api.applicationPasswordsUrl
 import uniffi.wp_api.buildTokenRequestUrl
 import uniffi.wp_api.parseAuthorizationUrl
 import uniffi.wp_mobile.Account
@@ -50,8 +52,12 @@ class WelcomeActivity : ComponentActivity() {
                 is ApiDiscoveryResult.Success -> apiDiscoveryResult.success
                 else -> throw IllegalStateException("Api discovery should succeed for the example app")
             }
-            val uriBuilder = success.applicationPasswordsAuthenticationUrl.url().toUri().buildUpon()
+
             apiDiscoverySuccess = success
+
+            val authUrl = applicationPasswordsUrl(success.authentication)
+                ?: throw IllegalStateException("Expected application passwords authentication")
+            val uriBuilder = authUrl.url().toUri().buildUpon()
 
             uriBuilder
                 .appendQueryParameter("app_name", "WordPressRsAndroidExample")
@@ -73,7 +79,7 @@ class WelcomeActivity : ComponentActivity() {
         val url = buildTokenRequestUrl(
             clientId = clientId,
             redirectUri = WPCOM_REDIRECT_URI,
-            scope = "global",
+            scope = listOf(WpComOauthScope.GLOBAL),
             state = state,
             blog = null
         )
