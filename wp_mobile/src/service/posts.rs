@@ -1042,7 +1042,13 @@ impl PostService {
         };
 
         for collection in &live_collections {
-            let _ = collection.update_post_membership(post_id);
+            if let Err(e) = collection.update_post_membership(post_id) {
+                log::error!(
+                    "Failed to update post membership for post {}: {}",
+                    post_id,
+                    e
+                );
+            }
         }
     }
 }
