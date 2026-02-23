@@ -5,7 +5,8 @@ import AuthenticationServices
 @MainActor
 final class LoginManager: ObservableObject {
 
-    public static let shared = LoginManager()
+    private let accountsRoot = URL.applicationSupportDirectory
+    private let accountStore: AccountRepository
 
     private let wpcomClientId = ProcessInfo.processInfo.environment["WPCOM_CLIENT_ID"] ?? ""
     private let wpcomClientSecret = ProcessInfo.processInfo.environment["WPCOM_CLIENT_SECRET"] ?? ""
@@ -25,224 +26,122 @@ final class LoginManager: ObservableObject {
     @Published
     var isLoggedInToWpCom: Bool = false
 
+    private var selfHostedAccount: Account? {
+        get throws {
+            try self.accountStore.all().first { $0.isSelfHosted() }
+        }
+    }
+
+    private var wpComAccount: Account? {
+        get throws {
+            try self.accountStore.all().first { $0.isWpCom() }
+        }
+    }
+
     private var wpComLoginTask: Task<Void, Never>?
 
-    private init() {
-        self.isLoggedIn = hasStoredLoginCredentials()
-        self.isLoggedInToWpCom = hasStoredWpComLoginCredentials()
-    }
+    init() throws {
+        #if DEBUG && os(macOS) // Avoids unlocking the keychain after every build during development on Mac devices
+        let keyFile = accountsRoot.appendingPathComponent("keyfile.dat") // not a security risk, no key here
+        let transformer = try SecureEnclavePasswordTransformer(keyFile: keyFile)
+        #else
+        let transformer = try SecureEnclavePasswordTransformer()
+        #endif
 
-    public func getApiRootUrl() -> String? {
-        guard let string = UserDefaults.standard.string(forKey: "api-root-url") else {
-            return nil
-        }
-
-        return string
-    }
-
-    func setApiRootUrl(to newValue: String) {
-        UserDefaults.standard.setValue(newValue, forKey: "api-root-url")
+        self.accountStore = try AccountRepository(
+            rootPath: accountsRoot.path(percentEncoded: false),
+            passwordTransformer: transformer
+        )
+        self.isLoggedIn = accountStore.hasSelfHostedAccount()
+        self.isLoggedInToWpCom = accountStore.hasWpComAccount()
     }
 
     public func hasStoredLoginCredentials() -> Bool {
-        guard let siteUrl = getApiRootUrl() else {
-            return false
-        }
-
-        do {
-            return try Keychain.hasCredentials(for: siteUrl)
-        } catch {
-            return false
-        }
-    }
-
-    public func hasStoredWpComLoginCredentials() -> Bool {
-        do {
-            return try Keychain.lookupForWPCom() != nil
-        } catch {
-            return false
-        }
+        return accountStore.hasSelfHostedAccount()
     }
 
     public func setLoginCredentials(to newValue: WpApiApplicationPasswordDetails, apiRootURL: URL) async throws {
-        setApiRootUrl(to: apiRootURL.absoluteString)
-        try Keychain.store(username: newValue.userLogin, password: newValue.password, for: apiRootURL.absoluteString)
+        _ = try accountStore.store(account: .selfHostedSite(
+            id: 42,
+            domain: newValue.siteUrl,
+            username: newValue.userLogin,
+            password: newValue.password,
+            siteApiRoot: apiRootURL.absoluteString
+        ))
 
         isLoggedIn = true
     }
 
-    public func getLoginCredentials() throws -> WpAuthentication? {
-
-        guard
-            let siteUrl = getApiRootUrl(),
-            let keychainItem = try Keychain.lookup(for: siteUrl)
-        else {
+    public func getApiRootUrl() throws  -> String? {
+        guard let account = try self.selfHostedAccount else {
             return nil
         }
 
-        return keychainItem
+        switch account {
+        case .selfHostedSite(id: _, domain: _, username: _, password: _, let siteApiRoot):
+            return siteApiRoot
+        case .wpCom:
+            preconditionFailure("This should never happen")
+        }
+    }
+
+    public func getLoginCredentials() throws -> WpAuthentication? {
+        guard let account = try self.accountStore.all().first(where: { $0.isSelfHosted() }) else {
+            return nil
+        }
+
+        switch account {
+            case .selfHostedSite(id: _, domain: _, let username, let password, siteApiRoot: _):
+            return WpAuthentication(username: username, password: password)
+            case .wpCom(id: _, username: _, token: _, siteApiRoot: _):
+            preconditionFailure("This should never happen")
+        }
     }
 
     public func setWpComLoginCredentials(to newValue: String) throws {
-        try Keychain.storeForWpCom(token: newValue)
+        _ = try self.accountStore.store(account: .wpCom(
+            id: 42,
+            username: "",
+            token: newValue,
+            siteApiRoot: "")
+        )
+
         self.objectWillChange.send()
         self.isLoggedInToWpCom = true
     }
 
     public func getWpComLoginCredentials() throws -> WpAuthentication? {
-        guard let token = try Keychain.lookupForWPCom() else {
+        switch try self.wpComAccount {
+        case .wpCom(_, _, let password, _):
+            return WpAuthentication.bearer(token: password)
+        case .selfHostedSite:
+            preconditionFailure("This should never happen")
+        case .none:
             return nil
         }
-
-        return token
     }
 
-    public func logout() async {
-        UserDefaults.standard.removeObject(forKey: "api-root-url")
-
-        await MainActor.run {
-            self.objectWillChange.send()
-            self.isLoggedIn = false
+    @MainActor
+    public func logout() throws {
+        guard let account = try self.selfHostedAccount else {
+            return
         }
+
+        try self.accountStore.remove(id: account.id())
+
+        self.objectWillChange.send()
+        self.isLoggedIn = false
     }
 
+    @MainActor
     public func logoutWpCom() throws {
-        try Keychain.clearCredentials(for: "wordpress.com")
+        guard let account = try self.wpComAccount else {
+            return
+        }
+
+        try self.accountStore.remove(id: account.id())
+
         self.objectWillChange.send()
         self.isLoggedInToWpCom = false
-    }
-}
-
-// MARK: Keychain Wrapper
-struct Keychain {
-    enum KeychainError: Error {
-        case noPassword
-        case invalidPassword
-        case unexpectedPasswordData
-        case unhandledError(status: OSStatus)
-    }
-
-    static func store(username: String, password: String, for server: String) throws {
-        guard let utf8Password = password.data(using: .utf8) else {
-            throw KeychainError.invalidPassword
-        }
-
-        if try lookup(for: server) != nil {
-            let deletionStatus = SecItemDelete([
-                kSecClass as String: kSecClassInternetPassword,
-                kSecAttrServer as String: server as CFString
-            ] as CFDictionary)
-
-            guard deletionStatus == errSecSuccess else { throw KeychainError.unhandledError(status: deletionStatus) }
-        }
-
-        let status = SecItemAdd([
-            kSecClass as String: kSecClassInternetPassword,
-            kSecAttrAccount as String: username as CFString,
-            kSecAttrServer as String: server as CFString,
-            kSecValueData as String: utf8Password as CFData
-        ] as CFDictionary, nil)
-        guard status == errSecSuccess else { throw KeychainError.unhandledError(status: status) }
-    }
-
-    static func storeForWpCom(token: String) throws {
-        guard let utf8Token = token.data(using: .utf8) else {
-            throw KeychainError.invalidPassword
-        }
-
-        if try lookup(for: "wordpress.com") != nil {
-            let deletionStatus = SecItemDelete([
-                kSecClass as String: kSecClassInternetPassword,
-                kSecAttrServer as String: "wordpress.com" as CFString
-            ] as CFDictionary)
-
-            guard deletionStatus == errSecSuccess else { throw KeychainError.unhandledError(status: deletionStatus) }
-        }
-
-        let status = SecItemAdd([
-            kSecClass as String: kSecClassInternetPassword,
-            kSecAttrAccount as String: "username" as CFString,
-            kSecAttrServer as String: "wordpress.com" as CFString,
-            kSecValueData as String: utf8Token as CFData
-        ] as CFDictionary, nil)
-        guard status == errSecSuccess else { throw KeychainError.unhandledError(status: status) }
-
-    }
-
-    static func lookup(for server: String) throws -> WpAuthentication? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassInternetPassword,
-            kSecAttrServer as String: server,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecReturnAttributes as String: true,
-            kSecReturnData as String: true
-        ]
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-
-        guard status != errSecItemNotFound else {
-            return nil
-        }
-
-        guard status == errSecSuccess else {
-            throw KeychainError.unhandledError(status: status)
-        }
-
-        guard let existingItem = item as? [String: Any],
-            let passwordData = existingItem[kSecValueData as String] as? Data,
-            let password = String(data: passwordData, encoding: String.Encoding.utf8),
-            let username = existingItem[kSecAttrAccount as String] as? String
-        else {
-            throw KeychainError.unexpectedPasswordData
-        }
-
-        return WpAuthentication(username: username, password: password)
-    }
-
-    static func lookupForWPCom() throws -> WpAuthentication? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassInternetPassword,
-            kSecAttrServer as String: "wordpress.com",
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecReturnAttributes as String: true,
-            kSecReturnData as String: true
-        ]
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-
-        guard status != errSecItemNotFound else {
-            return nil
-        }
-
-        guard status == errSecSuccess else {
-            throw KeychainError.unhandledError(status: status)
-        }
-
-        guard let existingItem = item as? [String: Any],
-            let passwordData = existingItem[kSecValueData as String] as? Data,
-            let password = String(data: passwordData, encoding: String.Encoding.utf8)
-        else {
-            throw KeychainError.unexpectedPasswordData
-        }
-
-        return WpAuthentication.bearer(token: password)
-    }
-
-    static func hasCredentials(for server: String) throws -> Bool {
-        try lookup(for: server) != nil
-    }
-
-    static func clearCredentials(for server: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassInternetPassword,
-            kSecAttrServer as String: server
-        ]
-
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.unhandledError(status: status)
-        }
     }
 }

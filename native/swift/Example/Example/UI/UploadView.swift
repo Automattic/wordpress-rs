@@ -5,7 +5,9 @@ import WordPressAPI
 
 struct UploadView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel = UploadViewModel()
+
+    @StateObject
+    var viewModel: UploadViewModel
 
     @State private var selectedItems: [MediaItem] = []
     @State private var isFilePickerPresented = false
@@ -136,9 +138,15 @@ struct TransferableImage: Transferable {
 }
 
 @MainActor
-private class UploadViewModel: ObservableObject {
+class UploadViewModel: ObservableObject {
     @Published var error: String?
     @Published var progress: Progress?
+
+    private let loginManager: LoginManager
+
+    init(loginManager: LoginManager) {
+        self.loginManager = loginManager
+    }
 
     func startUploading(_ items: [MediaItem]) async {
         self.error = nil
@@ -155,7 +163,7 @@ private class UploadViewModel: ObservableObject {
         self.progress = progress
         defer { self.progress = nil }
 
-        let api = try await WordPressAPI.globalInstance
+        let api = try await WordPressAPI.instance(loginManager: self.loginManager)
 
         for item in items {
             let child = Progress(totalUnitCount: unitForEachChild, parent: progress, pendingUnitCount: unitForEachChild)

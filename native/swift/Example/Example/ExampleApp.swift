@@ -12,6 +12,10 @@ struct ExampleApp: App {
 
     private let handle: Any
 
+    private let loginManager: LoginManager
+    private let selfHostedService: SelfHostedService
+    private let wpcomService: WPComService
+
     init() {
         // swiftlint:disable:next force_try
         _ = try! cache.performMigrations()
@@ -35,6 +39,10 @@ struct ExampleApp: App {
                 insertWeight: 25
             )
         )
+
+        self.loginManager = try! LoginManager()
+        self.selfHostedService = SelfHostedService(loginManager: self.loginManager)
+        self.wpcomService = WPComService(loginManager: self.loginManager)
     }
 
     var body: some Scene {
@@ -49,8 +57,9 @@ struct ExampleApp: App {
                 }
             }
         }
-        .environmentObject(LoginManager.shared)
-
+        .environmentObject(self.loginManager)
+        .environmentObject(self.selfHostedService)
+        .environmentObject(self.wpcomService)
     }
 
     var toolbarItemPlacement: ToolbarItemPlacement {

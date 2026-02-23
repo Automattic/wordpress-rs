@@ -93,5 +93,5 @@ struct LoginView: View {
 
 #Preview {
     LoginView()
-        .environmentObject(LoginManager.shared)
+        .environmentObject(try! LoginManager())
 }

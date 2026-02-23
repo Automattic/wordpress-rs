@@ -10,7 +10,8 @@ struct WPComRootView: View {
     @Environment(\.webAuthenticationSession)
     private var webAuthenticationSession
 
-    private let wpcomService = WPComService()
+    @EnvironmentObject
+    private var wpcomService: WPComService
 
     @State
     var isLoadingInitialData: Bool = true
@@ -108,4 +109,5 @@ struct WPComRootView: View {
 
 #Preview {
     WPComRootView()
+        .environmentObject(WPComService(loginManager: try! LoginManager()))
 }
