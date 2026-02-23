@@ -23,4 +23,11 @@ class WelcomeViewModel(private val accountRepository: AccountRepository): ViewMo
             _sites.value = accountRepository.all()
         }
     }
+
+    fun deleteSite(account: Account) {
+        viewModelScope.launch(Dispatchers.IO) {
+            accountRepository.remove(account.id())
+            _sites.value = accountRepository.all()
+        }
+    }
 }
