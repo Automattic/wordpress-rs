@@ -3,10 +3,9 @@ package rs.wordpress.example.shared.di
 import org.koin.dsl.module
 import rs.wordpress.api.kotlin.DebugMiddleware
 import rs.wordpress.api.kotlin.EmptyAppNotifier
+import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestExecutor
 import rs.wordpress.cache.kotlin.WordPressApiCache
-import rs.wordpress.example.shared.ui.plugins.PluginListViewModel
-import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
 import rs.wordpress.api.kotlin.WpComApiClient
 import uniffi.wp_api.WpApiClientDelegate
@@ -18,6 +17,7 @@ import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.AccountRepository
 import uniffi.wp_mobile.WpService
 import java.io.File
+import java.net.URI
 
 val cacheModule = module {
     single {
@@ -33,8 +33,6 @@ val cacheModule = module {
 }
 
 val viewModelModule = module {
-    single { PluginListViewModel() }
-    single { UserListViewModel() }
     single { WelcomeViewModel(get()) }
 }
 
@@ -54,6 +52,19 @@ fun createWpService(account: Account.SelfHostedSite, cache: WordPressApiCache): 
             appNotifier = EmptyAppNotifier()
         ),
         cache = cache.cache
+    )
+}
+
+fun createWpApiClient(account: Account.SelfHostedSite): WpApiClient {
+    val auth = if (account.siteApiRoot.startsWith("https://public-api.wordpress.com/")) {
+        WpAuthentication.Bearer(token = account.password)
+    } else {
+        wpAuthenticationFromUsernameAndPassword(account.username, account.password)
+    }
+    return WpApiClient(
+        wpOrgSiteApiRootUrl = URI(account.siteApiRoot).toURL(),
+        authProvider = WpAuthenticationProvider.staticWithAuth(auth),
+        interceptors = emptyList()
     )
 }
 

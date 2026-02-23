@@ -27,6 +27,15 @@ fun SiteScreen(
     onStressTestClicked: () -> Unit,
     onPostCollectionClicked: () -> Unit,
     onPostTypesClicked: () -> Unit,
+    onCategoriesClicked: () -> Unit,
+    onTagsClicked: () -> Unit,
+    onPagesClicked: () -> Unit,
+    onCommentsClicked: () -> Unit,
+    onMediaClicked: () -> Unit,
+    onThemesClicked: () -> Unit,
+    onSiteSettingsClicked: () -> Unit,
+    onSearchClicked: () -> Unit,
+    onSiteHealthClicked: () -> Unit,
     onBackClicked: () -> Unit = {}
 ) {
     Scaffold(
@@ -64,11 +73,83 @@ fun SiteScreen(
             }
             item {
                 ListItem(
-                    headlineContent = { Text("Stress Test") },
+                    headlineContent = { Text("Categories") },
                     trailingContent = {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                     },
-                    modifier = Modifier.clickable(onClick = onStressTestClicked)
+                    modifier = Modifier.clickable(onClick = onCategoriesClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Tags") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onTagsClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Pages") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onPagesClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Comments") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onCommentsClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Media") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onMediaClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Themes") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onThemesClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Site Settings") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onSiteSettingsClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Search") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onSearchClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Site Health") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onSiteHealthClicked)
                 )
             }
             item {
@@ -87,6 +168,15 @@ fun SiteScreen(
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                     },
                     modifier = Modifier.clickable(onClick = onPostTypesClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Stress Test") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onStressTestClicked)
                 )
             }
         }
