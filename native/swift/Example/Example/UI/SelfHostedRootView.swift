@@ -5,7 +5,8 @@ struct SelfHostedRootView: View {
     @EnvironmentObject
     var loginManager: LoginManager
 
-    private let selfHostedService = SelfHostedService()
+    @EnvironmentObject
+    var selfHostedService: SelfHostedService
 
     @Environment(\.webAuthenticationSession)
     private var webAuthenticationSession
@@ -39,13 +40,15 @@ struct SelfHostedRootView: View {
                 Text("Select a category of settings in the sidebar.")
             }
             .sheet(isPresented: $showUploadView) {
-                UploadView()
+                UploadView(viewModel: UploadViewModel(loginManager: loginManager))
             }
             .toolbar(content: {
                 ToolbarItem(placement: toolbarItemPlacement) {
                     Button("Log Out") {
-                        Task {
-                            await loginManager.logout()
+                        do {
+                            try loginManager.logout()
+                        } catch {
+                            debugPrint(error.localizedDescription)
                         }
                     }
                 }
@@ -80,4 +83,5 @@ struct SelfHostedRootView: View {
 
 #Preview {
     SelfHostedRootView()
+        .environmentObject(SelfHostedService(loginManager: try! LoginManager()))
 }

@@ -1,13 +1,21 @@
 import Foundation
 import WordPressAPI
 import WordPressApiCache
+import SwiftUI
 
-struct WPComService {
+@MainActor
+final class WPComService: ObservableObject {
+
+    private let loginManager: LoginManager
+
+    init(loginManager: LoginManager) {
+        self.loginManager = loginManager
+    }
 
     public func loadRootListItems() async throws -> [RootListData] {
         [
             RootListData(name: "Support Conversations", category: .system) {
-                try await WPComApiClient.globalInstance.supportTickets.getSupportConversationList().data.map {
+                try await WPComApiClient.instance(loginManager: self.loginManager).supportTickets.getSupportConversationList().data.map {
                     ListViewData(
                         id: String($0.id),
                         title: $0.title,
@@ -18,7 +26,7 @@ struct WPComService {
             },
 
             RootListData(name: "Bot Conversations", category: .system, callback: {
-                try await WPComApiClient.globalInstance.supportBots.getBotConversationList(
+                try await WPComApiClient.instance(loginManager: self.loginManager).supportBots.getBotConversationList(
                     botId: "jetpack-chat-mobile",
                     params: ListBotConversationParams()
                 ).data.map {
@@ -33,7 +41,7 @@ struct WPComService {
 
             // System
             RootListData(name: "Me", category: .system, callback: {
-                let data = try await WPComApiClient.globalInstance.me.get().data
+                let data = try await WPComApiClient.instance(loginManager: self.loginManager).me.get().data
 
                 return [
                     ListViewData(key: "User ID", value: "\(data.id)"),
