@@ -761,37 +761,6 @@ impl PostService {
         })
     }
 
-    /// Trigger an attempt to fetch the given post from the network.
-    ///
-    /// This method initiates a fetch operation for the specified post. However, it does
-    /// nothing if the post is already being fetched (in `Fetching` state).
-    ///
-    /// # Arguments
-    /// * `post_id` - The WordPress post ID to refresh
-    /// * `endpoint_type` - The post endpoint type (Posts, Pages, or Custom)
-    ///
-    /// # Returns
-    /// - `Ok(())` if the refresh was initiated successfully OR if a fetch is already in progress
-    /// - `Err(FetchError)` if network or database error occurs
-    ///
-    /// # Important
-    /// A successful result does NOT necessarily mean the post was successfully refreshed.
-    /// It means either:
-    /// - The post was successfully fetched and updated in the cache
-    /// - A fetch for this post is already in progress
-    ///
-    /// To determine the actual state of the post after calling this method, query the
-    /// entity state store or check the database cache.
-    pub async fn refresh_post(
-        &self,
-        post_id: wp_api::posts::PostId,
-        endpoint_type: &PostEndpointType,
-    ) -> Result<(), FetchError> {
-        self.load_posts_by_ids(endpoint_type, vec![post_id])
-            .await
-            .map(|_| ())
-    }
-
     /// Create a post via the REST API and cache the result locally.
     pub async fn create_post(
         self: &Arc<Self>,
