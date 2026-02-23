@@ -1,6 +1,7 @@
 package rs.wordpress.example.shared.di
 
 import org.koin.dsl.module
+import rs.wordpress.api.kotlin.DebugMiddleware
 import rs.wordpress.api.kotlin.EmptyAppNotifier
 import rs.wordpress.api.kotlin.WpRequestExecutor
 import rs.wordpress.cache.kotlin.WordPressApiCache
@@ -38,15 +39,18 @@ val viewModelModule = module {
 }
 
 fun createWpService(account: Account.SelfHostedSite, cache: WordPressApiCache): WpService {
+    val auth = if (account.siteApiRoot.startsWith("https://public-api.wordpress.com/")) {
+        WpAuthentication.Bearer(token = account.password)
+    } else {
+        wpAuthenticationFromUsernameAndPassword(account.username, account.password)
+    }
     return WpService.selfHosted(
         siteUrl = account.domain,
         apiRoot = account.siteApiRoot,
         delegate = WpApiClientDelegate(
-            WpAuthenticationProvider.staticWithAuth(
-                wpAuthenticationFromUsernameAndPassword(account.username, account.password)
-            ),
+            WpAuthenticationProvider.staticWithAuth(auth),
             requestExecutor = WpRequestExecutor(emptyList()),
-            middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
+            middlewarePipeline = WpApiMiddlewarePipeline(listOf(DebugMiddleware())),
             appNotifier = EmptyAppNotifier()
         ),
         cache = cache.cache
