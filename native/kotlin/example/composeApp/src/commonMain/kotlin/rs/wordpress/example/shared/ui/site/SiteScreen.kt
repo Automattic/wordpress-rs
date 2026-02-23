@@ -11,11 +11,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,132 +55,49 @@ fun SiteScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
-            item {
-                ListItem(
-                    headlineContent = { Text("Users") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onUsersClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Plugins") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onPluginsClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Categories") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onCategoriesClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Tags") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onTagsClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Pages") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onPagesClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Comments") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onCommentsClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Media") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onMediaClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Themes") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onThemesClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Site Settings") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onSiteSettingsClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Search") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onSearchClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Site Health") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onSiteHealthClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Post Collection") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onPostCollectionClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Post Types") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onPostTypesClicked)
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Stress Test") },
-                    trailingContent = {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                    },
-                    modifier = Modifier.clickable(onClick = onStressTestClicked)
-                )
-            }
+            // Posts
+            item { SectionHeader("Posts") }
+            item { NavigationItem("Post Collection", onPostCollectionClicked) }
+            item { NavigationItem("Pages", onPagesClicked) }
+            item { NavigationItem("Comments", onCommentsClicked) }
+            item { NavigationItem("Media", onMediaClicked) }
+
+            // Taxonomies
+            item { SectionHeader("Taxonomies") }
+            item { NavigationItem("Categories", onCategoriesClicked) }
+            item { NavigationItem("Tags", onTagsClicked) }
+
+            // System
+            item { SectionHeader("System") }
+            item { NavigationItem("Users", onUsersClicked) }
+            item { NavigationItem("Plugins", onPluginsClicked) }
+            item { NavigationItem("Post Types", onPostTypesClicked) }
+            item { NavigationItem("Themes", onThemesClicked) }
+            item { NavigationItem("Site Settings", onSiteSettingsClicked) }
+            item { NavigationItem("Search", onSearchClicked) }
+            item { NavigationItem("Site Health", onSiteHealthClicked) }
+            item { NavigationItem("Stress Test", onStressTestClicked) }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun NavigationItem(title: String, onClick: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(title) },
+        trailingContent = {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        },
+        modifier = Modifier.clickable(onClick = onClick)
+    )
 }
