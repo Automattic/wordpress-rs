@@ -16,6 +16,7 @@ import rs.wordpress.cache.kotlin.WordPressApiCache
 import rs.wordpress.example.shared.di.createWpApiClient
 import rs.wordpress.example.shared.di.createWpComApiClient
 import rs.wordpress.example.shared.di.createWpService
+import rs.wordpress.example.shared.ui.applicationpasswords.ApplicationPasswordListScreen
 import rs.wordpress.example.shared.ui.comments.CommentListScreen
 import rs.wordpress.example.shared.ui.login.LoginScreen
 import rs.wordpress.example.shared.ui.media.MediaListScreen
@@ -118,6 +119,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
                     onNavMenusClicked = { navController.navigate("navmenus") },
                     onNavMenuItemsClicked = { navController.navigate("navmenuitems") },
                     onMenuLocationsClicked = { navController.navigate("menulocations") },
+                    onApplicationPasswordsClicked = { navController.navigate("applicationpasswords") },
                     onUsersClicked = { navController.navigate("users") },
                     onPluginsClicked = { navController.navigate("plugins") },
                     onPostCollectionClicked = { navController.navigate("postcollection") },
@@ -246,6 +248,12 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
             }
             composable("menulocations") {
                 MenuLocationListScreen(
+                    apiClient = currentApiClient!!,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("applicationpasswords") {
+                ApplicationPasswordListScreen(
                     apiClient = currentApiClient!!,
                     onBackClicked = { navController.popBackStack() }
                 )
