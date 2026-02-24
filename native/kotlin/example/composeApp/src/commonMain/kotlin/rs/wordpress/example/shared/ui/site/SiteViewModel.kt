@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
+import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.PostTypeSupports
 import uniffi.wp_api.TaxonomyListParams
 
@@ -33,6 +34,9 @@ class SiteViewModel(private val apiClient: WpApiClient) {
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
 
     private var postTypesLoaded = false
     private var taxonomiesLoaded = false
@@ -59,7 +63,10 @@ class SiteViewModel(private val apiClient: WpApiClient) {
                         }
                         .map { SitePostType(name = it.name, restBase = it.restBase) }
                 }
-                else -> _postTypes.value = emptyList()
+                else -> {
+                    if (_error.value == null) _error.value = result.errorDescription()
+                    _postTypes.value = emptyList()
+                }
             }
             postTypesLoaded = true
             if (taxonomiesLoaded) _isLoading.value = false
@@ -78,7 +85,10 @@ class SiteViewModel(private val apiClient: WpApiClient) {
                         .filter { it.visibility?.showInNavMenus == true }
                         .map { SiteTaxonomy(name = it.name, restBase = it.restBase) }
                 }
-                else -> _taxonomies.value = emptyList()
+                else -> {
+                    if (_error.value == null) _error.value = result.errorDescription()
+                    _taxonomies.value = emptyList()
+                }
             }
             taxonomiesLoaded = true
             if (postTypesLoaded) _isLoading.value = false

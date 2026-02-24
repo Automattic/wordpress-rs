@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
+import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.NavMenuListParams
 import uniffi.wp_api.NavMenuWithEditContext
 
@@ -21,6 +22,9 @@ class NavMenuListViewModel(private val apiClient: WpApiClient) {
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
     init {
         loadNavMenus()
     }
@@ -32,7 +36,10 @@ class NavMenuListViewModel(private val apiClient: WpApiClient) {
             }
             when (result) {
                 is WpRequestResult.Success -> _navMenus.value = result.response.data
-                else -> _navMenus.value = emptyList()
+                else -> {
+                    _error.value = result.errorDescription()
+                    _navMenus.value = emptyList()
+                }
             }
             _isLoading.value = false
         }

@@ -23,6 +23,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import rs.wordpress.api.kotlin.WpApiClient
+import rs.wordpress.example.shared.ui.components.EmptyState
+import rs.wordpress.example.shared.ui.components.ErrorMessage
 import rs.wordpress.example.shared.ui.components.LoadingIndicator
 import rs.wordpress.example.shared.ui.components.LoadingMoreIndicator
 
@@ -38,6 +40,7 @@ fun CommentListScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val canLoadMore by viewModel.canLoadMore.collectAsState()
+    val error by viewModel.error.collectAsState()
 
     val listState = rememberLazyListState()
     val shouldLoadMore by remember {
@@ -68,6 +71,10 @@ fun CommentListScreen(
     ) { paddingValues ->
         if (isLoading) {
             LoadingIndicator(modifier = Modifier.padding(paddingValues))
+        } else if (error != null && comments.isEmpty()) {
+            ErrorMessage(error!!, modifier = Modifier.padding(paddingValues))
+        } else if (comments.isEmpty()) {
+            EmptyState("No comments found", modifier = Modifier.padding(paddingValues))
         } else {
             LazyColumn(
                 state = listState,
@@ -82,7 +89,11 @@ fun CommentListScreen(
                         overlineContent = { Text(comment.status.toString()) }
                     )
                 }
-                if (isLoadingMore) {
+                if (error != null) {
+                    item {
+                        ErrorMessage(error!!)
+                    }
+                } else if (isLoadingMore) {
                     item { LoadingMoreIndicator() }
                 }
             }

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
+import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.AnyPostWithEditContext
 import uniffi.wp_api.PostEndpointType
 import uniffi.wp_api.PostListParams
@@ -21,6 +22,9 @@ class PostListByTypeViewModel(
 
     private val _posts = MutableStateFlow<List<AnyPostWithEditContext>>(emptyList())
     val posts: StateFlow<List<AnyPostWithEditContext>> = _posts.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -51,7 +55,10 @@ class PostListByTypeViewModel(
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> _posts.value = emptyList()
+                else -> {
+                    _error.value = result.errorDescription()
+                    _posts.value = emptyList()
+                }
             }
             _isLoading.value = false
         }
@@ -74,7 +81,7 @@ class PostListByTypeViewModel(
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> {}
+                else -> _error.value = result.errorDescription()
             }
             _isLoadingMore.value = false
         }

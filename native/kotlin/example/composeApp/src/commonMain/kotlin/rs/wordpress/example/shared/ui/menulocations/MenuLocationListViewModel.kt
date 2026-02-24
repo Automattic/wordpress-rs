@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
+import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.MenuLocationWithEditContext
 
 class MenuLocationListViewModel(private val apiClient: WpApiClient) {
@@ -19,6 +20,9 @@ class MenuLocationListViewModel(private val apiClient: WpApiClient) {
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
 
     init {
         loadMenuLocations()
@@ -33,7 +37,10 @@ class MenuLocationListViewModel(private val apiClient: WpApiClient) {
                 is WpRequestResult.Success -> {
                     _menuLocations.value = result.response.data.locations.values.toList()
                 }
-                else -> _menuLocations.value = emptyList()
+                else -> {
+                    _error.value = result.errorDescription()
+                    _menuLocations.value = emptyList()
+                }
             }
             _isLoading.value = false
         }

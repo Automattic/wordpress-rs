@@ -19,6 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import rs.wordpress.api.kotlin.WpApiClient
+import rs.wordpress.example.shared.ui.components.EmptyState
+import rs.wordpress.example.shared.ui.components.ErrorMessage
 import rs.wordpress.example.shared.ui.components.LoadingIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +33,7 @@ fun SiteSettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
 
     Scaffold(
         topBar = {
@@ -46,6 +49,10 @@ fun SiteSettingsScreen(
     ) { paddingValues ->
         if (isLoading) {
             LoadingIndicator(modifier = Modifier.padding(paddingValues))
+        } else if (error != null) {
+            ErrorMessage(error!!, modifier = Modifier.padding(paddingValues))
+        } else if (settings == null) {
+            EmptyState("No settings available", modifier = Modifier.padding(paddingValues))
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(paddingValues)

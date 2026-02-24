@@ -29,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import rs.wordpress.api.kotlin.WpApiClient
+import rs.wordpress.example.shared.ui.components.EmptyState
+import rs.wordpress.example.shared.ui.components.ErrorMessage
 import rs.wordpress.example.shared.ui.components.LoadingIndicator
 import rs.wordpress.example.shared.ui.components.LoadingMoreIndicator
 
@@ -44,6 +46,8 @@ fun SearchScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val canLoadMore by viewModel.canLoadMore.collectAsState()
+    val error by viewModel.error.collectAsState()
+    val hasSearched by viewModel.hasSearched.collectAsState()
     var query by remember { mutableStateOf("") }
 
     val listState = rememberLazyListState()
@@ -88,6 +92,10 @@ fun SearchScreen(
             )
             if (isLoading) {
                 LoadingIndicator()
+            } else if (error != null && results.isEmpty()) {
+                ErrorMessage(error!!)
+            } else if (results.isEmpty() && hasSearched) {
+                EmptyState("No results found")
             } else {
                 LazyColumn(
                     state = listState,
@@ -103,7 +111,11 @@ fun SearchScreen(
                             }
                         )
                     }
-                    if (isLoadingMore) {
+                    if (error != null) {
+                        item {
+                            ErrorMessage(error!!)
+                        }
+                    } else if (isLoadingMore) {
                         item { LoadingMoreIndicator() }
                     }
                 }

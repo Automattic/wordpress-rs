@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
+import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.SearchListParams
 import uniffi.wp_api.SearchResultWithViewContext
 
@@ -27,6 +28,12 @@ class SearchViewModel(private val apiClient: WpApiClient) {
     private val _canLoadMore = MutableStateFlow(false)
     val canLoadMore: StateFlow<Boolean> = _canLoadMore.asStateFlow()
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _hasSearched = MutableStateFlow(false)
+    val hasSearched: StateFlow<Boolean> = _hasSearched.asStateFlow()
+
     private var nextPageParams: SearchListParams? = null
 
     fun search(query: String) {
@@ -36,6 +43,8 @@ class SearchViewModel(private val apiClient: WpApiClient) {
             _canLoadMore.value = false
             return
         }
+        _error.value = null
+        _hasSearched.value = true
         _isLoading.value = true
         nextPageParams = null
         _canLoadMore.value = false
@@ -49,7 +58,10 @@ class SearchViewModel(private val apiClient: WpApiClient) {
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> _results.value = emptyList()
+                else -> {
+                    _error.value = result.errorDescription()
+                    _results.value = emptyList()
+                }
             }
             _isLoading.value = false
         }
@@ -69,7 +81,7 @@ class SearchViewModel(private val apiClient: WpApiClient) {
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> {}
+                else -> _error.value = result.errorDescription()
             }
             _isLoadingMore.value = false
         }

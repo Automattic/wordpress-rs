@@ -20,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import rs.wordpress.api.kotlin.WpApiClient
+import rs.wordpress.example.shared.ui.components.EmptyState
+import rs.wordpress.example.shared.ui.components.ErrorMessage
 import rs.wordpress.example.shared.ui.components.LoadingIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +34,7 @@ fun MenuLocationListScreen(
 ) {
     val menuLocations by viewModel.menuLocations.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
 
     Scaffold(
         topBar = {
@@ -47,6 +50,10 @@ fun MenuLocationListScreen(
     ) { paddingValues ->
         if (isLoading) {
             LoadingIndicator(modifier = Modifier.padding(paddingValues))
+        } else if (error != null) {
+            ErrorMessage(error!!, modifier = Modifier.padding(paddingValues))
+        } else if (menuLocations.isEmpty()) {
+            EmptyState("No menu locations found", modifier = Modifier.padding(paddingValues))
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(paddingValues)

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
+import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.AnyTermWithEditContext
 import uniffi.wp_api.TermEndpointType
 import uniffi.wp_api.TermListParams
@@ -21,6 +22,9 @@ class TermListByTypeViewModel(
 
     private val _terms = MutableStateFlow<List<AnyTermWithEditContext>>(emptyList())
     val terms: StateFlow<List<AnyTermWithEditContext>> = _terms.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -51,7 +55,10 @@ class TermListByTypeViewModel(
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> _terms.value = emptyList()
+                else -> {
+                    _error.value = result.errorDescription()
+                    _terms.value = emptyList()
+                }
             }
             _isLoading.value = false
         }
@@ -74,7 +81,7 @@ class TermListByTypeViewModel(
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> {}
+                else -> _error.value = result.errorDescription()
             }
             _isLoadingMore.value = false
         }
