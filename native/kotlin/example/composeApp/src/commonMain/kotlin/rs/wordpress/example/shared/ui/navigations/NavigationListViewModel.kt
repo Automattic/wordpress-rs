@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
+import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.NavigationListParams
 import uniffi.wp_api.NavigationWithEditContext
 
@@ -17,6 +18,9 @@ class NavigationListViewModel(private val apiClient: WpApiClient) {
 
     private val _navigations = MutableStateFlow<List<NavigationWithEditContext>>(emptyList())
     val navigations: StateFlow<List<NavigationWithEditContext>> = _navigations.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -44,7 +48,10 @@ class NavigationListViewModel(private val apiClient: WpApiClient) {
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> _navigations.value = emptyList()
+                else -> {
+                    _error.value = result.errorDescription()
+                    _navigations.value = emptyList()
+                }
             }
             _isLoading.value = false
         }
@@ -64,7 +71,7 @@ class NavigationListViewModel(private val apiClient: WpApiClient) {
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> {}
+                else -> _error.value = result.errorDescription()
             }
             _isLoadingMore.value = false
         }

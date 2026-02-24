@@ -20,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import rs.wordpress.api.kotlin.WpApiClient
+import rs.wordpress.example.shared.ui.components.EmptyState
+import rs.wordpress.example.shared.ui.components.ErrorMessage
 import rs.wordpress.example.shared.ui.components.LoadingIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +34,7 @@ fun SiteHealthScreen(
 ) {
     val tests by viewModel.tests.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
 
     Scaffold(
         topBar = {
@@ -47,6 +50,10 @@ fun SiteHealthScreen(
     ) { paddingValues ->
         if (isLoading) {
             LoadingIndicator(modifier = Modifier.padding(paddingValues))
+        } else if (error != null) {
+            ErrorMessage(error!!, modifier = Modifier.padding(paddingValues))
+        } else if (tests.isEmpty()) {
+            EmptyState("No site health tests available", modifier = Modifier.padding(paddingValues))
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(paddingValues)

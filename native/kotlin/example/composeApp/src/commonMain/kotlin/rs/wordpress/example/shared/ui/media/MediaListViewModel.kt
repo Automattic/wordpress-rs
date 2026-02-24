@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
+import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.MediaListParams
 import uniffi.wp_api.MediaWithEditContext
 
@@ -17,6 +18,9 @@ class MediaListViewModel(private val apiClient: WpApiClient) {
 
     private val _media = MutableStateFlow<List<MediaWithEditContext>>(emptyList())
     val media: StateFlow<List<MediaWithEditContext>> = _media.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -44,7 +48,10 @@ class MediaListViewModel(private val apiClient: WpApiClient) {
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> _media.value = emptyList()
+                else -> {
+                    _error.value = result.errorDescription()
+                    _media.value = emptyList()
+                }
             }
             _isLoading.value = false
         }
@@ -64,7 +71,7 @@ class MediaListViewModel(private val apiClient: WpApiClient) {
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> {}
+                else -> _error.value = result.errorDescription()
             }
             _isLoadingMore.value = false
         }
