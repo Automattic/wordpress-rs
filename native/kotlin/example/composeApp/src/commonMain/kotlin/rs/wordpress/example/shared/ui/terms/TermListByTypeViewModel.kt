@@ -1,4 +1,4 @@
-package rs.wordpress.example.shared.ui.tags
+package rs.wordpress.example.shared.ui.terms
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,11 +13,14 @@ import uniffi.wp_api.AnyTermWithEditContext
 import uniffi.wp_api.TermEndpointType
 import uniffi.wp_api.TermListParams
 
-class TagListViewModel(private val apiClient: WpApiClient) {
+class TermListByTypeViewModel(
+    private val apiClient: WpApiClient,
+    private val termEndpointType: TermEndpointType
+) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    private val _tags = MutableStateFlow<List<AnyTermWithEditContext>>(emptyList())
-    val tags: StateFlow<List<AnyTermWithEditContext>> = _tags.asStateFlow()
+    private val _terms = MutableStateFlow<List<AnyTermWithEditContext>>(emptyList())
+    val terms: StateFlow<List<AnyTermWithEditContext>> = _terms.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -31,24 +34,24 @@ class TagListViewModel(private val apiClient: WpApiClient) {
     private var nextPageParams: TermListParams? = null
 
     init {
-        loadTags()
+        loadTerms()
     }
 
-    private fun loadTags() {
+    private fun loadTerms() {
         viewModelScope.launch(Dispatchers.IO) {
             val result = apiClient.request { requestBuilder ->
                 requestBuilder.terms().listWithEditContext(
-                    termEndpointType = TermEndpointType.Tags,
+                    termEndpointType = termEndpointType,
                     params = TermListParams()
                 )
             }
             when (result) {
                 is WpRequestResult.Success -> {
-                    _tags.value = result.response.data
+                    _terms.value = result.response.data
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> _tags.value = emptyList()
+                else -> _terms.value = emptyList()
             }
             _isLoading.value = false
         }
@@ -61,13 +64,13 @@ class TagListViewModel(private val apiClient: WpApiClient) {
         viewModelScope.launch(Dispatchers.IO) {
             val result = apiClient.request { requestBuilder ->
                 requestBuilder.terms().listWithEditContext(
-                    termEndpointType = TermEndpointType.Tags,
+                    termEndpointType = termEndpointType,
                     params = params
                 )
             }
             when (result) {
                 is WpRequestResult.Success -> {
-                    _tags.value = _tags.value + result.response.data
+                    _terms.value = _terms.value + result.response.data
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }

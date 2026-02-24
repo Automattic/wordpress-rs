@@ -1,4 +1,4 @@
-package rs.wordpress.example.shared.ui.categories
+package rs.wordpress.example.shared.ui.navmenuitems
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -9,15 +9,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
-import uniffi.wp_api.AnyTermWithEditContext
-import uniffi.wp_api.TermEndpointType
-import uniffi.wp_api.TermListParams
+import uniffi.wp_api.NavMenuItemListParams
+import uniffi.wp_api.NavMenuItemWithEditContext
 
-class CategoryListViewModel(private val apiClient: WpApiClient) {
+class NavMenuItemListViewModel(private val apiClient: WpApiClient) {
     private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    private val _categories = MutableStateFlow<List<AnyTermWithEditContext>>(emptyList())
-    val categories: StateFlow<List<AnyTermWithEditContext>> = _categories.asStateFlow()
+    private val _navMenuItems = MutableStateFlow<List<NavMenuItemWithEditContext>>(emptyList())
+    val navMenuItems: StateFlow<List<NavMenuItemWithEditContext>> = _navMenuItems.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -28,27 +27,24 @@ class CategoryListViewModel(private val apiClient: WpApiClient) {
     private val _canLoadMore = MutableStateFlow(false)
     val canLoadMore: StateFlow<Boolean> = _canLoadMore.asStateFlow()
 
-    private var nextPageParams: TermListParams? = null
+    private var nextPageParams: NavMenuItemListParams? = null
 
     init {
-        loadCategories()
+        loadNavMenuItems()
     }
 
-    private fun loadCategories() {
+    private fun loadNavMenuItems() {
         viewModelScope.launch(Dispatchers.IO) {
             val result = apiClient.request { requestBuilder ->
-                requestBuilder.terms().listWithEditContext(
-                    termEndpointType = TermEndpointType.Categories,
-                    params = TermListParams()
-                )
+                requestBuilder.navMenuItems().listWithEditContext(NavMenuItemListParams())
             }
             when (result) {
                 is WpRequestResult.Success -> {
-                    _categories.value = result.response.data
+                    _navMenuItems.value = result.response.data
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }
-                else -> _categories.value = emptyList()
+                else -> _navMenuItems.value = emptyList()
             }
             _isLoading.value = false
         }
@@ -60,14 +56,11 @@ class CategoryListViewModel(private val apiClient: WpApiClient) {
         _isLoadingMore.value = true
         viewModelScope.launch(Dispatchers.IO) {
             val result = apiClient.request { requestBuilder ->
-                requestBuilder.terms().listWithEditContext(
-                    termEndpointType = TermEndpointType.Categories,
-                    params = params
-                )
+                requestBuilder.navMenuItems().listWithEditContext(params)
             }
             when (result) {
                 is WpRequestResult.Success -> {
-                    _categories.value = _categories.value + result.response.data
+                    _navMenuItems.value = _navMenuItems.value + result.response.data
                     nextPageParams = result.response.nextPageParams
                     _canLoadMore.value = nextPageParams != null
                 }

@@ -31,8 +31,11 @@ fun SiteScreen(
     onPostTypeClicked: (SitePostType) -> Unit,
     onCommentsClicked: () -> Unit,
     onMediaClicked: () -> Unit,
-    onCategoriesClicked: () -> Unit,
-    onTagsClicked: () -> Unit,
+    onTaxonomyClicked: (SiteTaxonomy) -> Unit,
+    onNavigationsClicked: () -> Unit,
+    onNavMenusClicked: () -> Unit,
+    onNavMenuItemsClicked: () -> Unit,
+    onMenuLocationsClicked: () -> Unit,
     onUsersClicked: () -> Unit,
     onPluginsClicked: () -> Unit,
     onPostCollectionClicked: () -> Unit,
@@ -45,6 +48,7 @@ fun SiteScreen(
     onBackClicked: () -> Unit = {}
 ) {
     val postTypes by viewModel.postTypes.collectAsState()
+    val taxonomies by viewModel.taxonomies.collectAsState()
 
     Scaffold(
         topBar = {
@@ -71,8 +75,16 @@ fun SiteScreen(
 
             // Taxonomies
             item { SectionHeader("Taxonomies") }
-            item { NavigationItem("Categories", onCategoriesClicked) }
-            item { NavigationItem("Tags", onTagsClicked) }
+            items(taxonomies) { taxonomy ->
+                NavigationItem(taxonomy.name) { onTaxonomyClicked(taxonomy) }
+            }
+
+            // Navigation
+            item { SectionHeader("Navigation") }
+            item { NavigationItem("Navigations", onNavigationsClicked) }
+            item { NavigationItem("Menus", onNavMenusClicked) }
+            item { NavigationItem("Menu Items", onNavMenuItemsClicked) }
+            item { NavigationItem("Menu Locations", onMenuLocationsClicked) }
 
             // System
             item { SectionHeader("System") }

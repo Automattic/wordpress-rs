@@ -1,4 +1,4 @@
-package rs.wordpress.example.shared.ui.categories
+package rs.wordpress.example.shared.ui.navmenuitems
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -29,12 +29,12 @@ import rs.wordpress.example.shared.ui.components.LoadingMoreIndicator
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
-fun CategoryListScreen(
+fun NavMenuItemListScreen(
     apiClient: WpApiClient,
-    viewModel: CategoryListViewModel = remember { CategoryListViewModel(apiClient) },
+    viewModel: NavMenuItemListViewModel = remember { NavMenuItemListViewModel(apiClient) },
     onBackClicked: () -> Unit = {}
 ) {
-    val categories by viewModel.categories.collectAsState()
+    val navMenuItems by viewModel.navMenuItems.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val canLoadMore by viewModel.canLoadMore.collectAsState()
@@ -57,7 +57,7 @@ fun CategoryListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Categories") },
+                title = { Text("Menu Items") },
                 navigationIcon = {
                     IconButton(onClick = onBackClicked) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -73,11 +73,11 @@ fun CategoryListScreen(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(paddingValues)
             ) {
-                items(categories) { category ->
+                items(navMenuItems) { navMenuItem ->
                     ListItem(
-                        headlineContent = { Text(category.name) },
-                        supportingContent = { Text("${category.count} posts") },
-                        overlineContent = { Text(category.slug) }
+                        headlineContent = { Text(navMenuItem.title?.rendered ?: "(untitled)") },
+                        supportingContent = { Text(navMenuItem.typeLabel) },
+                        overlineContent = { Text(navMenuItem.url) }
                     )
                 }
                 if (isLoadingMore) {
