@@ -36,6 +36,7 @@ fun SiteScreen(
     onNavMenusClicked: () -> Unit,
     onNavMenuItemsClicked: () -> Unit,
     onMenuLocationsClicked: () -> Unit,
+    onApplicationPasswordsClicked: () -> Unit,
     onUsersClicked: () -> Unit,
     onPluginsClicked: () -> Unit,
     onPostCollectionClicked: () -> Unit,
@@ -88,6 +89,7 @@ fun SiteScreen(
 
             // System
             item { SectionHeader("System") }
+            item { NavigationItem("Application Passwords", onApplicationPasswordsClicked) }
             item { NavigationItem("Users", onUsersClicked) }
             item { NavigationItem("Plugins", onPluginsClicked) }
             item { NavigationItem("Post Collection", onPostCollectionClicked) }
