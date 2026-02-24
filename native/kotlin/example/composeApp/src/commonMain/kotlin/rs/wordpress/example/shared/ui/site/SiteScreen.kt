@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -16,6 +17,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -24,22 +27,25 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 @Preview
 fun SiteScreen(
-    onUsersClicked: () -> Unit,
-    onPluginsClicked: () -> Unit,
-    onStressTestClicked: () -> Unit,
-    onPostCollectionClicked: () -> Unit,
-    onPostTypesClicked: () -> Unit,
-    onCategoriesClicked: () -> Unit,
-    onTagsClicked: () -> Unit,
-    onPagesClicked: () -> Unit,
+    viewModel: SiteViewModel,
+    onPostTypeClicked: (SitePostType) -> Unit,
     onCommentsClicked: () -> Unit,
     onMediaClicked: () -> Unit,
+    onCategoriesClicked: () -> Unit,
+    onTagsClicked: () -> Unit,
+    onUsersClicked: () -> Unit,
+    onPluginsClicked: () -> Unit,
+    onPostCollectionClicked: () -> Unit,
+    onPostTypesClicked: () -> Unit,
     onThemesClicked: () -> Unit,
     onSiteSettingsClicked: () -> Unit,
     onSearchClicked: () -> Unit,
     onSiteHealthClicked: () -> Unit,
+    onStressTestClicked: () -> Unit,
     onBackClicked: () -> Unit = {}
 ) {
+    val postTypes by viewModel.postTypes.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -57,8 +63,9 @@ fun SiteScreen(
         ) {
             // Posts
             item { SectionHeader("Posts") }
-            item { NavigationItem("Post Collection", onPostCollectionClicked) }
-            item { NavigationItem("Pages", onPagesClicked) }
+            items(postTypes) { postType ->
+                NavigationItem(postType.name) { onPostTypeClicked(postType) }
+            }
             item { NavigationItem("Comments", onCommentsClicked) }
             item { NavigationItem("Media", onMediaClicked) }
 
@@ -71,6 +78,7 @@ fun SiteScreen(
             item { SectionHeader("System") }
             item { NavigationItem("Users", onUsersClicked) }
             item { NavigationItem("Plugins", onPluginsClicked) }
+            item { NavigationItem("Post Collection", onPostCollectionClicked) }
             item { NavigationItem("Post Types", onPostTypesClicked) }
             item { NavigationItem("Themes", onThemesClicked) }
             item { NavigationItem("Site Settings", onSiteSettingsClicked) }
