@@ -20,14 +20,16 @@ import rs.wordpress.example.shared.ui.categories.CategoryListScreen
 import rs.wordpress.example.shared.ui.comments.CommentListScreen
 import rs.wordpress.example.shared.ui.login.LoginScreen
 import rs.wordpress.example.shared.ui.media.MediaListScreen
-import rs.wordpress.example.shared.ui.pages.PageListScreen
 import rs.wordpress.example.shared.ui.plugins.PluginListScreen
 import rs.wordpress.example.shared.ui.postcollection.PostCollectionScreen
+import rs.wordpress.example.shared.ui.posts.PostListByTypeScreen
 import rs.wordpress.example.shared.ui.postmetadatacollection.PostMetadataCollectionScreen
 import rs.wordpress.example.shared.ui.posttypes.PostTypesScreen
 import rs.wordpress.example.shared.ui.search.SearchScreen
 import rs.wordpress.example.shared.ui.settings.SiteSettingsScreen
+import rs.wordpress.example.shared.ui.site.SitePostType
 import rs.wordpress.example.shared.ui.site.SiteScreen
+import rs.wordpress.example.shared.ui.site.SiteViewModel
 import rs.wordpress.example.shared.ui.sitehealth.SiteHealthScreen
 import rs.wordpress.example.shared.ui.stresstest.StressTestScreen
 import rs.wordpress.example.shared.ui.tags.TagListScreen
@@ -38,6 +40,7 @@ import rs.wordpress.example.shared.ui.wpcom.WpComBotConversationsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComMeScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSiteScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSupportConversationsScreen
+import uniffi.wp_api.PostEndpointType
 import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.WpService
 
@@ -52,6 +55,8 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
     var currentAccount by remember { mutableStateOf<Account.SelfHostedSite?>(null) }
     var currentWpComClient by remember { mutableStateOf<WpComApiClient?>(null) }
     var currentApiClient by remember { mutableStateOf<WpApiClient?>(null) }
+    var currentSiteViewModel by remember { mutableStateOf<SiteViewModel?>(null) }
+    var currentPostType by remember { mutableStateOf<SitePostType?>(null) }
 
     MaterialTheme {
         NavHost(navController, startDestination = "welcome") {
@@ -66,7 +71,9 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
                             is Account.SelfHostedSite -> {
                                 currentAccount = account
                                 currentWpService = createWpService(account, cache)
-                                currentApiClient = createWpApiClient(account)
+                                val apiClient = createWpApiClient(account)
+                                currentApiClient = apiClient
+                                currentSiteViewModel = SiteViewModel(apiClient)
                                 navController.navigate("site")
                             }
                             is Account.WpCom -> {
@@ -90,20 +97,24 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
             }
             composable("site") {
                 SiteScreen(
-                    onUsersClicked = { navController.navigate("users") },
-                    onPluginsClicked = { navController.navigate("plugins") },
-                    onStressTestClicked = { navController.navigate("stresstest") },
-                    onPostCollectionClicked = { navController.navigate("postcollection") },
-                    onPostTypesClicked = { navController.navigate("posttypes") },
-                    onCategoriesClicked = { navController.navigate("categories") },
-                    onTagsClicked = { navController.navigate("tags") },
-                    onPagesClicked = { navController.navigate("pages") },
+                    viewModel = currentSiteViewModel!!,
+                    onPostTypeClicked = { postType ->
+                        currentPostType = postType
+                        navController.navigate("postlistbytype")
+                    },
                     onCommentsClicked = { navController.navigate("comments") },
                     onMediaClicked = { navController.navigate("media") },
+                    onCategoriesClicked = { navController.navigate("categories") },
+                    onTagsClicked = { navController.navigate("tags") },
+                    onUsersClicked = { navController.navigate("users") },
+                    onPluginsClicked = { navController.navigate("plugins") },
+                    onPostCollectionClicked = { navController.navigate("postcollection") },
+                    onPostTypesClicked = { navController.navigate("posttypes") },
                     onThemesClicked = { navController.navigate("themes") },
                     onSiteSettingsClicked = { navController.navigate("sitesettings") },
                     onSearchClicked = { navController.navigate("search") },
                     onSiteHealthClicked = { navController.navigate("sitehealth") },
+                    onStressTestClicked = { navController.navigate("stresstest") },
                     onBackClicked = { navController.popBackStack() }
                 )
             }
@@ -131,9 +142,12 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, auth
                     onBackClicked = { navController.popBackStack() }
                 )
             }
-            composable("pages") {
-                PageListScreen(
+            composable("postlistbytype") {
+                val postType = currentPostType!!
+                PostListByTypeScreen(
                     apiClient = currentApiClient!!,
+                    postEndpointType = PostEndpointType.Custom(postType.restBase),
+                    title = postType.name,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
