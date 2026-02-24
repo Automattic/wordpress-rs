@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import rs.wordpress.example.shared.ui.components.LoadingIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +51,7 @@ fun SiteScreen(
 ) {
     val postTypes by viewModel.postTypes.collectAsState()
     val taxonomies by viewModel.taxonomies.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
     Scaffold(
         topBar = {
@@ -63,42 +65,46 @@ fun SiteScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(paddingValues)
-        ) {
-            // Posts
-            item { SectionHeader("Posts") }
-            items(postTypes) { postType ->
-                NavigationItem(postType.name) { onPostTypeClicked(postType) }
+        if (isLoading) {
+            LoadingIndicator(modifier = Modifier.padding(paddingValues))
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(paddingValues)
+            ) {
+                // Posts
+                item { SectionHeader("Posts") }
+                items(postTypes) { postType ->
+                    NavigationItem(postType.name) { onPostTypeClicked(postType) }
+                }
+                item { NavigationItem("Comments", onCommentsClicked) }
+                item { NavigationItem("Media", onMediaClicked) }
+
+                // Taxonomies
+                item { SectionHeader("Taxonomies") }
+                items(taxonomies) { taxonomy ->
+                    NavigationItem(taxonomy.name) { onTaxonomyClicked(taxonomy) }
+                }
+
+                // Navigation
+                item { SectionHeader("Navigation") }
+                item { NavigationItem("Navigations", onNavigationsClicked) }
+                item { NavigationItem("Menus", onNavMenusClicked) }
+                item { NavigationItem("Menu Items", onNavMenuItemsClicked) }
+                item { NavigationItem("Menu Locations", onMenuLocationsClicked) }
+
+                // System
+                item { SectionHeader("System") }
+                item { NavigationItem("Application Passwords", onApplicationPasswordsClicked) }
+                item { NavigationItem("Users", onUsersClicked) }
+                item { NavigationItem("Plugins", onPluginsClicked) }
+                item { NavigationItem("Post Collection", onPostCollectionClicked) }
+                item { NavigationItem("Post Types", onPostTypesClicked) }
+                item { NavigationItem("Themes", onThemesClicked) }
+                item { NavigationItem("Site Settings", onSiteSettingsClicked) }
+                item { NavigationItem("Search", onSearchClicked) }
+                item { NavigationItem("Site Health", onSiteHealthClicked) }
+                item { NavigationItem("Stress Test", onStressTestClicked) }
             }
-            item { NavigationItem("Comments", onCommentsClicked) }
-            item { NavigationItem("Media", onMediaClicked) }
-
-            // Taxonomies
-            item { SectionHeader("Taxonomies") }
-            items(taxonomies) { taxonomy ->
-                NavigationItem(taxonomy.name) { onTaxonomyClicked(taxonomy) }
-            }
-
-            // Navigation
-            item { SectionHeader("Navigation") }
-            item { NavigationItem("Navigations", onNavigationsClicked) }
-            item { NavigationItem("Menus", onNavMenusClicked) }
-            item { NavigationItem("Menu Items", onNavMenuItemsClicked) }
-            item { NavigationItem("Menu Locations", onMenuLocationsClicked) }
-
-            // System
-            item { SectionHeader("System") }
-            item { NavigationItem("Application Passwords", onApplicationPasswordsClicked) }
-            item { NavigationItem("Users", onUsersClicked) }
-            item { NavigationItem("Plugins", onPluginsClicked) }
-            item { NavigationItem("Post Collection", onPostCollectionClicked) }
-            item { NavigationItem("Post Types", onPostTypesClicked) }
-            item { NavigationItem("Themes", onThemesClicked) }
-            item { NavigationItem("Site Settings", onSiteSettingsClicked) }
-            item { NavigationItem("Search", onSearchClicked) }
-            item { NavigationItem("Site Health", onSiteHealthClicked) }
-            item { NavigationItem("Stress Test", onStressTestClicked) }
         }
     }
 }
