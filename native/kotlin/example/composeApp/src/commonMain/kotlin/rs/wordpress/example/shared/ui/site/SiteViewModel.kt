@@ -10,8 +10,14 @@ import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
 import uniffi.wp_api.PostTypeSupports
+import uniffi.wp_api.TaxonomyListParams
 
 data class SitePostType(
+    val name: String,
+    val restBase: String
+)
+
+data class SiteTaxonomy(
     val name: String,
     val restBase: String
 )
@@ -22,11 +28,18 @@ class SiteViewModel(private val apiClient: WpApiClient) {
     private val _postTypes = MutableStateFlow<List<SitePostType>>(emptyList())
     val postTypes: StateFlow<List<SitePostType>> = _postTypes.asStateFlow()
 
+    private val _taxonomies = MutableStateFlow<List<SiteTaxonomy>>(emptyList())
+    val taxonomies: StateFlow<List<SiteTaxonomy>> = _taxonomies.asStateFlow()
+
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private var postTypesLoaded = false
+    private var taxonomiesLoaded = false
+
     init {
         loadPostTypes()
+        loadTaxonomies()
     }
 
     private fun loadPostTypes() {
@@ -48,7 +61,27 @@ class SiteViewModel(private val apiClient: WpApiClient) {
                 }
                 else -> _postTypes.value = emptyList()
             }
-            _isLoading.value = false
+            postTypesLoaded = true
+            if (taxonomiesLoaded) _isLoading.value = false
+        }
+    }
+
+    private fun loadTaxonomies() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = apiClient.request { requestBuilder ->
+                requestBuilder.taxonomies().listWithEditContext(params = TaxonomyListParams())
+            }
+            when (result) {
+                is WpRequestResult.Success -> {
+                    _taxonomies.value = result.response.data.taxonomyTypes
+                        .values
+                        .filter { it.visibility?.showInNavMenus == true }
+                        .map { SiteTaxonomy(name = it.name, restBase = it.restBase) }
+                }
+                else -> _taxonomies.value = emptyList()
+            }
+            taxonomiesLoaded = true
+            if (postTypesLoaded) _isLoading.value = false
         }
     }
 }
