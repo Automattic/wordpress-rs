@@ -4,6 +4,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use wp_serde_helper::deserialize_empty_array_or_hashmap;
 
 /// The time period for grouping device stats.
 #[derive(
@@ -97,6 +98,8 @@ impl AppendUrlQueryPairs for StatsDevicesParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsDevicesResponse {
     /// Device type percentages keyed by device name (e.g., "desktop", "mobile", "tablet").
+    /// Can be an empty array `[]` or a map of device names to values.
+    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     pub top_values: HashMap<String, f64>,
 }
 
