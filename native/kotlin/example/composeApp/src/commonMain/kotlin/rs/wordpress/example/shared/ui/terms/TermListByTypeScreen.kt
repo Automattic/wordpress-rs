@@ -1,4 +1,4 @@
-package rs.wordpress.example.shared.ui.tags
+package rs.wordpress.example.shared.ui.terms
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -25,16 +25,21 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.example.shared.ui.components.LoadingIndicator
 import rs.wordpress.example.shared.ui.components.LoadingMoreIndicator
+import uniffi.wp_api.TermEndpointType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
-fun TagListScreen(
+fun TermListByTypeScreen(
     apiClient: WpApiClient,
-    viewModel: TagListViewModel = remember { TagListViewModel(apiClient) },
+    termEndpointType: TermEndpointType,
+    title: String,
+    viewModel: TermListByTypeViewModel = remember(termEndpointType) {
+        TermListByTypeViewModel(apiClient, termEndpointType)
+    },
     onBackClicked: () -> Unit = {}
 ) {
-    val tags by viewModel.tags.collectAsState()
+    val terms by viewModel.terms.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val canLoadMore by viewModel.canLoadMore.collectAsState()
@@ -57,7 +62,7 @@ fun TagListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Tags") },
+                title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = onBackClicked) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -73,11 +78,11 @@ fun TagListScreen(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(paddingValues)
             ) {
-                items(tags) { tag ->
+                items(terms) { term ->
                     ListItem(
-                        headlineContent = { Text(tag.name) },
-                        supportingContent = { Text("${tag.count} posts") },
-                        overlineContent = { Text(tag.slug) }
+                        headlineContent = { Text(term.name) },
+                        supportingContent = { Text("${term.count} posts") },
+                        overlineContent = { Text(term.slug) }
                     )
                 }
                 if (isLoadingMore) {
