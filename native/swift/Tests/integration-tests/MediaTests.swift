@@ -57,9 +57,7 @@ struct MediaTests {
         #expect(progress.fractionCompleted == 0)
 
         let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
-        await #expect(
-            throws: WpApiError.RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .cancellationError),
-            performing: {
+        let error = await #expect(throws: WpApiError.self, performing: {
                 let task = Task {
                     _ = try await api.uploadMedia(
                         params: .init(filePath: file.path),
@@ -76,6 +74,7 @@ struct MediaTests {
                 try await task.value
             }
         )
+        #expect(error?.isCancellationError == true)
 
         try await restoreTestServer()
     }
@@ -85,9 +84,7 @@ struct MediaTests {
         let progress = Progress.discreteProgress(totalUnitCount: 100)
         #expect(progress.fractionCompleted == 0)
         let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
-        await #expect(
-            throws: WpApiError.RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .cancellationError),
-            performing: {
+        let error = await #expect(throws: WpApiError.self, performing: {
                 let task = Task {
                     _ = try await api.uploadMedia(
                         params: .init(filePath: file.path),
@@ -104,6 +101,7 @@ struct MediaTests {
                 try await task.value
             }
         )
+        #expect(error?.isCancellationError == true)
 
         try await restoreTestServer()
     }

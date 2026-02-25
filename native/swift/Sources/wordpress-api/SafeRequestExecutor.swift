@@ -99,21 +99,25 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             }
 
             if errorIsDeviceIsOffline(error) {
-                return handleDeviceIsOfflineError(error)
+                return handleDeviceIsOfflineError(error, for: request)
             }
 
             if let urlError = error as? URLError, urlError.code == .cancelled {
                 return .failure(.RequestExecutionFailed(
                     statusCode: nil,
                     redirects: nil,
-                    reason: .cancellationError
+                    reason: .cancellationError,
+                    requestUrl: request.url(),
+                    requestMethod: request.method()
                 ))
             }
 
             return .failure(.RequestExecutionFailed(
                 statusCode: nil,
                 redirects: nil,
-                reason: .genericError(errorMessage: error.localizedDescription)
+                reason: .genericError(errorMessage: error.localizedDescription),
+                requestUrl: request.url(),
+                requestMethod: request.method()
             ))
        }
     }
@@ -172,7 +176,9 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             return .failure(.RequestExecutionFailed(
                  statusCode: nil,
                  redirects: executorDelegate.redirects(for: request.requestId()),
-                 reason: .invalidSslError(reason: InvalidSslErrorReason.genericSslError)
+                 reason: .invalidSslError(reason: InvalidSslErrorReason.genericSslError),
+                 requestUrl: request.url(),
+                 requestMethod: request.method()
             ))
         }
 
@@ -186,7 +192,9 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                     hostname: URL(string: request.url())?.host ?? "unknown host",
                     presentedHostnames: [siteCertificate.commonName()]
                 )
-             )
+             ),
+             requestUrl: request.url(),
+             requestMethod: request.method()
          ))
     }
 
@@ -201,7 +209,9 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 reason: .nonExistentSiteError(
                     errorMessage: error.localizedDescription,
                     suggestedAction: (error as NSError).localizedRecoverySuggestion
-                )
+                ),
+                requestUrl: request.url(),
+                requestMethod: request.method()
             )
         )
     }
@@ -242,7 +252,8 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     private func handleDeviceIsOfflineError(
-        _ error: Error
+        _ error: Error,
+        for request: NetworkRequestContent
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         .failure(
             .RequestExecutionFailed(
@@ -250,7 +261,9 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 redirects: nil,
                 reason: .deviceIsOfflineError(
                     errorMessage: error.localizedDescription
-                )
+                ),
+                requestUrl: request.url(),
+                requestMethod: request.method()
             )
         )
     }

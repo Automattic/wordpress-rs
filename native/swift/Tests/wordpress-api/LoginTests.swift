@@ -359,7 +359,7 @@ class LoginTests {
 
         if let failure = try getFindApiRootFailure(from: error) {
             if case .fetchHomepage(let transportError) = failure {
-                if case .RequestExecutionFailed(_, _, let reason) = transportError {
+                if case .RequestExecutionFailed(_, _, let reason, _, _) = transportError {
                     return reason
                 }
             }
@@ -367,7 +367,7 @@ class LoginTests {
 
         if let failure = try getFetchAndParseApiRootFailure(from: error) {
             if case .fetchApiRoot(let transportError) = failure {
-                if case .RequestExecutionFailed(_, _, let reason) = transportError {
+                if case .RequestExecutionFailed(_, _, let reason, _, _) = transportError {
                     return reason
                 }
             }
