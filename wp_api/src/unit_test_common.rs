@@ -1,6 +1,6 @@
 use crate::{
     date::WpGmtDateTime,
-    request::{WpNetworkHeaderMap, WpNetworkResponse, endpoint::WpEndpointUrl},
+    request::{RequestMethod, WpNetworkHeaderMap, WpNetworkResponse, endpoint::WpEndpointUrl},
     url_query::{AppendUrlQueryPairs, FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use std::sync::Arc;
@@ -49,6 +49,7 @@ pub fn wp_network_response_from_json(json: &str, status_code: u16) -> WpNetworkR
         status_code,
         response_header_map: Arc::new(WpNetworkHeaderMap::default()),
         request_url: WpEndpointUrl("http://example.com".to_string()),
+        request_method: RequestMethod::GET,
         request_header_map: Arc::new(WpNetworkHeaderMap::default()),
     }
 }

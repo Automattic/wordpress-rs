@@ -1,5 +1,7 @@
 use crate::request::WpRedirect;
-use crate::request::{HttpAuthMethod, HttpAuthMethodParsingError, WpNetworkResponse};
+use crate::request::{
+    HttpAuthMethod, HttpAuthMethodParsingError, RequestMethod, WpNetworkResponse,
+};
 use serde::Deserialize;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
@@ -9,7 +11,12 @@ where
     Self: Sized,
 {
     fn try_parse(response: &WpNetworkResponse) -> Option<Self>;
-    fn as_parse_error(reason: String, response: String) -> Self;
+    fn as_parse_error(
+        reason: String,
+        response: String,
+        request_url: String,
+        request_method: RequestMethod,
+    ) -> Self;
 }
 
 pub trait MaybeWpError {
@@ -22,11 +29,15 @@ pub trait MaybeWpError {
 pub enum WpApiError {
     InvalidHttpStatusCode {
         status_code: u16,
+        request_url: String,
+        request_method: RequestMethod,
     },
     RequestExecutionFailed {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
+        request_url: String,
+        request_method: RequestMethod,
     },
     MediaFileNotFound {
         file_path: String,
@@ -34,6 +45,8 @@ pub enum WpApiError {
     ResponseParsingError {
         reason: String,
         response: String,
+        request_url: String,
+        request_method: RequestMethod,
     },
     SiteUrlParsingError {
         reason: String,
@@ -41,12 +54,16 @@ pub enum WpApiError {
     UnknownError {
         status_code: u16,
         response: String,
+        request_url: String,
+        request_method: RequestMethod,
     },
     WpError {
         error_code: WpErrorCode,
         error_message: String,
         status_code: u16,
         response: String,
+        request_url: String,
+        request_method: RequestMethod,
     },
 }
 
@@ -83,7 +100,7 @@ where
 impl WpSupportsLocalization for WpApiError {
     fn message_bundle(&self) -> MessageBundle<'_> {
         match self {
-            WpApiError::InvalidHttpStatusCode { status_code } => {
+            WpApiError::InvalidHttpStatusCode { status_code, .. } => {
                 WpMessages::invalid_http_status_code(status_code)
             }
             WpApiError::RequestExecutionFailed { reason, .. } => reason.message_bundle(),
@@ -104,12 +121,16 @@ impl WpSupportsLocalization for WpApiError {
 
 impl ParsedRequestError for WpApiError {
     fn try_parse(response: &WpNetworkResponse) -> Option<Self> {
+        let request_url = response.request_url.0.clone();
+        let request_method = response.request_method.clone();
         if let Some(wp_error) = WpError::try_parse(&response.body) {
             Some(Self::WpError {
                 error_code: wp_error.code,
                 error_message: wp_error.message,
                 status_code: response.status_code,
                 response: response.body_as_string(),
+                request_url,
+                request_method,
             })
         } else {
             if let Some(reason) = RequestExecutionErrorReason::try_from_response(response) {
@@ -117,6 +138,8 @@ impl ParsedRequestError for WpApiError {
                     status_code: Some(response.status_code),
                     redirects: None,
                     reason,
+                    request_url,
+                    request_method,
                 });
             }
 
@@ -126,6 +149,8 @@ impl ParsedRequestError for WpApiError {
                         Some(Self::UnknownError {
                             status_code: response.status_code,
                             response: response.body_as_string(),
+                            request_url,
+                            request_method,
                         })
                     } else {
                         None
@@ -133,13 +158,25 @@ impl ParsedRequestError for WpApiError {
                 }
                 Err(_) => Some(WpApiError::InvalidHttpStatusCode {
                     status_code: response.status_code,
+                    request_url,
+                    request_method,
                 }),
             }
         }
     }
 
-    fn as_parse_error(reason: String, response: String) -> Self {
-        Self::ResponseParsingError { reason, response }
+    fn as_parse_error(
+        reason: String,
+        response: String,
+        request_url: String,
+        request_method: RequestMethod,
+    ) -> Self {
+        Self::ResponseParsingError {
+            reason,
+            response,
+            request_url,
+            request_method,
+        }
     }
 }
 
@@ -539,6 +576,8 @@ pub enum RequestExecutionError {
         status_code: Option<u16>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
+        request_url: String,
+        request_method: RequestMethod,
     },
     MediaFileNotFound {
         file_path: String,
@@ -708,26 +747,18 @@ impl From<RequestExecutionError> for WpApiError {
                 status_code,
                 redirects,
                 reason,
+                request_url,
+                request_method,
             } => Self::RequestExecutionFailed {
                 status_code,
                 redirects,
                 reason,
+                request_url,
+                request_method,
             },
             RequestExecutionError::MediaFileNotFound { file_path } => {
                 Self::MediaFileNotFound { file_path }
             }
-        }
-    }
-}
-
-impl From<HttpAuthMethodParsingError> for WpApiError {
-    fn from(value: HttpAuthMethodParsingError) -> Self {
-        WpApiError::RequestExecutionFailed {
-            status_code: None,
-            redirects: None,
-            reason: RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
-                issue: value,
-            },
         }
     }
 }

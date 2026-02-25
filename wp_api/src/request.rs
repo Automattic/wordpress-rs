@@ -1,9 +1,6 @@
 use self::endpoint::WpEndpointUrl;
 use crate::{
-    api_error::{
-        ParsedRequestError, RequestExecutionError, RequestExecutionErrorReason, WpApiError,
-        WpErrorCode,
-    },
+    api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpErrorCode},
     auth::WpAuthenticationProvider,
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
@@ -468,6 +465,7 @@ pub struct WpNetworkResponse {
     pub status_code: u16,
     pub response_header_map: Arc<WpNetworkHeaderMap>,
     pub request_url: WpEndpointUrl,
+    pub request_method: RequestMethod,
     pub request_header_map: Arc<WpNetworkHeaderMap>,
 }
 
@@ -652,8 +650,17 @@ impl WpNetworkResponse {
             return Err(err);
         }
 
+        let parse_error_url = self.request_url.0.clone();
+        let parse_error_method = self.request_method.clone();
         serde_json::from_slice(&self.body)
-            .map_err(|err| E::as_parse_error(err.to_string(), self.body_as_string()))
+            .map_err(|err| {
+                E::as_parse_error(
+                    err.to_string(),
+                    self.body_as_string(),
+                    parse_error_url,
+                    parse_error_method,
+                )
+            })
             .map(|x| {
                 let mut parsed_response = ParsedResponse::<DataType, ParamsType>::from(x);
                 if ParamsType::supports_pagination() {
@@ -739,7 +746,7 @@ struct HttpRetryDuration {
 /// Parser based on https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
 ///
 impl FromStr for HttpRetryDuration {
-    type Err = WpApiError;
+    type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // Handle the simple case where the header is a number of seconds
@@ -748,12 +755,7 @@ impl FromStr for HttpRetryDuration {
         }
 
         // Handle the case where the header is a date string
-        let parsed =
-            DateTime::parse_from_rfc2822(s).map_err(|_| WpApiError::RequestExecutionFailed {
-                status_code: None,
-                redirects: None,
-                reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
-            })?;
+        let parsed = DateTime::parse_from_rfc2822(s).map_err(|_| ())?;
 
         let now = Utc::now();
         let duration = parsed.signed_duration_since(now);
@@ -1212,6 +1214,7 @@ mod tests {
                     .unwrap(),
             ),
             request_url: WpEndpointUrl("http://example.com".to_string()),
+            request_method: RequestMethod::GET,
             request_header_map: Arc::new(WpNetworkHeaderMap::default()),
         };
         assert_eq!(
@@ -1340,6 +1343,7 @@ mod tests {
             status_code: 401,
             response_header_map: Arc::new(header_map),
             request_url: WpEndpointUrl("http://example.com".to_string()),
+            request_method: RequestMethod::GET,
             request_header_map: Arc::new(WpNetworkHeaderMap::default()),
         };
 
@@ -1361,6 +1365,7 @@ mod tests {
             status_code: 429,
             response_header_map: Arc::new(header_map),
             request_url: WpEndpointUrl("http://example.com".to_string()),
+            request_method: RequestMethod::GET,
             request_header_map: Arc::new(WpNetworkHeaderMap::default()),
         };
 
