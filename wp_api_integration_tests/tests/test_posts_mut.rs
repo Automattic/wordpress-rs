@@ -1,11 +1,14 @@
 use macro_helper::{
     generate_update_post_format_test, generate_update_post_status_test, generate_update_test,
 };
+use std::collections::HashMap;
+use wp_api::AnyJson;
 use wp_api::posts::{
     AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostFormat,
-    PostMeta, PostPingStatus, PostStatus, PostUpdateParams,
+    PostListParams, PostMeta, PostPingStatus, PostStatus, PostUpdateParams,
 };
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
+use wp_api::terms::TermId;
 use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliPost;
 
@@ -539,4 +542,108 @@ mod macro_helper {
     pub(super) use generate_update_post_format_test;
     pub(super) use generate_update_post_status_test;
     pub(super) use generate_update_test;
+}
+
+// Books custom post type has `genre` and `book-author` custom taxonomies
+// registered by the books-plugin. These appear as additional fields on book
+// posts, keyed by the taxonomy's rest_base.
+
+#[tokio::test]
+#[serial]
+async fn create_book_with_custom_taxonomy_terms() {
+    let books_endpoint = PostEndpointType::Custom("books".to_string());
+
+    // First, list existing genre terms to get valid IDs
+    let books = api_client()
+        .posts()
+        .list_with_edit_context(&books_endpoint, &PostListParams::default())
+        .await
+        .assert_response()
+        .data;
+    let genre_ids: Vec<TermId> = books
+        .iter()
+        .filter_map(|b| {
+            b.additional_fields
+                .as_ref()
+                .map(|af| af.term_ids_for_key("genre"))
+        })
+        .find(|ids| !ids.is_empty())
+        .expect("Expected at least one book with genres");
+
+    let additional =
+        AnyJson::from_term_id_map(HashMap::from([("genre".to_string(), genre_ids.clone())]));
+    let params = PostCreateParams {
+        title: Some("Integration Test Book".to_string()),
+        status: Some(PostStatus::Publish),
+        additional_fields: Some(additional),
+        ..Default::default()
+    };
+    let created_book = api_client()
+        .posts()
+        .create(&books_endpoint, &params)
+        .await
+        .assert_response()
+        .data;
+    let created_genres = created_book
+        .additional_fields
+        .as_ref()
+        .unwrap()
+        .term_ids_for_key("genre");
+    assert_eq!(created_genres, genre_ids);
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn update_book_custom_taxonomy_terms() {
+    let books_endpoint = PostEndpointType::Custom("books".to_string());
+
+    // List books and collect two different genre IDs
+    let books = api_client()
+        .posts()
+        .list_with_edit_context(&books_endpoint, &PostListParams::default())
+        .await
+        .assert_response()
+        .data;
+    let mut all_genre_ids: Vec<TermId> = books
+        .iter()
+        .filter_map(|b| {
+            b.additional_fields
+                .as_ref()
+                .map(|af| af.term_ids_for_key("genre"))
+        })
+        .flatten()
+        .collect();
+    all_genre_ids.sort_by_key(|t| t.0);
+    all_genre_ids.dedup();
+    assert!(
+        all_genre_ids.len() >= 2,
+        "Need at least 2 distinct genre IDs for this test"
+    );
+
+    let book_id = books[0].id;
+    let new_genres = vec![all_genre_ids[0], all_genre_ids[1]];
+
+    let additional =
+        AnyJson::from_term_id_map(HashMap::from([("genre".to_string(), new_genres.clone())]));
+    let params = PostUpdateParams {
+        additional_fields: Some(additional),
+        ..Default::default()
+    };
+    let updated_book = api_client()
+        .posts()
+        .update(&books_endpoint, &book_id, &params)
+        .await
+        .assert_response()
+        .data;
+    let mut updated_genres = updated_book
+        .additional_fields
+        .as_ref()
+        .unwrap()
+        .term_ids_for_key("genre");
+    updated_genres.sort_by_key(|t| t.0);
+    assert_eq!(updated_genres, new_genres);
+
+    RestoreServer::db().await;
 }

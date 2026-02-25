@@ -170,6 +170,7 @@ fn create_test_post(
         tags: None,
         parent: None,
         menu_order: None,
+        additional_fields: None,
     }
 }
 
