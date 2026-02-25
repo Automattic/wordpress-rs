@@ -2,48 +2,20 @@ env:
   IMAGE_ID: $IMAGE_ID
 
 steps:
-  # Experiment 1a: Does a single SE key creation hang in swift test?
-  - label: ":lock: Exp 1a: Single SE test"
+  # Experiment 1: Run ALL SE tests (single + 15 concurrent + 15 serialized + timeout)
+  # via swift test with NO filter. If the cooperative pool hypothesis is correct,
+  # this should hang because the 15 concurrent tests exhaust the thread pool.
+  - label: ":lock: Exp 1: All SE tests (swift test, no filter)"
     command: |
-      echo "--- :lock: Running swift test with 1 SE test"
+      echo "--- :lock: Running swift test on minimal SE package (all suites)"
       cd .buildkite/se-investigation
-      swift test --verbose --filter "Single SE Test" 2>&1
-    timeout_in_minutes: 3
-    agents:
-      queue: mac
-
-  # Experiment 1b: Do 15 concurrent SE tests exhaust the cooperative thread pool?
-  - label: ":lock: Exp 1b: 15 concurrent SE tests"
-    command: |
-      echo "--- :lock: Running swift test with 15 concurrent SE tests"
-      cd .buildkite/se-investigation
-      swift test --verbose --filter "Concurrent SE Tests" 2>&1
+      swift test 2>&1
     timeout_in_minutes: 5
     agents:
       queue: mac
 
-  # Experiment 2: Does .serialized prevent the hang?
-  - label: ":lock: Exp 2: 15 serialized SE tests"
-    command: |
-      echo "--- :lock: Running swift test with 15 serialized SE tests"
-      cd .buildkite/se-investigation
-      swift test --verbose --filter "Serialized SE Tests" 2>&1
-    timeout_in_minutes: 5
-    agents:
-      queue: mac
-
-  # Experiment 3: Can .timeLimit interrupt a blocked SE call?
-  - label: ":lock: Exp 3: SE test with timeout"
-    command: |
-      echo "--- :lock: Running swift test with .timeLimit(1 min)"
-      cd .buildkite/se-investigation
-      swift test --verbose --filter "Timeout SE Test" 2>&1
-    timeout_in_minutes: 3
-    agents:
-      queue: mac
-
-  # Experiment 4: Code signing comparison
-  - label: ":mag: Exp 4: Code signing comparison"
+  # Experiment 2: Code signing comparison (always useful data)
+  - label: ":mag: Exp 2: Code signing comparison"
     command: .buildkite/se_codesign_check.sh
     timeout_in_minutes: 5
     agents:
