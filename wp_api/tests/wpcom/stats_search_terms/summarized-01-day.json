@@ -1,0 +1,23 @@
+{
+    "date": "2026-02-18",
+    "period": "day",
+    "summary": {
+        "search_terms": [
+            {
+                "term": "https://example.com/support-tools/",
+                "views": 12
+            },
+            {
+                "term": "https://example.com/security-best-practices/",
+                "views": 11
+            },
+            {
+                "term": "search query example",
+                "views": 4
+            }
+        ],
+        "encrypted_search_terms": 14,
+        "other_search_terms": -429,
+        "total_search_terms": 0
+    }
+}
