@@ -1154,6 +1154,5 @@ mod tests {
                 site_icon_url: None,
             }
         }
-
     }
 }
