@@ -165,11 +165,9 @@ val generateTestCredentials = tasks.register("generateTestCredentials") {
     val outputDir = layout.buildDirectory.dir("generated/source/testCredentials")
     val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot") as String
     val credentialsFile = file("$cargoProjectRoot/test_credentials.json")
-    val wpComCredentialsFile = file("$cargoProjectRoot/wp_com_test_credentials.json")
 
     // Only mark as input if file exists - allows build to work without test server running
     inputs.files(credentialsFile).optional(true)
-    inputs.files(wpComCredentialsFile).optional(true)
     outputs.dir(outputDir)
 
     doLast {
@@ -199,32 +197,6 @@ val generateTestCredentials = tasks.register("generateTestCredentials") {
                     val ADMIN_PASSWORD: String? = null
                     val SUBSCRIBER_USERNAME: String? = null
                     val SUBSCRIBER_PASSWORD: String? = null
-                }
-            """.trimIndent())
-        }
-
-        val wpComCredentialsKtFile = outputDir.get().file("rs/wordpress/example/WpComCredentials.kt").asFile
-        wpComCredentialsKtFile.parentFile.mkdirs()
-
-        if (wpComCredentialsFile.exists()) {
-            val json = groovy.json.JsonSlurper().parseText(wpComCredentialsFile.readText()) as Map<*, *>
-            val clientId = json["client_id"]
-            val clientSecret = json["client_secret"]
-            wpComCredentialsKtFile.writeText("""
-                package rs.wordpress.example
-
-                object WpComCredentials {
-                    val CLIENT_ID: Long? = ${if (clientId != null && clientId != 0) clientId else "null"}
-                    val CLIENT_SECRET: String? = ${if (clientSecret != null && clientSecret != "") "\"$clientSecret\"" else "null"}
-                }
-            """.trimIndent())
-        } else {
-            wpComCredentialsKtFile.writeText("""
-                package rs.wordpress.example
-
-                object WpComCredentials {
-                    val CLIENT_ID: Long? = null
-                    val CLIENT_SECRET: String? = null
                 }
             """.trimIndent())
         }

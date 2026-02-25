@@ -96,7 +96,7 @@ fun WelcomeScreen(
                         modifier = Modifier.clickable {
                             onSiteClicked(
                                 Account.SelfHostedSite(
-                                    id = 0u,
+                                    id = 0uL,
                                     domain = testSiteUrl,
                                     username = devUsername,
                                     password = devPassword,

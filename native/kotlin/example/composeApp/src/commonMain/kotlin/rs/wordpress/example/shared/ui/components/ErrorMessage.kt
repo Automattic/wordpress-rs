@@ -16,17 +16,17 @@ import uniffi.wp_api.WpErrorCode
 fun <T> WpRequestResult<T>.errorDescription(): String = when (this) {
     is WpRequestResult.Success -> ""
     is WpRequestResult.WpError ->
-        "$errorMessage (${errorCode.displayName()})\n$requestMethod $requestUrl"
+        "$errorMessage (${errorCode.displayName()})"
     is WpRequestResult.RequestExecutionFailed ->
-        "${reason.description()}\n$requestMethod $requestUrl"
+        reason.description()
     is WpRequestResult.InvalidHttpStatusCode ->
-        "Unexpected HTTP status: $statusCode\n$requestMethod $requestUrl"
+        "Unexpected HTTP status: $statusCode"
     is WpRequestResult.ResponseParsingError ->
-        "Failed to parse response: $reason\n$requestMethod $requestUrl"
+        "Failed to parse response: $reason"
     is WpRequestResult.SiteUrlParsingError -> "Invalid site URL: $reason"
     is WpRequestResult.MediaFileNotFound -> "File not found: $filePath"
     is WpRequestResult.UnknownError ->
-        "Unknown error (HTTP $statusCode)\n$requestMethod $requestUrl"
+        "Unknown error (HTTP $statusCode)"
 }
 
 private fun WpErrorCode.displayName(): String = when (this) {

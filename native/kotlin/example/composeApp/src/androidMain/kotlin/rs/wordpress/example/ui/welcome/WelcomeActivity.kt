@@ -11,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import rs.wordpress.api.kotlin.ApiDiscoveryResult
+import rs.wordpress.api.kotlin.NetworkAvailabilityProvider
 import rs.wordpress.api.kotlin.WpComApiClient
 import rs.wordpress.api.kotlin.WpLoginClient
 import rs.wordpress.api.kotlin.WpRequestResult
@@ -34,6 +35,7 @@ import uniffi.wp_mobile.wordpressComSiteApiRoot
 
 class WelcomeActivity : ComponentActivity() {
     private val accountRepository: AccountRepository by inject()
+    private val networkAvailabilityProvider: NetworkAvailabilityProvider by inject()
     private var apiDiscoverySuccess: AutoDiscoveryAttemptSuccess? = null
     private var wpComOAuthState: String? = null
     private var siteSpecificOAuthConfig: OAuth2Configuration? = null
@@ -56,7 +58,7 @@ class WelcomeActivity : ComponentActivity() {
 
     private fun authenticateSite(url: String) {
         lifecycleScope.launch {
-            val success = when (val apiDiscoveryResult = WpLoginClient(emptyList()).apiDiscovery(url)) {
+            val success = when (val apiDiscoveryResult = WpLoginClient(emptyList(), networkAvailabilityProvider).apiDiscovery(url)) {
                 is ApiDiscoveryResult.Success -> apiDiscoveryResult.success
                 else -> throw IllegalStateException("Api discovery should succeed for the example app")
             }
@@ -143,7 +145,7 @@ class WelcomeActivity : ComponentActivity() {
                 ?: throw IllegalStateException("Api discovery has to be successful before authentication")
             accountRepository.store(
                 Account.SelfHostedSite(
-                    id = 0u,
+                    id = 0uL,
                     domain = discoverySuccess.parsedSiteUrl.toURL().toString(),
                     username = username,
                     password = password,
@@ -170,7 +172,8 @@ class WelcomeActivity : ComponentActivity() {
 
                     val wpComClient = WpComApiClient(
                         authProvider = WpAuthenticationProvider.none(),
-                        interceptors = emptyList()
+                        interceptors = emptyList(),
+                        networkAvailabilityProvider = networkAvailabilityProvider
                     )
 
                     val tokenResult = wpComClient.request { client ->
@@ -187,7 +190,7 @@ class WelcomeActivity : ComponentActivity() {
                                 ?: "WordPress.com"
                             accountRepository.store(
                                 Account.SelfHostedSite(
-                                    id = 0u,
+                                    id = 0uL,
                                     domain = siteUrl,
                                     username = siteUrl,
                                     password = tokenResponse.accessToken,
@@ -213,7 +216,8 @@ class WelcomeActivity : ComponentActivity() {
 
                     val wpComClient = WpComApiClient(
                         authProvider = WpAuthenticationProvider.none(),
-                        interceptors = emptyList()
+                        interceptors = emptyList(),
+                        networkAvailabilityProvider = networkAvailabilityProvider
                     )
 
                     val tokenResult = wpComClient.request { client ->
@@ -232,7 +236,7 @@ class WelcomeActivity : ComponentActivity() {
                             val tokenResponse = tokenResult.response.data
                             accountRepository.store(
                                 Account.WpCom(
-                                    id = 0u,
+                                    id = 0uL,
                                     username = tokenResponse.blogUrl ?: "WordPress.com",
                                     token = tokenResponse.accessToken,
                                     siteApiRoot = ""

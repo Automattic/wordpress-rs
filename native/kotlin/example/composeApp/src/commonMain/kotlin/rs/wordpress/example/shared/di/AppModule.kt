@@ -3,6 +3,7 @@ package rs.wordpress.example.shared.di
 import org.koin.dsl.module
 import rs.wordpress.api.kotlin.DebugMiddleware
 import rs.wordpress.api.kotlin.EmptyAppNotifier
+import rs.wordpress.api.kotlin.NetworkAvailabilityProvider
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestExecutor
 import rs.wordpress.cache.kotlin.WordPressApiCache
@@ -36,7 +37,11 @@ val viewModelModule = module {
     single { WelcomeViewModel(get()) }
 }
 
-fun createWpService(account: Account.SelfHostedSite, cache: WordPressApiCache): WpService {
+fun createWpService(
+    account: Account.SelfHostedSite,
+    cache: WordPressApiCache,
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): WpService {
     val auth = if (account.siteApiRoot.startsWith("https://public-api.wordpress.com/")) {
         WpAuthentication.Bearer(token = account.password)
     } else {
@@ -47,7 +52,7 @@ fun createWpService(account: Account.SelfHostedSite, cache: WordPressApiCache): 
         apiRoot = account.siteApiRoot,
         delegate = WpApiClientDelegate(
             WpAuthenticationProvider.staticWithAuth(auth),
-            requestExecutor = WpRequestExecutor(emptyList()),
+            requestExecutor = WpRequestExecutor(emptyList(), networkAvailabilityProvider),
             middlewarePipeline = WpApiMiddlewarePipeline(listOf(DebugMiddleware())),
             appNotifier = EmptyAppNotifier()
         ),
@@ -55,7 +60,10 @@ fun createWpService(account: Account.SelfHostedSite, cache: WordPressApiCache): 
     )
 }
 
-fun createWpApiClient(account: Account.SelfHostedSite): WpApiClient {
+fun createWpApiClient(
+    account: Account.SelfHostedSite,
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): WpApiClient {
     val auth = if (account.siteApiRoot.startsWith("https://public-api.wordpress.com/")) {
         WpAuthentication.Bearer(token = account.password)
     } else {
@@ -64,16 +72,21 @@ fun createWpApiClient(account: Account.SelfHostedSite): WpApiClient {
     return WpApiClient(
         wpOrgSiteApiRootUrl = URI(account.siteApiRoot).toURL(),
         authProvider = WpAuthenticationProvider.staticWithAuth(auth),
-        interceptors = emptyList()
+        interceptors = emptyList(),
+        networkAvailabilityProvider = networkAvailabilityProvider
     )
 }
 
-fun createWpComApiClient(account: Account.WpCom): WpComApiClient {
+fun createWpComApiClient(
+    account: Account.WpCom,
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): WpComApiClient {
     return WpComApiClient(
         authProvider = WpAuthenticationProvider.staticWithAuth(
             WpAuthentication.Bearer(token = account.token)
         ),
-        interceptors = emptyList()
+        interceptors = emptyList(),
+        networkAvailabilityProvider = networkAvailabilityProvider
     )
 }
 
