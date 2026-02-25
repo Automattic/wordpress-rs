@@ -1,3 +1,6 @@
+env:
+  IMAGE_ID: $IMAGE_ID
+
 steps:
   - label: ":lock: Test Secure Enclave availability on CI Mac"
     command: |
