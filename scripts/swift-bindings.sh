@@ -39,9 +39,34 @@ EOF
     done
 }
 
+# UniFFI generates Swift structs with immutable (`let`) properties. Some structs
+# need mutable properties so callers can modify fields after initialization.
+# This rewrites `public let` to `public var` for the specified structs.
+#
+# Usage: enable_mutability <swift_binding_file> <struct_name>...
+function enable_mutability {
+    local swift_binding=$1
+    shift
+    local struct_names=("$@")
+
+    for struct_name in "${struct_names[@]}"; do
+        if ! grep -q "^public struct ${struct_name}" "$swift_binding"; then
+            if grep -q "^public .* ${struct_name}" "$swift_binding"; then
+                echo "Error: '${struct_name}' is not a struct in ${swift_binding}" >&2
+                exit 1
+            fi
+            echo "Error: '${struct_name}' not found in ${swift_binding}" >&2
+            exit 1
+        fi
+
+        sed -i.bak "/^public struct ${struct_name}/,/^}/ s/public let /public var /g" "$swift_binding"
+    done
+}
+
 function patch_wp_api {
     local swift_binding=$1
     generate_localized_error_extension wp_api "$swift_binding"
+    enable_mutability "$swift_binding" PostCreateParams PostUpdateParams
 
     # Use sed to replace `import SQLite3` with the wrapped version
   sed -i.bak 's/^import SQLite3$/#if canImport(SQLite3)\
