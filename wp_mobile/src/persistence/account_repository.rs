@@ -825,6 +825,41 @@ mod tests {
     }
 
     #[test]
+    fn test_ids_are_unique_across_multiple_reloads() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let path = dir.path().to_string_lossy().to_string();
+        let transformer = test_transformer();
+
+        // Simulate several app launches, each storing accounts then shutting down.
+        // next_id is derived from the max ID in the persisted file, so a fresh
+        // instance must never reuse an ID from a previous one.
+        let mut all_ids = Vec::new();
+
+        for i in 0..5 {
+            let repo = AccountRepository::new(path.clone(), Arc::clone(&transformer))
+                .expect("failed to create repo");
+            let id = repo
+                .store(test_wp_com_account(&format!("launch-{i}.com")))
+                .expect("store failed");
+            all_ids.push(id);
+        }
+
+        all_ids.sort();
+        all_ids.dedup();
+        assert_eq!(all_ids.len(), 5, "IDs must be unique across reloads");
+
+        // Verify all accounts are retrievable from a fresh instance
+        let repo =
+            AccountRepository::new(path, transformer).expect("failed to create repo");
+        for id in &all_ids {
+            assert!(
+                repo.get(*id).expect("get failed").is_some(),
+                "account with id {id} missing after final reload"
+            );
+        }
+    }
+
+    #[test]
     fn test_corrupted_json_returns_error() {
         let dir = tempfile::tempdir().expect("failed to create temp dir");
         fs::write(dir.path().join("accounts.json"), "not valid json {{{").unwrap();

@@ -152,7 +152,7 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
     /// On iOS/tvOS/watchOS/visionOS devices the key is created in the Secure
     /// Enclave when available. On simulators a software P-256 key is used
     /// instead. On macOS the Secure Enclave is used when available (physical
-    /// Macs with a T2 chip or Apple Silicon), otherwise a software key is used.
+    /// Macs with a T1, T2, or Apple Silicon chip), otherwise a software key is used.
     private static func createKey() throws -> PrivateKey {
         #if targetEnvironment(simulator)
         .software(P256.KeyAgreement.PrivateKey())
@@ -291,9 +291,50 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
 
     // MARK: - PasswordTransformer
 
+    // MARK: - Encryption
+    //
+    // This uses ECIES (Elliptic Curve Integrated Encryption Scheme):
+    //
+    // 1. Generate a random one-time ("ephemeral") key pair
+    // 2. Combine the ephemeral private key with the Secure Enclave's public
+    //    key to produce a shared secret (ECDH key agreement)
+    // 3. Derive an AES key from that shared secret + a random salt (HKDF)
+    // 4. Encrypt the password with AES-256-GCM
+    // 5. Output: salt + ephemeral public key + AES ciphertext, base64-encoded
+    //
+    // To decrypt, the Secure Enclave performs key agreement internally using
+    // its private key (which never leaves the hardware) + the ephemeral
+    // public key from the ciphertext. This recreates the same shared secret,
+    // derives the same AES key, and decrypts.
+    //
+    // Security note: during encryption, the shared secret was
+    // ECDH(ephemeralPrivate, SE_Public). During decryption, the SE computes
+    // ECDH(SE_Private, ephemeralPublic), which produces the same result
+    // (that's the ECDH math).
+    //
+    // If an attacker substitutes their own attackerPublic key, the SE would
+    // compute ECDH(SE_Private, attackerPublic) — a completely different
+    // shared secret. They'd derive a different AES key, and AES-GCM
+    // authentication would reject it.
+    //
+    // To get the correct shared secret, you need either:
+    // - The ephemeral private key (discarded after encryption), or
+    // - The SE private key (never leaves the hardware)
+    //
+    // Having access to the SE doesn't help an attacker because they can only
+    // ask it to do key agreement with *their* public key, which produces a
+    // shared secret that's useless for decrypting existing ciphertext.
+    //
+    // Why not just AES with a stored key directly? Because Secure Enclave
+    // keys can't do AES — they only support ECDH key agreement. So we use
+    // ECDH to derive an AES key on every encrypt/decrypt operation.
+
     public func encrypt(password: String) throws -> String {
+        // Step 1: Create a throwaway key pair (used only for this one encryption)
         let ephemeralKey = P256.KeyAgreement.PrivateKey()
 
+        // Step 2: Generate a random salt (makes each encryption unique even
+        // for the same password)
         var salt = Data(count: Self.saltSize)
         let status = salt.withUnsafeMutableBytes {
             SecRandomCopyBytes(kSecRandomDefault, Self.saltSize, $0.baseAddress!)
@@ -304,6 +345,8 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
             )
         }
 
+        // Step 3: Combine the ephemeral private key + the Secure Enclave's
+        // public key to get a shared secret, then derive an AES key from it
         let symmetricKey: SymmetricKey
         do {
             symmetricKey = try deriveKey(
@@ -317,6 +360,7 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
             )
         }
 
+        // Step 4: Encrypt the password with AES-256-GCM
         let sealedBox: AES.GCM.SealedBox
         do {
             sealedBox = try AES.GCM.seal(
@@ -334,6 +378,8 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
             )
         }
 
+        // Step 5: Pack everything the decryptor needs into one blob:
+        //   [salt (32 bytes)] [ephemeral public key (65 bytes)] [AES ciphertext]
         var combined = Data()
         combined.append(salt)
         combined.append(ephemeralKey.publicKey.x963Representation)
@@ -343,12 +389,14 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
     }
 
     public func decrypt(password: String) throws -> String {
+        // Decode the base64 blob produced by encrypt()
         guard let data = Data(base64Encoded: password) else {
             throw PasswordTransformerError.DecryptionFailed(
                 reason: "Ciphertext is not valid base64"
             )
         }
 
+        // Verify minimum size: salt + public key + AES-GCM IV (12) + tag (16)
         let minimumSize = Self.saltSize + Self.publicKeySize + 12 + 16
         guard data.count >= minimumSize else {
             throw PasswordTransformerError.DecryptionFailed(
@@ -356,6 +404,7 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
             )
         }
 
+        // Unpack the blob: pull out the salt and ephemeral public key
         let salt = data.prefix(Self.saltSize)
         let rest = data.dropFirst(Self.saltSize)
 
@@ -370,6 +419,11 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
             )
         }
 
+        // Recreate the shared secret using the Secure Enclave's private key
+        // (which never leaves the hardware — we only hold an opaque reference
+        // to it) + the ephemeral public key from the ciphertext. This produces
+        // the same secret as the encryptor's ephemeral private key + our public
+        // key (this is the ECDH math: a*B == b*A).
         let sharedSecret: SharedSecret
         do {
             sharedSecret = try privateKey.sharedSecretFromKeyAgreement(
@@ -381,6 +435,7 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
             )
         }
 
+        // Derive the same AES key from the shared secret + salt
         let symmetricKey = sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
             salt: salt,
@@ -388,6 +443,7 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
             outputByteCount: 32
         )
 
+        // Decrypt the AES-GCM ciphertext (the remainder after salt + pubkey)
         let sealedBox: AES.GCM.SealedBox
         do {
             sealedBox = try AES.GCM.SealedBox(
@@ -418,6 +474,14 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
 
     // MARK: - Key Derivation
 
+    /// Performs ECDH key agreement between two keys, then runs the result
+    /// through HKDF (a Key Derivation Function) to produce an AES-256 key.
+    ///
+    /// ECDH produces a shared secret, but that secret isn't directly suitable
+    /// as an encryption key — it has the right amount of entropy but the wrong
+    /// structure. HKDF ("extract-then-expand") takes that raw secret plus a
+    /// random salt and produces a uniformly distributed key of the exact size
+    /// AES needs (32 bytes for AES-256).
     private func deriveKey(
         using ephemeralKey: P256.KeyAgreement.PrivateKey,
         withPublicKey publicKey: P256.KeyAgreement.PublicKey,

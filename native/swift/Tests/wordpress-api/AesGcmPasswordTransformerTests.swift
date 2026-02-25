@@ -43,13 +43,13 @@ struct AesGcmPasswordTransformerTests {
 
     @Test("Wrong key fails to decrypt")
     func wrongKeyFails() throws {
-        let t1 = AesGcmPasswordTransformer(sharedSecret: "key-one")
-        let t2 = AesGcmPasswordTransformer(sharedSecret: "key-two")
+        let transformer1 = AesGcmPasswordTransformer(sharedSecret: "key-one")
+        let transformer2 = AesGcmPasswordTransformer(sharedSecret: "key-two")
 
-        let encrypted = try t1.encrypt(password: "secret")
+        let encrypted = try transformer1.encrypt(password: "secret")
 
         #expect(throws: (any Error).self) {
-            _ = try t2.decrypt(password: encrypted)
+            _ = try transformer2.decrypt(password: encrypted)
         }
     }
 
