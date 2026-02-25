@@ -1,0 +1,22 @@
+{
+    "date": "2026-02-18",
+    "period": "day",
+    "summary": {
+        "files": [
+            {
+                "filename": null,
+                "relative_url": null,
+                "download_url": null,
+                "downloads": null
+            },
+            {
+                "filename": "example-file.pdf",
+                "relative_url": "/2026/02/example-file.pdf",
+                "download_url": "https://example.files.wordpress.com/2026/02/example-file.pdf",
+                "downloads": 10
+            }
+        ],
+        "other_downloads": 0,
+        "total_downloads": 10
+    }
+}

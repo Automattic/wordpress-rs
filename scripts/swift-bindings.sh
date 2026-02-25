@@ -47,6 +47,15 @@ function patch_wp_api {
   sed -i.bak 's/^import SQLite3$/#if canImport(SQLite3)\
 import SQLite3\
 #endif/' "$swift_binding"
+
+    cat >> "$swift_binding" <<'PATCH'
+
+// AnyPostWith*Context types contain `AnyJson` (a reference type) which
+// prevents automatic Hashable synthesis. Add the conformance manually.
+extension AnyPostWithEditContext: Hashable {}
+extension AnyPostWithEmbedContext: Hashable {}
+extension AnyPostWithViewContext: Hashable {}
+PATCH
 }
 
 function patch_wp_mobile {

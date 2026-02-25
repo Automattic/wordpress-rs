@@ -20,6 +20,7 @@ pub(crate) enum PostEmbedContextColumn {
     ExcerptProtected = 11,
     FeaturedMedia = 12,
     LastFetchedAt = 13,
+    AdditionalFields = 14,
 }
 
 impl ColumnIndex for PostEmbedContextColumn {

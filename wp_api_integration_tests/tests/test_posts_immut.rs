@@ -447,3 +447,72 @@ mod filter {
         post.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 }
+
+// Books custom post type has `genre` and `book-author` custom taxonomies
+// registered by the books-plugin. These appear as additional fields on book
+// posts, keyed by the taxonomy's rest_base.
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_book_has_custom_taxonomy_terms_in_additional_fields() {
+    let books_endpoint = PostEndpointType::Custom("books".to_string());
+    let books = api_client()
+        .posts()
+        .list_with_edit_context(&books_endpoint, &PostListParams::default())
+        .await
+        .assert_response()
+        .data;
+    // Find a book that has at least one genre assigned
+    let book_with_genre = books
+        .iter()
+        .find(|b| {
+            b.additional_fields
+                .as_ref()
+                .is_some_and(|af| !af.term_ids_for_key("genre").is_empty())
+        })
+        .expect("Expected at least one book with a genre assigned");
+    let additional = book_with_genre.additional_fields.as_ref().unwrap();
+    let genre_ids = additional.term_ids_for_key("genre");
+    assert!(!genre_ids.is_empty());
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_book_custom_taxonomy_terms_across_contexts() {
+    let books_endpoint = PostEndpointType::Custom("books".to_string());
+    // Get a book ID from edit context
+    let books = api_client()
+        .posts()
+        .list_with_edit_context(&books_endpoint, &PostListParams::default())
+        .await
+        .assert_response()
+        .data;
+    let book = books
+        .iter()
+        .find(|b| {
+            b.additional_fields
+                .as_ref()
+                .is_some_and(|af| !af.term_ids_for_key("genre").is_empty())
+        })
+        .expect("Expected at least one book with a genre assigned");
+    let book_id = book.id;
+    let expected_genres = book
+        .additional_fields
+        .as_ref()
+        .unwrap()
+        .term_ids_for_key("genre");
+
+    // Verify the same genre IDs appear in view context
+    let view_book = api_client()
+        .posts()
+        .retrieve_with_view_context(&books_endpoint, &book_id, &PostRetrieveParams::default())
+        .await
+        .assert_response()
+        .data;
+    let view_genres = view_book
+        .additional_fields
+        .as_ref()
+        .unwrap()
+        .term_ids_for_key("genre");
+    assert_eq!(view_genres, expected_genres);
+}

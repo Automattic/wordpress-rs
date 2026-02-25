@@ -140,6 +140,39 @@ pub struct AnyJson {
     pub raw: Value,
 }
 
+#[uniffi::export]
+impl AnyJson {
+    /// Extracts an array of term IDs from the additional fields for a given key.
+    /// Returns an empty vec if the key doesn't exist or isn't an array of integers.
+    pub fn term_ids_for_key(&self, key: &str) -> Vec<terms::TermId> {
+        match self.raw.get(key) {
+            Some(Value::Array(arr)) => arr
+                .iter()
+                .filter_map(|v| v.as_i64().map(terms::TermId))
+                .collect(),
+            _ => vec![],
+        }
+    }
+
+    /// Creates an AnyJson from a map of keys to term ID arrays.
+    /// Used to construct the additional_fields for PostCreateParams
+    /// and PostUpdateParams with custom taxonomy term IDs.
+    #[uniffi::constructor]
+    pub fn from_term_id_map(map: HashMap<String, Vec<terms::TermId>>) -> std::sync::Arc<Self> {
+        let mut json_map = serde_json::Map::new();
+        for (key, ids) in map {
+            let arr: Vec<Value> = ids
+                .into_iter()
+                .map(|id| Value::Number(id.0.into()))
+                .collect();
+            json_map.insert(key, Value::Array(arr));
+        }
+        std::sync::Arc::new(AnyJson {
+            raw: Value::Object(json_map),
+        })
+    }
+}
+
 uniffi::custom_newtype!(WpResponseString, Option<String>);
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "BoolOrString")]

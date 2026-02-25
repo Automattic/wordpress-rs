@@ -42,6 +42,7 @@ pub(crate) enum PostEditContextColumn {
     ExcerptRendered = 33,
     ExcerptProtected = 34,
     LastFetchedAt = 35,
+    AdditionalFields = 36,
 }
 
 impl ColumnIndex for PostEditContextColumn {

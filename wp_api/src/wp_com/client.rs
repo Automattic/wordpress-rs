@@ -6,15 +6,32 @@ use super::endpoint::{
     me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
     stats_city_views_endpoint::{StatsCityViewsRequestBuilder, StatsCityViewsRequestExecutor},
+    stats_clicks_endpoint::{StatsClicksRequestBuilder, StatsClicksRequestExecutor},
     stats_country_views_endpoint::{
         StatsCountryViewsRequestBuilder, StatsCountryViewsRequestExecutor,
+    },
+    stats_devices_browser_endpoint::{
+        StatsDevicesBrowserRequestBuilder, StatsDevicesBrowserRequestExecutor,
+    },
+    stats_devices_platform_endpoint::{
+        StatsDevicesPlatformRequestBuilder, StatsDevicesPlatformRequestExecutor,
+    },
+    stats_devices_screensize_endpoint::{
+        StatsDevicesScreensizeRequestBuilder, StatsDevicesScreensizeRequestExecutor,
+    },
+    stats_file_downloads_endpoint::{
+        StatsFileDownloadsRequestBuilder, StatsFileDownloadsRequestExecutor,
     },
     stats_referrers_endpoint::{StatsReferrersRequestBuilder, StatsReferrersRequestExecutor},
     stats_region_views_endpoint::{
         StatsRegionViewsRequestBuilder, StatsRegionViewsRequestExecutor,
     },
+    stats_search_terms_endpoint::{
+        StatsSearchTermsRequestBuilder, StatsSearchTermsRequestExecutor,
+    },
     stats_top_authors_endpoint::{StatsTopAuthorsRequestBuilder, StatsTopAuthorsRequestExecutor},
     stats_top_posts_endpoint::{StatsTopPostsRequestBuilder, StatsTopPostsRequestExecutor},
+    stats_video_plays_endpoint::{StatsVideoPlaysRequestBuilder, StatsVideoPlaysRequestExecutor},
     stats_visits_endpoint::{StatsVisitsRequestBuilder, StatsVisitsRequestExecutor},
     subscribers_endpoint::{SubscribersRequestBuilder, SubscribersRequestExecutor},
     support_bots_endpoint::{SupportBotsRequestBuilder, SupportBotsRequestExecutor},
@@ -45,11 +62,18 @@ pub struct WpComApiRequestBuilder {
     oauth2: Arc<Oauth2RequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
+    stats_clicks: Arc<StatsClicksRequestBuilder>,
+    stats_file_downloads: Arc<StatsFileDownloadsRequestBuilder>,
     stats_country_views: Arc<StatsCountryViewsRequestBuilder>,
+    stats_devices_browser: Arc<StatsDevicesBrowserRequestBuilder>,
+    stats_devices_platform: Arc<StatsDevicesPlatformRequestBuilder>,
+    stats_devices_screensize: Arc<StatsDevicesScreensizeRequestBuilder>,
     stats_referrers: Arc<StatsReferrersRequestBuilder>,
     stats_region_views: Arc<StatsRegionViewsRequestBuilder>,
+    stats_search_terms: Arc<StatsSearchTermsRequestBuilder>,
     stats_top_authors: Arc<StatsTopAuthorsRequestBuilder>,
     stats_top_posts: Arc<StatsTopPostsRequestBuilder>,
+    stats_video_plays: Arc<StatsVideoPlaysRequestBuilder>,
     stats_visits: Arc<StatsVisitsRequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
     support_bots: Arc<SupportBotsRequestBuilder>,
@@ -71,11 +95,18 @@ impl WpComApiRequestBuilder {
             oauth2,
             sites,
             stats_city_views,
+            stats_clicks,
+            stats_file_downloads,
             stats_country_views,
+            stats_devices_browser,
+            stats_devices_platform,
+            stats_devices_screensize,
             stats_referrers,
             stats_region_views,
+            stats_search_terms,
             stats_top_authors,
             stats_top_posts,
+            stats_video_plays,
             stats_visits,
             subscribers,
             support_bots,
@@ -108,11 +139,18 @@ pub struct WpComApiClient {
     oauth2: Arc<Oauth2RequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
+    stats_clicks: Arc<StatsClicksRequestExecutor>,
+    stats_file_downloads: Arc<StatsFileDownloadsRequestExecutor>,
     stats_country_views: Arc<StatsCountryViewsRequestExecutor>,
+    stats_devices_browser: Arc<StatsDevicesBrowserRequestExecutor>,
+    stats_devices_platform: Arc<StatsDevicesPlatformRequestExecutor>,
+    stats_devices_screensize: Arc<StatsDevicesScreensizeRequestExecutor>,
     stats_referrers: Arc<StatsReferrersRequestExecutor>,
     stats_region_views: Arc<StatsRegionViewsRequestExecutor>,
+    stats_search_terms: Arc<StatsSearchTermsRequestExecutor>,
     stats_top_authors: Arc<StatsTopAuthorsRequestExecutor>,
     stats_top_posts: Arc<StatsTopPostsRequestExecutor>,
+    stats_video_plays: Arc<StatsVideoPlaysRequestExecutor>,
     stats_visits: Arc<StatsVisitsRequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
     support_bots: Arc<SupportBotsRequestExecutor>,
@@ -135,11 +173,18 @@ impl WpComApiClient {
             oauth2,
             sites,
             stats_city_views,
+            stats_clicks,
+            stats_file_downloads,
             stats_country_views,
+            stats_devices_browser,
+            stats_devices_platform,
+            stats_devices_screensize,
             stats_referrers,
             stats_region_views,
+            stats_search_terms,
             stats_top_authors,
             stats_top_posts,
+            stats_video_plays,
             stats_visits,
             subscribers,
             support_bots,
@@ -155,11 +200,18 @@ api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
+api_client_generate_endpoint_impl!(WpComApi, stats_clicks);
+api_client_generate_endpoint_impl!(WpComApi, stats_file_downloads);
 api_client_generate_endpoint_impl!(WpComApi, stats_country_views);
+api_client_generate_endpoint_impl!(WpComApi, stats_devices_browser);
+api_client_generate_endpoint_impl!(WpComApi, stats_devices_platform);
+api_client_generate_endpoint_impl!(WpComApi, stats_devices_screensize);
 api_client_generate_endpoint_impl!(WpComApi, stats_referrers);
 api_client_generate_endpoint_impl!(WpComApi, stats_region_views);
+api_client_generate_endpoint_impl!(WpComApi, stats_search_terms);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_authors);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_posts);
+api_client_generate_endpoint_impl!(WpComApi, stats_video_plays);
 api_client_generate_endpoint_impl!(WpComApi, stats_visits);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);

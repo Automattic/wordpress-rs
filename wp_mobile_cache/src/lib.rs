@@ -412,7 +412,7 @@ impl From<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 10] = [
+static MIGRATION_QUERIES: [&str; 11] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -423,6 +423,7 @@ static MIGRATION_QUERIES: [&str; 10] = [
     include_str!("../migrations/0008-create-post-types-table.sql"),
     include_str!("../migrations/0009-create-entity-state-table.sql"),
     include_str!("../migrations/0010-create-wordpress-com-sites-table.sql"),
+    include_str!("../migrations/0011-add-additional-fields-to-posts-tables.sql"),
 ];
 
 pub struct MigrationManager<'a> {
@@ -465,6 +466,12 @@ impl<'a> MigrationManager<'a> {
         }
 
         let next_migration_id = self.get_next_migration_index()?;
+        if next_migration_id > MIGRATION_QUERIES.len() {
+            return Err(rusqlite::Error::InvalidParameterName(format!(
+                "next migration index ({next_migration_id}) exceeds available migrations ({})",
+                MIGRATION_QUERIES.len()
+            )));
+        }
         for (index, migration) in MIGRATION_QUERIES[next_migration_id..].iter().enumerate() {
             for query in migration
                 .split(";")
@@ -723,6 +730,24 @@ mod tests {
             error_count, 0,
             "Race condition detected: {} tasks failed",
             error_count
+        );
+    }
+
+    #[test]
+    fn test_migration_returns_error_when_index_exceeds_available_migrations() {
+        let connection = Connection::open_in_memory().unwrap();
+        let mut migration_manager = MigrationManager::new(&connection).unwrap();
+
+        migration_manager.create_migrations_table().unwrap();
+
+        // Insert a migration ID beyond the number of available migrations
+        let beyond_max = MIGRATION_QUERIES.len() as i64 + 1;
+        migration_manager.insert_migration(beyond_max).unwrap();
+
+        let result = migration_manager.perform_migrations();
+        assert!(
+            result.is_err(),
+            "Expected error when migration index exceeds available migrations"
         );
     }
 }
