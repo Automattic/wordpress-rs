@@ -75,6 +75,24 @@ impl MetadataService {
     // Read Operations
     // ============================================================
 
+    /// Check whether a list contains a specific entity ID.
+    ///
+    /// More efficient than `get_entity_ids` when only a membership check is needed.
+    pub fn list_contains_entity(
+        &self,
+        key: &ListKey,
+        entity_id: i64,
+    ) -> Result<bool, WpServiceError> {
+        self.cache.execute(|conn| {
+            Ok(ListMetadataRepository::contains_entity(
+                conn,
+                &self.db_site,
+                key,
+                entity_id,
+            )?)
+        })
+    }
+
     /// Get ordered entity IDs for a list.
     ///
     /// Returns entity IDs in display order (rowid order from database).
@@ -84,6 +102,42 @@ impl MetadataService {
             let items = ListMetadataRepository::get_items_by_list_key(conn, &self.db_site, key)?;
             Ok(items.into_iter().map(|item| item.entity_id).collect())
         })
+    }
+
+    /// Replace all items in a list with the given items.
+    ///
+    /// Looks up the list header and replaces all items in a single transaction.
+    /// Returns `Ok(())` on success, or an error if the list doesn't exist.
+    pub fn replace_list_items(
+        &self,
+        key: &ListKey,
+        items: &[ListMetadataItemInput],
+    ) -> Result<(), WpServiceError> {
+        Ok(self.cache.execute(|conn| {
+            let header =
+                ListMetadataRepository::get_header(conn, &self.db_site, key)?.ok_or_else(|| {
+                    wp_mobile_cache::SqliteDbError::SqliteError(format!("List '{}' not found", key))
+                })?;
+            ListMetadataRepository::set_items_by_list_metadata_id(conn, header.row_id, items)
+        })?)
+    }
+
+    /// Remove specific items from a list by entity ID.
+    ///
+    /// Uses a targeted DELETE instead of replacing the entire list,
+    /// avoiding race conditions with concurrent refresh or load-more operations.
+    pub fn remove_list_items(
+        &self,
+        key: &ListKey,
+        entity_ids: &[i64],
+    ) -> Result<(), WpServiceError> {
+        Ok(self.cache.execute(|conn| {
+            let header =
+                ListMetadataRepository::get_header(conn, &self.db_site, key)?.ok_or_else(|| {
+                    wp_mobile_cache::SqliteDbError::SqliteError(format!("List '{}' not found", key))
+                })?;
+            ListMetadataRepository::remove_items_by_entity_ids(conn, header.row_id, entity_ids)
+        })?)
     }
 
     /// Get list metadata as EntityMetadata structs (for ListMetadataReader trait).
