@@ -9,6 +9,15 @@ use super::endpoint::{
     stats_country_views_endpoint::{
         StatsCountryViewsRequestBuilder, StatsCountryViewsRequestExecutor,
     },
+    stats_devices_browser_endpoint::{
+        StatsDevicesBrowserRequestBuilder, StatsDevicesBrowserRequestExecutor,
+    },
+    stats_devices_platform_endpoint::{
+        StatsDevicesPlatformRequestBuilder, StatsDevicesPlatformRequestExecutor,
+    },
+    stats_devices_screensize_endpoint::{
+        StatsDevicesScreensizeRequestBuilder, StatsDevicesScreensizeRequestExecutor,
+    },
     stats_referrers_endpoint::{StatsReferrersRequestBuilder, StatsReferrersRequestExecutor},
     stats_region_views_endpoint::{
         StatsRegionViewsRequestBuilder, StatsRegionViewsRequestExecutor,
@@ -46,6 +55,9 @@ pub struct WpComApiRequestBuilder {
     sites: Arc<SitesRequestBuilder>,
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
     stats_country_views: Arc<StatsCountryViewsRequestBuilder>,
+    stats_devices_browser: Arc<StatsDevicesBrowserRequestBuilder>,
+    stats_devices_platform: Arc<StatsDevicesPlatformRequestBuilder>,
+    stats_devices_screensize: Arc<StatsDevicesScreensizeRequestBuilder>,
     stats_referrers: Arc<StatsReferrersRequestBuilder>,
     stats_region_views: Arc<StatsRegionViewsRequestBuilder>,
     stats_top_authors: Arc<StatsTopAuthorsRequestBuilder>,
@@ -72,6 +84,9 @@ impl WpComApiRequestBuilder {
             sites,
             stats_city_views,
             stats_country_views,
+            stats_devices_browser,
+            stats_devices_platform,
+            stats_devices_screensize,
             stats_referrers,
             stats_region_views,
             stats_top_authors,
@@ -109,6 +124,9 @@ pub struct WpComApiClient {
     sites: Arc<SitesRequestExecutor>,
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
     stats_country_views: Arc<StatsCountryViewsRequestExecutor>,
+    stats_devices_browser: Arc<StatsDevicesBrowserRequestExecutor>,
+    stats_devices_platform: Arc<StatsDevicesPlatformRequestExecutor>,
+    stats_devices_screensize: Arc<StatsDevicesScreensizeRequestExecutor>,
     stats_referrers: Arc<StatsReferrersRequestExecutor>,
     stats_region_views: Arc<StatsRegionViewsRequestExecutor>,
     stats_top_authors: Arc<StatsTopAuthorsRequestExecutor>,
@@ -136,6 +154,9 @@ impl WpComApiClient {
             sites,
             stats_city_views,
             stats_country_views,
+            stats_devices_browser,
+            stats_devices_platform,
+            stats_devices_screensize,
             stats_referrers,
             stats_region_views,
             stats_top_authors,
@@ -156,6 +177,9 @@ api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_country_views);
+api_client_generate_endpoint_impl!(WpComApi, stats_devices_browser);
+api_client_generate_endpoint_impl!(WpComApi, stats_devices_platform);
+api_client_generate_endpoint_impl!(WpComApi, stats_devices_screensize);
 api_client_generate_endpoint_impl!(WpComApi, stats_referrers);
 api_client_generate_endpoint_impl!(WpComApi, stats_region_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_authors);
