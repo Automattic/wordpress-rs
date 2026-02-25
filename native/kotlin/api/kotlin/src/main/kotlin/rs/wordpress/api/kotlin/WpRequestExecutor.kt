@@ -48,7 +48,7 @@ class WpRequestExecutor @JvmOverloads constructor(
      */
     @JvmOverloads
     constructor(
-        interceptors: List<Interceptor>,
+        interceptors: List<Interceptor> = listOf(),
         dispatcher: CoroutineDispatcher = Dispatchers.IO,
         fileResolver: FileResolver = DefaultFileResolver(),
         uploadListener: UploadListener? = null

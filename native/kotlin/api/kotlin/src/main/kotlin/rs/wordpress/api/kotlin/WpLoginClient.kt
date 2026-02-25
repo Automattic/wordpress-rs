@@ -24,7 +24,7 @@ class WpLoginClient @JvmOverloads constructor(
      */
     @JvmOverloads
     constructor(
-        interceptors: List<Interceptor>,
+        interceptors: List<Interceptor> = listOf(),
         middlewarePipeline: WpApiMiddlewarePipeline = WpApiMiddlewarePipeline(listOf()),
         dispatcher: CoroutineDispatcher = Dispatchers.IO
     ) : this(
