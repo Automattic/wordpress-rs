@@ -301,39 +301,28 @@ steps:
 
       print("Attempting SecureEnclave.P256.KeyAgreement.PrivateKey()...")
 
-      let process = Process()
-      process.executableURL = URL(fileURLWithPath: ProcessInfo.processInfo.arguments[0])
-      process.arguments = ["--create-key"]
+      let done = DispatchSemaphore(value: 0)
+      var succeeded = false
 
-      if CommandLine.arguments.contains("--create-key") {
-          let key = try SecureEnclave.P256.KeyAgreement.PrivateKey()
-          print("KEY_CREATED: \(key.publicKey.x963Representation.base64EncodedString())")
-          exit(0)
+      DispatchQueue.global().async {
+          do {
+              let key = try SecureEnclave.P256.KeyAgreement.PrivateKey()
+              print("KEY_CREATED: \(key.publicKey.x963Representation.base64EncodedString())")
+              succeeded = true
+          } catch {
+              print("ERROR: \(error)")
+          }
+          done.signal()
       }
 
-      let pipe = Pipe()
-      process.standardOutput = pipe
-      process.standardError = pipe
-      try process.run()
-
-      let deadline = Date().addingTimeInterval(10)
-      while process.isRunning && Date() < deadline {
-          Thread.sleep(forTimeInterval: 0.1)
-      }
-
-      if process.isRunning {
-          process.terminate()
+      if done.wait(timeout: .now() + .seconds(10)) == .timedOut {
           print("HANG: Key creation did not complete within 10 seconds.")
+          print("SecureEnclave.isAvailable returns true but key creation hangs on this VM.")
           exit(1)
-      }
-
-      let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-      print(output)
-
-      if process.terminationStatus == 0 && output.contains("KEY_CREATED") {
+      } else if succeeded {
           print("SUCCESS: Secure Enclave key creation works on this VM.")
       } else {
-          print("FAILED: Exit status \(process.terminationStatus), reason: \(process.terminationReason == .uncaughtSignal ? "signal" : "exit")")
+          print("FAILED: Key creation threw an error (see above).")
           exit(1)
       }
       SWIFT
