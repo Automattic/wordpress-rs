@@ -160,8 +160,8 @@ impl PostListFilter {
     /// Conservative: returns `true` if the match cannot be determined locally.
     /// Only returns `false` when the post definitely does NOT match.
     ///
-    /// Fields that require server-side data (search, categories, tags via term
-    /// relationships) are not checked and assumed to match.
+    /// Fields that require server-side evaluation (search) are not checked
+    /// and assumed to match.
     pub fn loosely_matches_post(&self, post: &wp_api::posts::AnyPostWithEditContext) -> bool {
         // Status check
         if !self.status.is_empty() && !self.status.contains(&post.status) {
@@ -204,6 +204,37 @@ impl PostListFilter {
         }
         // Slug check
         if !self.slug.is_empty() && !self.slug.contains(&post.slug) {
+            return false;
+        }
+        // Categories check: at least one filter category must be in the post's categories
+        if !self.categories.is_empty()
+            && let Some(post_categories) = &post.categories
+            && !self.categories.iter().any(|c| post_categories.contains(c))
+        {
+            return false;
+        }
+        // Categories exclude check: reject if any excluded category is present
+        if !self.categories_exclude.is_empty()
+            && let Some(post_categories) = &post.categories
+            && self
+                .categories_exclude
+                .iter()
+                .any(|c| post_categories.contains(c))
+        {
+            return false;
+        }
+        // Tags check: at least one filter tag must be in the post's tags
+        if !self.tags.is_empty()
+            && let Some(post_tags) = &post.tags
+            && !self.tags.iter().any(|t| post_tags.contains(t))
+        {
+            return false;
+        }
+        // Tags exclude check: reject if any excluded tag is present
+        if !self.tags_exclude.is_empty()
+            && let Some(post_tags) = &post.tags
+            && self.tags_exclude.iter().any(|t| post_tags.contains(t))
+        {
             return false;
         }
         true
@@ -570,12 +601,156 @@ mod tests {
         assert!(!filter.loosely_matches_post(&post));
     }
 
+    // ============================================================
+    // Categories filter tests
+    // ============================================================
+
     #[test]
-    fn test_matches_when_category_filter_present() {
-        // Category filters cannot be checked locally, so the filter is conservative
-        // and returns true even when categories are specified.
+    fn test_matches_categories() {
         let filter = PostListFilter {
             categories: vec![TermId(5), TermId(10)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_categories(vec![TermId(5), TermId(20)])
+            .build();
+        assert!(filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_no_match_wrong_categories() {
+        let filter = PostListFilter {
+            categories: vec![TermId(5), TermId(10)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_categories(vec![TermId(20), TermId(30)])
+            .build();
+        assert!(!filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_matches_categories_when_post_has_none() {
+        // Conservative: if the post has no categories data, assume it matches.
+        let filter = PostListFilter {
+            categories: vec![TermId(5), TermId(10)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal().build();
+        assert!(filter.loosely_matches_post(&post));
+    }
+
+    // ============================================================
+    // Categories exclude filter tests
+    // ============================================================
+
+    #[test]
+    fn test_no_match_categories_exclude() {
+        let filter = PostListFilter {
+            categories_exclude: vec![TermId(5)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_categories(vec![TermId(5), TermId(20)])
+            .build();
+        assert!(!filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_matches_categories_exclude_no_overlap() {
+        let filter = PostListFilter {
+            categories_exclude: vec![TermId(5)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_categories(vec![TermId(20), TermId(30)])
+            .build();
+        assert!(filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_matches_categories_exclude_when_post_has_none() {
+        // Conservative: if the post has no categories data, assume it matches.
+        let filter = PostListFilter {
+            categories_exclude: vec![TermId(5)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal().build();
+        assert!(filter.loosely_matches_post(&post));
+    }
+
+    // ============================================================
+    // Tags filter tests
+    // ============================================================
+
+    #[test]
+    fn test_matches_tags() {
+        let filter = PostListFilter {
+            tags: vec![TermId(10), TermId(20)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_tags(vec![TermId(10), TermId(30)])
+            .build();
+        assert!(filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_no_match_wrong_tags() {
+        let filter = PostListFilter {
+            tags: vec![TermId(10), TermId(20)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_tags(vec![TermId(30), TermId(40)])
+            .build();
+        assert!(!filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_matches_tags_when_post_has_none() {
+        // Conservative: if the post has no tags data, assume it matches.
+        let filter = PostListFilter {
+            tags: vec![TermId(10), TermId(20)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal().build();
+        assert!(filter.loosely_matches_post(&post));
+    }
+
+    // ============================================================
+    // Tags exclude filter tests
+    // ============================================================
+
+    #[test]
+    fn test_no_match_tags_exclude() {
+        let filter = PostListFilter {
+            tags_exclude: vec![TermId(10)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_tags(vec![TermId(10), TermId(30)])
+            .build();
+        assert!(!filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_matches_tags_exclude_no_overlap() {
+        let filter = PostListFilter {
+            tags_exclude: vec![TermId(10)],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_tags(vec![TermId(30), TermId(40)])
+            .build();
+        assert!(filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_matches_tags_exclude_when_post_has_none() {
+        // Conservative: if the post has no tags data, assume it matches.
+        let filter = PostListFilter {
+            tags_exclude: vec![TermId(10)],
             ..Default::default()
         };
         let post = PostBuilder::minimal().build();
