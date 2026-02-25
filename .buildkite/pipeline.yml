@@ -281,6 +281,66 @@ steps:
         agents:
           queue: android
 
+  - label: ":lock: Test Secure Enclave availability on CI Mac"
+    command: |
+      echo "--- :information_source: System info"
+      system_profiler SPHardwareDataType
+      sw_vers
+
+      echo "--- :lock: Testing Secure Enclave key creation"
+      cat > /tmp/se_test.swift << 'SWIFT'
+      import CryptoKit
+      import Foundation
+
+      print("SecureEnclave.isAvailable: \(SecureEnclave.isAvailable)")
+
+      guard SecureEnclave.isAvailable else {
+          print("Secure Enclave is not available on this machine.")
+          exit(0)
+      }
+
+      print("Attempting SecureEnclave.P256.KeyAgreement.PrivateKey()...")
+
+      let process = Process()
+      process.executableURL = URL(fileURLWithPath: ProcessInfo.processInfo.arguments[0])
+      process.arguments = ["--create-key"]
+
+      if CommandLine.arguments.contains("--create-key") {
+          let key = try SecureEnclave.P256.KeyAgreement.PrivateKey()
+          print("KEY_CREATED: \(key.publicKey.x963Representation.base64EncodedString())")
+          exit(0)
+      }
+
+      let pipe = Pipe()
+      process.standardOutput = pipe
+      process.standardError = pipe
+      try process.run()
+
+      let deadline = Date().addingTimeInterval(10)
+      while process.isRunning && Date() < deadline {
+          Thread.sleep(forTimeInterval: 0.1)
+      }
+
+      if process.isRunning {
+          process.terminate()
+          print("HANG: Key creation did not complete within 10 seconds.")
+          exit(1)
+      }
+
+      let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+      print(output)
+
+      if process.terminationStatus == 0 && output.contains("KEY_CREATED") {
+          print("SUCCESS: Secure Enclave key creation works on this VM.")
+      } else {
+          print("FAILED: Exit status \(process.terminationStatus), reason: \(process.terminationReason == .uncaughtSignal ? "signal" : "exit")")
+          exit(1)
+      }
+      SWIFT
+      swift /tmp/se_test.swift
+    agents:
+      queue: mac
+
   - label: ":rocket: Publish Swift release $NEW_VERSION"
     command: .buildkite/release.sh $NEW_VERSION
     depends_on: swift
