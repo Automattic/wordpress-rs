@@ -93,6 +93,13 @@ steps:
         agents:
           queue: mac
         if: build.pull_request.id != null
+      - label: ":swift: :package: Publish trunk XCFramework"
+        command: .buildkite/publish-trunk-xcframework.sh
+        depends_on: xcframework
+        plugins: [$CI_TOOLKIT]
+        agents:
+          queue: mac
+        if: build.branch == "trunk" && build.env("NEW_VERSION") == null
       - label: ":swift: Build Docs"
         command: |
           .buildkite/download-xcframework.sh
