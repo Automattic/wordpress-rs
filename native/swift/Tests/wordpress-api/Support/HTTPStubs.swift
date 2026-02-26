@@ -35,19 +35,21 @@ final class HTTPStubs: SafeRequestExecutor {
         switch missingStub {
         case let .success(response):
             return .success(response)
-        case .failure:
-            // TODO: Translate error into the Rust type
+        case .failure(let error):
+            if let requestError = error as? RequestExecutionError {
+                return .failure(requestError)
+            }
+            let reason: RequestExecutionErrorReason = .genericError(errorMessage: error.localizedDescription)
             return .failure(
                 .RequestExecutionFailed(
                     statusCode: nil,
                     redirects: nil,
-                    reason: .genericError(errorMessage: ""),
+                    reason: reason,
                     requestUrl: request.url(),
                     requestMethod: request.method()
                 )
             )
         default:
-            // TODO: Translate error into the Rust type
             return .failure(
                 .RequestExecutionFailed(
                     statusCode: nil,

@@ -31,9 +31,13 @@ import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLException
 import javax.net.ssl.SSLPeerUnverifiedException
 
 const val USER_AGENT_HEADER_NAME = "User-Agent"
+private const val HTTP_PROBE_TIMEOUT_MS = 5000
+private const val DEFAULT_HTTPS_PORT = 443
+private const val DEFAULT_HTTP_PORT = 80
 
 class WpRequestExecutor @JvmOverloads constructor(
     private val httpClient: WpHttpClient,
@@ -191,6 +195,10 @@ class WpRequestExecutor @JvmOverloads constructor(
                 requestUrl,
                 requestMethod,
             )
+        } catch (e: SSLException) {
+            throw requestExecutionFailedWith(
+                RequestExecutionErrorReason.sslException(e, urlRequest.url)
+            )
         } catch (e: UnknownHostException) {
             throw requestExecutionFailedWith(
                 RequestExecutionErrorReason.unknownHost(e),
@@ -204,10 +212,16 @@ class WpRequestExecutor @JvmOverloads constructor(
                 requestMethod,
             )
         } catch (e: ConnectException) {
+            val cause = e.cause
+            if (cause is SSLException) {
+                throw requestExecutionFailedWith(
+                    RequestExecutionErrorReason.sslException(cause, urlRequest.url),
+                    requestUrl,
+                    requestMethod,
+                )
+            }
             throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.HttpError(
-                    reason = "Connection failed: ${e.localizedMessage}"
-                ),
+                RequestExecutionErrorReason.connectException(e, urlRequest.url),
                 requestUrl,
                 requestMethod,
             )
@@ -292,6 +306,73 @@ private fun RequestExecutionErrorReason.Companion.noRouteToHost(e: NoRouteToHost
     RequestExecutionErrorReason.HttpError(
         reason = e.localizedMessage
     )
+
+@Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
+private fun RequestExecutionErrorReason.Companion.connectException(
+    e: ConnectException, // To avoid `SwallowedException` from Detekt
+    requestUrl: HttpUrl
+): RequestExecutionErrorReason {
+    // Connection was refused. If the original URL was HTTPS, check whether the site
+    // is reachable via HTTP — if so, the site doesn't support HTTPS.
+    if (requestUrl.scheme != "https") {
+        return RequestExecutionErrorReason.HttpError(
+            reason = "Connection failed: ${e.localizedMessage}"
+        )
+    }
+    return try {
+        // If the original URL used the default HTTPS port (443), probe on the default
+        // HTTP port (80). Otherwise, keep the custom port and just change the scheme.
+        val httpUrlBuilder = requestUrl.newBuilder().scheme("http")
+        if (requestUrl.port == DEFAULT_HTTPS_PORT) {
+            httpUrlBuilder.port(DEFAULT_HTTP_PORT)
+        }
+        val httpUrl = httpUrlBuilder.build()
+        val connection = httpUrl.toUrl().openConnection() as java.net.HttpURLConnection
+        connection.connectTimeout = HTTP_PROBE_TIMEOUT_MS
+        connection.readTimeout = HTTP_PROBE_TIMEOUT_MS
+        connection.requestMethod = "HEAD"
+        connection.connect()
+        try {
+            // Site responded over HTTP — it just doesn't support HTTPS
+            RequestExecutionErrorReason.HttpsNotSupportedError
+        } finally {
+            connection.disconnect()
+        }
+    } catch (ex: Exception) {
+        // HTTP also failed — site is genuinely unreachable
+        RequestExecutionErrorReason.HttpError(
+            reason = "Connection failed: ${e.localizedMessage}"
+        )
+    }
+}
+
+@Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
+private fun RequestExecutionErrorReason.Companion.sslException(
+    e: SSLException, // To avoid `SwallowedException` from Detekt
+    requestUrl: HttpUrl
+): RequestExecutionErrorReason {
+    // Try to re-connect with relaxed TLS settings to inspect the server's certificate.
+    // If this also fails, the server likely doesn't support HTTPS at all.
+    return try {
+        val newConnection = requestUrl.toUrl().openConnection() as HttpsURLConnection
+        newConnection.setHostnameVerifier { _, _ -> true }
+        newConnection.connect()
+        try {
+            val certificates = newConnection.serverCertificates.map { parseCertificate(it.encoded) }
+            RequestExecutionErrorReason.InvalidSslError(
+                reason = InvalidSslErrorReason.CertificateNotValidForName(
+                    hostname = requestUrl.host,
+                    presentedHostnames = listOfNotNull(certificates.first()?.commonName())
+                )
+            )
+        } finally {
+            newConnection.disconnect()
+        }
+    } catch (ex: Exception) {
+        // Re-connection also failed — server doesn't support HTTPS
+        RequestExecutionErrorReason.HttpsNotSupportedError
+    }
+}
 
 @Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
 private fun RequestExecutionErrorReason.Companion.invalidSSLError(

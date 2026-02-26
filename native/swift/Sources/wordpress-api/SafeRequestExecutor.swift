@@ -95,7 +95,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             }
 
             if errorIsNonExistentSiteError(error) {
-                return handleNonExistentSiteError(error, for: request)
+                return await handleNonExistentSiteError(error, for: request)
             }
 
             if errorIsDeviceIsOffline(error) {
@@ -173,6 +173,16 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             var peerCertificateChain = getPeerCertificateChain(error),
             !peerCertificateChain.isEmpty
         else {
+            // No peer certificates means the server didn't present any during TLS handshake.
+            // When combined with secureConnectionFailed, this indicates the server
+            // doesn't support HTTPS at all.
+            if (error as? URLError)?.code == .secureConnectionFailed {
+                return .failure(.RequestExecutionFailed(
+                     statusCode: nil,
+                     redirects: executorDelegate.redirects(for: request.requestId()),
+                     reason: .httpsNotSupportedError
+                ))
+            }
             return .failure(.RequestExecutionFailed(
                  statusCode: nil,
                  redirects: executorDelegate.redirects(for: request.requestId()),
@@ -201,8 +211,25 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     func handleNonExistentSiteError(
         _ error: Error,
         for request: NetworkRequestContent
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        .failure(
+    ) async -> Result<WpNetworkResponse, RequestExecutionError> {
+
+        // If the original request was HTTPS and the connection was refused,
+        // probe the same host via HTTP to see if the site is reachable.
+        // If it is, the site doesn't support HTTPS rather than being non-existent.
+        if let url = URL(string: request.url()),
+           url.scheme == "https",
+           (error as? URLError)?.code == .cannotConnectToHost,
+           await httpProbeSucceeds(for: url) {
+            return .failure(
+                .RequestExecutionFailed(
+                    statusCode: nil,
+                    redirects: executorDelegate.redirects(for: request.requestId()),
+                    reason: .httpsNotSupportedError
+                )
+            )
+        }
+
+        return .failure(
             .RequestExecutionFailed(
                 statusCode: nil,
                 redirects: executorDelegate.redirects(for: request.requestId()),
@@ -214,6 +241,35 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 requestMethod: request.method()
             )
         )
+    }
+
+    /// Attempts an HTTP HEAD request to the same host to check if the site is reachable over plain HTTP.
+    private func httpProbeSucceeds(for originalUrl: URL) async -> Bool {
+        guard var components = URLComponents(url: originalUrl, resolvingAgainstBaseURL: false) else {
+            return false
+        }
+        components.scheme = "http"
+
+        // If the original URL used the default HTTPS port (443 or unspecified),
+        // clear the port so the probe uses the default HTTP port (80).
+        if components.port == nil || components.port == 443 {
+            components.port = nil
+        }
+
+        guard let httpUrl = components.url else {
+            return false
+        }
+
+        var probeRequest = URLRequest(url: httpUrl)
+        probeRequest.httpMethod = "HEAD"
+        probeRequest.timeoutInterval = 5
+
+        do {
+            _ = try await URLSession.shared.data(for: probeRequest)
+            return true
+        } catch {
+            return false
+        }
     }
 
     public func sleep(millis: UInt64) async {

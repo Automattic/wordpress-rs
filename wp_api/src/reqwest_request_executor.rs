@@ -12,8 +12,9 @@ use hickory_resolver::error::ResolveError;
 use http::{HeaderMap, HeaderValue};
 use hyper::Error as HyperError;
 use reqwest::multipart::Part;
-use rustls::{CertificateError, Error as TlsError};
+use rustls::{CertificateError, Error as TlsError, InvalidMessage};
 use std::{error::Error, sync::Arc, time::Duration};
+use url::Url;
 
 const DEFAULT_TIMEOUT: u64 = 10;
 
@@ -95,6 +96,56 @@ impl ReqwestRequestExecutor {
         })
     }
 
+    /// When an HTTPS connection is refused, probe the same host via HTTP to determine
+    /// whether the site exists but doesn't support HTTPS, or is genuinely unreachable.
+    async fn handle_connect_error(
+        error: reqwest::Error,
+        request_url: &str,
+        request_method: RequestMethod,
+    ) -> RequestExecutionError {
+        let status_code = error.status().map(|s| s.as_u16());
+        let error_message = error.to_string();
+
+        if let Ok(url) = Url::parse(request_url)
+            && url.scheme() == "https"
+        {
+            // Build an HTTP URL: if the port is the default HTTPS port (443)
+            // or unspecified, use the default HTTP port (80).
+            let mut http_url = url.clone();
+            let _ = http_url.set_scheme("http");
+            if url.port().is_none() || url.port() == Some(443) {
+                let _ = http_url.set_port(None);
+            }
+
+            let probe_client = reqwest::Client::builder()
+                .timeout(Duration::from_secs(5))
+                .build();
+
+            if let Ok(probe_client) = probe_client
+                && let Ok(_response) = probe_client.head(http_url).send().await
+            {
+                return RequestExecutionError::RequestExecutionFailed {
+                    status_code,
+                    redirects: None,
+                    reason: RequestExecutionErrorReason::HttpsNotSupportedError,
+                    request_url: request_url.to_string(),
+                    request_method,
+                };
+            }
+        }
+
+        RequestExecutionError::RequestExecutionFailed {
+            status_code,
+            redirects: None,
+            reason: RequestExecutionErrorReason::NonExistentSiteError {
+                error_message: Some(error_message),
+                suggested_action: None,
+            },
+            request_url: request_url.to_string(),
+            request_method,
+        }
+    }
+
     pub fn request_method(method: RequestMethod) -> http::Method {
         match method {
             RequestMethod::GET => reqwest::Method::GET,
@@ -114,9 +165,13 @@ impl RequestExecutor for ReqwestRequestExecutor {
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let url = request.url().0.clone();
         let method = request.method();
-        self.async_request(request)
-            .await
-            .map_err(|e| request_execution_error_from_reqwest(e, url, method))
+        match self.async_request(request).await {
+            Ok(response) => Ok(response),
+            Err(error) if error.is_connect() && !error.is_timeout() => {
+                Err(Self::handle_connect_error(error, &url, method).await)
+            }
+            Err(error) => Err(request_execution_error_from_reqwest(error, url, method)),
+        }
     }
 
     async fn upload(
@@ -239,6 +294,14 @@ impl From<&TlsError> for RequestExecutionErrorReason {
                     presented_hostnames: presented.to_vec(),
                 },
             },
+            TlsError::InvalidCertificate(_) => RequestExecutionErrorReason::InvalidSslError {
+                reason: InvalidSslErrorReason::GenericSslError,
+            },
+            // InvalidContentType occurs when the server responds with plain HTTP to a TLS
+            // handshake, indicating the server doesn't support HTTPS
+            TlsError::InvalidMessage(InvalidMessage::InvalidContentType) => {
+                RequestExecutionErrorReason::HttpsNotSupportedError
+            }
             _ => RequestExecutionErrorReason::GenericError {
                 error_message: error.to_string(),
             },
@@ -368,4 +431,58 @@ pub(crate) fn find_error<'a, E: Error + 'static>(top: &'a (dyn Error + 'static))
         err = src.source();
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustls::pki_types::ServerName;
+
+    #[test]
+    fn test_invalid_content_type_maps_to_https_not_supported() {
+        let tls_error = TlsError::InvalidMessage(InvalidMessage::InvalidContentType);
+        let reason: RequestExecutionErrorReason = (&tls_error).into();
+        assert_eq!(reason, RequestExecutionErrorReason::HttpsNotSupportedError);
+    }
+
+    #[test]
+    fn test_certificate_not_valid_for_name_maps_to_invalid_ssl_error() {
+        let tls_error = TlsError::InvalidCertificate(CertificateError::NotValidForNameContext {
+            expected: ServerName::try_from("example.com").unwrap().to_owned(),
+            presented: vec!["other.com".to_string()],
+        });
+        let reason: RequestExecutionErrorReason = (&tls_error).into();
+        assert_eq!(
+            reason,
+            RequestExecutionErrorReason::InvalidSslError {
+                reason: InvalidSslErrorReason::CertificateNotValidForName {
+                    hostname: "example.com".to_string(),
+                    presented_hostnames: vec!["other.com".to_string()],
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_other_certificate_errors_map_to_generic_ssl_error() {
+        let tls_error = TlsError::InvalidCertificate(CertificateError::Expired);
+        let reason: RequestExecutionErrorReason = (&tls_error).into();
+        assert_eq!(
+            reason,
+            RequestExecutionErrorReason::InvalidSslError {
+                reason: InvalidSslErrorReason::GenericSslError,
+            }
+        );
+    }
+
+    #[test]
+    fn test_other_tls_errors_map_to_generic_error() {
+        let tls_error = TlsError::InvalidMessage(InvalidMessage::HandshakePayloadTooLarge);
+        let reason: RequestExecutionErrorReason = (&tls_error).into();
+        assert!(
+            matches!(reason, RequestExecutionErrorReason::GenericError { .. }),
+            "Expected GenericError, got: {:?}",
+            reason
+        );
+    }
 }

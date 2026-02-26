@@ -28,6 +28,8 @@ http_authentication_rejected_error = The server at {$url} rejected your credenti
 
 http_server_error = Unable to connect to server: {$reason}. Please contact your server provider.
 
+https_not_supported_error = This site doesn't support a secure (HTTPS) connection. Please check the site URL and try again using HTTP instead.
+
 misconfigured_http_authentication_error = The server is sending invalid HTTP authentication information. Please check your site's HTTP authentication configuration.
 
 misconfigured_rate_limit_error = The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.

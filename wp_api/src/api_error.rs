@@ -636,6 +636,7 @@ pub enum RequestExecutionErrorReason {
     HttpForbiddenError {
         hostname: String,
     },
+    HttpsNotSupportedError,
     HttpTimeoutError,
     MisconfiguredHttpAuthenticationError {
         issue: HttpAuthMethodParsingError,
@@ -727,6 +728,9 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
             }
             RequestExecutionErrorReason::DeviceIsOfflineError { error_message } => {
                 WpMessages::just(error_message)
+            }
+            RequestExecutionErrorReason::HttpsNotSupportedError => {
+                WpMessages::https_not_supported_error()
             }
             RequestExecutionErrorReason::HttpError { reason } => {
                 WpMessages::http_server_error(reason)
