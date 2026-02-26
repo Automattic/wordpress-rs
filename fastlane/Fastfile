@@ -109,8 +109,8 @@ lane :release do |options|
 
   validate
   update_swift_package
-  publish_release_to_github
   publish_to_s3
+  publish_release_to_github
 end
 
 lane :validate do
