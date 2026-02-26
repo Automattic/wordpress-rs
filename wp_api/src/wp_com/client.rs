@@ -19,6 +19,9 @@ use super::endpoint::{
     stats_devices_screensize_endpoint::{
         StatsDevicesScreensizeRequestBuilder, StatsDevicesScreensizeRequestExecutor,
     },
+    stats_emails_summary_endpoint::{
+        StatsEmailsSummaryRequestBuilder, StatsEmailsSummaryRequestExecutor,
+    },
     stats_file_downloads_endpoint::{
         StatsFileDownloadsRequestBuilder, StatsFileDownloadsRequestExecutor,
     },
@@ -66,6 +69,7 @@ pub struct WpComApiRequestBuilder {
     stats_file_downloads: Arc<StatsFileDownloadsRequestBuilder>,
     stats_country_views: Arc<StatsCountryViewsRequestBuilder>,
     stats_devices_browser: Arc<StatsDevicesBrowserRequestBuilder>,
+    stats_emails_summary: Arc<StatsEmailsSummaryRequestBuilder>,
     stats_devices_platform: Arc<StatsDevicesPlatformRequestBuilder>,
     stats_devices_screensize: Arc<StatsDevicesScreensizeRequestBuilder>,
     stats_referrers: Arc<StatsReferrersRequestBuilder>,
@@ -99,6 +103,7 @@ impl WpComApiRequestBuilder {
             stats_file_downloads,
             stats_country_views,
             stats_devices_browser,
+            stats_emails_summary,
             stats_devices_platform,
             stats_devices_screensize,
             stats_referrers,
@@ -143,6 +148,7 @@ pub struct WpComApiClient {
     stats_file_downloads: Arc<StatsFileDownloadsRequestExecutor>,
     stats_country_views: Arc<StatsCountryViewsRequestExecutor>,
     stats_devices_browser: Arc<StatsDevicesBrowserRequestExecutor>,
+    stats_emails_summary: Arc<StatsEmailsSummaryRequestExecutor>,
     stats_devices_platform: Arc<StatsDevicesPlatformRequestExecutor>,
     stats_devices_screensize: Arc<StatsDevicesScreensizeRequestExecutor>,
     stats_referrers: Arc<StatsReferrersRequestExecutor>,
@@ -177,6 +183,7 @@ impl WpComApiClient {
             stats_file_downloads,
             stats_country_views,
             stats_devices_browser,
+            stats_emails_summary,
             stats_devices_platform,
             stats_devices_screensize,
             stats_referrers,
@@ -204,6 +211,7 @@ api_client_generate_endpoint_impl!(WpComApi, stats_clicks);
 api_client_generate_endpoint_impl!(WpComApi, stats_file_downloads);
 api_client_generate_endpoint_impl!(WpComApi, stats_country_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_browser);
+api_client_generate_endpoint_impl!(WpComApi, stats_emails_summary);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_platform);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_screensize);
 api_client_generate_endpoint_impl!(WpComApi, stats_referrers);

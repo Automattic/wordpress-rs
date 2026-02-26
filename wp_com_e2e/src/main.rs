@@ -9,6 +9,7 @@ mod me_tests;
 mod sites_tests;
 mod stats_city_views_tests;
 mod stats_country_views_tests;
+mod stats_emails_summary_tests;
 mod stats_referrers_tests;
 mod stats_region_views_tests;
 mod stats_top_authors_tests;
@@ -52,6 +53,7 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(support_bot_tests::tests(Arc::clone(&ctx)));
     tests.extend(support_eligibility_test::tests(Arc::clone(&ctx)));
     tests.extend(support_tickets_test::tests(Arc::clone(&ctx)));
+    tests.extend(stats_emails_summary_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_top_posts_tests::tests(Arc::clone(&ctx)));
     tests.extend(wp_service_tests::tests(Arc::clone(&ctx)));
     tests
