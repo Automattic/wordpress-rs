@@ -15,6 +15,7 @@ import rs.wordpress.example.shared.repository.AuthenticationRepository
 import androidx.core.net.toUri
 import rs.wordpress.api.kotlin.toURL
 import uniffi.wp_api.AutoDiscoveryAttemptSuccess
+import uniffi.wp_api.applicationPasswordsUrl
 
 class WelcomeActivity : ComponentActivity() {
     private val authRepository: AuthenticationRepository by inject()
@@ -35,7 +36,7 @@ class WelcomeActivity : ComponentActivity() {
                 else -> throw IllegalStateException("Api discovery should succeed for the example app")
             }
         }
-        val uriBuilder = success.applicationPasswordsAuthenticationUrl.url().toUri().buildUpon()
+        val uriBuilder = applicationPasswordsUrl(success.authentication)!!.url().toUri().buildUpon()
         apiDiscoverySuccess = success
 
         uriBuilder

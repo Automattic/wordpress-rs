@@ -3,9 +3,10 @@ use super::{
     url_discovery::{
         self, API_ROOT_LINK_HEADER, ApiRootUrl, ApplicationPasswordsNotSupportedReason,
         AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
-        AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, FetchAndParseApiRootFailure,
-        FindApiRootFailure, ParseApiRootFailureReason, ParseHomepageResult, XmlrpcDisabledReason,
-        XmlrpcDiscoveryError, extract_rsd_url, is_xmlrpc_response, parse_rsd_for_xmlrpc,
+        AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, DiscoveredAuthenticationMechanism,
+        FetchAndParseApiRootFailure, FindApiRootFailure, ParseApiRootFailureReason,
+        ParseHomepageResult, XmlrpcDisabledReason, XmlrpcDiscoveryError, extract_rsd_url,
+        is_xmlrpc_response, parse_rsd_for_xmlrpc,
     },
 };
 use crate::{
@@ -210,52 +211,75 @@ impl WpLoginClient {
         };
         let api_details = Self::parse_api_root(&fetch_api_details_response)?;
 
+        // Try Application Passwords first (preferred for self-hosted sites)
         if let Some(application_passwords_authentication_url) =
             api_details.find_application_passwords_authentication_url()
         {
-            let application_passwords_authentication_url =
+            let authentication_url =
                 ParsedUrl::parse(application_passwords_authentication_url.as_str())
                     .expect(
                         "Application passwords url returned from the server should be a valid url",
                     )
                     .into();
-            Ok(AutoDiscoveryAttemptSuccess {
+            return Ok(AutoDiscoveryAttemptSuccess {
                 parsed_site_url,
                 api_root_url: Arc::clone(&api_root_url.0),
                 api_details: Arc::new(api_details),
-                application_passwords_authentication_url,
-            })
-        } else {
-            let reason = if api_details.has_application_password_blocking_plugin() {
-                let plugins = api_details.application_password_blocking_plugins();
-
-                if plugins.len() == 1 {
-                    // If there's only one candidate, we can show more information in the error message
-                    Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin {
-                        plugin: plugins.first().expect("Already verified there is one plugin").clone(),
-                    })
-                } else {
-                    // If there's more than one, for now we'll just give a generic error
-                    Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByMultiplePlugins)
-                }
-            } else if !api_details.uses_https() {
-                // Application Passwords are disabled for non-HTTPS sites by default
-                if api_details.site_url_is_local_development_environment() {
-                    Some(ApplicationPasswordsNotSupportedReason::SiteIsLocalDevelopmentEnvironment)
-                } else {
-                    Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordsDisabledForHttpSite)
-                }
-            } else {
-                None
-            };
-
-            Err(
-                FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported {
-                    api_details: api_details.into(),
-                    reason,
+                authentication: DiscoveredAuthenticationMechanism::ApplicationPasswords {
+                    authentication_url,
                 },
-            )
+            });
         }
+
+        // Try OAuth2 (used by WordPress.com sites)
+        if let Some(oauth2_endpoints) = api_details.find_oauth2_endpoints() {
+            return Ok(AutoDiscoveryAttemptSuccess {
+                parsed_site_url,
+                api_root_url: Arc::clone(&api_root_url.0),
+                api_details: Arc::new(api_details),
+                authentication: DiscoveredAuthenticationMechanism::OAuth2 {
+                    endpoints: oauth2_endpoints,
+                },
+            });
+        }
+
+        // Neither authentication mechanism is available
+        let reason = if api_details.has_application_password_blocking_plugin() {
+            let plugins = api_details.application_password_blocking_plugins();
+
+            if plugins.len() == 1 {
+                // If there's only one candidate, we can show more information in the error message
+                Some(
+                    ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin {
+                        plugin: plugins
+                            .first()
+                            .expect("Already verified there is one plugin")
+                            .clone(),
+                    },
+                )
+            } else {
+                // If there's more than one, for now we'll just give a generic error
+                Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByMultiplePlugins)
+            }
+        } else if !api_details.uses_https() {
+            // Application Passwords are disabled for non-HTTPS sites by default
+            if api_details.site_url_is_local_development_environment() {
+                Some(ApplicationPasswordsNotSupportedReason::SiteIsLocalDevelopmentEnvironment)
+            } else {
+                Some(
+                    ApplicationPasswordsNotSupportedReason::ApplicationPasswordsDisabledForHttpSite,
+                )
+            }
+        } else {
+            None
+        };
+
+        Err(
+            FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported {
+                api_details: api_details.into(),
+                reason,
+            },
+        )
     }
 
     async fn find_api_root_url(

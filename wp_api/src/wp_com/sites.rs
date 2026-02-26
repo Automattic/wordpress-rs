@@ -7,6 +7,27 @@ use crate::{
     wp_com::{WpComSiteId, me::WpComUserId},
     wp_content_string_id,
 };
+
+/// Identifies a WordPress.com site by either its numeric ID or its slug.
+///
+/// Used in API requests that target a specific site, such as fetching site details
+/// or requesting OAuth2 authorization scoped to a particular blog.
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum WpComSiteIdentifier {
+    /// A site identified by its numeric WordPress.com ID.
+    Id { value: u64 },
+    /// A site identified by its slug (e.g., `"mysite.wordpress.com"`).
+    Slug { value: String },
+}
+
+impl std::fmt::Display for WpComSiteIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WpComSiteIdentifier::Id { value } => write!(f, "{value}"),
+            WpComSiteIdentifier::Slug { value } => write!(f, "{value}"),
+        }
+    }
+}
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -376,6 +397,23 @@ impl serde::de::Visitor<'_> for DeserializeLaunchStatusVisitor {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct WPComSiteSummary {
+    /// The site's WordPress.com ID
+    #[serde(rename = "ID")]
+    pub id: WpComSiteId,
+
+    /// The site's name as set in Settings > General > Site Title.
+    pub name: String,
+
+    /// The site's tagline as set in Settings > General > Tagline.
+    pub description: String,
+
+    /// The site's URL as set in https://wordpress.com/domains.
+    #[serde(rename = "URL")]
+    pub url: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -403,7 +441,19 @@ mod tests {
     ) {
         let json = test_json(json_file_path).expect("Failed to read JSON file");
         let site: WPComSite =
-            serde_json::from_slice(json.as_slice()).expect("Failed to deserialize user info");
+            serde_json::from_slice(json.as_slice()).expect("Failed to deserialize site data");
+        assert_eq!(site.id, crate::wp_com::WpComSiteId(expected_id));
+    }
+
+    #[rstest]
+    #[case("v1.2-sites-noauth-01.json", 158030780)]
+    fn test_wpcom_site_summary_deserialization(
+        #[case] json_file_path: &str,
+        #[case] expected_id: u64,
+    ) {
+        let json = test_json(json_file_path).expect("Failed to read JSON file");
+        let site: WPComSiteSummary =
+            serde_json::from_slice(json.as_slice()).expect("Failed to deserialize site data");
         assert_eq!(site.id, crate::wp_com::WpComSiteId(expected_id));
     }
 

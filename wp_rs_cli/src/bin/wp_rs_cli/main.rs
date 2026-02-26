@@ -14,7 +14,8 @@ use wp_api::{
 };
 use wp_api::{
     login::url_discovery::{
-        AutoDiscoveryAttemptFailure, FetchAndParseApiRootFailure, FindApiRootFailure,
+        AutoDiscoveryAttemptFailure, DiscoveredAuthenticationMechanism,
+        FetchAndParseApiRootFailure, FindApiRootFailure,
     },
     prelude::*,
 };
@@ -182,10 +183,14 @@ async fn perform_api_discovery(
         .await
         .combined_result()
     {
-        Ok(s) => SimplifiedDiscoveryResult::success(
-            url,
-            LoginUrl(s.application_passwords_authentication_url.clone()),
-        ),
+        Ok(s) => match &s.authentication {
+            DiscoveredAuthenticationMechanism::ApplicationPasswords { authentication_url } => {
+                SimplifiedDiscoveryResult::success(url, LoginUrl(Arc::clone(authentication_url)))
+            }
+            DiscoveredAuthenticationMechanism::OAuth2 { .. } => {
+                unimplemented!("OAuth2 login not yet supported in CLI")
+            }
+        },
         Err(e) => SimplifiedDiscoveryResult::failure(url, e.clone()),
     }
 }
