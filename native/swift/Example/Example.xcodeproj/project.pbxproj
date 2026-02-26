@@ -154,6 +154,7 @@
 				2479BF792B621CB60014A01D /* Sources */,
 				2479BF7A2B621CB60014A01D /* Frameworks */,
 				2479BF7B2B621CB60014A01D /* Resources */,
+				24B280DA2F466D1300623902 /* Copy WP.com Test Credentials */,
 			);
 			buildRules = (
 			);
@@ -217,6 +218,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		24B280DA2F466D1300623902 /* Copy WP.com Test Credentials */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy WP.com Test Credentials";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/wp_com_test_credentials.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "CREDENTIALS_FILE=\"${SRCROOT}/../../../wp_com_test_credentials.json\"\nif [ -f \"$CREDENTIALS_FILE\" ]; then\n    cp \"$CREDENTIALS_FILE\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/wp_com_test_credentials.json\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		2479BF792B621CB60014A01D /* Sources */ = {

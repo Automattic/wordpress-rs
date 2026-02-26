@@ -53,6 +53,12 @@ struct LoginView: View {
                         .padding(.horizontal)
                 }
             })
+
+            if loginManager.wpComOAuthConfiguration != nil {
+                Button(action: self.startLoginWithWPCom, label: {
+                    Text("Sign in with WordPress.com")
+                })
+            }
         }
     }
 
@@ -70,17 +76,52 @@ struct LoginView: View {
                 )
 
                 let loginClient = WordPressLoginClient(urlSession: .shared)
-                let details = try await loginClient.details(ofSite: url)
+                let siteDetails = try await loginClient.details(ofSite: url)
 
-                let callbackUrl = try await self.webAuthenticationSession.authenticate(
-                    using: details.loginURL(for: application),
-                    callbackURLScheme: "x-wordpress-app"
-                )
+                if let applicationPasswordUrl = siteDetails.authentication.loginURL(for: application) {
+                    let callbackUrl = try await self.webAuthenticationSession.authenticate(
+                        using: applicationPasswordUrl,
+                        callbackURLScheme: "x-wordpress-app"
+                    )
 
-                let loginDetails = try loginClient.credentials(from: callbackUrl)
-                try await loginManager.setLoginCredentials(to: loginDetails, apiRootURL: details.apiRootUrl.asURL())
+                    let loginDetails = try loginClient.credentials(from: callbackUrl)
+                    try await loginManager
+                        .setLoginCredentials(to: loginDetails, apiRootURL: siteDetails.parsedSiteUrl.asURL())
+                }
+
+                if let endpoints = siteDetails.authentication.oauthEndpoints {
+                    if let configuration = loginManager.oauthRegistry.findConfiguration(endpoints: endpoints) {
+                        guard let host = siteDetails.parsedSiteUrl.asURL().host() else {
+                            preconditionFailure("Invalid site details response")
+                        }
+
+                        try await loginManager.logInToWpCom(
+                            configuration: configuration,
+                            webAuthenticationSession: webAuthenticationSession,
+                            blogId: .slug(value: host)
+                        )
+                    }
+                }
             } catch let err {
                 handleLoginError(err)
+            }
+        }
+    }
+
+    func startLoginWithWPCom() {
+        guard let configuration = loginManager.wpComOAuthConfiguration else { return }
+
+        self.loginError = nil
+        self.isLoggingIn = true
+
+        self.loginTask = Task {
+            do {
+                try await loginManager.logInToWpCom(
+                    configuration: configuration,
+                    webAuthenticationSession: webAuthenticationSession
+                )
+            } catch {
+                handleLoginError(error)
             }
         }
     }
@@ -92,6 +133,8 @@ struct LoginView: View {
 }
 
 #Preview {
+    // swiftlint:disable force_try
     LoginView()
-        .environmentObject(LoginManager.shared)
+        .environmentObject(try! LoginManager())
+    // swiftlint:enable force_try
 }

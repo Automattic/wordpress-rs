@@ -15,7 +15,7 @@ class LoginTests {
 
     @Test("Login Spec Example 1: Valid URL")
     func testValidURL() async throws {
-        let parsedUrl = try await client.findLoginUrl(forSite: "https://vanilla.wpmt.co")
+        let parsedUrl = try await findLoginUrl(forSite: "https://vanilla.wpmt.co")
         #expect("https://vanilla.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
@@ -32,7 +32,7 @@ class LoginTests {
         let client = WordPressLoginClient(requestExecutor: stubs)
 
         await #expect(performing: {
-            _ = try await client.findLoginUrl(forSite: "http://localhost")
+            _ = try await client.details(ofSite: "http://localhost")
         }, throws: { error in
             let reason = try #require(try self.getApplicationPasswordsNotSupportedReason(from: error))
 
@@ -50,20 +50,20 @@ class LoginTests {
         ("https://vanilla.wpmt.co/wp-admin", "https://vanilla.wpmt.co/wp-admin/authorize-application.php")
     ])
     func testAdminUrlProvided(_ provided: String, _ expected: String) async throws {
-        let parsedUrl = try await client.findLoginUrl(forSite: provided)
+        let parsedUrl = try await findLoginUrl(forSite: provided)
         #expect(expected == parsedUrl.url())
     }
 
     @Test("Login Spec Example 4: HTTP URL with HTTPS Support")
     func testAutoHttpsSupport() async throws {
-        let parsedUrl = try await client.findLoginUrl(forSite: "http://vanilla.wpmt.co")
+        let parsedUrl = try await findLoginUrl(forSite: "http://vanilla.wpmt.co")
         #expect("https://vanilla.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 5: HTTP-only site")
     func testHttpOnlySite() async {
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: "http://no-https.wpmt.co")
+            _ = try await self.client.details(ofSite: "http://no-https.wpmt.co")
         }, throws: { error in
             let reason = try #require(try self.getApplicationPasswordsNotSupportedReason(from: error))
 
@@ -78,20 +78,20 @@ class LoginTests {
 
     @Test("Login Spec Example 6: HTTP-Only Site with Application Password Override")
     func testHttpOnlySiteWithApplicationPasswordsEnabled() async throws {
-        let parsedUrl = try await client.findLoginUrl(forSite: "http://no-https-with-application-passwords.wpmt.co")
+        let parsedUrl = try await findLoginUrl(forSite: "http://no-https-with-application-passwords.wpmt.co")
         #expect("http://no-https-with-application-passwords.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 7: CDN-Cached Site")
     func testAggressivelyCachedSiteWithNoLinkheader() async throws {
-        let parsedUrl = try await client.findLoginUrl(forSite: "https://aggressive-caching.wpmt.co")
+        let parsedUrl = try await findLoginUrl(forSite: "https://aggressive-caching.wpmt.co")
         #expect("https://aggressive-caching.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 8: Site with Application Passwords Disabled by WordFence")
     func testSiteWithApplicationPasswordsDisabledByWordFence() async throws {
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: "https://wordfence.wpmt.co")
+            _ = try await self.client.details(ofSite: "https://wordfence.wpmt.co")
         }, throws: { error in
             let reason = try #require(try self.getApplicationPasswordsNotSupportedReason(from: error))
 
@@ -112,7 +112,7 @@ class LoginTests {
     ])
     func testNotWordPressSite(url: String) async throws {
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: url)
+            _ = try await self.client.details(ofSite: url)
         }, throws: { error in
             try #require(error is AutoDiscoveryAttemptFailure)
 
@@ -130,26 +130,26 @@ class LoginTests {
 
     @Test("Login Spec Example 10: WordPress in a subdirectory with a link header")
     func testWordPressSubdirectoryWithLinkHeader() async throws {
-        let parsedUrl = try await client.findLoginUrl(forSite: "https://subdirectory.wpmt.co/index.php?link_header=true")
+        let parsedUrl = try await findLoginUrl(forSite: "https://subdirectory.wpmt.co/index.php?link_header=true")
         #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 11: WordPress in a subdirectory with a link tag")
     func testWordPressSubdirectoryWithLinkTag() async throws {
-        let parsedUrl = try await client.findLoginUrl(forSite: "https://subdirectory.wpmt.co/index.php?link_tag=true")
+        let parsedUrl = try await findLoginUrl(forSite: "https://subdirectory.wpmt.co/index.php?link_tag=true")
         #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 12: WordPress in a subdirectory with a redirect")
     func testWordPressSubdirectory() async throws {
-        let parsedUrl = try await client.findLoginUrl(forSite: "https://subdirectory.wpmt.co/index.php?redirect=true")
+        let parsedUrl = try await findLoginUrl(forSite: "https://subdirectory.wpmt.co/index.php?redirect=true")
         #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 13: Site uses HTTP basic with no provided credentials")
     func testWordPressHttpBasic() async throws {
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: "https://basic-auth.wpmt.co")
+            _ = try await self.client.details(ofSite: "https://basic-auth.wpmt.co")
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
@@ -174,7 +174,7 @@ class LoginTests {
             _ = try await WordPressLoginClient(
                 urlSession: .init(configuration: .ephemeral),
                 middleware: MiddlewarePipeline(middlewares: invalid)
-            ).findLoginUrl(forSite: "https://basic-auth.wpmt.co")
+            ).details(ofSite: "https://basic-auth.wpmt.co")
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
@@ -195,23 +195,24 @@ class LoginTests {
     func testWordPressHttpBasicWithValidCredentials() async throws {
         let valid = ApiDiscoveryAuthenticationMiddleware(username: "test@example.com", password: "str0ngp4ssw0rd!")
 
-        let parsedUrl = try await WordPressLoginClient(
+        let result = try await WordPressLoginClient(
             urlSession: .init(configuration: .ephemeral),
             middleware: MiddlewarePipeline(middlewares: valid)
-        ).findLoginUrl(forSite: "https://basic-auth.wpmt.co")
+        ).details(ofSite: "https://basic-auth.wpmt.co")
 
+        let parsedUrl = result.authentication.applicationPasswordsUrl!
         #expect("https://basic-auth.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 14: Custom REST API Prefix")
     func testWordPressCustomRestApiPrefix() async throws {
-        let parsedUrl = try await client.findLoginUrl(forSite: "https://custom-rest-prefix.wpmt.co")
+        let parsedUrl = try await findLoginUrl(forSite: "https://custom-rest-prefix.wpmt.co")
         #expect("https://custom-rest-prefix.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 15: Rate Limited")
     func testWordPressHeavyRateLimiting() async throws {
-        let parsedUrl = try await client.findLoginUrl(forSite: "https://aggressive-rate-limiting.wpmt.co")
+        let parsedUrl = try await findLoginUrl(forSite: "https://aggressive-rate-limiting.wpmt.co")
         #expect("https://aggressive-rate-limiting.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
@@ -224,7 +225,7 @@ class LoginTests {
         await #expect(performing: {
             let retryMiddleware = RetryAfterMiddleware(maxRetries: 3, maxRetryWaitSeconds: 1)
             let client = WordPressLoginClient(requestExecutor: stubs, middleware: MiddlewarePipeline(middlewares: [retryMiddleware]))
-            _ = try await client.findLoginUrl(forSite: "https://aggressive-rate-limiting.wpmt.co")
+            _ = try await client.details(ofSite: "https://aggressive-rate-limiting.wpmt.co")
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
@@ -240,7 +241,7 @@ class LoginTests {
     @Test("Login Spec Example 16: Non-existent website")
     func testInvalidUrl() async {
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: "https://valid-looking-url-but-not-actually.foo")
+            _ = try await self.client.details(ofSite: "https://valid-looking-url-but-not-actually.foo")
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
@@ -256,7 +257,7 @@ class LoginTests {
     @Test("Login Spec Example 17: Invalid SSL Certificate")
     func testInvalidHTTPsFails() async throws {
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
+            _ = try await self.client.details(ofSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
@@ -290,14 +291,14 @@ class LoginTests {
         let executor = WpRequestExecutor(urlSession: .init(configuration: .ephemeral))
         executor.allowSSL(altNames: ["wordpress-1315525-4803651.cloudwaysapps.com"], forCommonName: "vanilla.wpmt.co")
         let client = WordPressLoginClient(requestExecutor: executor)
-        _ = try await client.findLoginUrl(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
+        _ = try await client.details(ofSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
     }
 
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
     @Test("Login Spec Example 19: Alternative name in SSL Certificate", .enabled(if: !isLinux()))
     func testAlternameWorks() async throws {
         // "vanilla1.wpmt.co" is one of the alternative names in vanilla.wpmt.co certificate.
-        _ = try await self.client.findLoginUrl(forSite: "https://vanilla1.wpmt.co")
+        _ = try await self.client.details(ofSite: "https://vanilla1.wpmt.co")
     }
 
     @Test("Cancel API discovery process")
@@ -318,6 +319,11 @@ class LoginTests {
                 error is AutoDiscoveryAttemptFailure || error is CancellationError
             },
         )
+    }
+
+    private func findLoginUrl(forSite url: String) async throws -> ParsedUrl {
+        let result = try await client.details(ofSite: url)
+        return result.authentication.applicationPasswordsUrl!
     }
 
     private func getApplicationPasswordsNotSupportedReason(

@@ -58,28 +58,6 @@ public final class WordPressLoginClient: @unchecked Sendable {
         }
     }
 
-    /// Uses the proposed site URL to scan the website it points to and find the Application Passwords login URL
-    ///
-    public func findLoginUrl(
-        forSite proposedSiteUrl: String
-    ) async throws -> ParsedUrl {
-        // All sites should have some form of authentication we can use
-        try await details(ofSite: proposedSiteUrl).applicationPasswordsAuthenticationUrl
-    }
-
-    /// Uses the proposed site URL to scan the website it points to and find the Application Passwords login URL,
-    /// then creates a URL that can be displayed by `ASWebAuthenticationSession`.
-    ///
-    /// This method uses `findLoginUrl:` under the hood, but you should prefer this method unless you really
-    /// need access to the raw login URL.
-    ///
-    public func loginURL(
-        forSite proposedSiteUrl: String,
-        application: Application
-    ) async throws -> URL {
-        try await details(ofSite: proposedSiteUrl).loginURL(for: application)
-    }
-
     /// Convert the callback URL into a set of authentication credentials
     ///
     public func credentials(from callbackUrl: URL) throws -> WpApiApplicationPasswordDetails {
@@ -103,16 +81,31 @@ public final class WordPressLoginClient: @unchecked Sendable {
     }
 }
 
-extension AutoDiscoveryAttemptSuccess {
+extension DiscoveredAuthenticationMechanism {
 
-    public func loginURL(for application: Application) -> URL {
-        createApplicationPasswordAuthenticationUrl(
-            loginUrl: applicationPasswordsAuthenticationUrl,
-            appName: application.name,
-            appId: application.id,
-            successUrl: application.successCallbackUrl,
-            rejectUrl: application.failureCallbackUrl
-        ).asURL()
+    public func loginURL(for application: Application) -> URL? {
+        switch self {
+        case .applicationPasswords(let authenticationUrl):
+            createApplicationPasswordAuthenticationUrl(
+                loginUrl: authenticationUrl,
+                appName: application.name,
+                appId: application.id,
+                successUrl: application.successCallbackUrl,
+                rejectUrl: application.failureCallbackUrl
+            ).asURL()
+        default: nil
+        }
+    }
+
+    public var applicationPasswordsUrl: ParsedUrl? {
+        WordPressAPIInternal.applicationPasswordsUrl(authentication: self)
+    }
+
+    public var oauthEndpoints: OAuth2Endpoints? {
+        switch self {
+        case .oAuth2(endpoints: let endpoints): endpoints
+        default: nil
+        }
     }
 }
 
