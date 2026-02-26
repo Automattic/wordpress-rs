@@ -40,7 +40,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:host="oauth2-callback"
+                    android:host="wpcom-authorized"
                     android:scheme="wordpressrsexample" >
                 </data>
             </intent-filter>

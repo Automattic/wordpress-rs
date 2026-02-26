@@ -23,6 +23,7 @@ import uniffi.wp_api.ParseUrlException
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestExecutionException
 import kotlin.test.assertContains
+import kotlin.test.assertNotNull
 
 @Execution(ExecutionMode.CONCURRENT)
 class ApiUrlDiscoveryTest {
@@ -33,7 +34,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "http://localhost/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("http://localhost")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -42,7 +43,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("https://vanilla.wpmt.co")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -80,13 +81,13 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("https://vanilla.wpmt.co/wp-login.php")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
 
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("https://vanilla.wpmt.co/wp-admin")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -95,7 +96,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("http://vanilla.wpmt.co")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -111,7 +112,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "http://no-https-with-application-passwords.wpmt.co/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("http://no-https-with-application-passwords.wpmt.co")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -120,7 +121,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://aggressive-caching.wpmt.co/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("https://aggressive-caching.wpmt.co")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -149,7 +150,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("https://subdirectory.wpmt.co/index.php?link_header=true")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -158,7 +159,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("https://subdirectory.wpmt.co?link_tag=true")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -167,7 +168,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("https://subdirectory.wpmt.co/index.php?redirect=true")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -211,7 +212,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://basic-auth.wpmt.co/wp-admin/authorize-application.php",
             client.apiDiscovery("https://basic-auth.wpmt.co")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -220,7 +221,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://custom-rest-prefix.wpmt.co/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("https://custom-rest-prefix.wpmt.co")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -229,7 +230,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://aggressive-rate-limiting.wpmt.co/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("https://aggressive-rate-limiting.wpmt.co")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -294,7 +295,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
             WpLoginClient(requestExecutor = executor).apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 
@@ -314,7 +315,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
             loginClient.apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
 
         // Other valid SSL sites should still work via fallback to default hostname verification.
@@ -330,7 +331,7 @@ class ApiUrlDiscoveryTest {
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
             WpLoginClient(requestExecutor = executor).apiDiscovery("https://vanilla.wpmt.co")
-                .assertSuccess().applicationPasswordsAuthenticationUrl()
+                .assertSuccess().assertApplicationPasswordsUrl()
         )
     }
 }
@@ -340,8 +341,12 @@ private fun ApiDiscoveryResult.assertSuccess(): AutoDiscoveryAttemptSuccess {
     return (this as ApiDiscoveryResult.Success).success
 }
 
-private fun AutoDiscoveryAttemptSuccess.applicationPasswordsAuthenticationUrl(): String {
-    return applicationPasswordsUrl(this.authentication)!!.url()
+private fun AutoDiscoveryAttemptSuccess.assertApplicationPasswordsUrl(): String {
+    val parsedUrl = assertNotNull(
+        uniffi.wp_api.applicationPasswordsUrl(this.authentication),
+        "Expected application passwords authentication"
+    )
+    return parsedUrl.url()
 }
 
 private fun ApiDiscoveryResult.assertFailureParseSiteUrl(): ParseUrlException {

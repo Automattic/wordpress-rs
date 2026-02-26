@@ -1,45 +1,59 @@
 package rs.wordpress.example.shared.ui.users
 
-import kotlinx.coroutines.runBlocking
-import rs.wordpress.api.kotlin.NetworkAvailabilityProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
-import rs.wordpress.example.shared.domain.AuthenticatedSite
-import rs.wordpress.example.shared.repository.AuthenticationRepository
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.UserWithEditContext
 import uniffi.wp_api.WpAuthenticationProvider
+import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import uniffi.wp_mobile.Account
+import java.net.URI
 
-class UserListViewModel(
-    private val authRepository: AuthenticationRepository,
-    private val networkAvailabilityProvider: NetworkAvailabilityProvider
-) {
+class UserListViewModel {
+    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var apiClient: WpApiClient? = null
 
-    fun setAuthenticatedSite(authenticatedSite: AuthenticatedSite) {
+    private val _users = MutableStateFlow<List<UserWithEditContext>>(emptyList())
+    val users: StateFlow<List<UserWithEditContext>> = _users.asStateFlow()
+
+    fun setAccount(account: Account) {
         apiClient = null
-        authRepository.authenticationForSite(authenticatedSite)?.let {
-            apiClient = WpApiClient(
-                wpOrgSiteApiRootUrl = authenticatedSite.apiRootUrl,
-                authProvider = WpAuthenticationProvider.staticWithAuth(it),
-                interceptors = emptyList(),
-                networkAvailabilityProvider = networkAvailabilityProvider
-            )
+        _users.value = emptyList()
+        when (account) {
+            is Account.SelfHostedSite -> {
+                apiClient = WpApiClient(
+                    wpOrgSiteApiRootUrl = URI(account.siteApiRoot).toURL(),
+                    authProvider = WpAuthenticationProvider.staticWithAuth(
+                        wpAuthenticationFromUsernameAndPassword(account.username, account.password)
+                    ),
+                    interceptors = emptyList()
+                )
+                loadUsers()
+            }
+            is Account.WpCom -> {
+                // WP.com accounts not yet supported in this view model
+            }
         }
     }
 
-    fun fetchUsers(): List<UserWithEditContext> {
-        apiClient?.let { apiClient ->
-            val usersResult = runBlocking {
-                apiClient.request { requestBuilder ->
+    private fun loadUsers() {
+        viewModelScope.launch(Dispatchers.IO) {
+            apiClient?.let { client ->
+                val usersResult = client.request { requestBuilder ->
                     requestBuilder.users().listWithEditContext(params = UserListParams())
                 }
-            }
-            return when (usersResult) {
-                is WpRequestResult.Success -> usersResult.response.data
-                else -> listOf()
+                when (usersResult) {
+                    is WpRequestResult.Success -> _users.value = usersResult.response.data
+                    else -> _users.value = emptyList()
+                }
             }
         }
-        return listOf()
     }
 }
