@@ -194,6 +194,78 @@ lane :publish_to_s3 do
   )
 end
 
+lane :publish_pr_xcframework do |options|
+  pr_number = options[:pr_number] || UI.user_error!('pr_number is required')
+  branch_name = "pr-build/#{pr_number}"
+  publish_xcframework_snapshot(
+    version: "pr-builds/#{pr_number}",
+    branch_name: branch_name
+  )
+  update_pr_xcframework_comment(pr_number: pr_number, branch_name: branch_name)
+end
+
+lane :publish_trunk_xcframework do |options|
+  commit_sha = options[:commit_sha] || UI.user_error!('commit_sha is required')
+  publish_xcframework_snapshot(
+    version: "trunk-builds/#{commit_sha}",
+    branch_name: 'trunk-build'
+  )
+end
+
+lane :publish_xcframework_snapshot do |options|
+  version = options[:version] || UI.user_error!('version is required')
+  branch_name = options[:branch_name] || UI.user_error!('branch_name is required')
+
+  # Upload xcframework and checksum to S3
+  upload_to_s3(
+    bucket: 'a8c-apps-public-artifacts',
+    key: File.join('wordpress-rs', version, File.basename(xcframework_file_path)),
+    file: xcframework_file_path,
+    auto_prefix: false,
+    if_exists: :replace
+  )
+
+  upload_to_s3(
+    bucket: 'a8c-apps-public-artifacts',
+    key: File.join('wordpress-rs', version, File.basename(xcframework_checksum_file_path)),
+    file: xcframework_checksum_file_path,
+    auto_prefix: false,
+    if_exists: :replace
+  )
+
+  # Update Package.swift to point to the S3 build
+  file_path = File.expand_path('./Package.swift', PROJECT_ROOT)
+  lines = File.readlines(file_path).map do |line|
+    if line.start_with?('let libwordpressFFIVersion: WordPressRSVersion =')
+      "let libwordpressFFIVersion: WordPressRSVersion = .release(version: \"#{version}\", checksum: \"#{xcframework_checksum}\")"
+    else
+      line
+    end
+  end
+  File.open(file_path, 'w') { |file| file.puts lines }
+
+  # Create snapshot branch and commit changes
+  sh "git checkout -B #{branch_name}"
+
+  git_commit(
+    path: file_path,
+    message: "Update Package.swift for #{version}"
+  )
+
+  git_add(path: xcframework_bindings_file_path, force: true)
+  git_commit(
+    path: xcframework_bindings_file_path,
+    message: "Update Swift bindings for #{version}",
+    allow_nothing_to_commit: true
+  )
+
+  sh "git push -f origin #{branch_name}"
+
+  UI.success("Published snapshot build to branch '#{branch_name}'")
+  UI.success("To use this build, add to your Package.swift:")
+  UI.success("  .package(url: \"https://github.com/#{GITHUB_REPO}\", branch: \"#{branch_name}\")")
+end
+
 # Converts the English Fluent localization file to PO format for translation
 #
 # The resulting PO file is saved as the source file (.pot) for translations and is synced to GlotPress.
@@ -432,6 +504,62 @@ lane :set_up_signing_release do |readonly: true|
 end
 
 # Utils
+
+XCFRAMEWORK_COMMENT_MARKER = '<!-- wordpress-rs-xcframework-build -->'
+
+def update_pr_xcframework_comment(pr_number:, branch_name:)
+  github_token = ENV['GITHUB_TOKEN']
+  unless github_token
+    UI.important('GITHUB_TOKEN not set, skipping PR comment')
+    return
+  end
+
+  commit_sha = ENV['BUILDKITE_COMMIT'] || 'unknown'
+  short_sha = commit_sha[0, 8]
+
+  comment_body = <<~MARKDOWN
+    #{XCFRAMEWORK_COMMENT_MARKER}
+    ## XCFramework Build
+
+    This PR's XCFramework is available for testing. Add to your `Package.swift`:
+
+    ```swift
+    .package(url: "https://github.com/#{GITHUB_REPO}", branch: "#{branch_name}")
+    ```
+
+    <sub>Built from #{short_sha}</sub>
+  MARKDOWN
+
+  # Find existing comment with our marker
+  result = github_api(
+    server_url: 'https://api.github.com',
+    api_token: github_token,
+    http_method: 'GET',
+    path: "/repos/#{GITHUB_REPO}/issues/#{pr_number}/comments?per_page=100"
+  )
+
+  existing_comment = result[:json]&.find { |c| c['body']&.include?(XCFRAMEWORK_COMMENT_MARKER) }
+
+  if existing_comment
+    github_api(
+      server_url: 'https://api.github.com',
+      api_token: github_token,
+      http_method: 'PATCH',
+      path: "/repos/#{GITHUB_REPO}/issues/comments/#{existing_comment['id']}",
+      body: { body: comment_body }
+    )
+    UI.success("Updated XCFramework build comment on PR ##{pr_number}")
+  else
+    github_api(
+      server_url: 'https://api.github.com',
+      api_token: github_token,
+      http_method: 'POST',
+      path: "/repos/#{GITHUB_REPO}/issues/#{pr_number}/comments",
+      body: { body: comment_body }
+    )
+    UI.success("Created XCFramework build comment on PR ##{pr_number}")
+  end
+end
 
 def xcframework_checksum
   File.read(xcframework_checksum_file_path).strip!
