@@ -86,6 +86,13 @@ steps:
         plugins: [$CI_TOOLKIT]
         agents:
           queue: mac
+      - label: ":swift: :package: Publish PR XCFramework"
+        command: .buildkite/publish-pr-xcframework.sh
+        depends_on: xcframework
+        plugins: [$CI_TOOLKIT]
+        agents:
+          queue: mac
+        if: build.pull_request.id != null
       - label: ":swift: Build Docs"
         command: |
           .buildkite/download-xcframework.sh

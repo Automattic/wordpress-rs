@@ -194,6 +194,57 @@ lane :publish_to_s3 do
   )
 end
 
+lane :publish_pr_xcframework do |options|
+  pr_number = options[:pr_number] || UI.user_error!('pr_number is required')
+  version = "pr-builds/#{pr_number}"
+
+  # Upload xcframework and checksum to S3
+  upload_to_s3(
+    bucket: 'a8c-apps-public-artifacts',
+    key: File.join('wordpress-rs', version, File.basename(xcframework_file_path)),
+    file: xcframework_file_path,
+    auto_prefix: false,
+    if_exists: :replace
+  )
+
+  upload_to_s3(
+    bucket: 'a8c-apps-public-artifacts',
+    key: File.join('wordpress-rs', version, File.basename(xcframework_checksum_file_path)),
+    file: xcframework_checksum_file_path,
+    auto_prefix: false,
+    if_exists: :replace
+  )
+
+  # Update Package.swift to point to the S3 build
+  file_path = File.expand_path('./Package.swift', PROJECT_ROOT)
+  lines = File.readlines(file_path).map do |line|
+    if line.start_with?('let libwordpressFFIVersion: WordPressRSVersion =')
+      "let libwordpressFFIVersion: WordPressRSVersion = .release(version: \"#{version}\", checksum: \"#{xcframework_checksum}\")"
+    else
+      line
+    end
+  end
+  File.open(file_path, 'w') { |file| file.puts lines }
+
+  # Create pr-build branch and commit changes
+  branch_name = "pr-build/#{pr_number}"
+  sh "git checkout -B #{branch_name}"
+
+  git_commit(
+    path: file_path,
+    message: "Update Package.swift for PR ##{pr_number} build"
+  )
+
+  git_add(path: xcframework_bindings_file_path, force: true)
+  git_commit(
+    path: xcframework_bindings_file_path,
+    message: "Update Swift bindings for PR ##{pr_number} build",
+    allow_nothing_to_commit: true
+  )
+
+  sh "git push -f origin #{branch_name}"
+end
+
 # Converts the English Fluent localization file to PO format for translation
 #
 # The resulting PO file is saved as the source file (.pot) for translations and is synced to GlotPress.
