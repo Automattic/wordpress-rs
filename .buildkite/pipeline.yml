@@ -66,10 +66,10 @@ steps:
           - "target/*/release/swift-bindings/**"
           - "native/swift/Sources/wordpress-api-wrapper/*.swift"
         matrix:
-          - "macos"
-          - "ios"
-          - "tvos"
-          - "watchos"
+          - "macOS"
+          - "iOS"
+          - "tvOS"
+          - "watchOS"
         plugins: [$CI_TOOLKIT]
         agents:
           queue: mac

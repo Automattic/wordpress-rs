@@ -114,10 +114,10 @@ build-apple-platform-tvos := $(addprefix _build-apple-,$(apple-platform-targets-
 build-apple-platform-watchos := $(addprefix _build-apple-,$(apple-platform-targets-watchos))
 
 # Build all targets for a specific platform (without creating xcframework).
-build-apple-macos: $(build-apple-platform-macos)
-build-apple-ios: $(build-apple-platform-ios)
-build-apple-tvos: $(build-apple-platform-tvos)
-build-apple-watchos: $(build-apple-platform-watchos)
+build-apple-macOS: $(build-apple-platform-macos)
+build-apple-iOS: $(build-apple-platform-ios)
+build-apple-tvOS: $(build-apple-platform-tvos)
+build-apple-watchOS: $(build-apple-platform-watchos)
 
 # Creating xcframework for one single platform, including real device and simulator.
 xcframework-only-macos: $(build-apple-platform-macos)
@@ -283,15 +283,15 @@ setup-rust-toolchain:
 		aarch64-apple-ios-sim
 
 # Platform-specific Rust setup (only installs what each platform needs in CI)
-setup-rust-macos:
+setup-rust-macOS:
 	rustup toolchain install stable
 	rustup target add --toolchain stable x86_64-apple-darwin aarch64-apple-darwin
 
-setup-rust-ios:
+setup-rust-iOS:
 	rustup toolchain install stable
 	rustup target add --toolchain stable aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
 
-setup-rust-tvos setup-rust-watchos:
+setup-rust-tvOS setup-rust-watchOS:
 	rustup toolchain install stable
 	rustup toolchain install $(rust_nightly_toolchain)
 	rustup component add rust-src --toolchain $(rust_nightly_toolchain)
