@@ -29,7 +29,15 @@ final class HTTPStubs: SafeRequestExecutor {
         _ request: WpNetworkRequest
     ) async -> Result<WpNetworkResponse, RequestExecutionError> {
         if let response = stub(for: request) {
-            return .success(response)
+            // Propagate request headers to the response so auth detection works correctly
+            let responseWithRequestHeaders = WpNetworkResponse(
+                body: response.body,
+                statusCode: response.statusCode,
+                responseHeaderMap: response.responseHeaderMap,
+                requestUrl: request.url(),
+                requestHeaderMap: request.headerMap()
+            )
+            return .success(responseWithRequestHeaders)
         }
 
         switch missingStub {
@@ -124,6 +132,24 @@ extension WpNetworkResponse {
         )
     }
 
+    static func loginMockResponse(named name: String) throws -> WpNetworkResponse {
+
+        guard let resourceUrl = Bundle
+            .module
+            .url(forResource: name, withExtension: "json", subdirectory: "login-mocks")
+        else {
+            preconditionFailure("Could not find \(name).json in login-mocks")
+        }
+
+        return WpNetworkResponse(
+            body: try Data(contentsOf: resourceUrl),
+            statusCode: 200,
+            responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "application/json"]),
+            requestUrl: "https://example.com",
+            requestHeaderMap: .empty
+        )
+    }
+
     static func retryResponse(after: TimeInterval) throws -> WpNetworkResponse {
         return WpNetworkResponse(
             body: Data(),
@@ -145,4 +171,32 @@ extension WpNetworkResponse {
             requestHeaderMap: .empty
         )
     }
+
+    static func htmlResponse(named name: String) throws -> WpNetworkResponse {
+        guard let resourceUrl = Bundle
+            .module
+            .url(forResource: name, withExtension: "html", subdirectory: "login-mocks")
+        else {
+            preconditionFailure("Could not find \(name).html")
+        }
+
+        return WpNetworkResponse(
+            body: try Data(contentsOf: resourceUrl),
+            statusCode: 200,
+            responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "text/html; charset=UTF-8"]),
+            requestUrl: "https://example.com",
+            requestHeaderMap: .empty
+        )
+    }
+
+    static func responseWithStatus(_ statusCode: UInt16, headers: [String: String] = [:]) throws -> WpNetworkResponse {
+        return WpNetworkResponse(
+            body: Data(),
+            statusCode: statusCode,
+            responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: headers),
+            requestUrl: "https://example.com",
+            requestHeaderMap: .empty
+        )
+    }
+
 }

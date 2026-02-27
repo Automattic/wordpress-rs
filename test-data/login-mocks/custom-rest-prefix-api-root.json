@@ -1,0 +1,24 @@
+{
+  "name": "Custom REST Prefix Site",
+  "description": "",
+  "url": "https://custom-rest-prefix.wpmt.co",
+  "home": "https://custom-rest-prefix.wpmt.co",
+  "gmt_offset": 0,
+  "timezone_string": "UTC",
+  "namespaces": [
+    "oembed/1.0",
+    "wp/v2",
+    "wp-site-health/v1"
+  ],
+  "authentication": {
+    "application-passwords": {
+      "endpoints": {
+        "authorization": "https://custom-rest-prefix.wpmt.co/wp-admin/authorize-application.php"
+      }
+    }
+  },
+  "routes": {},
+  "site_logo": 0,
+  "site_icon": 0,
+  "site_icon_url": ""
+}

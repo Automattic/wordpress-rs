@@ -108,6 +108,18 @@ fun setupJniAndBindings() {
         from("$cargoProjectRoot/test-data/integration-test-responses/localhost-json-root.json")
         into(generatedTestResourcesPath)
     }
+
+    tasks.register<Copy>("copyTestResponses") {
+        dependsOn(tasks.named("deleteGeneratedTestResources"))
+        from("$cargoProjectRoot/test-data/integration-test-responses/")
+        into(generatedTestResourcesPath)
+    }
+
+    tasks.register<Copy>("copyLoginMocks") {
+        dependsOn(tasks.named("deleteGeneratedTestResources"))
+        from("$cargoProjectRoot/test-data/login-mocks/")
+        into("$generatedTestResourcesPath/login-mocks")
+    }
 }
 
 fun resolveBinary(name: String): String {

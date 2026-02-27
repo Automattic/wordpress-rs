@@ -77,7 +77,10 @@ var package = Package(
                 .target(name: libwordpressFFI.name)
             ],
             path: "native/swift/Tests/wordpress-api",
-            resources: [.copy("../../../../test-data/integration-test-responses/")],
+            resources: [
+                .copy("../../../../test-data/integration-test-responses/"),
+                .copy("../../../../test-data/login-mocks/"),
+            ],
             swiftSettings: [
                 .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
             ]

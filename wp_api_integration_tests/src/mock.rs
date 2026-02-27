@@ -68,6 +68,14 @@ pub mod response_helpers {
         json_response_from_path(&json_file_path)
     }
 
+    pub fn json_response_from_login_mocks(file_name: &str) -> WpNetworkResponse {
+        let mut json_file_path = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
+        json_file_path.push("test-data");
+        json_file_path.push("login-mocks");
+        json_file_path.push(file_name);
+        json_response_from_path(&json_file_path)
+    }
+
     pub fn json_response_from_path(json_file_path: &PathBuf) -> WpNetworkResponse {
         let json = fs::read_to_string(json_file_path).unwrap_or_else(|_| {
             panic!("Should have been able to read the json file at: '{json_file_path:#?}'")
@@ -107,6 +115,41 @@ pub mod response_helpers {
             body: vec![],
             status_code,
             response_header_map: WpNetworkHeaderMap::default().into(),
+            request_url: WpEndpointUrl("".to_string()),
+            request_header_map: WpNetworkHeaderMap::default().into(),
+        }
+    }
+
+    pub fn html_response_from_login_mocks(file_name: &str) -> WpNetworkResponse {
+        let mut file_path = std::path::PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
+        file_path.push("test-data");
+        file_path.push("login-mocks");
+        file_path.push(file_name);
+        let html = fs::read_to_string(&file_path).unwrap_or_else(|_| {
+            panic!("Should have been able to read the file at: '{file_path:#?}'")
+        });
+        let mut map = HeaderMap::new();
+        map.insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("text/html; charset=UTF-8"),
+        );
+        WpNetworkResponse {
+            body: html.as_bytes().to_vec(),
+            status_code: 200,
+            response_header_map: Arc::new(map.into()),
+            request_url: WpEndpointUrl("".to_string()),
+            request_header_map: WpNetworkHeaderMap::default().into(),
+        }
+    }
+
+    pub fn response_with_status_and_headers(
+        status_code: u16,
+        headers: HeaderMap,
+    ) -> WpNetworkResponse {
+        WpNetworkResponse {
+            body: vec![],
+            status_code,
+            response_header_map: Arc::new(headers.into()),
             request_url: WpEndpointUrl("".to_string()),
             request_header_map: WpNetworkHeaderMap::default().into(),
         }

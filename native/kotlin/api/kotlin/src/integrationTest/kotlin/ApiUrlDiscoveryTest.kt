@@ -38,9 +38,23 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 1
     fun testValidSiteWorksCorrectly() = runTest {
+        val executor = MockRequestExecutor(
+            listOf(
+                Stub.forUrl(
+                    "https://vanilla.wpmt.co/",
+                    WpNetworkResponse.withApiRoot("https://vanilla.wpmt.co/wp-json/")
+                ),
+                Stub.forUrl(
+                    "https://vanilla.wpmt.co/wp-json/",
+                    WpNetworkResponse.jsonResponse("/login-mocks/vanilla-api-root.json")
+                ),
+            )
+        )
+
+        val client = WpLoginClient(executor)
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("https://vanilla.wpmt.co")
+            client.apiDiscovery("https://vanilla.wpmt.co")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
     }
@@ -76,49 +90,135 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 3
     fun testAdminUrlProvided() = runTest {
+        // AutoStrippedHttps strips admin paths and creates an attempt for https://vanilla.wpmt.co
+        // The UserInput attempts will fail (no stubs for wp-login.php / wp-admin URLs)
+        // and the AutoStrippedHttps attempt will succeed.
+        val executor = MockRequestExecutor(
+            stubs = listOf(
+                Stub.forUrl(
+                    "https://vanilla.wpmt.co/",
+                    WpNetworkResponse.withApiRoot("https://vanilla.wpmt.co/wp-json/")
+                ),
+                Stub.forUrl(
+                    "https://vanilla.wpmt.co/wp-json/",
+                    WpNetworkResponse.jsonResponse("/login-mocks/vanilla-api-root.json")
+                ),
+            ),
+            missingStubResponse = WpNetworkResponse.empty
+        )
+
+        val client = WpLoginClient(executor)
+
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("https://vanilla.wpmt.co/wp-login.php")
+            client.apiDiscovery("https://vanilla.wpmt.co/wp-login.php")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
 
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("https://vanilla.wpmt.co/wp-admin")
+            client.apiDiscovery("https://vanilla.wpmt.co/wp-admin")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
     }
 
     @Test // Spec Example 4
     fun testAutoHttpsSupport() = runTest {
+        // Input is http://, AutoStrippedHttps creates https:// attempt which succeeds.
+        // The http:// UserInput attempt will fail (no stubs for http://).
+        val executor = MockRequestExecutor(
+            stubs = listOf(
+                Stub.forUrl(
+                    "https://vanilla.wpmt.co/",
+                    WpNetworkResponse.withApiRoot("https://vanilla.wpmt.co/wp-json/")
+                ),
+                Stub.forUrl(
+                    "https://vanilla.wpmt.co/wp-json/",
+                    WpNetworkResponse.jsonResponse("/login-mocks/vanilla-api-root.json")
+                ),
+            ),
+            missingStubResponse = WpNetworkResponse.empty
+        )
+
+        val client = WpLoginClient(executor)
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("http://vanilla.wpmt.co")
+            client.apiDiscovery("http://vanilla.wpmt.co")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
     }
 
     @Test // Spec Example 5
     fun testHttpOnlySite() = runTest {
-        val reason = loginClient.apiDiscovery("http://no-https.wpmt.co").assertFailureFetchAndParseApiRoot()
+        // HTTP site with no application passwords auth URL.
+        // The https:// AutoStrippedHttps attempt fails (no stubs).
+        // The http:// UserInput attempt succeeds in finding the API root,
+        // but the site has no auth URL and uses HTTP -> ApplicationPasswordsDisabledForHttpSite.
+        val executor = MockRequestExecutor(
+            stubs = listOf(
+                Stub.forUrl(
+                    "http://no-https.wpmt.co/",
+                    WpNetworkResponse.withApiRoot("http://no-https.wpmt.co/wp-json/")
+                ),
+                Stub.forUrl(
+                    "http://no-https.wpmt.co/wp-json/",
+                    WpNetworkResponse.jsonResponse("/login-mocks/http-only-api-root.json")
+                ),
+            ),
+            missingStubResponse = WpNetworkResponse.empty
+        )
+
+        val client = WpLoginClient(executor)
+        val reason = client.apiDiscovery("http://no-https.wpmt.co").assertFailureFetchAndParseApiRoot()
             .getApplicationPasswordsNotSupportedReason()
         assertInstanceOf(ApplicationPasswordsDisabledForHttpSite::class.java, reason)
     }
 
     @Test // Spec Example 6
     fun testHttpOnlySiteWithApplicationPasswordsEnabled() = runTest {
+        // HTTP site that has application passwords enabled despite being HTTP.
+        val executor = MockRequestExecutor(
+            stubs = listOf(
+                Stub.forUrl(
+                    "http://no-https-with-application-passwords.wpmt.co/",
+                    WpNetworkResponse.withApiRoot("http://no-https-with-application-passwords.wpmt.co/wp-json/")
+                ),
+                Stub.forUrl(
+                    "http://no-https-with-application-passwords.wpmt.co/wp-json/",
+                    WpNetworkResponse.jsonResponse("/login-mocks/http-only-with-app-passwords-api-root.json")
+                ),
+            ),
+            missingStubResponse = WpNetworkResponse.empty
+        )
+
+        val client = WpLoginClient(executor)
         assertEquals(
             "http://no-https-with-application-passwords.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("http://no-https-with-application-passwords.wpmt.co")
+            client.apiDiscovery("http://no-https-with-application-passwords.wpmt.co")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
     }
 
     @Test // Spec Example 7
     fun testAggressivelyCachedSiteWithNoLinkHeader() = runTest {
+        // Homepage has no Link header but HTML body contains a <link> tag with the API root.
+        val executor = MockRequestExecutor(
+            listOf(
+                Stub.forUrl(
+                    "https://aggressive-caching.wpmt.co/",
+                    WpNetworkResponse.htmlResponse("/login-mocks/homepage-with-link-tag.html")
+                ),
+                Stub.forUrl(
+                    "https://aggressive-caching.wpmt.co/wp-json/",
+                    WpNetworkResponse.jsonResponse("/login-mocks/aggressive-caching-api-root.json")
+                ),
+            )
+        )
+
+        val client = WpLoginClient(executor)
         assertEquals(
             "https://aggressive-caching.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("https://aggressive-caching.wpmt.co")
+            client.apiDiscovery("https://aggressive-caching.wpmt.co")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
     }
@@ -139,41 +239,117 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 9
     fun testNotWordPressSite() = runTest {
-        val reason = loginClient.apiDiscovery("https://google.com").assertFailureFindApiRoot()
+        // Homepage returns non-WordPress HTML. No Link header, no <link> tag.
+        // Fallback to /wp-json/ gets empty response -> ProbablyNotAWordPressSite.
+        val executor = MockRequestExecutor(
+            stubs = listOf(
+                Stub.forUrl(
+                    "https://google.com/",
+                    WpNetworkResponse.htmlResponse("/login-mocks/homepage-not-wordpress.html")
+                ),
+            ),
+            missingStubResponse = WpNetworkResponse.empty
+        )
+
+        val client = WpLoginClient(executor)
+        val reason = client.apiDiscovery("https://google.com").assertFailureFindApiRoot()
         assertInstanceOf(FindApiRootFailure.ProbablyNotAWordPressSite::class.java, reason)
     }
 
     @Test // Spec Example 10
     fun testWordPressSubdirectoryWithLinkHeader() = runTest {
+        // Homepage URL includes query params; the Link header points to the subdirectory wp-json.
+        val executor = MockRequestExecutor(
+            listOf(
+                Stub.forUrl(
+                    "https://subdirectory.wpmt.co/index.php?link_header=true",
+                    WpNetworkResponse.withApiRoot("https://subdirectory.wpmt.co/wordpress/wp-json/")
+                ),
+                Stub.forUrl(
+                    "https://subdirectory.wpmt.co/wordpress/wp-json/",
+                    WpNetworkResponse.jsonResponse("/login-mocks/subdirectory-api-root.json")
+                ),
+            )
+        )
+
+        val client = WpLoginClient(executor)
         assertEquals(
             "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("https://subdirectory.wpmt.co/index.php?link_header=true")
+            client.apiDiscovery("https://subdirectory.wpmt.co/index.php?link_header=true")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
     }
 
     @Test // Spec Example 11
     fun testWordPressSubdirectoryWithLinkTag() = runTest {
+        // Homepage has no Link header but HTML body has a <link> tag pointing to subdirectory wp-json.
+        // Note: Url::parse adds a trailing slash, so "https://subdirectory.wpmt.co?link_tag=true"
+        // becomes "https://subdirectory.wpmt.co/?link_tag=true".
+        val executor = MockRequestExecutor(
+            listOf(
+                Stub.forUrl(
+                    "https://subdirectory.wpmt.co/?link_tag=true",
+                    WpNetworkResponse.htmlResponse("/login-mocks/homepage-with-subdirectory-link-tag.html")
+                ),
+                Stub.forUrl(
+                    "https://subdirectory.wpmt.co/wordpress/wp-json/",
+                    WpNetworkResponse.jsonResponse("/login-mocks/subdirectory-api-root.json")
+                ),
+            )
+        )
+
+        val client = WpLoginClient(executor)
         assertEquals(
             "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("https://subdirectory.wpmt.co?link_tag=true")
+            client.apiDiscovery("https://subdirectory.wpmt.co?link_tag=true")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
     }
 
     @Test // Spec Example 12
     fun testWordPressSubdirectoryWithRedirect() = runTest {
+        // In real life, this URL redirects to the WordPress subdirectory homepage.
+        // The mock simulates the final response after redirect: homepage with Link header.
+        val executor = MockRequestExecutor(
+            listOf(
+                Stub.forUrl(
+                    "https://subdirectory.wpmt.co/index.php?redirect=true",
+                    WpNetworkResponse.withApiRoot("https://subdirectory.wpmt.co/wordpress/wp-json/")
+                ),
+                Stub.forUrl(
+                    "https://subdirectory.wpmt.co/wordpress/wp-json/",
+                    WpNetworkResponse.jsonResponse("/login-mocks/subdirectory-api-root.json")
+                ),
+            )
+        )
+
+        val client = WpLoginClient(executor)
         assertEquals(
             "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("https://subdirectory.wpmt.co/index.php?redirect=true")
+            client.apiDiscovery("https://subdirectory.wpmt.co/index.php?redirect=true")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
     }
 
     @Test // Spec Example 13 (with no credentials)
     fun testWordPressHttpBasicWithMissingCredentials() = runTest {
+        // Homepage returns 401 with WWW-Authenticate header.
+        // No auth credentials provided -> HttpAuthenticationRequiredError.
+        val executor = MockRequestExecutor(
+            stubs = listOf(
+                Stub.forHost(
+                    "basic-auth.wpmt.co",
+                    WpNetworkResponse.responseWithStatus(
+                        401u,
+                        mapOf("WWW-Authenticate" to "Basic realm=\"Restricted\"")
+                    )
+                ),
+            ),
+        )
+
+        val client = WpLoginClient(executor)
         val reason =
-            loginClient.apiDiscovery("https://basic-auth.wpmt.co").assertFailureFindApiRoot()
+            client.apiDiscovery("https://basic-auth.wpmt.co").assertFailureFindApiRoot()
                 .getRequestExecutionErrorReason()
         assertInstanceOf(
             RequestExecutionErrorReason.HttpAuthenticationRequiredError::class.java,
@@ -183,10 +359,25 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 13 (with invalid credentials)
     fun testWordPressHttpBasicWithInvalidCredentials() = runTest {
+        // Homepage returns 401 with WWW-Authenticate header.
+        // The ApiDiscoveryAuthenticationMiddleware adds auth and retries, but still gets 401.
+        // With auth in request headers -> HttpAuthenticationRejectedError.
+        val executor = MockRequestExecutor(
+            listOf(
+                Stub.forHost(
+                    "basic-auth.wpmt.co",
+                    WpNetworkResponse.responseWithStatus(
+                        401u,
+                        mapOf("WWW-Authenticate" to "Basic realm=\"Restricted\"")
+                    )
+                ),
+            )
+        )
+
         val invalid =
             ApiDiscoveryAuthenticationMiddleware(username = "invalid", password = "invalid")
         val client = WpLoginClient(
-            WpRequestExecutor(emptyList()), WpApiMiddlewarePipeline(middlewares = listOf(invalid))
+            executor, WpApiMiddlewarePipeline(middlewares = listOf(invalid))
         )
         val reason = client.apiDiscovery("https://basic-auth.wpmt.co")
             .assertFailureFindApiRoot().getRequestExecutionErrorReason()
@@ -198,13 +389,43 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 13 (with valid credentials)
     fun testWordPressHttpBasicWithValidCredentials() = runTest {
+        // Homepage returns 401 without auth, but succeeds with valid auth.
+        // The middleware retries with credentials; the authenticated request succeeds.
+        val executor = MockRequestExecutor(
+            listOf(
+                // Authenticated requests succeed (more specific stub first)
+                Stub(
+                    evaluator = { request ->
+                        request.url() == "https://basic-auth.wpmt.co/" &&
+                            request.headerMap().toMap().containsKey("authorization")
+                    },
+                    response = WpNetworkResponse.withApiRoot("https://basic-auth.wpmt.co/wp-json/")
+                ),
+                Stub(
+                    evaluator = { request ->
+                        request.url() == "https://basic-auth.wpmt.co/wp-json/" &&
+                            request.headerMap().toMap().containsKey("authorization")
+                    },
+                    response = WpNetworkResponse.jsonResponse("/login-mocks/basic-auth-api-root.json")
+                ),
+                // Unauthenticated requests return 401
+                Stub.forHost(
+                    "basic-auth.wpmt.co",
+                    WpNetworkResponse.responseWithStatus(
+                        401u,
+                        mapOf("WWW-Authenticate" to "Basic realm=\"Restricted\"")
+                    )
+                ),
+            )
+        )
+
         val valid = ApiDiscoveryAuthenticationMiddleware(
             username = "test@example.com",
             password = "str0ngp4ssw0rd!"
         )
 
         val client = WpLoginClient(
-            WpRequestExecutor(emptyList()), WpApiMiddlewarePipeline(middlewares = listOf(valid))
+            executor, WpApiMiddlewarePipeline(middlewares = listOf(valid))
         )
 
         assertEquals(
@@ -216,9 +437,25 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 14
     fun testWordPressCustomRestApiPrefix() = runTest {
+        // Site uses a custom REST API prefix (not /wp-json/).
+        // The Link header points to the custom API root URL.
+        val executor = MockRequestExecutor(
+            listOf(
+                Stub.forUrl(
+                    "https://custom-rest-prefix.wpmt.co/",
+                    WpNetworkResponse.withApiRoot("https://custom-rest-prefix.wpmt.co/custom-api/")
+                ),
+                Stub.forUrl(
+                    "https://custom-rest-prefix.wpmt.co/custom-api/",
+                    WpNetworkResponse.jsonResponse("/login-mocks/custom-rest-prefix-api-root.json")
+                ),
+            )
+        )
+
+        val client = WpLoginClient(executor)
         assertEquals(
             "https://custom-rest-prefix.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("https://custom-rest-prefix.wpmt.co")
+            client.apiDiscovery("https://custom-rest-prefix.wpmt.co")
                 .assertSuccess().applicationPasswordsAuthenticationUrl.url()
         )
     }
