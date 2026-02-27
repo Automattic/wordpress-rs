@@ -282,6 +282,20 @@ setup-rust-toolchain:
 		x86_64-apple-darwin \
 		aarch64-apple-ios-sim
 
+# Platform-specific Rust setup (only installs what each platform needs in CI)
+setup-rust-macos:
+	rustup toolchain install stable
+	rustup target add --toolchain stable x86_64-apple-darwin aarch64-apple-darwin
+
+setup-rust-ios:
+	rustup toolchain install stable
+	rustup target add --toolchain stable aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+
+setup-rust-tvos setup-rust-watchos:
+	rustup toolchain install stable
+	rustup toolchain install $(rust_nightly_toolchain)
+	rustup component add rust-src --toolchain $(rust_nightly_toolchain)
+
 setup-rust-android-targets:
 	rustup target add \
 		x86_64-linux-android \
