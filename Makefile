@@ -113,6 +113,12 @@ build-apple-platform-ios := $(addprefix _build-apple-,$(apple-platform-targets-i
 build-apple-platform-tvos := $(addprefix _build-apple-,$(apple-platform-targets-tvos))
 build-apple-platform-watchos := $(addprefix _build-apple-,$(apple-platform-targets-watchos))
 
+# Build all targets for a specific platform (without creating xcframework).
+build-apple-macos: $(build-apple-platform-macos)
+build-apple-ios: $(build-apple-platform-ios)
+build-apple-tvos: $(build-apple-platform-tvos)
+build-apple-watchos: $(build-apple-platform-watchos)
+
 # Creating xcframework for one single platform, including real device and simulator.
 xcframework-only-macos: $(build-apple-platform-macos)
 xcframework-only-ios: $(build-apple-platform-ios)
@@ -120,6 +126,10 @@ xcframework-only-tvos: $(build-apple-platform-tvos)
 xcframework-only-watchos: $(build-apple-platform-watchos)
 xcframework-only-%:
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-$*)
+
+# Assemble pre-built targets into an xcframework (without building targets).
+xcframework-assemble:
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
 
 # Creating xcframework for all platforms.
 xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
