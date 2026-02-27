@@ -246,6 +246,32 @@ stop-server:
 	@# Help: Stop the running server.
 	docker-compose down
 
+npm-dependencies:
+	npm install
+
+# wp-env helper: run a wp-env command in a specific environment directory.
+# Usage: $(call wp-env-run,<env-name>,<wp-env-args>)
+wp-env-run = cd wp-env/$(1) && npx wp-env $(2)
+
+# wp-env port assignments (base: 4100, increment per environment)
+wp-env-port-wordfence := 4100
+
+.PHONY: wp-env-wordfence-start
+wp-env-wordfence-start: npm-dependencies
+	@# Help: Start the WordFence wp-env test server.
+	$(call wp-env-run,wordfence,start)
+	bash scripts/wp-env-setup.sh wp-env/wordfence $(wp-env-port-wordfence)
+
+.PHONY: wp-env-wordfence-stop
+wp-env-wordfence-stop:
+	@# Help: Stop the WordFence wp-env test server.
+	$(call wp-env-run,wordfence,stop)
+
+.PHONY: wp-env-wordfence-clean
+wp-env-wordfence-clean:
+	@# Help: Destroy the WordFence wp-env test server and remove all data.
+	cd wp-env/wordfence && echo "y" | npx wp-env destroy
+
 lint: lint-rust lint-swift
 	@# Help: Run the linter for all languages.
 

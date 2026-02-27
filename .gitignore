@@ -50,6 +50,9 @@ dump.sql
 # WP_COM Testing
 wp_com_test_credentials.json
 
+# wp-env
+node_modules
+
 # CI Cache
 .cargo/*
 /vendor

@@ -1,0 +1,10 @@
+{
+	"port": 4100,
+	"plugins": [
+		"https://downloads.wordpress.org/plugin/wordfence.zip"
+	],
+	"config": {
+		"WP_DEBUG": true,
+		"WP_DEBUG_LOG": true
+	}
+}
