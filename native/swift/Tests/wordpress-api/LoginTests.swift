@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import MockWebServer
 
 @testable import WordPressAPI
 
@@ -358,8 +359,17 @@ class LoginTests {
 
     @Test("Login Spec Example 17: Invalid SSL Certificate")
     func testInvalidHTTPsFails() async throws {
+        let server = MockWebServer()
+        try server.start(tls: .wrongHostname())
+        defer { server.shutdown() }
+
+        server.enqueue(MockResponse(statusCode: 200))
+
+        let siteUrl = server.url(forPath: "/").absoluteString
+        let client = WordPressLoginClient(urlSession: .init(configuration: .ephemeral))
+
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
+            _ = try await client.findLoginUrl(forSite: siteUrl)
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
@@ -379,8 +389,8 @@ class LoginTests {
                 return false
             }
 
-            #expect(hostname == "wordpress-1315525-4803651.cloudwaysapps.com")
-            #expect(presentedHostnames == ["vanilla.wpmt.co"])
+            #expect(hostname == "127.0.0.1")
+            #expect(presentedHostnames == ["wrong.example.com"])
             #endif
 
             return true
@@ -390,17 +400,53 @@ class LoginTests {
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
     @Test("Login Spec Example 18: Invalid SSL Certificate with explicit exception", .enabled(if: !isLinux()))
     func testInvalidHttpsWithExceptionWorks() async throws {
+        let server = MockWebServer()
+        try server.start(tls: .wrongHostname())
+        defer { server.shutdown() }
+
+        let port = server.port
+        let baseUrl = "https://127.0.0.1:\(port)"
+
+        server.route("/", MockResponse(statusCode: 200)
+            .withHeader("Link", "<\(baseUrl)/wp-json/>; rel=\"https://api.w.org/\""))
+
+        server.route("/wp-json/", .json("""
+        {"name":"Test Site","description":"","url":"\(baseUrl)","home":"\(baseUrl)","gmt_offset":0,"timezone_string":"UTC","namespaces":["oembed/1.0","wp/v2","wp-site-health/v1"],"authentication":{"application-passwords":{"endpoints":{"authorization":"\(baseUrl)/wp-admin/authorize-application.php"}}},"routes":{},"site_logo":0,"site_icon":0,"site_icon_url":""}
+        """))
+
         let executor = WpRequestExecutor(urlSession: .init(configuration: .ephemeral))
-        executor.allowSSL(altNames: ["wordpress-1315525-4803651.cloudwaysapps.com"], forCommonName: "vanilla.wpmt.co")
+        executor.allowSSL(altNames: ["127.0.0.1"], forCommonName: "wrong.example.com")
         let client = WordPressLoginClient(requestExecutor: executor)
-        _ = try await client.findLoginUrl(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
+        _ = try await client.findLoginUrl(forSite: baseUrl)
     }
 
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
     @Test("Login Spec Example 19: Alternative name in SSL Certificate", .enabled(if: !isLinux()))
-    func testAlternameWorks() async throws {
-        // "vanilla1.wpmt.co" is one of the alternative names in vanilla.wpmt.co certificate.
-        _ = try await self.client.findLoginUrl(forSite: "https://vanilla1.wpmt.co")
+    func testAlternativeNameWorks() async throws {
+        // The CA must be trusted in the system keychain: `make trust-test-ca`
+        guard let p12Url = Bundle.module.url(forResource: "san-test", withExtension: "p12", subdirectory: "ssl-certs") else {
+            preconditionFailure("Could not find san-test.p12 in ssl-certs")
+        }
+        let p12Data = try Data(contentsOf: p12Url)
+
+        let server = MockWebServer()
+        try server.start(tls: TLSConfiguration(p12Data: p12Data, password: "test"))
+        defer { server.shutdown() }
+
+        let port = server.port
+        let baseUrl = "https://127.0.0.1:\(port)"
+
+        server.route("/", MockResponse(statusCode: 200)
+            .withHeader("Link", "<\(baseUrl)/wp-json/>; rel=\"https://api.w.org/\""))
+
+        server.route("/wp-json/", .json("""
+        {"name":"Test Site","description":"","url":"\(baseUrl)","home":"\(baseUrl)","gmt_offset":0,"timezone_string":"UTC","namespaces":["oembed/1.0","wp/v2","wp-site-health/v1"],"authentication":{"application-passwords":{"endpoints":{"authorization":"\(baseUrl)/wp-admin/authorize-application.php"}}},"routes":{},"site_logo":0,"site_icon":0,"site_icon_url":""}
+        """))
+
+        // Connect using default URLSession (no allowSSL bypass) — succeeds because
+        // 127.0.0.1 is a SAN on the cert and the CA is trusted in the system keychain
+        let client = WordPressLoginClient(urlSession: .init(configuration: .ephemeral))
+        _ = try await client.findLoginUrl(forSite: baseUrl)
     }
 
     @Test("Cancel API discovery process")

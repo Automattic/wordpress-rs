@@ -6,6 +6,9 @@ set -euo pipefail
 
 export SKIP_PACKAGE_WP_API=true
 
+echo "--- :lock: Trusting test CA certificate"
+make trust-test-ca
+
 function run_tests() {
     local platform; platform=$1
     echo "--- :swift: Testing on $platform simulator"

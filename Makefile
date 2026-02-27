@@ -25,6 +25,10 @@ clean:
 	@# Help: Remove untracked files from the project via Git.
 	git clean -ffXd
 
+trust-test-ca:
+	@# Help: Trust the test CA certificate in the system keychain (requires root).
+	sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain test-data/ssl-certs/ca-cert.pem
+
 .PHONY: docs # Rebuild docs each time we run this command
 docs:
 	@# Help: Generate project documentation.
