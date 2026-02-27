@@ -186,9 +186,41 @@ steps:
           ./gradlew detektMain detektTest
         agents:
           queue: android
+      - label: ":rust: Build host library"
+        key: "rust-build-host"
+        artifact_paths:
+          - "target/release/libwp_mobile.so"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+
+          echo "--- :rust: Building host library"
+          cargo build --package wp_mobile --release
+        agents:
+          queue: android
+      - label: ":rust: Build Android {{matrix}}"
+        key: "rust-build-android"
+        plugins: [$CI_TOOLKIT]
+        artifact_paths:
+          - "native/kotlin/api/android/build/rustJniLibs/android/**/*"
+        command: .buildkite/build-android-rust-target.sh {{matrix}}
+        matrix:
+          - "arm"
+          - "arm64"
+          - "x86"
+          - "x86_64"
+        agents:
+          queue: android
       - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
         key: "publish-wp-api-kotlin"
         plugins: [$CI_TOOLKIT]
+        depends_on:
+          - "rust-build-host"
         command: |
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
@@ -207,6 +239,7 @@ steps:
         plugins: [$CI_TOOLKIT]
         depends_on:
           - "publish-wp-api-kotlin"
+          - "rust-build-android"
         command: |
           echo "--- :rust: Installing Rust"
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
@@ -215,7 +248,6 @@ steps:
 
           echo "--- :package: Installing Rust Toolchains"
           make setup-rust
-          make setup-rust-android-targets
 
           echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
           .buildkite/publish-wp-api-android.sh
@@ -224,18 +256,17 @@ steps:
 
       - label: ":android: Build Example App"
         plugins: [$CI_TOOLKIT]
+        depends_on:
+          - "publish-wp-api-android"
         command: |
-          echo "--- :rust: Installing Rust"
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
-
-          source "$$HOME/.cargo/env"
-
-          echo "--- :package: Installing Rust Toolchains"
-          make setup-rust
-          make setup-rust-android-targets
+          PUBLISHED_WP_API_KOTLIN_VERSION=$$(buildkite-agent meta-data get "PUBLISHED_WP_API_KOTLIN_VERSION")
+          PUBLISHED_WP_API_ANDROID_VERSION=$$(buildkite-agent meta-data get "PUBLISHED_WP_API_ANDROID_VERSION")
 
           echo "--- :android: Building Sample App"
-          ./native/kotlin/gradlew -p native/kotlin :example:composeApp:assembleDebug
+          ./native/kotlin/gradlew -p native/kotlin \
+            -PwpApiKotlinVersion="$$PUBLISHED_WP_API_KOTLIN_VERSION" \
+            -PwpApiAndroidVersion="$$PUBLISHED_WP_API_ANDROID_VERSION" \
+            :example:composeApp:assembleDebug
         agents:
           queue: android
 
