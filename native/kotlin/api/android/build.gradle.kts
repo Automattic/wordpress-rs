@@ -91,7 +91,11 @@ cargo {
     module = "$cargoProjectRoot/$moduleName/"
     libname = moduleName
     profile = "release"
-    targets = listOf("arm", "arm64", "x86", "x86_64")
+    targets = if (project.hasProperty("cargoTarget")) {
+        listOf(project.property("cargoTarget").toString())
+    } else {
+        listOf("arm", "arm64", "x86", "x86_64")
+    }
     targetDirectory = "$cargoProjectRoot/target"
     exec = { spec: ExecSpec, _: com.nishtahir.Toolchain ->
         // https://doc.rust-lang.org/rustc/command-line-arguments.html#-g-include-debug-information

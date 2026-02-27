@@ -50,7 +50,11 @@ kotlin {
             implementation(libs.navigation.compose)
             implementation(libs.navigation.fragment.ktx)
             implementation(libs.navigation.ui.ktx)
-            implementation(project(":api:android"))
+            if (project.hasProperty("wpApiAndroidVersion")) {
+                implementation("rs.wordpress.api:android:${project.properties["wpApiAndroidVersion"]}")
+            } else {
+                implementation(project(":api:android"))
+            }
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -65,11 +69,19 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.landscapist.coil)
             implementation(libs.lifecycle.viewmodel)
-            compileOnly(project(":api:kotlin"))
+            if (project.hasProperty("wpApiKotlinVersion")) {
+                compileOnly("rs.wordpress.api:kotlin:${project.properties["wpApiKotlinVersion"]}")
+            } else {
+                compileOnly(project(":api:kotlin"))
+            }
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
-            implementation(project(":api:kotlin"))
+            if (project.hasProperty("wpApiKotlinVersion")) {
+                implementation("rs.wordpress.api:kotlin:${project.properties["wpApiKotlinVersion"]}")
+            } else {
+                implementation(project(":api:kotlin"))
+            }
         }
     }
 }
