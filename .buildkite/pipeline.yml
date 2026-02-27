@@ -327,6 +327,8 @@ steps:
 
       - label: ":wordpress: :rust: wp-env Tests"
         command: ".buildkite/commands/run-wp-env-tests.sh"
+        agents:
+          queue: android
 
       - label: ":wordpress: WordPress.com e2e Tests"
         command: |
