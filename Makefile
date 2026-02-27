@@ -113,6 +113,12 @@ build-apple-platform-ios := $(addprefix _build-apple-,$(apple-platform-targets-i
 build-apple-platform-tvos := $(addprefix _build-apple-,$(apple-platform-targets-tvos))
 build-apple-platform-watchos := $(addprefix _build-apple-,$(apple-platform-targets-watchos))
 
+# Build all targets for a specific platform (without creating xcframework).
+build-apple-macOS: $(build-apple-platform-macos)
+build-apple-iOS: $(build-apple-platform-ios)
+build-apple-tvOS: $(build-apple-platform-tvos)
+build-apple-watchOS: $(build-apple-platform-watchos)
+
 # Creating xcframework for one single platform, including real device and simulator.
 xcframework-only-macos: $(build-apple-platform-macos)
 xcframework-only-ios: $(build-apple-platform-ios)
@@ -120,6 +126,10 @@ xcframework-only-tvos: $(build-apple-platform-tvos)
 xcframework-only-watchos: $(build-apple-platform-watchos)
 xcframework-only-%:
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-$*)
+
+# Assemble pre-built targets into an xcframework (without building targets).
+xcframework-assemble:
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
 
 # Creating xcframework for all platforms.
 xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
@@ -271,6 +281,20 @@ setup-rust-toolchain:
 		aarch64-apple-darwin \
 		x86_64-apple-darwin \
 		aarch64-apple-ios-sim
+
+# Platform-specific Rust setup (only installs what each platform needs in CI)
+setup-rust-macOS:
+	rustup toolchain install stable
+	rustup target add --toolchain stable x86_64-apple-darwin aarch64-apple-darwin
+
+setup-rust-iOS:
+	rustup toolchain install stable
+	rustup target add --toolchain stable aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+
+setup-rust-tvOS setup-rust-watchOS:
+	rustup toolchain install stable
+	rustup toolchain install $(rust_nightly_toolchain)
+	rustup component add rust-src --toolchain $(rust_nightly_toolchain)
 
 setup-rust-android-targets:
 	rustup target add \
