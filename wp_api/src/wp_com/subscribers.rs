@@ -5,9 +5,16 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     users::UserId,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::{collections::HashMap, ops::Not};
 use wp_serde_helper::{deserialize_false_or_string, deserialize_u64_or_string};
+
+fn deserialize_date_subscribed<'de, D>(deserializer: D) -> Result<Option<WpGmtDateTime>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(WpGmtDateTime::deserialize(deserializer).ok())
+}
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct Subscriber {
@@ -16,7 +23,8 @@ pub struct Subscriber {
     pub display_name: String,
     pub email_address: String,
     pub is_email_subscriber: bool,
-    pub date_subscribed: WpGmtDateTime,
+    #[serde(deserialize_with = "deserialize_date_subscribed")]
+    pub date_subscribed: Option<WpGmtDateTime>,
     pub subscription_status: Option<String>,
     pub avatar: String,
     pub url: Option<String>,
@@ -558,6 +566,18 @@ mod tests {
         assert_eq!(response.page, 1);
         assert_eq!(response.per_page, 100);
         assert_eq!(response.subscribers.len(), 4);
+    }
+
+    #[test]
+    fn test_subscriber_list_with_invalid_date() {
+        let json_file_path = "tests/wpcom/subscribers/subscriber-list-with-invalid-date.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: ListSubscribersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(response.subscribers.len(), 2);
+        assert!(response.subscribers[0].date_subscribed.is_some());
+        assert!(response.subscribers[1].date_subscribed.is_none());
     }
 
     #[test]
