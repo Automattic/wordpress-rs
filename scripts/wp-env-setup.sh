@@ -21,9 +21,11 @@ done
 
 echo "WordPress is ready."
 
-# Enable pretty permalinks so /wp-json/ works
-echo "Flushing rewrite rules..."
+# Use plain permalink structure so the REST API is accessed via ?rest_route=
+# instead of /wp-json/. The pretty permalink /wp-json/ path requires Apache
+# mod_rewrite with AllowOverride, which is unreliable across Docker environments.
+echo "Setting plain permalink structure..."
 cd "${WP_ENV_DIR}"
-npx wp-env run cli wp rewrite structure '/%postname%/' --hard
+npx wp-env run cli wp option update permalink_structure ''
 
 echo "wp-env setup complete. WordPress is running at ${WP_ENV_URL}"
