@@ -26,8 +26,10 @@ clean:
 	git clean -ffXd
 
 trust-test-ca:
-	@# Help: Trust the test CA certificate (macOS only, user domain).
-	security add-trusted-cert -r trustRoot test-data/ssl-certs/ca-cert.pem
+	@# Help: Trust the test CA certificate (macOS only).
+	@# Pre-authorize trust settings to avoid GUI prompt on headless CI.
+	sudo security authorizationdb write com.apple.trust-settings.admin allow
+	sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain test-data/ssl-certs/ca-cert.pem
 
 trust-test-ca-jvm:
 	@# Help: Trust the test CA certificate in the JVM keystore (requires write access to cacerts).
