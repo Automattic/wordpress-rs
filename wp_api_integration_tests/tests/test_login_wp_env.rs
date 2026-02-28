@@ -16,6 +16,7 @@ use wp_api::{
 /// Tests that a WordPress site with WordFence installed (which disables application passwords)
 /// is correctly detected. Requires the wp-env test server to be running (`make wp-env-wordfence-start`).
 #[tokio::test]
+#[ignore] // Requires wp-env server: `make wp-env-wordfence-start`
 async fn login_spec_8_site_with_application_passwords_disabled_by_wordfence() {
     let error = login_err("http://localhost:4100")
         .await

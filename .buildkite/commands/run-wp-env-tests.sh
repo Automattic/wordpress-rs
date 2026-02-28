@@ -15,7 +15,7 @@ echo "--- :docker: Starting wp-env (WordFence)"
 make wp-env-wordfence-start
 
 echo "--- 🧪 Running wp-env Tests"
-cargo test -p wp_api_integration_tests --test test_login_wp_env --no-fail-fast
+cargo test -p wp_api_integration_tests --test test_login_wp_env --no-fail-fast -- --include-ignored
 
 echo "--- :docker: Stopping wp-env"
 make wp-env-wordfence-stop
