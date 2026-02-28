@@ -120,6 +120,12 @@ fun setupJniAndBindings() {
         from("$cargoProjectRoot/test-data/login-mocks/")
         into("$generatedTestResourcesPath/login-mocks")
     }
+
+    tasks.register<Copy>("copySslCerts") {
+        dependsOn(tasks.named("deleteGeneratedTestResources"))
+        from("$cargoProjectRoot/test-data/ssl-certs/")
+        into("$generatedTestResourcesPath/ssl-certs")
+    }
 }
 
 fun resolveBinary(name: String): String {

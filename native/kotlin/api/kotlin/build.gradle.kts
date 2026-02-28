@@ -132,6 +132,7 @@ tasks.named("processIntegrationTestResources").configure {
     dependsOn(rootProject.tasks.named("copySampleJSON"))
     dependsOn(rootProject.tasks.named("copyTestResponses"))
     dependsOn(rootProject.tasks.named("copyLoginMocks"))
+    dependsOn(rootProject.tasks.named("copySslCerts"))
 }
 tasks.named("sourcesJar").configure {
     dependsOn(generateUniFFIBindingsTask)

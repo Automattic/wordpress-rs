@@ -1,6 +1,10 @@
 package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.Execution
@@ -21,6 +25,9 @@ import uniffi.wp_api.InvalidSslErrorReason
 import uniffi.wp_api.ParseUrlException
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestExecutionException
+import java.security.KeyStore
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SSLContext
 import kotlin.test.assertContains
 
 @Execution(ExecutionMode.CONCURRENT)
@@ -501,73 +508,128 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 17
     fun testInvalidHTTPsFails() = runTest {
-        val reason = loginClient.apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
-            .assertFailureFindApiRoot().getRequestExecutionErrorReason()
-        assertInstanceOf(RequestExecutionErrorReason.InvalidSslError::class.java, reason)
+        val server = MockWebServer()
+        server.useHttps(sslSocketFactoryFromP12("/ssl-certs/wrong-host.p12", "test"), false)
+        server.enqueue(MockResponse())
+        server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
+        try {
+            val baseUrl = "https://127.0.0.1:${server.port}"
+            val reason = loginClient.apiDiscovery(baseUrl)
+                .assertFailureFindApiRoot().getRequestExecutionErrorReason()
+            assertInstanceOf(RequestExecutionErrorReason.InvalidSslError::class.java, reason)
 
-        val sslError = (reason as RequestExecutionErrorReason.InvalidSslError).reason
-        assertInstanceOf(
-            InvalidSslErrorReason.CertificateNotValidForName::class.java,
-            sslError
-        )
+            val sslError = (reason as RequestExecutionErrorReason.InvalidSslError).reason
+            assertInstanceOf(
+                InvalidSslErrorReason.CertificateNotValidForName::class.java,
+                sslError
+            )
 
-        val hostname = (sslError as InvalidSslErrorReason.CertificateNotValidForName).hostname
-        val presentedHostnames = sslError.presentedHostnames
+            val hostname = (sslError as InvalidSslErrorReason.CertificateNotValidForName).hostname
+            val presentedHostnames = sslError.presentedHostnames
 
-        assertEquals(hostname, "wordpress-1315525-4803651.cloudwaysapps.com")
-        assertContains(presentedHostnames, "vanilla.wpmt.co")
+            assertEquals("127.0.0.1", hostname)
+            assertContains(presentedHostnames, "wrong.example.com")
+        } finally {
+            server.shutdown()
+        }
     }
 
-    @Test // Spec Example 17 (with exception)
+    @Test // Spec Example 18
     fun testInvalidHttpsWithExceptionWorks() = runTest {
-        val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
-        val executor = WpRequestExecutor(httpClient)
-        httpClient.addAllowedAlternativeNamesForHostname(
-            "vanilla.wpmt.co",
-            listOf("wordpress-1315525-4803651.cloudwaysapps.com")
-        )
+        val server = MockWebServer()
+        server.useHttps(sslSocketFactoryFromP12("/ssl-certs/wrong-host.p12", "test"), false)
+        server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
+        try {
+            val baseUrl = "https://127.0.0.1:${server.port}"
+            server.dispatcher = apiDiscoveryDispatcher(baseUrl)
 
-        assertEquals(
-            "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            WpLoginClient(requestExecutor = executor).apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
-                .assertSuccess().applicationPasswordsAuthenticationUrl.url()
-        )
+            val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
+            val executor = WpRequestExecutor(httpClient)
+            httpClient.addAllowedAlternativeNamesForHostname(
+                "wrong.example.com",
+                listOf("127.0.0.1")
+            )
+
+            assertEquals(
+                "$baseUrl/wp-admin/authorize-application.php",
+                WpLoginClient(requestExecutor = executor).apiDiscovery(baseUrl)
+                    .assertSuccess().applicationPasswordsAuthenticationUrl.url()
+            )
+        } finally {
+            server.shutdown()
+        }
     }
 
     @Test
     fun testAllowedHostnamesDoesNotBreakValidSites() = runTest {
-        val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
-        val executor = WpRequestExecutor(httpClient)
-        val loginClient = WpLoginClient(requestExecutor = executor)
+        val wrongHostServer = MockWebServer()
+        wrongHostServer.useHttps(sslSocketFactoryFromP12("/ssl-certs/wrong-host.p12", "test"), false)
+        wrongHostServer.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
 
-        // First, configure an allowed hostname override for a specific cert/hostname pair
-        httpClient.addAllowedAlternativeNamesForHostname(
-            "vanilla.wpmt.co",
-            listOf("wordpress-1315525-4803651.cloudwaysapps.com")
-        )
+        val validServer = MockWebServer()
+        validServer.useHttps(sslSocketFactoryFromP12("/ssl-certs/san-test.p12", "test"), false)
+        validServer.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
 
-        // The override should work
-        assertEquals(
-            "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
-                .assertSuccess().applicationPasswordsAuthenticationUrl.url()
-        )
+        try {
+            val wrongHostUrl = "https://127.0.0.1:${wrongHostServer.port}"
+            wrongHostServer.dispatcher = apiDiscoveryDispatcher(wrongHostUrl)
 
-        // Other valid SSL sites should still work via fallback to default hostname verification.
-        // google.com uses wildcard/SAN certificates which require proper OkHttp verification.
-        val reason = loginClient.apiDiscovery("https://google.com").assertFailureFindApiRoot()
-        assertInstanceOf(FindApiRootFailure.ProbablyNotAWordPressSite::class.java, reason)
+            // Valid server returns non-WordPress responses for all paths
+            validServer.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    return MockResponse()
+                }
+            }
+
+            val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
+            val executor = WpRequestExecutor(httpClient)
+            val loginClient = WpLoginClient(requestExecutor = executor)
+
+            // Configure an allowed hostname override for the wrong-host cert
+            httpClient.addAllowedAlternativeNamesForHostname(
+                "wrong.example.com",
+                listOf("127.0.0.1")
+            )
+
+            // The override should work
+            assertEquals(
+                "$wrongHostUrl/wp-admin/authorize-application.php",
+                loginClient.apiDiscovery(wrongHostUrl)
+                    .assertSuccess().applicationPasswordsAuthenticationUrl.url()
+            )
+
+            // Other valid SSL sites should still work via fallback to default hostname verification.
+            // The SAN cert has SAN=IP:127.0.0.1, so connecting to 127.0.0.1 matches via OkHttp's
+            // default hostname verifier.
+            val validUrl = "https://127.0.0.1:${validServer.port}"
+            val reason = loginClient.apiDiscovery(validUrl).assertFailureFindApiRoot()
+            assertInstanceOf(FindApiRootFailure.ProbablyNotAWordPressSite::class.java, reason)
+        } finally {
+            wrongHostServer.shutdown()
+            validServer.shutdown()
+        }
     }
 
     @Test
     fun testCustomOkHttpClient() = runTest {
-        val executor =
-            WpRequestExecutor(httpClient = WpHttpClient.CustomOkHttpClient(client = OkHttpClient()))
-        assertEquals(
-            "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            WpLoginClient(requestExecutor = executor).apiDiscovery("https://vanilla.wpmt.co")
-                .assertSuccess().applicationPasswordsAuthenticationUrl.url()
-        )
+        val server = MockWebServer()
+        server.useHttps(sslSocketFactoryFromP12("/ssl-certs/san-test.p12", "test"), false)
+        server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
+        try {
+            val baseUrl = "https://127.0.0.1:${server.port}"
+            server.dispatcher = apiDiscoveryDispatcher(baseUrl)
+
+            val executor = WpRequestExecutor(
+                httpClient = WpHttpClient.CustomOkHttpClient(client = OkHttpClient())
+            )
+            assertEquals(
+                "$baseUrl/wp-admin/authorize-application.php",
+                WpLoginClient(requestExecutor = executor).apiDiscovery(baseUrl)
+                    .assertSuccess().applicationPasswordsAuthenticationUrl.url()
+            )
+        } finally {
+            server.shutdown()
+        }
     }
 }
 
@@ -614,5 +676,30 @@ private fun RequestExecutionException.reason(): RequestExecutionErrorReason? {
     return when (this) {
         is RequestExecutionException.RequestExecutionFailed -> this.reason
         is RequestExecutionException.MediaFileNotFound -> null
+    }
+}
+
+private fun sslSocketFactoryFromP12(resourcePath: String, password: String): javax.net.ssl.SSLSocketFactory {
+    val keyStore = KeyStore.getInstance("PKCS12")
+    val stream = {}.javaClass.getResourceAsStream(resourcePath)
+        ?: throw IllegalArgumentException("Resource not found: $resourcePath")
+    keyStore.load(stream, password.toCharArray())
+    val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+    kmf.init(keyStore, password.toCharArray())
+    val sslContext = SSLContext.getInstance("TLS")
+    sslContext.init(kmf.keyManagers, null, null)
+    return sslContext.socketFactory
+}
+
+private fun apiDiscoveryDispatcher(baseUrl: String) = object : Dispatcher() {
+    override fun dispatch(request: RecordedRequest): MockResponse {
+        return when (request.path) {
+            "/" -> MockResponse()
+                .addHeader("Link", "<$baseUrl/wp-json/>; rel=\"https://api.w.org/\"")
+            "/wp-json/" -> MockResponse()
+                .addHeader("Content-Type", "application/json")
+                .setBody("""{"name":"Test Site","description":"","url":"$baseUrl","home":"$baseUrl","gmt_offset":0,"timezone_string":"UTC","namespaces":["wp/v2"],"authentication":{"application-passwords":{"endpoints":{"authorization":"$baseUrl/wp-admin/authorize-application.php"}}},"routes":{}}""")
+            else -> MockResponse().setResponseCode(404)
+        }
     }
 }
