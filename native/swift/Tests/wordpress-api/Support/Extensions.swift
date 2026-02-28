@@ -54,7 +54,7 @@ func isTestCATrusted() -> Bool {
         .filter { !$0.hasPrefix("-----") && !$0.isEmpty }
         .joined()
     guard let derData = Data(base64Encoded: base64),
-          let cert = SecCertificateCreateWithDER(nil, derData as CFData) else {
+          let cert = SecCertificateCreateWithData(nil, derData as CFData) else {
         return false
     }
 
