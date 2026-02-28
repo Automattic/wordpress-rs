@@ -11,7 +11,7 @@ function run_tests() {
 
     if [ "$platform" = "iOS" ]; then
         echo "--- :lock: Trusting test CA certificate"
-        make trust-test-ca
+        make trust-test-ca || echo "⚠️ Could not trust test CA — spec 19 (custom CA cert) will be skipped"
     fi
 
     echo "--- :swift: Testing on $platform simulator"

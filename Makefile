@@ -27,8 +27,9 @@ clean:
 
 trust-test-ca:
 	@# Help: Trust the test CA certificate (macOS only).
-	@# Pre-authorize trust settings to avoid GUI prompt on headless CI.
-	sudo security authorizationdb write com.apple.trust-settings.admin allow
+	@# Uses admin domain (-d) for system-wide trust. Requires user interaction
+	@# on headless CI — if this fails, HTTPS tests using the test CA (spec 19)
+	@# will be skipped.
 	sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain test-data/ssl-certs/ca-cert.pem
 
 trust-test-ca-jvm:

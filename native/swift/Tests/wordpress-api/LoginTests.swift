@@ -5,6 +5,10 @@ import Testing
 import MockWebServer
 #endif
 
+#if canImport(Security)
+import Security
+#endif
+
 @testable import WordPressAPI
 
 #if os(Linux)
@@ -424,10 +428,9 @@ class LoginTests {
         _ = try await client.findLoginUrl(forSite: baseUrl)
     }
 
-    /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
-    @Test("Login Spec Example 19: Alternative name in SSL Certificate", .enabled(if: !isLinux()))
+    /// This test requires the test CA to be trusted: `make trust-test-ca`
+    @Test("Login Spec Example 19: Alternative name in SSL Certificate", .enabled(if: !isLinux() && isTestCATrusted()))
     func testAlternativeNameWorks() async throws {
-        // The CA must be trusted in the system keychain: `make trust-test-ca`
         guard let p12Url = Bundle.module.url(forResource: "san-test", withExtension: "p12", subdirectory: "ssl-certs") else {
             preconditionFailure("Could not find san-test.p12 in ssl-certs")
         }
