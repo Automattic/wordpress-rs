@@ -76,7 +76,7 @@ var package = Package(
                 .target(name: "WordPressAPI"),
                 .target(name: "WordPressApiCache"),
                 .target(name: libwordpressFFI.name),
-                .product(name: "MockWebServer", package: "mocktail-swift"),
+                .product(name: "MockWebServer", package: "mocktail-swift", condition: .when(platforms: [.iOS, .macOS, .tvOS, .watchOS])),
             ],
             path: "native/swift/Tests/wordpress-api",
             resources: [

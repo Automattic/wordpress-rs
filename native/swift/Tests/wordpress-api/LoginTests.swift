@@ -1,6 +1,9 @@
 import Foundation
 import Testing
+
+#if canImport(MockWebServer)
 import MockWebServer
+#endif
 
 @testable import WordPressAPI
 
@@ -357,6 +360,7 @@ class LoginTests {
         })
     }
 
+    #if canImport(MockWebServer)
     @Test("Login Spec Example 17: Invalid SSL Certificate")
     func testInvalidHTTPsFails() async throws {
         let server = MockWebServer()
@@ -448,6 +452,7 @@ class LoginTests {
         let client = WordPressLoginClient(urlSession: .init(configuration: .ephemeral))
         _ = try await client.findLoginUrl(forSite: baseUrl)
     }
+    #endif // canImport(MockWebServer)
 
     @Test("Cancel API discovery process")
     func testCancellation() async throws {
