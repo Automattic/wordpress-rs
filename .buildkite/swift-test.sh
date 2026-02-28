@@ -6,6 +6,17 @@ set -euo pipefail
 
 export SKIP_PACKAGE_WP_API=true
 
+# Create and unlock a temporary keychain for SecPKCS12Import (used by MockWebServer TLS tests).
+# On CI, the default keychain may be locked, causing errSecInteractionNotAllowed (-25308).
+if [ "${BUILDKITE:-}" = "true" ]; then
+    echo "--- :key: Setting up keychain for TLS tests"
+    security delete-keychain ci-test.keychain-db 2>/dev/null || true
+    security create-keychain -p "" ci-test.keychain-db
+    security default-keychain -s ci-test.keychain-db
+    security unlock-keychain -p "" ci-test.keychain-db
+    security set-keychain-settings ci-test.keychain-db
+fi
+
 function run_tests() {
     local platform; platform=$1
 
