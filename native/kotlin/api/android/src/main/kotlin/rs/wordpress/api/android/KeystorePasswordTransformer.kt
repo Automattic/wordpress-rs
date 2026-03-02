@@ -6,6 +6,7 @@ import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
 import android.util.Base64
+import android.util.Log
 import uniffi.wp_mobile.PasswordTransformer
 import uniffi.wp_mobile.PasswordTransformerException
 import java.security.KeyStore
@@ -117,7 +118,9 @@ class KeystorePasswordTransformer(applicationName: String) : PasswordTransformer
 
             val combined = Base64.decode(password, Base64.NO_WRAP)
 
-            require(combined.size >= GCM_IV_SIZE + GCM_TAG_SIZE) { "Ciphertext too short" }
+            if (combined.size < GCM_IV_SIZE + GCM_TAG_SIZE) {
+                throw PasswordTransformerException.DecryptionFailed("Ciphertext too short")
+            }
 
             val iv = combined.copyOfRange(0, GCM_IV_SIZE)
             val ciphertext = combined.copyOfRange(GCM_IV_SIZE, combined.size)
@@ -141,6 +144,7 @@ class KeystorePasswordTransformer(applicationName: String) : PasswordTransformer
     }
 
     companion object {
+        private const val TAG = "KeystorePwTransformer"
         private val BASE64_PATTERN = Regex("^[A-Za-z0-9+/]*=*$")
         private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
@@ -171,7 +175,8 @@ class KeystorePasswordTransformer(applicationName: String) : PasswordTransformer
                 keyGenerator.init(builder.build())
                 return keyGenerator.generateKey()
             } catch (_: StrongBoxUnavailableException) {
-                // StrongBox not available — rebuild the spec without it.
+                // StrongBox not available — fall back to TEE/software-backed key.
+                Log.w(TAG, "StrongBox unavailable, falling back to software-backed key")
                 builder.setIsStrongBoxBacked(false)
                 keyGenerator.init(builder.build())
                 return keyGenerator.generateKey()

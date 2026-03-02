@@ -316,12 +316,12 @@ struct SecureEnclavePasswordTransformerAllTests {
             let storage = InMemoryKeychainStorage()
 
             let transformer1 = try SecureEnclavePasswordTransformer(
-                applicationName: "test-roundtrip", keychainStorage: storage
+                keychainStorage: storage
             )
             let encrypted = try transformer1.encrypt(password: "secret")
 
             let transformer2 = try SecureEnclavePasswordTransformer(
-                applicationName: "test-roundtrip", keychainStorage: storage
+                keychainStorage: storage
             )
             let decrypted = try transformer2.decrypt(password: encrypted)
 
@@ -333,7 +333,7 @@ struct SecureEnclavePasswordTransformerAllTests {
             let storage = InMemoryKeychainStorage()
 
             let transformer = try SecureEnclavePasswordTransformer(
-                applicationName: "test-default-name", keychainStorage: storage
+                keychainStorage: storage
             )
             let encrypted = try transformer.encrypt(password: "default-test")
             let decrypted = try transformer.decrypt(password: encrypted)
@@ -347,10 +347,10 @@ struct SecureEnclavePasswordTransformerAllTests {
             let storage2 = InMemoryKeychainStorage()
 
             let transformer1 = try SecureEnclavePasswordTransformer(
-                applicationName: "name-1", keychainStorage: storage1
+                keychainStorage: storage1
             )
             let transformer2 = try SecureEnclavePasswordTransformer(
-                applicationName: "name-2", keychainStorage: storage2
+                keychainStorage: storage2
             )
 
             #expect(transformer1.persistedKeyData != transformer2.persistedKeyData)

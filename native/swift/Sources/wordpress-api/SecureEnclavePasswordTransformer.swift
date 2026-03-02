@@ -3,40 +3,6 @@ import CryptoKit
 import Foundation
 import WordPressAPIInternal
 
-/// A `PasswordTransformer` that encrypts passwords using the Secure Enclave
-/// when available, falling back to a software key in Simulator builds.
-///
-/// The encryption key is generated once and persisted — either to the
-/// Keychain via ``init(applicationName:)`` or to a file via
-/// ``init(keyFile:)``. On physical devices the key never leaves the
-/// Secure Enclave hardware. Check ``isHardwareBacked`` to determine
-/// which mode is active.
-///
-/// ## Key Persistence
-///
-/// Use ``init(applicationName:)`` to auto-persist the key to the Keychain:
-///
-/// ```swift
-/// // The key is created on first use and restored automatically on
-/// // subsequent launches — no manual persistence needed.
-/// let transformer = try SecureEnclavePasswordTransformer(applicationName: "my-app-key")
-/// ```
-///
-/// Alternatively, you can restore a previously saved key via
-/// ``init(persistedKeyData:)``. On physical devices ``persistedKeyData``
-/// is an opaque Secure Enclave reference — it does **not** contain the
-/// private key itself, so it can safely be stored in UserDefaults, a
-/// file, or any other persistent store.
-///
-/// ## Encrypting and Decrypting
-///
-/// ```swift
-/// let transformer = try SecureEnclavePasswordTransformer(applicationName: "my-key")
-///
-/// let encrypted = try transformer.encrypt(password: "hunter2")
-/// let decrypted = try transformer.decrypt(password: encrypted)
-/// // decrypted == "hunter2"
-/// ```
 /// A storage backend for persisting encryption key data.
 ///
 /// The default implementation (``SystemKeychainStorage``) uses the system
@@ -118,6 +84,40 @@ struct SystemKeychainStorage: KeychainStorage {
     }
 }
 
+/// A `PasswordTransformer` that encrypts passwords using the Secure Enclave
+/// when available, falling back to a software key in Simulator builds.
+///
+/// The encryption key is generated once and persisted — either to the
+/// Keychain via ``init(applicationName:)`` or to a file via
+/// ``init(keyFile:)``. On physical devices the key never leaves the
+/// Secure Enclave hardware. Check ``isHardwareBacked`` to determine
+/// which mode is active.
+///
+/// ## Key Persistence
+///
+/// Use ``init(applicationName:)`` to auto-persist the key to the Keychain:
+///
+/// ```swift
+/// // The key is created on first use and restored automatically on
+/// // subsequent launches — no manual persistence needed.
+/// let transformer = try SecureEnclavePasswordTransformer(applicationName: "my-app-key")
+/// ```
+///
+/// Alternatively, you can restore a previously saved key via
+/// ``init(persistedKeyData:)``. On physical devices ``persistedKeyData``
+/// is an opaque Secure Enclave reference — it does **not** contain the
+/// private key itself, so it can safely be stored in UserDefaults, a
+/// file, or any other persistent store.
+///
+/// ## Encrypting and Decrypting
+///
+/// ```swift
+/// let transformer = try SecureEnclavePasswordTransformer(applicationName: "my-key")
+///
+/// let encrypted = try transformer.encrypt(password: "hunter2")
+/// let decrypted = try transformer.decrypt(password: encrypted)
+/// // decrypted == "hunter2"
+/// ```
 public final class SecureEnclavePasswordTransformer: PasswordTransformer {
 
     private let privateKey: PrivateKey
@@ -188,7 +188,6 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
     ///   if Keychain access fails.
     public convenience init(applicationName: String) throws {
         try self.init(
-            applicationName: applicationName,
             keychainStorage: SystemKeychainStorage(applicationName: applicationName)
         )
     }
@@ -196,10 +195,7 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
     /// Creates a transformer using the given storage backend for key
     /// persistence. This exists so tests can inject a mock ``KeychainStorage``
     /// without touching the real Keychain.
-    convenience init(
-        applicationName: String,
-        keychainStorage: KeychainStorage
-    ) throws {
+    convenience init(keychainStorage: KeychainStorage) throws {
         if let existing = try keychainStorage.load() {
             try self.init(persistedKeyData: existing)
         } else {

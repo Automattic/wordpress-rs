@@ -301,6 +301,7 @@ public typealias JetpackConnectionClient = WordPressAPIInternal.JetpackConnectio
 
 // MARK: - Persistence
 public typealias Account = WordPressAPIInternal.Account
+public typealias AccountId = UInt64
 public typealias AccountRepository = WordPressAPIInternal.AccountRepository
 public typealias AccountRepositoryError = WordPressAPIInternal.AccountRepositoryError
 #if os(Linux)
