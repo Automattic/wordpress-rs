@@ -475,7 +475,7 @@ When a state variant carries `data`, it is a `FullEntityAnyPostWithEditContext` 
 | `entityId` | `EntityId` | Database identity (site + type + WordPress ID) |
 | `data` | `AnyPostWithEditContext` | The full WordPress post object |
 
-Use `data.data.title`, `data.data.status`, `data.data.dateGmt`, etc. to access post fields for display.
+Use `data.title`, `data.status`, `data.dateGmt`, etc. to access post fields for display.
 
 ---
 
