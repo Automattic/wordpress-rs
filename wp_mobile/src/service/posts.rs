@@ -1391,13 +1391,15 @@ mod tests {
 
     /// Helper to create a PostService with mock network error
     fn service_with_network_error() -> PostService {
-        let mock_executor = Arc::new(MockExecutor::with_execute_fn(|_| {
+        let mock_executor = Arc::new(MockExecutor::with_execute_fn(|request| {
             Err(RequestExecutionError::RequestExecutionFailed {
                 status_code: None,
                 redirects: None,
                 reason: RequestExecutionErrorReason::GenericError {
                     error_message: "Network timeout".to_string(),
                 },
+                request_url: request.url().0,
+                request_method: request.method(),
             })
         }));
 

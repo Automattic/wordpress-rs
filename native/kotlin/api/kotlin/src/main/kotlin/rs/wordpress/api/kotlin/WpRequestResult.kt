@@ -1,6 +1,7 @@
 package rs.wordpress.api.kotlin
 
 import uniffi.wp_api.RequestExecutionErrorReason
+import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.WpRedirect
 
@@ -11,16 +12,22 @@ sealed class WpRequestResult<T> {
         val errorMessage: String,
         val statusCode: UShort,
         val response: String,
+        val requestUrl: String,
+        val requestMethod: RequestMethod,
     ) : WpRequestResult<T>()
 
     data class InvalidHttpStatusCode<T>(
-        val statusCode: UShort
+        val statusCode: UShort,
+        val requestUrl: String,
+        val requestMethod: RequestMethod,
     ) : WpRequestResult<T>()
 
     data class RequestExecutionFailed<T>(
         val statusCode: UShort?,
         val redirects: List<WpRedirect>?,
         val reason: RequestExecutionErrorReason,
+        val requestUrl: String,
+        val requestMethod: RequestMethod,
     ) : WpRequestResult<T>()
 
     data class MediaFileNotFound<T>(
@@ -34,11 +41,15 @@ sealed class WpRequestResult<T> {
     data class ResponseParsingError<T>(
         val reason: String,
         val response: String,
+        val requestUrl: String,
+        val requestMethod: RequestMethod,
     ) : WpRequestResult<T>()
 
     data class UnknownError<T>(
         val statusCode: UShort,
         val response: String,
+        val requestUrl: String,
+        val requestMethod: RequestMethod,
     ) : WpRequestResult<T>()
 
     fun successfulResponse(): T? =

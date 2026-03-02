@@ -90,6 +90,7 @@ impl ReqwestRequestExecutor {
             body: body.to_vec(),
             response_header_map: Arc::new(WpNetworkHeaderMap::new(response_header_map)),
             request_url: wp_request.url(),
+            request_method: wp_request.method(),
             request_header_map: wp_request.header_map(),
         })
     }
@@ -111,7 +112,11 @@ impl RequestExecutor for ReqwestRequestExecutor {
         &self,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        self.async_request(request).await.map_err(|e| e.into())
+        let url = request.url().0.clone();
+        let method = request.method();
+        self.async_request(request)
+            .await
+            .map_err(|e| request_execution_error_from_reqwest(e, url, method))
     }
 
     async fn upload(
@@ -150,8 +155,13 @@ impl RequestExecutor for ReqwestRequestExecutor {
             }
         }
 
+        let url = upload_request.url().0.clone();
+        let method = upload_request.method();
         let request = request.multipart(form);
-        let mut response = request.send().await?;
+        let mut response = request
+            .send()
+            .await
+            .map_err(|e| request_execution_error_from_reqwest(e, url, method))?;
 
         let header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
@@ -159,6 +169,7 @@ impl RequestExecutor for ReqwestRequestExecutor {
             body: response.bytes().await.unwrap().to_vec(),
             response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
             request_url: upload_request.url(),
+            request_method: upload_request.method(),
             request_header_map: upload_request.header_map(),
         })
     }
@@ -172,83 +183,46 @@ impl RequestExecutor for ReqwestRequestExecutor {
     }
 }
 
-impl From<reqwest::Error> for RequestExecutionError {
-    fn from(error: reqwest::Error) -> Self {
-        let status_code = error.status().map(|s| s.as_u16());
-        if error.is_timeout() {
-            return RequestExecutionError::RequestExecutionFailed {
-                status_code,
-                redirects: None,
-                reason: RequestExecutionErrorReason::HttpTimeoutError,
-            };
-        }
-
-        if let Some(tls_error) = error.as_tls_error() {
-            return RequestExecutionError::RequestExecutionFailed {
-                status_code,
-                redirects: None,
-                reason: tls_error.into(),
-            };
-        }
-
-        if let Some(io_error) = error.as_io_error() {
-            match io_error.kind() {
-                std::io::ErrorKind::UnexpectedEof => {
-                    // Server terminated the connection unexpectedly
-                    return RequestExecutionError::RequestExecutionFailed {
-                        status_code,
-                        redirects: None,
-                        reason: RequestExecutionErrorReason::HttpError {
-                            reason: "The server terminated the connection unexpectedly".to_string(),
-                        },
-                    };
-                }
-                _ => {
-                    return RequestExecutionError::RequestExecutionFailed {
-                        status_code,
-                        redirects: None,
-                        reason: RequestExecutionErrorReason::HttpError {
-                            reason: io_error.to_string(),
-                        },
-                    };
-                }
-            }
-        }
-
-        if let Some(hyper_error) = error.as_hyper_error() {
-            return RequestExecutionError::RequestExecutionFailed {
-                status_code,
-                redirects: None,
-                reason: hyper_error.into(),
-            };
-        }
-
-        if let Some(dns_error) = error.as_dns_error() {
-            return RequestExecutionError::RequestExecutionFailed {
-                status_code,
-                redirects: None,
-                reason: dns_error.into(),
-            };
-        }
-
-        if error.is_connect() {
-            return RequestExecutionError::RequestExecutionFailed {
-                status_code,
-                redirects: None,
-                reason: RequestExecutionErrorReason::NonExistentSiteError {
-                    error_message: Some(error.to_string()),
-                    suggested_action: None,
-                },
-            };
-        }
-
-        RequestExecutionError::RequestExecutionFailed {
-            status_code,
-            redirects: None,
-            reason: RequestExecutionErrorReason::GenericError {
-                error_message: error.to_string(),
+fn request_execution_error_from_reqwest(
+    error: reqwest::Error,
+    request_url: String,
+    request_method: RequestMethod,
+) -> RequestExecutionError {
+    let status_code = error.status().map(|s| s.as_u16());
+    let reason = if error.is_timeout() {
+        RequestExecutionErrorReason::HttpTimeoutError
+    } else if let Some(tls_error) = error.as_tls_error() {
+        tls_error.into()
+    } else if let Some(io_error) = error.as_io_error() {
+        match io_error.kind() {
+            std::io::ErrorKind::UnexpectedEof => RequestExecutionErrorReason::HttpError {
+                reason: "The server terminated the connection unexpectedly".to_string(),
+            },
+            _ => RequestExecutionErrorReason::HttpError {
+                reason: io_error.to_string(),
             },
         }
+    } else if let Some(hyper_error) = error.as_hyper_error() {
+        hyper_error.into()
+    } else if let Some(dns_error) = error.as_dns_error() {
+        dns_error.into()
+    } else if error.is_connect() {
+        RequestExecutionErrorReason::NonExistentSiteError {
+            error_message: Some(error.to_string()),
+            suggested_action: None,
+        }
+    } else {
+        RequestExecutionErrorReason::GenericError {
+            error_message: error.to_string(),
+        }
+    };
+
+    RequestExecutionError::RequestExecutionFailed {
+        status_code,
+        redirects: None,
+        reason,
+        request_url,
+        request_method,
     }
 }
 

@@ -12,8 +12,8 @@ pub use crate::{
     middleware::WpApiMiddlewarePipeline,
     parsed_url::{ParseUrlError, ParsedUrl},
     request::{
-        NetworkRequestAccessor, RequestExecutor, WpNetworkHeaderMap, WpNetworkRequest,
-        WpNetworkResponse,
+        NetworkRequestAccessor, RequestExecutor, RequestMethod, WpNetworkHeaderMap,
+        WpNetworkRequest, WpNetworkResponse,
         endpoint::{ApiUrlResolver, WpOrgSiteApiUrlResolver},
     },
     uuid::{WpUuid, WpUuidParseError},

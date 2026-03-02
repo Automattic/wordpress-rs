@@ -22,6 +22,7 @@ extension WpNetworkResponse {
             statusCode: UInt16(response.statusCode),
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders),
             requestUrl: request.url(),
+            requestMethod: request.method(),
             requestHeaderMap: request.headerMap()
         )
     }
@@ -35,7 +36,10 @@ extension MiddlewarePipeline {
 
 extension WpApiError {
     public var isCancellationError: Bool {
-        if case .RequestExecutionFailed(statusCode: _, redirects: _, reason: .cancellationError) = self {
+        if case .RequestExecutionFailed(
+            statusCode: _, redirects: _, reason: .cancellationError,
+            requestUrl: _, requestMethod: _
+        ) = self {
             return true
         }
         return false

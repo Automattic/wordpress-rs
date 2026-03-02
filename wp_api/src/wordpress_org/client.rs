@@ -239,6 +239,7 @@ impl From<RequestExecutionError> for WordPressOrgApiClientError {
                 status_code,
                 redirects,
                 reason,
+                ..
             } => WordPressOrgApiClientError::RequestExecutionFailed {
                 status_code,
                 redirects,

@@ -119,6 +119,8 @@ pub trait PerformsRequests {
                 status_code: Some(response.status_code),
                 redirects: None,
                 reason,
+                request_url: response.request_url.0.clone(),
+                request_method: response.request_method.clone(),
             });
         }
 
@@ -141,6 +143,8 @@ pub trait PerformsRequests {
                 status_code: Some(response.status_code),
                 redirects: None,
                 reason,
+                request_url: response.request_url.0.clone(),
+                request_method: response.request_method.clone(),
             });
         }
 
@@ -202,6 +206,8 @@ impl WpApiMiddleware for RetryAfterMiddleware {
                 status_code: Some(response.status_code),
                 redirects: None,
                 reason: RequestExecutionErrorReason::MisconfiguredRateLimitError {},
+                request_url: response.request_url.0.clone(),
+                request_method: response.request_method.clone(),
             });
         }
         if let Some(retry_after) = response.get_retry_after() {
@@ -281,7 +287,7 @@ mod tests {
     use super::*;
 
     mod api_discovery_authentication_middleware {
-        use crate::request::{WpNetworkHeaderMap, endpoint::WpEndpointUrl};
+        use crate::request::{RequestMethod, WpNetworkHeaderMap, endpoint::WpEndpointUrl};
 
         use super::*;
         use async_trait::async_trait;
@@ -364,6 +370,7 @@ mod tests {
                         status_code: 204,
                         response_header_map: Arc::new(WpNetworkHeaderMap::default()),
                         request_url: WpEndpointUrl("http://example.com".to_string()),
+                        request_method: RequestMethod::GET,
                         request_header_map: Arc::new(WpNetworkHeaderMap::default()),
                     })
                 },
@@ -397,6 +404,7 @@ mod tests {
                         status_code: initial_response_status_code,
                         response_header_map: Arc::new(WpNetworkHeaderMap::default()),
                         request_url: WpEndpointUrl("http://example.com".to_string()),
+                        request_method: RequestMethod::GET,
                         request_header_map: Arc::new(map.into()),
                     },
                     WpNetworkRequest::get(WpEndpointUrl("unused".to_string())).into(),
@@ -408,7 +416,9 @@ mod tests {
 
     mod retry_after_middleware {
         use super::*;
-        use crate::request::{WpNetworkHeaderMap, endpoint::WpEndpointUrl};
+        use crate::request::{
+            NetworkRequestAccessor, RequestMethod, WpNetworkHeaderMap, endpoint::WpEndpointUrl,
+        };
         use async_trait::async_trait;
         use http::HeaderMap;
         use std::sync::atomic::{AtomicBool, Ordering};
@@ -423,7 +433,7 @@ mod tests {
         impl RequestExecutor for FooExecutor {
             async fn execute(
                 &self,
-                _: Arc<WpNetworkRequest>,
+                request: Arc<WpNetworkRequest>,
             ) -> Result<WpNetworkResponse, RequestExecutionError> {
                 if self.first_request.load(Ordering::Relaxed) {
                     println!("First mock request; returning 429..");
@@ -435,7 +445,8 @@ mod tests {
                         body: vec![],
                         status_code: 200,
                         response_header_map: WpNetworkHeaderMap::default().into(),
-                        request_url: WpEndpointUrl("http://example.com".to_string()),
+                        request_url: request.url(),
+                        request_method: request.method(),
                         request_header_map: Arc::new(WpNetworkHeaderMap::default()),
                     })
                 }
@@ -443,7 +454,7 @@ mod tests {
 
             async fn upload(
                 &self,
-                _request: Arc<WpMultipartFormRequest>,
+                request: Arc<WpMultipartFormRequest>,
             ) -> Result<WpNetworkResponse, RequestExecutionError> {
                 Err(RequestExecutionError::RequestExecutionFailed {
                     status_code: None,
@@ -451,6 +462,8 @@ mod tests {
                     reason: RequestExecutionErrorReason::GenericError {
                         error_message: "upload_media is not used".to_string(),
                     },
+                    request_url: request.url().0,
+                    request_method: request.method(),
                 })
             }
 
@@ -477,6 +490,7 @@ mod tests {
                     status_code: Some(429),
                     redirects: None,
                     reason: RequestExecutionErrorReason::MisconfiguredRateLimitError,
+                    ..
                 })
             ));
         }
@@ -509,6 +523,7 @@ mod tests {
                 status_code: 429,
                 response_header_map: Arc::new(map.into()),
                 request_url: WpEndpointUrl("http://example.com".to_string()),
+                request_method: RequestMethod::GET,
                 request_header_map: Arc::new(WpNetworkHeaderMap::default()),
             }
         }

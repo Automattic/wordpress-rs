@@ -38,12 +38,24 @@ final class HTTPStubs: SafeRequestExecutor {
         case .failure:
             // TODO: Translate error into the Rust type
             return .failure(
-                .RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .genericError(errorMessage: ""))
+                .RequestExecutionFailed(
+                    statusCode: nil,
+                    redirects: nil,
+                    reason: .genericError(errorMessage: ""),
+                    requestUrl: request.url(),
+                    requestMethod: request.method()
+                )
             )
         default:
             // TODO: Translate error into the Rust type
             return .failure(
-                .RequestExecutionFailed(statusCode: nil, redirects: nil, reason: .genericError(errorMessage: ""))
+                .RequestExecutionFailed(
+                    statusCode: nil,
+                    redirects: nil,
+                    reason: .genericError(errorMessage: ""),
+                    requestUrl: request.url(),
+                    requestMethod: request.method()
+                )
             )
         }
     }
@@ -102,6 +114,7 @@ extension WpNetworkResponse {
             statusCode: 200,
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "application/json"]),
             requestUrl: "https://example.com",
+            requestMethod: .get,
             requestHeaderMap: .empty
         )
     }
@@ -120,6 +133,7 @@ extension WpNetworkResponse {
             statusCode: statusCode,
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "application/json"]),
             requestUrl: "https://example.com",
+            requestMethod: .get,
             requestHeaderMap: .empty
         )
     }
@@ -130,6 +144,7 @@ extension WpNetworkResponse {
             statusCode: 429,
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Retry-After": String(Int(after))]),
             requestUrl: "https://example.com",
+            requestMethod: .get,
             requestHeaderMap: .empty
         )
     }
@@ -142,6 +157,7 @@ extension WpNetworkResponse {
                 "Link": "<\(url)>; rel=\"https://api.w.org/\""
             ]),
             requestUrl: url,
+            requestMethod: .get,
             requestHeaderMap: .empty
         )
     }

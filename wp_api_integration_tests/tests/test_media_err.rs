@@ -194,7 +194,7 @@ impl MediaErrNetworking {
 impl RequestExecutor for MediaErrNetworking {
     async fn execute(
         &self,
-        _request: Arc<WpNetworkRequest>,
+        request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         Err(RequestExecutionError::RequestExecutionFailed {
             status_code: None,
@@ -202,6 +202,8 @@ impl RequestExecutor for MediaErrNetworking {
             reason: RequestExecutionErrorReason::GenericError {
                 error_message: "Execute function is not necessary for these tests".to_string(),
             },
+            request_url: request.url().0,
+            request_method: request.method(),
         })
     }
 
@@ -234,7 +236,19 @@ impl RequestExecutor for MediaErrNetworking {
         }
 
         let request = request.multipart(form);
-        let mut response = request.send().await?;
+        let mut response =
+            request
+                .send()
+                .await
+                .map_err(|e| RequestExecutionError::RequestExecutionFailed {
+                    status_code: e.status().map(|s| s.as_u16()),
+                    redirects: None,
+                    reason: RequestExecutionErrorReason::GenericError {
+                        error_message: e.to_string(),
+                    },
+                    request_url: upload_request.url().0.clone(),
+                    request_method: upload_request.method(),
+                })?;
 
         let header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
@@ -242,6 +256,7 @@ impl RequestExecutor for MediaErrNetworking {
             body: response.bytes().await.unwrap().to_vec(),
             response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
             request_url: upload_request.url(),
+            request_method: upload_request.method(),
             request_header_map: upload_request.header_map(),
         })
     }

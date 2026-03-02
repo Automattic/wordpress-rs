@@ -42,7 +42,9 @@ impl RequestExecutor for MockExecutor {
 pub mod response_helpers {
     use http::{HeaderMap, header::HeaderValue};
     use std::{fs, path::PathBuf, sync::Arc};
-    use wp_api::request::{WpNetworkHeaderMap, WpNetworkResponse, endpoint::WpEndpointUrl};
+    use wp_api::request::{
+        RequestMethod, WpNetworkHeaderMap, WpNetworkResponse, endpoint::WpEndpointUrl,
+    };
 
     pub fn with_api_root(url: &str) -> WpNetworkResponse {
         let mut map = HeaderMap::new();
@@ -56,6 +58,7 @@ pub mod response_helpers {
             status_code: 200,
             response_header_map: Arc::new(map.into()),
             request_url: WpEndpointUrl("".to_string()),
+            request_method: RequestMethod::GET,
             request_header_map: WpNetworkHeaderMap::default().into(),
         }
     }
@@ -82,6 +85,7 @@ pub mod response_helpers {
             status_code: 200,
             response_header_map: Arc::new(map.into()),
             request_url: WpEndpointUrl("".to_string()),
+            request_method: RequestMethod::GET,
             request_header_map: WpNetworkHeaderMap::default().into(),
         }
     }
@@ -98,6 +102,7 @@ pub mod response_helpers {
             status_code: 429,
             response_header_map: Arc::new(map.into()),
             request_url: WpEndpointUrl("".to_string()),
+            request_method: RequestMethod::GET,
             request_header_map: WpNetworkHeaderMap::default().into(),
         }
     }
@@ -108,6 +113,7 @@ pub mod response_helpers {
             status_code,
             response_header_map: WpNetworkHeaderMap::default().into(),
             request_url: WpEndpointUrl("".to_string()),
+            request_method: RequestMethod::GET,
             request_header_map: WpNetworkHeaderMap::default().into(),
         }
     }

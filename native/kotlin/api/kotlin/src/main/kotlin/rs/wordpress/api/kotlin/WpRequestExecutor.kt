@@ -76,7 +76,7 @@ class WpRequestExecutor @JvmOverloads constructor(
             addRequestHeaders(requestBuilder, request.headerMap())
             val urlRequest = requestBuilder.build()
 
-            executeRequestSafely(urlRequest, request.url(), request.headerMap())
+            executeRequestSafely(urlRequest, request.url(), request.method(), request.headerMap())
         }
 
     override suspend fun upload(request: WpMultipartFormRequest): WpNetworkResponse =
@@ -89,7 +89,13 @@ class WpRequestExecutor @JvmOverloads constructor(
             addRequestHeaders(requestBuilder, request.headerMap())
             val urlRequest = requestBuilder.build()
 
-            executeRequestSafely(urlRequest, request.url(), request.headerMap(), notifyUploadListener = true)
+            executeRequestSafely(
+                urlRequest,
+                request.url(),
+                request.method(),
+                request.headerMap(),
+                notifyUploadListener = true
+            )
         }
 
     private fun buildMultipartBody(request: WpMultipartFormRequest): MultipartBody {
@@ -157,6 +163,7 @@ class WpRequestExecutor @JvmOverloads constructor(
     private fun executeRequestSafely(
         urlRequest: Request,
         requestUrl: String,
+        requestMethod: RequestMethod,
         requestHeaderMap: WpNetworkHeaderMap,
         notifyUploadListener: Boolean = false
     ): WpNetworkResponse {
@@ -174,30 +181,49 @@ class WpRequestExecutor @JvmOverloads constructor(
                     statusCode = response.code.toUShort(),
                     responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
                     requestUrl = requestUrl,
+                    requestMethod = requestMethod,
                     requestHeaderMap = requestHeaderMap
                 )
             }
         } catch (e: SSLPeerUnverifiedException) {
             throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
+                RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url),
+                requestUrl,
+                requestMethod,
             )
         } catch (e: UnknownHostException) {
-            throw requestExecutionFailedWith(RequestExecutionErrorReason.unknownHost(e))
+            throw requestExecutionFailedWith(
+                RequestExecutionErrorReason.unknownHost(e),
+                requestUrl,
+                requestMethod,
+            )
         } catch (e: NoRouteToHostException) {
-            throw requestExecutionFailedWith(RequestExecutionErrorReason.noRouteToHost(e))
+            throw requestExecutionFailedWith(
+                RequestExecutionErrorReason.noRouteToHost(e),
+                requestUrl,
+                requestMethod,
+            )
         } catch (e: ConnectException) {
             throw requestExecutionFailedWith(
                 RequestExecutionErrorReason.HttpError(
                     reason = "Connection failed: ${e.localizedMessage}"
-                )
+                ),
+                requestUrl,
+                requestMethod,
             )
         } catch (e: SocketTimeoutException) {
-            throw requestExecutionFailedWith(RequestExecutionErrorReason.HttpTimeoutError)
+            throw requestExecutionFailedWith(
+                RequestExecutionErrorReason.HttpTimeoutError,
+                requestUrl,
+                requestMethod,
+            )
         } catch (e: Exception) {
             throw requestExecutionFailedWith(
                 RequestExecutionErrorReason.GenericError(
                     errorMessage = e.localizedMessage ?: e.toString()
-                )
+                ),
+                requestUrl,
+                requestMethod,
             )
         }
     }
@@ -309,9 +335,15 @@ private fun RequestExecutionErrorReason.Companion.invalidSSLError(
     }
 }
 
-private fun requestExecutionFailedWith(reason: RequestExecutionErrorReason) =
+private fun requestExecutionFailedWith(
+    reason: RequestExecutionErrorReason,
+    requestUrl: String,
+    requestMethod: RequestMethod,
+) =
     RequestExecutionException.RequestExecutionFailed(
         statusCode = null,
         redirects = null,
-        reason = reason
+        reason = reason,
+        requestUrl = requestUrl,
+        requestMethod = requestMethod,
     )

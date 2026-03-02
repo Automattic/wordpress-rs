@@ -342,6 +342,10 @@ impl ParseHomepageResult {
     }
 }
 
+// RequestExecutionError (216 bytes) is much larger than the other variants, but this enum is only
+// created on login failure and never in hot paths or large collections. Kept consistent with
+// FindApiRootFailure and XmlrpcDiscoveryError which can't use indirection due to UniFFI.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum FetchWpJsonFailure {
     ParseSiteUrl {
@@ -429,6 +433,10 @@ impl WpSupportsLocalization for AutoDiscoveryAttemptFailure {
     }
 }
 
+// RequestExecutionError (216 bytes) is much larger than the unit variants, but this enum is only
+// created on login failure and never in hot paths or large collections. UniFFI doesn't support
+// Box or Arc for non-Object types, so indirection isn't possible here.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, uniffi::Enum)]
 pub enum FindApiRootFailure {
     FetchHomepage { error: RequestExecutionError },
@@ -698,6 +706,10 @@ impl WpSupportsLocalization for FetchApiDetailsError {
     }
 }
 
+// RequestExecutionError (216 bytes) is much larger than the other variants, but this enum is only
+// created during XMLRPC discovery failures and never in hot paths. UniFFI doesn't support Box or
+// Arc for non-Object types, so indirection isn't possible here.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum XmlrpcDiscoveryError {
     FetchHomepage { error: RequestExecutionError },
@@ -804,6 +816,7 @@ impl ParseApiRootFailureReason {
 mod tests {
     use super::AutoDiscoveryAttempt as A;
     use super::*;
+    use crate::request::RequestMethod;
     use rstest::*;
 
     #[rstest]
@@ -1122,6 +1135,8 @@ mod tests {
                 status_code: None,
                 redirects: None,
                 reason: RequestExecutionErrorReason::MisconfiguredRateLimitError,
+                request_url: "https://example.com".to_string(),
+                request_method: RequestMethod::GET,
             }
         }
 

@@ -4,6 +4,7 @@ import kotlinx.coroutines.delay
 import okio.FileNotFoundException
 import uniffi.wp_api.RequestContext
 import uniffi.wp_api.RequestExecutor
+import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpMultipartFormRequest
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkRequest
@@ -60,6 +61,7 @@ val WpNetworkResponse.Companion.empty: WpNetworkResponse
         200u,
         WpNetworkHeaderMap.empty,
         "",
+        RequestMethod.GET,
         WpNetworkHeaderMap.empty
     )
 
@@ -72,6 +74,7 @@ fun WpNetworkResponse.Companion.withApiRoot(url: String): WpNetworkResponse {
         200u,
         WpNetworkHeaderMap.fromMap(mapOf("Link" to "<$url>; rel=\"https://api.w.org/\"")),
         "",
+        RequestMethod.GET,
         WpNetworkHeaderMap.empty
     )
 }
@@ -88,6 +91,7 @@ fun WpNetworkResponse.Companion.jsonResponse(name: String): WpNetworkResponse {
         200u,
         WpNetworkHeaderMap.fromMap(mapOf("Content-Type" to "application/json")),
         "",
+        RequestMethod.GET,
         WpNetworkHeaderMap.empty
     )
 }
@@ -98,6 +102,7 @@ fun WpNetworkResponse.Companion.retryResponse(delay: ULong): WpNetworkResponse {
         429u,
         WpNetworkHeaderMap.fromMap(mapOf("Retry-After" to delay.toString())),
         "",
+        RequestMethod.GET,
         WpNetworkHeaderMap.empty
     )
 }
