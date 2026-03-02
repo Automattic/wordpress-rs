@@ -2,7 +2,7 @@
 import CryptoKit
 import Foundation
 import Testing
-import WordPressAPI
+@testable import WordPressAPI
 
 /// Create a temporary key file URL for testing.
 private func temporaryKeyFile() throws -> (URL, URL) {

@@ -42,7 +42,7 @@ import WordPressAPIInternal
 /// The default implementation (``SystemKeychainStorage``) uses the system
 /// Keychain. Conforming types can provide alternative storage (e.g. in-memory)
 /// for testing or environments where the Keychain is unavailable.
-public protocol KeychainStorage {
+protocol KeychainStorage {
     func load() throws -> Data?
     func save(data: Data) throws
 }
@@ -52,16 +52,16 @@ public protocol KeychainStorage {
 /// The `applicationName` is stored as the `kSecAttrService` value, which is
 /// the most visible field in Keychain Access. This makes it easy to identify
 /// which app owns a given Keychain item.
-public struct SystemKeychainStorage: KeychainStorage {
+struct SystemKeychainStorage: KeychainStorage {
     private let applicationName: String
 
     private static let accountName = "encryption-key"
 
-    public init(applicationName: String) {
+    init(applicationName: String) {
         self.applicationName = applicationName
     }
 
-    public func load() throws -> Data? {
+    func load() throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: applicationName,
@@ -83,7 +83,7 @@ public struct SystemKeychainStorage: KeychainStorage {
         }
     }
 
-    public func save(data: Data) throws {
+    func save(data: Data) throws {
         let attributes: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: applicationName,
@@ -175,30 +175,36 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
         self.init(privateKey: try Self.privateKey(from: persistedKeyData))
     }
 
-    /// Creates a transformer whose key is automatically persisted via the
-    /// given ``KeychainStorage``.
+    /// Creates a transformer whose key is automatically persisted to the
+    /// system Keychain.
     ///
     /// On first use a new key is created and saved. On subsequent calls with
     /// the same application name the existing key is restored, so encrypted
     /// data survives app relaunches without any manual persistence.
     ///
-    /// - Parameters:
-    ///   - applicationName: An identifier for the stored key. Different names
-    ///     produce independent keys. Used as `kSecAttrService` in the Keychain.
-    ///   - keychainStorage: The storage backend used to persist the key.
-    ///     Defaults to ``SystemKeychainStorage`` which uses the system Keychain.
+    /// - Parameter applicationName: An identifier for the stored key. Different
+    ///   names produce independent keys. Used as `kSecAttrService` in the Keychain.
     /// - Throws: ``SecureEnclavePasswordTransformerError/keychainError(_:)``
-    ///   if storage access fails.
-    public convenience init(
+    ///   if Keychain access fails.
+    public convenience init(applicationName: String) throws {
+        try self.init(
+            applicationName: applicationName,
+            keychainStorage: SystemKeychainStorage(applicationName: applicationName)
+        )
+    }
+
+    /// Creates a transformer using the given storage backend for key
+    /// persistence. This exists so tests can inject a mock ``KeychainStorage``
+    /// without touching the real Keychain.
+    convenience init(
         applicationName: String,
-        keychainStorage: KeychainStorage? = nil
+        keychainStorage: KeychainStorage
     ) throws {
-        let storage = keychainStorage ?? SystemKeychainStorage(applicationName: applicationName)
-        if let existing = try storage.load() {
+        if let existing = try keychainStorage.load() {
             try self.init(persistedKeyData: existing)
         } else {
             self.init(privateKey: try Self.createKey())
-            try storage.save(data: persistedKeyData)
+            try keychainStorage.save(data: persistedKeyData)
         }
     }
 
