@@ -275,14 +275,16 @@ impl AccountRepository {
         password_transformer: Arc<dyn PasswordTransformer>,
     ) -> Result<Self, AccountRepositoryError> {
         let accounts: Vec<StoredAccount> = match fs::read_to_string(&file_path) {
-            Ok(data) => serde_json::from_str(&data).map_err(|e| AccountRepositoryError::IoError {
-                reason: e.to_string(),
-            })?,
+            Ok(data) => {
+                serde_json::from_str(&data).map_err(|e| AccountRepositoryError::IoError {
+                    reason: e.to_string(),
+                })?
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
             Err(e) => {
                 return Err(AccountRepositoryError::IoError {
                     reason: e.to_string(),
-                })
+                });
             }
         };
 
@@ -309,26 +311,31 @@ impl AccountRepository {
         // is guaranteed to be atomic on the same filesystem), write the data,
         // set permissions, then rename over the target. The temp file is
         // automatically cleaned up if we bail out early.
-        let dir = self.file_path.parent().ok_or_else(|| AccountRepositoryError::IoError {
-            reason: "accounts.json has no parent directory".to_string(),
-        })?;
+        let dir = self
+            .file_path
+            .parent()
+            .ok_or_else(|| AccountRepositoryError::IoError {
+                reason: "accounts.json has no parent directory".to_string(),
+            })?;
 
-        let mut temp = tempfile::NamedTempFile::new_in(dir).map_err(|e| {
-            AccountRepositoryError::IoError {
+        let mut temp =
+            tempfile::NamedTempFile::new_in(dir).map_err(|e| AccountRepositoryError::IoError {
                 reason: e.to_string(),
-            }
-        })?;
+            })?;
 
-        temp.write_all(json.as_bytes()).map_err(|e| AccountRepositoryError::IoError {
-            reason: e.to_string(),
-        })?;
+        temp.write_all(json.as_bytes())
+            .map_err(|e| AccountRepositoryError::IoError {
+                reason: e.to_string(),
+            })?;
 
         // Flush the userspace buffer and sync to disk before renaming.
         // Without this, a crash between persist() and the OS flushing its
         // buffers could leave the renamed file with incomplete content.
-        temp.as_file().sync_all().map_err(|e| AccountRepositoryError::IoError {
-            reason: e.to_string(),
-        })?;
+        temp.as_file()
+            .sync_all()
+            .map_err(|e| AccountRepositoryError::IoError {
+                reason: e.to_string(),
+            })?;
 
         #[cfg(unix)]
         {
@@ -340,9 +347,10 @@ impl AccountRepository {
             })?;
         }
 
-        temp.persist(&self.file_path).map_err(|e| AccountRepositoryError::IoError {
-            reason: e.to_string(),
-        })?;
+        temp.persist(&self.file_path)
+            .map_err(|e| AccountRepositoryError::IoError {
+                reason: e.to_string(),
+            })?;
 
         Ok(())
     }
@@ -378,9 +386,11 @@ impl AccountRepository {
         // We use the canonical path for all file operations (not just the
         // singleton registry), so that symlinks or relative paths don't
         // cause save() to write to a different location than load() read from.
-        let canonical_dir = root.canonicalize().map_err(|e| AccountRepositoryError::IoError {
-            reason: e.to_string(),
-        })?;
+        let canonical_dir = root
+            .canonicalize()
+            .map_err(|e| AccountRepositoryError::IoError {
+                reason: e.to_string(),
+            })?;
 
         let file_path = canonical_dir.join("accounts.json");
         let canonical = file_path.clone();
@@ -968,8 +978,7 @@ mod tests {
         assert_eq!(all_ids.len(), 5, "IDs must be unique across reloads");
 
         // Verify all accounts are retrievable from a fresh instance
-        let repo =
-            AccountRepository::new(path, transformer).expect("failed to create repo");
+        let repo = AccountRepository::new(path, transformer).expect("failed to create repo");
         for id in &all_ids {
             assert!(
                 repo.get(*id).expect("get failed").is_some(),
