@@ -1,8 +1,14 @@
+use std::collections::HashSet;
 use std::fmt;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use zeroize::Zeroize;
+
+/// Tracks which canonical file paths have an active `AccountRepository`.
+/// Prevents multiple instances from operating on the same file, which would
+/// lead to data races and lost writes.
+static ACTIVE_PATHS: Mutex<Option<HashSet<PathBuf>>> = Mutex::new(None);
 
 pub type AccountId = u64;
 
@@ -79,6 +85,10 @@ impl Account {
 }
 
 /// Internal storage representation with encrypted passwords.
+///
+/// Only the `token` and `password` fields are encrypted. Usernames, domains,
+/// and site URLs are stored in plaintext so account lists can be displayed
+/// without decryption.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 enum StoredAccount {
     WpCom {
@@ -228,41 +238,113 @@ struct AccountRepositoryState {
     next_id: AccountId,
 }
 
+/// Encrypted, file-backed account storage.
+///
+/// Thread-safe within a single process: all reads and writes are serialized
+/// through an internal mutex. However, there is no cross-process locking —
+/// if multiple processes need to access the same file, external coordination
+/// is required.
+///
+/// Only one `AccountRepository` may exist per file path within a process.
+/// Attempting to create a second instance for the same path will panic.
 #[derive(uniffi::Object)]
 pub struct AccountRepository {
     file_path: PathBuf,
+    /// The canonicalized form of `file_path`, used as the key in `ACTIVE_PATHS`.
+    canonical_path: PathBuf,
     state: Mutex<AccountRepositoryState>,
     password_transformer: Arc<dyn PasswordTransformer>,
 }
 
+impl Drop for AccountRepository {
+    fn drop(&mut self) {
+        // Use lock().ok() instead of .expect() so that Drop never panics,
+        // even if the mutex was poisoned by an earlier panic.
+        if let Ok(mut guard) = ACTIVE_PATHS.lock()
+            && let Some(set) = guard.as_mut()
+        {
+            set.remove(&self.canonical_path);
+        }
+    }
+}
+
 impl AccountRepository {
+    fn load(
+        file_path: PathBuf,
+        canonical_path: PathBuf,
+        password_transformer: Arc<dyn PasswordTransformer>,
+    ) -> Result<Self, AccountRepositoryError> {
+        let accounts: Vec<StoredAccount> = match fs::read_to_string(&file_path) {
+            Ok(data) => serde_json::from_str(&data).map_err(|e| AccountRepositoryError::IoError {
+                reason: e.to_string(),
+            })?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(e) => {
+                return Err(AccountRepositoryError::IoError {
+                    reason: e.to_string(),
+                })
+            }
+        };
+
+        let next_id = accounts.iter().map(|a| a.id()).max().unwrap_or(0) + 1;
+
+        Ok(Self {
+            file_path,
+            canonical_path,
+            state: Mutex::new(AccountRepositoryState { accounts, next_id }),
+            password_transformer,
+        })
+    }
+
     fn save(&self, state: &AccountRepositoryState) -> Result<(), AccountRepositoryError> {
+        use std::io::Write;
+
         let json = serde_json::to_string_pretty(&state.accounts).map_err(|e| {
             AccountRepositoryError::IoError {
                 reason: e.to_string(),
             }
         })?;
 
-        // Atomic write: write to a temp file then rename, so a crash can never
-        // leave a half-written accounts.json.
-        let temp_path = self.file_path.with_extension("tmp");
-        fs::write(&temp_path, json).map_err(|e| AccountRepositoryError::IoError {
+        // Atomic write: create a temp file in the same directory (so rename
+        // is guaranteed to be atomic on the same filesystem), write the data,
+        // set permissions, then rename over the target. The temp file is
+        // automatically cleaned up if we bail out early.
+        let dir = self.file_path.parent().ok_or_else(|| AccountRepositoryError::IoError {
+            reason: "accounts.json has no parent directory".to_string(),
+        })?;
+
+        let mut temp = tempfile::NamedTempFile::new_in(dir).map_err(|e| {
+            AccountRepositoryError::IoError {
+                reason: e.to_string(),
+            }
+        })?;
+
+        temp.write_all(json.as_bytes()).map_err(|e| AccountRepositoryError::IoError {
+            reason: e.to_string(),
+        })?;
+
+        // Flush the userspace buffer and sync to disk before renaming.
+        // Without this, a crash between persist() and the OS flushing its
+        // buffers could leave the renamed file with incomplete content.
+        temp.as_file().sync_all().map_err(|e| AccountRepositoryError::IoError {
             reason: e.to_string(),
         })?;
 
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&temp_path, fs::Permissions::from_mode(0o600)).map_err(|e| {
+            fs::set_permissions(temp.path(), fs::Permissions::from_mode(0o600)).map_err(|e| {
                 AccountRepositoryError::IoError {
                     reason: e.to_string(),
                 }
             })?;
         }
 
-        fs::rename(&temp_path, &self.file_path).map_err(|e| AccountRepositoryError::IoError {
+        temp.persist(&self.file_path).map_err(|e| AccountRepositoryError::IoError {
             reason: e.to_string(),
-        })
+        })?;
+
+        Ok(())
     }
 }
 
@@ -289,27 +371,45 @@ impl AccountRepository {
             })?;
         }
 
-        let file_path = root.join("accounts.json");
+        // Canonicalize the directory (which we just created) rather than the
+        // file (which may not exist yet). If this fails, something is seriously
+        // wrong — we just created the directory.
+        //
+        // We use the canonical path for all file operations (not just the
+        // singleton registry), so that symlinks or relative paths don't
+        // cause save() to write to a different location than load() read from.
+        let canonical_dir = root.canonicalize().map_err(|e| AccountRepositoryError::IoError {
+            reason: e.to_string(),
+        })?;
 
-        let accounts: Vec<StoredAccount> = if file_path.exists() {
-            let data =
-                fs::read_to_string(&file_path).map_err(|e| AccountRepositoryError::IoError {
-                    reason: e.to_string(),
-                })?;
-            serde_json::from_str(&data).map_err(|e| AccountRepositoryError::IoError {
-                reason: e.to_string(),
-            })?
-        } else {
-            Vec::new()
+        let file_path = canonical_dir.join("accounts.json");
+        let canonical = file_path.clone();
+
+        // Ensure no other instance is already using this path. This is a
+        // programmer error — callers should treat AccountRepository as a
+        // singleton per file path.
+        let already_open = {
+            let mut guard = ACTIVE_PATHS.lock().expect("poisoned global mutex");
+            let set = guard.get_or_insert_with(HashSet::new);
+            !set.insert(canonical.clone())
         };
+        assert!(
+            !already_open,
+            "An AccountRepository is already open for {}",
+            canonical.display()
+        );
 
-        let next_id = accounts.iter().map(|a| a.id()).max().unwrap_or(0) + 1;
+        let result = Self::load(file_path, canonical.clone(), password_transformer);
 
-        Ok(Self {
-            file_path,
-            state: Mutex::new(AccountRepositoryState { accounts, next_id }),
-            password_transformer,
-        })
+        // If loading failed, remove the path from the registry so it can be retried.
+        if result.is_err() {
+            let mut guard = ACTIVE_PATHS.lock().expect("poisoned global mutex");
+            if let Some(set) = guard.as_mut() {
+                set.remove(&canonical);
+            }
+        }
+
+        result
     }
 
     pub fn store(&self, account: Account) -> Result<AccountId, AccountRepositoryError> {
@@ -321,7 +421,13 @@ impl AccountRepository {
         let stored =
             StoredAccount::encrypt(account, self.password_transformer.as_ref())?.with_id(id);
         state.accounts.push(stored);
-        self.save(&state)?;
+
+        if let Err(e) = self.save(&state) {
+            state.accounts.pop();
+            state.next_id -= 1;
+            return Err(e);
+        }
+
         Ok(id)
     }
 
@@ -369,8 +475,21 @@ impl AccountRepository {
 
     pub fn remove(&self, id: AccountId) -> Result<(), AccountRepositoryError> {
         let mut state = self.state.lock().expect("poisoned mutex");
-        state.accounts.retain(|a| a.id() != id);
-        self.save(&state)
+
+        // Find and remove by index so we can restore on save failure
+        // without cloning the entire account list.
+        let Some(index) = state.accounts.iter().position(|a| a.id() == id) else {
+            return Ok(());
+        };
+
+        let removed = state.accounts.remove(index);
+
+        if let Err(e) = self.save(&state) {
+            state.accounts.insert(index, removed);
+            return Err(e);
+        }
+
+        Ok(())
     }
 }
 
@@ -884,5 +1003,65 @@ mod tests {
         let result =
             AccountRepository::new("/dev/null/impossible/path".to_string(), test_transformer());
         assert!(result.is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "An AccountRepository is already open")]
+    fn test_second_instance_for_same_path_panics() {
+        let (_dir, _repo) = temp_repo();
+        let _repo2 = AccountRepository::new(
+            _dir.path().to_string_lossy().to_string(),
+            test_transformer(),
+        );
+    }
+
+    #[test]
+    fn test_path_is_released_after_drop() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let path = dir.path().to_string_lossy().to_string();
+
+        {
+            let _repo =
+                AccountRepository::new(path.clone(), test_transformer()).expect("first open");
+        }
+
+        // After the first instance is dropped, we can open a new one.
+        let _repo =
+            AccountRepository::new(path, test_transformer()).expect("second open after drop");
+    }
+
+    #[test]
+    fn test_different_paths_can_coexist() {
+        let dir1 = tempfile::tempdir().expect("failed to create temp dir");
+        let dir2 = tempfile::tempdir().expect("failed to create temp dir");
+
+        let _repo1 = AccountRepository::new(
+            dir1.path().to_string_lossy().to_string(),
+            test_transformer(),
+        )
+        .expect("first open");
+
+        let _repo2 = AccountRepository::new(
+            dir2.path().to_string_lossy().to_string(),
+            test_transformer(),
+        )
+        .expect("second open at different path");
+    }
+
+    #[test]
+    fn test_failed_load_does_not_block_retry() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let path = dir.path().to_string_lossy().to_string();
+
+        // Write invalid JSON so the first open fails during load.
+        fs::write(dir.path().join("accounts.json"), "not valid json").unwrap();
+
+        let result = AccountRepository::new(path.clone(), test_transformer());
+        assert!(result.is_err());
+
+        // Fix the file and try again — should succeed because the failed
+        // attempt cleaned up its registry entry.
+        fs::write(dir.path().join("accounts.json"), "[]").unwrap();
+        let _repo = AccountRepository::new(path, test_transformer()).expect("retry after fix");
     }
 }
