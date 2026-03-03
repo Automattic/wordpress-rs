@@ -196,7 +196,7 @@
 			);
 			mainGroup = 2479BF742B621CB60014A01D;
 			packageReferences = (
-				242132C62CE69CE80021D8E8 /* XCLocalSwiftPackageReference "../../../../wordpress-rs" */,
+				242132C62CE69CE80021D8E8 /* XCLocalSwiftPackageReference "../../.." */,
 			);
 			productRefGroup = 2479BF7E2B621CB60014A01D /* Products */;
 			projectDirPath = "";
@@ -489,9 +489,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		242132C62CE69CE80021D8E8 /* XCLocalSwiftPackageReference "../../../../wordpress-rs" */ = {
+		242132C62CE69CE80021D8E8 /* XCLocalSwiftPackageReference "../../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../../../wordpress-rs";
+			relativePath = "../../..";
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -506,7 +506,7 @@
 		};
 		24A4820F2ECFE385003A46BA /* WordPressApiCache */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 242132C62CE69CE80021D8E8 /* XCLocalSwiftPackageReference "../../../../wordpress-rs" */;
+			package = 242132C62CE69CE80021D8E8 /* XCLocalSwiftPackageReference "../../.." */;
 			productName = WordPressApiCache;
 		};
 		24E77D022CE44DD900F6998C /* WordPressAPI */ = {
