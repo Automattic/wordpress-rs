@@ -95,6 +95,7 @@ class MediaEndpointTest {
         )
         val requestExecutor = WpRequestExecutor(
             interceptors = emptyList(),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true },
             fileResolver = FileResolverMock(),
             uploadListener = uploadListener
         )
@@ -146,6 +147,7 @@ class MediaEndpointTest {
         )
         val requestExecutor = WpRequestExecutor(
             interceptors = emptyList(),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true },
             fileResolver = FileResolverMock()
         )
         return WpApiClient(

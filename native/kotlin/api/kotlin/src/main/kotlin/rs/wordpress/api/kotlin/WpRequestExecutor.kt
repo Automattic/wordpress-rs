@@ -35,8 +35,25 @@ import javax.net.ssl.SSLPeerUnverifiedException
 
 const val USER_AGENT_HEADER_NAME = "User-Agent"
 
+/**
+ * Provides network availability information to [WpRequestExecutor].
+ *
+ * On Android, implement this using [ConnectivityManager]:
+ * ```
+ * val provider = NetworkAvailabilityProvider {
+ *     val cm = context.getSystemService(ConnectivityManager::class.java)
+ *     val capabilities = cm.getNetworkCapabilities(cm.activeNetwork)
+ *     capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+ * }
+ * ```
+ */
+fun interface NetworkAvailabilityProvider {
+    fun isNetworkAvailable(): Boolean
+}
+
 class WpRequestExecutor @JvmOverloads constructor(
     private val httpClient: WpHttpClient,
+    private val networkAvailabilityProvider: NetworkAvailabilityProvider,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val fileResolver: FileResolver = DefaultFileResolver(),
     private val uploadListener: UploadListener? = null
@@ -49,11 +66,13 @@ class WpRequestExecutor @JvmOverloads constructor(
     @JvmOverloads
     constructor(
         interceptors: List<Interceptor> = listOf(),
+        networkAvailabilityProvider: NetworkAvailabilityProvider,
         dispatcher: CoroutineDispatcher = Dispatchers.IO,
         fileResolver: FileResolver = DefaultFileResolver(),
         uploadListener: UploadListener? = null
     ) : this(
         httpClient = WpHttpClient.DefaultHttpClient(interceptors),
+        networkAvailabilityProvider = networkAvailabilityProvider,
         dispatcher = dispatcher,
         fileResolver = fileResolver,
         uploadListener = uploadListener
@@ -193,7 +212,7 @@ class WpRequestExecutor @JvmOverloads constructor(
             )
         } catch (e: UnknownHostException) {
             throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.unknownHost(e),
+                RequestExecutionErrorReason.unknownHost(e, networkAvailabilityProvider),
                 requestUrl,
                 requestMethod,
             )
@@ -282,11 +301,21 @@ class WpRequestExecutor @JvmOverloads constructor(
     }
 }
 
-private fun RequestExecutionErrorReason.Companion.unknownHost(e: UnknownHostException) =
-    RequestExecutionErrorReason.NonExistentSiteError(
+private fun RequestExecutionErrorReason.Companion.unknownHost(
+    e: UnknownHostException,
+    networkAvailabilityProvider: NetworkAvailabilityProvider
+): RequestExecutionErrorReason {
+    if (!networkAvailabilityProvider.isNetworkAvailable()) {
+        return RequestExecutionErrorReason.DeviceIsOfflineError(
+            errorMessage = e.localizedMessage ?: "No internet connection"
+        )
+    }
+
+    return RequestExecutionErrorReason.NonExistentSiteError(
         errorMessage = e.localizedMessage,
         suggestedAction = "Check that the URL is valid and try again"
     )
+}
 
 private fun RequestExecutionErrorReason.Companion.noRouteToHost(e: NoRouteToHostException) =
     RequestExecutionErrorReason.HttpError(

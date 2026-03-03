@@ -26,7 +26,7 @@ import kotlin.test.assertContains
 
 @Execution(ExecutionMode.CONCURRENT)
 class ApiUrlDiscoveryTest {
-    private val loginClient: WpLoginClient = WpLoginClient(emptyList())
+    private val loginClient: WpLoginClient = WpLoginClient(emptyList(), NetworkAvailabilityProvider { true })
 
     @Test
     fun testLocalSite() = runTest {
@@ -187,7 +187,7 @@ class ApiUrlDiscoveryTest {
         val invalid =
             ApiDiscoveryAuthenticationMiddleware(username = "invalid", password = "invalid")
         val client = WpLoginClient(
-            WpRequestExecutor(emptyList()), WpApiMiddlewarePipeline(middlewares = listOf(invalid))
+            WpRequestExecutor(emptyList(), NetworkAvailabilityProvider { true }), WpApiMiddlewarePipeline(middlewares = listOf(invalid))
         )
         val reason = client.apiDiscovery("https://basic-auth.wpmt.co")
             .assertFailureFindApiRoot().getRequestExecutionErrorReason()
@@ -205,7 +205,7 @@ class ApiUrlDiscoveryTest {
         )
 
         val client = WpLoginClient(
-            WpRequestExecutor(emptyList()), WpApiMiddlewarePipeline(middlewares = listOf(valid))
+            WpRequestExecutor(emptyList(), NetworkAvailabilityProvider { true }), WpApiMiddlewarePipeline(middlewares = listOf(valid))
         )
 
         assertEquals(
@@ -285,7 +285,7 @@ class ApiUrlDiscoveryTest {
     @Test // Spec Example 17 (with exception)
     fun testInvalidHttpsWithExceptionWorks() = runTest {
         val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
-        val executor = WpRequestExecutor(httpClient)
+        val executor = WpRequestExecutor(httpClient, NetworkAvailabilityProvider { true })
         httpClient.addAllowedAlternativeNamesForHostname(
             "vanilla.wpmt.co",
             listOf("wordpress-1315525-4803651.cloudwaysapps.com")
@@ -301,7 +301,7 @@ class ApiUrlDiscoveryTest {
     @Test
     fun testAllowedHostnamesDoesNotBreakValidSites() = runTest {
         val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
-        val executor = WpRequestExecutor(httpClient)
+        val executor = WpRequestExecutor(httpClient, NetworkAvailabilityProvider { true })
         val loginClient = WpLoginClient(requestExecutor = executor)
 
         // First, configure an allowed hostname override for a specific cert/hostname pair
@@ -326,7 +326,7 @@ class ApiUrlDiscoveryTest {
     @Test
     fun testCustomOkHttpClient() = runTest {
         val executor =
-            WpRequestExecutor(httpClient = WpHttpClient.CustomOkHttpClient(client = OkHttpClient()))
+            WpRequestExecutor(httpClient = WpHttpClient.CustomOkHttpClient(client = OkHttpClient()), networkAvailabilityProvider = NetworkAvailabilityProvider { true })
         assertEquals(
             "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
             WpLoginClient(requestExecutor = executor).apiDiscovery("https://vanilla.wpmt.co")

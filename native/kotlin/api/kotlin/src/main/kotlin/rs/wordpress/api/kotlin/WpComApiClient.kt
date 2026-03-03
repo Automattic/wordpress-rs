@@ -26,11 +26,12 @@ class WpComApiClient(
     constructor(
         authProvider: WpAuthenticationProvider,
         interceptors: List<Interceptor>,
+        networkAvailabilityProvider: NetworkAvailabilityProvider,
         appNotifier: WpAppNotifier = EmptyAppNotifier(),
         dispatcher: CoroutineDispatcher = Dispatchers.IO
     ) : this(
         authProvider,
-        requestExecutor = WpRequestExecutor(interceptors),
+        requestExecutor = WpRequestExecutor(interceptors, networkAvailabilityProvider),
         appNotifier,
         dispatcher
     )
