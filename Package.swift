@@ -34,6 +34,7 @@ var package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
+        .package(url: "https://github.com/jkmassel/mocktail-swift.git", branch: "main"),
     ],
     targets: [
         .target(
@@ -74,10 +75,15 @@ var package = Package(
             dependencies: [
                 .target(name: "WordPressAPI"),
                 .target(name: "WordPressApiCache"),
-                .target(name: libwordpressFFI.name)
+                .target(name: libwordpressFFI.name),
+                .product(name: "MockWebServer", package: "mocktail-swift", condition: .when(platforms: [.iOS, .macOS, .tvOS, .watchOS])),
             ],
             path: "native/swift/Tests/wordpress-api",
-            resources: [.copy("../../../../test-data/integration-test-responses/")],
+            resources: [
+                .copy("../../../../test-data/integration-test-responses/"),
+                .copy("../../../../test-data/login-mocks/"),
+                .copy("../../../../test-data/ssl-certs/"),
+            ],
             swiftSettings: [
                 .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
             ]

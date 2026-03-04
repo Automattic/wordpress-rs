@@ -25,6 +25,17 @@ clean:
 	@# Help: Remove untracked files from the project via Git.
 	git clean -ffXd
 
+trust-test-ca:
+	@# Help: Trust the test CA certificate (macOS only).
+	@# Uses admin domain (-d) for system-wide trust. Requires user interaction
+	@# on headless CI — if this fails, HTTPS tests using the test CA (spec 19)
+	@# will be skipped.
+	sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain test-data/ssl-certs/ca-cert.pem
+
+trust-test-ca-jvm:
+	@# Help: Trust the test CA certificate in the JVM keystore (requires write access to cacerts).
+	keytool -importcert -file test-data/ssl-certs/ca-cert.pem -keystore $$JAVA_HOME/lib/security/cacerts -storepass changeit -noprompt -alias wordpress-rs-test-ca
+
 .PHONY: docs # Rebuild docs each time we run this command
 docs:
 	@# Help: Generate project documentation.

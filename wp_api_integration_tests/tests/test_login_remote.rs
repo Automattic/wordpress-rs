@@ -11,7 +11,9 @@ use wp_api::{
         ApiDiscoveryAuthenticationMiddleware, RetryAfterMiddleware, WpApiMiddleware,
         WpApiMiddlewarePipeline,
     },
-    request::{NetworkRequestAccessor, RequestExecutor},
+    request::{
+        NetworkRequestAccessor, RequestExecutor, WpNetworkResponse, endpoint::WpEndpointUrl,
+    },
     reqwest_request_executor::ReqwestRequestExecutor,
 };
 use wp_api_integration_tests::prelude::*;
@@ -20,8 +22,20 @@ use wp_api_integration_tests::prelude::*;
 #[parallel]
 async fn login_spec_1_valid_site_works_correctly() {
     // Spec Example 1
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        "https://vanilla.wpmt.co/" => Ok(response_helpers::with_api_root(
+            "https://vanilla.wpmt.co/wp-json/",
+        )),
+        "https://vanilla.wpmt.co/wp-json/" => Ok(response_helpers::json_response_from_login_mocks(
+            "vanilla-api-root.json",
+        )),
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let login_url = discovery_helper(Arc::new(executor), vec![], "https://vanilla.wpmt.co")
+        .await
+        .expect("Expected api discovery to be successful");
     assert_eq!(
-        login_url("https://vanilla.wpmt.co").await,
+        login_url,
         "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
     );
 }
@@ -61,12 +75,44 @@ async fn login_spec_2_local_development_environment() {
 #[parallel]
 async fn login_spec_3_admin_url_provided() {
     // Spec Example 3
+    // Mock handles URLs for both wp-login.php and wp-admin variants
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        // UserInput attempts for admin URLs — return non-WP page
+        "https://vanilla.wpmt.co/wp-login.php" | "https://vanilla.wpmt.co/wp-admin" => Ok(
+            response_helpers::html_response_from_login_mocks("homepage-not-wordpress.html"),
+        ),
+        // Fallback wp-json for UserInput attempts — return error
+        "https://vanilla.wpmt.co/wp-login.php/wp-json"
+        | "https://vanilla.wpmt.co/wp-admin/wp-json" => Ok(response_helpers::empty_response(404)),
+        // AutoStrippedHttps attempt homepage — success with Link header
+        "https://vanilla.wpmt.co/" => Ok(response_helpers::with_api_root(
+            "https://vanilla.wpmt.co/wp-json/",
+        )),
+        // API root
+        "https://vanilla.wpmt.co/wp-json/" => Ok(response_helpers::json_response_from_login_mocks(
+            "vanilla-api-root.json",
+        )),
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let executor: Arc<dyn RequestExecutor> = Arc::new(executor);
     assert_eq!(
-        login_url("https://vanilla.wpmt.co/wp-login.php").await,
+        discovery_helper(
+            Arc::clone(&executor),
+            vec![],
+            "https://vanilla.wpmt.co/wp-login.php"
+        )
+        .await
+        .expect("Expected api discovery to be successful"),
         "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
     );
     assert_eq!(
-        login_url("https://vanilla.wpmt.co/wp-admin").await,
+        discovery_helper(
+            Arc::clone(&executor),
+            vec![],
+            "https://vanilla.wpmt.co/wp-admin"
+        )
+        .await
+        .expect("Expected api discovery to be successful"),
         "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
     );
 }
@@ -75,8 +121,28 @@ async fn login_spec_3_admin_url_provided() {
 #[parallel]
 async fn login_spec_4_auth_https_support() {
     // Spec Example 4
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        // HTTP UserInput homepage — non-WP page (HTTPS attempt succeeds instead)
+        "http://vanilla.wpmt.co/" => Ok(response_helpers::html_response_from_login_mocks(
+            "homepage-not-wordpress.html",
+        )),
+        // HTTP fallback wp-json — error
+        "http://vanilla.wpmt.co/wp-json" => Ok(response_helpers::empty_response(404)),
+        // HTTPS AutoStrippedHttps homepage — success with Link header
+        "https://vanilla.wpmt.co/" => Ok(response_helpers::with_api_root(
+            "https://vanilla.wpmt.co/wp-json/",
+        )),
+        // API root
+        "https://vanilla.wpmt.co/wp-json/" => Ok(response_helpers::json_response_from_login_mocks(
+            "vanilla-api-root.json",
+        )),
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let login_url = discovery_helper(Arc::new(executor), vec![], "http://vanilla.wpmt.co")
+        .await
+        .expect("Expected api discovery to be successful");
     assert_eq!(
-        login_url("http://vanilla.wpmt.co").await,
+        login_url,
         "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
     );
 }
@@ -85,8 +151,26 @@ async fn login_spec_4_auth_https_support() {
 #[parallel]
 async fn login_spec_5_http_only_site() {
     // Spec Example 5
-    let error = login_err("http://no-https.wpmt.co")
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        // HTTP UserInput homepage — Link header pointing to HTTP API root
+        "http://no-https.wpmt.co/" => Ok(response_helpers::with_api_root(
+            "http://no-https.wpmt.co/wp-json/",
+        )),
+        // HTTP API root — returns JSON with no auth URL
+        "http://no-https.wpmt.co/wp-json/" => Ok(response_helpers::json_response_from_login_mocks(
+            "http-only-api-root.json",
+        )),
+        // HTTPS AutoStrippedHttps homepage — non-WP page (HTTPS not available)
+        "https://no-https.wpmt.co/" => Ok(response_helpers::html_response_from_login_mocks(
+            "homepage-not-wordpress.html",
+        )),
+        // HTTPS fallback wp-json — error
+        "https://no-https.wpmt.co/wp-json" => Ok(response_helpers::empty_response(404)),
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let error = discovery_helper(Arc::new(executor), vec![], "http://no-https.wpmt.co")
         .await
+        .expect_err("Expected api discovery to fail")
         .to_fetch_and_parse_api_root_failure();
     if let FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } = error {
         assert_eq!(
@@ -104,8 +188,38 @@ async fn login_spec_5_http_only_site() {
 #[parallel]
 async fn login_spec_6_http_only_site_with_application_passwords_enabled() {
     // Spec Example 6
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        // HTTP UserInput homepage — Link header pointing to HTTP API root
+        "http://no-https-with-application-passwords.wpmt.co/" => {
+            Ok(response_helpers::with_api_root(
+                "http://no-https-with-application-passwords.wpmt.co/wp-json/",
+            ))
+        }
+        // HTTP API root — returns JSON with auth URL
+        "http://no-https-with-application-passwords.wpmt.co/wp-json/" => {
+            Ok(response_helpers::json_response_from_login_mocks(
+                "http-only-with-app-passwords-api-root.json",
+            ))
+        }
+        // HTTPS AutoStrippedHttps homepage — non-WP page (HTTPS not available)
+        "https://no-https-with-application-passwords.wpmt.co/" => Ok(
+            response_helpers::html_response_from_login_mocks("homepage-not-wordpress.html"),
+        ),
+        // HTTPS fallback wp-json — error
+        "https://no-https-with-application-passwords.wpmt.co/wp-json" => {
+            Ok(response_helpers::empty_response(404))
+        }
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let login_url = discovery_helper(
+        Arc::new(executor),
+        vec![],
+        "http://no-https-with-application-passwords.wpmt.co",
+    )
+    .await
+    .expect("Expected api discovery to be successful");
     assert_eq!(
-        login_url("http://no-https-with-application-passwords.wpmt.co").await,
+        login_url,
         "http://no-https-with-application-passwords.wpmt.co/wp-admin/authorize-application.php"
     );
 }
@@ -114,8 +228,25 @@ async fn login_spec_6_http_only_site_with_application_passwords_enabled() {
 #[parallel]
 async fn login_spec_7_aggressively_cached_site_with_no_link_header() {
     // Spec Example 7
+    // Homepage has no Link header but HTML body contains link tag
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        "https://aggressive-caching.wpmt.co/" => Ok(
+            response_helpers::html_response_from_login_mocks("homepage-with-link-tag.html"),
+        ),
+        "https://aggressive-caching.wpmt.co/wp-json/" => Ok(
+            response_helpers::json_response_from_login_mocks("aggressive-caching-api-root.json"),
+        ),
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let login_url = discovery_helper(
+        Arc::new(executor),
+        vec![],
+        "https://aggressive-caching.wpmt.co",
+    )
+    .await
+    .expect("Expected api discovery to be successful");
     assert_eq!(
-        login_url("https://aggressive-caching.wpmt.co").await,
+        login_url,
         "https://aggressive-caching.wpmt.co/wp-admin/authorize-application.php"
     );
 }
@@ -147,18 +278,45 @@ async fn login_spec_8_site_with_application_passwords_disabled_by_wordfence() {
 #[parallel]
 async fn login_spec_9_not_a_wordpress_site() {
     // Spec Example 9
-    assert_eq!(
-        login_err("google.com").await.to_find_api_root_failure(),
-        FindApiRootFailure::ProbablyNotAWordPressSite
-    );
+    // "google.com" → UserInput "google.com" (fails to parse) + AutoStrippedHttps "https://google.com"
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        // AutoStrippedHttps homepage — non-WP page
+        "https://google.com/" => Ok(response_helpers::html_response_from_login_mocks(
+            "homepage-not-wordpress.html",
+        )),
+        // Fallback wp-json — empty response
+        "https://google.com/wp-json" => Ok(response_helpers::empty_response(404)),
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let error = discovery_helper(Arc::new(executor), vec![], "google.com")
+        .await
+        .expect_err("Expected api discovery to fail")
+        .to_find_api_root_failure();
+    assert_eq!(error, FindApiRootFailure::ProbablyNotAWordPressSite);
 }
 
 #[tokio::test]
 #[parallel]
 async fn login_spec_10_wordpress_subdirectory_with_link_header() {
     // Spec Example 10
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        "https://subdirectory.wpmt.co/index.php?link_header=true" => Ok(
+            response_helpers::with_api_root("https://subdirectory.wpmt.co/wordpress/wp-json/"),
+        ),
+        "https://subdirectory.wpmt.co/wordpress/wp-json/" => Ok(
+            response_helpers::json_response_from_login_mocks("subdirectory-api-root.json"),
+        ),
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let login_url = discovery_helper(
+        Arc::new(executor),
+        vec![],
+        "https://subdirectory.wpmt.co/index.php?link_header=true",
+    )
+    .await
+    .expect("Expected api discovery to be successful");
     assert_eq!(
-        login_url("https://subdirectory.wpmt.co/index.php?link_header=true").await,
+        login_url,
         "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php"
     );
 }
@@ -167,8 +325,27 @@ async fn login_spec_10_wordpress_subdirectory_with_link_header() {
 #[parallel]
 async fn login_spec_11_wordpress_subdirectory_with_link_tag() {
     // Spec Example 11
+    // Homepage HTML body contains link tag pointing to subdirectory wp-json
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        "https://subdirectory.wpmt.co/index.php?link_tag=true" => {
+            Ok(response_helpers::html_response_from_login_mocks(
+                "homepage-with-subdirectory-link-tag.html",
+            ))
+        }
+        "https://subdirectory.wpmt.co/wordpress/wp-json/" => Ok(
+            response_helpers::json_response_from_login_mocks("subdirectory-api-root.json"),
+        ),
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let login_url = discovery_helper(
+        Arc::new(executor),
+        vec![],
+        "https://subdirectory.wpmt.co/index.php?link_tag=true",
+    )
+    .await
+    .expect("Expected api discovery to be successful");
     assert_eq!(
-        login_url("https://subdirectory.wpmt.co/index.php?link_tag=true").await,
+        login_url,
         "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php"
     );
 }
@@ -177,8 +354,25 @@ async fn login_spec_11_wordpress_subdirectory_with_link_tag() {
 #[parallel]
 async fn login_spec_12_wordpress_subdirectory_with_redirect() {
     // Spec Example 12
+    // Since mock doesn't follow redirects, simulate with Link header pointing to subdirectory
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        "https://subdirectory.wpmt.co/index.php?redirect=true" => Ok(
+            response_helpers::with_api_root("https://subdirectory.wpmt.co/wordpress/wp-json/"),
+        ),
+        "https://subdirectory.wpmt.co/wordpress/wp-json/" => Ok(
+            response_helpers::json_response_from_login_mocks("subdirectory-api-root.json"),
+        ),
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let login_url = discovery_helper(
+        Arc::new(executor),
+        vec![],
+        "https://subdirectory.wpmt.co/index.php?redirect=true",
+    )
+    .await
+    .expect("Expected api discovery to be successful");
     assert_eq!(
-        login_url("https://subdirectory.wpmt.co/index.php?redirect=true").await,
+        login_url,
         "https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php"
     );
 }
@@ -187,9 +381,25 @@ async fn login_spec_12_wordpress_subdirectory_with_redirect() {
 #[parallel]
 async fn login_spec_13_wordpress_http_basic_with_missing_credentials() {
     // Spec Example 13 (with missing credentials)
+    // No middleware — homepage returns 401 with WWW-Authenticate, no auth in request
     let expected_hostname = "https://basic-auth.wpmt.co/";
-    let reason = login_err(expected_hostname)
+    let executor = MockExecutor::with_execute_fn(|request| {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            http::header::WWW_AUTHENTICATE,
+            HeaderValue::from_static("Basic realm=\"Restricted\""),
+        );
+        Ok(WpNetworkResponse {
+            body: vec![],
+            status_code: 401,
+            response_header_map: Arc::new(headers.into()),
+            request_url: WpEndpointUrl(request.url().0.clone()),
+            request_header_map: request.header_map(),
+        })
+    });
+    let reason = discovery_helper(Arc::new(executor), vec![], expected_hostname)
         .await
+        .expect_err("Expected api discovery to fail")
         .to_fetch_home_page_reason();
     if let RequestExecutionErrorReason::HttpAuthenticationRequiredError { hostname, .. } = reason {
         assert_eq!(hostname, expected_hostname);
@@ -204,9 +414,25 @@ async fn login_spec_13_wordpress_http_basic_with_missing_credentials() {
 #[parallel]
 async fn login_spec_13_wordpress_http_basic_with_invalid_credentials() {
     // Spec Example 13 (with invalid credentials)
+    // Middleware adds auth but server still returns 401
     let expected_hostname = "https://basic-auth.wpmt.co/";
+    let executor = MockExecutor::with_execute_fn(|request| {
+        // Always return 401 with WWW-Authenticate, copying request headers to response
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            http::header::WWW_AUTHENTICATE,
+            HeaderValue::from_static("Basic realm=\"Restricted\""),
+        );
+        Ok(WpNetworkResponse {
+            body: vec![],
+            status_code: 401,
+            response_header_map: Arc::new(headers.into()),
+            request_url: WpEndpointUrl(request.url().0.clone()),
+            request_header_map: request.header_map(),
+        })
+    });
     let reason = discovery_helper(
-        Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(executor),
         vec![Arc::new(ApiDiscoveryAuthenticationMiddleware::new(
             "invalid".to_string(),
             "invalid".to_string(),
@@ -229,8 +455,44 @@ async fn login_spec_13_wordpress_http_basic_with_invalid_credentials() {
 #[parallel]
 async fn login_spec_13_wordpress_http_basic_with_valid_credentials() {
     // Spec Example 13 (with valid credentials)
+    // Middleware adds auth, server returns success on authenticated requests
+    let executor = MockExecutor::with_execute_fn(|request| {
+        let url = request.url();
+        let url_str = url.0.as_str();
+        let has_auth = request.has_http_authentication();
+
+        match (url_str, has_auth) {
+            // Unauthenticated requests — return 401 (triggers middleware retry with auth)
+            ("https://basic-auth.wpmt.co/" | "https://basic-auth.wpmt.co/wp-json/", false) => {
+                let mut headers = HeaderMap::new();
+                headers.insert(
+                    http::header::WWW_AUTHENTICATE,
+                    HeaderValue::from_static("Basic realm=\"Restricted\""),
+                );
+                Ok(WpNetworkResponse {
+                    body: vec![],
+                    status_code: 401,
+                    response_header_map: Arc::new(headers.into()),
+                    request_url: WpEndpointUrl(url.0.clone()),
+                    request_header_map: request.header_map(),
+                })
+            }
+            // Authenticated homepage — return Link header
+            ("https://basic-auth.wpmt.co/", true) => Ok(response_helpers::with_api_root(
+                "https://basic-auth.wpmt.co/wp-json/",
+            )),
+            // Authenticated API root — return JSON
+            ("https://basic-auth.wpmt.co/wp-json/", true) => Ok(
+                response_helpers::json_response_from_login_mocks("basic-auth-api-root.json"),
+            ),
+            _ => panic!(
+                "Unexpected request URL: {:#?} (has_auth: {})",
+                url, has_auth
+            ),
+        }
+    });
     let login_url = discovery_helper(
-        Arc::new(ReqwestRequestExecutor::default()),
+        Arc::new(executor),
         vec![Arc::new(ApiDiscoveryAuthenticationMiddleware::new(
             "test@example.com".to_string(),
             "str0ngp4ssw0rd!".to_string(),
@@ -238,7 +500,7 @@ async fn login_spec_13_wordpress_http_basic_with_valid_credentials() {
         "https://basic-auth.wpmt.co/",
     )
     .await
-    .expect("Expected api discovery to fail");
+    .expect("Expected api discovery to succeed");
     assert_eq!(
         login_url,
         "https://basic-auth.wpmt.co/wp-admin/authorize-application.php"
@@ -249,8 +511,25 @@ async fn login_spec_13_wordpress_http_basic_with_valid_credentials() {
 #[parallel]
 async fn login_spec_14_wordpress_custom_rest_api_prefix() {
     // Spec Example 14
+    // Link header points to a custom REST API prefix
+    let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
+        "https://custom-rest-prefix.wpmt.co/" => Ok(response_helpers::with_api_root(
+            "https://custom-rest-prefix.wpmt.co/api/",
+        )),
+        "https://custom-rest-prefix.wpmt.co/api/" => Ok(
+            response_helpers::json_response_from_login_mocks("custom-rest-prefix-api-root.json"),
+        ),
+        _ => panic!("Unexpected request URL: {:#?}", request.url()),
+    });
+    let login_url = discovery_helper(
+        Arc::new(executor),
+        vec![],
+        "https://custom-rest-prefix.wpmt.co",
+    )
+    .await
+    .expect("Expected api discovery to be successful");
     assert_eq!(
-        login_url("https://custom-rest-prefix.wpmt.co").await,
+        login_url,
         "https://custom-rest-prefix.wpmt.co/wp-admin/authorize-application.php"
     );
 }

@@ -1,5 +1,5 @@
 {
-  "originHash" : "283d6745467d75f5921b090c61c117a36db0062bf3ddc329c97354553842b877",
+  "originHash" : "21ed6276c2428a1fd304b95ed12ef4cccd7561363061b47e8c34d9b30cfb16b3",
   "pins" : [
     {
       "identity" : "collectionconcurrencykit",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "132f5b209cd0251067f29cdb59c97d9f8a63252a",
         "version" : "1.8.5"
+      }
+    },
+    {
+      "identity" : "mocktail-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jkmassel/mocktail-swift.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "2c582a18d1a0c49f920386ff0138fc697e17ad20"
       }
     },
     {

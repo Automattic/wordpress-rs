@@ -28,7 +28,10 @@ class Stub(val evaluator: (WpNetworkRequest) -> Boolean, val response: WpNetwork
 class NoStubFoundException(message: String) : Exception(message)
 
 // A class used for testing the request executor.
-class MockRequestExecutor(private var stubs: List<Stub> = listOf()) : RequestExecutor {
+class MockRequestExecutor(
+    private var stubs: List<Stub> = listOf(),
+    private val missingStubResponse: WpNetworkResponse? = null
+) : RequestExecutor {
 
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse {
         val stub = stubs.firstOrNull {
@@ -36,7 +39,24 @@ class MockRequestExecutor(private var stubs: List<Stub> = listOf()) : RequestExe
         }
 
         if (stub != null) {
-            return stub.response
+            // Copy request headers to response for auth error detection
+            return WpNetworkResponse(
+                stub.response.body,
+                stub.response.statusCode,
+                stub.response.responseHeaderMap,
+                stub.response.requestUrl,
+                request.headerMap()
+            )
+        }
+
+        if (missingStubResponse != null) {
+            return WpNetworkResponse(
+                missingStubResponse.body,
+                missingStubResponse.statusCode,
+                missingStubResponse.responseHeaderMap,
+                missingStubResponse.requestUrl,
+                request.headerMap()
+            )
         }
 
         throw NoStubFoundException("No stub found for ${request.url()}")
@@ -106,3 +126,34 @@ fun WpNetworkResponse.Companion.retryResponse(delay: ULong): WpNetworkResponse {
         WpNetworkHeaderMap.empty
     )
 }
+
+fun WpNetworkResponse.Companion.htmlResponse(name: String): WpNetworkResponse {
+    val data = {}.javaClass.getResource(name)?.readText()
+
+    if (data == null) {
+        throw FileNotFoundException("No resource found for $name")
+    }
+
+    return WpNetworkResponse(
+        data.toByteArray(),
+        200u,
+        WpNetworkHeaderMap.fromMap(mapOf("Content-Type" to "text/html; charset=UTF-8")),
+        "",
+        WpNetworkHeaderMap.empty
+    )
+}
+
+fun WpNetworkResponse.Companion.responseWithStatus(
+    statusCode: UShort,
+    headers: Map<String, String> = mapOf()
+): WpNetworkResponse {
+    return WpNetworkResponse(
+        ByteArray(0),
+        statusCode,
+        WpNetworkHeaderMap.fromMap(headers),
+        "",
+        WpNetworkHeaderMap.empty
+    )
+}
+
+

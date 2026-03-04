@@ -1,6 +1,14 @@
 import Foundation
 import Testing
 
+#if canImport(MockWebServer)
+import MockWebServer
+#endif
+
+#if canImport(Security)
+import Security
+#endif
+
 @testable import WordPressAPI
 
 #if os(Linux)
@@ -15,6 +23,11 @@ class LoginTests {
 
     @Test("Login Spec Example 1: Valid URL")
     func testValidURL() async throws {
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "https://vanilla.wpmt.co/", with: .withApiRoot("https://vanilla.wpmt.co/wp-json/")),
+            try HTTPStubs.stub(url: "https://vanilla.wpmt.co/wp-json/", with: .loginMockResponse(named: "vanilla-api-root"))
+        ])
+        let client = WordPressLoginClient(requestExecutor: stubs)
         let parsedUrl = try await client.findLoginUrl(forSite: "https://vanilla.wpmt.co")
         #expect("https://vanilla.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
@@ -50,20 +63,46 @@ class LoginTests {
         ("https://vanilla.wpmt.co/wp-admin", "https://vanilla.wpmt.co/wp-admin/authorize-application.php")
     ])
     func testAdminUrlProvided(_ provided: String, _ expected: String) async throws {
+        // The UserInput attempt uses the admin URL as-is (no stub found -> fails).
+        // The AutoStrippedHttps attempt strips the admin suffix and succeeds.
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "https://vanilla.wpmt.co/", with: .withApiRoot("https://vanilla.wpmt.co/wp-json/")),
+            try HTTPStubs.stub(url: "https://vanilla.wpmt.co/wp-json/", with: .loginMockResponse(named: "vanilla-api-root"))
+        ])
+        let client = WordPressLoginClient(requestExecutor: stubs)
         let parsedUrl = try await client.findLoginUrl(forSite: provided)
         #expect(expected == parsedUrl.url())
     }
 
     @Test("Login Spec Example 4: HTTP URL with HTTPS Support")
     func testAutoHttpsSupport() async throws {
+        // UserInput attempt fetches http://vanilla.wpmt.co/ (no stub -> fails).
+        // AutoStrippedHttps attempt converts to https:// and succeeds.
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "https://vanilla.wpmt.co/", with: .withApiRoot("https://vanilla.wpmt.co/wp-json/")),
+            try HTTPStubs.stub(url: "https://vanilla.wpmt.co/wp-json/", with: .loginMockResponse(named: "vanilla-api-root"))
+        ])
+        let client = WordPressLoginClient(requestExecutor: stubs)
         let parsedUrl = try await client.findLoginUrl(forSite: "http://vanilla.wpmt.co")
         #expect("https://vanilla.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 5: HTTP-only site")
     func testHttpOnlySite() async {
+        let stubs: HTTPStubs
+        do {
+            stubs = HTTPStubs(stubs: [
+                try HTTPStubs.stub(url: "http://no-https.wpmt.co/", with: .withApiRoot("http://no-https.wpmt.co/wp-json/")),
+                try HTTPStubs.stub(url: "http://no-https.wpmt.co/wp-json/", with: .loginMockResponse(named: "http-only-api-root"))
+            ])
+        } catch {
+            Issue.record("Failed to create stubs: \(error)")
+            return
+        }
+        let client = WordPressLoginClient(requestExecutor: stubs)
+
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: "http://no-https.wpmt.co")
+            _ = try await client.findLoginUrl(forSite: "http://no-https.wpmt.co")
         }, throws: { error in
             let reason = try #require(try self.getApplicationPasswordsNotSupportedReason(from: error))
 
@@ -78,12 +117,23 @@ class LoginTests {
 
     @Test("Login Spec Example 6: HTTP-Only Site with Application Password Override")
     func testHttpOnlySiteWithApplicationPasswordsEnabled() async throws {
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "http://no-https-with-application-passwords.wpmt.co/", with: .withApiRoot("http://no-https-with-application-passwords.wpmt.co/wp-json/")),
+            try HTTPStubs.stub(url: "http://no-https-with-application-passwords.wpmt.co/wp-json/", with: .loginMockResponse(named: "http-only-with-app-passwords-api-root"))
+        ])
+        let client = WordPressLoginClient(requestExecutor: stubs)
         let parsedUrl = try await client.findLoginUrl(forSite: "http://no-https-with-application-passwords.wpmt.co")
         #expect("http://no-https-with-application-passwords.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 7: CDN-Cached Site")
     func testAggressivelyCachedSiteWithNoLinkheader() async throws {
+        // Homepage has no Link header, but HTML contains a <link> tag pointing to the API root
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "https://aggressive-caching.wpmt.co/", with: .htmlResponse(named: "homepage-with-link-tag")),
+            try HTTPStubs.stub(url: "https://aggressive-caching.wpmt.co/wp-json/", with: .loginMockResponse(named: "aggressive-caching-api-root"))
+        ])
+        let client = WordPressLoginClient(requestExecutor: stubs)
         let parsedUrl = try await client.findLoginUrl(forSite: "https://aggressive-caching.wpmt.co")
         #expect("https://aggressive-caching.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
@@ -111,8 +161,20 @@ class LoginTests {
         "https://google.com"
     ])
     func testNotWordPressSite(url: String) async throws {
+        // Homepage returns non-WordPress HTML, no Link header, and no WP markers
+        let stubs: HTTPStubs
+        do {
+            stubs = HTTPStubs(stubs: [
+                try HTTPStubs.stub(url: "https://google.com/", with: .htmlResponse(named: "homepage-not-wordpress"))
+            ])
+        } catch {
+            Issue.record("Failed to create stubs: \(error)")
+            return
+        }
+        let client = WordPressLoginClient(requestExecutor: stubs)
+
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: url)
+            _ = try await client.findLoginUrl(forSite: url)
         }, throws: { error in
             try #require(error is AutoDiscoveryAttemptFailure)
 
@@ -130,26 +192,55 @@ class LoginTests {
 
     @Test("Login Spec Example 10: WordPress in a subdirectory with a link header")
     func testWordPressSubdirectoryWithLinkHeader() async throws {
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "https://subdirectory.wpmt.co/index.php?link_header=true", with: .withApiRoot("https://subdirectory.wpmt.co/wordpress/wp-json/")),
+            try HTTPStubs.stub(url: "https://subdirectory.wpmt.co/wordpress/wp-json/", with: .loginMockResponse(named: "subdirectory-api-root"))
+        ])
+        let client = WordPressLoginClient(requestExecutor: stubs)
         let parsedUrl = try await client.findLoginUrl(forSite: "https://subdirectory.wpmt.co/index.php?link_header=true")
         #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 11: WordPress in a subdirectory with a link tag")
     func testWordPressSubdirectoryWithLinkTag() async throws {
+        // Homepage has no Link header but HTML contains a <link> tag pointing to subdirectory wp-json
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "https://subdirectory.wpmt.co/index.php?link_tag=true", with: .htmlResponse(named: "homepage-with-subdirectory-link-tag")),
+            try HTTPStubs.stub(url: "https://subdirectory.wpmt.co/wordpress/wp-json/", with: .loginMockResponse(named: "subdirectory-api-root"))
+        ])
+        let client = WordPressLoginClient(requestExecutor: stubs)
         let parsedUrl = try await client.findLoginUrl(forSite: "https://subdirectory.wpmt.co/index.php?link_tag=true")
         #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 12: WordPress in a subdirectory with a redirect")
     func testWordPressSubdirectory() async throws {
+        // In the real scenario, the server redirects to /wordpress/ which has the Link header.
+        // With mocks, we simulate the final response directly on the requested URL.
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "https://subdirectory.wpmt.co/index.php?redirect=true", with: .withApiRoot("https://subdirectory.wpmt.co/wordpress/wp-json/")),
+            try HTTPStubs.stub(url: "https://subdirectory.wpmt.co/wordpress/wp-json/", with: .loginMockResponse(named: "subdirectory-api-root"))
+        ])
+        let client = WordPressLoginClient(requestExecutor: stubs)
         let parsedUrl = try await client.findLoginUrl(forSite: "https://subdirectory.wpmt.co/index.php?redirect=true")
         #expect("https://subdirectory.wpmt.co/wordpress/wp-admin/authorize-application.php" == parsedUrl.url())
     }
 
     @Test("Login Spec Example 13: Site uses HTTP basic with no provided credentials")
     func testWordPressHttpBasic() async throws {
+        let stubs: HTTPStubs
+        do {
+            stubs = HTTPStubs(stubs: [
+                try HTTPStubs.stub(host: "basic-auth.wpmt.co", with: .responseWithStatus(401, headers: ["WWW-Authenticate": "Basic realm=\"Restricted\""]))
+            ])
+        } catch {
+            Issue.record("Failed to create stubs: \(error)")
+            return
+        }
+        let client = WordPressLoginClient(requestExecutor: stubs)
+
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: "https://basic-auth.wpmt.co")
+            _ = try await client.findLoginUrl(forSite: "https://basic-auth.wpmt.co")
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
@@ -168,11 +259,20 @@ class LoginTests {
 
     @Test("Login Spec Example 13: Site uses HTTP basic with invalid credentials provided")
     func testWordPressHttpBasicWithInvalidCredentials() async throws {
+        let stubs: HTTPStubs
+        do {
+            stubs = HTTPStubs(stubs: [
+                try HTTPStubs.stub(host: "basic-auth.wpmt.co", with: .responseWithStatus(401, headers: ["WWW-Authenticate": "Basic realm=\"Restricted\""]))
+            ])
+        } catch {
+            Issue.record("Failed to create stubs: \(error)")
+            return
+        }
         let invalid = ApiDiscoveryAuthenticationMiddleware(username: "invalid", password: "invalid")
 
         await #expect(performing: {
             _ = try await WordPressLoginClient(
-                urlSession: .init(configuration: .ephemeral),
+                requestExecutor: stubs,
                 middleware: MiddlewarePipeline(middlewares: invalid)
             ).findLoginUrl(forSite: "https://basic-auth.wpmt.co")
         }, throws: { error in
@@ -193,10 +293,14 @@ class LoginTests {
 
     @Test("Login Spec Example 13: Site uses HTTP basic with correct credentials provided")
     func testWordPressHttpBasicWithValidCredentials() async throws {
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "https://basic-auth.wpmt.co/", with: .withApiRoot("https://basic-auth.wpmt.co/wp-json/")),
+            try HTTPStubs.stub(url: "https://basic-auth.wpmt.co/wp-json/", with: .loginMockResponse(named: "basic-auth-api-root"))
+        ])
         let valid = ApiDiscoveryAuthenticationMiddleware(username: "test@example.com", password: "str0ngp4ssw0rd!")
 
         let parsedUrl = try await WordPressLoginClient(
-            urlSession: .init(configuration: .ephemeral),
+            requestExecutor: stubs,
             middleware: MiddlewarePipeline(middlewares: valid)
         ).findLoginUrl(forSite: "https://basic-auth.wpmt.co")
 
@@ -205,6 +309,13 @@ class LoginTests {
 
     @Test("Login Spec Example 14: Custom REST API Prefix")
     func testWordPressCustomRestApiPrefix() async throws {
+        // Site uses a custom REST prefix (e.g., /custom-api/ instead of /wp-json/)
+        // The Link header points to the custom API root
+        let stubs = HTTPStubs(stubs: [
+            try HTTPStubs.stub(url: "https://custom-rest-prefix.wpmt.co/", with: .withApiRoot("https://custom-rest-prefix.wpmt.co/custom-api/")),
+            try HTTPStubs.stub(url: "https://custom-rest-prefix.wpmt.co/custom-api/", with: .loginMockResponse(named: "custom-rest-prefix-api-root"))
+        ])
+        let client = WordPressLoginClient(requestExecutor: stubs)
         let parsedUrl = try await client.findLoginUrl(forSite: "https://custom-rest-prefix.wpmt.co")
         #expect("https://custom-rest-prefix.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
     }
@@ -253,10 +364,20 @@ class LoginTests {
         })
     }
 
+    #if canImport(MockWebServer)
     @Test("Login Spec Example 17: Invalid SSL Certificate")
     func testInvalidHTTPsFails() async throws {
+        let server = MockWebServer()
+        try server.start(tls: .wrongHostname())
+        defer { server.shutdown() }
+
+        server.enqueue(MockResponse(statusCode: 200))
+
+        let siteUrl = server.url(forPath: "/").absoluteString
+        let client = WordPressLoginClient(urlSession: .init(configuration: .ephemeral))
+
         await #expect(performing: {
-            _ = try await self.client.findLoginUrl(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
+            _ = try await client.findLoginUrl(forSite: siteUrl)
         }, throws: { error in
             let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
@@ -276,8 +397,8 @@ class LoginTests {
                 return false
             }
 
-            #expect(hostname == "wordpress-1315525-4803651.cloudwaysapps.com")
-            #expect(presentedHostnames == ["vanilla.wpmt.co"])
+            #expect(hostname == "127.0.0.1")
+            #expect(presentedHostnames == ["wrong.example.com"])
             #endif
 
             return true
@@ -287,18 +408,54 @@ class LoginTests {
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
     @Test("Login Spec Example 18: Invalid SSL Certificate with explicit exception", .enabled(if: !isLinux()))
     func testInvalidHttpsWithExceptionWorks() async throws {
+        let server = MockWebServer()
+        try server.start(tls: .wrongHostname())
+        defer { server.shutdown() }
+
+        let port = server.port
+        let baseUrl = "https://127.0.0.1:\(port)"
+
+        server.route("/", MockResponse(statusCode: 200)
+            .withHeader("Link", "<\(baseUrl)/wp-json/>; rel=\"https://api.w.org/\""))
+
+        server.route("/wp-json/", .json("""
+        {"name":"Test Site","description":"","url":"\(baseUrl)","home":"\(baseUrl)","gmt_offset":0,"timezone_string":"UTC","namespaces":["oembed/1.0","wp/v2","wp-site-health/v1"],"authentication":{"application-passwords":{"endpoints":{"authorization":"\(baseUrl)/wp-admin/authorize-application.php"}}},"routes":{},"site_logo":0,"site_icon":0,"site_icon_url":""}
+        """))
+
         let executor = WpRequestExecutor(urlSession: .init(configuration: .ephemeral))
-        executor.allowSSL(altNames: ["wordpress-1315525-4803651.cloudwaysapps.com"], forCommonName: "vanilla.wpmt.co")
+        executor.allowSSL(altNames: ["127.0.0.1"], forCommonName: "wrong.example.com")
         let client = WordPressLoginClient(requestExecutor: executor)
-        _ = try await client.findLoginUrl(forSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
+        _ = try await client.findLoginUrl(forSite: baseUrl)
     }
 
-    /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
-    @Test("Login Spec Example 19: Alternative name in SSL Certificate", .enabled(if: !isLinux()))
-    func testAlternameWorks() async throws {
-        // "vanilla1.wpmt.co" is one of the alternative names in vanilla.wpmt.co certificate.
-        _ = try await self.client.findLoginUrl(forSite: "https://vanilla1.wpmt.co")
+    /// This test requires the test CA to be trusted: `make trust-test-ca`
+    @Test("Login Spec Example 19: Alternative name in SSL Certificate", .enabled(if: !isLinux() && isTestCATrusted()))
+    func testAlternativeNameWorks() async throws {
+        guard let p12Url = Bundle.module.url(forResource: "san-test", withExtension: "p12", subdirectory: "ssl-certs") else {
+            preconditionFailure("Could not find san-test.p12 in ssl-certs")
+        }
+        let p12Data = try Data(contentsOf: p12Url)
+
+        let server = MockWebServer()
+        try server.start(tls: TLSConfiguration(p12Data: p12Data, password: "test"))
+        defer { server.shutdown() }
+
+        let port = server.port
+        let baseUrl = "https://127.0.0.1:\(port)"
+
+        server.route("/", MockResponse(statusCode: 200)
+            .withHeader("Link", "<\(baseUrl)/wp-json/>; rel=\"https://api.w.org/\""))
+
+        server.route("/wp-json/", .json("""
+        {"name":"Test Site","description":"","url":"\(baseUrl)","home":"\(baseUrl)","gmt_offset":0,"timezone_string":"UTC","namespaces":["oembed/1.0","wp/v2","wp-site-health/v1"],"authentication":{"application-passwords":{"endpoints":{"authorization":"\(baseUrl)/wp-admin/authorize-application.php"}}},"routes":{},"site_logo":0,"site_icon":0,"site_icon_url":""}
+        """))
+
+        // Connect using default URLSession (no allowSSL bypass) — succeeds because
+        // 127.0.0.1 is a SAN on the cert and the CA is trusted in the system keychain
+        let client = WordPressLoginClient(urlSession: .init(configuration: .ephemeral))
+        _ = try await client.findLoginUrl(forSite: baseUrl)
     }
+    #endif // canImport(MockWebServer)
 
     @Test("Cancel API discovery process")
     func testCancellation() async throws {
