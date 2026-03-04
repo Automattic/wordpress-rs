@@ -2,6 +2,7 @@ package rs.wordpress.example.ui.welcome
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
@@ -56,52 +57,78 @@ class WelcomeActivity : ComponentActivity() {
         }
     }
 
-    private fun authenticateSite(url: String) {
+    private fun authenticateSite(url: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         lifecycleScope.launch {
-            val success = when (val apiDiscoveryResult = WpLoginClient(emptyList(), networkAvailabilityProvider).apiDiscovery(url)) {
-                is ApiDiscoveryResult.Success -> apiDiscoveryResult.success
-                else -> throw IllegalStateException("Api discovery should succeed for the example app")
-            }
-
-            apiDiscoverySuccess = success
-
-            when (success.authentication) {
-                is DiscoveredAuthenticationMechanism.ApplicationPasswords -> {
-                    val authUrl = applicationPasswordsUrl(success.authentication)
-                        ?: throw IllegalStateException("Expected application passwords authentication")
-                    val uriBuilder = authUrl.url().toUri().buildUpon()
-
-                    uriBuilder
-                        .appendQueryParameter("app_name", "WordPressRsAndroidExample")
-                        .appendQueryParameter("app_id", "00000000-0000-4000-8000-000000000000")
-                        .appendQueryParameter("success_url", SELF_HOSTED_REDIRECT_URI)
-
-                    uriBuilder.build().let { uri ->
-                        startActivity(Intent(Intent.ACTION_VIEW, uri))
+            try {
+                val apiDiscoveryResult = WpLoginClient(emptyList(), networkAvailabilityProvider).apiDiscovery(url)
+                val success = when (apiDiscoveryResult) {
+                    is ApiDiscoveryResult.Success -> apiDiscoveryResult.success
+                    else -> {
+                        runOnUiThread {
+                            val message = apiDiscoveryResult.userFacingErrorMessage(url)
+                                ?: "Failed to discover site API"
+                            Toast.makeText(this@WelcomeActivity, message, Toast.LENGTH_LONG).show()
+                            onError(message)
+                        }
+                        return@launch
                     }
                 }
-                is DiscoveredAuthenticationMechanism.OAuth2 -> {
-                    val clientId = WpComCredentials.CLIENT_ID ?: return@launch
-                    val clientSecret = WpComCredentials.CLIENT_SECRET ?: return@launch
 
-                    val config = wordpressComOauth2Configuration(
-                        clientId = clientId,
-                        clientSecret = clientSecret,
-                        redirectUri = WPCOM_REDIRECT_URI,
-                        scope = listOf(WpComOauthScope.GLOBAL)
-                    )
-                    siteSpecificOAuthConfig = config
+                apiDiscoverySuccess = success
 
-                    val host = success.parsedSiteUrl.toURL().toURI().host
-                    discoveredSiteHost = host
-                    val state = java.util.UUID.randomUUID().toString()
-                    siteSpecificOAuthState = state
+                when (success.authentication) {
+                    is DiscoveredAuthenticationMechanism.ApplicationPasswords -> {
+                        val authUrl = applicationPasswordsUrl(success.authentication)
+                        if (authUrl == null) {
+                            runOnUiThread {
+                                val message = "Application passwords not supported"
+                                Toast.makeText(this@WelcomeActivity, message, Toast.LENGTH_LONG).show()
+                                onError(message)
+                            }
+                            return@launch
+                        }
+                        val uriBuilder = authUrl.url().toUri().buildUpon()
 
-                    val authUrl = config.buildTokenRequestUrl(
-                        state = state,
-                        blog = WpComSiteIdentifier.Slug(value = host)
-                    )
-                    startActivity(Intent(Intent.ACTION_VIEW, authUrl.url().toUri()))
+                        uriBuilder
+                            .appendQueryParameter("app_name", "WordPressRsAndroidExample")
+                            .appendQueryParameter("app_id", "00000000-0000-4000-8000-000000000000")
+                            .appendQueryParameter("success_url", SELF_HOSTED_REDIRECT_URI)
+
+                        runOnUiThread { onSuccess() }
+                        uriBuilder.build().let { uri ->
+                            startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        }
+                    }
+                    is DiscoveredAuthenticationMechanism.OAuth2 -> {
+                        val clientId = WpComCredentials.CLIENT_ID ?: return@launch
+                        val clientSecret = WpComCredentials.CLIENT_SECRET ?: return@launch
+
+                        val config = wordpressComOauth2Configuration(
+                            clientId = clientId,
+                            clientSecret = clientSecret,
+                            redirectUri = WPCOM_REDIRECT_URI,
+                            scope = listOf(WpComOauthScope.GLOBAL)
+                        )
+                        siteSpecificOAuthConfig = config
+
+                        val host = success.parsedSiteUrl.toURL().toURI().host
+                        discoveredSiteHost = host
+                        val state = java.util.UUID.randomUUID().toString()
+                        siteSpecificOAuthState = state
+
+                        val authUrl = config.buildTokenRequestUrl(
+                            state = state,
+                            blog = WpComSiteIdentifier.Slug(value = host)
+                        )
+                        runOnUiThread { onSuccess() }
+                        startActivity(Intent(Intent.ACTION_VIEW, authUrl.url().toUri()))
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    val message = e.localizedMessage ?: "An unexpected error occurred"
+                    Toast.makeText(this@WelcomeActivity, message, Toast.LENGTH_LONG).show()
+                    onError(message)
                 }
             }
         }
@@ -264,5 +291,5 @@ class WelcomeActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    App(authenticationEnabled = false, authenticateSite = {}, authenticateWpCom = null)
+    App(authenticationEnabled = false, authenticateSite = { _, _, _ -> }, authenticateWpCom = null)
 }

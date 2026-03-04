@@ -51,7 +51,7 @@ import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.WpService
 
 @Composable
-fun App(authenticationEnabled: Boolean, authenticateSite: (String) -> Unit, authenticateWpCom: (() -> Unit)?) {
+fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit, authenticateWpCom: (() -> Unit)?) {
     val cache = koinInject<WordPressApiCache>()
     val navController = rememberNavController()
 
