@@ -11,48 +11,47 @@ use wp_serde_helper::deserialize_u64_or_string;
 /// WordPress.com OAuth2 permission scopes.
 ///
 /// Each scope grants access to a specific area of the WordPress.com API.
-/// Scopes are backed by power-of-2 integer values suitable for bitwise operations.
+/// Multiple scopes can be requested by passing a `Vec<WpComOauthScope>`.
 ///
 /// See: <https://developer.wordpress.com/docs/api/oauth2/#available-scopes>
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
-#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, uniffi::Enum)]
 pub enum WpComOauthScope {
     /// Access to authentication endpoints.
-    Auth = 1,
+    Auth,
     /// Access to user data.
-    Users = 2,
+    Users,
     /// Access to site data.
-    Sites = 4,
+    Sites,
     /// Access to posts.
-    Posts = 8,
+    Posts,
     /// Access to comments.
-    Comments = 16,
+    Comments,
     /// Access to taxonomies (categories, tags).
-    Taxonomy = 32,
+    Taxonomy,
     /// Access to follow/unfollow actions.
-    Follow = 64,
+    Follow,
     /// Access to sharing settings and actions.
-    Sharing = 128,
+    Sharing,
     /// Access to Freshly Pressed content.
-    FreshlyPressed = 256,
+    FreshlyPressed,
     /// Access to notifications.
-    Notifications = 512,
+    Notifications,
     /// Access to site insights and analytics.
-    Insights = 1024,
+    Insights,
     /// Access to read content from followed sites.
-    Read = 2048,
+    Read,
     /// Access to site statistics.
-    Stats = 4096,
+    Stats,
     /// Access to media uploads and library.
-    Media = 8192,
+    Media,
     /// Access to navigation menus.
-    Menus = 16384,
+    Menus,
     /// Access to batch API operations.
-    Batch = 32768,
+    Batch,
     /// Access to video hosting features.
-    Videos = 65536,
+    Videos,
     /// Full access to all scopes.
-    Global = 131072,
+    Global,
 }
 
 impl std::fmt::Display for WpComOauthScope {
@@ -82,9 +81,13 @@ impl std::fmt::Display for WpComOauthScope {
 }
 
 /// Serialize a set of OAuth scopes to a space-separated string.
+///
+/// Duplicate scopes are removed automatically.
 #[uniffi::export]
 pub fn wp_com_oauth_scope_list_to_string(scopes: Vec<WpComOauthScope>) -> String {
     scopes
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>()
         .iter()
         .map(|s| s.to_string())
         .collect::<Vec<_>>()
@@ -568,34 +571,12 @@ mod tests {
                 WpComOauthScope::Media,
                 WpComOauthScope::Stats
             ]),
-            "posts media stats"
+            "posts stats media"
         );
     }
 
     #[test]
     fn test_scope_list_to_string_empty() {
         assert_eq!(wp_com_oauth_scope_list_to_string(vec![]), "");
-    }
-
-    #[test]
-    fn test_scope_bitwise_values() {
-        assert_eq!(WpComOauthScope::Auth as u32, 1 << 0);
-        assert_eq!(WpComOauthScope::Users as u32, 1 << 1);
-        assert_eq!(WpComOauthScope::Sites as u32, 1 << 2);
-        assert_eq!(WpComOauthScope::Posts as u32, 1 << 3);
-        assert_eq!(WpComOauthScope::Comments as u32, 1 << 4);
-        assert_eq!(WpComOauthScope::Taxonomy as u32, 1 << 5);
-        assert_eq!(WpComOauthScope::Follow as u32, 1 << 6);
-        assert_eq!(WpComOauthScope::Sharing as u32, 1 << 7);
-        assert_eq!(WpComOauthScope::FreshlyPressed as u32, 1 << 8);
-        assert_eq!(WpComOauthScope::Notifications as u32, 1 << 9);
-        assert_eq!(WpComOauthScope::Insights as u32, 1 << 10);
-        assert_eq!(WpComOauthScope::Read as u32, 1 << 11);
-        assert_eq!(WpComOauthScope::Stats as u32, 1 << 12);
-        assert_eq!(WpComOauthScope::Media as u32, 1 << 13);
-        assert_eq!(WpComOauthScope::Menus as u32, 1 << 14);
-        assert_eq!(WpComOauthScope::Batch as u32, 1 << 15);
-        assert_eq!(WpComOauthScope::Videos as u32, 1 << 16);
-        assert_eq!(WpComOauthScope::Global as u32, 1 << 17);
     }
 }
