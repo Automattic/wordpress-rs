@@ -98,7 +98,7 @@ impl AppendUrlQueryPairs for StatsSubscribersParams {
 }
 
 /// Response from the stats subscribers endpoint.
-#[derive(Debug, Hash, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsSubscribersResponse {
     /// The date for the stats query.
     pub date: String,
@@ -138,6 +138,11 @@ fn get_stats_subscribers_data(
     handle: &str,
     response: &StatsSubscribersResponse,
 ) -> Vec<(String, u64)> {
+    let period_index = match response.fields.iter().position(|f| f == "period") {
+        Some(i) => i,
+        None => return vec![],
+    };
+
     let field_index = match response.fields.iter().position(|field| field == handle) {
         Some(index) => index,
         None => return vec![],
@@ -147,8 +152,8 @@ fn get_stats_subscribers_data(
         .data
         .iter()
         .filter_map(|row| {
-            if let Some(period) = row[0].as_string()
-                && let Some(value) = row[field_index].as_number()
+            if let Some(period) = row.get(period_index).and_then(|v| v.as_string())
+                && let Some(value) = row.get(field_index).and_then(|v| v.as_number())
             {
                 return Some((period.clone(), value));
             }

@@ -71,6 +71,29 @@ pub mod wp_utc_date_format {
     }
 }
 
+pub mod wp_utc_date_format_option {
+    use super::wp_utc_date_format;
+    use chrono::{DateTime, Utc};
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S>(date: &Option<DateTime<Utc>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match date {
+            Some(d) => wp_utc_date_format::serialize(d, serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(wp_utc_date_format::deserialize(deserializer).ok())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

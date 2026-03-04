@@ -15,6 +15,7 @@ mod stats_region_views_tests;
 mod stats_subscribers_tests;
 mod stats_top_authors_tests;
 mod stats_top_posts_tests;
+mod subscribers_by_user_type_tests;
 mod support_bot_tests;
 mod support_eligibility_test;
 mod support_tickets_test;
@@ -57,6 +58,7 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(stats_emails_summary_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_subscribers_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_top_posts_tests::tests(Arc::clone(&ctx)));
+    tests.extend(subscribers_by_user_type_tests::tests(Arc::clone(&ctx)));
     tests.extend(wp_service_tests::tests(Arc::clone(&ctx)));
     tests
 }

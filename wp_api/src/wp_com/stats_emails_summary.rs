@@ -1,5 +1,5 @@
 use crate::{
-    impl_as_query_value_from_to_string,
+    WpApiParamOrder, impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
 use serde::{Deserialize, Serialize};
@@ -29,7 +29,9 @@ pub enum StatsEmailsSummaryPeriod {
     Month,
     Year,
     #[default]
-    Alltime,
+    #[serde(rename = "alltime")]
+    #[strum(serialize = "alltime")]
+    AllTime,
 }
 
 impl_as_query_value_from_to_string!(StatsEmailsSummaryPeriod);
@@ -68,33 +70,6 @@ pub enum StatsEmailsSummarySortField {
 
 impl_as_query_value_from_to_string!(StatsEmailsSummarySortField);
 
-/// The sort order for emails summary results.
-#[derive(
-    Debug,
-    Default,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    uniffi::Enum,
-    strum_macros::EnumString,
-    strum_macros::Display,
-)]
-#[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
-pub enum StatsEmailsSummarySortOrder {
-    Asc,
-    #[default]
-    Desc,
-}
-
-impl_as_query_value_from_to_string!(StatsEmailsSummarySortOrder);
-
 /// Parameters for the stats emails summary endpoint.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct StatsEmailsSummaryParams {
@@ -109,7 +84,7 @@ pub struct StatsEmailsSummaryParams {
     pub sort_field: Option<StatsEmailsSummarySortField>,
     /// The sort order for results.
     #[uniffi(default = None)]
-    pub sort_order: Option<StatsEmailsSummarySortOrder>,
+    pub sort_order: Option<WpApiParamOrder>,
 }
 
 impl AppendUrlQueryPairs for StatsEmailsSummaryParams {
@@ -173,10 +148,10 @@ mod tests {
         .expect("Failed to parse url");
 
         let params = StatsEmailsSummaryParams {
-            period: Some(StatsEmailsSummaryPeriod::Alltime),
+            period: Some(StatsEmailsSummaryPeriod::AllTime),
             quantity: Some(30),
             sort_field: Some(StatsEmailsSummarySortField::PostDate),
-            sort_order: Some(StatsEmailsSummarySortOrder::Desc),
+            sort_order: Some(WpApiParamOrder::Desc),
         };
 
         let mut query_pairs = url.query_pairs_mut();

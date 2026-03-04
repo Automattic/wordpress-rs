@@ -1,20 +1,13 @@
 use crate::{
     WpApiParamOrder,
-    date::WpGmtDateTime,
+    date::{WpGmtDateTime, wp_gmt_date_time_option},
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     users::UserId,
 };
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Not};
 use wp_serde_helper::{deserialize_false_or_string, deserialize_u64_or_string};
-
-fn deserialize_date_subscribed<'de, D>(deserializer: D) -> Result<Option<WpGmtDateTime>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Ok(WpGmtDateTime::deserialize(deserializer).ok())
-}
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct Subscriber {
@@ -23,7 +16,7 @@ pub struct Subscriber {
     pub display_name: String,
     pub email_address: String,
     pub is_email_subscriber: bool,
-    #[serde(deserialize_with = "deserialize_date_subscribed")]
+    #[serde(default, with = "wp_gmt_date_time_option")]
     pub date_subscribed: Option<WpGmtDateTime>,
     pub subscription_status: Option<String>,
     pub avatar: String,
@@ -256,12 +249,15 @@ impl_as_query_value_from_to_string!(SubscribersByUserTypeUserType);
     strum_macros::EnumString,
     strum_macros::Display,
 )]
+#[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum SubscribersByUserTypeSortField {
     #[default]
     DateSubscribed,
+    #[serde(rename = "email")]
     #[strum(serialize = "email")]
     EmailAddress,
+    #[serde(rename = "name")]
     #[strum(serialize = "name")]
     DisplayName,
 }
