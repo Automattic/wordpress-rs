@@ -1,9 +1,8 @@
 package rs.wordpress.example.shared.ui.posttypes
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,7 +31,7 @@ data class PostTypeDisplayData(
     val description: String?,
     val hierarchical: Boolean,
     val restBase: String?
-) {
+) : ViewModel() {
     companion object {
         fun fromEntity(entity: FullEntityPostTypeDetailsWithEditContext): PostTypeDisplayData {
             val postType = entity.data
@@ -49,8 +48,7 @@ data class PostTypeDisplayData(
 
 class PostTypesViewModel(
     private val selfHostedService: WpService
-) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+) : ViewModel() {
 
     private val _state = MutableStateFlow(PostTypesState())
     val state: StateFlow<PostTypesState> = _state.asStateFlow()
@@ -156,9 +154,8 @@ class PostTypesViewModel(
     /**
      * Clean up resources when ViewModel is destroyed
      */
-    fun onCleared() {
+    override fun onCleared() {
         observableCollection?.close()
         observableCollection = null
-        viewModelScope.cancel()
     }
 }

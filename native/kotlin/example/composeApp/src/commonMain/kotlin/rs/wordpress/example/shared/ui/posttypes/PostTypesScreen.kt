@@ -13,12 +13,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.Button
-import androidx.compose.material.Card
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,40 +35,42 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import org.koin.compose.koinInject
+import androidx.compose.runtime.remember
+import uniffi.wp_mobile.WpService
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
 fun PostTypesScreen(
-    viewModel: PostTypesViewModel = koinInject(),
+    wpService: WpService,
+    viewModel: PostTypesViewModel = remember { PostTypesViewModel(wpService) },
     onBackClicked: (() -> Unit)? = null,
     onPostTypeClicked: (String) -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     val postTypes by viewModel.postTypes.collectAsState()
 
-    MaterialTheme {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-        ) {
-            // Back button (for desktop)
-            if (onBackClicked != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
-                ) {
-                    TextButton(onClick = onBackClicked) {
-                        Text("← Back")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Post Types") },
+                navigationIcon = {
+                    if (onBackClicked != null) {
+                        IconButton(onClick = onBackClicked) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp),
+        ) {
             // Header card with refresh button
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = 2.dp
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -71,7 +80,7 @@ fun PostTypesScreen(
                     ) {
                         Text(
                             text = "Post Types",
-                            style = MaterialTheme.typography.h6,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Button(
@@ -82,7 +91,7 @@ fun PostTypesScreen(
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(16.dp),
                                     strokeWidth = 2.dp,
-                                    color = MaterialTheme.colors.onPrimary
+                                    color = MaterialTheme.colorScheme.onPrimary
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                             }
@@ -92,7 +101,7 @@ fun PostTypesScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "${postTypes.size} post types available",
-                        style = MaterialTheme.typography.body2
+                        style = MaterialTheme.typography.bodyMedium
                     )
 
                     // Show error if any
@@ -100,8 +109,8 @@ fun PostTypesScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Error: $error",
-                            style = MaterialTheme.typography.caption,
-                            color = MaterialTheme.colors.error
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
@@ -111,9 +120,8 @@ fun PostTypesScreen(
 
             // Post types list
             if (postTypes.isEmpty() && !state.isFetching) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = 2.dp
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
                         modifier = Modifier.padding(32.dp),
@@ -125,8 +133,8 @@ fun PostTypesScreen(
                             } else {
                                 "Click Refresh to load post types"
                             },
-                            style = MaterialTheme.typography.body1,
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -152,11 +160,10 @@ fun PostTypeCard(
     postType: PostTypeDisplayData,
     onClick: () -> Unit
 ) {
-    Card(
+    ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        elevation = 2.dp
+            .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -167,19 +174,19 @@ fun PostTypeCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = postType.name,
-                        style = MaterialTheme.typography.subtitle1,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = postType.slug,
-                        style = MaterialTheme.typography.caption,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
-                Text(
-                    text = "→",
-                    style = MaterialTheme.typography.h6,
-                    color = MaterialTheme.colors.primary
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -188,10 +195,10 @@ fun PostTypeCard(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = description,
-                        style = MaterialTheme.typography.body2,
+                        style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -200,8 +207,8 @@ fun PostTypeCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "REST: /$restBase",
-                    style = MaterialTheme.typography.overline,
-                    color = MaterialTheme.colors.primary.copy(alpha = 0.7f)
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                 )
             }
         }

@@ -27,29 +27,24 @@ class ExampleApplication: Application() {
             }
         }
 
-        val accountRepoModule = module {
-            single {
-                val transformer = KeystorePasswordTransformer("rs.wordpress.example")
-                val rootPath = filesDir.resolve("accounts").absolutePath
+        val transformer = KeystorePasswordTransformer("rs.wordpress.example")
+        val rootPath = filesDir.resolve("accounts").absolutePath
 
-                val repo = AccountRepository(rootPath, transformer)
-                try {
-                    repo.all()
-                } catch (e: AccountRepositoryException.PasswordException) {
-                    // Existing data was encrypted with a different key (e.g., after
-                    // reinstall). Discard the unrecoverable data and start fresh.
-                    Log.w("ExampleApplication", "Clearing unreadable account data", e)
-                    repo.close()
-                    filesDir.resolve("accounts").deleteRecursively()
-                    return@single AccountRepository(rootPath, transformer)
-                }
-                repo
-            }
+        val accountRepository = try {
+            val repo = AccountRepository(rootPath, transformer)
+            repo.all()
+            repo
+        } catch (e: AccountRepositoryException.PasswordException) {
+            // Existing data was encrypted with a different key (e.g., after
+            // reinstall). Discard the unrecoverable data and start fresh.
+            Log.w("ExampleApplication", "Clearing unreadable account data", e)
+            filesDir.resolve("accounts").deleteRecursively()
+            AccountRepository(rootPath, transformer)
         }
 
         startKoin {
             androidContext(this@ExampleApplication)
-            modules(listOf(networkModule, accountRepoModule) + commonModules())
+            modules(listOf(networkModule) + commonModules(accountRepository))
         }
     }
 }

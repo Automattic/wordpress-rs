@@ -1,41 +1,24 @@
 package rs.wordpress.example.shared.di
 
 import org.koin.dsl.module
+import rs.wordpress.api.kotlin.DebugMiddleware
 import rs.wordpress.api.kotlin.EmptyAppNotifier
 import rs.wordpress.api.kotlin.NetworkAvailabilityProvider
+import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestExecutor
 import rs.wordpress.cache.kotlin.WordPressApiCache
-import rs.wordpress.example.TestCredentials
-import rs.wordpress.example.shared.localTestSiteUrl
-import rs.wordpress.example.shared.repository.AuthenticationRepository
-import rs.wordpress.example.shared.ui.plugins.PluginListViewModel
-import rs.wordpress.example.shared.ui.postcollection.PostCollectionViewModel
-import rs.wordpress.example.shared.ui.postmetadatacollection.PostMetadataCollectionViewModel
-import rs.wordpress.example.shared.ui.posttypes.PostTypesViewModel
-import rs.wordpress.example.shared.ui.stresstest.StressTestViewModel
-import rs.wordpress.example.shared.ui.users.UserListViewModel
 import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
+import rs.wordpress.api.kotlin.WpComApiClient
 import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiMiddlewarePipeline
+import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.WpAuthenticationProvider
+import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
+import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.AccountRepository
-import uniffi.wp_mobile.MockPostService
-import uniffi.wp_mobile.SiteInfo
 import uniffi.wp_mobile.WpService
 import java.io.File
-
-val authModule = module {
-    single {
-        AuthenticationRepository(
-            accountRepository = getOrNull<AccountRepository>(),
-            localTestSiteUrl = localTestSiteUrl().siteUrl,
-            localTestSiteUsername = TestCredentials.ADMIN_USERNAME,
-            localTestSitePassword = TestCredentials.ADMIN_PASSWORD
-        ).apply {
-            addTestSiteIfAvailable()
-        }
-    }
-}
+import java.net.URI
 
 val cacheModule = module {
     single {
@@ -50,74 +33,71 @@ val cacheModule = module {
     }
 }
 
-val mockServiceModule = module {
-    single {
-        val cache = get<WordPressApiCache>()
-        val wpService = get<WpService>()
-
-        // Use the exact same site_url and api_root as WpService
-        val siteInfo = wpService.sites().getCurrentSiteInfo()
-
-        val (siteUrl, apiRoot) = when (siteInfo) {
-            is SiteInfo.SelfHosted -> siteInfo.siteUrl to siteInfo.apiRoot
-            is SiteInfo.WordPressCom -> error("MockPostService requires a self-hosted site")
-        }
-
-        MockPostService(
-            cache.cache,
-            siteUrl,
-            apiRoot
-        )
-    }
-}
-
-val selfHostedServiceModule = module {
-    single {
-        val cache = get<WordPressApiCache>()
-        val authRepo = get<AuthenticationRepository>()
-
-        // Get the authenticated site from the repository
-        val authenticatedSite = authRepo.authenticatedSiteList().firstOrNull()
-        val wpAuth = authenticatedSite?.let { authRepo.authenticationForSite(it) }
-
-        val authProvider = if (wpAuth != null) {
-            WpAuthenticationProvider.staticWithAuth(wpAuth)
-        } else {
-            WpAuthenticationProvider.none()
-        }
-
-        val siteUrl = localTestSiteUrl().siteUrl
-        val apiRoot = "$siteUrl/wp-json"
-
-        WpService.selfHosted(
-            siteUrl = siteUrl,
-            apiRoot = apiRoot,
-            delegate = WpApiClientDelegate(
-                authProvider,
-                requestExecutor = WpRequestExecutor(emptyList(), get<NetworkAvailabilityProvider>()),
-                middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
-                appNotifier = EmptyAppNotifier()
-            ),
-            cache = cache.cache
-        )
-    }
-}
-
 val viewModelModule = module {
-    // TODO: Need to pass a scoped api client
-    single { PluginListViewModel(get(), get()) }
-    single { UserListViewModel(get(), get()) }
     single { WelcomeViewModel(get()) }
-    single { StressTestViewModel(get(), get(), get()) }
-    single { PostCollectionViewModel(get()) }
-    single { PostMetadataCollectionViewModel(get()) }
-    single { PostTypesViewModel(get()) }
 }
 
-fun commonModules() = listOf(
-    authModule,
-    cacheModule,
-    mockServiceModule,
-    selfHostedServiceModule,
-    viewModelModule
-)
+fun createWpService(
+    account: Account.SelfHostedSite,
+    cache: WordPressApiCache,
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): WpService {
+    val auth = if (account.siteApiRoot.startsWith("https://public-api.wordpress.com/")) {
+        WpAuthentication.Bearer(token = account.password)
+    } else {
+        wpAuthenticationFromUsernameAndPassword(account.username, account.password)
+    }
+    return WpService.selfHosted(
+        siteUrl = account.domain,
+        apiRoot = account.siteApiRoot,
+        delegate = WpApiClientDelegate(
+            WpAuthenticationProvider.staticWithAuth(auth),
+            requestExecutor = WpRequestExecutor(emptyList(), networkAvailabilityProvider),
+            middlewarePipeline = WpApiMiddlewarePipeline(listOf(DebugMiddleware())),
+            appNotifier = EmptyAppNotifier()
+        ),
+        cache = cache.cache
+    )
+}
+
+fun createWpApiClient(
+    account: Account.SelfHostedSite,
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): WpApiClient {
+    val auth = if (account.siteApiRoot.startsWith("https://public-api.wordpress.com/")) {
+        WpAuthentication.Bearer(token = account.password)
+    } else {
+        wpAuthenticationFromUsernameAndPassword(account.username, account.password)
+    }
+    return WpApiClient(
+        wpOrgSiteApiRootUrl = URI(account.siteApiRoot).toURL(),
+        authProvider = WpAuthenticationProvider.staticWithAuth(auth),
+        interceptors = emptyList(),
+        networkAvailabilityProvider = networkAvailabilityProvider
+    )
+}
+
+fun createWpComApiClient(
+    account: Account.WpCom,
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): WpComApiClient {
+    return WpComApiClient(
+        authProvider = WpAuthenticationProvider.staticWithAuth(
+            WpAuthentication.Bearer(token = account.token)
+        ),
+        interceptors = emptyList(),
+        networkAvailabilityProvider = networkAvailabilityProvider
+    )
+}
+
+fun commonModules(accountRepository: AccountRepository): List<org.koin.core.module.Module> {
+    val accountModule = module {
+        single { accountRepository }
+    }
+
+    return listOf(
+        accountModule,
+        cacheModule,
+        viewModelModule
+    )
+}

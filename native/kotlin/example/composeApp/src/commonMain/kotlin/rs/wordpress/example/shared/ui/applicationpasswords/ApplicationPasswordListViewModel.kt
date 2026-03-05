@@ -1,0 +1,57 @@
+package rs.wordpress.example.shared.ui.applicationpasswords
+
+import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.Dispatchers
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import rs.wordpress.api.kotlin.WpApiClient
+import rs.wordpress.api.kotlin.WpRequestResult
+import rs.wordpress.example.shared.ui.components.errorDescription
+import uniffi.wp_api.ApplicationPasswordWithEditContext
+
+class ApplicationPasswordListViewModel(private val apiClient: WpApiClient) : ViewModel() {
+
+    private val _applicationPasswords = MutableStateFlow<List<ApplicationPasswordWithEditContext>>(emptyList())
+    val applicationPasswords: StateFlow<List<ApplicationPasswordWithEditContext>> = _applicationPasswords.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    init {
+        loadApplicationPasswords()
+    }
+
+    private fun loadApplicationPasswords() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val meResult = apiClient.request { requestBuilder ->
+                requestBuilder.users().retrieveMeWithEditContext()
+            }
+            val userId = when (meResult) {
+                is WpRequestResult.Success -> meResult.response.data.id
+                else -> {
+                    _error.value = meResult.errorDescription()
+                    _isLoading.value = false
+                    return@launch
+                }
+            }
+
+            val result = apiClient.request { requestBuilder ->
+                requestBuilder.applicationPasswords().listWithEditContext(userId)
+            }
+            when (result) {
+                is WpRequestResult.Success -> _applicationPasswords.value = result.response.data
+                else -> {
+                    _error.value = result.errorDescription()
+                    _applicationPasswords.value = emptyList()
+                }
+            }
+            _isLoading.value = false
+        }
+    }
+}

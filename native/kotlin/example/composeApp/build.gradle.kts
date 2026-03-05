@@ -43,7 +43,6 @@ kotlin {
 
         androidMain.dependencies {
             implementation(compose.preview)
-            implementation(libs.androidx.material)
             implementation(libs.androidx.activity.compose)
             implementation(libs.koin.android)
             implementation(libs.lifecycle.viewmodel.compose)
@@ -59,7 +58,8 @@ kotlin {
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
-            implementation(compose.material)
+            implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
@@ -165,11 +165,9 @@ val generateTestCredentials = tasks.register("generateTestCredentials") {
     val outputDir = layout.buildDirectory.dir("generated/source/testCredentials")
     val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot") as String
     val credentialsFile = file("$cargoProjectRoot/test_credentials.json")
-    val wpComCredentialsFile = file("$cargoProjectRoot/wp_com_test_credentials.json")
 
     // Only mark as input if file exists - allows build to work without test server running
     inputs.files(credentialsFile).optional(true)
-    inputs.files(wpComCredentialsFile).optional(true)
     outputs.dir(outputDir)
 
     doLast {
@@ -202,32 +200,6 @@ val generateTestCredentials = tasks.register("generateTestCredentials") {
                 }
             """.trimIndent())
         }
-
-        val wpComCredentialsKtFile = outputDir.get().file("rs/wordpress/example/WpComCredentials.kt").asFile
-        wpComCredentialsKtFile.parentFile.mkdirs()
-
-        if (wpComCredentialsFile.exists()) {
-            val json = groovy.json.JsonSlurper().parseText(wpComCredentialsFile.readText()) as Map<*, *>
-            val clientId = json["client_id"]
-            val clientSecret = json["client_secret"]
-            wpComCredentialsKtFile.writeText("""
-                package rs.wordpress.example
-
-                object WpComCredentials {
-                    val CLIENT_ID: Long? = ${if (clientId != null && clientId != 0) clientId else "null"}
-                    val CLIENT_SECRET: String? = ${if (clientSecret != null && clientSecret != "") "\"$clientSecret\"" else "null"}
-                }
-            """.trimIndent())
-        } else {
-            wpComCredentialsKtFile.writeText("""
-                package rs.wordpress.example
-
-                object WpComCredentials {
-                    val CLIENT_ID: Long? = null
-                    val CLIENT_SECRET: String? = null
-                }
-            """.trimIndent())
-        }
     }
 }
 
@@ -237,16 +209,57 @@ kotlin.sourceSets.getByName("desktopMain") {
 
 kotlin.sourceSets.getByName("commonMain") {
     kotlin.srcDir(layout.buildDirectory.dir("generated/source/testCredentials"))
+    kotlin.srcDir(layout.buildDirectory.dir("generated/source/wpComCredentials"))
+}
+
+// Generate WpComCredentials from wp_com_test_credentials.json
+val generateWpComCredentials = tasks.register("generateWpComCredentials") {
+    val outputDir = layout.buildDirectory.dir("generated/source/wpComCredentials")
+    val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot") as String
+    val credentialsFile = file("$cargoProjectRoot/wp_com_test_credentials.json")
+
+    inputs.files(credentialsFile).optional(true)
+    outputs.dir(outputDir)
+
+    doLast {
+        val wpComCredentialsFile = outputDir.get().file("rs/wordpress/example/WpComCredentials.kt").asFile
+        wpComCredentialsFile.parentFile.mkdirs()
+
+        if (credentialsFile.exists()) {
+            val json = groovy.json.JsonSlurper().parseText(credentialsFile.readText()) as Map<*, *>
+            val clientId = json["client_id"]
+            val clientSecret = json["client_secret"]
+            wpComCredentialsFile.writeText("""
+                package rs.wordpress.example
+
+                object WpComCredentials {
+                    val CLIENT_ID: ULong? = ${if (clientId != null) "${clientId}uL" else "null"}
+                    val CLIENT_SECRET: String? = ${if (clientSecret != null) "\"$clientSecret\"" else "null"}
+                }
+            """.trimIndent())
+        } else {
+            wpComCredentialsFile.writeText("""
+                package rs.wordpress.example
+
+                object WpComCredentials {
+                    val CLIENT_ID: ULong? = null
+                    val CLIENT_SECRET: String? = null
+                }
+            """.trimIndent())
+        }
+    }
 }
 
 tasks.named("compileKotlinDesktop").configure {
     dependsOn(generateBuildConfig)
     dependsOn(generateTestCredentials)
+    dependsOn(generateWpComCredentials)
 }
 
-// Ensure test credentials are generated before any Android compilation
+// Ensure generated sources are available before any Android compilation
 tasks.named("preBuild").configure {
     dependsOn(generateTestCredentials)
+    dependsOn(generateWpComCredentials)
 }
 
 tasks.named("desktopProcessResources").configure {

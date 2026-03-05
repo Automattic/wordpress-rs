@@ -1,45 +1,46 @@
 package rs.wordpress.example.shared.ui.plugins
 
-import kotlinx.coroutines.runBlocking
-import rs.wordpress.api.kotlin.NetworkAvailabilityProvider
+import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.Dispatchers
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
-import rs.wordpress.example.shared.domain.AuthenticatedSite
-import rs.wordpress.example.shared.repository.AuthenticationRepository
+import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.PluginListParams
 import uniffi.wp_api.PluginWithEditContext
-import uniffi.wp_api.WpAuthenticationProvider
 
-class PluginListViewModel(
-    private val authRepository: AuthenticationRepository,
-    private val networkAvailabilityProvider: NetworkAvailabilityProvider
-) {
-    private var apiClient: WpApiClient? = null
+class PluginListViewModel(private val apiClient: WpApiClient) : ViewModel() {
 
-    fun setAuthenticatedSite(authenticatedSite: AuthenticatedSite) {
-        apiClient = null
-        authRepository.authenticationForSite(authenticatedSite)?.let {
-            apiClient = WpApiClient(
-                wpOrgSiteApiRootUrl = authenticatedSite.apiRootUrl,
-                authProvider = WpAuthenticationProvider.staticWithAuth(it),
-                interceptors = emptyList(),
-                networkAvailabilityProvider = networkAvailabilityProvider
-            )
-        }
+    private val _plugins = MutableStateFlow<List<PluginWithEditContext>>(emptyList())
+    val plugins: StateFlow<List<PluginWithEditContext>> = _plugins.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    init {
+        loadPlugins()
     }
 
-    fun fetchPlugins(): List<PluginWithEditContext> {
-        apiClient?.let { apiClient ->
-            val pluginsResult = runBlocking {
-                apiClient.request { requestBuilder ->
-                    requestBuilder.plugins().listWithEditContext(params = PluginListParams())
+    private fun loadPlugins() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val pluginsResult = apiClient.request { requestBuilder ->
+                requestBuilder.plugins().listWithEditContext(params = PluginListParams())
+            }
+            when (pluginsResult) {
+                is WpRequestResult.Success -> _plugins.value = pluginsResult.response.data
+                else -> {
+                    _error.value = pluginsResult.errorDescription()
+                    _plugins.value = emptyList()
                 }
             }
-            return when (pluginsResult) {
-                is WpRequestResult.Success -> pluginsResult.response.data
-                else -> listOf()
-            }
+            _isLoading.value = false
         }
-        return listOf()
     }
 }

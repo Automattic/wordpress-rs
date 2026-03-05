@@ -1,9 +1,8 @@
 package rs.wordpress.example.shared.ui.postcollection
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +25,7 @@ data class CollectionState(
     val lastFetchResult: FetchResult? = null,
     val lastFetchError: Any? = null,
     val isFetching: Boolean = false
-) {
+) : ViewModel() {
     val nextPage: Int get() = currentPage + 1
 
     /**
@@ -51,8 +50,7 @@ data class CollectionState(
 
 class PostCollectionViewModel(
     private val selfHostedService: WpService
-) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+) : ViewModel() {
 
     private val _state = MutableStateFlow(CollectionState(currentFilter = AnyPostFilter(null)))
     val state: StateFlow<CollectionState> = _state.asStateFlow()
@@ -196,12 +194,9 @@ class PostCollectionViewModel(
     /**
      * Clean up resources when ViewModel is destroyed
      */
-    fun onCleared() {
+    override fun onCleared() {
         // Close the observable collection to unregister from DatabaseChangeNotifier
         observableCollection?.close()
         observableCollection = null
-
-        // Cancel coroutine scope
-        viewModelScope.cancel()
     }
 }
