@@ -1,6 +1,7 @@
 package rs.wordpress.example.shared.ui.users
 
 import kotlinx.coroutines.runBlocking
+import rs.wordpress.api.kotlin.NetworkAvailabilityProvider
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
 import rs.wordpress.example.shared.domain.AuthenticatedSite
@@ -9,7 +10,10 @@ import uniffi.wp_api.UserListParams
 import uniffi.wp_api.UserWithEditContext
 import uniffi.wp_api.WpAuthenticationProvider
 
-class UserListViewModel(private val authRepository: AuthenticationRepository) {
+class UserListViewModel(
+    private val authRepository: AuthenticationRepository,
+    private val networkAvailabilityProvider: NetworkAvailabilityProvider
+) {
     private var apiClient: WpApiClient? = null
 
     fun setAuthenticatedSite(authenticatedSite: AuthenticatedSite) {
@@ -18,7 +22,8 @@ class UserListViewModel(private val authRepository: AuthenticationRepository) {
             apiClient = WpApiClient(
                 wpOrgSiteApiRootUrl = authenticatedSite.apiRootUrl,
                 authProvider = WpAuthenticationProvider.staticWithAuth(it),
-                interceptors = emptyList()
+                interceptors = emptyList(),
+                networkAvailabilityProvider = networkAvailabilityProvider
             )
         }
     }
@@ -32,7 +37,7 @@ class UserListViewModel(private val authRepository: AuthenticationRepository) {
             }
             return when (usersResult) {
                 is WpRequestResult.Success -> usersResult.response.data
-                else -> throw IllegalStateException("User list request should succeed: $usersResult")
+                else -> listOf()
             }
         }
         return listOf()

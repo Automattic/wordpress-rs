@@ -1,8 +1,7 @@
-use crate::wp_com::sites::{SitesListParams, WPComSiteListResponse};
-use crate::wp_com::{WpComSiteId, sites::WpComSiteSlug};
+use crate::wp_com::sites::{SitesListParams, WPComSiteListResponse, WpComSiteIdentifier};
 use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
-    wp_com::{WpComNamespace, sites::WPComSite},
+    wp_com::{WpComNamespace, sites::WPComSite, sites::WPComSiteSummary},
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
@@ -11,11 +10,12 @@ enum SitesRequest {
     #[get(url = "/me/sites", params = &SitesListParams, output = WPComSiteListResponse)]
     Get,
 
-    #[get(url = "/sites/<wp_com_site_id>", output = WPComSite)]
-    GetSiteById,
+    #[get(url = "/sites/<wp_com_site_identifier>", output = WPComSite)]
+    GetSite,
 
-    #[get(url = "/sites/<wp_com_site_slug>", output = WPComSite)]
-    GetSiteBySlug,
+    // Suitable for fetching anonymously
+    #[get(url = "/sites/<wp_com_site_identifier>", output = WPComSiteSummary)]
+    GetSiteSummary,
 }
 
 impl DerivedRequest for SitesRequest {

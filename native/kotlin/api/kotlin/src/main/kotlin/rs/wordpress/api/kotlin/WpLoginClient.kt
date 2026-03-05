@@ -25,10 +25,11 @@ class WpLoginClient @JvmOverloads constructor(
     @JvmOverloads
     constructor(
         interceptors: List<Interceptor> = listOf(),
+        networkAvailabilityProvider: NetworkAvailabilityProvider,
         middlewarePipeline: WpApiMiddlewarePipeline = WpApiMiddlewarePipeline(listOf()),
         dispatcher: CoroutineDispatcher = Dispatchers.IO
     ) : this(
-        requestExecutor = WpRequestExecutor(interceptors),
+        requestExecutor = WpRequestExecutor(interceptors, networkAvailabilityProvider),
         middlewarePipeline = middlewarePipeline,
         dispatcher = dispatcher
     )

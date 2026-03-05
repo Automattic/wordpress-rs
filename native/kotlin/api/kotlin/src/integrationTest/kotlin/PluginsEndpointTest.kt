@@ -21,7 +21,8 @@ class PluginsEndpointTest {
             username = testCredentials.adminUsername,
             password = testCredentials.adminPassword
         ),
-        emptyList()
+        emptyList(),
+        NetworkAvailabilityProvider { true }
     )
     private val clientAsSubscriber = WpApiClient(
         testCredentials.apiRootUrl,
@@ -29,7 +30,8 @@ class PluginsEndpointTest {
             username = testCredentials.subscriberUsername,
             password = testCredentials.subscriberPassword
         ),
-        emptyList()
+        emptyList(),
+        NetworkAvailabilityProvider { true }
     )
 
     @Test

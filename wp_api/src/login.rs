@@ -16,6 +16,7 @@ const KEY_OAUTH2: &str = "oauth2";
 
 pub mod login_client;
 pub mod nonce;
+pub mod oauth2_configuration;
 pub mod url_discovery;
 
 #[derive(Debug, uniffi::Record)]
@@ -355,20 +356,10 @@ impl WpApiDetailsAuthenticationMap {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
 pub struct OAuth2Endpoints {
     pub authorization_url: String,
     pub token_url: String,
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
-pub struct OAuth2Client {
-    pub client_id: String,
-    pub client_secret: String,
-    #[serde(rename = "redirectUri")]
-    pub redirect_uri: String,
-    pub scope: String,
-    pub state: Option<String>,
 }
 
 /// Return a URL to be used in application password authentication.

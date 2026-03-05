@@ -1,4 +1,4 @@
-use super::WpApiDetails;
+use super::{OAuth2Endpoints, WpApiDetails};
 use crate::{
     api_error::{RequestExecutionError, RequestExecutionErrorReason, WpErrorCode},
     login::KnownAuthenticationBlockingPlugin,
@@ -360,12 +360,30 @@ pub enum FetchWpJsonFailure {
     },
 }
 
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum DiscoveredAuthenticationMechanism {
+    ApplicationPasswords { authentication_url: Arc<ParsedUrl> },
+    OAuth2 { endpoints: OAuth2Endpoints },
+}
+
+#[uniffi::export]
+pub fn application_passwords_url(
+    authentication: &DiscoveredAuthenticationMechanism,
+) -> Option<Arc<ParsedUrl>> {
+    match authentication {
+        DiscoveredAuthenticationMechanism::ApplicationPasswords { authentication_url } => {
+            Some(Arc::clone(authentication_url))
+        }
+        _ => None,
+    }
+}
+
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct AutoDiscoveryAttemptSuccess {
     pub parsed_site_url: Arc<ParsedUrl>,
     pub api_root_url: Arc<ParsedUrl>,
     pub api_details: Arc<WpApiDetails>,
-    pub application_passwords_authentication_url: Arc<ParsedUrl>,
+    pub authentication: DiscoveredAuthenticationMechanism,
 }
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]

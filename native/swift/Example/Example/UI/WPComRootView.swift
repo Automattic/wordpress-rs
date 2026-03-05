@@ -10,7 +10,8 @@ struct WPComRootView: View {
     @Environment(\.webAuthenticationSession)
     private var webAuthenticationSession
 
-    private let wpcomService = WPComService()
+    @EnvironmentObject
+    private var wpcomService: WPComService
 
     @State
     var isLoadingInitialData: Bool = true
@@ -23,16 +24,16 @@ struct WPComRootView: View {
 
     var body: some View {
         if loginManager.isLoggedInToWpCom {
-            NavigationSplitView {
-                NavigationStack {
-                    if isLoadingInitialData {
-                        ProgressView()
-                    } else {
-                        RootListView(items: rootListItems.grouped)
-                    }
+            NavigationView {
+                if isLoadingInitialData {
+                    ProgressView()
+                } else {
+                    RootListView(items: rootListItems.grouped)
                 }
-            } detail: {
-                Text("Logged in")
+
+                EmptyView()
+
+                Text("Select an item from the sidebar.")
             }
             .toolbar {
                 Button(action: self.logOutOfWPCom) {
@@ -46,7 +47,7 @@ struct WPComRootView: View {
                     debugPrint(error.localizedDescription)
                 }
             }
-        } else {
+        } else if loginManager.wpComOAuthConfiguration != nil {
             ContentUnavailableView {
                 Text("Not logged in")
             } actions: {
@@ -55,42 +56,24 @@ struct WPComRootView: View {
                         .padding(.horizontal)
                 }).buttonStyle(.borderedProminent)
             }
+        } else {
+            ContentUnavailableView {
+                Text("WordPress.com credentials not configured")
+            } description: {
+                Text("Add a wp_com_test_credentials.json file to the repository root and rebuild.")
+            }
         }
     }
 
     private func loginToWPCom() {
+        guard let configuration = loginManager.wpComOAuthConfiguration else { return }
+
         Task {
             do {
-                let redirectUri = URL(string: "x-wordpress-app://oauth2-callback")!
-
-                let url = WPComApiClient.OAuth2.buildTokenRequestUrl(
-                    clientId: 11,
-                    redirectUri: redirectUri,
-                    scope: ["global"]
+                try await loginManager.logInToWpCom(
+                        configuration: configuration,
+                        webAuthenticationSession: webAuthenticationSession
                 )
-
-                let callbackUrl = try await webAuthenticationSession.authenticate(
-                    using: url,
-                    callbackURLScheme: "x-wordpress-app"
-                )
-
-                let tokenResponse = try WPComApiClient.OAuth2.parseTokenResponse(url: callbackUrl)
-
-                let client = WPComApiClient(
-                    authentication: .none,
-                    middlewarePipeline: MiddlewarePipeline(middlewares: [DebugMiddleware()])
-                )
-
-                let requestParams = TokenRequestParameters(
-                    clientId: UInt64(ProcessInfo.processInfo.environment["WPCOM_CLIENT_ID"]!)!,
-                    clientSecret: ProcessInfo.processInfo.environment["WPCOM_CLIENT_SECRET"]!,
-                    code: tokenResponse.code,
-                    redirectUri: redirectUri.absoluteString
-                )
-
-                let response = try await client.oauth2.requestToken(params: requestParams)
-                try self.loginManager.setWpComLoginCredentials(to: response.data.accessToken)
-
             } catch {
                 self.error = error
             }
@@ -98,14 +81,19 @@ struct WPComRootView: View {
     }
 
     private func logOutOfWPCom() {
-        do {
-            try self.loginManager.logoutWpCom()
-        } catch {
-            self.error = error
+        Task {
+            do {
+                try await self.loginManager.logoutWpCom()
+            } catch {
+                self.error = error
+            }
         }
     }
 }
 
 #Preview {
+    // swiftlint:disable force_try
     WPComRootView()
+        .environmentObject(WPComService(loginManager: try! LoginManager()))
+    // swiftlint:enable force_try
 }

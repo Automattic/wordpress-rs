@@ -45,7 +45,8 @@ class WpRequestExecutorTest {
             .build()
 
         val executor = WpRequestExecutor(
-            httpClient = WpHttpClient.CustomOkHttpClient(client)
+            httpClient = WpHttpClient.CustomOkHttpClient(client),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
         )
 
         val apiClient = WpApiClient(

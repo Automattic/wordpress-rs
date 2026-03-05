@@ -2,15 +2,23 @@ import Foundation
 import WordPressAPI
 import WordPressApiCache
 
-struct SelfHostedService: Sendable {
+@MainActor
+final class SelfHostedService: ObservableObject {
+
+    private let loginManager: LoginManager
 
     private let userListParams = UserListParams(perPage: 5)
     private let postListParams = PostListParams(perPage: 5)
     private let mediaListParams = MediaListParams(perPage: 5)
     private let termListParams = TermListParams(perPage: 5)
 
+    init(loginManager: LoginManager) {
+        self.loginManager = loginManager
+    }
+
     func loadRootListItems() async throws -> [RootListData] {
-        let api = try await WordPressAPI.globalInstance
+        let api = try await WordPressAPI.instance(loginManager: self.loginManager)
+
         var baseData = [
             RootListData(name: "Application Passwords", callback: {
                 try await api.applicationPasswords.listWithEditContext(userId: 1)
@@ -37,13 +45,13 @@ struct SelfHostedService: Sendable {
             }, category: .posts),
             RootListData(name: "Site Health Tests", callback: {
                 let items: [any ListViewDataConvertable] = [
-                    try await WordPressAPI.globalInstance.siteHealthTests.authorizationHeader().data,
-                    try await WordPressAPI.globalInstance.siteHealthTests.backgroundUpdates().data,
-                    try await WordPressAPI.globalInstance.siteHealthTests.directorySizes().data,
-                    try await WordPressAPI.globalInstance.siteHealthTests.dotorgCommunication().data,
-                    try await WordPressAPI.globalInstance.siteHealthTests.httpsStatus().data,
-                    try await WordPressAPI.globalInstance.siteHealthTests.loopbackRequests().data,
-                    try await WordPressAPI.globalInstance.siteHealthTests.pageCache().data
+                    try await api.siteHealthTests.authorizationHeader().data,
+                    try await api.siteHealthTests.backgroundUpdates().data,
+                    try await api.siteHealthTests.directorySizes().data,
+                    try await api.siteHealthTests.dotorgCommunication().data,
+                    try await api.siteHealthTests.httpsStatus().data,
+                    try await api.siteHealthTests.loopbackRequests().data,
+                    try await api.siteHealthTests.pageCache().data
                 ]
 
                 return items.map { $0.asListViewData }
@@ -70,9 +78,9 @@ struct SelfHostedService: Sendable {
 
         for type in postTypes {
             baseData.append(RootListData(name: type.name, sequence: {
-                let sequence = try await WordPressAPI.globalInstance.posts.sequenceWithEditContext(
+                let sequence = api.posts.sequenceWithEditContext(
                     type: PostEndpointType.custom(type.restBase),
-                    params: postListParams
+                    params: self.postListParams
                 )
                 return ListViewSequence(underlyingSequence: sequence)
             }, category: .posts))
@@ -85,7 +93,7 @@ struct SelfHostedService: Sendable {
 
         for type in taxonomyTypes {
             baseData.append(RootListData(name: type.name, sequence: {
-                let sequence = try await WordPressAPI.globalInstance.terms.sequenceWithEditContext(
+                let sequence = api.terms.sequenceWithEditContext(
                     type: .custom(type.restBase),
                     params: self.termListParams
                 )
@@ -95,33 +103,33 @@ struct SelfHostedService: Sendable {
         }
 
         baseData.append(RootListData(name: "Post Statuses", callback: {
-            try await WordPressAPI.globalInstance.postStatuses.listWithEditContext()
+            try await api.postStatuses.listWithEditContext()
                 .data
                 .postStatuses
                 .map(\.value.asListViewData)
         }, category: .posts))
 
         baseData.append(RootListData(name: "Navigations", callback: {
-            try await WordPressAPI.globalInstance.navigations.listWithEditContext(params: NavigationListParams())
+            try await api.navigations.listWithEditContext(params: NavigationListParams())
                 .data
                 .map(\.asListViewData)
         }, category: .navigation))
 
         baseData.append(RootListData(name: "Menus", callback: {
-            try await WordPressAPI.globalInstance.navMenus.listWithEditContext(params: NavMenuListParams())
+            try await api.navMenus.listWithEditContext(params: NavMenuListParams())
                 .data
                 .map(\.asListViewData)
         }, category: .navigation))
 
         baseData.append(RootListData(name: "Menu Items", sequence: {
-            let sequence = try await WordPressAPI.globalInstance.navMenuItems
+            let sequence = api.navMenuItems
                 .sequenceWithEditContext(params: NavMenuItemListParams())
 
             return ListViewSequence(underlyingSequence: sequence)
         }, category: .navigation))
 
         baseData.append(RootListData(name: "Menu Locations", callback: {
-            try await WordPressAPI.globalInstance.menuLocations.listWithEditContext()
+            try await api.menuLocations.listWithEditContext()
                 .data
                 .locations
                 .map(\.value.asListViewData)

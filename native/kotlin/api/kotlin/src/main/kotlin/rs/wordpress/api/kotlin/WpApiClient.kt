@@ -47,12 +47,13 @@ class WpApiClient @JvmOverloads constructor(
         wpOrgSiteApiRootUrl: URL,
         authProvider: WpAuthenticationProvider,
         interceptors: List<Interceptor>,
+        networkAvailabilityProvider: NetworkAvailabilityProvider,
         appNotifier: WpAppNotifier = EmptyAppNotifier(),
         dispatcher: CoroutineDispatcher = Dispatchers.IO
     ) : this(
         wpOrgSiteApiRootUrl,
         authProvider,
-        requestExecutor = WpRequestExecutor(interceptors),
+        requestExecutor = WpRequestExecutor(interceptors, networkAvailabilityProvider),
         appNotifier,
         dispatcher
     )

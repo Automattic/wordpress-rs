@@ -26,7 +26,7 @@ fun defaultApiClient(): WpApiClient {
     val authProvider = WpAuthenticationProvider.staticWithUsernameAndPassword(
         username = testCredentials.adminUsername, password = testCredentials.adminPassword
     )
-    return WpApiClient(testCredentials.apiRootUrl, authProvider, emptyList())
+    return WpApiClient(testCredentials.apiRootUrl, authProvider, emptyList(), NetworkAvailabilityProvider { true })
 }
 
 data class TestServiceContext(
@@ -57,7 +57,7 @@ fun createTestServiceContext(): TestServiceContext {
         apiRoot = apiRootUrl,
         delegate = WpApiClientDelegate(
             authProvider,
-            requestExecutor = WpRequestExecutor(emptyList()),
+            requestExecutor = WpRequestExecutor(emptyList(), NetworkAvailabilityProvider { true }),
             middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
             appNotifier = EmptyAppNotifier()
         ),

@@ -1,25 +1,127 @@
 use crate::{
     prelude::ParsedUrl,
     url_query::{AppendUrlQueryPairs, QueryPairs},
+    wp_com::sites::WpComSiteIdentifier,
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
 use wp_serde_helper::deserialize_u64_or_none_with_zero_as_none_from_string;
 use wp_serde_helper::deserialize_u64_or_string;
 
+/// WordPress.com OAuth2 permission scopes.
+///
+/// Each scope grants access to a specific area of the WordPress.com API.
+/// Multiple scopes can be requested by passing a `Vec<WpComOauthScope>`.
+///
+/// See: <https://developer.wordpress.com/docs/api/oauth2/#available-scopes>
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, uniffi::Enum)]
+pub enum WpComOauthScope {
+    /// Access to authentication endpoints.
+    Auth,
+    /// Access to user data.
+    Users,
+    /// Access to site data.
+    Sites,
+    /// Access to posts.
+    Posts,
+    /// Access to comments.
+    Comments,
+    /// Access to taxonomies (categories, tags).
+    Taxonomy,
+    /// Access to follow/unfollow actions.
+    Follow,
+    /// Access to sharing settings and actions.
+    Sharing,
+    /// Access to Freshly Pressed content.
+    FreshlyPressed,
+    /// Access to notifications.
+    Notifications,
+    /// Access to site insights and analytics.
+    Insights,
+    /// Access to read content from followed sites.
+    Read,
+    /// Access to site statistics.
+    Stats,
+    /// Access to media uploads and library.
+    Media,
+    /// Access to navigation menus.
+    Menus,
+    /// Access to batch API operations.
+    Batch,
+    /// Access to video hosting features.
+    Videos,
+    /// Full access to all scopes.
+    Global,
+}
+
+impl std::fmt::Display for WpComOauthScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Auth => "auth",
+            Self::Users => "users",
+            Self::Sites => "sites",
+            Self::Posts => "posts",
+            Self::Comments => "comments",
+            Self::Taxonomy => "taxonomy",
+            Self::Follow => "follow",
+            Self::Sharing => "sharing",
+            Self::FreshlyPressed => "freshly-pressed",
+            Self::Notifications => "notifications",
+            Self::Insights => "insights",
+            Self::Read => "read",
+            Self::Stats => "stats",
+            Self::Media => "media",
+            Self::Menus => "menus",
+            Self::Batch => "batch",
+            Self::Videos => "videos",
+            Self::Global => "global",
+        };
+        write!(f, "{s}")
+    }
+}
+
+/// Serialize a set of OAuth scopes to a space-separated string.
+///
+/// Duplicate scopes are removed automatically.
+#[uniffi::export]
+pub fn wp_com_oauth_scope_list_to_string(scopes: Vec<WpComOauthScope>) -> String {
+    scopes
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>()
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Errors that can occur when extracting an authorization code from an OAuth2 callback URL.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum AuthorizationCodeExtractionError {
+    /// The callback URL could not be parsed.
     #[error("Invalid URL: {reason}")]
     InvalidUrl { reason: String },
+    /// The `code` query parameter was not present in the callback URL.
     #[error("Missing 'code' parameter in authorization URL")]
     MissingCode,
+    /// The `state` parameter in the callback did not match the expected value.
+    /// This may indicate a CSRF attack.
+    #[error("State mismatch: expected '{expected}', got '{actual}'")]
+    StateMismatch { expected: String, actual: String },
+    /// A `state` parameter was expected but not present in the callback URL.
+    /// This may indicate a CSRF attack.
+    #[error("State mismatch: expected '{expected}', but no state was returned")]
+    StateMissing { expected: String },
+    /// The authorization server returned an error (e.g., `access_denied`).
     #[error("{reason}")]
     Error { reason: String, code: String },
 }
 
+/// The result of extracting an authorization code from an OAuth2 callback URL.
 #[derive(Debug, Serialize, uniffi::Record)]
 pub struct AuthorizationCodeExtractionResult {
+    /// The authorization code to exchange for an access token.
     pub code: String,
+    /// The state parameter, if one was included in the callback URL.
     pub state: Option<String>,
 }
 
@@ -115,11 +217,10 @@ pub struct TokenRequestResponse {
 ///   Must exactly match the URL registered with your application.
 /// * `response_type` - The type of OAuth2 flow: `"code"` for Authorization Code flow
 ///   or `"token"` for Implicit flow
-/// * `scope` - Space-separated list of permissions (e.g., `"posts media"`) or `"global"`
-///   for full access
+/// * `scope` - List of permissions (e.g., `[Posts, Media]`) or `[Global]` for full access
 /// * `state` - A random string for CSRF protection. Should be verified when the user
 ///   is redirected back.
-/// * `blog` - Optional blog ID to request access to a specific blog
+/// * `blog` - Optional site identifier (ID or slug) to request access to a specific blog
 ///
 /// # Returns
 ///
@@ -128,9 +229,9 @@ pub struct TokenRequestResponse {
 pub fn build_token_request_url(
     client_id: u64,
     redirect_uri: &str,
-    scope: &str,
+    scope: Vec<WpComOauthScope>,
     state: &str,
-    blog: Option<u64>,
+    blog: Option<WpComSiteIdentifier>,
 ) -> ParsedUrl {
     let mut url = Url::parse("https://public-api.wordpress.com/oauth2/authorize")
         .expect("Failed to parse url");
@@ -140,12 +241,11 @@ pub fn build_token_request_url(
             .append_pair("client_id", &client_id.to_string())
             .append_pair("redirect_uri", redirect_uri)
             .append_pair("response_type", "code")
-            .append_pair("scope", scope)
+            .append_pair("scope", &wp_com_oauth_scope_list_to_string(scope.clone()))
             .append_pair("state", state);
 
-        if let Some(blog_id) = blog {
-            url.query_pairs_mut()
-                .append_pair("blog", &blog_id.to_string());
+        if let Some(blog) = &blog {
+            url.query_pairs_mut().append_pair("blog", &blog.to_string());
         }
     }
 
@@ -279,7 +379,7 @@ mod tests {
         let url = build_token_request_url(
             12345,
             "https://yourapp.com/callback",
-            "posts media",
+            vec![WpComOauthScope::Posts, WpComOauthScope::Media],
             "abc123xyz",
             None,
         );
@@ -297,9 +397,9 @@ mod tests {
         let url = build_token_request_url(
             12345,
             "https://yourapp.com/callback",
-            "posts media",
+            vec![WpComOauthScope::Posts, WpComOauthScope::Media],
             "abc123xyz",
-            Some(67890),
+            Some(WpComSiteIdentifier::Id { value: 67890 }),
         );
 
         assert_eq!(
@@ -315,7 +415,7 @@ mod tests {
         let url = build_token_request_url(
             12345,
             "https://yourapp.com/callback",
-            "global",
+            vec![WpComOauthScope::Global],
             "abc123xyz",
             None,
         );
@@ -443,5 +543,40 @@ mod tests {
         f.read_to_end(&mut buffer)?;
 
         Ok(buffer)
+    }
+
+    #[test]
+    fn test_scope_display() {
+        assert_eq!(WpComOauthScope::Global.to_string(), "global");
+        assert_eq!(WpComOauthScope::Posts.to_string(), "posts");
+        assert_eq!(
+            WpComOauthScope::FreshlyPressed.to_string(),
+            "freshly-pressed"
+        );
+    }
+
+    #[test]
+    fn test_scope_list_to_string_single() {
+        assert_eq!(
+            wp_com_oauth_scope_list_to_string(vec![WpComOauthScope::Global]),
+            "global"
+        );
+    }
+
+    #[test]
+    fn test_scope_list_to_string_multiple() {
+        assert_eq!(
+            wp_com_oauth_scope_list_to_string(vec![
+                WpComOauthScope::Posts,
+                WpComOauthScope::Media,
+                WpComOauthScope::Stats
+            ]),
+            "posts stats media"
+        );
+    }
+
+    #[test]
+    fn test_scope_list_to_string_empty() {
+        assert_eq!(wp_com_oauth_scope_list_to_string(vec![]), "");
     }
 }

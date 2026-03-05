@@ -2,6 +2,7 @@ package rs.wordpress.example.shared.di
 
 import org.koin.dsl.module
 import rs.wordpress.api.kotlin.EmptyAppNotifier
+import rs.wordpress.api.kotlin.NetworkAvailabilityProvider
 import rs.wordpress.api.kotlin.WpRequestExecutor
 import rs.wordpress.cache.kotlin.WordPressApiCache
 import rs.wordpress.example.TestCredentials
@@ -17,6 +18,7 @@ import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
 import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAuthenticationProvider
+import uniffi.wp_mobile.AccountRepository
 import uniffi.wp_mobile.MockPostService
 import uniffi.wp_mobile.SiteInfo
 import uniffi.wp_mobile.WpService
@@ -25,11 +27,11 @@ import java.io.File
 val authModule = module {
     single {
         AuthenticationRepository(
+            accountRepository = getOrNull<AccountRepository>(),
             localTestSiteUrl = localTestSiteUrl().siteUrl,
             localTestSiteUsername = TestCredentials.ADMIN_USERNAME,
             localTestSitePassword = TestCredentials.ADMIN_PASSWORD
         ).apply {
-            // Add test site if credentials are available
             addTestSiteIfAvailable()
         }
     }
@@ -92,7 +94,7 @@ val selfHostedServiceModule = module {
             apiRoot = apiRoot,
             delegate = WpApiClientDelegate(
                 authProvider,
-                requestExecutor = WpRequestExecutor(emptyList()),
+                requestExecutor = WpRequestExecutor(emptyList(), get<NetworkAvailabilityProvider>()),
                 middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
                 appNotifier = EmptyAppNotifier()
             ),
@@ -103,8 +105,8 @@ val selfHostedServiceModule = module {
 
 val viewModelModule = module {
     // TODO: Need to pass a scoped api client
-    single { PluginListViewModel(get()) }
-    single { UserListViewModel(get()) }
+    single { PluginListViewModel(get(), get()) }
+    single { UserListViewModel(get(), get()) }
     single { WelcomeViewModel(get()) }
     single { StressTestViewModel(get(), get(), get()) }
     single { PostCollectionViewModel(get()) }
