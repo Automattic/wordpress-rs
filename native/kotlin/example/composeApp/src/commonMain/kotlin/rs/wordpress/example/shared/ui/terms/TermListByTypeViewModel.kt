@@ -1,8 +1,8 @@
 package rs.wordpress.example.shared.ui.terms
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,8 +17,7 @@ import uniffi.wp_api.TermListParams
 class TermListByTypeViewModel(
     private val apiClient: WpApiClient,
     private val termEndpointType: TermEndpointType
-) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+) : ViewModel() {
 
     private val _terms = MutableStateFlow<List<AnyTermWithEditContext>>(emptyList())
     val terms: StateFlow<List<AnyTermWithEditContext>> = _terms.asStateFlow()

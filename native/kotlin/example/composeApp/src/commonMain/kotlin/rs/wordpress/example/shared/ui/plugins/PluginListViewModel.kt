@@ -1,8 +1,8 @@
 package rs.wordpress.example.shared.ui.plugins
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,8 +13,7 @@ import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.PluginListParams
 import uniffi.wp_api.PluginWithEditContext
 
-class PluginListViewModel(private val apiClient: WpApiClient) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+class PluginListViewModel(private val apiClient: WpApiClient) : ViewModel() {
 
     private val _plugins = MutableStateFlow<List<PluginWithEditContext>>(emptyList())
     val plugins: StateFlow<List<PluginWithEditContext>> = _plugins.asStateFlow()

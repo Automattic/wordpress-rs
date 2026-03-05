@@ -1,8 +1,8 @@
 package rs.wordpress.example.shared.ui.site
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,8 +23,7 @@ data class SiteTaxonomy(
     val restBase: String
 )
 
-class SiteViewModel(private val apiClient: WpApiClient) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+class SiteViewModel(private val apiClient: WpApiClient) : ViewModel() {
 
     private val _postTypes = MutableStateFlow<List<SitePostType>>(emptyList())
     val postTypes: StateFlow<List<SitePostType>> = _postTypes.asStateFlow()

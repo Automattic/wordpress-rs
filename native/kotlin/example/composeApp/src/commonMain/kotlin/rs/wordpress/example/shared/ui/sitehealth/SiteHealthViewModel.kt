@@ -1,8 +1,8 @@
 package rs.wordpress.example.shared.ui.sitehealth
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,8 +13,7 @@ import rs.wordpress.api.kotlin.WpRequestResult
 import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.WpSiteHealthTest
 
-class SiteHealthViewModel(private val apiClient: WpApiClient) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+class SiteHealthViewModel(private val apiClient: WpApiClient) : ViewModel() {
 
     private val _tests = MutableStateFlow<List<WpSiteHealthTest>>(emptyList())
     val tests: StateFlow<List<WpSiteHealthTest>> = _tests.asStateFlow()

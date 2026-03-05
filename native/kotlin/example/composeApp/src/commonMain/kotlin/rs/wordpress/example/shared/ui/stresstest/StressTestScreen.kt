@@ -28,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import org.koin.compose.koinInject
 import rs.wordpress.cache.kotlin.WordPressApiCache
@@ -51,9 +50,6 @@ fun StressTestScreen(
     }
     val viewModel = remember {
         StressTestViewModel(mockPostService, wpService, cache)
-    }
-    DisposableEffect(viewModel) {
-        onDispose { viewModel.onCleared() }
     }
     val posts by viewModel.posts.collectAsState()
     val totalUpdates by viewModel.totalUpdates.collectAsState()

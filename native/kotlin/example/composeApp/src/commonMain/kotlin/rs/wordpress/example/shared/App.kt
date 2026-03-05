@@ -16,6 +16,7 @@ import rs.wordpress.cache.kotlin.WordPressApiCache
 import rs.wordpress.example.shared.di.createWpApiClient
 import rs.wordpress.example.shared.di.createWpComApiClient
 import rs.wordpress.example.shared.di.createWpService
+import rs.wordpress.example.shared.ui.components.ErrorMessage
 import rs.wordpress.example.shared.ui.applicationpasswords.ApplicationPasswordListScreen
 import rs.wordpress.example.shared.ui.comments.CommentListScreen
 import rs.wordpress.example.shared.ui.login.LoginScreen
@@ -103,8 +104,13 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                 }
             }
             composable("site") {
+                val viewModel = currentSiteViewModel
+                if (viewModel == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 SiteScreen(
-                    viewModel = currentSiteViewModel!!,
+                    viewModel = viewModel,
                     onPostTypeClicked = { postType ->
                         currentPostType = postType
                         navController.navigate("postlistbytype")
@@ -133,87 +139,153 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                 )
             }
             composable("users") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 UserListScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("plugins") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 PluginListScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("termlistbytype") {
-                val taxonomy = currentTaxonomy!!
+                val apiClient = currentApiClient
+                val taxonomy = currentTaxonomy
+                if (apiClient == null || taxonomy == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 TermListByTypeScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     termEndpointType = TermEndpointType.Custom(taxonomy.restBase),
                     title = taxonomy.name,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("postlistbytype") {
-                val postType = currentPostType!!
+                val apiClient = currentApiClient
+                val postType = currentPostType
+                if (apiClient == null || postType == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 PostListByTypeScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     postEndpointType = PostEndpointType.Custom(postType.restBase),
                     title = postType.name,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("comments") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 CommentListScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("media") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 MediaListScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("themes") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 ThemeListScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("sitesettings") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 SiteSettingsScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("search") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 SearchScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("sitehealth") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 SiteHealthScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("stresstest") {
+                val wpService = currentWpService
+                val account = currentAccount
+                if (wpService == null || account == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 StressTestScreen(
-                    wpService = currentWpService!!,
-                    account = currentAccount!!,
+                    wpService = wpService,
+                    account = account,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("postcollection") {
+                val wpService = currentWpService
+                if (wpService == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 PostCollectionScreen(
-                    wpService = currentWpService!!,
+                    wpService = wpService,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("posttypes") {
+                val wpService = currentWpService
+                if (wpService == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 PostTypesScreen(
-                    wpService = currentWpService!!,
+                    wpService = wpService,
                     onBackClicked = { navController.popBackStack() },
                     onPostTypeClicked = { postTypeSlug ->
                         currentPostTypeSlug = postTypeSlug
@@ -222,39 +294,69 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                 )
             }
             composable("postmetadatacollection") {
+                val wpService = currentWpService
+                if (wpService == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 PostMetadataCollectionScreen(
-                    wpService = currentWpService!!,
+                    wpService = wpService,
                     postTypeSlug = currentPostTypeSlug,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("navigations") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 NavigationListScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("navmenus") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 NavMenuListScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("navmenuitems") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 NavMenuItemListScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("menulocations") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 MenuLocationListScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("applicationpasswords") {
+                val apiClient = currentApiClient
+                if (apiClient == null) {
+                    ErrorMessage("No site connected")
+                    return@composable
+                }
                 ApplicationPasswordListScreen(
-                    apiClient = currentApiClient!!,
+                    apiClient = apiClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
@@ -267,20 +369,35 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                 )
             }
             composable("wpcom_me") {
+                val wpComClient = currentWpComClient
+                if (wpComClient == null) {
+                    ErrorMessage("No WordPress.com account connected")
+                    return@composable
+                }
                 WpComMeScreen(
-                    wpComApiClient = currentWpComClient!!,
+                    wpComApiClient = wpComClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("wpcom_support") {
+                val wpComClient = currentWpComClient
+                if (wpComClient == null) {
+                    ErrorMessage("No WordPress.com account connected")
+                    return@composable
+                }
                 WpComSupportConversationsScreen(
-                    wpComApiClient = currentWpComClient!!,
+                    wpComApiClient = wpComClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }
             composable("wpcom_bots") {
+                val wpComClient = currentWpComClient
+                if (wpComClient == null) {
+                    ErrorMessage("No WordPress.com account connected")
+                    return@composable
+                }
                 WpComBotConversationsScreen(
-                    wpComApiClient = currentWpComClient!!,
+                    wpComApiClient = wpComClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }

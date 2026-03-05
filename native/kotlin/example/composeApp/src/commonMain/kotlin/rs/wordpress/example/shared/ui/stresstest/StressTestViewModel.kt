@@ -1,9 +1,8 @@
 package rs.wordpress.example.shared.ui.stresstest
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,8 +29,7 @@ class StressTestViewModel(
     private val mockPostService: MockPostService,
     private val selfHostedService: WpService,
     private val cache: WordPressApiCache
-) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+) : ViewModel() {
 
     private val _posts = MutableStateFlow<List<PostDisplayData>>(emptyList())
     val posts: StateFlow<List<PostDisplayData>> = _posts.asStateFlow()
@@ -223,7 +221,7 @@ class StressTestViewModel(
         }
     }
 
-    fun onCleared() {
+    override fun onCleared() {
         // Stop the running flag to stop polling
         _isRunning.value = false
 
@@ -233,8 +231,5 @@ class StressTestViewModel(
         // Close the observable collection to unregister from DatabaseChangeNotifier
         observableCollection?.close()
         observableCollection = null
-
-        // Cancel coroutine scope
-        viewModelScope.cancel()
     }
 }

@@ -1,8 +1,8 @@
 package rs.wordpress.example.shared.ui.posts
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,8 +17,7 @@ import uniffi.wp_api.PostListParams
 class PostListByTypeViewModel(
     private val apiClient: WpApiClient,
     private val postEndpointType: PostEndpointType
-) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+) : ViewModel() {
 
     private val _posts = MutableStateFlow<List<AnyPostWithEditContext>>(emptyList())
     val posts: StateFlow<List<AnyPostWithEditContext>> = _posts.asStateFlow()

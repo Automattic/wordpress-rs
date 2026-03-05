@@ -1,8 +1,8 @@
 package rs.wordpress.example.shared.ui.media
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,8 +13,7 @@ import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.MediaListParams
 import uniffi.wp_api.MediaWithEditContext
 
-class MediaListViewModel(private val apiClient: WpApiClient) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+class MediaListViewModel(private val apiClient: WpApiClient) : ViewModel() {
 
     private val _media = MutableStateFlow<List<MediaWithEditContext>>(emptyList())
     val media: StateFlow<List<MediaWithEditContext>> = _media.asStateFlow()

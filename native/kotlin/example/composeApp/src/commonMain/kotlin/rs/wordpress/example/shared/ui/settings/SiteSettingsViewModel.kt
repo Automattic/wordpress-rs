@@ -1,8 +1,8 @@
 package rs.wordpress.example.shared.ui.settings
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,8 +12,7 @@ import rs.wordpress.api.kotlin.WpRequestResult
 import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.SiteSettingsWithEditContext
 
-class SiteSettingsViewModel(private val apiClient: WpApiClient) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+class SiteSettingsViewModel(private val apiClient: WpApiClient) : ViewModel() {
 
     private val _settings = MutableStateFlow<SiteSettingsWithEditContext?>(null)
     val settings: StateFlow<SiteSettingsWithEditContext?> = _settings.asStateFlow()

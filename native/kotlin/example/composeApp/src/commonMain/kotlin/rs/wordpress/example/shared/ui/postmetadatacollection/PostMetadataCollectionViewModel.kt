@@ -1,9 +1,8 @@
 package rs.wordpress.example.shared.ui.postmetadatacollection
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,7 +29,7 @@ data class PostMetadataCollectionState(
     val listInfo: ListInfo? = null,
     val lastSyncResult: SyncResult? = null,
     val lastError: String? = null
-) {
+) : ViewModel() {
     /**
      * Whether a sync operation is in progress.
      * Derived from listInfo.state - the single source of truth from the database.
@@ -76,7 +75,7 @@ data class PostItemDisplayData(
     val status: String?,
     val isLoading: Boolean,
     val errorMessage: String?
-) {
+) : ViewModel() {
     companion object {
         fun fromCollectionItem(item: PostMetadataCollectionItem): PostItemDisplayData {
             // Extract data from state variants that carry data
@@ -113,8 +112,7 @@ data class PostItemDisplayData(
 class PostMetadataCollectionViewModel(
     private val selfHostedService: WpService,
     private val postTypeSlug: String = "post"
-) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+) : ViewModel() {
 
     private val _state = MutableStateFlow(
         PostMetadataCollectionState(
@@ -279,9 +277,8 @@ class PostMetadataCollectionViewModel(
         }
     }
 
-    fun onCleared() {
+    override fun onCleared() {
         observableCollection?.close()
         observableCollection = null
-        viewModelScope.cancel()
     }
 }

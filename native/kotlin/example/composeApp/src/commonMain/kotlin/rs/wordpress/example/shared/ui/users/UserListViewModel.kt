@@ -1,8 +1,8 @@
 package rs.wordpress.example.shared.ui.users
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,8 +13,7 @@ import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.UserWithEditContext
 
-class UserListViewModel(private val apiClient: WpApiClient) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+class UserListViewModel(private val apiClient: WpApiClient) : ViewModel() {
 
     private val _users = MutableStateFlow<List<UserWithEditContext>>(emptyList())
     val users: StateFlow<List<UserWithEditContext>> = _users.asStateFlow()

@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import rs.wordpress.example.shared.ui.components.PostCard
 import uniffi.wp_mobile.WpService
@@ -45,9 +44,6 @@ fun PostCollectionScreen(
     viewModel: PostCollectionViewModel = remember { PostCollectionViewModel(wpService) },
     onBackClicked: (() -> Unit)? = null
 ) {
-    DisposableEffect(viewModel) {
-        onDispose { viewModel.onCleared() }
-    }
     val state by viewModel.state.collectAsState()
     val posts by viewModel.posts.collectAsState()
     val listState = rememberLazyListState()

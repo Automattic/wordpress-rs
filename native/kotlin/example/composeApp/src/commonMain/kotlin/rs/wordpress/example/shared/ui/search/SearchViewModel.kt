@@ -1,8 +1,8 @@
 package rs.wordpress.example.shared.ui.search
 
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,8 +13,7 @@ import rs.wordpress.example.shared.ui.components.errorDescription
 import uniffi.wp_api.SearchListParams
 import uniffi.wp_api.SearchResultWithViewContext
 
-class SearchViewModel(private val apiClient: WpApiClient) {
-    private val viewModelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+class SearchViewModel(private val apiClient: WpApiClient) : ViewModel() {
 
     private val _results = MutableStateFlow<List<SearchResultWithViewContext>>(emptyList())
     val results: StateFlow<List<SearchResultWithViewContext>> = _results.asStateFlow()

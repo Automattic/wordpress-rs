@@ -40,7 +40,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import uniffi.wp_mobile.PostItemState
 import uniffi.wp_mobile.WpService
@@ -57,9 +56,6 @@ fun PostMetadataCollectionScreen(
     },
     onBackClicked: (() -> Unit)? = null
 ) {
-    DisposableEffect(viewModel) {
-        onDispose { viewModel.onCleared() }
-    }
     val state by viewModel.state.collectAsState()
     val items by viewModel.items.collectAsState()
     val listState = rememberLazyListState()

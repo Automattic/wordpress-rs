@@ -35,7 +35,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import uniffi.wp_mobile.WpService
 
@@ -48,9 +47,6 @@ fun PostTypesScreen(
     onBackClicked: (() -> Unit)? = null,
     onPostTypeClicked: (String) -> Unit = {}
 ) {
-    DisposableEffect(viewModel) {
-        onDispose { viewModel.onCleared() }
-    }
     val state by viewModel.state.collectAsState()
     val postTypes by viewModel.postTypes.collectAsState()
 
