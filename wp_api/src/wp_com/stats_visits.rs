@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
     Eq,
     PartialOrd,
     Ord,
-    Hash,
     Serialize,
     Deserialize,
     uniffi::Enum,
@@ -63,7 +62,7 @@ impl AppendUrlQueryPairs for StatsVisitsParams {
 }
 
 /// Response from the stats visits endpoint.
-#[derive(Debug, Hash, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitsResponse {
     /// The date for the stats query.
     pub date: String,
@@ -121,65 +120,68 @@ impl StatsVisitsResponse {
 }
 
 fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(String, u64)> {
-    let field_index = response
-        .fields
-        .iter()
-        .position(|field| field == handle)
-        .unwrap();
+    let period_index = match response.fields.iter().position(|f| f == "period") {
+        Some(i) => i,
+        None => return vec![],
+    };
+
+    let field_index = match response.fields.iter().position(|field| field == handle) {
+        Some(index) => index,
+        None => return vec![],
+    };
 
     response
         .data
         .iter()
         .filter_map(|row| {
-            if let Some(period) = row[0].as_string()
-                && let Some(value) = row[field_index].as_number()
+            if let Some(period) = row.get(period_index).and_then(|v| v.as_string())
+                && let Some(value) = row.get(field_index).and_then(|v| v.as_number())
             {
                 return Some((period.clone(), value));
             }
-
             None
         })
         .collect()
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitsDataPoint {
     pub period: String,
     pub visits: u64,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitorsDataPoint {
     pub period: String,
     pub visitors: u64,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsLikesDataPoint {
     pub period: String,
     pub likes: u64,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsReblogsDataPoint {
     pub period: String,
     pub reblogs: u64,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsCommentsDataPoint {
     pub period: String,
     pub comments: u64,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostsDataPoint {
     pub period: String,
     pub posts: u64,
 }
 
 /// A value in the stats visits data array (can be string, number, or null).
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Enum)]
 #[serde(untagged)]
 pub enum StatsVisitsDataValue {
     String(String),
