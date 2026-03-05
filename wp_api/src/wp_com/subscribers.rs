@@ -572,8 +572,22 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         assert_eq!(response.subscribers.len(), 2);
-        assert!(response.subscribers[0].date_subscribed.is_some());
-        assert!(response.subscribers[1].date_subscribed.is_none());
+
+        // Valid date is parsed correctly
+        let valid_subscriber = &response.subscribers[0];
+        assert!(valid_subscriber.date_subscribed.is_some());
+        assert_eq!(
+            valid_subscriber.date_subscribed.unwrap().to_string(),
+            "2025-02-03T09:09:12+00:00"
+        );
+
+        // Invalid date "-001-11-30T00:00:00+00:00" is gracefully handled as None
+        let invalid_date_subscriber = &response.subscribers[1];
+        assert!(invalid_date_subscriber.date_subscribed.is_none());
+        assert_eq!(
+            invalid_date_subscriber.display_name,
+            "User With Invalid Date"
+        );
     }
 
     #[test]
@@ -793,6 +807,30 @@ mod tests {
         assert!(!first.is_email_subscriber);
         assert!(first.subscription_status.is_none());
         assert_eq!(first.url, Some("https://nikhilc.dev".to_string()));
+    }
+
+    #[test]
+    fn test_subscribers_by_user_type_with_invalid_date() {
+        let json_file_path =
+            "tests/wpcom/subscribers/subscribers-by-user-type-with-invalid-date.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: ListSubscribersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(response.subscribers.len(), 2);
+
+        // Valid date is parsed correctly
+        let valid_subscriber = &response.subscribers[0];
+        assert!(valid_subscriber.date_subscribed.is_some());
+        assert_eq!(
+            valid_subscriber.date_subscribed.unwrap().to_string(),
+            "2024-12-26T10:08:55+00:00"
+        );
+
+        // Invalid date "-001-11-30T00:00:00+00:00" is gracefully handled as None
+        let invalid_date_subscriber = &response.subscribers[1];
+        assert!(invalid_date_subscriber.date_subscribed.is_none());
+        assert_eq!(invalid_date_subscriber.display_name, "Old Subscriber");
     }
 
     #[test]
