@@ -1,6 +1,7 @@
 use crate::url_query::{AppendUrlQueryPairs, QueryPairs};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use wp_serde_helper::deserialize_empty_array_or_hashmap;
 
 /// Parameters for the stats insights endpoint.
 ///
@@ -29,10 +30,13 @@ pub struct StatsInsightsResponse {
     /// The percentage of posts published on the highest day.
     pub highest_day_percent: f64,
     /// Post counts by day of week, keyed by day index ("0"=Sunday through "6"=Saturday).
+    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     pub days: HashMap<String, u64>,
     /// Post counts by hour of day, keyed by hour string ("00" through "23").
+    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     pub hours: HashMap<String, u64>,
     /// View counts by datetime, keyed by "YYYY-MM-DD HH:00:00" strings.
+    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     pub hourly_views: HashMap<String, u64>,
     /// Yearly posting summaries.
     pub years: Vec<StatsInsightsYearData>,
@@ -95,6 +99,21 @@ mod tests {
         assert!((response.highest_hour_percent - 9.588268471517203).abs() < 1e-10);
         assert_eq!(response.highest_day_of_week, 0);
         assert!((response.highest_day_percent - 24.946865037194474).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_stats_insights_response_deserialization_empty() {
+        let json_file_path = "tests/wpcom/stats_insights/response-02-empty.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsInsightsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with empty arrays");
+
+        assert_eq!(response.highest_hour, 0);
+        assert!((response.highest_hour_percent - 0.0).abs() < 1e-10);
+        assert!(response.days.is_empty());
+        assert!(response.hours.is_empty());
+        assert!(response.hourly_views.is_empty());
+        assert!(response.years.is_empty());
     }
 
     #[test]
