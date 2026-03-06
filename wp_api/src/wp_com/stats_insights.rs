@@ -70,6 +70,7 @@ pub struct StatsInsightsYearData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::*;
 
     #[test]
     fn test_stats_insights_params_serialization() {
@@ -115,12 +116,16 @@ mod tests {
         assert!(response.years.is_empty());
     }
 
-    #[test]
-    fn test_stats_insights_response_deserialization_integer_fields() {
-        let json_file_path = "tests/wpcom/stats_insights/response-03-integer-fields.json";
+    /// The WP.com API may return non-map values (integer, null, false) for map
+    /// fields when a site has no data. All should deserialize as empty HashMaps.
+    #[rstest]
+    #[case("tests/wpcom/stats_insights/response-03-integer-fields.json")]
+    #[case("tests/wpcom/stats_insights/response-04-null-fields.json")]
+    #[case("tests/wpcom/stats_insights/response-05-false-fields.json")]
+    fn test_stats_insights_response_deserialization_non_map_fields(#[case] json_file_path: &str) {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsInsightsResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON with integer fields");
+            serde_json::from_reader(file).expect("Unable to parse JSON with non-map fields");
 
         assert_eq!(response.highest_hour, 0);
         assert!(response.days.is_empty());
