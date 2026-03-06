@@ -22,6 +22,7 @@ use super::endpoint::{
     stats_file_downloads_endpoint::{
         StatsFileDownloadsRequestBuilder, StatsFileDownloadsRequestExecutor,
     },
+    stats_insights_endpoint::{StatsInsightsRequestBuilder, StatsInsightsRequestExecutor},
     stats_referrers_endpoint::{StatsReferrersRequestBuilder, StatsReferrersRequestExecutor},
     stats_region_views_endpoint::{
         StatsRegionViewsRequestBuilder, StatsRegionViewsRequestExecutor,
@@ -64,6 +65,7 @@ pub struct WpComApiRequestBuilder {
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
     stats_clicks: Arc<StatsClicksRequestBuilder>,
     stats_file_downloads: Arc<StatsFileDownloadsRequestBuilder>,
+    stats_insights: Arc<StatsInsightsRequestBuilder>,
     stats_country_views: Arc<StatsCountryViewsRequestBuilder>,
     stats_devices_browser: Arc<StatsDevicesBrowserRequestBuilder>,
     stats_devices_platform: Arc<StatsDevicesPlatformRequestBuilder>,
@@ -97,6 +99,7 @@ impl WpComApiRequestBuilder {
             stats_city_views,
             stats_clicks,
             stats_file_downloads,
+            stats_insights,
             stats_country_views,
             stats_devices_browser,
             stats_devices_platform,
@@ -141,6 +144,7 @@ pub struct WpComApiClient {
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
     stats_clicks: Arc<StatsClicksRequestExecutor>,
     stats_file_downloads: Arc<StatsFileDownloadsRequestExecutor>,
+    stats_insights: Arc<StatsInsightsRequestExecutor>,
     stats_country_views: Arc<StatsCountryViewsRequestExecutor>,
     stats_devices_browser: Arc<StatsDevicesBrowserRequestExecutor>,
     stats_devices_platform: Arc<StatsDevicesPlatformRequestExecutor>,
@@ -175,6 +179,7 @@ impl WpComApiClient {
             stats_city_views,
             stats_clicks,
             stats_file_downloads,
+            stats_insights,
             stats_country_views,
             stats_devices_browser,
             stats_devices_platform,
@@ -202,6 +207,7 @@ api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_clicks);
 api_client_generate_endpoint_impl!(WpComApi, stats_file_downloads);
+api_client_generate_endpoint_impl!(WpComApi, stats_insights);
 api_client_generate_endpoint_impl!(WpComApi, stats_country_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_browser);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_platform);
