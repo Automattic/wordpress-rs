@@ -12,11 +12,12 @@ use std::{collections::HashMap, fmt, marker::PhantomData};
 ///
 /// Accepts:
 /// - Empty JSON array `[]` → empty `HashMap`
+/// - Integer (e.g. `0`) → empty `HashMap`
 /// - JSON object `{...}` → `HashMap` with deserialized key-value pairs
 ///
 /// # Errors
 ///
-/// Returns an error for non-empty arrays, `null`, strings, numbers, or booleans.
+/// Returns an error for non-empty arrays, `null`, strings, or booleans.
 pub fn deserialize_empty_array_or_hashmap<'de, D, K, V>(
     deserializer: D,
 ) -> Result<HashMap<K, V>, D::Error>
@@ -116,7 +117,21 @@ where
     type Value = HashMap<K, V>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("empty array or a HashMap")
+        formatter.write_str("empty array, integer, or a HashMap")
+    }
+
+    fn visit_u64<E>(self, _value: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(HashMap::new())
+    }
+
+    fn visit_i64<E>(self, _value: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(HashMap::new())
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -166,6 +181,18 @@ mod tests {
         map
     })]
     fn test_deserialize_empty_array_or_hashmap(
+        #[case] test_case: &str,
+        #[case] expected_result: HashMap<String, String>,
+    ) {
+        let wrapper: HashMapWrapper =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, wrapper.map);
+    }
+
+    #[rstest]
+    #[case(r#"{"map": 0}"#, HashMap::new())]
+    #[case(r#"{"map": 42}"#, HashMap::new())]
+    fn test_deserialize_integer_as_empty_hashmap(
         #[case] test_case: &str,
         #[case] expected_result: HashMap<String, String>,
     ) {

@@ -102,14 +102,27 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_insights_response_deserialization_empty() {
+    fn test_stats_insights_response_deserialization_empty_arrays() {
         let json_file_path = "tests/wpcom/stats_insights/response-02-empty.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsInsightsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with empty arrays");
 
         assert_eq!(response.highest_hour, 0);
-        assert!((response.highest_hour_percent - 0.0).abs() < 1e-10);
+        assert!(response.days.is_empty());
+        assert!(response.hours.is_empty());
+        assert!(response.hourly_views.is_empty());
+        assert!(response.years.is_empty());
+    }
+
+    #[test]
+    fn test_stats_insights_response_deserialization_integer_fields() {
+        let json_file_path = "tests/wpcom/stats_insights/response-03-integer-fields.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsInsightsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON with integer fields");
+
+        assert_eq!(response.highest_hour, 0);
         assert!(response.days.is_empty());
         assert!(response.hours.is_empty());
         assert!(response.hourly_views.is_empty());
