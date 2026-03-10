@@ -453,3 +453,147 @@ async fn test_delete_permanently_removes_from_collection() {
 
     RestoreServer::db().await;
 }
+
+#[tokio::test]
+#[serial]
+async fn test_load_posts_by_ids_includes_trashed_post() {
+    // 1. Create a draft post, then trash it.
+    // 2. Call `load_posts_by_ids` with the trashed post's ID.
+    //
+    // Expected result: the trashed post is returned successfully and
+    // its status in the cache is `PostStatus::Trash`.
+
+    let ctx = create_test_context();
+
+    let created = ctx
+        .service
+        .posts()
+        .create_post(
+            &PostEndpointType::Posts,
+            &PostCreateParams {
+                title: Some("Post To Trash Then Load By ID".to_string()),
+                status: Some(PostStatus::Draft),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("create_post should succeed");
+
+    let trashed = ctx
+        .service
+        .posts()
+        .trash_post(&PostEndpointType::Posts, &created.id)
+        .await
+        .expect("trash_post should succeed");
+    assert_eq!(trashed.status, PostStatus::Trash);
+
+    let result = ctx
+        .service
+        .posts()
+        .load_posts_by_ids(&PostEndpointType::Posts, vec![created.id])
+        .await
+        .expect("load_posts_by_ids should succeed");
+
+    assert_eq!(result.entity_ids.len(), 1, "should load 1 post");
+    assert_eq!(result.failed_count, 0, "no posts should fail to load");
+
+    let cached_posts = ctx
+        .service
+        .posts()
+        .read_posts_by_ids_from_db(&[created.id.0])
+        .expect("read_posts_by_ids_from_db should succeed");
+    assert_eq!(cached_posts.len(), 1, "should have 1 cached post");
+    assert_eq!(
+        cached_posts[0].data.status,
+        PostStatus::Trash,
+        "cached post should have Trash status"
+    );
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_load_posts_by_ids_includes_mixed_status_posts() {
+    // 1. Create a draft post.
+    // 2. Create another post and trash it.
+    // 3. Call `load_posts_by_ids` with both IDs.
+    //
+    // Expected result: both posts are returned—one with Draft status and
+    // one with Trash status.
+
+    let ctx = create_test_context();
+
+    let draft = ctx
+        .service
+        .posts()
+        .create_post(
+            &PostEndpointType::Posts,
+            &PostCreateParams {
+                title: Some("Draft Post For Mixed Status Test".to_string()),
+                status: Some(PostStatus::Draft),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("create draft should succeed");
+
+    let to_trash = ctx
+        .service
+        .posts()
+        .create_post(
+            &PostEndpointType::Posts,
+            &PostCreateParams {
+                title: Some("Post To Trash For Mixed Status Test".to_string()),
+                status: Some(PostStatus::Draft),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("create post to trash should succeed");
+
+    ctx.service
+        .posts()
+        .trash_post(&PostEndpointType::Posts, &to_trash.id)
+        .await
+        .expect("trash_post should succeed");
+
+    let result = ctx
+        .service
+        .posts()
+        .load_posts_by_ids(&PostEndpointType::Posts, vec![draft.id, to_trash.id])
+        .await
+        .expect("load_posts_by_ids should succeed");
+
+    assert_eq!(result.entity_ids.len(), 2, "should load 2 posts");
+    assert_eq!(result.failed_count, 0, "no posts should fail to load");
+
+    let cached_posts = ctx
+        .service
+        .posts()
+        .read_posts_by_ids_from_db(&[draft.id.0, to_trash.id.0])
+        .expect("read_posts_by_ids_from_db should succeed");
+    assert_eq!(cached_posts.len(), 2, "should have 2 cached posts");
+
+    let draft_post = cached_posts
+        .iter()
+        .find(|p| p.data.id == draft.id)
+        .expect("draft post should be in cache");
+    let trashed_post = cached_posts
+        .iter()
+        .find(|p| p.data.id == to_trash.id)
+        .expect("trashed post should be in cache");
+
+    assert_eq!(
+        draft_post.data.status,
+        PostStatus::Draft,
+        "draft post should have Draft status"
+    );
+    assert_eq!(
+        trashed_post.data.status,
+        PostStatus::Trash,
+        "trashed post should have Trash status"
+    );
+
+    RestoreServer::db().await;
+}
