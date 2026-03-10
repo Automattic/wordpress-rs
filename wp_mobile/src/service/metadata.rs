@@ -534,9 +534,7 @@ impl MetadataService {
             // Version mismatch means refresh was called while we were fetching (race condition).
             // Don't modify state - whoever called refresh owns the state transition.
             // Our fetched data is stale, so just discard it and return an error.
-            return Err(FetchError::Database {
-                err_message: "List was refreshed during load more, discarding results".to_string(),
-            });
+            return Err(FetchError::StaleLoadMore);
         }
 
         // 4. Append metadata to existing items
