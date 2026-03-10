@@ -520,18 +520,10 @@ impl PostService {
             // Ensure we get all requested posts regardless of default per_page
             per_page: Some(BATCH_FETCH_SIZE as u32),
             // Request all available post statuses as defined in the WordPress REST API.
-            // See: https://developer.wordpress.org/rest-api/reference/posts/#arguments
-            // The API defaults to 'publish' only, so we must explicitly list all statuses
-            // to fetch posts by ID regardless of their status (drafts, pending, etc.).
-            // Note: 'trash' is not included in the API's allowed status values.
-            // Note: This will not work with custom statuses and may need special handling.
-            status: vec![
-                PostStatus::Publish,
-                PostStatus::Draft,
-                PostStatus::Pending,
-                PostStatus::Private,
-                PostStatus::Future,
-            ],
+            // Use "any" to match all post statuses (including custom ones), plus
+            // "trash" which WordPress excludes from "any" because it has
+            // `internal: true` (and therefore `exclude_from_search: true`).
+            status: vec![PostStatus::Trash, PostStatus::Custom("any".to_string())],
             ..Default::default()
         };
 
