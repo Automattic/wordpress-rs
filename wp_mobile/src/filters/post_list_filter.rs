@@ -166,7 +166,7 @@ impl PostListFilter {
     pub fn loosely_matches_post(&self, post: &wp_api::posts::AnyPostWithEditContext) -> bool {
         // Status check
         if !self.status.is_empty() {
-            if self.status.contains(&PostStatus::Custom("any".to_string())) {
+            if self.status.contains(&PostStatus::Any) {
                 // "any" excludes statuses with `exclude_from_search = true`.
                 // In WordPress core, `trash` and `auto-draft` have this flag set by default.
                 if post.status == PostStatus::Trash
@@ -603,7 +603,7 @@ mod tests {
     #[test]
     fn test_matches_any_status_with_publish() {
         let filter = PostListFilter {
-            status: vec![PostStatus::Custom("any".to_string())],
+            status: vec![PostStatus::Any],
             ..Default::default()
         };
         let post = PostBuilder::minimal()
@@ -615,7 +615,7 @@ mod tests {
     #[test]
     fn test_matches_any_status_with_draft() {
         let filter = PostListFilter {
-            status: vec![PostStatus::Custom("any".to_string())],
+            status: vec![PostStatus::Any],
             ..Default::default()
         };
         let post = PostBuilder::minimal()
@@ -627,7 +627,7 @@ mod tests {
     #[test]
     fn test_any_status_excludes_trash() {
         let filter = PostListFilter {
-            status: vec![PostStatus::Custom("any".to_string())],
+            status: vec![PostStatus::Any],
             ..Default::default()
         };
         let post = PostBuilder::minimal()
@@ -639,7 +639,7 @@ mod tests {
     #[test]
     fn test_any_status_excludes_auto_draft() {
         let filter = PostListFilter {
-            status: vec![PostStatus::Custom("any".to_string())],
+            status: vec![PostStatus::Any],
             ..Default::default()
         };
         let post = PostBuilder::minimal()
