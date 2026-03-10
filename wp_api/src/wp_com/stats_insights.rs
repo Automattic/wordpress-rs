@@ -1,17 +1,22 @@
-use crate::url_query::{AppendUrlQueryPairs, QueryPairs};
+use crate::{
+    url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+    wp_com::language::WPComLanguage,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use wp_serde_helper::deserialize_empty_array_or_hashmap;
 
 /// Parameters for the stats insights endpoint.
-///
-/// The insights endpoint does not accept any query parameters.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
-pub struct StatsInsightsParams {}
+pub struct StatsInsightsParams {
+    /// The locale for the response.
+    #[uniffi(default = None)]
+    pub locale: Option<WPComLanguage>,
+}
 
 impl AppendUrlQueryPairs for StatsInsightsParams {
-    fn append_query_pairs(&self, _query_pairs_mut: &mut QueryPairs) {
-        // No query parameters for this endpoint
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut.append_option_query_value_pair("locale", self.locale.as_ref());
     }
 }
 
@@ -73,12 +78,31 @@ mod tests {
     use rstest::*;
 
     #[test]
-    fn test_stats_insights_params_serialization() {
+    fn test_stats_insights_params_serialization_with_locale() {
         let mut url =
             url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/insights")
                 .expect("Failed to parse url");
 
-        let params = StatsInsightsParams {};
+        let params = StatsInsightsParams {
+            locale: Some(WPComLanguage::Spanish),
+        };
+
+        let mut query_pairs = url.query_pairs_mut();
+        params.append_query_pairs(&mut query_pairs);
+
+        assert_eq!(
+            query_pairs.finish().as_str(),
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/insights?locale=es"
+        );
+    }
+
+    #[test]
+    fn test_stats_insights_params_serialization_default() {
+        let mut url =
+            url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/insights")
+                .expect("Failed to parse url");
+
+        let params = StatsInsightsParams::default();
 
         let mut query_pairs = url.query_pairs_mut();
         params.append_query_pairs(&mut query_pairs);
