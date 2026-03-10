@@ -15,7 +15,6 @@ use serde::{Deserialize, Serialize};
     Eq,
     PartialOrd,
     Ord,
-    Hash,
     Serialize,
     Deserialize,
     uniffi::Enum,

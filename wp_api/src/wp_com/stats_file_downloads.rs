@@ -16,7 +16,6 @@ use std::collections::HashMap;
     Eq,
     PartialOrd,
     Ord,
-    Hash,
     Serialize,
     Deserialize,
     uniffi::Enum,
