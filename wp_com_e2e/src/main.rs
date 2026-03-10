@@ -12,6 +12,7 @@ mod stats_country_views_tests;
 mod stats_insights_tests;
 mod stats_referrers_tests;
 mod stats_region_views_tests;
+mod stats_summary_tests;
 mod stats_top_authors_tests;
 mod stats_top_posts_tests;
 mod support_bot_tests;
@@ -49,6 +50,7 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(stats_insights_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_referrers_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_region_views_tests::tests(Arc::clone(&ctx)));
+    tests.extend(stats_summary_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_top_authors_tests::tests(Arc::clone(&ctx)));
     tests.extend(sites_tests::tests(Arc::clone(&ctx)));
     tests.extend(support_bot_tests::tests(Arc::clone(&ctx)));
