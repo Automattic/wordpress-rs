@@ -523,7 +523,7 @@ impl PostService {
             // Use "any" to match all post statuses (including custom ones), plus
             // "trash" which WordPress excludes from "any" because it has
             // `internal: true` (and therefore `exclude_from_search: true`).
-            status: vec![PostStatus::Trash, PostStatus::Custom("any".to_string())],
+            status: vec![PostStatus::Trash, PostStatus::Any],
             ..Default::default()
         };
 

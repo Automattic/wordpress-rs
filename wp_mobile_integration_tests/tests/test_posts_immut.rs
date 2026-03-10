@@ -51,7 +51,7 @@ async fn test_fetch_all_posts_with_any_status() {
     let filter = PostListFilter {
         order: Some(WpApiParamOrder::Desc),
         orderby: Some(WpApiParamPostsOrderBy::Date),
-        status: vec![PostStatus::Custom("any".to_string())],
+        status: vec![PostStatus::Any],
         ..Default::default()
     };
 
