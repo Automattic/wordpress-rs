@@ -1,6 +1,6 @@
 use crate::{
     WpApiParamOrder,
-    date::{WpGmtDateTime, wp_gmt_date_time_option},
+    date::WpGmtDateTime,
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     users::UserId,
@@ -16,8 +16,7 @@ pub struct Subscriber {
     pub display_name: String,
     pub email_address: String,
     pub is_email_subscriber: bool,
-    #[serde(default, with = "wp_gmt_date_time_option")]
-    pub date_subscribed: Option<WpGmtDateTime>,
+    pub date_subscribed: WpGmtDateTime,
     pub subscription_status: Option<String>,
     pub avatar: String,
     pub url: Option<String>,
@@ -565,29 +564,11 @@ mod tests {
     }
 
     #[test]
-    fn test_subscriber_list_with_invalid_date() {
+    fn test_subscriber_list_with_invalid_date_returns_parsing_error() {
         let json_file_path = "tests/wpcom/subscribers/subscriber-list-with-invalid-date.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: ListSubscribersResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        assert_eq!(response.subscribers.len(), 2);
-
-        // Valid date is parsed correctly
-        let valid_subscriber = &response.subscribers[0];
-        assert!(valid_subscriber.date_subscribed.is_some());
-        assert_eq!(
-            valid_subscriber.date_subscribed.unwrap().to_string(),
-            "2025-02-03T09:09:12+00:00"
-        );
-
-        // Invalid date "-001-11-30T00:00:00+00:00" is gracefully handled as None
-        let invalid_date_subscriber = &response.subscribers[1];
-        assert!(invalid_date_subscriber.date_subscribed.is_none());
-        assert_eq!(
-            invalid_date_subscriber.display_name,
-            "User With Invalid Date"
-        );
+        let result: Result<ListSubscribersResponse, _> = serde_json::from_reader(file);
+        assert!(result.is_err(), "Expected parsing error for malformed date");
     }
 
     #[test]
@@ -810,27 +791,12 @@ mod tests {
     }
 
     #[test]
-    fn test_subscribers_by_user_type_with_invalid_date() {
+    fn test_subscribers_by_user_type_with_invalid_date_returns_parsing_error() {
         let json_file_path =
             "tests/wpcom/subscribers/subscribers-by-user-type-with-invalid-date.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let response: ListSubscribersResponse =
-            serde_json::from_reader(file).expect("Unable to parse JSON");
-
-        assert_eq!(response.subscribers.len(), 2);
-
-        // Valid date is parsed correctly
-        let valid_subscriber = &response.subscribers[0];
-        assert!(valid_subscriber.date_subscribed.is_some());
-        assert_eq!(
-            valid_subscriber.date_subscribed.unwrap().to_string(),
-            "2024-12-26T10:08:55+00:00"
-        );
-
-        // Invalid date "-001-11-30T00:00:00+00:00" is gracefully handled as None
-        let invalid_date_subscriber = &response.subscribers[1];
-        assert!(invalid_date_subscriber.date_subscribed.is_none());
-        assert_eq!(invalid_date_subscriber.display_name, "Old Subscriber");
+        let result: Result<ListSubscribersResponse, _> = serde_json::from_reader(file);
+        assert!(result.is_err(), "Expected parsing error for malformed date");
     }
 
     #[test]

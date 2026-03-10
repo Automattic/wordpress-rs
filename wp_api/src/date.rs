@@ -28,30 +28,6 @@ impl Display for WpGmtDateTime {
     }
 }
 
-/// Serde helper that deserializes a `WpGmtDateTime` into `Option<WpGmtDateTime>`,
-/// returning `None` for invalid or unparseable dates instead of failing.
-pub mod wp_gmt_date_time_option {
-    use super::WpGmtDateTime;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn serialize<S>(date: &Option<WpGmtDateTime>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match date {
-            Some(d) => d.serialize(serializer),
-            None => serializer.serialize_none(),
-        }
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<WpGmtDateTime>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Ok(WpGmtDateTime::deserialize(deserializer).ok())
-    }
-}
-
 uniffi::custom_type!(WpGmtDateTime, i64, {
     lower: |date_time| date_time.0.timestamp(),
     try_lift: |seconds| Ok(WpGmtDateTime::from_timestamp(seconds)),
