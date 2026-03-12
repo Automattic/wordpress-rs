@@ -31,6 +31,7 @@ use super::endpoint::{
         StatsSearchTermsRequestBuilder, StatsSearchTermsRequestExecutor,
     },
     stats_summary_endpoint::{StatsSummaryRequestBuilder, StatsSummaryRequestExecutor},
+    stats_tags_endpoint::{StatsTagsRequestBuilder, StatsTagsRequestExecutor},
     stats_top_authors_endpoint::{StatsTopAuthorsRequestBuilder, StatsTopAuthorsRequestExecutor},
     stats_top_posts_endpoint::{StatsTopPostsRequestBuilder, StatsTopPostsRequestExecutor},
     stats_video_plays_endpoint::{StatsVideoPlaysRequestBuilder, StatsVideoPlaysRequestExecutor},
@@ -75,6 +76,7 @@ pub struct WpComApiRequestBuilder {
     stats_region_views: Arc<StatsRegionViewsRequestBuilder>,
     stats_search_terms: Arc<StatsSearchTermsRequestBuilder>,
     stats_summary: Arc<StatsSummaryRequestBuilder>,
+    stats_tags: Arc<StatsTagsRequestBuilder>,
     stats_top_authors: Arc<StatsTopAuthorsRequestBuilder>,
     stats_top_posts: Arc<StatsTopPostsRequestBuilder>,
     stats_video_plays: Arc<StatsVideoPlaysRequestBuilder>,
@@ -110,6 +112,7 @@ impl WpComApiRequestBuilder {
             stats_region_views,
             stats_search_terms,
             stats_summary,
+            stats_tags,
             stats_top_authors,
             stats_top_posts,
             stats_video_plays,
@@ -156,6 +159,7 @@ pub struct WpComApiClient {
     stats_region_views: Arc<StatsRegionViewsRequestExecutor>,
     stats_search_terms: Arc<StatsSearchTermsRequestExecutor>,
     stats_summary: Arc<StatsSummaryRequestExecutor>,
+    stats_tags: Arc<StatsTagsRequestExecutor>,
     stats_top_authors: Arc<StatsTopAuthorsRequestExecutor>,
     stats_top_posts: Arc<StatsTopPostsRequestExecutor>,
     stats_video_plays: Arc<StatsVideoPlaysRequestExecutor>,
@@ -192,6 +196,7 @@ impl WpComApiClient {
             stats_region_views,
             stats_search_terms,
             stats_summary,
+            stats_tags,
             stats_top_authors,
             stats_top_posts,
             stats_video_plays,
@@ -221,6 +226,7 @@ api_client_generate_endpoint_impl!(WpComApi, stats_referrers);
 api_client_generate_endpoint_impl!(WpComApi, stats_region_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_search_terms);
 api_client_generate_endpoint_impl!(WpComApi, stats_summary);
+api_client_generate_endpoint_impl!(WpComApi, stats_tags);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_authors);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_posts);
 api_client_generate_endpoint_impl!(WpComApi, stats_video_plays);
