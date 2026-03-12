@@ -44,6 +44,7 @@ import rs.wordpress.example.shared.ui.users.UserListScreen
 import rs.wordpress.example.shared.ui.welcome.WelcomeScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComBotConversationsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComMeScreen
+import rs.wordpress.example.shared.ui.wpcom.WpComPostFormatsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSiteScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSupportConversationsScreen
 import uniffi.wp_api.PostEndpointType
@@ -363,8 +364,20 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
             composable("wpcom_site") {
                 WpComSiteScreen(
                     onMeClicked = { navController.navigate("wpcom_me") },
+                    onPostFormatsClicked = { navController.navigate("wpcom_post_formats") },
                     onSupportConversationsClicked = { navController.navigate("wpcom_support") },
                     onBotConversationsClicked = { navController.navigate("wpcom_bots") },
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("wpcom_post_formats") {
+                val wpComClient = currentWpComClient
+                if (wpComClient == null) {
+                    ErrorMessage("No WordPress.com account connected")
+                    return@composable
+                }
+                WpComPostFormatsScreen(
+                    wpComApiClient = wpComClient,
                     onBackClicked = { navController.popBackStack() }
                 )
             }

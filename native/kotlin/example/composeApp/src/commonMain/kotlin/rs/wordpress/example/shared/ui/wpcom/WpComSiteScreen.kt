@@ -23,6 +23,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Preview
 fun WpComSiteScreen(
     onMeClicked: () -> Unit,
+    onPostFormatsClicked: () -> Unit,
     onSupportConversationsClicked: () -> Unit,
     onBotConversationsClicked: () -> Unit,
     onBackClicked: () -> Unit = {}
@@ -49,6 +50,15 @@ fun WpComSiteScreen(
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                     },
                     modifier = Modifier.clickable(onClick = onMeClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Post Formats") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onPostFormatsClicked)
                 )
             }
             item {
