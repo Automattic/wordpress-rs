@@ -230,7 +230,7 @@ async fn paginate_list_posts_with_edit_context(#[case] params: PostListParams) {
 #[rstest]
 #[parallel]
 #[case(PostListParams { per_page: Some(60), ..Default::default() })]
-#[case(PostListParams { per_page: Some(60), status: vec![PostStatus::Custom("any".to_string())], ..Default::default() })]
+#[case(PostListParams { per_page: Some(60), status: vec![PostStatus::Any], ..Default::default() })]
 async fn paginate_list_all_posts(#[case] params: PostListParams) {
     // The `per_page` parameter is a magic number between published posts and draft posts total.
 

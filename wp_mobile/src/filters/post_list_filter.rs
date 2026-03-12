@@ -155,7 +155,8 @@ pub struct PostListFilter {
 }
 
 impl PostListFilter {
-    /// Check if a cached post loosely matches this filter.
+    /// Check if a cached post loosely matches this filter, mimicking the
+    /// WordPress REST API's query parameter behavior.
     ///
     /// Conservative: returns `true` if the match cannot be determined locally.
     /// Only returns `false` when the post definitely does NOT match.
@@ -164,8 +165,18 @@ impl PostListFilter {
     /// and assumed to match.
     pub fn loosely_matches_post(&self, post: &wp_api::posts::AnyPostWithEditContext) -> bool {
         // Status check
-        if !self.status.is_empty() && !self.status.contains(&post.status) {
-            return false;
+        if !self.status.is_empty() {
+            if self.status.contains(&PostStatus::Any) {
+                // "any" excludes statuses with `exclude_from_search = true`.
+                // In WordPress core, `trash` and `auto-draft` have this flag set by default.
+                if post.status == PostStatus::Trash
+                    || post.status == PostStatus::Custom("auto-draft".to_string())
+                {
+                    return false;
+                }
+            } else if !self.status.contains(&post.status) {
+                return false;
+            }
         }
         // Author check
         if !self.author.is_empty()
@@ -587,6 +598,54 @@ mod tests {
             .with_status(PostStatus::Publish)
             .build();
         assert!(filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_matches_any_status_with_publish() {
+        let filter = PostListFilter {
+            status: vec![PostStatus::Any],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_status(PostStatus::Publish)
+            .build();
+        assert!(filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_matches_any_status_with_draft() {
+        let filter = PostListFilter {
+            status: vec![PostStatus::Any],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_status(PostStatus::Draft)
+            .build();
+        assert!(filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_any_status_excludes_trash() {
+        let filter = PostListFilter {
+            status: vec![PostStatus::Any],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_status(PostStatus::Trash)
+            .build();
+        assert!(!filter.loosely_matches_post(&post));
+    }
+
+    #[test]
+    fn test_any_status_excludes_auto_draft() {
+        let filter = PostListFilter {
+            status: vec![PostStatus::Any],
+            ..Default::default()
+        };
+        let post = PostBuilder::minimal()
+            .with_status(PostStatus::Custom("auto-draft".to_string()))
+            .build();
+        assert!(!filter.loosely_matches_post(&post));
     }
 
     #[test]

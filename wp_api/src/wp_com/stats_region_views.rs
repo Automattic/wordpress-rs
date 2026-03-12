@@ -17,7 +17,6 @@ use wp_serde_helper::deserialize_option_empty_array_or_hashmap;
     Eq,
     PartialOrd,
     Ord,
-    Hash,
     Serialize,
     Deserialize,
     uniffi::Enum,
