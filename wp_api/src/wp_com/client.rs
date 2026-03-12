@@ -5,6 +5,7 @@ use super::endpoint::{
     },
     me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
+    post_formats_endpoint::{PostFormatsRequestBuilder, PostFormatsRequestExecutor},
     stats_city_views_endpoint::{StatsCityViewsRequestBuilder, StatsCityViewsRequestExecutor},
     stats_clicks_endpoint::{StatsClicksRequestBuilder, StatsClicksRequestExecutor},
     stats_country_views_endpoint::{
@@ -60,6 +61,7 @@ pub struct WpComApiRequestBuilder {
     languages: Arc<LanguagesRequestBuilder>,
     me: Arc<MeRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
+    post_formats: Arc<PostFormatsRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
     stats_clicks: Arc<StatsClicksRequestBuilder>,
@@ -93,6 +95,7 @@ impl WpComApiRequestBuilder {
             languages,
             me,
             oauth2,
+            post_formats,
             sites,
             stats_city_views,
             stats_clicks,
@@ -137,6 +140,7 @@ pub struct WpComApiClient {
     languages: Arc<LanguagesRequestExecutor>,
     me: Arc<MeRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
+    post_formats: Arc<PostFormatsRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
     stats_clicks: Arc<StatsClicksRequestExecutor>,
@@ -171,6 +175,7 @@ impl WpComApiClient {
             languages,
             me,
             oauth2,
+            post_formats,
             sites,
             stats_city_views,
             stats_clicks,
@@ -198,6 +203,7 @@ api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
 api_client_generate_endpoint_impl!(WpComApi, languages);
 api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
+api_client_generate_endpoint_impl!(WpComApi, post_formats);
 api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_clicks);

@@ -12,6 +12,7 @@ pub mod jetpack_connection_endpoint;
 pub mod languages_endpoint;
 pub mod me_endpoint;
 pub mod oauth2;
+pub mod post_formats_endpoint;
 pub mod sites_endpoint;
 pub mod stats_city_views_endpoint;
 pub mod stats_clicks_endpoint;

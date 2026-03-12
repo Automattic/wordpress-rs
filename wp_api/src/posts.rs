@@ -551,6 +551,16 @@ fn post_status_from_string(s: String) -> PostStatus {
     PostStatus::from_str(&s).unwrap_or(PostStatus::Custom(s))
 }
 
+/// Parse a string into a PostFormat.
+///
+/// This is a helper function for platform code that can't access the `FromStr` trait
+/// directly due to UniFFI limitations. Unknown values are returned as `Custom`.
+#[uniffi::export]
+fn post_format_from_string(s: String) -> PostFormat {
+    use std::str::FromStr;
+    PostFormat::from_str(&s).unwrap_or(PostFormat::Custom(s))
+}
+
 #[derive(
     Debug,
     Clone,

@@ -10,6 +10,7 @@ pub mod jetpack_connection;
 pub mod language;
 pub mod me;
 pub mod oauth2;
+pub mod post_formats;
 pub mod sites;
 pub mod stats_city_views;
 pub mod stats_clicks;
