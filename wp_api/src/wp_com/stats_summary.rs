@@ -61,9 +61,13 @@ pub struct StatsSummaryStats {
     /// Average comments per month.
     pub comments_per_month: u64,
     /// The most active recent day for comments.
-    pub comments_most_active_recent_day: String,
+    /// Empty strings from the API are treated as `None`.
+    #[serde(deserialize_with = "wp_serde_helper::deserialize_empty_string_as_none")]
+    pub comments_most_active_recent_day: Option<String>,
     /// The most active time for comments.
-    pub comments_most_active_time: String,
+    /// `"N/A"` values from the API are treated as `None`.
+    #[serde(deserialize_with = "wp_serde_helper::deserialize_placeholder_string_as_none")]
+    pub comments_most_active_time: Option<String>,
     /// Number of spam comments.
     pub comments_spam: u64,
     /// Total number of categories.
@@ -137,8 +141,8 @@ mod tests {
         assert_eq!(response.stats.followers_blog, 89);
         assert_eq!(response.stats.followers_comments, 4);
         assert_eq!(response.stats.comments_per_month, 0);
-        assert_eq!(response.stats.comments_most_active_recent_day, "");
-        assert_eq!(response.stats.comments_most_active_time, "N/A");
+        assert_eq!(response.stats.comments_most_active_recent_day, None);
+        assert_eq!(response.stats.comments_most_active_time, None);
         assert_eq!(response.stats.comments_spam, 0);
         assert_eq!(response.stats.categories, 473);
         assert_eq!(response.stats.tags, 1403);

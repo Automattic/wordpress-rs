@@ -44,6 +44,24 @@ where
     }
 }
 
+/// Deserialize a string, treating empty/whitespace-only strings and `"N/A"` as `None`.
+///
+/// Returns `None` if the string is empty, contains only whitespace, or equals `"N/A"`.
+/// Returns `Some(String)` for any other non-empty string (preserving the original value).
+pub fn deserialize_placeholder_string_as_none<'de, D>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if s.trim().is_empty() || s.trim() == "N/A" {
+        Ok(None)
+    } else {
+        Ok(Some(s))
+    }
+}
+
 /// Deserialize a value that can be either a single string or an array of strings.
 ///
 /// - A single string `"foo"` becomes `vec!["foo"]`
