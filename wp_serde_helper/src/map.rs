@@ -1,16 +1,72 @@
 use serde::{
     Deserialize,
-    de::{self, DeserializeOwned},
+    de::{self, DeserializeOwned, Unexpected},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt, marker::PhantomData};
 
-/// Deserialize a `HashMap` that may be represented as an empty JSON array
-/// or any other non-map placeholder value.
+/// Deserialize a `HashMap` that may be represented as an empty JSON array.
 ///
-/// Some APIs return `[]`, `0`, `null`, `false`, or other non-map values
-/// instead of `{}` when a map is empty. This function handles all such
-/// representations by first consuming the JSON value, then converting
-/// only JSON objects into a `HashMap`.
+/// Some APIs return `[]` instead of `{}` when a map is empty. This function
+/// handles both representations, returning an empty `HashMap` for `[]` and
+/// deserializing normally for JSON objects.
+///
+/// Accepts:
+/// - Empty JSON array `[]` → empty `HashMap`
+/// - JSON object `{...}` → `HashMap` with deserialized key-value pairs
+///
+/// # Errors
+///
+/// Returns an error for non-empty arrays, `null`, strings, numbers, or booleans.
+pub fn deserialize_empty_array_or_hashmap<'de, D, K, V>(
+    deserializer: D,
+) -> Result<HashMap<K, V>, D::Error>
+where
+    D: de::Deserializer<'de>,
+    K: DeserializeOwned + std::hash::Hash + Eq,
+    V: DeserializeOwned,
+{
+    deserializer.deserialize_any(DeserializeEmptyArrayOrHashMapVisitor::<K, V>(PhantomData))
+}
+
+struct DeserializeEmptyArrayOrHashMapVisitor<K, V>(PhantomData<(K, V)>);
+
+impl<'de, K, V> de::Visitor<'de> for DeserializeEmptyArrayOrHashMapVisitor<K, V>
+where
+    K: DeserializeOwned + std::hash::Hash + Eq,
+    V: DeserializeOwned,
+{
+    type Value = HashMap<K, V>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("empty array or a HashMap")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        if seq.next_element::<Self::Value>()?.is_none() {
+            // It's an empty array
+            Ok(HashMap::new())
+        } else {
+            // not an empty array
+            Err(serde::de::Error::invalid_type(Unexpected::Seq, &self))
+        }
+    }
+
+    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::MapAccess<'de>,
+    {
+        HashMap::deserialize(de::value::MapAccessDeserializer::new(map))
+    }
+}
+
+/// Deserialize a `HashMap` that may be represented as a non-map placeholder value.
+///
+/// Some APIs return `0`, `[]`, `null`, `false`, or other non-map values
+/// instead of `{}` when a map has no data. This function treats any non-object
+/// JSON value as an empty `HashMap`.
 ///
 /// Accepts:
 /// - JSON object `{...}` → `HashMap` with deserialized key-value pairs
@@ -20,7 +76,7 @@ use std::collections::HashMap;
 ///
 /// Returns an error only if a JSON object's keys or values can't be
 /// deserialized into the target types.
-pub fn deserialize_empty_array_or_hashmap<'de, D, K, V>(
+pub fn deserialize_hashmap_or_placeholder_as_empty<'de, D, K, V>(
     deserializer: D,
 ) -> Result<HashMap<K, V>, D::Error>
 where
@@ -36,13 +92,11 @@ where
     }
 }
 
-/// Deserialize an `Option<HashMap>` that may be represented as `null`, an empty JSON array,
-/// or any other non-map placeholder value.
+/// Deserialize an `Option<HashMap>` that may be represented as a non-map placeholder value.
 ///
 /// Some APIs return `[]`, `0`, `null`, `false`, or other non-map values
-/// instead of `{}` when a map is empty. This function handles all such
-/// representations by first consuming the JSON value, then converting
-/// only JSON objects into a `HashMap`.
+/// instead of `{}` when a map has no data. This function treats any non-object
+/// JSON value as `None`.
 ///
 /// Accepts:
 /// - JSON object `{...}` → `Some(HashMap)` with deserialized key-value pairs
@@ -52,7 +106,7 @@ where
 ///
 /// Returns an error only if a JSON object's keys or values can't be
 /// deserialized into the target types.
-pub fn deserialize_option_empty_array_or_hashmap<'de, D, K, V>(
+pub fn deserialize_option_hashmap_or_placeholder_as_none<'de, D, K, V>(
     deserializer: D,
 ) -> Result<Option<HashMap<K, V>>, D::Error>
 where
@@ -105,31 +159,11 @@ mod tests {
     }
 
     #[rstest]
-    #[case(r#"{"map": 0}"#, HashMap::new())]
-    #[case(r#"{"map": 42}"#, HashMap::new())]
-    #[case(r#"{"map": null}"#, HashMap::new())]
-    #[case(r#"{"map": false}"#, HashMap::new())]
-    #[case(r#"{"map": true}"#, HashMap::new())]
-    #[case(r#"{"map": 0.0}"#, HashMap::new())]
-    fn test_deserialize_non_map_as_empty_hashmap(
-        #[case] test_case: &str,
-        #[case] expected_result: HashMap<String, String>,
-    ) {
-        let wrapper: HashMapWrapper =
-            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
-        assert_eq!(expected_result, wrapper.map);
-    }
-
-    #[rstest]
-    #[case(r#"{"map": ["not", "empty"]}"#, HashMap::new())]
-    #[case(r#"{"map": "some string"}"#, HashMap::new())]
-    fn test_deserialize_non_object_as_empty_hashmap(
-        #[case] test_case: &str,
-        #[case] expected_result: HashMap<String, String>,
-    ) {
-        let wrapper: HashMapWrapper =
-            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
-        assert_eq!(expected_result, wrapper.map);
+    #[case(r#"{"map": ["not", "empty"]}"#)]
+    #[case(r#"{"map": null}"#)]
+    fn test_deserialize_empty_array_or_hashmap_errors(#[case] test_case: &str) {
+        let result: Result<HashMapWrapper, serde_json::Error> = serde_json::from_str(test_case);
+        assert!(result.is_err(), "The deserializer should emit an error");
     }
 
     #[derive(Debug, Deserialize)]
@@ -161,15 +195,79 @@ mod tests {
         assert_eq!(expected_result, wrapper.map);
     }
 
+    // Tests for deserialize_hashmap_or_placeholder_as_empty
+
     #[derive(Debug, Deserialize)]
-    pub struct OptionHashMapWrapper {
-        #[serde(deserialize_with = "deserialize_option_empty_array_or_hashmap")]
+    pub struct PlaceholderHashMapWrapper {
+        #[serde(deserialize_with = "deserialize_hashmap_or_placeholder_as_empty")]
+        pub map: HashMap<String, String>,
+    }
+
+    #[rstest]
+    #[case(r#"{"map": []}"#, HashMap::new())]
+    #[case(r#"{"map": {"key": "value"}}"#, {
+        let mut map = HashMap::new();
+        map.insert("key".to_string(), "value".to_string());
+        map
+    })]
+    #[case(r#"{"map": {"foo": "bar", "hello": "world"}}"#, {
+        let mut map = HashMap::new();
+        map.insert("foo".to_string(), "bar".to_string());
+        map.insert("hello".to_string(), "world".to_string());
+        map
+    })]
+    fn test_deserialize_hashmap_or_placeholder_as_empty(
+        #[case] test_case: &str,
+        #[case] expected_result: HashMap<String, String>,
+    ) {
+        let wrapper: PlaceholderHashMapWrapper =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, wrapper.map);
+    }
+
+    #[rstest]
+    #[case(r#"{"map": 0}"#, HashMap::new())]
+    #[case(r#"{"map": 42}"#, HashMap::new())]
+    #[case(r#"{"map": null}"#, HashMap::new())]
+    #[case(r#"{"map": false}"#, HashMap::new())]
+    #[case(r#"{"map": true}"#, HashMap::new())]
+    #[case(r#"{"map": 0.0}"#, HashMap::new())]
+    #[case(r#"{"map": ["not", "empty"]}"#, HashMap::new())]
+    #[case(r#"{"map": "some string"}"#, HashMap::new())]
+    fn test_deserialize_placeholder_as_empty_hashmap(
+        #[case] test_case: &str,
+        #[case] expected_result: HashMap<String, String>,
+    ) {
+        let wrapper: PlaceholderHashMapWrapper =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, wrapper.map);
+    }
+
+    // Tests for deserialize_option_hashmap_or_placeholder_as_none
+
+    #[derive(Debug, Deserialize)]
+    pub struct OptionPlaceholderHashMapWrapper {
+        #[serde(deserialize_with = "deserialize_option_hashmap_or_placeholder_as_none")]
         pub map: Option<HashMap<String, String>>,
     }
 
     #[rstest]
     #[case(r#"{"map": null}"#, None)]
     #[case(r#"{"map": []}"#, None)]
+    #[case(r#"{"map": 0}"#, None)]
+    #[case(r#"{"map": false}"#, None)]
+    #[case(r#"{"map": ["not", "empty"]}"#, None)]
+    #[case(r#"{"map": "string"}"#, None)]
+    fn test_deserialize_option_placeholder_as_none(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<HashMap<String, String>>,
+    ) {
+        let wrapper: OptionPlaceholderHashMapWrapper =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, wrapper.map);
+    }
+
+    #[rstest]
     #[case(r#"{"map": {"key": "value"}}"#, Some({
         let mut map = HashMap::new();
         map.insert("key".to_string(), "value".to_string());
@@ -181,25 +279,11 @@ mod tests {
         map.insert("hello".to_string(), "world".to_string());
         map
     }))]
-    fn test_deserialize_option_empty_array_or_hashmap(
+    fn test_deserialize_option_placeholder_as_some(
         #[case] test_case: &str,
         #[case] expected_result: Option<HashMap<String, String>>,
     ) {
-        let wrapper: OptionHashMapWrapper =
-            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
-        assert_eq!(expected_result, wrapper.map);
-    }
-
-    #[rstest]
-    #[case(r#"{"map": 0}"#, None)]
-    #[case(r#"{"map": false}"#, None)]
-    #[case(r#"{"map": ["not", "empty"]}"#, None)]
-    #[case(r#"{"map": "string"}"#, None)]
-    fn test_deserialize_option_non_object_as_none(
-        #[case] test_case: &str,
-        #[case] expected_result: Option<HashMap<String, String>>,
-    ) {
-        let wrapper: OptionHashMapWrapper =
+        let wrapper: OptionPlaceholderHashMapWrapper =
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, wrapper.map);
     }

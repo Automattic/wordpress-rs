@@ -4,7 +4,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use wp_serde_helper::deserialize_empty_array_or_hashmap;
+use wp_serde_helper::deserialize_hashmap_or_placeholder_as_empty;
 
 /// Parameters for the stats insights endpoint.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
@@ -35,13 +35,13 @@ pub struct StatsInsightsResponse {
     /// The percentage of posts published on the highest day.
     pub highest_day_percent: f64,
     /// Post counts by day of week, keyed by day index ("0"=Sunday through "6"=Saturday).
-    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    #[serde(deserialize_with = "deserialize_hashmap_or_placeholder_as_empty")]
     pub days: HashMap<String, u64>,
     /// Post counts by hour of day, keyed by hour string ("00" through "23").
-    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    #[serde(deserialize_with = "deserialize_hashmap_or_placeholder_as_empty")]
     pub hours: HashMap<String, u64>,
     /// View counts by datetime, keyed by "YYYY-MM-DD HH:00:00" strings.
-    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    #[serde(deserialize_with = "deserialize_hashmap_or_placeholder_as_empty")]
     pub hourly_views: HashMap<String, u64>,
     /// Yearly posting summaries.
     pub years: Vec<StatsInsightsYearData>,

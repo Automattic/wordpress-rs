@@ -5,7 +5,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use wp_serde_helper::deserialize_option_empty_array_or_hashmap;
+use wp_serde_helper::deserialize_option_hashmap_or_placeholder_as_none;
 
 /// The time period for grouping region views.
 #[derive(
@@ -112,7 +112,7 @@ pub struct StatsRegionViewsResponse {
     /// Can be `null`, an empty array `[]`, or a map of country codes to info.
     #[serde(
         rename = "country-info",
-        deserialize_with = "deserialize_option_empty_array_or_hashmap"
+        deserialize_with = "deserialize_option_hashmap_or_placeholder_as_none"
     )]
     pub country_info: Option<HashMap<String, StatsRegionCountryInfo>>,
     /// Summary data with aggregated region views (present when summarize=1).
