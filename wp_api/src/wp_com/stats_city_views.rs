@@ -3,9 +3,34 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::language::WPComLanguage,
 };
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Serialize,
+    de::{self, DeserializeOwned},
+};
 use std::collections::HashMap;
-use wp_serde_helper::deserialize_option_hashmap_or_placeholder_as_none;
+
+/// Deserialize an `Option<HashMap>` that may be represented as a non-map placeholder value.
+///
+/// The WP.com stats API returns `[]` or `null` instead of `{}` when there is no
+/// country info. This handles all such cases by treating any non-object JSON value
+/// as `None`.
+fn deserialize_option_hashmap_or_placeholder_as_none<'de, D, K, V>(
+    deserializer: D,
+) -> Result<Option<HashMap<K, V>>, D::Error>
+where
+    D: de::Deserializer<'de>,
+    K: DeserializeOwned + std::hash::Hash + Eq,
+    V: DeserializeOwned,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    if let serde_json::Value::Object(map) = value {
+        serde_json::from_value(serde_json::Value::Object(map))
+            .map(Some)
+            .map_err(de::Error::custom)
+    } else {
+        Ok(None)
+    }
+}
 
 /// The time period for grouping city views.
 #[derive(

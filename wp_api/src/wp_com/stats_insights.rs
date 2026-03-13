@@ -2,9 +2,32 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::language::WPComLanguage,
 };
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Serialize,
+    de::{self, DeserializeOwned},
+};
 use std::collections::HashMap;
-use wp_serde_helper::deserialize_hashmap_or_placeholder_as_empty;
+
+/// Deserialize a `HashMap` that may be represented as a non-map placeholder value.
+///
+/// The WP.com stats insights API returns `0`, `null`, or `false` instead of `{}`
+/// when a site has no posting data. This handles all such cases by treating any
+/// non-object JSON value as an empty `HashMap`.
+fn deserialize_hashmap_or_placeholder_as_empty<'de, D, K, V>(
+    deserializer: D,
+) -> Result<HashMap<K, V>, D::Error>
+where
+    D: de::Deserializer<'de>,
+    K: DeserializeOwned + std::hash::Hash + Eq,
+    V: DeserializeOwned,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    if let serde_json::Value::Object(map) = value {
+        serde_json::from_value(serde_json::Value::Object(map)).map_err(de::Error::custom)
+    } else {
+        Ok(HashMap::new())
+    }
+}
 
 /// Parameters for the stats insights endpoint.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
