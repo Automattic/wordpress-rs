@@ -61,9 +61,13 @@ pub struct StatsSummaryStats {
     /// Average comments per month.
     pub comments_per_month: u64,
     /// The most active recent day for comments.
-    pub comments_most_active_recent_day: String,
+    /// Empty strings from the API are treated as `None`.
+    #[serde(deserialize_with = "wp_serde_helper::deserialize_empty_string_as_none")]
+    pub comments_most_active_recent_day: Option<String>,
     /// The most active time for comments.
-    pub comments_most_active_time: String,
+    /// `"N/A"` values from the API are treated as `None`.
+    #[serde(deserialize_with = "wp_serde_helper::deserialize_placeholder_string_as_none")]
+    pub comments_most_active_time: Option<String>,
     /// Number of spam comments.
     pub comments_spam: u64,
     /// Total number of categories.
@@ -137,8 +141,8 @@ mod tests {
         assert_eq!(response.stats.followers_blog, 89);
         assert_eq!(response.stats.followers_comments, 4);
         assert_eq!(response.stats.comments_per_month, 0);
-        assert_eq!(response.stats.comments_most_active_recent_day, "");
-        assert_eq!(response.stats.comments_most_active_time, "N/A");
+        assert_eq!(response.stats.comments_most_active_recent_day, None);
+        assert_eq!(response.stats.comments_most_active_time, None);
         assert_eq!(response.stats.comments_spam, 0);
         assert_eq!(response.stats.categories, 473);
         assert_eq!(response.stats.tags, 1403);
@@ -165,5 +169,42 @@ mod tests {
         assert_eq!(visitors.len(), 30);
         assert_eq!(visitors[0].period, "2026-02-09");
         assert_eq!(visitors[0].visitors, 376);
+    }
+
+    #[test]
+    fn test_stats_summary_zero_stats_deserialization() {
+        let json_file_path = "tests/wpcom/stats_summary/response-02-zero-stats.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsSummaryResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(response.date, "2026-03-10");
+
+        // Verify all stats are zero
+        assert_eq!(response.stats.visitors_today, 0);
+        assert_eq!(response.stats.visitors_yesterday, 0);
+        assert_eq!(response.stats.visitors, 0);
+        assert_eq!(response.stats.views_today, 0);
+        assert_eq!(response.stats.views_yesterday, 0);
+        assert_eq!(response.stats.views_best_day, "");
+        assert_eq!(response.stats.views_best_day_total, 0);
+        assert_eq!(response.stats.views, 0);
+        assert_eq!(response.stats.comments, 0);
+        assert_eq!(response.stats.posts, 0);
+        assert_eq!(response.stats.followers_blog, 0);
+        assert_eq!(response.stats.followers_comments, 0);
+        assert_eq!(response.stats.comments_per_month, 0);
+        assert_eq!(response.stats.comments_most_active_recent_day, None);
+        assert_eq!(response.stats.comments_most_active_time, None);
+        assert_eq!(response.stats.comments_spam, 0);
+        assert_eq!(response.stats.categories, 0);
+        assert_eq!(response.stats.tags, 0);
+        assert_eq!(response.stats.shares, 0);
+
+        // Verify empty visits
+        assert_eq!(response.visits.unit, "day");
+        assert_eq!(response.visits.data.len(), 0);
+        assert!(response.visits.visits_data().is_empty());
+        assert!(response.visits.visitors_data().is_empty());
     }
 }

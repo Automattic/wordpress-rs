@@ -6,7 +6,7 @@ use crate::{
             AddSubscribersParams, AddSubscribersResponse, IndividualSubscriberParams,
             IndividualSubscriberStats, IndividualSubscriberStatsParams, ListSubscribersResponse,
             Subscriber, SubscriberImportJob, SubscriberImportJobsListParams,
-            SubscriberStatsResponse, SubscribersListParams, UploadId,
+            SubscriberStatsResponse, SubscribersByUserTypeParams, SubscribersListParams, UploadId,
         },
     },
 };
@@ -28,6 +28,8 @@ enum SubscribersRequest {
     AddSubscribers,
     #[get(url = "/sites/<wp_com_site_id>/subscribers/stats", output = SubscriberStatsResponse)]
     GetSubscriberStats,
+    #[get(url = "/sites/<wp_com_site_id>/subscribers_by_user_type", params = &SubscribersByUserTypeParams, output = ListSubscribersResponse)]
+    ListSubscribersByUserType,
 }
 
 impl DerivedRequest for SubscribersRequest {

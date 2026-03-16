@@ -189,6 +189,35 @@ impl MetadataService {
         })
     }
 
+    /// Delete a list if its stored `per_page` doesn't match the expected value.
+    ///
+    /// When the app updates the `per_page` configuration for a collection,
+    /// the existing list in the DB becomes incompatible because page boundaries
+    /// are derived from `per_page`. This deletes the stale list so the next
+    /// refresh recreates it with the correct `per_page`.
+    ///
+    /// No-op if the list doesn't exist or already has the expected `per_page`.
+    pub(crate) fn delete_list_if_per_page_changed(
+        &self,
+        key: &ListKey,
+        per_page: u32,
+    ) -> Result<(), WpServiceError> {
+        self.cache.execute(|conn| {
+            if let Some(header) = ListMetadataRepository::get_header(conn, &self.db_site, key)?
+                && header.per_page != per_page as i64
+            {
+                log::info!(
+                    "per_page changed for key={} (stored={}, expected={}), deleting old list",
+                    key,
+                    header.per_page,
+                    per_page
+                );
+                ListMetadataRepository::delete_list(conn, &self.db_site, key)?;
+            }
+            Ok(())
+        })
+    }
+
     /// Get the current version for concurrency checking.
     fn get_version(&self, key: &ListKey) -> Result<i64, WpServiceError> {
         self.cache
@@ -534,9 +563,7 @@ impl MetadataService {
             // Version mismatch means refresh was called while we were fetching (race condition).
             // Don't modify state - whoever called refresh owns the state transition.
             // Our fetched data is stale, so just discard it and return an error.
-            return Err(FetchError::Database {
-                err_message: "List was refreshed during load more, discarding results".to_string(),
-            });
+            return Err(FetchError::StaleLoadMore);
         }
 
         // 4. Append metadata to existing items

@@ -159,6 +159,13 @@ impl PostMetadataCollectionWithEditContext {
     pub async fn refresh(&self) -> Result<SyncResult, FetchError> {
         log::debug!("PostMetadataCollection: Refreshing collection");
 
+        // If the per_page configuration changed since this list was created,
+        // delete the stale list so it gets recreated with the correct per_page.
+        // This is safe because refresh replaces all list content anyway.
+        self.service
+            .metadata_service
+            .delete_list_if_per_page_changed(self.core.key(), self.core.per_page())?;
+
         let result = self
             .service
             .sync_list(

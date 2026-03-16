@@ -109,8 +109,8 @@ lane :release do |options|
 
   validate
   update_swift_package
-  publish_release_to_github
   publish_to_s3
+  publish_release_to_github
 end
 
 lane :validate do
@@ -156,9 +156,15 @@ lane :publish_release_to_github do
     message: "Update Package.swift to use version #{version}"
   )
 
+  # Re-resolve Swift package dependencies so Package.resolved matches the
+  # updated Package.swift (which now points to the remote binary target).
+  sh "cd #{PROJECT_ROOT} && swift package resolve"
+
+  package_resolved_path = File.expand_path('./Package.resolved', PROJECT_ROOT)
   git_add(path: xcframework_bindings_file_path, force: true)
+  git_add(path: package_resolved_path)
   git_commit(
-    path: xcframework_bindings_file_path,
+    path: xcframework_bindings_file_path + [package_resolved_path],
     message: "Commit Swift Bindings for version #{version}"
   )
 

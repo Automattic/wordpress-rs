@@ -2,9 +2,32 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::language::WPComLanguage,
 };
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Serialize,
+    de::{self, DeserializeOwned},
+};
 use std::collections::HashMap;
-use wp_serde_helper::deserialize_empty_array_or_hashmap;
+
+/// Deserialize a `HashMap` that may be represented as a non-map placeholder value.
+///
+/// The WP.com stats insights API returns `0`, `null`, or `false` instead of `{}`
+/// when a site has no posting data. This handles all such cases by treating any
+/// non-object JSON value as an empty `HashMap`.
+fn deserialize_hashmap_or_placeholder_as_empty<'de, D, K, V>(
+    deserializer: D,
+) -> Result<HashMap<K, V>, D::Error>
+where
+    D: de::Deserializer<'de>,
+    K: DeserializeOwned + std::hash::Hash + Eq,
+    V: DeserializeOwned,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    if let serde_json::Value::Object(map) = value {
+        serde_json::from_value(serde_json::Value::Object(map)).map_err(de::Error::custom)
+    } else {
+        Ok(HashMap::new())
+    }
+}
 
 /// Parameters for the stats insights endpoint.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
@@ -35,13 +58,13 @@ pub struct StatsInsightsResponse {
     /// The percentage of posts published on the highest day.
     pub highest_day_percent: f64,
     /// Post counts by day of week, keyed by day index ("0"=Sunday through "6"=Saturday).
-    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    #[serde(deserialize_with = "deserialize_hashmap_or_placeholder_as_empty")]
     pub days: HashMap<String, u64>,
     /// Post counts by hour of day, keyed by hour string ("00" through "23").
-    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    #[serde(deserialize_with = "deserialize_hashmap_or_placeholder_as_empty")]
     pub hours: HashMap<String, u64>,
     /// View counts by datetime, keyed by "YYYY-MM-DD HH:00:00" strings.
-    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    #[serde(deserialize_with = "deserialize_hashmap_or_placeholder_as_empty")]
     pub hourly_views: HashMap<String, u64>,
     /// Yearly posting summaries.
     pub years: Vec<StatsInsightsYearData>,

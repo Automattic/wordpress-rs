@@ -19,6 +19,9 @@ use super::endpoint::{
     stats_devices_screensize_endpoint::{
         StatsDevicesScreensizeRequestBuilder, StatsDevicesScreensizeRequestExecutor,
     },
+    stats_emails_summary_endpoint::{
+        StatsEmailsSummaryRequestBuilder, StatsEmailsSummaryRequestExecutor,
+    },
     stats_file_downloads_endpoint::{
         StatsFileDownloadsRequestBuilder, StatsFileDownloadsRequestExecutor,
     },
@@ -30,6 +33,7 @@ use super::endpoint::{
     stats_search_terms_endpoint::{
         StatsSearchTermsRequestBuilder, StatsSearchTermsRequestExecutor,
     },
+    stats_subscribers_endpoint::{StatsSubscribersRequestBuilder, StatsSubscribersRequestExecutor},
     stats_summary_endpoint::{StatsSummaryRequestBuilder, StatsSummaryRequestExecutor},
     stats_tags_endpoint::{StatsTagsRequestBuilder, StatsTagsRequestExecutor},
     stats_top_authors_endpoint::{StatsTopAuthorsRequestBuilder, StatsTopAuthorsRequestExecutor},
@@ -70,9 +74,11 @@ pub struct WpComApiRequestBuilder {
     stats_insights: Arc<StatsInsightsRequestBuilder>,
     stats_country_views: Arc<StatsCountryViewsRequestBuilder>,
     stats_devices_browser: Arc<StatsDevicesBrowserRequestBuilder>,
+    stats_emails_summary: Arc<StatsEmailsSummaryRequestBuilder>,
     stats_devices_platform: Arc<StatsDevicesPlatformRequestBuilder>,
     stats_devices_screensize: Arc<StatsDevicesScreensizeRequestBuilder>,
     stats_referrers: Arc<StatsReferrersRequestBuilder>,
+    stats_subscribers: Arc<StatsSubscribersRequestBuilder>,
     stats_region_views: Arc<StatsRegionViewsRequestBuilder>,
     stats_search_terms: Arc<StatsSearchTermsRequestBuilder>,
     stats_summary: Arc<StatsSummaryRequestBuilder>,
@@ -106,9 +112,11 @@ impl WpComApiRequestBuilder {
             stats_insights,
             stats_country_views,
             stats_devices_browser,
+            stats_emails_summary,
             stats_devices_platform,
             stats_devices_screensize,
             stats_referrers,
+            stats_subscribers,
             stats_region_views,
             stats_search_terms,
             stats_summary,
@@ -153,9 +161,11 @@ pub struct WpComApiClient {
     stats_insights: Arc<StatsInsightsRequestExecutor>,
     stats_country_views: Arc<StatsCountryViewsRequestExecutor>,
     stats_devices_browser: Arc<StatsDevicesBrowserRequestExecutor>,
+    stats_emails_summary: Arc<StatsEmailsSummaryRequestExecutor>,
     stats_devices_platform: Arc<StatsDevicesPlatformRequestExecutor>,
     stats_devices_screensize: Arc<StatsDevicesScreensizeRequestExecutor>,
     stats_referrers: Arc<StatsReferrersRequestExecutor>,
+    stats_subscribers: Arc<StatsSubscribersRequestExecutor>,
     stats_region_views: Arc<StatsRegionViewsRequestExecutor>,
     stats_search_terms: Arc<StatsSearchTermsRequestExecutor>,
     stats_summary: Arc<StatsSummaryRequestExecutor>,
@@ -190,9 +200,11 @@ impl WpComApiClient {
             stats_insights,
             stats_country_views,
             stats_devices_browser,
+            stats_emails_summary,
             stats_devices_platform,
             stats_devices_screensize,
             stats_referrers,
+            stats_subscribers,
             stats_region_views,
             stats_search_terms,
             stats_summary,
@@ -220,9 +232,11 @@ api_client_generate_endpoint_impl!(WpComApi, stats_file_downloads);
 api_client_generate_endpoint_impl!(WpComApi, stats_insights);
 api_client_generate_endpoint_impl!(WpComApi, stats_country_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_browser);
+api_client_generate_endpoint_impl!(WpComApi, stats_emails_summary);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_platform);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_screensize);
 api_client_generate_endpoint_impl!(WpComApi, stats_referrers);
+api_client_generate_endpoint_impl!(WpComApi, stats_subscribers);
 api_client_generate_endpoint_impl!(WpComApi, stats_region_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_search_terms);
 api_client_generate_endpoint_impl!(WpComApi, stats_summary);
