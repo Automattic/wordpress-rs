@@ -57,14 +57,8 @@ impl_as_query_value_from_to_string!(StatsEmailsSummaryPeriod);
 #[strum(serialize_all = "snake_case")]
 pub enum StatsEmailsSummarySortField {
     #[default]
-    #[serde(rename = "post_date")]
-    #[strum(serialize = "post_date")]
     PostDate,
-    #[serde(rename = "opens")]
-    #[strum(serialize = "opens")]
     Opens,
-    #[serde(rename = "clicks")]
-    #[strum(serialize = "clicks")]
     Clicks,
 }
 

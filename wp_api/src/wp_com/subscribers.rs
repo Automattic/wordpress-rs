@@ -219,7 +219,7 @@ pub struct ListSubscribersResponse {
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-pub enum SubscribersByUserTypeUserType {
+pub enum WPComSubscriberType {
     #[default]
     #[serde(rename = "wpcom")]
     #[strum(serialize = "wpcom")]
@@ -229,7 +229,7 @@ pub enum SubscribersByUserTypeUserType {
     Free,
 }
 
-impl_as_query_value_from_to_string!(SubscribersByUserTypeUserType);
+impl_as_query_value_from_to_string!(WPComSubscriberType);
 
 /// The field to sort subscribers by user type results by.
 #[derive(
@@ -274,7 +274,7 @@ pub struct SubscribersByUserTypeParams {
     pub page: Option<u64>,
     /// The user type to filter by.
     #[uniffi(default = None)]
-    pub user_type: Option<SubscribersByUserTypeUserType>,
+    pub user_type: Option<WPComSubscriberType>,
     /// The field to sort results by.
     #[uniffi(default = None)]
     pub sort: Option<SubscribersByUserTypeSortField>,
@@ -731,7 +731,7 @@ mod tests {
         let params = SubscribersByUserTypeParams {
             per_page: Some(10),
             page: Some(1),
-            user_type: Some(SubscribersByUserTypeUserType::WpCom),
+            user_type: Some(WPComSubscriberType::WpCom),
             sort: Some(SubscribersByUserTypeSortField::DateSubscribed),
         };
 
@@ -754,7 +754,7 @@ mod tests {
         let params = SubscribersByUserTypeParams {
             per_page: Some(20),
             page: None,
-            user_type: Some(SubscribersByUserTypeUserType::Email),
+            user_type: Some(WPComSubscriberType::Email),
             sort: None,
         };
 
