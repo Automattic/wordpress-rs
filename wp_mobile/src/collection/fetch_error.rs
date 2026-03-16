@@ -14,6 +14,10 @@ pub enum FetchError {
 
     /// Database error during cache upsert
     Database { err_message: String },
+
+    /// A list refresh occurred while a load-more fetch was in-flight,
+    /// making the paginated results stale.
+    StaleLoadMore,
 }
 
 impl From<WpApiError> for FetchError {
@@ -45,6 +49,9 @@ impl WpSupportsLocalization for FetchError {
             FetchError::Database { err_message } => {
                 WpMessages::database_generic_message(err_message)
             }
+            FetchError::StaleLoadMore => WpMessages::database_generic_message(
+                "List was refreshed during load more, discarding results",
+            ),
         }
     }
 }

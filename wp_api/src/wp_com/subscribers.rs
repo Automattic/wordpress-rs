@@ -198,6 +198,98 @@ pub struct ListSubscribersResponse {
     pub is_owner_subscribed: bool,
 }
 
+// MARK: - List Subscribers by User Type
+
+/// The user type to filter subscribers by.
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum WPComSubscriberType {
+    #[default]
+    #[serde(rename = "wpcom")]
+    #[strum(serialize = "wpcom")]
+    WpCom,
+    Email,
+    Paid,
+    Free,
+}
+
+impl_as_query_value_from_to_string!(WPComSubscriberType);
+
+/// The field to sort subscribers by user type results by.
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum SubscribersByUserTypeSortField {
+    #[default]
+    DateSubscribed,
+    #[serde(rename = "email")]
+    #[strum(serialize = "email")]
+    EmailAddress,
+    #[serde(rename = "name")]
+    #[strum(serialize = "name")]
+    DisplayName,
+}
+
+impl_as_query_value_from_to_string!(SubscribersByUserTypeSortField);
+
+/// Parameters for the subscribers by user type endpoint.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct SubscribersByUserTypeParams {
+    /// The number of subscribers per page.
+    #[uniffi(default = None)]
+    pub per_page: Option<u64>,
+    /// The page number to return.
+    #[uniffi(default = None)]
+    pub page: Option<u64>,
+    /// The user type to filter by.
+    #[uniffi(default = None)]
+    pub user_type: Option<WPComSubscriberType>,
+    /// The field to sort results by.
+    #[uniffi(default = None)]
+    pub sort: Option<SubscribersByUserTypeSortField>,
+}
+
+impl AppendUrlQueryPairs for SubscribersByUserTypeParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut
+            .append_option_query_value_pair("per_page", self.per_page.as_ref())
+            .append_option_query_value_pair("page", self.page.as_ref())
+            .append_option_query_value_pair("user_type", self.user_type.as_ref())
+            .append_option_query_value_pair("sort", self.sort.as_ref());
+    }
+}
+
 // MARK: - Get Subscriber
 
 #[derive(Debug, uniffi::Enum)]
@@ -472,6 +564,14 @@ mod tests {
     }
 
     #[test]
+    fn test_subscriber_list_with_invalid_date_returns_parsing_error() {
+        let json_file_path = "tests/wpcom/subscribers/subscriber-list-with-invalid-date.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let result: Result<ListSubscribersResponse, _> = serde_json::from_reader(file);
+        assert!(result.is_err(), "Expected parsing error for malformed date");
+    }
+
+    #[test]
     fn test_subscriber_list_not_allowed_response() {
         let json_file_path = "tests/wpcom/subscribers/subscriber-list-not-authorized.json";
         let file: std::fs::File = std::fs::File::open(json_file_path).expect("Failed to open file");
@@ -619,5 +719,94 @@ mod tests {
         let stats: IndividualSubscriberStats =
             serde_json::from_reader(file).expect("Unable to parse JSON");
         assert_eq!(stats.emails_sent, 2);
+    }
+
+    #[test]
+    fn test_subscribers_by_user_type_params_serialization() {
+        let mut url = url::Url::parse(
+            "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers_by_user_type",
+        )
+        .expect("Failed to parse url");
+
+        let params = SubscribersByUserTypeParams {
+            per_page: Some(10),
+            page: Some(1),
+            user_type: Some(WPComSubscriberType::WpCom),
+            sort: Some(SubscribersByUserTypeSortField::DateSubscribed),
+        };
+
+        let mut query_pairs = url.query_pairs_mut();
+        params.append_query_pairs(&mut query_pairs);
+
+        assert_eq!(
+            query_pairs.finish().as_str(),
+            "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers_by_user_type?per_page=10&page=1&user_type=wpcom&sort=date_subscribed"
+        );
+    }
+
+    #[test]
+    fn test_subscribers_by_user_type_params_serialization_partial() {
+        let mut url = url::Url::parse(
+            "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers_by_user_type",
+        )
+        .expect("Failed to parse url");
+
+        let params = SubscribersByUserTypeParams {
+            per_page: Some(20),
+            page: None,
+            user_type: Some(WPComSubscriberType::Email),
+            sort: None,
+        };
+
+        let mut query_pairs = url.query_pairs_mut();
+        params.append_query_pairs(&mut query_pairs);
+
+        assert_eq!(
+            query_pairs.finish().as_str(),
+            "https://public-api.wordpress.com/wpcom/v2/sites/1234/subscribers_by_user_type?per_page=20&user_type=email"
+        );
+    }
+
+    #[test]
+    fn test_subscribers_by_user_type_response_deserialization() {
+        let json_file_path = "tests/wpcom/subscribers/subscribers-by-user-type.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: ListSubscribersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(response.total, 88);
+        assert_eq!(response.pages, 9);
+        assert_eq!(response.page, 1);
+        assert_eq!(response.per_page, 10);
+        assert!(!response.is_owner_subscribed);
+        assert_eq!(response.subscribers.len(), 3);
+
+        let first = &response.subscribers[0];
+        assert_eq!(first.user_id, UserId(33840434));
+        assert_eq!(first.subscription_id, SubscriptionId(792200219));
+        assert_eq!(first.display_name, "Nik");
+        assert!(!first.is_email_subscriber);
+        assert!(first.subscription_status.is_none());
+        assert_eq!(first.url, Some("https://nikhilc.dev".to_string()));
+    }
+
+    #[test]
+    fn test_subscribers_by_user_type_with_invalid_date_returns_parsing_error() {
+        let json_file_path =
+            "tests/wpcom/subscribers/subscribers-by-user-type-with-invalid-date.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let result: Result<ListSubscribersResponse, _> = serde_json::from_reader(file);
+        assert!(result.is_err(), "Expected parsing error for malformed date");
+    }
+
+    #[test]
+    fn test_subscribers_by_user_type_empty_response() {
+        let json_file_path = "tests/wpcom/subscribers/subscribers-by-user-type-empty.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: ListSubscribersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(response.total, 0);
+        assert!(response.subscribers.is_empty());
     }
 }
