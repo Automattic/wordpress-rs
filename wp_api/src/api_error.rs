@@ -70,7 +70,7 @@ pub enum WpApiError {
 impl WpApiError {
     pub fn status_code(&self) -> Option<u16> {
         match self {
-            WpApiError::InvalidHttpStatusCode { status_code }
+            WpApiError::InvalidHttpStatusCode { status_code, .. }
             | WpApiError::UnknownError { status_code, .. }
             | WpApiError::WpError { status_code, .. } => Some(*status_code),
             WpApiError::RequestExecutionFailed { status_code, .. } => *status_code,
