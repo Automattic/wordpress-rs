@@ -218,4 +218,24 @@ mod tests {
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, empty_string_as_none.value);
     }
+
+    #[derive(Debug, Deserialize)]
+    pub struct PlaceholderStringAsNone {
+        #[serde(deserialize_with = "deserialize_placeholder_string_as_none")]
+        pub value: Option<String>,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": "N/A"}"#, None)]
+    #[case(r#"{"value": ""}"#, None)]
+    #[case(r#"{"value": " "}"#, None)]
+    #[case(r#"{"value": "some value"}"#, Some("some value".to_string()))]
+    fn test_deserialize_placeholder_string_as_none(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<String>,
+    ) {
+        let wrapper: PlaceholderStringAsNone =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, wrapper.value);
+    }
 }
