@@ -25,6 +25,7 @@ use super::endpoint::{
     stats_file_downloads_endpoint::{
         StatsFileDownloadsRequestBuilder, StatsFileDownloadsRequestExecutor,
     },
+    stats_insights_endpoint::{StatsInsightsRequestBuilder, StatsInsightsRequestExecutor},
     stats_referrers_endpoint::{StatsReferrersRequestBuilder, StatsReferrersRequestExecutor},
     stats_region_views_endpoint::{
         StatsRegionViewsRequestBuilder, StatsRegionViewsRequestExecutor,
@@ -33,6 +34,7 @@ use super::endpoint::{
         StatsSearchTermsRequestBuilder, StatsSearchTermsRequestExecutor,
     },
     stats_subscribers_endpoint::{StatsSubscribersRequestBuilder, StatsSubscribersRequestExecutor},
+    stats_summary_endpoint::{StatsSummaryRequestBuilder, StatsSummaryRequestExecutor},
     stats_top_authors_endpoint::{StatsTopAuthorsRequestBuilder, StatsTopAuthorsRequestExecutor},
     stats_top_posts_endpoint::{StatsTopPostsRequestBuilder, StatsTopPostsRequestExecutor},
     stats_video_plays_endpoint::{StatsVideoPlaysRequestBuilder, StatsVideoPlaysRequestExecutor},
@@ -68,6 +70,7 @@ pub struct WpComApiRequestBuilder {
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
     stats_clicks: Arc<StatsClicksRequestBuilder>,
     stats_file_downloads: Arc<StatsFileDownloadsRequestBuilder>,
+    stats_insights: Arc<StatsInsightsRequestBuilder>,
     stats_country_views: Arc<StatsCountryViewsRequestBuilder>,
     stats_devices_browser: Arc<StatsDevicesBrowserRequestBuilder>,
     stats_emails_summary: Arc<StatsEmailsSummaryRequestBuilder>,
@@ -77,6 +80,7 @@ pub struct WpComApiRequestBuilder {
     stats_subscribers: Arc<StatsSubscribersRequestBuilder>,
     stats_region_views: Arc<StatsRegionViewsRequestBuilder>,
     stats_search_terms: Arc<StatsSearchTermsRequestBuilder>,
+    stats_summary: Arc<StatsSummaryRequestBuilder>,
     stats_top_authors: Arc<StatsTopAuthorsRequestBuilder>,
     stats_top_posts: Arc<StatsTopPostsRequestBuilder>,
     stats_video_plays: Arc<StatsVideoPlaysRequestBuilder>,
@@ -103,6 +107,7 @@ impl WpComApiRequestBuilder {
             stats_city_views,
             stats_clicks,
             stats_file_downloads,
+            stats_insights,
             stats_country_views,
             stats_devices_browser,
             stats_emails_summary,
@@ -112,6 +117,7 @@ impl WpComApiRequestBuilder {
             stats_subscribers,
             stats_region_views,
             stats_search_terms,
+            stats_summary,
             stats_top_authors,
             stats_top_posts,
             stats_video_plays,
@@ -149,6 +155,7 @@ pub struct WpComApiClient {
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
     stats_clicks: Arc<StatsClicksRequestExecutor>,
     stats_file_downloads: Arc<StatsFileDownloadsRequestExecutor>,
+    stats_insights: Arc<StatsInsightsRequestExecutor>,
     stats_country_views: Arc<StatsCountryViewsRequestExecutor>,
     stats_devices_browser: Arc<StatsDevicesBrowserRequestExecutor>,
     stats_emails_summary: Arc<StatsEmailsSummaryRequestExecutor>,
@@ -158,6 +165,7 @@ pub struct WpComApiClient {
     stats_subscribers: Arc<StatsSubscribersRequestExecutor>,
     stats_region_views: Arc<StatsRegionViewsRequestExecutor>,
     stats_search_terms: Arc<StatsSearchTermsRequestExecutor>,
+    stats_summary: Arc<StatsSummaryRequestExecutor>,
     stats_top_authors: Arc<StatsTopAuthorsRequestExecutor>,
     stats_top_posts: Arc<StatsTopPostsRequestExecutor>,
     stats_video_plays: Arc<StatsVideoPlaysRequestExecutor>,
@@ -185,6 +193,7 @@ impl WpComApiClient {
             stats_city_views,
             stats_clicks,
             stats_file_downloads,
+            stats_insights,
             stats_country_views,
             stats_devices_browser,
             stats_emails_summary,
@@ -194,6 +203,7 @@ impl WpComApiClient {
             stats_subscribers,
             stats_region_views,
             stats_search_terms,
+            stats_summary,
             stats_top_authors,
             stats_top_posts,
             stats_video_plays,
@@ -214,6 +224,7 @@ api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_clicks);
 api_client_generate_endpoint_impl!(WpComApi, stats_file_downloads);
+api_client_generate_endpoint_impl!(WpComApi, stats_insights);
 api_client_generate_endpoint_impl!(WpComApi, stats_country_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_browser);
 api_client_generate_endpoint_impl!(WpComApi, stats_emails_summary);
@@ -223,6 +234,7 @@ api_client_generate_endpoint_impl!(WpComApi, stats_referrers);
 api_client_generate_endpoint_impl!(WpComApi, stats_subscribers);
 api_client_generate_endpoint_impl!(WpComApi, stats_region_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_search_terms);
+api_client_generate_endpoint_impl!(WpComApi, stats_summary);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_authors);
 api_client_generate_endpoint_impl!(WpComApi, stats_top_posts);
 api_client_generate_endpoint_impl!(WpComApi, stats_video_plays);
