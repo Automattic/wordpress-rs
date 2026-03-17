@@ -40,8 +40,9 @@ struct UsersTests {
         ])
 
         let api = try WordPressAPI(
-            apiUrlResolver: WpOrgSiteApiUrlResolver(
-                apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json")
+            siteInfo: .selfHosted(
+                siteUrl: ParsedUrl.parse(input: "https://wordpress.org"),
+                apiRoot: ParsedUrl.parse(input: "https://wordpress.org/wp-json")
             ),
             authenticationProvider: .none(),
             executor: stubs,

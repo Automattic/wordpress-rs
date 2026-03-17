@@ -66,7 +66,7 @@ struct NonceAuthenticationTests {
         let credentials = TestCredentials.instance()
         let api = WordPressAPI(
             urlSession: .init(configuration: .ephemeral),
-            siteUrl: credentials.siteUrl,
+            siteUrl: credentials.siteURL,
             apiRootUrl: credentials.apiRootURL,
             username: credentials.adminUsername,
             password: credentials.adminAccountPassword
