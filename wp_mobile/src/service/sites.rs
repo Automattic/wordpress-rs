@@ -1,6 +1,8 @@
 use crate::service::WpServiceError;
 use std::sync::Arc;
+use wp_api::prelude::{ApiUrlResolver, ParsedUrl, WpOrgSiteApiUrlResolver};
 use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::{WpComBaseUrl, endpoint::WpComDotOrgApiUrlResolver};
 use wp_mobile_cache::{
     DbTable, SqliteDbError, WpApiCache,
     db_types::db_site::{DbSite, DbSiteType},
@@ -13,8 +15,28 @@ use wp_mobile_cache::{
 /// Information about a site
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum SiteInfo {
-    SelfHosted { site_url: String, api_root: String },
-    WordPressCom { site_id: WpComSiteId },
+    SelfHosted {
+        site_url: Arc<ParsedUrl>,
+        api_root: Arc<ParsedUrl>,
+    },
+    WordPressCom {
+        site_id: WpComSiteId,
+    },
+}
+
+#[uniffi::export]
+impl SiteInfo {
+    pub fn api_url_resolver(&self) -> Arc<dyn ApiUrlResolver> {
+        match self {
+            Self::SelfHosted { api_root, .. } => {
+                Arc::new(WpOrgSiteApiUrlResolver::new(Arc::clone(api_root)))
+            }
+            Self::WordPressCom { site_id } => Arc::new(WpComDotOrgApiUrlResolver::new(
+                site_id.to_string(),
+                WpComBaseUrl::default(),
+            )),
+        }
+    }
 }
 
 /// Service for site-related operations
@@ -32,7 +54,7 @@ impl SiteService {
     /// Get or create a DbSite for a self-hosted WordPress site
     ///
     /// Looks up an existing site by URL, or creates it if not found.
-    /// This is an internal helper called by WpService::new_self_hosted().
+    /// This is an internal helper called by WpService::new().
     ///
     /// # Arguments
     /// * `cache` - The cache instance to use for database operations
@@ -70,7 +92,7 @@ impl SiteService {
     /// Get or create a DbSite for a WordPress.com site
     ///
     /// Looks up an existing site by site_id, or creates it if not found.
-    /// This is an internal helper called by WpService::new_wordpress_com().
+    /// This is an internal helper called by WpService::new().
     pub(crate) fn get_or_create_wordpress_com_site(
         cache: Arc<WpApiCache>,
         site_id: WpComSiteId,
@@ -119,9 +141,21 @@ impl SiteService {
 
                 full_entity
                     .ok_or(WpServiceError::SiteNotFound)
-                    .map(|entity| SiteInfo::SelfHosted {
-                        site_url: entity.data.url,
-                        api_root: entity.data.api_root,
+                    .and_then(|entity| {
+                        let site_url = ParsedUrl::parse(&entity.data.url).map_err(|e| {
+                            WpServiceError::InvalidUrl {
+                                err_message: e.to_string(),
+                            }
+                        })?;
+                        let api_root = ParsedUrl::parse(&entity.data.api_root).map_err(|e| {
+                            WpServiceError::InvalidUrl {
+                                err_message: e.to_string(),
+                            }
+                        })?;
+                        Ok(SiteInfo::SelfHosted {
+                            site_url: Arc::new(site_url),
+                            api_root: Arc::new(api_root),
+                        })
                     })
             }
             DbSiteType::WordPressCom => {
