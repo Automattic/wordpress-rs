@@ -78,7 +78,7 @@ enum RootListData: Identifiable, Sendable {
         }
 
         var name: String {
-            return switch self {
+            switch self {
             case .posts: "Posts"
             case .taxonomies: "Taxonomies"
             case .navigation: "Navigation"

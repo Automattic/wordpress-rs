@@ -9,7 +9,8 @@ private func temporaryKeyFile() throws -> (URL, URL) {
     let dir = FileManager.default.temporaryDirectory
         .appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(
-        at: dir, withIntermediateDirectories: true
+        at: dir,
+        withIntermediateDirectories: true
     )
     let keyFile = dir.appendingPathComponent("key.dat")
     return (dir, keyFile)

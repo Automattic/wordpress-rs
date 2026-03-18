@@ -101,14 +101,6 @@ var package = Package(
     ].addingIntegrationTests()
 )
 
-// MARK: - Enable local development toolings
-
-let localDevelopment = libwordpressFFIVersion.isLocal
-
-if localDevelopment {
-    try enableSwiftLint()
-}
-
 // MARK: - Helpers
 
 enum WordPressRSVersion {
@@ -136,24 +128,6 @@ enum WordPressRSVersion {
     }
 }
 
-// Add SwiftLint to the package so that we can see linting issues directly from Xcode.
-@MainActor
-func enableSwiftLint() throws {
-#if os(macOS)
-    let filePath = URL(string:"./.swiftlint.yml", relativeTo: URL(filePath: #filePath))!
-    let version = try String(contentsOf: filePath, encoding: .utf8)
-        .split(separator: "\n")
-        .first(where: { $0.starts(with: "swiftlint_version") })?
-        .split(separator: ":")
-        .last?
-        .trimmingCharacters(in: .whitespaces)
-    guard let version else {
-        fatalError("Can't find swiftlint_version in .swiftlint.yml")
-    }
-
-    package.dependencies.append(.package(url: "https://github.com/realm/SwiftLint", exact: .init(version)!))
-#endif
-}
 
 extension Array where Element == Target {
 

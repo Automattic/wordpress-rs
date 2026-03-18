@@ -43,10 +43,10 @@ struct TestCredentials: Decodable {
 
     static func instance() -> Self {
         let json = URL(
-                string: "../../../../test_credentials.json",
-                relativeTo: URL(fileURLWithPath: #filePath)
-            )!
-            .absoluteURL
+            string: "../../../../test_credentials.json",
+            relativeTo: URL(fileURLWithPath: #filePath)
+        )!
+        .absoluteURL
         // swiftlint:disable:next force_try
         return try! JSONDecoder().decode(Self.self, from: Data(contentsOf: json))
     }

@@ -58,7 +58,7 @@ struct MultipartFormField {
         }
 
         guard let inputStream = InputStream(fileAtPath: path),
-              let bytes = (attrs[FileAttributeKey.size] as? NSNumber)?.uint64Value
+            let bytes = (attrs[FileAttributeKey.size] as? NSNumber)?.uint64Value
         else {
             // Given we can successfully read the file attributes, the above calls should never fail.
             throw MultipartFormError.impossible

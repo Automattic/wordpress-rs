@@ -16,13 +16,13 @@ extension WordPressAPI {
         }
 
         return WordPressAPI(
-           urlSession: .shared,
-           apiRootUrl: apiRootUrl,
-           authentication: loginCredentials,
-           middlewarePipeline: MiddlewarePipeline(middlewares: [
+            urlSession: .shared,
+            apiRootUrl: apiRootUrl,
+            authentication: loginCredentials,
+            middlewarePipeline: MiddlewarePipeline(middlewares: [
                 DebugMiddleware()
-           ])
-       )
+            ])
+        )
     }
 
 }

@@ -139,7 +139,7 @@ steps:
       - label: ":swift: Lint"
         command: |
           .buildkite/download-xcframework.sh
-          echo "--- :swift: Swiftlint"
+          echo "--- :swift: swift-format lint"
           make lint-swift
         depends_on: xcframework
         agents:

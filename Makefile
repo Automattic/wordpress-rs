@@ -255,11 +255,14 @@ lint-rust:
 
 lint-swift:
 	@# Help: Run the linter for Swift.
-	swift package plugin swiftlint
+	xcrun swift format lint --strict --recursive --parallel --ignore-unparsable-files \
+		native/swift/Sources/wordpress-api \
+		native/swift/Sources/wordpress-api-cache \
+		native/swift/Tests \
+		native/swift/Example \
+		native/swift/Tools
 
-lintfix-swift:
-	@# Help: Run the linter for Swift and correct fixable issues.
-	swift package plugin swiftlint --autocorrect
+lintfix-swift: fmt-swift
 
 fmt-rust:
 	$(rust_docker_run) /bin/bash -c "rustup component add rustfmt && cargo fmt"
@@ -311,8 +314,8 @@ validate-localizations:
 	$(rust_docker_run) /bin/bash -c "cargo run --bin wp_localization_validation -- --localization-folder ./wp_localization/localization/"
 
 fmt-swift:
-	@# Help: Format the Swift binding code
-	xcrun swift format -i -r native/swift/Sources/wordpress-api-wrapper
+	@# Help: Format Swift code.
+	xcrun swift format --in-place --recursive --parallel --ignore-unparsable-files native/swift
 
 help:
 	@printf "%-40s %s\n" "Target" "Description"

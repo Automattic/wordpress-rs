@@ -39,7 +39,8 @@ struct WPComRootView: View {
                 Button(action: self.logOutOfWPCom) {
                     Text("Sign Out")
                 }
-            }.task {
+            }
+            .task {
                 do {
                     self.rootListItems = try await wpcomService.loadRootListItems()
                     self.isLoadingInitialData = false
@@ -51,10 +52,14 @@ struct WPComRootView: View {
             ContentUnavailableView {
                 Text("Not logged in")
             } actions: {
-                Button(action: self.loginToWPCom, label: {
-                    Text("Sign in to WordPress.com")
-                        .padding(.horizontal)
-                }).buttonStyle(.borderedProminent)
+                Button(
+                    action: self.loginToWPCom,
+                    label: {
+                        Text("Sign in to WordPress.com")
+                            .padding(.horizontal)
+                    }
+                )
+                .buttonStyle(.borderedProminent)
             }
         } else {
             ContentUnavailableView {
@@ -71,8 +76,8 @@ struct WPComRootView: View {
         Task {
             do {
                 try await loginManager.logInToWpCom(
-                        configuration: configuration,
-                        webAuthenticationSession: webAuthenticationSession
+                    configuration: configuration,
+                    webAuthenticationSession: webAuthenticationSession
                 )
             } catch {
                 self.error = error
