@@ -245,7 +245,7 @@ public final class WordPressAPI: Sendable {
         self.requestBuilder.menuLocations()
     }
 
-#if PROGRESS_REPORTING_ENABLED
+    #if PROGRESS_REPORTING_ENABLED
     /// Track the progress of the given HTTP API calls in the `apiCall` closure.
     ///
     /// Note: pass the `RequestContext` parameter in `apiCall` to one and only one HTTP API call.
@@ -301,7 +301,7 @@ public final class WordPressAPI: Sendable {
             try await media.createCancellation(params: params, context: $0)
         }
     }
-#endif
+    #endif
 
     enum ParseError: Error {
         case invalidUrl
@@ -335,7 +335,7 @@ public extension WpNetworkRequest {
 
 extension Result {
     @inlinable public func tryMap<NewSuccess>(
-            _ transform: (Success) throws -> NewSuccess
+        _ transform: (Success) throws -> NewSuccess
     ) -> Result<NewSuccess, any Error> {
         switch self {
         case .success(let success):

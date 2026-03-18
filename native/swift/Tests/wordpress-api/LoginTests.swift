@@ -31,24 +31,30 @@ class LoginTests {
 
         let client = WordPressLoginClient(requestExecutor: stubs)
 
-        await #expect(performing: {
-            _ = try await client.details(ofSite: "http://localhost")
-        }, throws: { error in
-            let reason = try #require(try self.getApplicationPasswordsNotSupportedReason(from: error))
+        await #expect(
+            performing: {
+                _ = try await client.details(ofSite: "http://localhost")
+            },
+            throws: { error in
+                let reason = try #require(try self.getApplicationPasswordsNotSupportedReason(from: error))
 
-            guard case .siteIsLocalDevelopmentEnvironment = reason else {
-                Issue.record("The reason should be .SiteIsLocalDevelopmentEnvironment")
-                return false
+                guard case .siteIsLocalDevelopmentEnvironment = reason else {
+                    Issue.record("The reason should be .SiteIsLocalDevelopmentEnvironment")
+                    return false
+                }
+
+                return true
             }
-
-            return true
-        })
+        )
     }
 
-    @Test("Login Spec Example 3: Admin URL Provided", arguments: [
-        ("https://vanilla.wpmt.co/wp-login.php", "https://vanilla.wpmt.co/wp-admin/authorize-application.php"),
-        ("https://vanilla.wpmt.co/wp-admin", "https://vanilla.wpmt.co/wp-admin/authorize-application.php")
-    ])
+    @Test(
+        "Login Spec Example 3: Admin URL Provided",
+        arguments: [
+            ("https://vanilla.wpmt.co/wp-login.php", "https://vanilla.wpmt.co/wp-admin/authorize-application.php"),
+            ("https://vanilla.wpmt.co/wp-admin", "https://vanilla.wpmt.co/wp-admin/authorize-application.php")
+        ]
+    )
     func testAdminUrlProvided(_ provided: String, _ expected: String) async throws {
         let parsedUrl = try await findLoginUrl(forSite: provided)
         #expect(expected == parsedUrl.url())
@@ -62,24 +68,29 @@ class LoginTests {
 
     @Test("Login Spec Example 5: HTTP-only site")
     func testHttpOnlySite() async {
-        await #expect(performing: {
-            _ = try await self.client.details(ofSite: "http://no-https.wpmt.co")
-        }, throws: { error in
-            let reason = try #require(try self.getApplicationPasswordsNotSupportedReason(from: error))
+        await #expect(
+            performing: {
+                _ = try await self.client.details(ofSite: "http://no-https.wpmt.co")
+            },
+            throws: { error in
+                let reason = try #require(try self.getApplicationPasswordsNotSupportedReason(from: error))
 
-            guard case .applicationPasswordsDisabledForHttpSite = reason else {
-                Issue.record("The reason should be .ApplicationPasswordsDisabledForHttpSite")
-                return false
+                guard case .applicationPasswordsDisabledForHttpSite = reason else {
+                    Issue.record("The reason should be .ApplicationPasswordsDisabledForHttpSite")
+                    return false
+                }
+
+                return true
             }
-
-            return true
-        })
+        )
     }
 
     @Test("Login Spec Example 6: HTTP-Only Site with Application Password Override")
     func testHttpOnlySiteWithApplicationPasswordsEnabled() async throws {
         let parsedUrl = try await findLoginUrl(forSite: "http://no-https-with-application-passwords.wpmt.co")
-        #expect("http://no-https-with-application-passwords.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
+        #expect(
+            "http://no-https-with-application-passwords.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url()
+        )
     }
 
     @Test("Login Spec Example 7: CDN-Cached Site")
@@ -90,42 +101,51 @@ class LoginTests {
 
     @Test("Login Spec Example 8: Site with Application Passwords Disabled by WordFence")
     func testSiteWithApplicationPasswordsDisabledByWordFence() async throws {
-        await #expect(performing: {
-            _ = try await self.client.details(ofSite: "https://wordfence.wpmt.co")
-        }, throws: { error in
-            let reason = try #require(try self.getApplicationPasswordsNotSupportedReason(from: error))
+        await #expect(
+            performing: {
+                _ = try await self.client.details(ofSite: "https://wordfence.wpmt.co")
+            },
+            throws: { error in
+                let reason = try #require(try self.getApplicationPasswordsNotSupportedReason(from: error))
 
-            guard case .applicationPasswordBlockedByPlugin(plugin: let plugin) = reason else {
-                Issue.record("The reason should be .ApplicationPasswordsDisabledForHttpSite")
-                return false
+                guard case .applicationPasswordBlockedByPlugin(plugin: let plugin) = reason else {
+                    Issue.record("The reason should be .ApplicationPasswordsDisabledForHttpSite")
+                    return false
+                }
+
+                #expect(plugin.name == "Wordfence")
+
+                return true
             }
-
-            #expect(plugin.name == "Wordfence")
-
-            return true
-        })
+        )
     }
 
-    @Test("Login Spec Example 9: Not a WordPress Site", arguments: [
-        "google.com",
-        "https://google.com"
-    ])
+    @Test(
+        "Login Spec Example 9: Not a WordPress Site",
+        arguments: [
+            "google.com",
+            "https://google.com"
+        ]
+    )
     func testNotWordPressSite(url: String) async throws {
-        await #expect(performing: {
-            _ = try await self.client.details(ofSite: url)
-        }, throws: { error in
-            try #require(error is AutoDiscoveryAttemptFailure)
+        await #expect(
+            performing: {
+                _ = try await self.client.details(ofSite: url)
+            },
+            throws: { error in
+                try #require(error is AutoDiscoveryAttemptFailure)
 
-            guard let failure = try self.getFindApiRootFailure(from: error) else {
-                return false
-            }
+                guard let failure = try self.getFindApiRootFailure(from: error) else {
+                    return false
+                }
 
-            if case .probablyNotAWordPressSite = failure {
-                return true
-            } else {
-                return false
+                if case .probablyNotAWordPressSite = failure {
+                    return true
+                } else {
+                    return false
+                }
             }
-        })
+        )
     }
 
     @Test("Login Spec Example 10: WordPress in a subdirectory with a link header")
@@ -148,47 +168,54 @@ class LoginTests {
 
     @Test("Login Spec Example 13: Site uses HTTP basic with no provided credentials")
     func testWordPressHttpBasic() async throws {
-        await #expect(performing: {
-            _ = try await self.client.details(ofSite: "https://basic-auth.wpmt.co")
-        }, throws: { error in
-            let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
+        await #expect(
+            performing: {
+                _ = try await self.client.details(ofSite: "https://basic-auth.wpmt.co")
+            },
+            throws: { error in
+                let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
-            guard case .httpAuthenticationRequiredError(hostname: let hostname, method: _) = reason else {
-                Issue.record("The transport error must be `httpAuthenticationRequiredError`")
-                return false
+                guard case .httpAuthenticationRequiredError(hostname: let hostname, method: _) = reason else {
+                    Issue.record("The transport error must be `httpAuthenticationRequiredError`")
+                    return false
+                }
+
+                if hostname == "https://basic-auth.wpmt.co" {
+                    Issue.record("Hostname shouldn't contain the scheme: \(hostname)")
+                }
+
+                return true
             }
-
-            if hostname == "https://basic-auth.wpmt.co" {
-                Issue.record("Hostname shouldn't contain the scheme: \(hostname)")
-            }
-
-            return true
-        })
+        )
     }
 
     @Test("Login Spec Example 13: Site uses HTTP basic with invalid credentials provided")
     func testWordPressHttpBasicWithInvalidCredentials() async throws {
         let invalid = ApiDiscoveryAuthenticationMiddleware(username: "invalid", password: "invalid")
 
-        await #expect(performing: {
-            _ = try await WordPressLoginClient(
-                urlSession: .init(configuration: .ephemeral),
-                middleware: MiddlewarePipeline(middlewares: invalid)
-            ).details(ofSite: "https://basic-auth.wpmt.co")
-        }, throws: { error in
-            let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
+        await #expect(
+            performing: {
+                _ = try await WordPressLoginClient(
+                    urlSession: .init(configuration: .ephemeral),
+                    middleware: MiddlewarePipeline(middlewares: invalid)
+                )
+                .details(ofSite: "https://basic-auth.wpmt.co")
+            },
+            throws: { error in
+                let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
-            guard case .httpAuthenticationRejectedError(hostname: let hostname, method: _) = reason else {
-                Issue.record("The transport error must be `httpAuthenticationRequiredError`")
-                return false
+                guard case .httpAuthenticationRejectedError(hostname: let hostname, method: _) = reason else {
+                    Issue.record("The transport error must be `httpAuthenticationRequiredError`")
+                    return false
+                }
+
+                if hostname == "https://basic-auth.wpmt.co" {
+                    Issue.record("Hostname shouldn't contain the scheme: \(hostname)")
+                }
+
+                return true
             }
-
-            if hostname == "https://basic-auth.wpmt.co" {
-                Issue.record("Hostname shouldn't contain the scheme: \(hostname)")
-            }
-
-            return true
-        })
+        )
     }
 
     @Test("Login Spec Example 13: Site uses HTTP basic with correct credentials provided")
@@ -198,7 +225,8 @@ class LoginTests {
         let result = try await WordPressLoginClient(
             urlSession: .init(configuration: .ephemeral),
             middleware: MiddlewarePipeline(middlewares: valid)
-        ).details(ofSite: "https://basic-auth.wpmt.co")
+        )
+        .details(ofSite: "https://basic-auth.wpmt.co")
 
         let parsedUrl = result.authentication.applicationPasswordsUrl!
         #expect("https://basic-auth.wpmt.co/wp-admin/authorize-application.php" == parsedUrl.url())
@@ -222,67 +250,79 @@ class LoginTests {
             try HTTPStubs.stub(host: "aggressive-rate-limiting.wpmt.co", with: .retryResponse(after: 1))
         ])
 
-        await #expect(performing: {
-            let retryMiddleware = RetryAfterMiddleware(maxRetries: 3, maxRetryWaitSeconds: 1)
-            let client = WordPressLoginClient(requestExecutor: stubs, middleware: MiddlewarePipeline(middlewares: [retryMiddleware]))
-            _ = try await client.details(ofSite: "https://aggressive-rate-limiting.wpmt.co")
-        }, throws: { error in
-            let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
+        await #expect(
+            performing: {
+                let retryMiddleware = RetryAfterMiddleware(maxRetries: 3, maxRetryWaitSeconds: 1)
+                let client = WordPressLoginClient(
+                    requestExecutor: stubs,
+                    middleware: MiddlewarePipeline(middlewares: [retryMiddleware])
+                )
+                _ = try await client.details(ofSite: "https://aggressive-rate-limiting.wpmt.co")
+            },
+            throws: { error in
+                let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
-            guard case .misconfiguredRateLimitError = reason else {
-                Issue.record("The transport error must be `misconfiguredRateLimitError`")
-                return false
+                guard case .misconfiguredRateLimitError = reason else {
+                    Issue.record("The transport error must be `misconfiguredRateLimitError`")
+                    return false
+                }
+
+                return true
             }
-
-            return true
-        })
+        )
     }
 
     @Test("Login Spec Example 16: Non-existent website")
     func testInvalidUrl() async {
-        await #expect(performing: {
-            _ = try await self.client.details(ofSite: "https://valid-looking-url-but-not-actually.foo")
-        }, throws: { error in
-            let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
+        await #expect(
+            performing: {
+                _ = try await self.client.details(ofSite: "https://valid-looking-url-but-not-actually.foo")
+            },
+            throws: { error in
+                let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
-            guard case .nonExistentSiteError = reason else {
-                Issue.record("The transport error must be `nonExistentSiteError`")
-                return false
+                guard case .nonExistentSiteError = reason else {
+                    Issue.record("The transport error must be `nonExistentSiteError`")
+                    return false
+                }
+
+                return true
             }
-
-            return true
-        })
+        )
     }
 
     @Test("Login Spec Example 17: Invalid SSL Certificate")
     func testInvalidHTTPsFails() async throws {
-        await #expect(performing: {
-            _ = try await self.client.details(ofSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
-        }, throws: { error in
-            let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
+        await #expect(
+            performing: {
+                _ = try await self.client.details(ofSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
+            },
+            throws: { error in
+                let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
-            guard case .invalidSslError(let underlyingReason) = reason else {
-                Issue.record("The transport error must be `invalidSslError`")
-                return false
+                guard case .invalidSslError(let underlyingReason) = reason else {
+                    Issue.record("The transport error must be `invalidSslError`")
+                    return false
+                }
+
+                #if os(watchOS) // watchOS doesn't make the underlying certificate available to us
+                guard case .genericSslError = underlyingReason else {
+                    Issue.record("The underlying error must be `genericSslError`")
+                    return false
+                }
+                #else
+                guard case .certificateNotValidForName(let hostname, let presentedHostnames) = underlyingReason else {
+                    Issue.record("The underlying error must be `certificateNotValidForName`")
+                    return false
+                }
+
+                #expect(hostname == "wordpress-1315525-4803651.cloudwaysapps.com")
+                #expect(presentedHostnames == ["vanilla.wpmt.co"])
+                #endif
+
+                return true
             }
-
-            #if os(watchOS) // watchOS doesn't make the underlying certificate available to us
-            guard case .genericSslError = underlyingReason else {
-                Issue.record("The underlying error must be `genericSslError`")
-                return false
-            }
-            #else
-            guard case .certificateNotValidForName(let hostname, let presentedHostnames) = underlyingReason else {
-                Issue.record("The underlying error must be `certificateNotValidForName`")
-                return false
-            }
-
-            #expect(hostname == "wordpress-1315525-4803651.cloudwaysapps.com")
-            #expect(presentedHostnames == ["vanilla.wpmt.co"])
-            #endif
-
-            return true
-        })
+        )
     }
 
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
@@ -353,7 +393,9 @@ class LoginTests {
     private func getFetchAndParseApiRootFailure(from error: any Error) throws -> FetchAndParseApiRootFailure? {
         try #require(error is AutoDiscoveryAttemptFailure)
 
-        if case .FetchAndParseApiRoot(parsedSiteUrl: _, apiRootUrl: _, let failure) = error as? AutoDiscoveryAttemptFailure {
+        if case .FetchAndParseApiRoot(parsedSiteUrl: _, apiRootUrl: _, let failure) = error
+            as? AutoDiscoveryAttemptFailure
+        {
             return failure
         }
 

@@ -8,7 +8,7 @@ struct WPComOAuthCredentials {
     let clientSecret: String
 
     static func load() -> WPComOAuthCredentials? {
-        return fromCredentialsFile()
+        fromCredentialsFile()
     }
 
     private static func fromCredentialsFile() -> WPComOAuthCredentials? {
@@ -128,17 +128,19 @@ final class LoginManager: ObservableObject {
     }
 
     public func hasStoredLoginCredentials() -> Bool {
-        return accountStore.hasSelfHostedAccount()
+        accountStore.hasSelfHostedAccount()
     }
 
     public func setLoginCredentials(to newValue: WpApiApplicationPasswordDetails, apiRootURL: URL) throws {
-        _ = try accountStore.store(account: .selfHostedSite(
-            id: 42,
-            domain: newValue.siteUrl,
-            username: newValue.userLogin,
-            password: newValue.password,
-            siteApiRoot: apiRootURL.absoluteString
-        ))
+        _ = try accountStore.store(
+            account: .selfHostedSite(
+                id: 42,
+                domain: newValue.siteUrl,
+                username: newValue.userLogin,
+                password: newValue.password,
+                siteApiRoot: apiRootURL.absoluteString
+            )
+        )
 
         isLoggedIn = true
     }
@@ -170,11 +172,13 @@ final class LoginManager: ObservableObject {
     }
 
     public func setWpComLoginCredentials(to newValue: String) throws {
-        _ = try self.accountStore.store(account: .wpCom(
-            id: 42,
-            username: "",
-            token: newValue,
-            siteApiRoot: "")
+        _ = try self.accountStore.store(
+            account: .wpCom(
+                id: 42,
+                username: "",
+                token: newValue,
+                siteApiRoot: ""
+            )
         )
 
         self.objectWillChange.send()

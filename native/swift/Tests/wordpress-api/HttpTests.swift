@@ -19,8 +19,11 @@ class HTTPErrorTests {
             appNotifier: nil
         )
 
-        await #expect(throws: WpApiError.self, performing: {
-            _ = try await api.users.retrieveWithViewContext(userId: 1)
-        })
+        await #expect(
+            throws: WpApiError.self,
+            performing: {
+                _ = try await api.users.retrieveWithViewContext(userId: 1)
+            }
+        )
     }
 }

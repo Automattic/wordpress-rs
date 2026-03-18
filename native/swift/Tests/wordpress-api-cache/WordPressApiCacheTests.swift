@@ -77,9 +77,10 @@ struct WordPressApiCacheTests {
         var (cache, mockService): (WordPressApiCache?, MockPostService) = try testContext()
 
         try await confirmation(expectedCount: 5) { confirmation in
-            _ = cache?.addDatabaseUpdatesObserver { _ in
-                confirmation()
-            }
+            _ = cache?
+                .addDatabaseUpdatesObserver { _ in
+                    confirmation()
+                }
 
             _ = mockService.generateAndInsertPosts(count: 5)
 
@@ -120,9 +121,10 @@ struct WordPressApiCacheTests {
         let (cache, mockService) = try testContext()
 
         await confirmation(expectedCount: 10) { confirmation in
-            let cancellable = cache.databaseUpdatesPublisher().sink { _ in
-                confirmation()
-            }
+            let cancellable = cache.databaseUpdatesPublisher()
+                .sink { _ in
+                    confirmation()
+                }
 
             _ = mockService.generateAndInsertPosts(count: 10)
 
@@ -154,9 +156,10 @@ struct WordPressApiCacheTests {
         await withTaskGroup { group in
             group.addTask {
                 await confirmation(expectedCount: 3) { confirmation in
-                    let cancellable = cache0.databaseUpdatesPublisher().sink { _ in
-                        confirmation()
-                    }
+                    let cancellable = cache0.databaseUpdatesPublisher()
+                        .sink { _ in
+                            confirmation()
+                        }
 
                     _ = mockService0.generateAndInsertPosts(count: 3)
                     cancellable.cancel()
@@ -164,9 +167,10 @@ struct WordPressApiCacheTests {
             }
             group.addTask {
                 await confirmation(expectedCount: 6) { confirmation in
-                    let cancellable = cache1.databaseUpdatesPublisher().sink { _ in
-                        confirmation()
-                    }
+                    let cancellable = cache1.databaseUpdatesPublisher()
+                        .sink { _ in
+                            confirmation()
+                        }
 
                     _ = mockService1.generateAndInsertPosts(count: 6)
                     cancellable.cancel()
@@ -174,9 +178,10 @@ struct WordPressApiCacheTests {
             }
             group.addTask {
                 await confirmation(expectedCount: 9) { confirmation in
-                    let cancellable = cache2.databaseUpdatesPublisher().sink { _ in
-                        confirmation()
-                    }
+                    let cancellable = cache2.databaseUpdatesPublisher()
+                        .sink { _ in
+                            confirmation()
+                        }
 
                     _ = mockService2.generateAndInsertPosts(count: 9)
                     cancellable.cancel()

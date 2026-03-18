@@ -103,23 +103,27 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             }
 
             if let urlError = error as? URLError, urlError.code == .cancelled {
-                return .failure(.RequestExecutionFailed(
-                    statusCode: nil,
-                    redirects: nil,
-                    reason: .cancellationError,
-                    requestUrl: request.url(),
-                    requestMethod: request.method()
-                ))
+                return .failure(
+                    .RequestExecutionFailed(
+                        statusCode: nil,
+                        redirects: nil,
+                        reason: .cancellationError,
+                        requestUrl: request.url(),
+                        requestMethod: request.method()
+                    )
+                )
             }
 
-            return .failure(.RequestExecutionFailed(
-                statusCode: nil,
-                redirects: nil,
-                reason: .genericError(errorMessage: error.localizedDescription),
-                requestUrl: request.url(),
-                requestMethod: request.method()
-            ))
-       }
+            return .failure(
+                .RequestExecutionFailed(
+                    statusCode: nil,
+                    redirects: nil,
+                    reason: .genericError(errorMessage: error.localizedDescription),
+                    requestUrl: request.url(),
+                    requestMethod: request.method()
+                )
+            )
+        }
     }
 
     private func fetch(request: URLRequest) async throws -> (Data, URLResponse) {
@@ -130,7 +134,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         #endif
     }
 
-#if PROGRESS_REPORTING_ENABLED
+    #if PROGRESS_REPORTING_ENABLED
     public func progresses(for context: RequestContext) -> AnyPublisher<Progress, Never> {
         NotificationCenter.default.publisher(for: RequestExecutorDelegate.didCreateTaskNotification)
             .compactMap { $0.object as? URLSessionTask }
@@ -142,13 +146,14 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             .map { $0.progress }
             .eraseToAnyPublisher()
     }
-#endif
+    #endif
 
     private func cancelRequest(withId requestId: String) async {
-#if canImport(Combine)
-        var task = (await self.session.allTasks).first {
-            $0.originalRequest?.requestId == requestId
-        }
+        #if canImport(Combine)
+        var task = (await self.session.allTasks)
+            .first {
+                $0.originalRequest?.requestId == requestId
+            }
 
         if task == nil {
             task = await NotificationCenter.default
@@ -161,7 +166,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         }
 
         task?.cancel()
-#endif
+        #endif
     }
 
     private func handleHttpsError(
@@ -173,29 +178,33 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             var peerCertificateChain = getPeerCertificateChain(error),
             !peerCertificateChain.isEmpty
         else {
-            return .failure(.RequestExecutionFailed(
-                 statusCode: nil,
-                 redirects: executorDelegate.redirects(for: request.requestId()),
-                 reason: .invalidSslError(reason: InvalidSslErrorReason.genericSslError),
-                 requestUrl: request.url(),
-                 requestMethod: request.method()
-            ))
+            return .failure(
+                .RequestExecutionFailed(
+                    statusCode: nil,
+                    redirects: executorDelegate.redirects(for: request.requestId()),
+                    reason: .invalidSslError(reason: InvalidSslErrorReason.genericSslError),
+                    requestUrl: request.url(),
+                    requestMethod: request.method()
+                )
+            )
         }
 
         let siteCertificate = peerCertificateChain.remove(at: 0)
 
-        return .failure(.RequestExecutionFailed(
-             statusCode: nil,
-             redirects: executorDelegate.redirects(for: request.requestId()),
-             reason: RequestExecutionErrorReason.invalidSslError(
-                reason: .certificateNotValidForName(
-                    hostname: URL(string: request.url())?.host ?? "unknown host",
-                    presentedHostnames: [siteCertificate.commonName()]
-                )
-             ),
-             requestUrl: request.url(),
-             requestMethod: request.method()
-         ))
+        return .failure(
+            .RequestExecutionFailed(
+                statusCode: nil,
+                redirects: executorDelegate.redirects(for: request.requestId()),
+                reason: RequestExecutionErrorReason.invalidSslError(
+                    reason: .certificateNotValidForName(
+                        hostname: URL(string: request.url())?.host ?? "unknown host",
+                        presentedHostnames: [siteCertificate.commonName()]
+                    )
+                ),
+                requestUrl: request.url(),
+                requestMethod: request.method()
+            )
+        )
     }
 
     func handleNonExistentSiteError(
@@ -232,7 +241,8 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             .serverCertificateHasBadDate,
             .serverCertificateNotYetValid,
             .serverCertificateHasUnknownRoot
-        ].contains(urlError.code)
+        ]
+        .contains(urlError.code)
     }
 
     private func errorIsNonExistentSiteError(_ error: Error) -> Bool {
@@ -241,14 +251,16 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             .cannotConnectToHost,
             .cannotFindHost,
             .dnsLookupFailed
-        ].contains((error as? URLError)?.code)
+        ]
+        .contains((error as? URLError)?.code)
     }
 
     private func errorIsDeviceIsOffline(_ error: Error) -> Bool {
         [
             .networkConnectionLost,
             .notConnectedToInternet
-        ].contains((error as? URLError)?.code)
+        ]
+        .contains((error as? URLError)?.code)
     }
 
     private func handleDeviceIsOfflineError(
@@ -285,7 +297,8 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 }
 
 private final class RequestExecutorDelegate:
-    NSObject, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
+    NSObject, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable
+{
 
     static let didCreateTaskNotification = Notification.Name("RequestExecutorDelegate.didCreateTaskNotification")
 
@@ -328,11 +341,12 @@ private final class RequestExecutorDelegate:
         didReceive challenge: URLAuthenticationChallenge
     ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-           let trust = challenge.protectionSpace.serverTrust,
-           let certificateChain = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
-           let cert = certificateChain.first,
-           let cert = parseCertificate(data: SecCertificateCopyData(cert) as Data),
-           alternateNames(forCertificate: cert).contains(challenge.protectionSpace.host) {
+            let trust = challenge.protectionSpace.serverTrust,
+            let certificateChain = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
+            let cert = certificateChain.first,
+            let cert = parseCertificate(data: SecCertificateCopyData(cert) as Data),
+            alternateNames(forCertificate: cert).contains(challenge.protectionSpace.host)
+        {
             return (.useCredential, URLCredential(trust: trust))
         }
 
@@ -368,10 +382,13 @@ private final class RequestExecutorDelegate:
                 redirects[requestID] = [WpRedirect]()
             }
 
-            redirects[requestID]?.append(WpRedirect(
-                source: source.absoluteString,
-                destination: destination.absoluteString
-            ))
+            redirects[requestID]?
+                .append(
+                    WpRedirect(
+                        source: source.absoluteString,
+                        destination: destination.absoluteString
+                    )
+                )
         }
 
         return request
@@ -379,7 +396,7 @@ private final class RequestExecutorDelegate:
 
     func urlSession(_ session: URLSession, taskIsWaitingForConnectivity task: URLSessionTask) {
         #if !os(Linux)
-            delegate?.urlSession?(session, taskIsWaitingForConnectivity: task)
+        delegate?.urlSession?(session, taskIsWaitingForConnectivity: task)
         #endif
     }
 
@@ -391,7 +408,8 @@ private final class RequestExecutorDelegate:
         totalBytesExpectedToSend: Int64
     ) {
         #if os(Linux)
-            delegate?.urlSession(
+        delegate?
+            .urlSession(
                 session,
                 task: task,
                 didSendBodyData: bytesSent,
@@ -399,13 +417,13 @@ private final class RequestExecutorDelegate:
                 totalBytesExpectedToSend: totalBytesExpectedToSend
             )
         #else
-            delegate?.urlSession?(
-                session,
-                task: task,
-                didSendBodyData: bytesSent,
-                totalBytesSent: totalBytesSent,
-                totalBytesExpectedToSend: totalBytesExpectedToSend
-            )
+        delegate?.urlSession?(
+            session,
+            task: task,
+            didSendBodyData: bytesSent,
+            totalBytesSent: totalBytesSent,
+            totalBytesExpectedToSend: totalBytesExpectedToSend
+        )
         #endif
     }
 
@@ -415,29 +433,29 @@ private final class RequestExecutorDelegate:
         didReceiveInformationalResponse response: HTTPURLResponse
     ) {
         #if os(macOS)
-            if #available(macOS 14.0, *) {
-                delegate?.urlSession?(session, task: task, didReceiveInformationalResponse: response)
-            }
+        if #available(macOS 14.0, *) {
+            delegate?.urlSession?(session, task: task, didReceiveInformationalResponse: response)
+        }
         #elseif os(iOS)
-            if #available(iOS 17.0, *) {
-               delegate?.urlSession?(session, task: task, didReceiveInformationalResponse: response)
-            }
+        if #available(iOS 17.0, *) {
+            delegate?.urlSession?(session, task: task, didReceiveInformationalResponse: response)
+        }
         #endif
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
         #if os(Linux)
-            delegate?.urlSession(session, task: task, didFinishCollecting: metrics)
+        delegate?.urlSession(session, task: task, didFinishCollecting: metrics)
         #else
-            delegate?.urlSession?(session, task: task, didFinishCollecting: metrics)
+        delegate?.urlSession?(session, task: task, didFinishCollecting: metrics)
         #endif
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
         #if os(Linux)
-            delegate?.urlSession(session, task: task, didCompleteWithError: error)
+        delegate?.urlSession(session, task: task, didCompleteWithError: error)
         #else
-            delegate?.urlSession?(session, task: task, didCompleteWithError: error)
+        delegate?.urlSession?(session, task: task, didCompleteWithError: error)
         #endif
     }
 
@@ -448,11 +466,20 @@ private final class RequestExecutorDelegate:
         completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
     ) {
         #if os(Linux)
-            (delegate as? URLSessionDataDelegate)?.urlSession(
-                session, dataTask: dataTask, didReceive: response, completionHandler: { _ in })
+        (delegate as? URLSessionDataDelegate)?
+            .urlSession(
+                session,
+                dataTask: dataTask,
+                didReceive: response,
+                completionHandler: { _ in }
+            )
         #else
-            (delegate as? URLSessionDataDelegate)?.urlSession?(
-                session, dataTask: dataTask, didReceive: response, completionHandler: { _ in })
+        (delegate as? URLSessionDataDelegate)?.urlSession?(
+            session,
+            dataTask: dataTask,
+            didReceive: response,
+            completionHandler: { _ in }
+        )
         #endif
 
         completionHandler(.allow)
@@ -460,9 +487,9 @@ private final class RequestExecutorDelegate:
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         #if os(Linux)
-            (delegate as? URLSessionDataDelegate)?.urlSession(session, dataTask: dataTask, didReceive: data)
+        (delegate as? URLSessionDataDelegate)?.urlSession(session, dataTask: dataTask, didReceive: data)
         #else
-            (delegate as? URLSessionDataDelegate)?.urlSession?(session, dataTask: dataTask, didReceive: data)
+        (delegate as? URLSessionDataDelegate)?.urlSession?(session, dataTask: dataTask, didReceive: data)
         #endif
     }
 }
@@ -571,9 +598,11 @@ extension WpMultipartFormRequest: NetworkRequestContent {
 
                 #if canImport(UniformTypeIdentifiers)
                 if mimeType == nil {
-                    mimeType = UTType(
-                        filenameExtension: URL(fileURLWithPath: file.filePath).pathExtension
-                    )?.preferredMIMEType
+                    mimeType =
+                        UTType(
+                            filenameExtension: URL(fileURLWithPath: file.filePath).pathExtension
+                        )?
+                        .preferredMIMEType
                 }
                 #endif
 
@@ -608,7 +637,8 @@ extension WpMultipartFormRequest: NetworkRequestContent {
         return try await withTaskCancellationHandler {
             let result: Result<(Data, URLResponse), Error> = await withCheckedContinuation { continuation in
                 let completion = completionHandler(continuation)
-                let task = switch body {
+                let task =
+                    switch body {
                     case let .inMemory(data):
                         session.uploadTask(with: request, from: data, completionHandler: completion)
                     case let .onDisk(file):
@@ -684,23 +714,24 @@ private func notifyTaskResult(
     if let task = task as? URLSessionDataTask, let delegate = delegate as? URLSessionDataDelegate {
         if case let .success((data, response)) = result {
             #if os(Linux)
-                delegate.urlSession(session, dataTask: task, didReceive: response, completionHandler: { _ in })
-                delegate.urlSession(session, dataTask: task, didReceive: data)
+            delegate.urlSession(session, dataTask: task, didReceive: response, completionHandler: { _ in })
+            delegate.urlSession(session, dataTask: task, didReceive: data)
             #else
-                delegate.urlSession?(session, dataTask: task, didReceive: response, completionHandler: { _ in })
-                delegate.urlSession?(session, dataTask: task, didReceive: data)
+            delegate.urlSession?(session, dataTask: task, didReceive: response, completionHandler: { _ in })
+            delegate.urlSession?(session, dataTask: task, didReceive: data)
             #endif
         }
     }
 
-    let error: Error? = if case let .failure(error) = result {
+    let error: Error? =
+        if case let .failure(error) = result {
             error
         } else {
             nil
         }
     #if os(Linux)
-        delegate?.urlSession(session, task: task, didCompleteWithError: error)
+    delegate?.urlSession(session, task: task, didCompleteWithError: error)
     #else
-        delegate?.urlSession?(session, task: task, didCompleteWithError: error)
+    delegate?.urlSession?(session, task: task, didCompleteWithError: error)
     #endif
 }

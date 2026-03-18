@@ -366,7 +366,8 @@ public final class SecureEnclavePasswordTransformer: PasswordTransformer {
         let sealedBox: AES.GCM.SealedBox
         do {
             sealedBox = try AES.GCM.seal(
-                Data(password.utf8), using: symmetricKey
+                Data(password.utf8),
+                using: symmetricKey
             )
         } catch {
             throw PasswordTransformerError.EncryptionFailed(

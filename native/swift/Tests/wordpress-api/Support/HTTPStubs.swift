@@ -64,11 +64,11 @@ final class HTTPStubs: SafeRequestExecutor {
         preconditionFailure("This method is not yet implemented")
     }
 
-#if PROGRESS_REPORTING_ENABLED
+    #if PROGRESS_REPORTING_ENABLED
     func progresses(for context: RequestContext) -> AnyPublisher<Progress, Never> {
         Record(output: [], completion: .finished).eraseToAnyPublisher()
     }
-#endif
+    #endif
 
     private func stub(for request: WpNetworkRequest) -> WpNetworkResponse? {
         stubs.first { stub in stub.condition(request) }?
@@ -121,9 +121,10 @@ extension WpNetworkResponse {
 
     static func jsonResponse(named name: String, statusCode: UInt16 = 200) throws -> WpNetworkResponse {
 
-        guard let resourceUrl = Bundle
-            .module
-            .url(forResource: name, withExtension: "json", subdirectory: "integration-test-responses")
+        guard
+            let resourceUrl = Bundle
+                .module
+                .url(forResource: name, withExtension: "json", subdirectory: "integration-test-responses")
         else {
             preconditionFailure("Could not find \(name).json")
         }
@@ -139,7 +140,7 @@ extension WpNetworkResponse {
     }
 
     static func retryResponse(after: TimeInterval) throws -> WpNetworkResponse {
-        return WpNetworkResponse(
+        WpNetworkResponse(
             body: Data(),
             statusCode: 429,
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Retry-After": String(Int(after))]),
@@ -150,7 +151,7 @@ extension WpNetworkResponse {
     }
 
     static func withApiRoot(_ url: String) throws -> WpNetworkResponse {
-        return WpNetworkResponse(
+        WpNetworkResponse(
             body: Data(),
             statusCode: 200,
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: [

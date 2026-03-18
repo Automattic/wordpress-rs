@@ -92,7 +92,8 @@ extension DiscoveredAuthenticationMechanism {
                 appId: application.id,
                 successUrl: application.successCallbackUrl,
                 rejectUrl: application.failureCallbackUrl
-            ).asURL()
+            )
+            .asURL()
         default: nil
         }
     }

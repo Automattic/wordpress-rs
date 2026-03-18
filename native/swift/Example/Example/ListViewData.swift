@@ -33,36 +33,56 @@ protocol ListViewDataConvertable {
 
 extension UserWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.email, fields: [
-            "First Name": self.firstName,
-            "Last Name": self.lastName,
-            "Email": self.email
-        ])
+        ListViewData(
+            id: "user-\(self.id)",
+            title: self.name,
+            subtitle: self.email,
+            fields: [
+                "First Name": self.firstName,
+                "Last Name": self.lastName,
+                "Email": self.email
+            ]
+        )
     }
 }
 
 extension UserWithViewContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.slug, fields: [
-            "Name": self.name
-        ])
+        ListViewData(
+            id: "user-\(self.id)",
+            title: self.name,
+            subtitle: self.slug,
+            fields: [
+                "Name": self.name
+            ]
+        )
     }
 }
 
 extension UserWithEmbedContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: "user-\(self.id)", title: self.name, subtitle: self.slug, fields: [
-            "Name": self.name
-        ])
+        ListViewData(
+            id: "user-\(self.id)",
+            title: self.name,
+            subtitle: self.slug,
+            fields: [
+                "Name": self.name
+            ]
+        )
     }
 }
 
 extension PluginWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.plugin.slug, title: self.name, subtitle: self.version, fields: [
-            "Author": self.author,
-            "Author URI": self.authorUri
-        ])
+        ListViewData(
+            id: self.plugin.slug,
+            title: self.name,
+            subtitle: self.version,
+            fields: [
+                "Author": self.author,
+                "Author URI": self.authorUri
+            ]
+        )
     }
 }
 
@@ -76,9 +96,14 @@ extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
     }
 
     var asListViewData: ListViewData {
-        ListViewData(id: self.uuid.uuid, title: self.name, subtitle: creationDateString, fields: [
-            "Created": creationDateString
-        ])
+        ListViewData(
+            id: self.uuid.uuid,
+            title: self.name,
+            subtitle: creationDateString,
+            fields: [
+                "Created": creationDateString
+            ]
+        )
     }
 }
 
@@ -98,7 +123,8 @@ extension SiteHealthDirectorySizes: ListViewDataConvertable {
             self.totalSize.size,
             self.uploadsSize.size,
             self.wordpressSize.size
-        ].joined(separator: "-")
+        ]
+        .joined(separator: "-")
     }
 
     var asListViewData: ListViewData {
@@ -121,20 +147,30 @@ extension SiteHealthDirectorySizes: ListViewDataConvertable {
 
 extension PostTypeDetailsWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [
-            "REST Base": self.restBase,
-            "Show in Nav": self.visibility.showInNavMenus.description
-        ])
+        ListViewData(
+            id: self.slug,
+            title: self.name,
+            subtitle: self.slug,
+            fields: [
+                "REST Base": self.restBase,
+                "Show in Nav": self.visibility.showInNavMenus.description
+            ]
+        )
     }
 }
 
 extension TaxonomyTypeDetailsWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.slug, title: self.name, subtitle: self.restBase, fields: [
-            "REST Base": self.restBase,
-            "Show in Nav": self.visibility.showInNavMenus.description
+        ListViewData(
+            id: self.slug,
+            title: self.name,
+            subtitle: self.restBase,
+            fields: [
+                "REST Base": self.restBase,
+                "Show in Nav": self.visibility.showInNavMenus.description
 
-        ])
+            ]
+        )
     }
 }
 
@@ -152,7 +188,8 @@ extension SiteSettingsWithEditContext {
             "Timezone": self.timezone,
             "Title": self.title,
             "URL": self.url
-        ].map { key, value in
+        ]
+        .map { key, value in
             ListViewData(id: key, title: key, subtitle: value, fields: [:])
         }
     }
@@ -172,10 +209,15 @@ extension AnyPostRevisionWithEditContext: ListViewDataConvertable {
 
 extension AnyTermWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        ListViewData(id: self.slug, title: self.name, subtitle: self.slug, fields: [
-            "Count": "\(self.count)",
-            "Description": self.description
-        ])
+        ListViewData(
+            id: self.slug,
+            title: self.name,
+            subtitle: self.slug,
+            fields: [
+                "Count": "\(self.count)",
+                "Description": self.description
+            ]
+        )
     }
 }
 
@@ -199,7 +241,7 @@ extension PostStatusWithEditContext: ListViewDataConvertable {
 
 extension NavigationWithEditContext: ListViewDataConvertable {
     var asListViewData: ListViewData {
-        return ListViewData(id: self.id.description, title: self.title.rendered, subtitle: self.slug, fields: [:])
+        ListViewData(id: self.id.description, title: self.title.rendered, subtitle: self.slug, fields: [:])
     }
 }
 
