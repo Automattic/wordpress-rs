@@ -23,6 +23,7 @@ pub mod stats_region_views;
 pub mod stats_search_terms;
 pub mod stats_subscribers;
 pub mod stats_summary;
+pub mod stats_tags;
 pub mod stats_top_authors;
 pub mod stats_top_posts;
 pub mod stats_video_plays;
