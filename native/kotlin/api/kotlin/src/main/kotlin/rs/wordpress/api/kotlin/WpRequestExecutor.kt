@@ -10,6 +10,7 @@ import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttp
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -30,10 +31,13 @@ import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLException
 import javax.net.ssl.SSLPeerUnverifiedException
 
 const val USER_AGENT_HEADER_NAME = "User-Agent"
+private const val HTTP_PROBE_TIMEOUT_MS = 5000
+private const val DEFAULT_HTTPS_PORT = 443
+private const val DEFAULT_HTTP_PORT = 80
 
 /**
  * Provides network availability information to [WpRequestExecutor].
@@ -210,6 +214,10 @@ class WpRequestExecutor @JvmOverloads constructor(
                 requestUrl,
                 requestMethod,
             )
+        } catch (e: SSLException) {
+            throw requestExecutionFailedWith(
+                RequestExecutionErrorReason.sslException(e, urlRequest.url)
+            )
         } catch (e: UnknownHostException) {
             throw requestExecutionFailedWith(
                 RequestExecutionErrorReason.unknownHost(e, networkAvailabilityProvider),
@@ -223,10 +231,16 @@ class WpRequestExecutor @JvmOverloads constructor(
                 requestMethod,
             )
         } catch (e: ConnectException) {
+            val cause = e.cause
+            if (cause is SSLException) {
+                throw requestExecutionFailedWith(
+                    RequestExecutionErrorReason.sslException(cause, urlRequest.url),
+                    requestUrl,
+                    requestMethod,
+                )
+            }
             throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.HttpError(
-                    reason = "Connection failed: ${e.localizedMessage}"
-                ),
+                RequestExecutionErrorReason.connectException(e, urlRequest.url),
                 requestUrl,
                 requestMethod,
             )
@@ -323,6 +337,88 @@ private fun RequestExecutionErrorReason.Companion.noRouteToHost(e: NoRouteToHost
     )
 
 @Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
+private fun RequestExecutionErrorReason.Companion.connectException(
+    e: ConnectException, // To avoid `SwallowedException` from Detekt
+    requestUrl: HttpUrl
+): RequestExecutionErrorReason {
+    // Connection was refused. If the original URL was HTTPS, check whether the site
+    // is reachable via HTTP — if so, the site doesn't support HTTPS.
+    if (requestUrl.scheme != "https") {
+        return RequestExecutionErrorReason.HttpError(
+            reason = "Connection failed: ${e.localizedMessage}"
+        )
+    }
+    return try {
+        // If the original URL used the default HTTPS port (443), probe on the default
+        // HTTP port (80). Otherwise, keep the custom port and just change the scheme.
+        val httpUrlBuilder = requestUrl.newBuilder().scheme("http")
+        if (requestUrl.port == DEFAULT_HTTPS_PORT) {
+            httpUrlBuilder.port(DEFAULT_HTTP_PORT)
+        }
+        val httpUrl = httpUrlBuilder.build()
+        val probeClient = OkHttpClient.Builder()
+            .connectTimeout(HTTP_PROBE_TIMEOUT_MS.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .readTimeout(HTTP_PROBE_TIMEOUT_MS.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+        val request = Request.Builder().url(httpUrl).head().build()
+        probeClient.newCall(request).execute().close()
+        // Site responded over HTTP — it just doesn't support HTTPS
+        RequestExecutionErrorReason.HttpsNotSupportedError
+    } catch (ex: Exception) {
+        // HTTP also failed — site is genuinely unreachable
+        RequestExecutionErrorReason.HttpError(
+            reason = "Connection failed: ${e.localizedMessage}"
+        )
+    }
+}
+
+@Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
+private fun RequestExecutionErrorReason.Companion.sslException(
+    e: SSLException, // To avoid `SwallowedException` from Detekt
+    requestUrl: HttpUrl
+): RequestExecutionErrorReason {
+    // Try to re-connect with relaxed TLS settings to inspect the server's certificate.
+    // If this also fails, the server likely doesn't support HTTPS at all.
+    return try {
+        val trustAllManager = object : javax.net.ssl.X509TrustManager {
+            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+        }
+        val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
+        sslContext.init(null, arrayOf(trustAllManager), null)
+
+        val probeClient = OkHttpClient.Builder()
+            .sslSocketFactory(sslContext.socketFactory, trustAllManager)
+            .hostnameVerifier(javax.net.ssl.HostnameVerifier { _, _ -> true })
+            .connectTimeout(HTTP_PROBE_TIMEOUT_MS.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .readTimeout(HTTP_PROBE_TIMEOUT_MS.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+        val request = Request.Builder().url(requestUrl).head().build()
+        val response = probeClient.newCall(request).execute()
+        try {
+            val handshake = response.handshake
+            if (handshake == null) {
+                RequestExecutionErrorReason.HttpsNotSupportedError
+            } else {
+                val certificates = handshake.peerCertificates.map { cert -> parseCertificate(cert.encoded) }
+                RequestExecutionErrorReason.InvalidSslError(
+                    reason = InvalidSslErrorReason.CertificateNotValidForName(
+                        hostname = requestUrl.host,
+                        presentedHostnames = listOfNotNull(certificates.first()?.commonName())
+                    )
+                )
+            }
+        } finally {
+            response.close()
+        }
+    } catch (ex: Exception) {
+        // Re-connection also failed — server doesn't support HTTPS
+        RequestExecutionErrorReason.HttpsNotSupportedError
+    }
+}
+
+@Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
 private fun RequestExecutionErrorReason.Companion.invalidSSLError(
     e: SSLPeerUnverifiedException, // To avoid `SwallowedException` from Detekt
     requestUrl: HttpUrl
@@ -334,21 +430,43 @@ private fun RequestExecutionErrorReason.Companion.invalidSSLError(
     // We spin up a new connection that'll accept any certificate. The connection will then
     // contain all the details we need for the error.
     return try {
-        val newConnection = requestUrl.toUrl().openConnection() as HttpsURLConnection
-        newConnection.setHostnameVerifier { _, _ -> true }
-        newConnection.connect()
+        val trustAllManager = object : javax.net.ssl.X509TrustManager {
+            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+        }
+        val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
+        sslContext.init(null, arrayOf(trustAllManager), null)
 
+        val probeClient = OkHttpClient.Builder()
+            .sslSocketFactory(sslContext.socketFactory, trustAllManager)
+            .hostnameVerifier(javax.net.ssl.HostnameVerifier { _, _ -> true })
+            .connectTimeout(HTTP_PROBE_TIMEOUT_MS.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .readTimeout(HTTP_PROBE_TIMEOUT_MS.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+        val request = Request.Builder().url(requestUrl).head().build()
+        val response = probeClient.newCall(request).execute()
         try {
             // Certificate is parsed by the Rust shared implementation.
-            val certificates = newConnection.serverCertificates.map { parseCertificate(it.encoded) }
-            RequestExecutionErrorReason.InvalidSslError(
-                reason = InvalidSslErrorReason.CertificateNotValidForName(
-                    hostname = requestUrl.host,
-                    presentedHostnames = listOfNotNull(certificates.first()?.commonName())
+            val handshake = response.handshake
+            if (handshake != null) {
+                val certificates = handshake.peerCertificates.map { cert -> parseCertificate(cert.encoded) }
+                RequestExecutionErrorReason.InvalidSslError(
+                    reason = InvalidSslErrorReason.CertificateNotValidForName(
+                        hostname = requestUrl.host,
+                        presentedHostnames = listOfNotNull(certificates.first()?.commonName())
+                    )
                 )
-            )
+            } else {
+                RequestExecutionErrorReason.InvalidSslError(
+                    reason = InvalidSslErrorReason.CertificateNotValidForName(
+                        hostname = requestUrl.host,
+                        presentedHostnames = emptyList()
+                    )
+                )
+            }
         } finally {
-            newConnection.disconnect()
+            response.close()
         }
     } catch (ex: Exception) {
         // Fallback if certificate inspection fails due to network issues, cast failures, etc.

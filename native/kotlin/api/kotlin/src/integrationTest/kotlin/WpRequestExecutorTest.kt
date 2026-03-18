@@ -12,6 +12,7 @@ import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpAuthenticationProvider
 import java.net.URI
+import java.net.URL
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertIs
 
@@ -66,4 +67,44 @@ class WpRequestExecutorTest {
             (result as WpRequestResult.RequestExecutionFailed<*>).reason
         )
     }
+
+    @Test
+    fun `connecting via HTTPS to an HTTP-only server is mapped to HttpsNotSupportedError`() = runTest {
+        // Start MockWebServer on a specific port and connect via HTTPS.
+        // MockWebServer speaks plain HTTP, so the TLS handshake will fail,
+        // which is the exact scenario we want to detect.
+        val httpOnlyServer = MockWebServer()
+        httpOnlyServer.start()
+        httpOnlyServer.enqueue(MockResponse().setBody("Hello"))
+
+        val httpsUrl = URL("https://127.0.0.1:${httpOnlyServer.port}/wp-json")
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(
+                OkHttpClient.Builder()
+                    .connectTimeout(5, TimeUnit.SECONDS)
+                    .readTimeout(5, TimeUnit.SECONDS)
+                    .build()
+            )
+        )
+
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = httpsUrl,
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        httpOnlyServer.shutdown()
+
+        assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+        assertIs<RequestExecutionErrorReason.HttpsNotSupportedError>(
+            (result as WpRequestResult.RequestExecutionFailed<*>).reason
+        )
+    }
+
+
 }
