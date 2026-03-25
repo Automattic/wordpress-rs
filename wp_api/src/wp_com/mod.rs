@@ -11,6 +11,7 @@ pub mod jetpack_connection;
 pub mod language;
 pub mod me;
 pub mod oauth2;
+pub mod publicize;
 pub mod segments;
 pub mod sites;
 pub mod stats_city_views;
