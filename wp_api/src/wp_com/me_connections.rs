@@ -121,10 +121,7 @@ mod tests {
             page.external_description,
             Some("A test Facebook page".to_string())
         );
-        assert_eq!(
-            page.external_category,
-            Some("Internet company".to_string())
-        );
+        assert_eq!(page.external_category, Some("Internet company".to_string()));
 
         let page2 = &facebook.additional_external_users[1];
         assert_eq!(page2.external_profile_picture, None);
@@ -139,7 +136,10 @@ mod tests {
             serde_json::from_str(json).expect("Failed to deserialize single connection");
         assert_eq!(connection.id, 98765);
         assert_eq!(connection.service, "mastodon");
-        assert_eq!(connection.refresh_url, "https://public-api.wordpress.com/connect/?action=request&service=mastodon");
+        assert_eq!(
+            connection.refresh_url,
+            "https://public-api.wordpress.com/connect/?action=request&service=mastodon"
+        );
     }
 
     #[test]

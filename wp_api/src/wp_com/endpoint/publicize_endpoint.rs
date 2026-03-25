@@ -3,9 +3,8 @@ use crate::{
     wp_com::{
         WpComNamespace, WpComSiteId,
         publicize::{
-            CreatePublicizeConnectionParams, PublicizeConnectionId,
-            PublicizeConnectionResponse, PublicizeServiceResponse,
-            UpdatePublicizeConnectionParams,
+            CreatePublicizeConnectionParams, PublicizeConnectionId, PublicizeConnectionResponse,
+            PublicizeServiceResponse, UpdatePublicizeConnectionParams,
         },
     },
 };

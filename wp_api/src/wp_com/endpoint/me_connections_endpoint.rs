@@ -1,10 +1,10 @@
 use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
+    wp_com::WpComNamespace,
     wp_com::me_connections::{
         KeyringConnectionDeleteResponse, KeyringConnectionResponse, KeyringTokenId,
         MeConnectionsResponse,
     },
-    wp_com::WpComNamespace,
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
