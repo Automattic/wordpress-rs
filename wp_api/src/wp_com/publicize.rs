@@ -1,4 +1,17 @@
+use crate::impl_as_query_value_for_new_type;
 use serde::{Deserialize, Serialize};
+
+impl_as_query_value_for_new_type!(PublicizeConnectionId);
+uniffi::custom_newtype!(PublicizeConnectionId, String);
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PublicizeConnectionId(pub String);
+
+impl std::fmt::Display for PublicizeConnectionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// A social media connection from the site-level publicize connections endpoint.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
@@ -36,6 +49,28 @@ pub struct PublicizeServiceResponse {
 pub struct PublicizeServiceSupports {
     pub additional_users: bool,
     pub additional_users_only: bool,
+}
+
+/// Parameters for creating a new publicize connection.
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct CreatePublicizeConnectionParams {
+    #[serde(rename = "keyring_connection_ID")]
+    pub keyring_connection_id: i64,
+    #[serde(rename = "external_user_ID")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_user_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shared: Option<bool>,
+}
+
+/// Parameters for updating an existing publicize connection.
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct UpdatePublicizeConnectionParams {
+    #[serde(rename = "external_user_ID")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_user_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shared: Option<bool>,
 }
 
 #[cfg(test)]
@@ -83,5 +118,31 @@ mod tests {
         let services: Vec<PublicizeServiceResponse> =
             serde_json::from_str("[]").expect("Failed to deserialize empty services");
         assert!(services.is_empty());
+    }
+
+    #[test]
+    fn test_serialize_create_connection_params() {
+        let params = CreatePublicizeConnectionParams {
+            keyring_connection_id: 12345,
+            external_user_id: Some("67890".to_string()),
+            shared: Some(true),
+        };
+        let json = serde_json::to_value(&params).expect("Failed to serialize");
+        assert_eq!(json["keyring_connection_ID"], 12345);
+        assert_eq!(json["external_user_ID"], "67890");
+        assert_eq!(json["shared"], true);
+    }
+
+    #[test]
+    fn test_serialize_create_connection_params_minimal() {
+        let params = CreatePublicizeConnectionParams {
+            keyring_connection_id: 12345,
+            external_user_id: None,
+            shared: None,
+        };
+        let json = serde_json::to_value(&params).expect("Failed to serialize");
+        assert_eq!(json["keyring_connection_ID"], 12345);
+        assert!(json.get("external_user_ID").is_none());
+        assert!(json.get("shared").is_none());
     }
 }
