@@ -21,13 +21,13 @@ impl std::fmt::Display for KeyringTokenId {
 }
 
 /// Envelope for the list endpoint: `{ "connections": [...] }`.
-#[derive(Debug, Deserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct MeConnectionsResponse {
     pub connections: Vec<KeyringConnectionResponse>,
 }
 
 /// A keyring connection (OAuth token for a third-party service).
-#[derive(Debug, Deserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct KeyringConnectionResponse {
     #[serde(rename = "ID")]
     pub id: i64,
@@ -49,7 +49,7 @@ pub struct KeyringConnectionResponse {
 }
 
 /// An alternative account available on the same keyring connection.
-#[derive(Debug, Deserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct KeyringExternalUser {
     #[serde(rename = "external_ID")]
     pub external_id: String,
@@ -60,7 +60,7 @@ pub struct KeyringExternalUser {
 }
 
 /// Response from `DELETE /me/connections/{token_id}`.
-#[derive(Debug, Deserialize, uniffi::Record)]
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct KeyringConnectionDeleteResponse {
     #[serde(rename = "ID")]
     pub id: i64,

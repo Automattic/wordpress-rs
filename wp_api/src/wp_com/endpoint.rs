@@ -11,6 +11,7 @@ pub mod extensions;
 pub mod followers_endpoint;
 pub mod jetpack_connection_endpoint;
 pub mod languages_endpoint;
+pub mod me_connections_endpoint;
 pub mod me_endpoint;
 pub mod oauth2;
 pub mod publicize_endpoint;
