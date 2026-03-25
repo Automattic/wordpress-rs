@@ -2,10 +2,11 @@ use macro_helper::{
     generate_update_post_format_test, generate_update_post_status_test, generate_update_test,
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 use wp_api::AnyJson;
 use wp_api::posts::{
-    AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostFormat,
-    PostListParams, PostMeta, PostPingStatus, PostStatus, PostUpdateParams,
+    AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFormat, PostListParams,
+    PostMeta, PostPingStatus, PostStatus, PostUpdateParams,
 };
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api::terms::TermId;
@@ -37,17 +38,17 @@ async fn create_post_with_title_and_meta() {
     test_create_post(
         &PostCreateParams {
             title: Some("foo".to_string()),
-            meta: Some(PostMeta {
-                footnotes: Some(vec![PostFootnote {
-                    id: "bar".to_string(),
-                    content: "baz".to_string(),
-                }]),
-            }),
+            meta: Some(Arc::new(
+                serde_json::from_str::<PostMeta>(
+                    r#"{"footnotes": "[{\"id\":\"bar\",\"content\":\"baz\"}]"}"#,
+                )
+                .unwrap(),
+            )),
             ..Default::default()
         },
         |created_post, post_from_wp_cli| {
             let meta = created_post.meta.unwrap();
-            let footnotes = meta.footnotes.unwrap();
+            let footnotes = meta.footnotes().unwrap();
             let footnote = footnotes.first().unwrap();
             assert_eq!(
                 created_post.title.and_then(|t| t.raw),
@@ -328,15 +329,15 @@ generate_update_test!(
 generate_update_test!(
     update_meta_to_add_footnote,
     meta,
-    PostMeta {
-        footnotes: Some(vec![PostFootnote {
-            id: "foo".to_string(),
-            content: "bar".to_string()
-        }])
-    },
+    Arc::new(
+        serde_json::from_str::<PostMeta>(
+            r#"{"footnotes": "[{\"id\":\"foo\",\"content\":\"bar\"}]"}"#
+        )
+        .unwrap()
+    ),
     |updated_post, _| {
         let meta = updated_post.meta.unwrap();
-        let footnotes = meta.footnotes.unwrap();
+        let footnotes = meta.footnotes().unwrap();
         let footnote = footnotes.first().unwrap();
         assert_eq!(footnote.id, "foo");
         assert_eq!(footnote.content, "bar");

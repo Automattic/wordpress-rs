@@ -26,8 +26,8 @@ use wp_api::{
     posts::{
         AnyPostWithEditContext, AnyPostWithEmbedContext, AnyPostWithViewContext,
         PostContentWithEditContext, PostContentWithViewContext, PostGuidWithEditContext,
-        PostGuidWithViewContext, PostId, PostTitleWithEditContext, PostTitleWithEmbedContext,
-        PostTitleWithViewContext, SparsePostExcerpt,
+        PostGuidWithViewContext, PostId, PostMeta, PostTitleWithEditContext,
+        PostTitleWithEmbedContext, PostTitleWithViewContext, SparsePostExcerpt,
     },
     prelude::WpGmtDateTime,
     taxonomies::TaxonomyType,
@@ -507,7 +507,7 @@ impl PostContext for EditContext {
             comment_status: parse_optional_enum(row, CommentStatus)?,
             ping_status: parse_optional_enum(row, PingStatus)?,
             format: parse_optional_enum(row, Format)?,
-            meta: deserialize_json_value(row.get_column(Meta)?)?,
+            meta: deserialize_json_value::<PostMeta>(row.get_column(Meta)?)?.map(Arc::new),
             sticky: integer_to_bool(row.get_column(Sticky)?),
             template: row.get_column(Template)?,
             categories: if categories.is_empty() {
@@ -596,7 +596,7 @@ impl PostContext for ViewContext {
             comment_status: parse_optional_enum(row, CommentStatus)?,
             ping_status: parse_optional_enum(row, PingStatus)?,
             format: parse_optional_enum(row, Format)?,
-            meta: deserialize_json_value(row.get_column(Meta)?)?,
+            meta: deserialize_json_value::<PostMeta>(row.get_column(Meta)?)?.map(Arc::new),
             sticky: integer_to_bool(row.get_column(Sticky)?),
             template: row.get_column(Template)?,
             categories: if categories.is_empty() {

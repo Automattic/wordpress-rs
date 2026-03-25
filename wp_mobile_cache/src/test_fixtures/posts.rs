@@ -1,9 +1,10 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 use wp_api::{
     media::MediaId,
     posts::{
-        AnyPostWithEditContext, PostContentWithEditContext, PostFootnote, PostGuidWithEditContext,
-        PostId, PostMeta, PostStatus, PostTitleWithEditContext, SparsePostExcerpt,
+        AnyPostWithEditContext, PostContentWithEditContext, PostGuidWithEditContext, PostId,
+        PostMeta, PostStatus, PostTitleWithEditContext, SparsePostExcerpt,
     },
     terms::TermId,
     users::UserId,
@@ -257,18 +258,12 @@ fn create_full_post() -> AnyPostWithEditContext {
         comment_status: Some(wp_api::posts::PostCommentStatus::Open),
         ping_status: Some(wp_api::posts::PostPingStatus::Closed),
         format: Some(wp_api::posts::PostFormat::Standard),
-        meta: Some(PostMeta {
-            footnotes: Some(vec![
-                PostFootnote {
-                    id: "fn1".to_string(),
-                    content: "Footnote 1".to_string(),
-                },
-                PostFootnote {
-                    id: "fn2".to_string(),
-                    content: "Footnote 2".to_string(),
-                },
-            ]),
-        }),
+        meta: Some(Arc::new(
+            serde_json::from_str::<PostMeta>(
+                r#"{"footnotes": "[{\"id\":\"fn1\",\"content\":\"Footnote 1\"},{\"id\":\"fn2\",\"content\":\"Footnote 2\"}]"}"#,
+            )
+            .unwrap(),
+        )),
         sticky: Some(true),
         template: "custom-template.php".to_string(),
         categories: Some(vec![TermId(1), TermId(2), TermId(3)]),

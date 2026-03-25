@@ -200,6 +200,15 @@ impl AnyJson {
         self.raw.get(key).map(JsonValue::from)
     }
 
+    /// Creates an AnyJson from a raw JSON string.
+    /// Returns an empty JSON object if the string is not valid JSON.
+    #[uniffi::constructor]
+    pub fn from_raw_json(json: String) -> std::sync::Arc<Self> {
+        let raw =
+            serde_json::from_str::<Value>(&json).unwrap_or(Value::Object(serde_json::Map::new()));
+        std::sync::Arc::new(AnyJson { raw })
+    }
+
     /// Creates an AnyJson from a map of keys to term ID arrays.
     /// Used to construct the additional_fields for PostCreateParams
     /// and PostUpdateParams with custom taxonomy term IDs.
@@ -215,6 +224,29 @@ impl AnyJson {
         }
         std::sync::Arc::new(AnyJson {
             raw: Value::Object(json_map),
+        })
+    }
+
+    /// Insert or update a key in the raw JSON object.
+    /// The `value` parameter is a JSON-encoded string that is parsed before insertion.
+    /// If `value` is not valid JSON, `Value::Null` is inserted.
+    pub fn upsert(&self, key: String, value: String) -> std::sync::Arc<Self> {
+        let mut obj = match &self.raw {
+            Value::Object(map) => map.clone(),
+            _ => serde_json::Map::new(),
+        };
+        let parsed = serde_json::from_str(&value).unwrap_or(Value::Null);
+        obj.insert(key, parsed);
+        std::sync::Arc::new(AnyJson {
+            raw: Value::Object(obj),
+        })
+    }
+
+    /// Create an empty AnyJson object.
+    #[uniffi::constructor]
+    pub fn empty() -> std::sync::Arc<Self> {
+        std::sync::Arc::new(AnyJson {
+            raw: Value::Object(serde_json::Map::new()),
         })
     }
 }
@@ -468,5 +500,49 @@ mod tests {
                 )]))
             )]))
         );
+    }
+
+    #[test]
+    fn test_any_json_empty() {
+        let json = AnyJson::empty();
+        assert_eq!(json.raw, Value::Object(serde_json::Map::new()));
+    }
+
+    #[test]
+    fn test_any_json_upsert_into_empty() {
+        let json = AnyJson::empty();
+        let updated = json.upsert("key".to_string(), r#""value""#.to_string());
+        assert_eq!(
+            updated.raw.get("key"),
+            Some(&Value::String("value".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_any_json_upsert_preserves_existing_keys() {
+        let json = AnyJson::from_raw_json(r#"{"existing": 42}"#.to_string());
+        let updated = json.upsert("new_key".to_string(), r#""new_value""#.to_string());
+        assert_eq!(updated.raw.get("existing"), Some(&Value::Number(42.into())));
+        assert_eq!(
+            updated.raw.get("new_key"),
+            Some(&Value::String("new_value".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_any_json_upsert_replaces_existing_key() {
+        let json = AnyJson::from_raw_json(r#"{"key": "old"}"#.to_string());
+        let updated = json.upsert("key".to_string(), r#""new""#.to_string());
+        assert_eq!(
+            updated.raw.get("key"),
+            Some(&Value::String("new".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_any_json_upsert_with_invalid_json_inserts_null() {
+        let json = AnyJson::empty();
+        let updated = json.upsert("key".to_string(), "not valid json {".to_string());
+        assert_eq!(updated.raw.get("key"), Some(&Value::Null));
     }
 }

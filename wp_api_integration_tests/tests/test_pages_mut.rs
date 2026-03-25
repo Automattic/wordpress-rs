@@ -1,7 +1,8 @@
 use macro_helper::{generate_update_page_status_test, generate_update_test};
+use std::sync::Arc;
 use wp_api::posts::{
-    AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostMeta,
-    PostPingStatus, PostStatus, PostUpdateParams,
+    AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostMeta, PostPingStatus,
+    PostStatus, PostUpdateParams,
 };
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api_integration_tests::{PAGE_TEMPLATE_WITH_SIDEBAR, prelude::*};
@@ -32,17 +33,17 @@ async fn create_page_with_title_and_meta() {
     test_create_page(
         &PostCreateParams {
             title: Some("foo".to_string()),
-            meta: Some(PostMeta {
-                footnotes: Some(vec![PostFootnote {
-                    id: "bar".to_string(),
-                    content: "baz".to_string(),
-                }]),
-            }),
+            meta: Some(Arc::new(
+                serde_json::from_str::<PostMeta>(
+                    r#"{"footnotes": "[{\"id\":\"bar\",\"content\":\"baz\"}]"}"#,
+                )
+                .unwrap(),
+            )),
             ..Default::default()
         },
         |created_page, page_from_wp_cli| {
             let meta = created_page.meta.unwrap();
-            let footnotes = meta.footnotes.unwrap();
+            let footnotes = meta.footnotes().unwrap();
             let footnote = footnotes.first().unwrap();
             assert_eq!(
                 created_page.title.and_then(|t| t.raw),
@@ -357,15 +358,15 @@ generate_update_test!(
 generate_update_test!(
     update_meta_to_add_footnote,
     meta,
-    PostMeta {
-        footnotes: Some(vec![PostFootnote {
-            id: "foo".to_string(),
-            content: "bar".to_string()
-        }])
-    },
+    Arc::new(
+        serde_json::from_str::<PostMeta>(
+            r#"{"footnotes": "[{\"id\":\"foo\",\"content\":\"bar\"}]"}"#
+        )
+        .unwrap()
+    ),
     |updated_page, _| {
         let meta = updated_page.meta.unwrap();
-        let footnotes = meta.footnotes.unwrap();
+        let footnotes = meta.footnotes().unwrap();
         let footnote = footnotes.first().unwrap();
         assert_eq!(footnote.id, "foo");
         assert_eq!(footnote.content, "bar");

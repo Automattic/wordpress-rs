@@ -10,10 +10,10 @@ use crate::{
     wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
 use wp_contextual::WpContextual;
-use wp_derive::{WpDeriveParamsField, WpDeserialize};
-use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
+use wp_derive::WpDeriveParamsField;
 
 #[derive(
     Debug,
@@ -239,7 +239,9 @@ pub struct PostCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<PostFormat>,
     // Meta fields.
-    pub meta: Option<PostMeta>,
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Arc<PostMeta>>,
     // Whether or not the post should be treated as sticky.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -331,7 +333,9 @@ pub struct PostUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<PostFormat>,
     // Meta fields.
-    pub meta: Option<PostMeta>,
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Arc<PostMeta>>,
     // Whether or not the post should be treated as sticky.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -425,7 +429,7 @@ pub struct SparseAnyPost {
     pub format: Option<PostFormat>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
-    pub meta: Option<PostMeta>,
+    pub meta: Option<Arc<PostMeta>>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
     pub sticky: Option<bool>,
@@ -493,12 +497,55 @@ pub struct SparsePostExcerpt {
     pub protected: Option<bool>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, WpDeserialize, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, uniffi::Object)]
+#[uniffi::export(Eq, Hash)]
 pub struct PostMeta {
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_from_string_of_json_array")]
-    #[serde(serialize_with = "serialize_as_json_string")]
-    pub footnotes: Option<Vec<PostFootnote>>,
+    #[serde(flatten)]
+    raw: Value,
+}
+
+impl PostMeta {
+    /// Access a raw JSON value by key. Crate-internal helper for
+    /// jetpack/social.rs and other modules that need to read meta fields.
+    pub(crate) fn raw_value(&self, key: &str) -> Option<&Value> {
+        self.raw.get(key)
+    }
+}
+
+#[uniffi::export]
+impl PostMeta {
+    /// Parse footnotes from the raw meta JSON.
+    /// WordPress stores footnotes as a double-encoded JSON string
+    /// (the array is JSON-encoded as a string value).
+    pub fn footnotes(&self) -> Option<Vec<PostFootnote>> {
+        match self.raw.get("footnotes") {
+            Some(Value::String(s)) if !s.is_empty() => serde_json::from_str(s).ok(),
+            _ => None,
+        }
+    }
+
+    /// Insert or update a key in the raw JSON object.
+    /// The `value` parameter is a JSON-encoded string that is parsed before insertion.
+    /// If `value` is not valid JSON, `Value::Null` is inserted.
+    pub fn upsert(&self, key: String, value: String) -> Arc<PostMeta> {
+        let mut obj = match &self.raw {
+            Value::Object(map) => map.clone(),
+            _ => serde_json::Map::new(),
+        };
+        let parsed = serde_json::from_str(&value).unwrap_or(Value::Null);
+        obj.insert(key, parsed);
+        Arc::new(PostMeta {
+            raw: Value::Object(obj),
+        })
+    }
+
+    /// Create an empty PostMeta.
+    #[uniffi::constructor]
+    pub fn empty() -> Arc<PostMeta> {
+        Arc::new(PostMeta {
+            raw: Value::Object(serde_json::Map::new()),
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
@@ -756,18 +803,63 @@ mod tests {
     #[case(r#"{"other": "values"}"#)]
     fn test_meta_without_footnotes(#[case] json_data: &str) {
         let meta: PostMeta = serde_json::from_str(json_data).unwrap();
-        assert_eq!(meta.footnotes, None);
+        assert_eq!(meta.footnotes(), None);
     }
 
     #[test]
     fn test_meta_footnotes() {
         let json_data = r#"{"footnotes": "[{\"content\":\"some_content\",\"id\":\"some_id\"}]"}"#;
         let meta: PostMeta = serde_json::from_str(json_data).unwrap();
-        let footnotes = meta.footnotes.unwrap();
+        let footnotes = meta.footnotes().unwrap();
 
         assert_eq!(footnotes.len(), 1);
         assert_eq!(footnotes[0].id, "some_id");
         assert_eq!(footnotes[0].content, "some_content");
+    }
+
+    #[test]
+    fn test_meta_preserves_unknown_keys() {
+        let json_data = r#"{"footnotes": "", "jetpack_publicize_message": "Hello", "other": 42}"#;
+        let meta: PostMeta = serde_json::from_str(json_data).unwrap();
+        let serialized = serde_json::to_string(&meta).unwrap();
+        let round_tripped: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(
+            round_tripped.get("jetpack_publicize_message"),
+            Some(&serde_json::Value::String("Hello".to_string()))
+        );
+        assert_eq!(
+            round_tripped.get("other"),
+            Some(&serde_json::Value::Number(42.into()))
+        );
+    }
+
+    #[test]
+    fn test_meta_empty() {
+        let meta = PostMeta::empty();
+        assert_eq!(meta.footnotes(), None);
+    }
+
+    #[test]
+    fn test_meta_upsert_preserves_existing_keys() {
+        let json_data = r#"{"footnotes": "[{\"content\":\"c\",\"id\":\"i\"}]"}"#;
+        let meta: PostMeta = serde_json::from_str(json_data).unwrap();
+        let updated = meta.upsert("new_key".to_string(), r#""new_value""#.to_string());
+        assert!(updated.footnotes().is_some());
+        let serialized = serde_json::to_string(updated.as_ref()).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(
+            value.get("new_key"),
+            Some(&serde_json::Value::String("new_value".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_meta_round_trip_through_serialize() {
+        let json_data = r#"{"footnotes": "[{\"content\":\"c\",\"id\":\"i\"}]", "extra": true}"#;
+        let meta: PostMeta = serde_json::from_str(json_data).unwrap();
+        let serialized = serde_json::to_string(&meta).unwrap();
+        let meta2: PostMeta = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(meta.footnotes(), meta2.footnotes());
     }
 
     fn expected_query_pairs_for_post_list_params_with_all_fields() -> String {
