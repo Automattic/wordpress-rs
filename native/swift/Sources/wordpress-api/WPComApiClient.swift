@@ -103,4 +103,12 @@ public final class WPComApiClient: Sendable {
     public var statsVisits: StatsVisitsRequestExecutor {
         internalClient.statsVisits()
     }
+
+    public var publicize: PublicizeRequestExecutor {
+        internalClient.publicize()
+    }
+
+    public var meConnections: MeConnectionsRequestExecutor {
+        internalClient.meConnections()
+    }
 }
