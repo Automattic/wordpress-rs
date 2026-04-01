@@ -31,7 +31,8 @@
           "activate_plugins": true,
           "update_plugins": false,
           "export": true,
-          "import": true
+          "import": true,
+          "vc_access_rules_post_types": "custom"
         },
         "jetpack": false,
         "jetpack_connection": false,
