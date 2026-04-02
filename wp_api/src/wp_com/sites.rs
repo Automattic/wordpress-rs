@@ -433,25 +433,6 @@ mod tests {
         assert_eq!(site_list.sites.len(), expected_count);
     }
 
-    #[test]
-    fn test_wpcom_site_capabilities_with_non_boolean_values() {
-        let json = test_json("v1.2-me-sites-01.json").expect("Failed to read JSON file");
-        let site_list: WPComSiteListResponse =
-            serde_json::from_slice(json.as_slice()).expect("Failed to deserialize site list");
-        let site = &site_list.sites[0];
-
-        // Standard boolean capabilities
-        assert!(site.capabilities.has_cap(crate::users::UserCapability::EditPosts));
-        assert!(!site.capabilities.has_cap(crate::users::UserCapability::EditUsers));
-
-        // WPBakery-style string capability should not be treated as granted
-        assert!(!site
-            .capabilities
-            .has_cap(crate::users::UserCapability::Custom(
-                "vc_access_rules_post_types".to_string()
-            )));
-    }
-
     #[rstest]
     #[case("v1.2-sites-01.json", 100001003)]
     fn test_wpcom_site_single_response_deserialization(

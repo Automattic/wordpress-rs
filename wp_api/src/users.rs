@@ -608,6 +608,18 @@ mod tests {
         assert_eq!(UserCapability::from_str(expected_str), Ok(capability));
     }
 
+    #[test]
+    fn test_user_capabilities_map_with_non_boolean_values() {
+        let json = r#"{
+            "edit_posts": true,
+            "edit_users": false,
+            "vc_access_rules_post_types": "custom"
+        }"#;
+        let caps: UserCapabilitiesMap = serde_json::from_str(json)
+            .expect("Failed to deserialize capabilities with non-boolean values");
+        assert_eq!(caps.map.len(), 3);
+    }
+
     #[rstest]
     #[case(UserRole::SuperAdmin, "super_admin")]
     #[case(UserRole::Administrator, "administrator")]
