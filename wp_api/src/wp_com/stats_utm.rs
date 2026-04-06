@@ -70,9 +70,6 @@ pub struct StatsUtmParams {
     /// The start date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
     pub start_date: Option<String>,
-    /// A specific post ID to filter results.
-    #[uniffi(default = None)]
-    pub post_id: Option<String>,
     /// Whether to include top posts data in the response.
     #[uniffi(default = true)]
     pub query_top_posts: bool,
@@ -85,7 +82,6 @@ impl Default for StatsUtmParams {
             date: None,
             days: None,
             start_date: None,
-            post_id: None,
             query_top_posts: true,
         }
     }
@@ -98,7 +94,6 @@ impl AppendUrlQueryPairs for StatsUtmParams {
             .append_option_query_value_pair("date", self.date.as_ref())
             .append_option_query_value_pair("days", self.days.as_ref())
             .append_option_query_value_pair("start_date", self.start_date.as_ref())
-            .append_option_query_value_pair("post_id", self.post_id.as_ref())
             .append_query_value_pair("query_top_posts", &(self.query_top_posts as u32));
     }
 }
@@ -169,7 +164,6 @@ mod tests {
             date: Some("2026-03-24".to_string()),
             days: Some(365),
             start_date: Some("2026-03-24".to_string()),
-            post_id: None,
             query_top_posts: true,
         };
 
