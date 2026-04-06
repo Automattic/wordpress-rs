@@ -39,14 +39,23 @@ uniffi::custom_newtype!(StatsUtmKeys, String);
 pub struct StatsUtmKeys(pub String);
 
 impl StatsUtmKeys {
-    pub fn new(keys: &[StatsUtmKey]) -> Self {
-        Self(
+    pub fn new(keys: &[StatsUtmKey]) -> Result<Self, StatsUtmError> {
+        if keys.is_empty() {
+            return Err(StatsUtmError::EmptyUtmKeys);
+        }
+        Ok(Self(
             keys.iter()
                 .map(|k| k.to_string())
                 .collect::<Vec<_>>()
                 .join(","),
-        )
+        ))
     }
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error)]
+pub enum StatsUtmError {
+    #[error("At least one UTM key must be provided")]
+    EmptyUtmKeys,
 }
 
 impl std::fmt::Display for StatsUtmKeys {
@@ -132,13 +141,13 @@ mod tests {
 
     #[test]
     fn test_stats_utm_keys_single() {
-        let keys = StatsUtmKeys::new(&[StatsUtmKey::UtmSource]);
+        let keys = StatsUtmKeys::new(&[StatsUtmKey::UtmSource]).unwrap();
         assert_eq!(keys.to_string(), "utm_source");
     }
 
     #[test]
     fn test_stats_utm_keys_multiple() {
-        let keys = StatsUtmKeys::new(&[StatsUtmKey::UtmSource, StatsUtmKey::UtmMedium]);
+        let keys = StatsUtmKeys::new(&[StatsUtmKey::UtmSource, StatsUtmKey::UtmMedium]).unwrap();
         assert_eq!(keys.to_string(), "utm_source,utm_medium");
     }
 
@@ -148,8 +157,15 @@ mod tests {
             StatsUtmKey::UtmCampaign,
             StatsUtmKey::UtmSource,
             StatsUtmKey::UtmMedium,
-        ]);
+        ])
+        .unwrap();
         assert_eq!(keys.to_string(), "utm_campaign,utm_source,utm_medium");
+    }
+
+    #[test]
+    fn test_stats_utm_keys_empty() {
+        let result = StatsUtmKeys::new(&[]);
+        assert_eq!(result, Err(StatsUtmError::EmptyUtmKeys));
     }
 
     #[test]
