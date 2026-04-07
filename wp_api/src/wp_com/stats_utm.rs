@@ -117,7 +117,7 @@ pub struct StatsUtmResponse {
     pub top_utm_values: HashMap<String, u64>,
     /// Top posts grouped by UTM value.
     /// Keys match the keys in `top_utm_values`.
-    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    #[serde(default, deserialize_with = "deserialize_empty_array_or_hashmap")]
     pub top_posts: HashMap<String, Vec<StatsUtmPost>>,
 }
 
@@ -288,6 +288,17 @@ mod tests {
     #[test]
     fn test_stats_utm_response_deserialization_empty_arrays() {
         let json_file_path = "tests/wpcom/stats_utm/empty-arrays-response.json";
+        let file = std::fs::File::open(json_file_path).expect("Failed to open file");
+        let response: StatsUtmResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(response.top_utm_values.is_empty());
+        assert!(response.top_posts.is_empty());
+    }
+
+    #[test]
+    fn test_stats_utm_response_deserialization_missing_top_posts() {
+        let json_file_path = "tests/wpcom/stats_utm/missing-top-posts.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         let response: StatsUtmResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
