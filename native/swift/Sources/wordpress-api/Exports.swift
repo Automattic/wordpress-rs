@@ -134,6 +134,7 @@ public typealias AnyPostWithEditContext = WordPressAPIInternal.AnyPostWithEditCo
 public typealias AnyPostWithViewContext = WordPressAPIInternal.AnyPostWithViewContext
 public typealias AnyPostWithEmbedContext = WordPressAPIInternal.AnyPostWithEmbedContext
 public typealias PostListParams = WordPressAPIInternal.PostListParams
+public typealias PostUpdateParams = WordPressAPIInternal.PostUpdateParams
 public typealias PostsRequestExecutor = WordPressAPIInternal.PostsRequestExecutor
 public typealias PostEndpointType = WordPressAPIInternal.PostEndpointType
 
