@@ -130,14 +130,34 @@ impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    use rstest::rstest;
+    use crate::{request::endpoint::ApiEndpointUrl, wp_com::WpComNamespace};
+    use rstest::*;
+    use std::sync::Arc;
+
+    const WP_COM_BASE_URL: &str = "https://public-api.wordpress.com";
+
+    #[fixture]
+    pub fn fixture_wp_com_api_url_resolver() -> Arc<dyn ApiUrlResolver> {
+        Arc::new(WpComApiClientInternalUrlResolver::default())
+    }
+
+    pub fn validate_wp_com_rest_v1_1_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint(WpComNamespace::RestV1_1, endpoint_url, path);
+    }
+
+    fn validate_endpoint(namespace: WpComNamespace, endpoint_url: ApiEndpointUrl, path: &str) {
+        assert_eq!(
+            endpoint_url.as_str(),
+            format!("{}{}{}", WP_COM_BASE_URL, namespace.namespace_value(), path)
+        );
+    }
 
     #[rstest]
-    #[case("/wp/v2", vec!["posts".to_string()], "https://public-api.wordpress.com/wp/v2/sites/example.wordpress.com/posts")]
+    #[case(WpNamespace::WpV2, vec!["posts".to_string()], "https://public-api.wordpress.com/wp/v2/sites/example.wordpress.com/posts")]
     fn wp_com_dot_org_api_url_resolver(
-        #[case] namespace: &str,
+        #[case] namespace: WpNamespace,
         #[case] endpoint_segments: Vec<String>,
         #[case] expected_url: &str,
     ) {
@@ -147,7 +167,7 @@ mod tests {
         );
         assert_eq!(
             resolver
-                .resolve(namespace.to_string(), endpoint_segments)
+                .resolve(namespace.namespace_value().to_string(), endpoint_segments)
                 .url(),
             expected_url
         );
