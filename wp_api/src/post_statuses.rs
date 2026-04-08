@@ -3,7 +3,6 @@ use std::{collections::HashMap, fmt::Display};
 use wp_contextual::WpContextual;
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
-#[serde(transparent)]
 pub struct SparsePostStatusesResponse {
     #[serde(flatten)]
     #[WpContext(edit, embed, view)]

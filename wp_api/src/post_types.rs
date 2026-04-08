@@ -58,7 +58,6 @@ impl PostTypeDetailsWithEditContext {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
-#[serde(transparent)]
 pub struct SparsePostTypesResponse {
     #[serde(flatten)]
     #[WpContext(edit, embed, view)]
@@ -100,11 +99,9 @@ pub struct SparsePostTypeDetails {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
-#[serde(transparent)]
 pub struct PostTypeSupportsMap {
     #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     #[serde(flatten)]
-    #[serde(rename = "supports")]
     pub map: HashMap<PostTypeSupports, JsonValue>,
 }
 

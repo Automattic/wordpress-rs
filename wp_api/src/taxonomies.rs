@@ -118,7 +118,6 @@ pub struct TaxonomyListParams {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
-#[serde(transparent)]
 pub struct SparseTaxonomyTypesResponse {
     #[serde(flatten)]
     #[WpContext(edit, embed, view)]

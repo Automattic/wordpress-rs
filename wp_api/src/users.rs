@@ -261,11 +261,9 @@ pub enum UserCapability {
 impl_as_query_value_from_to_string!(UserCapability);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
-#[serde(transparent)]
 pub struct UserCapabilitiesMap {
     #[serde(deserialize_with = "wp_serde_helper::deserialize_empty_array_or_hashmap")]
     #[serde(flatten)]
-    #[serde(rename = "capabilities")]
     pub map: HashMap<UserCapability, JsonValue>,
 }
 
