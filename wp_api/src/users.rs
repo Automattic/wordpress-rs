@@ -1,5 +1,5 @@
 use crate::{
-    EnumFromStrParsingError, OptionFromStr, WpApiParamOrder, WpResponseString,
+    EnumFromStrParsingError, JsonValue, OptionFromStr, WpApiParamOrder, WpResponseString,
     impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
@@ -260,6 +260,27 @@ pub enum UserCapability {
 
 impl_as_query_value_from_to_string!(UserCapability);
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
+#[serde(transparent)]
+pub struct UserCapabilitiesMap {
+    #[serde(deserialize_with = "wp_serde_helper::deserialize_empty_array_or_hashmap")]
+    #[serde(flatten)]
+    #[serde(rename = "capabilities")]
+    pub map: HashMap<UserCapability, JsonValue>,
+}
+
+#[uniffi::export]
+impl UserCapabilitiesMap {
+    /// Check if the user has a specific capability.
+    ///
+    /// Returns `true` only if the capability is present and its value is a boolean `true`.
+    /// Capabilities with non-boolean values (e.g., strings like "custom" or "any" added by
+    /// plugins such as WPBakery) return `false`.
+    pub fn has_cap(&self, capability: UserCapability) -> bool {
+        self.map.get(&capability) == Some(&JsonValue::Bool(true))
+    }
+}
+
 #[uniffi::export]
 fn user_capability_from_string(value: String) -> UserCapability {
     UserCapability::from_str(value.as_str()).unwrap_or(UserCapability::Custom(value))
@@ -488,7 +509,7 @@ pub struct SparseUser {
     #[WpContext(edit)]
     pub roles: Option<Vec<UserRole>>,
     #[WpContext(edit)]
-    pub capabilities: Option<HashMap<UserCapability, bool>>,
+    pub capabilities: Option<UserCapabilitiesMap>,
     #[WpContext(edit)]
     pub extra_capabilities: Option<HashMap<String, bool>>,
     #[WpContext(edit, embed, view)]
@@ -585,6 +606,18 @@ mod tests {
         #[case] expected_str: &str,
     ) {
         assert_eq!(UserCapability::from_str(expected_str), Ok(capability));
+    }
+
+    #[test]
+    fn test_user_capabilities_map_with_non_boolean_values() {
+        let json = r#"{
+            "edit_posts": true,
+            "edit_users": false,
+            "vc_access_rules_post_types": "custom"
+        }"#;
+        let caps: UserCapabilitiesMap = serde_json::from_str(json)
+            .expect("Failed to deserialize capabilities with non-boolean values");
+        assert_eq!(caps.map.len(), 3);
     }
 
     #[rstest]

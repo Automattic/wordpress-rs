@@ -3,7 +3,7 @@ use crate::{
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    users::UserCapability,
+    users::UserCapabilitiesMap,
     wp_com::{WpComSiteId, me::WpComUserId},
     wp_content_string_id,
 };
@@ -138,7 +138,7 @@ pub struct WPComSite {
     pub url: String,
 
     /// The user's capabilities for the site.
-    pub capabilities: HashMap<UserCapability, bool>,
+    pub capabilities: UserCapabilitiesMap,
 
     /// Whether the site is a Jetpack site.
     pub jetpack: bool,
