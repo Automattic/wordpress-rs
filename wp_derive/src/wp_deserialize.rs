@@ -180,13 +180,13 @@ impl ParsedStruct {
             .ident
             .as_ref()
             .expect("transparent field must have an ident");
-        let inner_type = Self::extract_option_inner_type(field)
-            .expect("transparent field must be Option<T>");
+        let inner_type =
+            Self::extract_option_inner_type(field).expect("transparent field must be Option<T>");
 
         if !Self::is_hashmap(inner_type) {
-            return Err(WpDeserializeParseError::TransparentRequiresHashMap.into_syn_error(
-                field.ty.span(),
-            ));
+            return Err(
+                WpDeserializeParseError::TransparentRequiresHashMap.into_syn_error(field.ty.span())
+            );
         }
 
         let visitor_ident = format_ident!("{}TransparentVisitor", self.struct_ident);
@@ -273,7 +273,6 @@ impl ParsedStruct {
 
         Ok(fields)
     }
-
 }
 
 impl Parse for ParsedStruct {

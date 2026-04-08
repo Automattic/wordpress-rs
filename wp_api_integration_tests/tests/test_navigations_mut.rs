@@ -199,8 +199,6 @@ where
 }
 
 mod macro_helper {
-    use super::*;
-
     macro_rules! generate_update_test {
         ($ident:ident, $field:ident, $new_value:expr, $assertion:expr) => {
             paste::paste! {
