@@ -19,6 +19,12 @@ updates:
     directory: "native/kotlin" # Location of package manifests
     schedule:
       interval: "weekly"
+    groups:
+      kotlin-ecosystem:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.compose"
+          - "io.insert-koin:*"
 
   - package-ecosystem: "bundler"
     directory: "/" # Location of package manifests
