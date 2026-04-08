@@ -1,0 +1,15 @@
+{
+    "top_utm_values": {
+        "[\"logo_click\",\"trustpilot\",\"company_profile\"]": 1
+    },
+    "top_posts": {
+        "[\"logo_click\",\"trustpilot\",\"company_profile\"]": [
+            {
+                "id": 0,
+                "href": "https://fieldguide.automattic.com/",
+                "title": "Home page / Archives",
+                "views": 1
+            }
+        ]
+    }
+}

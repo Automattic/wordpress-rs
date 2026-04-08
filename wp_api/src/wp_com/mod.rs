@@ -26,6 +26,7 @@ pub mod stats_summary;
 pub mod stats_tags;
 pub mod stats_top_authors;
 pub mod stats_top_posts;
+pub mod stats_utm;
 pub mod stats_video_plays;
 pub mod stats_visits;
 pub mod subscribers;
