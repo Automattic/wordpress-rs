@@ -264,8 +264,6 @@ impl_as_query_value_from_to_string!(UserCapability);
 #[serde(transparent)]
 pub struct UserCapabilitiesMap {
     #[serde(deserialize_with = "wp_serde_helper::deserialize_empty_array_or_hashmap")]
-    #[serde(flatten)]
-    #[serde(rename = "capabilities")]
     pub map: HashMap<UserCapability, JsonValue>,
 }
 
@@ -642,5 +640,13 @@ mod tests {
     #[case(UserRole::Custom("custom".to_string()), "custom")]
     fn test_user_role_from_str(#[case] role: UserRole, #[case] expected_str: &str) {
         assert_eq!(UserRole::from_str(expected_str), Ok(role));
+    }
+
+    #[test]
+    fn test_user_capabilities_map_from_empty_array() {
+        let json = r#"[]"#;
+        let caps: UserCapabilitiesMap =
+            serde_json::from_str(json).expect("Should handle empty array from WordPress API");
+        assert!(caps.map.is_empty());
     }
 }
