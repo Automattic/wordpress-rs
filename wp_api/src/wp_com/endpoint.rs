@@ -155,9 +155,9 @@ pub(crate) mod tests {
     }
 
     #[rstest]
-    #[case(WpNamespace::WpV2, vec!["posts".to_string()], "https://public-api.wordpress.com/wp/v2/sites/example.wordpress.com/posts")]
+    #[case("/wp/v2", vec!["posts".to_string()], "https://public-api.wordpress.com/wp/v2/sites/example.wordpress.com/posts")]
     fn wp_com_dot_org_api_url_resolver(
-        #[case] namespace: WpNamespace,
+        #[case] namespace: &str,
         #[case] endpoint_segments: Vec<String>,
         #[case] expected_url: &str,
     ) {
@@ -167,7 +167,7 @@ pub(crate) mod tests {
         );
         assert_eq!(
             resolver
-                .resolve(namespace.namespace_value().to_string(), endpoint_segments)
+                .resolve(namespace.to_string(), endpoint_segments)
                 .url(),
             expected_url
         );

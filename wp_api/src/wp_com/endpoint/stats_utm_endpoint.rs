@@ -47,7 +47,7 @@ mod tests {
     )]
     #[case(
         vec![StatsUtmKey::UtmCampaign, StatsUtmKey::UtmSource, StatsUtmKey::UtmMedium],
-        "/sites/12345/stats/utm/utm_campaign,utm_source,utm_medium?query_top_posts=1"
+        "/sites/12345/stats/utm/utm_source,utm_medium,utm_campaign?query_top_posts=1"
     )]
     #[case(
         vec![],

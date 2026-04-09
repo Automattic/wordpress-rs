@@ -40,11 +40,14 @@ pub struct StatsUtmKeys(pub Vec<StatsUtmKey>);
 
 impl std::fmt::Display for StatsUtmKeys {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let keys = if self.0.is_empty() {
+        let mut keys: Vec<StatsUtmKey> = if self.0.is_empty() {
             StatsUtmKey::iter().collect()
         } else {
             self.0.clone()
         };
+        // Sorted for dedup
+        keys.sort();
+        keys.dedup();
         let joined: Vec<_> = keys.iter().map(|k| k.to_string()).collect();
         write!(f, "{}", joined.join(","))
     }
@@ -144,7 +147,17 @@ mod tests {
             StatsUtmKey::UtmSource,
             StatsUtmKey::UtmMedium,
         ]);
-        assert_eq!(keys.to_string(), "utm_campaign,utm_source,utm_medium");
+        assert_eq!(keys.to_string(), "utm_source,utm_medium,utm_campaign");
+    }
+
+    #[test]
+    fn test_stats_utm_keys_deduplicates() {
+        let keys = StatsUtmKeys(vec![
+            StatsUtmKey::UtmSource,
+            StatsUtmKey::UtmMedium,
+            StatsUtmKey::UtmSource,
+        ]);
+        assert_eq!(keys.to_string(), "utm_source,utm_medium");
     }
 
     #[test]
