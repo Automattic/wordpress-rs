@@ -1,6 +1,7 @@
 use crate::url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use strum::IntoEnumIterator;
 use wp_serde_helper::deserialize_empty_array_or_hashmap;
 
 /// A single UTM key that can be used in the stats UTM endpoint path.
@@ -17,6 +18,7 @@ use wp_serde_helper::deserialize_empty_array_or_hashmap;
     uniffi::Enum,
     strum_macros::EnumString,
     strum_macros::Display,
+    strum_macros::EnumIter,
 )]
 pub enum StatsUtmKey {
     #[strum(serialize = "utm_source")]
@@ -30,29 +32,24 @@ pub enum StatsUtmKey {
     UtmCampaign,
 }
 
-uniffi::custom_newtype!(StatsUtmKeys, String);
-/// Comma-separated UTM keys used as a URL path segment.
-///
-/// For example, `"utm_source,utm_medium"` or `"utm_campaign"`.
-/// Construct from a list of `StatsUtmKey` using `StatsUtmKeys::new`.
+uniffi::custom_newtype!(StatsUtmKeys, Vec<StatsUtmKey>);
+/// UTM keys to query in the stats UTM endpoint.
+/// An empty vec defaults to all UTM keys.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StatsUtmKeys(pub String);
-
-impl StatsUtmKeys {
-    pub fn new(keys: &[StatsUtmKey]) -> Self {
-        assert!(!keys.is_empty(), "At least one UTM key must be provided");
-        Self(
-            keys.iter()
-                .map(|k| k.to_string())
-                .collect::<Vec<_>>()
-                .join(","),
-        )
-    }
-}
+pub struct StatsUtmKeys(pub Vec<StatsUtmKey>);
 
 impl std::fmt::Display for StatsUtmKeys {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        let mut keys: Vec<StatsUtmKey> = if self.0.is_empty() {
+            StatsUtmKey::iter().collect()
+        } else {
+            self.0.clone()
+        };
+        // Sorted for dedup
+        keys.sort();
+        keys.dedup();
+        let joined: Vec<_> = keys.iter().map(|k| k.to_string()).collect();
+        write!(f, "{}", joined.join(","))
     }
 }
 
@@ -133,30 +130,40 @@ mod tests {
 
     #[test]
     fn test_stats_utm_keys_single() {
-        let keys = StatsUtmKeys::new(&[StatsUtmKey::UtmSource]);
+        let keys = StatsUtmKeys(vec![StatsUtmKey::UtmSource]);
         assert_eq!(keys.to_string(), "utm_source");
     }
 
     #[test]
     fn test_stats_utm_keys_multiple() {
-        let keys = StatsUtmKeys::new(&[StatsUtmKey::UtmSource, StatsUtmKey::UtmMedium]);
+        let keys = StatsUtmKeys(vec![StatsUtmKey::UtmSource, StatsUtmKey::UtmMedium]);
         assert_eq!(keys.to_string(), "utm_source,utm_medium");
     }
 
     #[test]
-    fn test_stats_utm_keys_all() {
-        let keys = StatsUtmKeys::new(&[
+    fn test_stats_utm_keys_all_explicit() {
+        let keys = StatsUtmKeys(vec![
             StatsUtmKey::UtmCampaign,
             StatsUtmKey::UtmSource,
             StatsUtmKey::UtmMedium,
         ]);
-        assert_eq!(keys.to_string(), "utm_campaign,utm_source,utm_medium");
+        assert_eq!(keys.to_string(), "utm_source,utm_medium,utm_campaign");
     }
 
     #[test]
-    #[should_panic(expected = "At least one UTM key must be provided")]
-    fn test_stats_utm_keys_empty() {
-        StatsUtmKeys::new(&[]);
+    fn test_stats_utm_keys_deduplicates() {
+        let keys = StatsUtmKeys(vec![
+            StatsUtmKey::UtmSource,
+            StatsUtmKey::UtmMedium,
+            StatsUtmKey::UtmSource,
+        ]);
+        assert_eq!(keys.to_string(), "utm_source,utm_medium");
+    }
+
+    #[test]
+    fn test_stats_utm_keys_empty_defaults_to_all() {
+        let keys = StatsUtmKeys(vec![]);
+        assert_eq!(keys.to_string(), "utm_source,utm_medium,utm_campaign");
     }
 
     #[test]
