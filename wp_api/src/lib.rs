@@ -390,4 +390,71 @@ mod tests {
         assert_eq!(person.name, "Alice");
         assert_eq!(person.other_fields.raw, serde_json::json!({}));
     }
+
+    #[test]
+    fn test_json_value_from_null() {
+        assert_eq!(JsonValue::from(&serde_json::json!(null)), JsonValue::Null);
+    }
+
+    #[test]
+    fn test_json_value_from_bool() {
+        assert_eq!(JsonValue::from(&serde_json::json!(true)), JsonValue::Bool(true));
+        assert_eq!(JsonValue::from(&serde_json::json!(false)), JsonValue::Bool(false));
+    }
+
+    #[test]
+    fn test_json_value_from_positive_int() {
+        assert_eq!(JsonValue::from(&serde_json::json!(42)), JsonValue::Int(42));
+    }
+
+    #[test]
+    fn test_json_value_from_negative_int() {
+        assert_eq!(JsonValue::from(&serde_json::json!(-7)), JsonValue::Int(-7));
+    }
+
+    #[test]
+    fn test_json_value_from_large_u64() {
+        // u64::MAX doesn't fit in i64, so it falls through to the u64 → f64 path
+        let val = serde_json::json!(u64::MAX);
+        assert_eq!(JsonValue::from(&val), JsonValue::Float(u64::MAX as f64));
+    }
+
+    #[test]
+    fn test_json_value_from_float() {
+        assert_eq!(JsonValue::from(&serde_json::json!(3.14)), JsonValue::Float(3.14));
+    }
+
+    #[test]
+    fn test_json_value_from_string() {
+        assert_eq!(
+            JsonValue::from(&serde_json::json!("hello")),
+            JsonValue::String("hello".to_string())
+        );
+    }
+
+    #[test]
+    fn test_json_value_from_array() {
+        assert_eq!(
+            JsonValue::from(&serde_json::json!([1, "two", null])),
+            JsonValue::Array(vec![
+                JsonValue::Int(1),
+                JsonValue::String("two".to_string()),
+                JsonValue::Null,
+            ])
+        );
+    }
+
+    #[test]
+    fn test_json_value_from_nested_object() {
+        assert_eq!(
+            JsonValue::from(&serde_json::json!({"a": {"b": [1, 2]}})),
+            JsonValue::Object(HashMap::from([(
+                "a".to_string(),
+                JsonValue::Object(HashMap::from([(
+                    "b".to_string(),
+                    JsonValue::Array(vec![JsonValue::Int(1), JsonValue::Int(2)])
+                )]))
+            )]))
+        );
+    }
 }
