@@ -132,6 +132,27 @@ pub enum JsonValue {
     Object(HashMap<String, JsonValue>),
 }
 
+impl From<&Value> for JsonValue {
+    fn from(value: &Value) -> Self {
+        match value {
+            Value::Null => JsonValue::Null,
+            Value::Bool(b) => JsonValue::Bool(*b),
+            Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    JsonValue::Int(i)
+                } else {
+                    JsonValue::Float(n.as_f64().unwrap_or(0.0))
+                }
+            }
+            Value::String(s) => JsonValue::String(s.clone()),
+            Value::Array(arr) => JsonValue::Array(arr.iter().map(JsonValue::from).collect()),
+            Value::Object(obj) => {
+                JsonValue::Object(obj.iter().map(|(k, v)| (k.clone(), JsonValue::from(v))).collect())
+            }
+        }
+    }
+}
+
 /// Similar to `JsonValue`, but exported as a Uniffi object.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Object)]
 #[uniffi::export(Eq, Hash)]
@@ -152,6 +173,20 @@ impl AnyJson {
                 .collect(),
             _ => vec![],
         }
+    }
+
+    /// Returns the keys present in this JSON object, or an empty vec if not an object.
+    pub fn keys(&self) -> Vec<String> {
+        match &self.raw {
+            Value::Object(map) => map.keys().cloned().collect(),
+            _ => vec![],
+        }
+    }
+
+    /// Returns the value for a given key as a `JsonValue`, or `None` if the key
+    /// doesn't exist or this isn't an object.
+    pub fn value_for_key(&self, key: &str) -> Option<JsonValue> {
+        self.raw.get(key).map(JsonValue::from)
     }
 
     /// Creates an AnyJson from a map of keys to term ID arrays.
