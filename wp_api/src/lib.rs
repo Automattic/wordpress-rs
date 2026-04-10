@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_json_value_from_float() {
-        assert_eq!(JsonValue::from(&serde_json::json!(3.14)), JsonValue::Float(3.14));
+        assert_eq!(JsonValue::from(&serde_json::json!(2.5)), JsonValue::Float(2.5));
     }
 
     #[test]
