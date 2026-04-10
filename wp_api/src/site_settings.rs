@@ -119,7 +119,6 @@ pub struct SparseSiteSettings {
     // Writing custom settings back via SiteSettingsUpdateParams is a separate effort.
     #[serde(flatten)]
     #[WpContext(edit, embed, view)]
-    #[WpContextualOption]
     #[WpContextualExcludeFromFields]
     pub additional_fields: Option<Arc<AnyJson>>,
 }
@@ -362,28 +361,27 @@ mod tests {
             Some(SiteSettingsPingStatus::Open)
         );
 
-        let additional = settings.additional_fields.expect("additional_fields should be present");
-        let keys = additional.keys();
+        let keys = settings.additional_fields.keys();
         assert!(keys.contains(&"jetpack_search_color_theme".to_string()));
         assert!(keys.contains(&"active_templates".to_string()));
         assert!(keys.contains(&"cookie_consent_template".to_string()));
         assert!(keys.contains(&"Blogroll Recommendations".to_string()));
 
         assert_eq!(
-            additional.value_for_key("jetpack_search_color_theme"),
+            settings.additional_fields.value_for_key("jetpack_search_color_theme"),
             Some(crate::JsonValue::String("light".to_string()))
         );
         assert_eq!(
-            additional.value_for_key("jetpack_search_enable_sort"),
+            settings.additional_fields.value_for_key("jetpack_search_enable_sort"),
             Some(crate::JsonValue::Bool(true))
         );
         assert_eq!(
-            additional.value_for_key("active_templates"),
+            settings.additional_fields.value_for_key("active_templates"),
             Some(crate::JsonValue::Null)
         );
         // Known fields should NOT leak into additional_fields
-        assert!(additional.value_for_key("title").is_none());
-        assert!(additional.value_for_key("site_icon").is_none());
+        assert!(settings.additional_fields.value_for_key("title").is_none());
+        assert!(settings.additional_fields.value_for_key("site_icon").is_none());
     }
 
     #[test]
@@ -391,8 +389,7 @@ mod tests {
         let settings: SiteSettingsWithEditContext =
             serde_json::from_str(RESPONSE_WITH_CUSTOM_ENTRIES).unwrap();
         assert_eq!(settings.title, "Test Site");
-        let additional = settings.additional_fields.expect("additional_fields should be present");
-        assert!(additional.keys().contains(&"jetpack_search_highlight_color".to_string()));
+        assert!(settings.additional_fields.keys().contains(&"jetpack_search_highlight_color".to_string()));
     }
 
     #[test]
@@ -404,8 +401,8 @@ mod tests {
         assert!(additional.keys().contains(&"Blogroll Recommendations".to_string()));
     }
 
-    // With no unknown fields, additional_fields is Some with an empty object
-    // (not None). Consumers should check keys().is_empty() rather than is_none().
+    // With no unknown fields, additional_fields is an empty object.
+    // Consumers should check keys().is_empty().
     #[test]
     fn test_additional_fields_is_empty_when_no_custom_entries() {
         let json = r#"{
@@ -431,9 +428,6 @@ mod tests {
             "site_icon": 0
         }"#;
         let settings: SiteSettingsWithViewContext = serde_json::from_str(json).unwrap();
-        let additional = settings
-            .additional_fields
-            .expect("additional_fields should be Some even with no custom entries");
-        assert!(additional.keys().is_empty());
+        assert!(settings.additional_fields.keys().is_empty());
     }
 }
