@@ -115,6 +115,8 @@ pub struct SparseSiteSettings {
     pub site_logo: Option<u64>,
     #[WpContext(edit, embed, view)]
     pub site_icon: Option<u64>,
+    // Read-only for now — captures extra keys from plugin responses (e.g. Jetpack).
+    // Writing custom settings back via SiteSettingsUpdateParams is a separate effort.
     #[serde(flatten)]
     #[WpContext(edit, embed, view)]
     #[WpContextualOption]
