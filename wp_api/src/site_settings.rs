@@ -403,4 +403,37 @@ mod tests {
         let additional = settings.additional_fields.expect("additional_fields should be present");
         assert!(additional.keys().contains(&"Blogroll Recommendations".to_string()));
     }
+
+    // With no unknown fields, additional_fields is Some with an empty object
+    // (not None). Consumers should check keys().is_empty() rather than is_none().
+    #[test]
+    fn test_additional_fields_is_empty_when_no_custom_entries() {
+        let json = r#"{
+            "title": "Test Site",
+            "description": "",
+            "url": "https://example.com",
+            "email": "test@example.com",
+            "timezone": "",
+            "date_format": "F j, Y",
+            "time_format": "g:i a",
+            "start_of_week": 1,
+            "language": "en_US",
+            "use_smilies": true,
+            "default_category": 1,
+            "default_post_format": "standard",
+            "posts_per_page": 10,
+            "show_on_front": "posts",
+            "page_on_front": 0,
+            "page_for_posts": 0,
+            "default_ping_status": "open",
+            "default_comment_status": "open",
+            "site_logo": null,
+            "site_icon": 0
+        }"#;
+        let settings: SiteSettingsWithViewContext = serde_json::from_str(json).unwrap();
+        let additional = settings
+            .additional_fields
+            .expect("additional_fields should be Some even with no custom entries");
+        assert!(additional.keys().is_empty());
+    }
 }
