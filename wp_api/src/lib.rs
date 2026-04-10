@@ -140,8 +140,16 @@ impl From<&Value> for JsonValue {
             Value::Number(n) => {
                 if let Some(i) = n.as_i64() {
                     JsonValue::Int(i)
+                } else if let Some(u) = n.as_u64() {
+                    // u64 values that don't fit in i64 (> i64::MAX) — store as
+                    // float, accepting precision loss beyond 2^53. WordPress
+                    // APIs don't produce values in this range.
+                    JsonValue::Float(u as f64)
                 } else {
-                    JsonValue::Float(n.as_f64().unwrap_or(0.0))
+                    // Must be a float — as_f64() only returns None for
+                    // out-of-range values which serde_json won't parse without
+                    // the arbitrary_precision feature.
+                    JsonValue::Float(n.as_f64().expect("unexpected unrepresentable JSON number"))
                 }
             }
             Value::String(s) => JsonValue::String(s.clone()),
