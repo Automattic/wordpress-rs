@@ -4,12 +4,14 @@ use serde::{Deserialize, Serialize};
 use std::{num::ParseIntError, str::FromStr, sync::Arc};
 
 pub mod client;
+pub mod domains;
 pub mod endpoint;
 pub mod followers;
 pub mod jetpack_connection;
 pub mod language;
 pub mod me;
 pub mod oauth2;
+pub mod segments;
 pub mod sites;
 pub mod stats_city_views;
 pub mod stats_clicks;

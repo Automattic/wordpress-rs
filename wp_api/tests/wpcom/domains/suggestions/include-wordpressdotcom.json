@@ -1,0 +1,87 @@
+[
+  {
+    "domain_name": "testsite03.wordpress.com",
+    "cost": "Free",
+    "is_free": true
+  },
+  {
+    "domain_name": "brightspace.com",
+    "relevance": 1,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 6,
+    "product_slug": "domain_reg",
+    "cost": "$18.00",
+    "renew_cost": "$18.00",
+    "renew_raw_price": 18,
+    "raw_price": 18,
+    "currency_code": "USD"
+  },
+  {
+    "domain_name": "testsite.blog",
+    "relevance": 0.99,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common",
+      "exact-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 76,
+    "product_slug": "dotblog_domain",
+    "cost": "$20.00",
+    "renew_cost": "$20.00",
+    "renew_raw_price": 20,
+    "raw_price": 20,
+    "currency_code": "USD",
+    "sale_cost": 2.0
+  },
+  {
+    "domain_name": "freshpage.art",
+    "relevance": 0.8,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 355,
+    "product_slug": "dotart_domain",
+    "cost": "$33.00",
+    "renew_cost": "$33.00",
+    "renew_raw_price": 33,
+    "raw_price": 33,
+    "currency_code": "USD",
+    "sale_cost": 1.64
+  },
+  {
+    "domain_name": "testsite.dev",
+    "relevance": 0.6,
+    "supports_privacy": false,
+    "vendor": "donuts",
+    "hsts_required": true,
+    "policy_notices": [
+      {
+        "type": "hsts",
+        "label": "HSTS required",
+        "message": "All domains with this ending require an SSL certificate to host a website."
+      }
+    ],
+    "match_reasons": [
+      "exact-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 373,
+    "product_slug": "dotdev_domain",
+    "cost": "$20.00",
+    "renew_cost": "$20.00",
+    "renew_raw_price": 20,
+    "raw_price": 20,
+    "currency_code": "USD"
+  }
+]
