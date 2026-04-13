@@ -132,6 +132,37 @@ pub enum JsonValue {
     Object(HashMap<String, JsonValue>),
 }
 
+impl From<&Value> for JsonValue {
+    fn from(value: &Value) -> Self {
+        match value {
+            Value::Null => JsonValue::Null,
+            Value::Bool(b) => JsonValue::Bool(*b),
+            Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    JsonValue::Int(i)
+                } else if let Some(u) = n.as_u64() {
+                    // u64 values that don't fit in i64 (> i64::MAX) — store as
+                    // float, accepting precision loss beyond 2^53. WordPress
+                    // APIs don't produce values in this range.
+                    JsonValue::Float(u as f64)
+                } else {
+                    // Must be a float — as_f64() only returns None for
+                    // out-of-range values which serde_json won't parse without
+                    // the arbitrary_precision feature.
+                    JsonValue::Float(n.as_f64().expect("unexpected unrepresentable JSON number"))
+                }
+            }
+            Value::String(s) => JsonValue::String(s.clone()),
+            Value::Array(arr) => JsonValue::Array(arr.iter().map(JsonValue::from).collect()),
+            Value::Object(obj) => JsonValue::Object(
+                obj.iter()
+                    .map(|(k, v)| (k.clone(), JsonValue::from(v)))
+                    .collect(),
+            ),
+        }
+    }
+}
+
 /// Similar to `JsonValue`, but exported as a Uniffi object.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Object)]
 #[uniffi::export(Eq, Hash)]
@@ -152,6 +183,20 @@ impl AnyJson {
                 .collect(),
             _ => vec![],
         }
+    }
+
+    /// Returns the keys present in this JSON object, or an empty vec if not an object.
+    pub fn keys(&self) -> Vec<String> {
+        match &self.raw {
+            Value::Object(map) => map.keys().cloned().collect(),
+            _ => vec![],
+        }
+    }
+
+    /// Returns the value for a given key as a `JsonValue`, or `None` if the key
+    /// doesn't exist or this isn't an object.
+    pub fn value_for_key(&self, key: &str) -> Option<JsonValue> {
+        self.raw.get(key).map(JsonValue::from)
     }
 
     /// Creates an AnyJson from a map of keys to term ID arrays.
@@ -346,5 +391,81 @@ mod tests {
         let person: Person = serde_json::from_str(json).unwrap();
         assert_eq!(person.name, "Alice");
         assert_eq!(person.other_fields.raw, serde_json::json!({}));
+    }
+
+    #[test]
+    fn test_json_value_from_null() {
+        assert_eq!(JsonValue::from(&serde_json::json!(null)), JsonValue::Null);
+    }
+
+    #[test]
+    fn test_json_value_from_bool() {
+        assert_eq!(
+            JsonValue::from(&serde_json::json!(true)),
+            JsonValue::Bool(true)
+        );
+        assert_eq!(
+            JsonValue::from(&serde_json::json!(false)),
+            JsonValue::Bool(false)
+        );
+    }
+
+    #[test]
+    fn test_json_value_from_positive_int() {
+        assert_eq!(JsonValue::from(&serde_json::json!(42)), JsonValue::Int(42));
+    }
+
+    #[test]
+    fn test_json_value_from_negative_int() {
+        assert_eq!(JsonValue::from(&serde_json::json!(-7)), JsonValue::Int(-7));
+    }
+
+    #[test]
+    fn test_json_value_from_large_u64() {
+        // u64::MAX doesn't fit in i64, so it falls through to the u64 → f64 path
+        let val = serde_json::json!(u64::MAX);
+        assert_eq!(JsonValue::from(&val), JsonValue::Float(u64::MAX as f64));
+    }
+
+    #[test]
+    fn test_json_value_from_float() {
+        assert_eq!(
+            JsonValue::from(&serde_json::json!(2.5)),
+            JsonValue::Float(2.5)
+        );
+    }
+
+    #[test]
+    fn test_json_value_from_string() {
+        assert_eq!(
+            JsonValue::from(&serde_json::json!("hello")),
+            JsonValue::String("hello".to_string())
+        );
+    }
+
+    #[test]
+    fn test_json_value_from_array() {
+        assert_eq!(
+            JsonValue::from(&serde_json::json!([1, "two", null])),
+            JsonValue::Array(vec![
+                JsonValue::Int(1),
+                JsonValue::String("two".to_string()),
+                JsonValue::Null,
+            ])
+        );
+    }
+
+    #[test]
+    fn test_json_value_from_nested_object() {
+        assert_eq!(
+            JsonValue::from(&serde_json::json!({"a": {"b": [1, 2]}})),
+            JsonValue::Object(HashMap::from([(
+                "a".to_string(),
+                JsonValue::Object(HashMap::from([(
+                    "b".to_string(),
+                    JsonValue::Array(vec![JsonValue::Int(1), JsonValue::Int(2)])
+                )]))
+            )]))
+        );
     }
 }
