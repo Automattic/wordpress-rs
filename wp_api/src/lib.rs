@@ -154,9 +154,11 @@ impl From<&Value> for JsonValue {
             }
             Value::String(s) => JsonValue::String(s.clone()),
             Value::Array(arr) => JsonValue::Array(arr.iter().map(JsonValue::from).collect()),
-            Value::Object(obj) => {
-                JsonValue::Object(obj.iter().map(|(k, v)| (k.clone(), JsonValue::from(v))).collect())
-            }
+            Value::Object(obj) => JsonValue::Object(
+                obj.iter()
+                    .map(|(k, v)| (k.clone(), JsonValue::from(v)))
+                    .collect(),
+            ),
         }
     }
 }
@@ -398,8 +400,14 @@ mod tests {
 
     #[test]
     fn test_json_value_from_bool() {
-        assert_eq!(JsonValue::from(&serde_json::json!(true)), JsonValue::Bool(true));
-        assert_eq!(JsonValue::from(&serde_json::json!(false)), JsonValue::Bool(false));
+        assert_eq!(
+            JsonValue::from(&serde_json::json!(true)),
+            JsonValue::Bool(true)
+        );
+        assert_eq!(
+            JsonValue::from(&serde_json::json!(false)),
+            JsonValue::Bool(false)
+        );
     }
 
     #[test]
@@ -421,7 +429,10 @@ mod tests {
 
     #[test]
     fn test_json_value_from_float() {
-        assert_eq!(JsonValue::from(&serde_json::json!(2.5)), JsonValue::Float(2.5));
+        assert_eq!(
+            JsonValue::from(&serde_json::json!(2.5)),
+            JsonValue::Float(2.5)
+        );
     }
 
     #[test]

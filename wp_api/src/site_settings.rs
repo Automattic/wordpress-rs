@@ -368,11 +368,15 @@ mod tests {
         assert!(keys.contains(&"Blogroll Recommendations".to_string()));
 
         assert_eq!(
-            settings.additional_fields.value_for_key("jetpack_search_color_theme"),
+            settings
+                .additional_fields
+                .value_for_key("jetpack_search_color_theme"),
             Some(crate::JsonValue::String("light".to_string()))
         );
         assert_eq!(
-            settings.additional_fields.value_for_key("jetpack_search_enable_sort"),
+            settings
+                .additional_fields
+                .value_for_key("jetpack_search_enable_sort"),
             Some(crate::JsonValue::Bool(true))
         );
         assert_eq!(
@@ -381,7 +385,12 @@ mod tests {
         );
         // Known fields should NOT leak into additional_fields
         assert!(settings.additional_fields.value_for_key("title").is_none());
-        assert!(settings.additional_fields.value_for_key("site_icon").is_none());
+        assert!(
+            settings
+                .additional_fields
+                .value_for_key("site_icon")
+                .is_none()
+        );
     }
 
     #[test]
@@ -389,7 +398,12 @@ mod tests {
         let settings: SiteSettingsWithEditContext =
             serde_json::from_str(RESPONSE_WITH_CUSTOM_ENTRIES).unwrap();
         assert_eq!(settings.title, "Test Site");
-        assert!(settings.additional_fields.keys().contains(&"jetpack_search_highlight_color".to_string()));
+        assert!(
+            settings
+                .additional_fields
+                .keys()
+                .contains(&"jetpack_search_highlight_color".to_string())
+        );
     }
 
     #[test]
@@ -397,8 +411,14 @@ mod tests {
         let settings: SparseSiteSettings =
             serde_json::from_str(RESPONSE_WITH_CUSTOM_ENTRIES).unwrap();
         assert_eq!(settings.title, Some("Test Site".to_string()));
-        let additional = settings.additional_fields.expect("additional_fields should be present");
-        assert!(additional.keys().contains(&"Blogroll Recommendations".to_string()));
+        let additional = settings
+            .additional_fields
+            .expect("additional_fields should be present");
+        assert!(
+            additional
+                .keys()
+                .contains(&"Blogroll Recommendations".to_string())
+        );
     }
 
     // With no unknown fields, additional_fields is an empty object.
