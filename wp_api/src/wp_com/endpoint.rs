@@ -6,12 +6,14 @@ use crate::{
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 
+pub mod domains_endpoint;
 pub mod extensions;
 pub mod followers_endpoint;
 pub mod jetpack_connection_endpoint;
 pub mod languages_endpoint;
 pub mod me_endpoint;
 pub mod oauth2;
+pub mod segments_endpoint;
 pub mod sites_endpoint;
 pub mod stats_city_views_endpoint;
 pub mod stats_clicks_endpoint;
@@ -145,6 +147,10 @@ pub(crate) mod tests {
 
     pub fn validate_wp_com_rest_v1_1_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
         validate_endpoint(WpComNamespace::RestV1_1, endpoint_url, path);
+    }
+
+    pub fn validate_wp_com_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint(WpComNamespace::V2, endpoint_url, path);
     }
 
     fn validate_endpoint(namespace: WpComNamespace, endpoint_url: ApiEndpointUrl, path: &str) {

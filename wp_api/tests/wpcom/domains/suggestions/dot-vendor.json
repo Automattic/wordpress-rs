@@ -1,0 +1,21 @@
+[
+  {
+    "domain_name": "testsite.home.blog",
+    "relevance": 1,
+    "supports_privacy": true,
+    "vendor": "dotblogsubdomains",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 76,
+    "product_slug": "dotblog_domain",
+    "cost": "$20.00",
+    "renew_cost": "$20.00",
+    "renew_raw_price": 20,
+    "raw_price": 20,
+    "currency_code": "USD",
+    "sale_cost": 2.0
+  }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "id": 2,
+    "slug": "blog",
+    "mobile": true,
+    "segment_type_title": "Blog",
+    "segment_type_subtitle": "Share and discuss ideas, updates, or creations.",
+    "icon_URL": "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_blogger.png",
+    "icon_color": "#3d4145"
+  },
+  {
+    "id": 1,
+    "slug": "business",
+    "mobile": true,
+    "segment_type_title": "Business",
+    "segment_type_subtitle": "Promote products and services.",
+    "icon_URL": "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_business.png",
+    "icon_color": "#3d4145"
+  },
+  {
+    "id": 3,
+    "slug": "online-store",
+    "mobile": false,
+    "segment_type_title": "Online store",
+    "segment_type_subtitle": "Sell your collection of products online.",
+    "icon_URL": "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_store.png",
+    "icon_color": "#3d4145"
+  },
+  {
+    "id": 4,
+    "slug": "professional",
+    "mobile": true,
+    "segment_type_title": "Professional",
+    "segment_type_subtitle": "Showcase your portfolio, skills or work.",
+    "icon_URL": "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_professional.png",
+    "icon_color": "#3d4145"
+  },
+  {
+    "id": 6,
+    "slug": "blank-canvas",
+    "mobile": true,
+    "segment_type_title": "Blank Canvas",
+    "segment_type_subtitle": "Start with a blank site.",
+    "icon_URL": "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_blank_canvas.png",
+    "icon_color": "#3d4145"
+  }
+]
