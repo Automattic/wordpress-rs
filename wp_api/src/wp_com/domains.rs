@@ -132,7 +132,9 @@ pub struct PaidDomainSuggestion {
     /// `true` if the TLD requires HSTS (e.g. `.dev`).
     pub hsts_required: Option<bool>,
     /// Policy notices attached to the suggestion (e.g. HSTS warnings).
-    pub policy_notices: Option<Vec<DomainPolicyNotice>>,
+    #[serde(default)]
+    #[uniffi(default = [])]
+    pub policy_notices: Vec<DomainPolicyNotice>,
 }
 
 /// A policy notice attached to a domain suggestion (e.g. an HSTS warning).
@@ -207,7 +209,7 @@ mod tests {
         assert_eq!(first.currency_code, "USD");
         assert_eq!(first.sale_cost, None);
         assert_eq!(first.hsts_required, None);
-        assert!(first.policy_notices.is_none());
+        assert!(first.policy_notices.is_empty());
 
         // `freshpage.art` has no `match_reasons` field in the JSON.
         let freshpage_art = suggestions
@@ -229,14 +231,14 @@ mod tests {
             })
             .expect("testsite.dev missing");
         assert_eq!(testsite_dev.hsts_required, Some(true));
-        let notices = testsite_dev
-            .policy_notices
-            .as_ref()
-            .expect("policy_notices missing");
-        assert_eq!(notices.len(), 1);
-        assert_eq!(notices[0].notice_type, "hsts");
-        assert_eq!(notices[0].label, "HSTS required");
-        assert!(notices[0].message.contains("SSL certificate"));
+        assert_eq!(testsite_dev.policy_notices.len(), 1);
+        assert_eq!(testsite_dev.policy_notices[0].notice_type, "hsts");
+        assert_eq!(testsite_dev.policy_notices[0].label, "HSTS required");
+        assert!(
+            testsite_dev.policy_notices[0]
+                .message
+                .contains("SSL certificate")
+        );
     }
 
     #[test]
