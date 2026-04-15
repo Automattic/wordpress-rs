@@ -1,4 +1,5 @@
 use super::endpoint::{
+    domains_endpoint::{DomainsRequestBuilder, DomainsRequestExecutor},
     followers_endpoint::{FollowersRequestBuilder, FollowersRequestExecutor},
     jetpack_connection_endpoint::{
         JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
@@ -57,12 +58,14 @@ use crate::{
     wp_com::endpoint::{
         WpComApiClientInternalUrlResolver,
         languages_endpoint::{LanguagesRequestBuilder, LanguagesRequestExecutor},
+        segments_endpoint::{SegmentsRequestBuilder, SegmentsRequestExecutor},
         sites_endpoint::{SitesRequestBuilder, SitesRequestExecutor},
     },
 };
 use std::sync::Arc;
 
 pub struct WpComApiRequestBuilder {
+    domains: Arc<DomainsRequestBuilder>,
     followers: Arc<FollowersRequestBuilder>,
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
     languages: Arc<LanguagesRequestBuilder>,
@@ -89,6 +92,7 @@ pub struct WpComApiRequestBuilder {
     stats_utm: Arc<StatsUtmRequestBuilder>,
     stats_video_plays: Arc<StatsVideoPlaysRequestBuilder>,
     stats_visits: Arc<StatsVisitsRequestBuilder>,
+    segments: Arc<SegmentsRequestBuilder>,
     subscribers: Arc<SubscribersRequestBuilder>,
     support_bots: Arc<SupportBotsRequestBuilder>,
     support_eligibility: Arc<SupportEligibilityRequestBuilder>,
@@ -102,6 +106,7 @@ impl WpComApiRequestBuilder {
         api_client_generate_request_builder!(
             api_url_resolver,
             auth_provider;
+            domains,
             followers,
             jetpack_connection,
             languages,
@@ -128,6 +133,7 @@ impl WpComApiRequestBuilder {
             stats_utm,
             stats_video_plays,
             stats_visits,
+            segments,
             subscribers,
             support_bots,
             support_eligibility,
@@ -152,6 +158,7 @@ impl UniffiWpComApiClient {
 }
 
 pub struct WpComApiClient {
+    domains: Arc<DomainsRequestExecutor>,
     followers: Arc<FollowersRequestExecutor>,
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
     languages: Arc<LanguagesRequestExecutor>,
@@ -178,6 +185,7 @@ pub struct WpComApiClient {
     stats_utm: Arc<StatsUtmRequestExecutor>,
     stats_video_plays: Arc<StatsVideoPlaysRequestExecutor>,
     stats_visits: Arc<StatsVisitsRequestExecutor>,
+    segments: Arc<SegmentsRequestExecutor>,
     subscribers: Arc<SubscribersRequestExecutor>,
     support_bots: Arc<SupportBotsRequestExecutor>,
     support_eligibility: Arc<SupportEligibilityRequestExecutor>,
@@ -192,6 +200,7 @@ impl WpComApiClient {
         api_client_generate_api_client!(
             api_url_resolver,
             delegate;
+            domains,
             followers,
             jetpack_connection,
             languages,
@@ -218,6 +227,7 @@ impl WpComApiClient {
             stats_utm,
             stats_video_plays,
             stats_visits,
+            segments,
             subscribers,
             support_bots,
             support_eligibility,
@@ -225,6 +235,7 @@ impl WpComApiClient {
         )
     }
 }
+api_client_generate_endpoint_impl!(WpComApi, domains);
 api_client_generate_endpoint_impl!(WpComApi, followers);
 api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
 api_client_generate_endpoint_impl!(WpComApi, languages);
@@ -251,6 +262,7 @@ api_client_generate_endpoint_impl!(WpComApi, stats_top_posts);
 api_client_generate_endpoint_impl!(WpComApi, stats_utm);
 api_client_generate_endpoint_impl!(WpComApi, stats_video_plays);
 api_client_generate_endpoint_impl!(WpComApi, stats_visits);
+api_client_generate_endpoint_impl!(WpComApi, segments);
 api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);
 api_client_generate_endpoint_impl!(WpComApi, support_eligibility);
