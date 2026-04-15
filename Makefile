@@ -246,7 +246,7 @@ stop-server:
 	@# Help: Stop the running server.
 	docker-compose down
 
-lint: lint-rust lint-swift
+lint: lint-rust lint-swift fmt-check-json
 	@# Help: Run the linter for all languages.
 
 lint-rust:
@@ -263,6 +263,14 @@ lint-swift:
 		native/swift/Tools
 
 lintfix-swift: fmt-swift
+
+fmt-json:
+	@# Help: Format all JSON test fixtures with 2-space indent.
+	@./scripts/check-json-formatting.sh --fix
+
+fmt-check-json:
+	@# Help: Check that all JSON test fixtures are pretty-printed.
+	@./scripts/check-json-formatting.sh
 
 fmt-rust:
 	$(rust_docker_run) /bin/bash -c "rustup component add rustfmt && cargo fmt"
