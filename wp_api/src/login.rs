@@ -1,6 +1,6 @@
 use crate::{
     JsonValue, login::url_discovery::is_local_dev_environment_url, parsed_url::ParsedUrl,
-    uuid::WpUuid,
+    request::endpoint::ApiUrlResolver, uuid::WpUuid,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str, sync::Arc};
@@ -212,6 +212,28 @@ impl WpApiDetails {
     pub fn has_route(&self, route: String) -> bool {
         self.routes.contains_key(&route)
     }
+
+    /// Returns `true` if the site has a route matching the given namespace and path,
+    /// using the provided resolver to construct the expected route key.
+    ///
+    /// The resolver may prepend a base path (e.g. `/wp-json`) or insert
+    /// site-specific segments (e.g. `/sites/{id}`). This method strips the
+    /// base path by locating the namespace within the resolved URL path,
+    /// so the lookup matches the route keys returned by the API root.
+    pub fn has_route_for_endpoint(
+        &self,
+        api_url_resolver: &dyn ApiUrlResolver,
+        namespace: String,
+        endpoint_path: String,
+    ) -> bool {
+        let resolved = api_url_resolver.resolve(namespace.clone(), vec![endpoint_path]);
+        let full_path = resolved.inner.path();
+        if let Some(idx) = full_path.find(&namespace) {
+            self.routes.contains_key(&full_path[idx..])
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, uniffi::Record)]
@@ -399,6 +421,9 @@ pub fn create_application_password_authentication_url(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        request::endpoint::WpOrgSiteApiUrlResolver, wp_com::endpoint::WpComDotOrgApiUrlResolver,
+    };
     use rstest::rstest;
     use std::io::Read;
 
@@ -693,6 +718,216 @@ mod tests {
 
         assert!(unwrapped_result.has_route("/jetpack/v4/backup-helper-script".to_string()));
         assert!(!unwrapped_result.has_route("/jetpack/v4/fake-endpoint".to_string()));
+    }
+
+    fn wp_org_resolver() -> WpOrgSiteApiUrlResolver {
+        WpOrgSiteApiUrlResolver::new(
+            ParsedUrl::parse("https://example.com/wp-json")
+                .expect("Valid URL")
+                .into(),
+        )
+    }
+
+    fn wp_com_resolver(site_id: &str) -> WpComDotOrgApiUrlResolver {
+        WpComDotOrgApiUrlResolver::new(site_id.to_string(), crate::wp_com::WpComBaseUrl::Production)
+    }
+
+    fn api_details_with_routes(routes: Vec<&str>) -> WpApiDetails {
+        let routes = routes
+            .into_iter()
+            .map(|r| {
+                (
+                    r.to_string(),
+                    WpRoute {
+                        namespace: String::new(),
+                        methods: vec!["GET".to_string()],
+                        endpoints: vec![],
+                    },
+                )
+            })
+            .collect();
+        WpApiDetails {
+            name: String::new(),
+            description: String::new(),
+            url: "https://example.com".to_string(),
+            home: "https://example.com".to_string(),
+            gmt_offset: None,
+            timezone_string: None,
+            namespaces: vec![],
+            authentication: WpApiDetailsAuthenticationMap(HashMap::new()),
+            site_icon_url: None,
+            routes,
+        }
+    }
+
+    // WP.org: has_route_for_endpoint matches existing routes
+    #[rstest]
+    #[case("/wp/v2", "posts", "/wp/v2/posts")]
+    #[case("/wp/v2", "posts/123", "/wp/v2/posts/123")]
+    #[case("/wp-block-editor/v1", "settings", "/wp-block-editor/v1/settings")]
+    #[case(
+        "/wp-site-health/v1",
+        "tests/background",
+        "/wp-site-health/v1/tests/background"
+    )]
+    fn test_has_route_for_endpoint_wp_org_found(
+        #[case] namespace: &str,
+        #[case] endpoint_path: &str,
+        #[case] route_key: &str,
+    ) {
+        let details = api_details_with_routes(vec![route_key]);
+        let resolver = wp_org_resolver();
+        assert!(details.has_route_for_endpoint(
+            &resolver,
+            namespace.to_string(),
+            endpoint_path.to_string()
+        ));
+    }
+
+    // WP.org: has_route_for_endpoint returns false for missing routes
+    #[rstest]
+    #[case("/wp/v2", "fake-endpoint")]
+    #[case("/wp-block-editor/v1", "nonexistent")]
+    #[case("/wp/v2", "posts/999/revisions")]
+    fn test_has_route_for_endpoint_wp_org_not_found(
+        #[case] namespace: &str,
+        #[case] endpoint_path: &str,
+    ) {
+        let details = api_details_with_routes(vec!["/wp/v2/posts", "/wp-block-editor/v1/settings"]);
+        let resolver = wp_org_resolver();
+        assert!(!details.has_route_for_endpoint(
+            &resolver,
+            namespace.to_string(),
+            endpoint_path.to_string()
+        ));
+    }
+
+    // WP.com: has_route_for_endpoint matches routes with sites/{site_id} inserted
+    #[rstest]
+    #[case("/wp/v2", "posts", "/wp/v2/sites/mobile.blog/posts")]
+    #[case("/wp/v2", "posts/123", "/wp/v2/sites/mobile.blog/posts/123")]
+    #[case(
+        "/wp-block-editor/v1",
+        "settings",
+        "/wp-block-editor/v1/sites/mobile.blog/settings"
+    )]
+    #[case(
+        "/wp-site-health/v1",
+        "tests/background",
+        "/wp-site-health/v1/sites/mobile.blog/tests/background"
+    )]
+    fn test_has_route_for_endpoint_wp_com_found(
+        #[case] namespace: &str,
+        #[case] endpoint_path: &str,
+        #[case] route_key: &str,
+    ) {
+        let details = api_details_with_routes(vec![route_key]);
+        let resolver = wp_com_resolver("mobile.blog");
+        assert!(details.has_route_for_endpoint(
+            &resolver,
+            namespace.to_string(),
+            endpoint_path.to_string()
+        ));
+    }
+
+    // WP.com: has_route_for_endpoint returns false for missing routes
+    #[rstest]
+    #[case("/wp/v2", "fake-endpoint")]
+    #[case("/wp-block-editor/v1", "nonexistent")]
+    fn test_has_route_for_endpoint_wp_com_not_found(
+        #[case] namespace: &str,
+        #[case] endpoint_path: &str,
+    ) {
+        let details = api_details_with_routes(vec![
+            "/wp/v2/sites/mobile.blog/posts",
+            "/wp-block-editor/v1/sites/mobile.blog/settings",
+        ]);
+        let resolver = wp_com_resolver("mobile.blog");
+        assert!(!details.has_route_for_endpoint(
+            &resolver,
+            namespace.to_string(),
+            endpoint_path.to_string()
+        ));
+    }
+
+    // Same namespace+path resolves differently depending on the resolver
+    #[test]
+    fn test_has_route_for_endpoint_same_input_different_resolvers() {
+        let wp_org_details = api_details_with_routes(vec!["/wp/v2/posts"]);
+        let wp_com_details = api_details_with_routes(vec!["/wp/v2/sites/mobile.blog/posts"]);
+
+        let org_resolver = wp_org_resolver();
+        let com_resolver = wp_com_resolver("mobile.blog");
+
+        // WP.org resolver matches WP.org routes
+        assert!(wp_org_details.has_route_for_endpoint(
+            &org_resolver,
+            "/wp/v2".to_string(),
+            "posts".to_string(),
+        ));
+        // WP.org resolver does NOT match WP.com routes
+        assert!(!wp_com_details.has_route_for_endpoint(
+            &org_resolver,
+            "/wp/v2".to_string(),
+            "posts".to_string(),
+        ));
+
+        // WP.com resolver matches WP.com routes
+        assert!(wp_com_details.has_route_for_endpoint(
+            &com_resolver,
+            "/wp/v2".to_string(),
+            "posts".to_string(),
+        ));
+        // WP.com resolver does NOT match WP.org routes
+        assert!(!wp_org_details.has_route_for_endpoint(
+            &com_resolver,
+            "/wp/v2".to_string(),
+            "posts".to_string(),
+        ));
+    }
+
+    // WP.com: different site IDs produce different route keys
+    #[test]
+    fn test_has_route_for_endpoint_wp_com_different_site_ids() {
+        let details = api_details_with_routes(vec!["/wp/v2/sites/mobile.blog/posts"]);
+        let correct_resolver = wp_com_resolver("mobile.blog");
+        let wrong_resolver = wp_com_resolver("other.blog");
+
+        assert!(details.has_route_for_endpoint(
+            &correct_resolver,
+            "/wp/v2".to_string(),
+            "posts".to_string(),
+        ));
+        assert!(!details.has_route_for_endpoint(
+            &wrong_resolver,
+            "/wp/v2".to_string(),
+            "posts".to_string(),
+        ));
+    }
+
+    // Verify has_route_for_endpoint works against real test fixture data
+    #[test]
+    fn test_has_route_for_endpoint_with_test_fixture() {
+        let json: Vec<u8> =
+            test_json("api-details/test-case-03.json").expect("Failed to read test resource");
+        let details = WpApiDetails::try_from(json.as_slice()).unwrap();
+        let resolver = wp_org_resolver();
+
+        assert!(details.has_route_for_endpoint(
+            &resolver,
+            "/wp-block-editor/v1".to_string(),
+            "settings".to_string(),
+        ));
+        assert!(details.has_route_for_endpoint(
+            &resolver,
+            "/wp/v2".to_string(),
+            "posts".to_string(),
+        ));
+        assert!(!details.has_route_for_endpoint(
+            &resolver,
+            "/wp/v2".to_string(),
+            "fake-endpoint".to_string(),
+        ));
     }
 
     fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
