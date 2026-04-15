@@ -48,28 +48,28 @@ mod tests {
 
         assert_eq!(segments.len(), 5);
 
-        let blog = segments
+        let unicorn = segments
             .iter()
-            .find(|s| s.slug == "blog")
-            .expect("blog segment missing");
-        assert_eq!(blog.id, SegmentId(2));
-        assert!(blog.mobile);
-        assert_eq!(blog.title, "Blog");
+            .find(|s| s.slug == "unicorn-ranch")
+            .expect("unicorn-ranch segment missing");
+        assert_eq!(unicorn.id, SegmentId(101));
+        assert!(unicorn.mobile);
+        assert_eq!(unicorn.title, "Unicorn Ranch");
         assert_eq!(
-            blog.subtitle,
-            "Share and discuss ideas, updates, or creations."
+            unicorn.subtitle,
+            "Manage your mythical creature farm online."
         );
         assert_eq!(
-            blog.icon_url,
-            "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_blogger.png"
+            unicorn.icon_url,
+            "https://example.invalid/icons/ic_unicorn.png"
         );
-        assert_eq!(blog.icon_color, "#3d4145");
+        assert_eq!(unicorn.icon_color, "#ff00ff");
 
-        let online_store = segments
+        let bakery = segments
             .iter()
-            .find(|s| s.slug == "online-store")
-            .expect("online-store segment missing");
-        assert_eq!(online_store.id, SegmentId(3));
-        assert!(!online_store.mobile);
+            .find(|s| s.slug == "cloud-bakery")
+            .expect("cloud-bakery segment missing");
+        assert_eq!(bakery.id, SegmentId(103));
+        assert!(!bakery.mobile);
     }
 }
