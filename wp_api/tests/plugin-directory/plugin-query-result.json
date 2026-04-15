@@ -1,5 +1,9 @@
 {
-  "info": { "page": 1, "pages": 27333, "results": 54665 },
+  "info": {
+    "page": 1,
+    "pages": 27333,
+    "results": 54665
+  },
   "plugins": [
     {
       "name": "Plugin 1",
@@ -12,7 +16,13 @@
       "requires_php": "7.4",
       "requires_plugins": [],
       "rating": 92,
-      "ratings": { "5": 5, "4": 4, "3": 3, "2": 2, "1": 1 },
+      "ratings": {
+        "5": 5,
+        "4": 4,
+        "3": 3,
+        "2": 2,
+        "1": 1
+      },
       "num_ratings": 15,
       "support_threads": 2,
       "support_threads_resolved": 9,
@@ -45,7 +55,13 @@
       "requires_php": "7.4",
       "requires_plugins": [],
       "rating": 92,
-      "ratings": { "5": 5, "4": 4, "3": 3, "2": 2, "1": 1 },
+      "ratings": {
+        "5": 5,
+        "4": 4,
+        "3": 3,
+        "2": 2,
+        "1": 1
+      },
       "num_ratings": 15,
       "support_threads": 2,
       "support_threads_resolved": 9,

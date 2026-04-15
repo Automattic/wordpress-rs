@@ -1,15 +1,15 @@
 {
   "name": "my-test-site",
   "description": "",
-  "url": "http:\/\/localhost",
-  "home": "http:\/\/localhost",
+  "url": "http://localhost",
+  "home": "http://localhost",
   "gmt_offset": -5,
-  "timezone_string": "America\/New_York",
+  "timezone_string": "America/New_York",
   "namespaces": [
-    "oembed\/1.0",
-    "wp\/v2",
-    "wp-site-health\/v1",
-    "wp-block-editor\/v1"
+    "oembed/1.0",
+    "wp/v2",
+    "wp-site-health/v1",
+    "wp-block-editor/v1"
   ],
   "authentication": {},
   "routes": {},
@@ -19,7 +19,7 @@
   "_links": {
     "help": [
       {
-        "href": "https:\/\/developer.wordpress.org\/rest-api\/"
+        "href": "https://developer.wordpress.org/rest-api/"
       }
     ]
   }
