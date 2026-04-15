@@ -1,4 +1,5 @@
 use crate::{
+    decimal2::Decimal2,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::segments::SegmentId,
 };
@@ -122,13 +123,13 @@ pub struct PaidDomainSuggestion {
     /// Formatted renewal cost (e.g. `"$18.00"`).
     pub renew_cost: String,
     /// Raw numeric renewal price in `currency_code`.
-    pub renew_raw_price: f64,
+    pub renew_raw_price: Decimal2,
     /// Raw numeric registration price in `currency_code`.
-    pub raw_price: f64,
+    pub raw_price: Decimal2,
     /// ISO 4217 currency code for `raw_price`/`renew_raw_price` (e.g. `"USD"`).
     pub currency_code: String,
     /// Promotional sale price in `currency_code`, if the domain is on sale.
-    pub sale_cost: Option<f64>,
+    pub sale_cost: Option<Decimal2>,
     /// `true` if the TLD requires HSTS (e.g. `.dev`).
     pub hsts_required: Option<bool>,
     /// Policy notices attached to the suggestion (e.g. HSTS warnings).
@@ -204,8 +205,8 @@ mod tests {
         assert_eq!(first.product_slug, "domain_reg");
         assert_eq!(first.cost, "$18.00");
         assert_eq!(first.renew_cost, "$18.00");
-        assert_eq!(first.renew_raw_price, 18.0);
-        assert_eq!(first.raw_price, 18.0);
+        assert_eq!(first.renew_raw_price.hundredths(), 1800);
+        assert_eq!(first.raw_price.hundredths(), 1800);
         assert_eq!(first.currency_code, "USD");
         assert_eq!(first.sale_cost, None);
         assert_eq!(first.hsts_required, None);
@@ -220,7 +221,7 @@ mod tests {
             })
             .expect("freshpage.art missing");
         assert!(freshpage_art.match_reasons.is_none());
-        assert_eq!(freshpage_art.sale_cost, Some(1.64));
+        assert_eq!(freshpage_art.sale_cost.map(|d| d.hundredths()), Some(164));
 
         // `testsite.dev` has hsts_required and policy_notices populated.
         let testsite_dev = suggestions
