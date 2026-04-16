@@ -92,17 +92,19 @@ impl de::Visitor<'_> for Decimal2Visitor {
     }
 
     fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
-        let hundredths =
+        let signed =
             i64::try_from(v).map_err(|_| E::invalid_value(Unexpected::Unsigned(v), &self))?;
-        Ok(Decimal2 {
-            hundredths: hundredths * 100,
-        })
+        let hundredths = signed
+            .checked_mul(100)
+            .ok_or_else(|| E::invalid_value(Unexpected::Unsigned(v), &self))?;
+        Ok(Decimal2 { hundredths })
     }
 
     fn visit_i64<E: de::Error>(self, v: i64) -> Result<Self::Value, E> {
-        Ok(Decimal2 {
-            hundredths: v * 100,
-        })
+        let hundredths = v
+            .checked_mul(100)
+            .ok_or_else(|| E::invalid_value(Unexpected::Signed(v), &self))?;
+        Ok(Decimal2 { hundredths })
     }
 
     fn visit_f64<E: de::Error>(self, v: f64) -> Result<Self::Value, E> {
