@@ -137,6 +137,56 @@ pub struct PaidDomainSuggestion {
     pub policy_notices: Vec<DomainPolicyNotice>,
 }
 
+impl PaidDomainSuggestion {
+    /// Returns a formatted sale price string matching the server's
+    /// `combined_sale_cost_display` format, or `None` if the domain is
+    /// not on sale.
+    ///
+    /// The format uses the currency prefix from [`cost`](Self::cost)
+    /// (e.g. `"TL"`, `"$"`), comma thousand-separators, and two decimal
+    /// places only when the value has a fractional part.
+    ///
+    /// Examples: `"TL 47.50"`, `"TL 174"`, `"TL 1,099.35"`, `"$ 18.00"`.
+    pub fn sale_cost_display(&self) -> Option<String> {
+        let sale = self.sale_cost.filter(|&v| v > 0.0)?;
+
+        let prefix: String = self
+            .cost
+            .trim_start()
+            .chars()
+            .take_while(|c| !c.is_ascii_digit())
+            .collect::<String>()
+            .trim_end()
+            .to_string();
+
+        let integer = sale as u64;
+        let formatted_int =
+            num_format::ToFormattedString::to_formatted_string(&integer, &num_format::Locale::en);
+
+        let formatted = if sale.fract() == 0.0 {
+            formatted_int
+        } else {
+            let fraction = ((sale - integer as f64) * 100.0).round() as u64;
+            format!("{formatted_int}.{fraction:02}")
+        };
+
+        Some(format!("{prefix} {formatted}"))
+    }
+}
+
+/// Returns a formatted sale price string for a [PaidDomainSuggestion],
+/// matching the server's `combined_sale_cost_display` format.
+///
+/// Returns `None` if the domain is not on sale. This is a free-standing
+/// wrapper around [`PaidDomainSuggestion::sale_cost_display`] for UniFFI
+/// export, since UniFFI records do not support methods.
+#[uniffi::export]
+pub fn paid_domain_suggestion_sale_cost_display(
+    suggestion: &PaidDomainSuggestion,
+) -> Option<String> {
+    suggestion.sale_cost_display()
+}
+
 /// A policy notice attached to a domain suggestion (e.g. an HSTS warning).
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct DomainPolicyNotice {
@@ -301,5 +351,58 @@ mod tests {
         };
         assert_eq!(only.domain_name, "testsite.home.blog");
         assert_eq!(only.vendor, "dotblogsubdomains");
+    }
+
+    /// Test cases derived from real WordPress.com `/products/?type=domains`
+    /// responses, verifying that [`PaidDomainSuggestion::sale_cost_display`]
+    /// matches the server's `combined_sale_cost_display` field exactly.
+    #[rstest]
+    // Two decimal places
+    #[case(Some(25.92), "TL 432", Some("TL 25.92"))]
+    // One trailing decimal → padded to two
+    #[case(Some(47.5), "TL 475", Some("TL 47.50"))]
+    // One trailing decimal (different value)
+    #[case(Some(39.3), "TL 786", Some("TL 39.30"))]
+    // Two decimals, no padding needed
+    #[case(Some(183.28), "TL 2,291", Some("TL 183.28"))]
+    // Whole number → no decimals
+    #[case(Some(174.0), "TL 580", Some("TL 174"))]
+    // Whole number (larger)
+    #[case(Some(858.0), "TL 1,144", Some("TL 858"))]
+    // Thousands with comma separator and decimals
+    #[case(Some(1099.35), "TL 3,141", Some("TL 1,099.35"))]
+    // Thousands with comma separator and decimals (larger)
+    #[case(Some(4689.65), "TL 13,399", Some("TL 4,689.65"))]
+    // Thousands with comma separator, padded decimal
+    #[case(Some(1508.4), "TL 2,514", Some("TL 1,508.40"))]
+    // No sale cost
+    #[case(None, "TL 426", None)]
+    // Zero sale cost
+    #[case(Some(0.0), "TL 426", None)]
+    fn test_sale_cost_display(
+        #[case] sale_cost: Option<f64>,
+        #[case] cost: &str,
+        #[case] expected: Option<&str>,
+    ) {
+        let suggestion = PaidDomainSuggestion {
+            domain_name: "test.com".to_string(),
+            relevance: 1.0,
+            supports_privacy: true,
+            vendor: "donuts".to_string(),
+            match_reasons: None,
+            max_reg_years: 10,
+            multi_year_reg_allowed: true,
+            product_id: 6,
+            product_slug: "domain_reg".to_string(),
+            cost: cost.to_string(),
+            renew_cost: cost.to_string(),
+            renew_raw_price: 0.0,
+            raw_price: 0.0,
+            currency_code: "TRY".to_string(),
+            sale_cost,
+            hsts_required: None,
+            policy_notices: vec![],
+        };
+        assert_eq!(suggestion.sale_cost_display().as_deref(), expected);
     }
 }

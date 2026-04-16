@@ -25,6 +25,7 @@ hyper-util = { workspace = true, optional = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+num-format = { workspace = true }
 url = { workspace = true }
 parse_link_header = { workspace = true }
 paste = { workspace = true }
