@@ -246,11 +246,17 @@ pub struct SupportedCountry {
     /// Whether a subdivision (state/province) is required in the tax address.
     pub tax_needs_subdivision: bool,
     /// Whether a street address is required for tax purposes.
-    pub tax_needs_address: Option<bool>,
+    #[serde(default)]
+    #[uniffi(default = false)]
+    pub tax_needs_address: bool,
     /// Whether an organization name is required for tax purposes.
-    pub tax_needs_organization: Option<bool>,
+    #[serde(default)]
+    #[uniffi(default = false)]
+    pub tax_needs_organization: bool,
     /// Additional country codes whose tax rules apply alongside this one.
-    pub tax_country_codes: Option<Vec<String>>,
+    #[serde(default)]
+    #[uniffi(default = [])]
+    pub tax_country_codes: Vec<String>,
     /// Localized tax name (e.g. `"GST"`, `"VAT"`).
     pub tax_name: Option<String>,
 }
@@ -433,7 +439,7 @@ mod tests {
             .iter()
             .find(|c| c.code == "BR")
             .expect("BR missing from all");
-        assert_eq!(br.tax_country_codes, None);
+        assert!(br.tax_country_codes.is_empty());
         assert_eq!(br.tax_name, None);
 
         // Australia has `tax_country_codes` and `tax_name`.
@@ -442,10 +448,7 @@ mod tests {
             .iter()
             .find(|c| c.code == "AU")
             .expect("AU missing from all");
-        assert_eq!(
-            au.tax_country_codes.as_deref(),
-            Some(["AU".to_string()].as_slice())
-        );
+        assert_eq!(au.tax_country_codes, vec!["AU".to_string()]);
         assert_eq!(au.tax_name.as_deref(), Some("GST"));
 
         // The separator entry should be filtered out.
