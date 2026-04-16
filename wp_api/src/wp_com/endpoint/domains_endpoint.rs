@@ -3,7 +3,7 @@ use crate::{
     wp_com::{
         WpComNamespace,
         domains::{
-            CountryCode, DomainSuggestion, DomainSuggestionsParams, SupportedCountry,
+            CountryCode, DomainSuggestion, DomainSuggestionsParams, SupportedCountries,
             SupportedState,
         },
     },
@@ -14,7 +14,7 @@ use wp_derive_request_builder::WpDerivedRequest;
 enum DomainsRequest {
     #[get(url = "/domains/suggestions", params = &DomainSuggestionsParams, output = Vec<DomainSuggestion>)]
     Suggestions,
-    #[get(url = "/domains/supported-countries", output = Vec<SupportedCountry>)]
+    #[get(url = "/domains/supported-countries", output = SupportedCountries)]
     SupportedCountries,
     #[get(url = "/domains/supported-states/<country_code>", output = Vec<SupportedState>)]
     SupportedStates,

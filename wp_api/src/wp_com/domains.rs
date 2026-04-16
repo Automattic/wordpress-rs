@@ -164,25 +164,87 @@ impl std::fmt::Display for CountryCode {
     }
 }
 
-/// A country supported by the WordPress.com domain registration flow.
+/// Structured response from `GET /domains/supported-countries`.
 ///
-/// Returned from `GET /domains/supported-countries`. Note that the response
-/// also contains sentinel entries with empty `code`/`name` used by the web
-/// UI as visual separators in the country dropdown.
+/// The raw API response is a flat array where a sentinel entry (empty
+/// `code`/`name`, `has_postal_codes: false`) separates "featured" countries
+/// from the full alphabetical list. This type deserializes that array and
+/// splits it into two vectors, filtering out the sentinel.
+///
+/// If no sentinel is found the full list is placed in `all` and `featured`
+/// is empty.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "Vec<SupportedCountryEntry>")]
+pub struct SupportedCountries {
+    /// Countries the API surfaces at the top of the picker, in the API's
+    /// priority order (not alphabetical).
+    pub featured: Vec<SupportedCountry>,
+    /// Every supported country, alphabetized by localized name.
+    pub all: Vec<SupportedCountry>,
+}
+
+impl From<Vec<SupportedCountryEntry>> for SupportedCountries {
+    fn from(mut entries: Vec<SupportedCountryEntry>) -> Self {
+        let into_countries = |v: Vec<SupportedCountryEntry>| {
+            v.into_iter()
+                .filter_map(|e| match e {
+                    SupportedCountryEntry::Country(c) => Some(c),
+                    SupportedCountryEntry::Divider { .. } => None,
+                })
+                .collect()
+        };
+
+        let divider_pos = entries
+            .iter()
+            .position(|e| matches!(e, SupportedCountryEntry::Divider { .. }));
+
+        match divider_pos {
+            Some(pos) => {
+                let all_entries = entries.split_off(pos + 1);
+                Self {
+                    featured: into_countries(entries),
+                    all: into_countries(all_entries),
+                }
+            }
+            None => Self {
+                featured: Vec::new(),
+                all: into_countries(entries),
+            },
+        }
+    }
+}
+
+/// Internal type used to deserialize the raw API array which mixes real
+/// country entries with sentinel dividers.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum SupportedCountryEntry {
+    Country(SupportedCountry),
+    Divider {
+        #[allow(dead_code)]
+        code: String,
+        #[allow(dead_code)]
+        name: String,
+        #[allow(dead_code)]
+        has_postal_codes: bool,
+    },
+}
+
+/// A country supported by the WordPress.com domain registration flow.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct SupportedCountry {
-    /// ISO 3166-1 alpha-2 code (e.g. `"US"`). Empty for separator entries.
+    /// ISO 3166-1 alpha-2 code (e.g. `"US"`).
     pub code: String,
-    /// Localized country name. Empty for separator entries.
+    /// Localized country name.
     pub name: String,
     /// Whether this country uses postal codes in addresses.
     pub has_postal_codes: bool,
     /// Whether VAT is collected for this country.
-    pub vat_supported: Option<bool>,
+    pub vat_supported: bool,
     /// Whether a city is required in the tax address.
-    pub tax_needs_city: Option<bool>,
+    pub tax_needs_city: bool,
     /// Whether a subdivision (state/province) is required in the tax address.
-    pub tax_needs_subdivision: Option<bool>,
+    pub tax_needs_subdivision: bool,
     /// Whether a street address is required for tax purposes.
     pub tax_needs_address: Option<bool>,
     /// Whether an organization name is required for tax purposes.
@@ -347,51 +409,52 @@ mod tests {
     fn test_supported_countries_deserialization() {
         let file = File::open("tests/wpcom/domains/supported_countries/all.json")
             .expect("Failed to open file");
-        let countries: Vec<SupportedCountry> =
+        let response: SupportedCountries =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(countries.len(), 249);
+        assert_eq!(response.featured.len(), 10);
+        assert_eq!(response.all.len(), 238);
 
-        // US has all optional tax fields populated.
-        let us = countries
+        // US is in featured and has all optional tax fields populated.
+        let us = response
+            .featured
             .iter()
             .find(|c| c.code == "US")
-            .expect("US missing");
+            .expect("US missing from featured");
         assert_eq!(us.name, "United States");
         assert!(us.has_postal_codes);
-        assert_eq!(us.vat_supported, Some(false));
-        assert_eq!(us.tax_needs_city, Some(false));
-        assert_eq!(us.tax_needs_subdivision, Some(false));
+        assert!(!us.vat_supported);
+        assert!(!us.tax_needs_city);
+        assert!(!us.tax_needs_subdivision);
 
         // Brazil has no `tax_country_codes` or `tax_name`.
-        let br = countries
+        let br = response
+            .all
             .iter()
             .find(|c| c.code == "BR")
-            .expect("BR missing");
+            .expect("BR missing from all");
         assert_eq!(br.tax_country_codes, None);
         assert_eq!(br.tax_name, None);
 
         // Australia has `tax_country_codes` and `tax_name`.
-        let au = countries
+        let au = response
+            .all
             .iter()
             .find(|c| c.code == "AU")
-            .expect("AU missing");
+            .expect("AU missing from all");
         assert_eq!(
             au.tax_country_codes.as_deref(),
             Some(["AU".to_string()].as_slice())
         );
         assert_eq!(au.tax_name.as_deref(), Some("GST"));
 
-        // The separator entry has empty code/name and only `has_postal_codes`.
-        let separator = countries
+        // The separator entry should be filtered out.
+        let separator = response
+            .featured
             .iter()
-            .find(|c| c.code.is_empty())
-            .expect("separator entry missing");
-        assert!(separator.name.is_empty());
-        assert!(!separator.has_postal_codes);
-        assert_eq!(separator.vat_supported, None);
-        assert_eq!(separator.tax_needs_city, None);
-        assert_eq!(separator.tax_needs_subdivision, None);
+            .chain(response.all.iter())
+            .find(|c| c.code.is_empty());
+        assert!(separator.is_none(), "separator should be filtered out");
     }
 
     #[rstest]
