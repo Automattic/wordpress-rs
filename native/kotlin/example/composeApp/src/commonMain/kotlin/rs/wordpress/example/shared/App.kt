@@ -46,6 +46,9 @@ import rs.wordpress.example.shared.ui.wpcom.WpComBotConversationsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComMeScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSiteScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSupportConversationsScreen
+import rs.wordpress.example.shared.ui.wpcom.WpComUnifiedConversationScreen
+import rs.wordpress.example.shared.ui.wpcom.WpComUnifiedConversationsScreen
+import uniffi.wp_api.ConversationId
 import uniffi.wp_api.PostEndpointType
 import uniffi.wp_api.TermEndpointType
 import uniffi.wp_mobile.Account
@@ -65,6 +68,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
     var currentSiteViewModel by remember { mutableStateOf<SiteViewModel?>(null) }
     var currentPostType by remember { mutableStateOf<SitePostType?>(null) }
     var currentTaxonomy by remember { mutableStateOf<SiteTaxonomy?>(null) }
+    var currentUnifiedConversationId by remember { mutableStateOf<ConversationId?>(null) }
 
     MaterialTheme {
         NavHost(navController, startDestination = "welcome") {
@@ -364,6 +368,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                 WpComSiteScreen(
                     onMeClicked = { navController.navigate("wpcom_me") },
                     onSupportConversationsClicked = { navController.navigate("wpcom_support") },
+                    onUnifiedConversationsClicked = { navController.navigate("wpcom_unified") },
                     onBotConversationsClicked = { navController.navigate("wpcom_bots") },
                     onBackClicked = { navController.popBackStack() }
                 )
@@ -398,6 +403,38 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                 }
                 WpComBotConversationsScreen(
                     wpComApiClient = wpComClient,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("wpcom_unified") {
+                val wpComClient = currentWpComClient
+                if (wpComClient == null) {
+                    ErrorMessage("No WordPress.com account connected")
+                    return@composable
+                }
+                WpComUnifiedConversationsScreen(
+                    wpComApiClient = wpComClient,
+                    onConversationClicked = { conversationId ->
+                        currentUnifiedConversationId = conversationId
+                        navController.navigate("wpcom_unified_detail")
+                    },
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("wpcom_unified_detail") {
+                val wpComClient = currentWpComClient
+                val conversationId = currentUnifiedConversationId
+                if (wpComClient == null) {
+                    ErrorMessage("No WordPress.com account connected")
+                    return@composable
+                }
+                if (conversationId == null) {
+                    ErrorMessage("No conversation selected")
+                    return@composable
+                }
+                WpComUnifiedConversationScreen(
+                    wpComApiClient = wpComClient,
+                    conversationId = conversationId,
                     onBackClicked = { navController.popBackStack() }
                 )
             }

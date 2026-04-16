@@ -100,6 +100,10 @@ public final class WPComApiClient: Sendable {
         internalClient.supportTickets()
     }
 
+    public var unifiedConversations: UnifiedConversationsRequestExecutor {
+        internalClient.unifiedConversations()
+    }
+
     public var statsVisits: StatsVisitsRequestExecutor {
         internalClient.statsVisits()
     }
