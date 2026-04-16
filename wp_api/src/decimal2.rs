@@ -88,7 +88,14 @@ impl de::Visitor<'_> for Decimal2Visitor {
     type Value = Decimal2;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a number with at most 2 decimal places")
+        formatter.write_str("a number (or numeric string) with at most 2 decimal places")
+    }
+
+    fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        let parsed: f64 = v
+            .parse()
+            .map_err(|_| E::invalid_value(Unexpected::Str(v), &self))?;
+        self.visit_f64(parsed)
     }
 
     fn visit_u64<E: de::Error>(self, v: u64) -> Result<Self::Value, E> {
@@ -141,6 +148,9 @@ mod tests {
     #[case(r#"{"value": 1.5}"#, 150)]
     #[case(r#"{"value": -3.25}"#, -325)]
     #[case(r#"{"value": 0.01}"#, 1)]
+    #[case(r#"{"value": "19.99"}"#, 1999)]
+    #[case(r#"{"value": "11"}"#, 1100)]
+    #[case(r#"{"value": "0.5"}"#, 50)]
     fn test_deserialize(#[case] json: &str, #[case] expected_hundredths: i64) {
         let wrapper: Wrapper = serde_json::from_str(json).expect("should deserialize");
         assert_eq!(wrapper.value.hundredths(), expected_hundredths);
@@ -150,7 +160,9 @@ mod tests {
     #[case(r#"{"value": 8.635}"#)]
     #[case(r#"{"value": 1.999}"#)]
     #[case(r#"{"value": 0.001}"#)]
-    fn test_deserialize_rejects_more_than_two_decimals(#[case] json: &str) {
+    #[case(r#"{"value": "8.635"}"#)]
+    #[case(r#"{"value": "abc"}"#)]
+    fn test_deserialize_rejects_invalid_values(#[case] json: &str) {
         let result: Result<Wrapper, _> = serde_json::from_str(json);
         assert!(
             result.is_err(),
