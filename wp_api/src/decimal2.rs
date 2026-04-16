@@ -182,12 +182,12 @@ mod tests {
     }
 
     #[rstest]
-    #[case(1100, "1100")]
-    #[case(863, "8.63")]
-    #[case(0, "0")]
-    #[case(1800, "1800")]
-    #[case(150, "1.5")]
-    fn test_serialize_roundtrip(#[case] hundredths: i64, #[case] _label: &str) {
+    #[case(1100)]
+    #[case(863)]
+    #[case(0)]
+    #[case(1800)]
+    #[case(150)]
+    fn test_serialize_roundtrip(#[case] hundredths: i64) {
         let original = Decimal2 { hundredths };
         let json = serde_json::to_string(&original).expect("should serialize");
         let restored: Decimal2 = serde_json::from_str(&json).expect("should deserialize back");
