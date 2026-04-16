@@ -35,6 +35,7 @@ pub mod subscribers;
 pub mod support_bots;
 pub mod support_eligibility;
 pub mod support_tickets;
+pub mod unified_conversations;
 
 impl_as_query_value_for_new_type!(WpComSiteId);
 uniffi::custom_newtype!(WpComSiteId, u64);
