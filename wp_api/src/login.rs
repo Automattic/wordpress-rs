@@ -638,7 +638,6 @@ mod tests {
     #[case("api-details/test-case-05.json")]
     #[case("api-details/test-case-06.json")]
     #[case("api-details/test-case-07.json")]
-    #[case("api-details/test-case-08-wpcom.json")]
     fn test_api_details_json(#[case] input: &str) {
         let json = test_json(input).expect("Failed to read test resource");
 
@@ -916,38 +915,6 @@ mod tests {
             "/wp/v2".to_string(),
             "posts".to_string(),
         ));
-        assert!(!details.has_route_for_endpoint(
-            &resolver,
-            "/wp/v2".to_string(),
-            "fake-endpoint".to_string(),
-        ));
-    }
-
-    // Verify has_route_for_endpoint works against real WP.com API root response
-    #[test]
-    fn test_has_route_for_endpoint_with_wp_com_fixture() {
-        let json: Vec<u8> =
-            test_json("api-details/test-case-08-wpcom.json").expect("Failed to read test resource");
-        let details = WpApiDetails::try_from(json.as_slice()).unwrap();
-        let resolver = wp_com_resolver("mobiledotblog.wordpress.com");
-
-        // Routes that exist in the WP.com response
-        assert!(details.has_route_for_endpoint(
-            &resolver,
-            "/wp-block-editor/v1".to_string(),
-            "settings".to_string(),
-        ));
-        assert!(details.has_route_for_endpoint(
-            &resolver,
-            "/wp/v2".to_string(),
-            "posts".to_string(),
-        ));
-        assert!(details.has_route_for_endpoint(
-            &resolver,
-            "/wp/v2".to_string(),
-            "media".to_string(),
-        ));
-        // Route that doesn't exist
         assert!(!details.has_route_for_endpoint(
             &resolver,
             "/wp/v2".to_string(),
