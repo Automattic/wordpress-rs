@@ -1,4 +1,7 @@
-use crate::url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension};
+use crate::{
+    decimal2::Decimal2,
+    url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -72,7 +75,7 @@ pub struct Product {
     /// Numeric sale price when a coupon applies.
     #[serde(default)]
     #[uniffi(default = None)]
-    pub sale_cost: Option<f64>,
+    pub sale_cost: Option<Decimal2>,
     /// Formatted combined sale cost (e.g. `"$6.00"`).
     #[serde(default)]
     #[uniffi(default = None)]
@@ -201,7 +204,7 @@ mod tests {
             .expect("dotinfo_domain should have sale_coupon");
         assert_eq!(coupon.discount, 65);
         assert_eq!(coupon.code, "fakecoupon123");
-        assert_eq!(dotinfo.sale_cost, Some(7.0));
+        assert_eq!(dotinfo.sale_cost, Some(Decimal2::from_hundredths(700)));
     }
 
     #[test]
