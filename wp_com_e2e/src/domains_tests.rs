@@ -27,7 +27,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     .featured
                     .iter()
                     .chain(response.all.iter())
-                    .any(|c| c.code.is_empty());
+                    .any(|c| c.code.0.is_empty());
                 if has_separator {
                     return Err("separator entry should be filtered out".into());
                 }

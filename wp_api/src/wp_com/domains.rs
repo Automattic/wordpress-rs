@@ -234,7 +234,7 @@ enum SupportedCountryEntry {
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct SupportedCountry {
     /// ISO 3166-1 alpha-2 code (e.g. `"US"`).
-    pub code: String,
+    pub code: CountryCode,
     /// Localized country name.
     pub name: String,
     /// Whether this country uses postal codes in addresses.
@@ -425,7 +425,7 @@ mod tests {
         let us = response
             .featured
             .iter()
-            .find(|c| c.code == "US")
+            .find(|c| c.code.0 == "US")
             .expect("US missing from featured");
         assert_eq!(us.name, "United States");
         assert!(us.has_postal_codes);
@@ -437,7 +437,7 @@ mod tests {
         let br = response
             .all
             .iter()
-            .find(|c| c.code == "BR")
+            .find(|c| c.code.0 == "BR")
             .expect("BR missing from all");
         assert!(br.tax_country_codes.is_empty());
         assert_eq!(br.tax_name, None);
@@ -446,7 +446,7 @@ mod tests {
         let au = response
             .all
             .iter()
-            .find(|c| c.code == "AU")
+            .find(|c| c.code.0 == "AU")
             .expect("AU missing from all");
         assert_eq!(au.tax_country_codes, vec!["AU".to_string()]);
         assert_eq!(au.tax_name.as_deref(), Some("GST"));
@@ -456,7 +456,7 @@ mod tests {
             .featured
             .iter()
             .chain(response.all.iter())
-            .find(|c| c.code.is_empty());
+            .find(|c| c.code.0.is_empty());
         assert!(separator.is_none(), "separator should be filtered out");
     }
 
