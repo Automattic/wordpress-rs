@@ -15,6 +15,7 @@ pub mod application_passwords;
 pub mod auth;
 pub mod comments;
 pub mod date;
+pub mod decimal2;
 pub mod login;
 pub mod media;
 pub mod menu_locations;
