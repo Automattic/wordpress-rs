@@ -12,6 +12,7 @@ pub mod language;
 pub mod me;
 pub mod me_connections;
 pub mod oauth2;
+pub mod products;
 pub mod publicize;
 pub mod segments;
 pub mod sites;

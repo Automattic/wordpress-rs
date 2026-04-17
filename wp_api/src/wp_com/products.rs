@@ -1,0 +1,236 @@
+use crate::url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// Parameters for `GET /products`.
+#[derive(Debug, Default, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct ProductsParams {
+    /// Filter by product type (e.g. `"domains"`).
+    #[uniffi(default = None)]
+    pub product_type: Option<String>,
+}
+
+impl AppendUrlQueryPairs for ProductsParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut.append_option_query_value_pair("type", self.product_type.as_ref());
+    }
+}
+
+/// Map of product slug to product, as returned by `GET /products`.
+pub type ProductMap = HashMap<String, Product>;
+
+/// A WordPress.com product.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct Product {
+    pub product_id: u64,
+    pub product_name: String,
+    pub product_slug: String,
+    pub description: String,
+    pub product_type: String,
+    pub available: bool,
+    pub billing_product_slug: String,
+    pub is_domain_registration: bool,
+    /// Formatted display cost (e.g. `"$18.00"`), localized to the account's
+    /// currency.
+    pub cost_display: String,
+    /// Formatted combined cost without decimal places (e.g. `"$18"`).
+    pub combined_cost_display: String,
+    /// Numeric cost in the account's currency.
+    pub cost: f64,
+    /// Cost in the smallest currency unit (e.g. cents).
+    pub cost_smallest_unit: u64,
+    pub currency_code: String,
+    /// Billing period (e.g. `"year"`).
+    pub product_term: String,
+    /// Localized billing period label.
+    pub product_term_localized: String,
+    pub price_tier_slug: String,
+    #[serde(default)]
+    #[uniffi(default = [])]
+    pub price_tier_list: Vec<PriceTier>,
+    /// Top-level domain for registration products (e.g. `"com"`, `"net"`).
+    /// Absent for non-registration products like domain mapping.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub tld: Option<String>,
+    /// Whether WHOIS privacy can be purchased with this domain.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub is_privacy_protection_product_purchase_allowed: Option<bool>,
+    /// Whether HSTS is required for this TLD (e.g. `.dev`, `.app`).
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub is_hsts_required: Option<bool>,
+    /// Whether the `.gay` TLD policy notice is required.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub is_dot_gay_notice_required: Option<bool>,
+    /// Formatted monthly cost (e.g. `"$1.50"`).
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub cost_per_month_display: Option<String>,
+    /// Numeric sale price when a coupon applies.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub sale_cost: Option<f64>,
+    /// Formatted combined sale cost (e.g. `"$6.00"`).
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub combined_sale_cost_display: Option<String>,
+    /// Active sale coupon details, if any.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub sale_coupon: Option<SaleCoupon>,
+    /// Introductory offer details, if any.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub introductory_offer: Option<IntroductoryOffer>,
+}
+
+/// A pricing tier for usage-based products.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct PriceTier {
+    pub minimum_units: u64,
+    /// `None` for the highest (unbounded) tier.
+    pub maximum_units: Option<u64>,
+    pub minimum_price: u64,
+    pub maximum_price: u64,
+    pub minimum_price_display: String,
+    pub minimum_price_monthly_display: String,
+    /// `None` for the highest (unbounded) tier.
+    pub maximum_price_display: Option<String>,
+    /// `None` for the highest (unbounded) tier.
+    pub maximum_price_monthly_display: Option<String>,
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub flat_fee: Option<u64>,
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub per_unit_fee: Option<u64>,
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub transform_quantity_divide_by: Option<u64>,
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub transform_quantity_round: Option<String>,
+}
+
+/// Details of an active sale coupon applied to a product.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct SaleCoupon {
+    pub start_date: String,
+    pub expires: String,
+    /// Discount percentage (e.g. `65` means 65% off).
+    pub discount: u32,
+    pub product_ids: Vec<u64>,
+    #[serde(default)]
+    #[uniffi(default = [])]
+    pub purchase_types: Vec<u32>,
+    pub allowed_for_domain_transfers: bool,
+    pub allowed_for_renewals: bool,
+    pub allowed_for_new_purchases: bool,
+    pub code: String,
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub tld_rank: Option<u32>,
+}
+
+/// Introductory pricing offer for a product.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct IntroductoryOffer {
+    /// Unit of the offer interval (e.g. `"month"`).
+    pub interval_unit: String,
+    pub interval_count: u32,
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub usage_limit: Option<u32>,
+    /// Cost per interval during the offer period.
+    pub cost_per_interval: f64,
+    pub transition_after_renewal_count: u32,
+    pub should_prorate_when_offer_ends: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+
+    use super::*;
+
+    #[test]
+    fn test_products_domains_deserialization() {
+        let file = File::open("tests/wpcom/products/domains.json").expect("Failed to open file");
+        let products: ProductMap = serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(products.len(), 5);
+
+        // domain_map is a non-registration product without tld.
+        let domain_map = products.get("domain_map").expect("domain_map missing");
+        assert_eq!(domain_map.product_id, 1001);
+        assert!(!domain_map.is_domain_registration);
+        assert_eq!(domain_map.tld, None);
+
+        // domain_reg is a registration product.
+        let domain_reg = products.get("domain_reg").expect("domain_reg missing");
+        assert!(domain_reg.is_domain_registration);
+        assert_eq!(domain_reg.tld.as_deref(), Some("com"));
+
+        // dotdev_domain requires HSTS.
+        let dotdev = products
+            .get("dotdev_domain")
+            .expect("dotdev_domain missing");
+        assert_eq!(dotdev.is_hsts_required, Some(true));
+
+        // dotgay_domain requires the .gay policy notice.
+        let dotgay = products
+            .get("dotgay_domain")
+            .expect("dotgay_domain missing");
+        assert_eq!(dotgay.is_dot_gay_notice_required, Some(true));
+    }
+
+    #[test]
+    fn test_products_with_sale_coupon() {
+        let file = File::open("tests/wpcom/products/domains.json").expect("Failed to open file");
+        let products: ProductMap = serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let dotinfo = products
+            .get("dotinfo_domain")
+            .expect("dotinfo_domain missing");
+        let coupon = dotinfo
+            .sale_coupon
+            .as_ref()
+            .expect("dotinfo_domain should have sale_coupon");
+        assert_eq!(coupon.discount, 65);
+        assert_eq!(coupon.code, "fakecoupon123");
+        assert_eq!(dotinfo.sale_cost, Some(7.0));
+    }
+
+    #[test]
+    fn test_products_all_deserialization() {
+        let file = File::open("tests/wpcom/products/all.json").expect("Failed to open file");
+        let products: ProductMap = serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(products.len(), 7);
+
+        // Verify a product with price tiers (including an unbounded top tier).
+        let storage = products
+            .get("fake_storage_addon_yearly")
+            .expect("fake_storage_addon_yearly missing");
+        assert_eq!(storage.price_tier_list.len(), 2);
+        assert_eq!(storage.price_tier_list[0].minimum_units, 0);
+        assert!(
+            storage.price_tier_list[1].maximum_units.is_none(),
+            "top tier should be unbounded"
+        );
+
+        // Verify a product with an introductory offer.
+        let mail = products
+            .get("fake_mail_monthly")
+            .expect("fake_mail_monthly missing");
+        let offer = mail
+            .introductory_offer
+            .as_ref()
+            .expect("fake_mail_monthly should have introductory_offer");
+        assert_eq!(offer.interval_unit, "month");
+        assert_eq!(offer.interval_count, 3);
+    }
+}
