@@ -119,6 +119,11 @@ impl AsNamespace for WpNamespace {
 #[uniffi::export(with_foreign)]
 pub trait ApiUrlResolver: Send + Sync {
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl>;
+
+    /// Returns the route key for an endpoint, matching the keys used in
+    /// `WpApiDetails.routes`. Implementations must produce the same path
+    /// structure that `resolve` would produce after the base URL.
+    fn route_path(&self, namespace: String, endpoint_path: String) -> String;
 }
 
 #[derive(Debug, uniffi::Object)]
@@ -147,6 +152,14 @@ impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
                     [namespace].into_iter().chain(endpoint_segments),
                 )
                 .into(),
+        )
+    }
+
+    fn route_path(&self, namespace: String, endpoint_path: String) -> String {
+        format!(
+            "{}/{}",
+            namespace.trim_end_matches('/'),
+            endpoint_path.trim_start_matches('/')
         )
     }
 }

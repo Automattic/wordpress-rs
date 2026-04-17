@@ -213,26 +213,18 @@ impl WpApiDetails {
         self.routes.contains_key(&route)
     }
 
-    /// Returns `true` if the site has a route matching the given namespace and path,
-    /// using the provided resolver to construct the expected route key.
+    /// Returns `true` if the site has a route matching the given namespace and path.
     ///
-    /// The resolver may prepend a base path (e.g. `/wp-json`) or insert
-    /// site-specific segments (e.g. `/sites/{id}`). This method strips the
-    /// base path by locating the namespace within the resolved URL path,
-    /// so the lookup matches the route keys returned by the API root.
+    /// Uses the resolver to construct the expected route key (which may
+    /// include site-specific segments like `/sites/{id}` for WordPress.com).
     pub fn has_route_for_endpoint(
         &self,
         api_url_resolver: &dyn ApiUrlResolver,
         namespace: String,
         endpoint_path: String,
     ) -> bool {
-        let resolved = api_url_resolver.resolve(namespace.clone(), vec![endpoint_path]);
-        let full_path = resolved.inner.path();
-        if let Some(idx) = full_path.find(&namespace) {
-            self.routes.contains_key(&full_path[idx..])
-        } else {
-            false
-        }
+        let route_key = api_url_resolver.route_path(namespace, endpoint_path);
+        self.routes.contains_key(&route_key)
     }
 }
 
@@ -961,6 +953,71 @@ mod tests {
             "/wp/v2".to_string(),
             "fake-endpoint".to_string(),
         ));
+    }
+
+    // Regression test: a base path that contains the namespace as a substring
+    // must not cause has_route_for_endpoint to mis-locate the route key.
+    // This would have failed under a `find(&namespace)` approach on the URL path.
+    #[test]
+    fn test_has_route_for_endpoint_namespace_substring_in_base_path() {
+        let resolver = WpOrgSiteApiUrlResolver::new(
+            ParsedUrl::parse("https://example.com/wp/v2/api/wp-json")
+                .expect("Valid URL")
+                .into(),
+        );
+        let details = api_details_with_routes(vec!["/wp/v2/posts"]);
+
+        assert!(details.has_route_for_endpoint(
+            &resolver,
+            "/wp/v2".to_string(),
+            "posts".to_string(),
+        ));
+    }
+
+    // Consistency test: the route key produced by `route_path` must match the
+    // tail of the URL path produced by `resolve`. If someone changes the URL
+    // structure in `resolve` without updating `route_path` (or vice versa),
+    // this test will fail.
+    #[rstest]
+    #[case::wp_org_wp_v2("/wp/v2", "posts")]
+    #[case::wp_org_wp_v2_id("/wp/v2", "posts/123")]
+    #[case::wp_org_block_editor("/wp-block-editor/v1", "settings")]
+    #[case::wp_org_site_health("/wp-site-health/v1", "tests/background")]
+    fn test_route_path_matches_resolve_wp_org(
+        #[case] namespace: &str,
+        #[case] endpoint_path: &str,
+    ) {
+        let resolver = wp_org_resolver();
+        let resolved = resolver.resolve(namespace.to_string(), vec![endpoint_path.to_string()]);
+        let route_key = resolver.route_path(namespace.to_string(), endpoint_path.to_string());
+
+        assert!(
+            resolved.inner.path().ends_with(&route_key),
+            "route_path `{}` is not the tail of resolved URL path `{}` — `route_path` and `resolve` are out of sync",
+            route_key,
+            resolved.inner.path()
+        );
+    }
+
+    #[rstest]
+    #[case::wp_com_wp_v2("/wp/v2", "posts")]
+    #[case::wp_com_wp_v2_id("/wp/v2", "posts/123")]
+    #[case::wp_com_block_editor("/wp-block-editor/v1", "settings")]
+    #[case::wp_com_site_health("/wp-site-health/v1", "tests/background")]
+    fn test_route_path_matches_resolve_wp_com(
+        #[case] namespace: &str,
+        #[case] endpoint_path: &str,
+    ) {
+        let resolver = wp_com_resolver("mobile.blog");
+        let resolved = resolver.resolve(namespace.to_string(), vec![endpoint_path.to_string()]);
+        let route_key = resolver.route_path(namespace.to_string(), endpoint_path.to_string());
+
+        assert!(
+            resolved.inner.path().ends_with(&route_key),
+            "route_path `{}` is not the tail of resolved URL path `{}` — `route_path` and `resolve` are out of sync",
+            route_key,
+            resolved.inner.path()
+        );
     }
 
     fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {
