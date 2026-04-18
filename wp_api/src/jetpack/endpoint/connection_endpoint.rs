@@ -19,7 +19,7 @@ enum ConnectionRequest {
 }
 
 impl DerivedRequest for ConnectionRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         JetpackNamespace {}
     }
 }

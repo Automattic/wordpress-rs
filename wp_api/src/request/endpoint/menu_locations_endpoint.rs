@@ -11,7 +11,7 @@ enum MenuLocationsRequest {
 }
 
 impl DerivedRequest for MenuLocationsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

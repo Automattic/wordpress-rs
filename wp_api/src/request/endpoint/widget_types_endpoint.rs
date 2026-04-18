@@ -11,7 +11,7 @@ enum WidgetTypesRequest {
 }
 
 impl DerivedRequest for WidgetTypesRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

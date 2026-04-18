@@ -14,7 +14,7 @@ enum StatsTopAuthorsRequest {
 }
 
 impl DerivedRequest for StatsTopAuthorsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::RestV1_1
     }
 }

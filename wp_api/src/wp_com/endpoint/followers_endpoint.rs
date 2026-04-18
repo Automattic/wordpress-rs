@@ -16,7 +16,7 @@ enum FollowersRequest {
 }
 
 impl DerivedRequest for FollowersRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::RestV1_1
     }
 }

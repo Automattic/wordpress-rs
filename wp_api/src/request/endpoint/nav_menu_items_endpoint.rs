@@ -26,7 +26,7 @@ impl DerivedRequest for NavMenuItemsRequest {
         }
     }
 
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

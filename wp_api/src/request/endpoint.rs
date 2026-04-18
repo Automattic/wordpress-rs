@@ -90,7 +90,7 @@ pub trait DerivedRequest {
         Vec::new()
     }
 
-    fn namespace() -> impl AsNamespace;
+    fn namespace(&self) -> impl AsNamespace;
 }
 
 pub trait AsNamespace: Send + Sync {

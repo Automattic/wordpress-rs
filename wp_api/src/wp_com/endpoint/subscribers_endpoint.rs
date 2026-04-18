@@ -33,7 +33,7 @@ enum SubscribersRequest {
 }
 
 impl DerivedRequest for SubscribersRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::V2
     }
 }

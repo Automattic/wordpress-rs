@@ -28,7 +28,7 @@ impl DerivedRequest for MediaRequest {
         }
     }
 
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

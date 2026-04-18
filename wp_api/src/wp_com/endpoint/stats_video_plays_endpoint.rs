@@ -14,7 +14,7 @@ enum StatsVideoPlaysRequest {
 }
 
 impl DerivedRequest for StatsVideoPlaysRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::RestV1_1
     }
 }
