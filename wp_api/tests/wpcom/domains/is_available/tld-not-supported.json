@@ -1,0 +1,9 @@
+{
+  "domain_name": "mysite.ai",
+  "tld": "ai",
+  "status": "tld_not_supported",
+  "mappable": "mappable",
+  "supports_privacy": false,
+  "root_domain_provider": "unknown",
+  "ownership_verification_type": "no_verification_required"
+}

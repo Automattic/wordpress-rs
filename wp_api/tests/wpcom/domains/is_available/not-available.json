@@ -1,0 +1,8 @@
+{
+  "domain_name": "example.com",
+  "tld": "com",
+  "status": "blacklisted_domain",
+  "mappable": "blacklisted_domain",
+  "supports_privacy": true,
+  "root_domain_provider": "unknown"
+}

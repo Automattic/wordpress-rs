@@ -1,0 +1,14 @@
+{
+  "domain_name": "taken-domain.io",
+  "tld": "io",
+  "status": "transferrable",
+  "mappable": "mappable",
+  "supports_privacy": true,
+  "root_domain_provider": "unknown",
+  "product_id": 1337,
+  "product_slug": "domain_transfer",
+  "cost": "$48.00",
+  "raw_price": 4800,
+  "currency_code": "USD",
+  "ownership_verification_type": "no_verification_required"
+}

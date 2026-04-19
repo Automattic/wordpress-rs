@@ -1,0 +1,22 @@
+{
+  "domain_name": "myproject.dev",
+  "tld": "dev",
+  "status": "recent_registration_lock_not_transferrable",
+  "mappable": "mappable",
+  "supports_privacy": false,
+  "root_domain_provider": "unknown",
+  "hsts_required": true,
+  "product_id": 1337,
+  "product_slug": "domain_transfer",
+  "cost": "$120.00",
+  "raw_price": 12000,
+  "currency_code": "USD",
+  "ownership_verification_type": "no_verification_required",
+  "policy_notices": [
+    {
+      "type": "hsts",
+      "label": "HSTS required",
+      "message": "All domains with this ending require an SSL certificate to host a website."
+    }
+  ]
+}

@@ -151,6 +151,80 @@ pub struct DomainPolicyNotice {
     pub message: String,
 }
 
+/// Response from `GET /domains/{name}/is-available/` (v1.3).
+///
+/// Reports whether a domain name is available for registration or
+/// mapping, along with pricing and product details when applicable.
+///
+/// The set of fields present varies by `status`: available domains
+/// include full pricing, transferrable domains include partial
+/// pricing, and blacklisted/restricted domains have only the core
+/// fields.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct DomainAvailability {
+    /// The domain name that was checked.
+    pub domain_name: String,
+    /// The TLD portion of the domain (e.g. `"com"`, `"io"`, `"dev"`).
+    pub tld: String,
+    /// Availability status (e.g. `"available"`, `"transferrable"`,
+    /// `"blacklisted_domain"`, `"tld_not_supported"`,
+    /// `"restricted_domain"`,
+    /// `"recent_registration_lock_not_transferrable"`).
+    pub status: String,
+    /// Whether the domain can be mapped to a WordPress.com site
+    /// (e.g. `"mappable"`, `"blacklisted_domain"`,
+    /// `"restricted_domain"`).
+    pub mappable: String,
+    /// Whether the domain supports WHOIS privacy protection.
+    #[serde(default)]
+    #[uniffi(default = false)]
+    pub supports_privacy: bool,
+    /// Provider of the root domain (e.g. `"unknown"`).
+    pub root_domain_provider: String,
+    /// WordPress.com product ID for purchasing this domain.
+    pub product_id: Option<u64>,
+    /// WordPress.com product slug (e.g. `"domain_reg"`,
+    /// `"domain_transfer"`, `"dotnet_domain"`).
+    pub product_slug: Option<String>,
+    /// Formatted registration cost (e.g. `"TL 426"`, `"$18.00"`).
+    pub cost: Option<String>,
+    /// Formatted renewal cost (e.g. `"TL 426"`).
+    pub renew_cost: Option<String>,
+    /// Raw numeric renewal price in `currency_code`.
+    pub renew_raw_price: Option<u64>,
+    /// Raw numeric registration price in `currency_code`.
+    pub raw_price: Option<u64>,
+    /// ISO 4217 currency code (e.g. `"USD"`, `"TRY"`).
+    pub currency_code: Option<String>,
+    /// Reasons the domain matched (e.g. `"exact-match"`,
+    /// `"tld-exact"`, `"tld-common"`).
+    pub match_reasons: Option<Vec<String>>,
+    /// The registry vendor (e.g. `"availability"`).
+    pub vendor: Option<String>,
+    /// Type of ownership verification required (e.g.
+    /// `"no_verification_required"`).
+    pub ownership_verification_type: Option<String>,
+    /// `true` if the TLD requires HSTS (e.g. `.dev`).
+    pub hsts_required: Option<bool>,
+    /// Policy notices attached to the domain (e.g. HSTS warnings).
+    #[serde(default)]
+    #[uniffi(default = [])]
+    pub policy_notices: Vec<DomainPolicyNotice>,
+}
+
+impl_as_query_value_for_new_type!(DomainName);
+uniffi::custom_newtype!(DomainName, String);
+/// A domain name (e.g. `"example.com"`, `"myblog.org"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct DomainName(pub String);
+
+impl std::fmt::Display for DomainName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl_as_query_value_for_new_type!(CountryCode);
 uniffi::custom_newtype!(CountryCode, String);
 /// ISO 3166-1 alpha-2 country code (e.g. `"US"`, `"CA"`, `"GB"`).
@@ -508,5 +582,142 @@ mod tests {
         };
         assert_eq!(only.domain_name, "testsite.home.blog");
         assert_eq!(only.vendor, "dotblogsubdomains");
+    }
+
+    #[rstest]
+    #[case::available(
+        "tests/wpcom/domains/is_available/available.json",
+        "freshsite2025.com",
+        "com",
+        "available",
+        "mappable",
+        true
+    )]
+    #[case::blacklisted(
+        "tests/wpcom/domains/is_available/not-available.json",
+        "example.com",
+        "com",
+        "blacklisted_domain",
+        "blacklisted_domain",
+        true
+    )]
+    #[case::transferrable(
+        "tests/wpcom/domains/is_available/transferrable.json",
+        "taken-domain.io",
+        "io",
+        "transferrable",
+        "mappable",
+        true
+    )]
+    #[case::tld_not_supported(
+        "tests/wpcom/domains/is_available/tld-not-supported.json",
+        "mysite.ai",
+        "ai",
+        "tld_not_supported",
+        "mappable",
+        false
+    )]
+    #[case::hsts_required(
+        "tests/wpcom/domains/is_available/hsts-required.json",
+        "myproject.dev",
+        "dev",
+        "recent_registration_lock_not_transferrable",
+        "mappable",
+        false
+    )]
+    fn test_domain_availability_deserialization(
+        #[case] json_file_path: &str,
+        #[case] expected_domain: &str,
+        #[case] expected_tld: &str,
+        #[case] expected_status: &str,
+        #[case] expected_mappable: &str,
+        #[case] expected_privacy: bool,
+    ) {
+        let file = File::open(json_file_path).expect("Failed to open file");
+        let availability: DomainAvailability =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(availability.domain_name, expected_domain);
+        assert_eq!(availability.tld, expected_tld);
+        assert_eq!(availability.status, expected_status);
+        assert_eq!(availability.mappable, expected_mappable);
+        assert_eq!(availability.supports_privacy, expected_privacy);
+    }
+
+    #[test]
+    fn test_domain_availability_available_details() {
+        let file = File::open("tests/wpcom/domains/is_available/available.json")
+            .expect("Failed to open file");
+        let availability: DomainAvailability =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(availability.product_id, Some(6));
+        assert_eq!(availability.product_slug.as_deref(), Some("domain_reg"));
+        assert_eq!(availability.cost.as_deref(), Some("$18.00"));
+        assert_eq!(availability.renew_cost.as_deref(), Some("$18.00"));
+        assert_eq!(availability.raw_price, Some(1800));
+        assert_eq!(availability.renew_raw_price, Some(1800));
+        assert_eq!(availability.currency_code.as_deref(), Some("USD"));
+        assert_eq!(
+            availability.match_reasons.as_deref(),
+            Some(
+                ["exact-match", "tld-exact", "tld-common"]
+                    .map(String::from)
+                    .as_slice()
+            )
+        );
+        assert_eq!(availability.vendor.as_deref(), Some("availability"));
+        assert_eq!(
+            availability.ownership_verification_type.as_deref(),
+            Some("no_verification_required")
+        );
+    }
+
+    #[test]
+    fn test_domain_availability_blacklisted_has_no_pricing() {
+        let file = File::open("tests/wpcom/domains/is_available/not-available.json")
+            .expect("Failed to open file");
+        let availability: DomainAvailability =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(availability.product_id, None);
+        assert_eq!(availability.product_slug, None);
+        assert_eq!(availability.cost, None);
+        assert_eq!(availability.raw_price, None);
+        assert_eq!(availability.currency_code, None);
+        assert_eq!(availability.match_reasons, None);
+        assert!(availability.policy_notices.is_empty());
+    }
+
+    #[test]
+    fn test_domain_availability_transferrable_partial_pricing() {
+        let file = File::open("tests/wpcom/domains/is_available/transferrable.json")
+            .expect("Failed to open file");
+        let availability: DomainAvailability =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(availability.product_id, Some(1337));
+        assert_eq!(
+            availability.product_slug.as_deref(),
+            Some("domain_transfer")
+        );
+        assert_eq!(availability.cost.as_deref(), Some("$48.00"));
+        assert_eq!(availability.raw_price, Some(4800));
+        // Transferrable domains don't include renewal pricing.
+        assert_eq!(availability.renew_cost, None);
+        assert_eq!(availability.renew_raw_price, None);
+    }
+
+    #[test]
+    fn test_domain_availability_hsts_policy_notices() {
+        let file = File::open("tests/wpcom/domains/is_available/hsts-required.json")
+            .expect("Failed to open file");
+        let availability: DomainAvailability =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(availability.hsts_required, Some(true));
+        assert_eq!(availability.policy_notices.len(), 1);
+        assert_eq!(availability.policy_notices[0].notice_type, "hsts");
+        assert_eq!(availability.policy_notices[0].label, "HSTS required");
+        assert!(
+            availability.policy_notices[0]
+                .message
+                .contains("SSL certificate")
+        );
     }
 }

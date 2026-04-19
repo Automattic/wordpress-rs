@@ -90,6 +90,7 @@ pub(crate) enum WpComNamespace {
     Oauth2,
     RestV1_1,
     RestV1_2,
+    RestV1_3,
     V2,
 }
 
@@ -99,6 +100,7 @@ impl AsNamespace for WpComNamespace {
             WpComNamespace::Oauth2 => "/oauth2",
             WpComNamespace::RestV1_1 => "/rest/v1.1",
             WpComNamespace::RestV1_2 => "/rest/v1.2",
+            WpComNamespace::RestV1_3 => "/rest/v1.3",
             WpComNamespace::V2 => "/wpcom/v2",
         }
     }
