@@ -91,6 +91,15 @@ impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
                 .into(),
         )
     }
+
+    fn route_path(&self, namespace: String, endpoint_path: String) -> String {
+        format!(
+            "{}/sites/{}/{}",
+            namespace.trim_end_matches('/'),
+            self.site_id,
+            endpoint_path.trim_start_matches('/')
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -127,6 +136,14 @@ impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
                     vec![namespace].into_iter().chain(endpoint_segments),
                 )
                 .into(),
+        )
+    }
+
+    fn route_path(&self, namespace: String, endpoint_path: String) -> String {
+        format!(
+            "{}/{}",
+            namespace.trim_end_matches('/'),
+            endpoint_path.trim_start_matches('/')
         )
     }
 }

@@ -3,6 +3,7 @@ use libtest_mimic::{Arguments, Trial, run};
 use std::env;
 use std::sync::Arc;
 
+mod api_root_tests;
 mod context;
 mod languages_tests;
 mod me_tests;
@@ -46,6 +47,7 @@ fn main() {
 
 fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut tests = vec![];
+    tests.extend(api_root_tests::tests(Arc::clone(&ctx)));
     tests.extend(languages_tests::tests(Arc::clone(&ctx)));
     tests.extend(me_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_city_views_tests::tests(Arc::clone(&ctx)));
