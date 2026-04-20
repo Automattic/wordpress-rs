@@ -19,7 +19,7 @@ enum SitesRequest {
 }
 
 impl DerivedRequest for SitesRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::RestV1_2
     }
 }

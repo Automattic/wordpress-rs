@@ -14,7 +14,7 @@ enum DomainsRequest {
 }
 
 impl DerivedRequest for DomainsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::RestV1_1
     }
 }

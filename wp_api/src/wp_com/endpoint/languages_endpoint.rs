@@ -12,7 +12,7 @@ enum LanguagesRequest {
 }
 
 impl DerivedRequest for LanguagesRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::V2
     }
 }

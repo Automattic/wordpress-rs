@@ -14,7 +14,7 @@ enum JetpackConnectionRequest {
 }
 
 impl DerivedRequest for JetpackConnectionRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::V2
     }
 }

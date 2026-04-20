@@ -11,7 +11,7 @@ enum TaxonomiesRequest {
 }
 
 impl DerivedRequest for TaxonomiesRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

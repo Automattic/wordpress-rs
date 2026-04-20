@@ -14,7 +14,7 @@ enum NavMenuItemAutosavesRequest {
 }
 
 impl DerivedRequest for NavMenuItemAutosavesRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

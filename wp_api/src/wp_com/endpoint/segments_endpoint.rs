@@ -11,7 +11,7 @@ enum SegmentsRequest {
 }
 
 impl DerivedRequest for SegmentsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::V2
     }
 }

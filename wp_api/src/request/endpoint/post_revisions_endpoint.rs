@@ -17,7 +17,7 @@ enum PostRevisionsRequest {
 }
 
 impl DerivedRequest for PostRevisionsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 
