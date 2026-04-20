@@ -39,7 +39,7 @@ pub struct Product {
     /// Formatted combined cost without decimal places (e.g. `"$18"`).
     pub combined_cost_display: String,
     /// Numeric cost in the account's currency.
-    pub cost: f64,
+    pub cost: Decimal2,
     /// Cost in the smallest currency unit (e.g. cents).
     pub cost_smallest_unit: u64,
     pub currency_code: String,
@@ -135,7 +135,7 @@ pub struct SaleCoupon {
     pub code: String,
     #[serde(default)]
     #[uniffi(default = None)]
-    pub tld_rank: Option<u32>,
+    pub tld_rank: Option<f64>,
 }
 
 /// Introductory pricing offer for a product.
@@ -148,7 +148,7 @@ pub struct IntroductoryOffer {
     #[uniffi(default = None)]
     pub usage_limit: Option<u32>,
     /// Cost per interval during the offer period.
-    pub cost_per_interval: f64,
+    pub cost_per_interval: Decimal2,
     pub transition_after_renewal_count: u32,
     pub should_prorate_when_offer_ends: bool,
 }
