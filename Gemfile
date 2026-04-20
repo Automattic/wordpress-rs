@@ -2,7 +2,7 @@
 
 source 'https://rubygems.org'
 
-gem 'fastlane', '~> 2.232'
+gem 'fastlane', '~> 2.233'
 gem 'fastlane-plugin-wpmreleasetoolkit', '~> 14.3'
 gem 'fluent-tools', '~> 0.3'
 gem "openssl", "~> 4.0.1"
