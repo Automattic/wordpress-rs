@@ -279,8 +279,8 @@ mod tests {
 
     #[test]
     fn test_products_locale_es_deserialization() {
-        let file = File::open("tests/wpcom/products/all-locale-es.json")
-            .expect("Failed to open file");
+        let file =
+            File::open("tests/wpcom/products/all-locale-es.json").expect("Failed to open file");
         let products: ProductMap = serde_json::from_reader(file).expect("Unable to parse JSON");
 
         assert_eq!(products.len(), 3);
@@ -293,8 +293,8 @@ mod tests {
 
     #[test]
     fn test_products_locale_ja_domains_deserialization() {
-        let file = File::open("tests/wpcom/products/domains-locale-ja.json")
-            .expect("Failed to open file");
+        let file =
+            File::open("tests/wpcom/products/domains-locale-ja.json").expect("Failed to open file");
         let products: ProductMap = serde_json::from_reader(file).expect("Unable to parse JSON");
 
         assert_eq!(products.len(), 2);
@@ -311,8 +311,7 @@ mod tests {
 
     #[test]
     fn test_products_jetpack_deserialization() {
-        let file =
-            File::open("tests/wpcom/products/jetpack.json").expect("Failed to open file");
+        let file = File::open("tests/wpcom/products/jetpack.json").expect("Failed to open file");
         let products: ProductMap = serde_json::from_reader(file).expect("Unable to parse JSON");
 
         assert_eq!(products.len(), 3);
