@@ -1,6 +1,7 @@
 use crate::{
     decimal2::Decimal2,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+    wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -11,11 +12,16 @@ pub struct ProductsParams {
     /// Filter by product type (e.g. `"domains"`).
     #[uniffi(default = None)]
     pub product_type: Option<String>,
+    /// Locale for localized product names and descriptions.
+    #[uniffi(default = None)]
+    pub locale: Option<WPComLanguage>,
 }
 
 impl AppendUrlQueryPairs for ProductsParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut.append_option_query_value_pair("type", self.product_type.as_ref());
+        query_pairs_mut
+            .append_option_query_value_pair("type", self.product_type.as_ref())
+            .append_option_query_value_pair("locale", self.locale.as_ref());
     }
 }
 
@@ -235,5 +241,37 @@ mod tests {
             .expect("fake_mail_monthly should have introductory_offer");
         assert_eq!(offer.interval_unit, "month");
         assert_eq!(offer.interval_count, 3);
+    }
+
+    #[test]
+    fn test_products_locale_es_deserialization() {
+        let file = File::open("tests/wpcom/products/all-locale-es.json")
+            .expect("Failed to open file");
+        let products: ProductMap = serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(products.len(), 3);
+
+        // Localized product name.
+        let domain_map = products.get("domain_map").expect("domain_map missing");
+        assert_eq!(domain_map.product_name, "Conexión de dominio falso");
+        assert_eq!(domain_map.product_term_localized, "año");
+    }
+
+    #[test]
+    fn test_products_locale_ja_domains_deserialization() {
+        let file = File::open("tests/wpcom/products/domains-locale-ja.json")
+            .expect("Failed to open file");
+        let products: ProductMap = serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(products.len(), 2);
+
+        let domain_map = products.get("domain_map").expect("domain_map missing");
+        assert_eq!(domain_map.product_name, "偽ドメイン連携");
+        assert_eq!(domain_map.product_term_localized, "年");
+
+        // Domain registration fields still present with locale.
+        let domain_reg = products.get("domain_reg").expect("domain_reg missing");
+        assert!(domain_reg.is_domain_registration);
+        assert_eq!(domain_reg.tld.as_deref(), Some("com"));
     }
 }

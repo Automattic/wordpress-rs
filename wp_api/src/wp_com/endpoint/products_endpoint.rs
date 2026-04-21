@@ -31,6 +31,7 @@ mod tests {
             products::ProductsParams,
         },
     };
+    use crate::wp_com::language::WPComLanguage;
     use rstest::*;
     use std::sync::Arc;
 
@@ -44,8 +45,31 @@ mod tests {
         validate_wp_com_rest_v1_1_endpoint(
             endpoint.list(&ProductsParams {
                 product_type: Some("domains".to_string()),
+                ..Default::default()
             }),
             "/products?type=domains",
+        );
+    }
+
+    #[rstest]
+    fn list_with_locale(endpoint: ProductsRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.list(&ProductsParams {
+                locale: Some(WPComLanguage::Spanish),
+                ..Default::default()
+            }),
+            "/products?locale=es",
+        );
+    }
+
+    #[rstest]
+    fn list_with_type_and_locale(endpoint: ProductsRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.list(&ProductsParams {
+                product_type: Some("domains".to_string()),
+                locale: Some(WPComLanguage::Japanese),
+            }),
+            "/products?type=domains&locale=ja",
         );
     }
 
