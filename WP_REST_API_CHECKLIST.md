@@ -38,12 +38,12 @@
 
 ## Navigation & Menus
 
-- [ ] `/wp/v2/navigation`
-- [ ] `/wp/v2/navigation/<id>/revisions`
-- [ ] `/wp/v2/navigation/<id>/autosaves`
+- [x] `/wp/v2/navigation`
+- [x] `/wp/v2/navigation/<id>/revisions`
+- [x] `/wp/v2/navigation/<id>/autosaves`
 - [x] `/wp/v2/menus`
 - [x] `/wp/v2/menu-items`
-- [ ] `/wp/v2/menu-items/<id>/autosaves`
+- [x] `/wp/v2/menu-items/<id>/autosaves`
 - [x] `/wp/v2/menu-locations`
 
 ## Widgets & Sidebars
