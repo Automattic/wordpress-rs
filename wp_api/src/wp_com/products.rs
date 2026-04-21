@@ -1,17 +1,41 @@
 use crate::{
     decimal2::Decimal2,
-    url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+    url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
     wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Filter for the `type` query parameter on `GET /products`.
+///
+/// The API supports `"domains"` and `"jetpack"` as built-in filters.
+/// Use `Other` for any value not covered by these variants.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum ProductTypeFilter {
+    /// Return only domain-related products (registrations, transfers, mapping, etc.).
+    Domains,
+    /// Return only Jetpack plans and products.
+    Jetpack,
+    /// A product type filter not covered by the known variants.
+    Other { value: String },
+}
+
+impl AsQueryValue for ProductTypeFilter {
+    fn as_query_value(&self) -> impl AsRef<str> {
+        match self {
+            Self::Domains => "domains".to_string(),
+            Self::Jetpack => "jetpack".to_string(),
+            Self::Other { value } => value.clone(),
+        }
+    }
+}
+
 /// Parameters for `GET /products`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct ProductsParams {
-    /// Filter by product type (e.g. `"domains"`).
+    /// Filter by product type.
     #[uniffi(default = None)]
-    pub product_type: Option<String>,
+    pub product_type: Option<ProductTypeFilter>,
     /// Locale for localized product names and descriptions.
     #[uniffi(default = None)]
     pub locale: Option<WPComLanguage>,
@@ -273,5 +297,40 @@ mod tests {
         let domain_reg = products.get("domain_reg").expect("domain_reg missing");
         assert!(domain_reg.is_domain_registration);
         assert_eq!(domain_reg.tld.as_deref(), Some("com"));
+    }
+
+    #[test]
+    fn test_products_jetpack_deserialization() {
+        let file =
+            File::open("tests/wpcom/products/jetpack.json").expect("Failed to open file");
+        let products: ProductMap = serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(products.len(), 3);
+
+        // Basic jetpack product without introductory offer.
+        let backup = products
+            .get("fake_jetpack_backup_daily")
+            .expect("fake_jetpack_backup_daily missing");
+        assert_eq!(backup.product_type, "jetpack");
+        assert!(!backup.is_domain_registration);
+        assert!(backup.introductory_offer.is_none());
+
+        // Jetpack product with introductory offer.
+        let security = products
+            .get("fake_jetpack_security_yearly")
+            .expect("fake_jetpack_security_yearly missing");
+        assert_eq!(security.product_type, "jetpack");
+        let offer = security
+            .introductory_offer
+            .as_ref()
+            .expect("should have introductory_offer");
+        assert_eq!(offer.interval_unit, "year");
+        assert_eq!(offer.cost_per_interval, Decimal2::from_hundredths(12000));
+
+        // Bundle product also returned by jetpack filter.
+        let complete = products
+            .get("fake_jetpack_complete")
+            .expect("fake_jetpack_complete missing");
+        assert_eq!(complete.product_type, "bundle");
     }
 }

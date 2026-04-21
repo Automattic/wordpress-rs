@@ -28,10 +28,10 @@ mod tests {
             endpoint::tests::{
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
             },
-            products::ProductsParams,
+            language::WPComLanguage,
+            products::{ProductTypeFilter, ProductsParams},
         },
     };
-    use crate::wp_com::language::WPComLanguage;
     use rstest::*;
     use std::sync::Arc;
 
@@ -41,13 +41,37 @@ mod tests {
     }
 
     #[rstest]
-    fn list_with_type_filter(endpoint: ProductsRequestEndpoint) {
+    fn list_with_domains_filter(endpoint: ProductsRequestEndpoint) {
         validate_wp_com_rest_v1_1_endpoint(
             endpoint.list(&ProductsParams {
-                product_type: Some("domains".to_string()),
+                product_type: Some(ProductTypeFilter::Domains),
                 ..Default::default()
             }),
             "/products?type=domains",
+        );
+    }
+
+    #[rstest]
+    fn list_with_jetpack_filter(endpoint: ProductsRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.list(&ProductsParams {
+                product_type: Some(ProductTypeFilter::Jetpack),
+                ..Default::default()
+            }),
+            "/products?type=jetpack",
+        );
+    }
+
+    #[rstest]
+    fn list_with_other_filter(endpoint: ProductsRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.list(&ProductsParams {
+                product_type: Some(ProductTypeFilter::Other {
+                    value: "theme".to_string(),
+                }),
+                ..Default::default()
+            }),
+            "/products?type=theme",
         );
     }
 
@@ -66,7 +90,7 @@ mod tests {
     fn list_with_type_and_locale(endpoint: ProductsRequestEndpoint) {
         validate_wp_com_rest_v1_1_endpoint(
             endpoint.list(&ProductsParams {
-                product_type: Some("domains".to_string()),
+                product_type: Some(ProductTypeFilter::Domains),
                 locale: Some(WPComLanguage::Japanese),
             }),
             "/products?type=domains&locale=ja",
