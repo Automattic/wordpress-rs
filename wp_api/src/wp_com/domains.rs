@@ -725,8 +725,8 @@ mod tests {
     )]
     #[case::sale_coupon(
         "tests/wpcom/domains/is_available/sale-coupon.json",
-        "newsite.info",
-        "info",
+        "freshblog2025.online",
+        "online",
         "available",
         "mappable",
         true
@@ -738,6 +738,14 @@ mod tests {
         "tld_in_maintenance",
         "mappable",
         false
+    )]
+    #[case::dot_gay_notice(
+        "tests/wpcom/domains/is_available/dot-gay-notice.json",
+        "testsite2025.gay",
+        "gay",
+        "mappable",
+        "mappable",
+        true
     )]
     fn test_domain_availability_deserialization(
         #[case] json_file_path: &str,
@@ -852,8 +860,22 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert_eq!(availability.sale_cost, Some(Decimal2::from_hundredths(700)));
-        assert_eq!(availability.raw_price, Some(Decimal2::from_hundredths(2000)));
+        assert_eq!(availability.sale_cost, Some(Decimal2::from_hundredths(1000)));
+        assert_eq!(availability.raw_price, Some(Decimal2::from_hundredths(2500)));
+    }
+
+    #[test]
+    fn test_domain_availability_dot_gay_notice() {
+        let file = File::open("tests/wpcom/domains/is_available/dot-gay-notice.json")
+            .expect("Failed to open file");
+        let availability: DomainAvailability =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(availability.is_dot_gay_notice_required, Some(true));
+        assert_eq!(availability.policy_notices.len(), 1);
+        assert_eq!(
+            availability.policy_notices[0].notice_type,
+            "gay_accept_requirements"
+        );
     }
 
     #[test]

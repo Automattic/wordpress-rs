@@ -1,0 +1,17 @@
+{
+  "domain_name": "testsite2025.gay",
+  "tld": "gay",
+  "status": "mappable",
+  "mappable": "mappable",
+  "supports_privacy": true,
+  "root_domain_provider": "unknown",
+  "is_dot_gay_notice_required": true,
+  "ownership_verification_type": "no_verification_required",
+  "policy_notices": [
+    {
+      "type": "gay_accept_requirements",
+      "label": "Special requirements",
+      "message": "Any anti-LGBTQ content is prohibited and can result in registration termination. The registry will donate 20% of all registration revenue to LGBTQ non-profit organizations."
+    }
+  ]
+}
