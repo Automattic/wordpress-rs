@@ -262,7 +262,7 @@ pub struct SupportedCountry {
     /// Additional country codes whose tax rules apply alongside this one.
     #[serde(default)]
     #[uniffi(default = [])]
-    pub tax_country_codes: Vec<String>,
+    pub tax_country_codes: Vec<CountryCode>,
     /// Localized tax name (e.g. `"GST"`, `"VAT"`).
     pub tax_name: Option<String>,
 }
@@ -454,7 +454,7 @@ mod tests {
             .iter()
             .find(|c| c.code.0 == "AU")
             .expect("AU missing from all");
-        assert_eq!(au.tax_country_codes, vec!["AU".to_string()]);
+        assert_eq!(au.tax_country_codes, vec![CountryCode::from("AU")]);
         assert_eq!(au.tax_name.as_deref(), Some("GST"));
 
         // The separator entry should be filtered out.
