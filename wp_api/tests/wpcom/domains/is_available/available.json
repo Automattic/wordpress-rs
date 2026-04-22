@@ -9,8 +9,8 @@
   "product_slug": "domain_reg",
   "cost": "$18.00",
   "renew_cost": "$18.00",
-  "renew_raw_price": 1800,
-  "raw_price": 1800,
+  "renew_raw_price": 18,
+  "raw_price": 18,
   "currency_code": "USD",
   "match_reasons": [
     "exact-match",

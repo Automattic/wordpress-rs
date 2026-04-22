@@ -191,9 +191,13 @@ pub struct DomainAvailability {
     /// Formatted renewal cost (e.g. `"TL 426"`).
     pub renew_cost: Option<String>,
     /// Raw numeric renewal price in `currency_code`.
-    pub renew_raw_price: Option<u64>,
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub renew_raw_price: Option<Decimal2>,
     /// Raw numeric registration price in `currency_code`.
-    pub raw_price: Option<u64>,
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub raw_price: Option<Decimal2>,
     /// ISO 4217 currency code (e.g. `"USD"`, `"TRY"`).
     pub currency_code: Option<String>,
     /// Reasons the domain matched (e.g. `"exact-match"`,
@@ -411,8 +415,8 @@ mod tests {
         assert_eq!(first.renew_raw_price.hundredths(), 1800);
         assert_eq!(first.raw_price.hundredths(), 1800);
         assert_eq!(first.currency_code, "USD");
-        assert_eq!(first.sale_cost, None);
-        assert_eq!(first.hsts_required, None);
+        assert!(first.sale_cost.is_none());
+        assert!(first.hsts_required.is_none());
         assert!(first.policy_notices.is_empty());
 
         // `freshpage.art` has no `match_reasons` field in the JSON.
@@ -653,8 +657,11 @@ mod tests {
         assert_eq!(availability.product_slug.as_deref(), Some("domain_reg"));
         assert_eq!(availability.cost.as_deref(), Some("$18.00"));
         assert_eq!(availability.renew_cost.as_deref(), Some("$18.00"));
-        assert_eq!(availability.raw_price, Some(1800));
-        assert_eq!(availability.renew_raw_price, Some(1800));
+        assert_eq!(availability.raw_price, Some(Decimal2::from_hundredths(1800)));
+        assert_eq!(
+            availability.renew_raw_price,
+            Some(Decimal2::from_hundredths(1800))
+        );
         assert_eq!(availability.currency_code.as_deref(), Some("USD"));
         assert_eq!(
             availability.match_reasons.as_deref(),
@@ -677,12 +684,12 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert_eq!(availability.product_id, None);
-        assert_eq!(availability.product_slug, None);
-        assert_eq!(availability.cost, None);
-        assert_eq!(availability.raw_price, None);
-        assert_eq!(availability.currency_code, None);
-        assert_eq!(availability.match_reasons, None);
+        assert!(availability.product_id.is_none());
+        assert!(availability.product_slug.is_none());
+        assert!(availability.cost.is_none());
+        assert!(availability.raw_price.is_none());
+        assert!(availability.currency_code.is_none());
+        assert!(availability.match_reasons.is_none());
         assert!(availability.policy_notices.is_empty());
     }
 
@@ -698,10 +705,10 @@ mod tests {
             Some("domain_transfer")
         );
         assert_eq!(availability.cost.as_deref(), Some("$48.00"));
-        assert_eq!(availability.raw_price, Some(4800));
+        assert_eq!(availability.raw_price, Some(Decimal2::from_hundredths(4800)));
         // Transferrable domains don't include renewal pricing.
-        assert_eq!(availability.renew_cost, None);
-        assert_eq!(availability.renew_raw_price, None);
+        assert!(availability.renew_cost.is_none());
+        assert!(availability.renew_raw_price.is_none());
     }
 
     #[test]

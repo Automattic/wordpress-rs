@@ -9,7 +9,7 @@
   "product_id": 1337,
   "product_slug": "domain_transfer",
   "cost": "$120.00",
-  "raw_price": 12000,
+  "raw_price": 120,
   "currency_code": "USD",
   "ownership_verification_type": "no_verification_required",
   "policy_notices": [
