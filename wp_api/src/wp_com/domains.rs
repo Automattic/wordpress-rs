@@ -775,7 +775,10 @@ mod tests {
         assert_eq!(availability.product_slug.as_deref(), Some("domain_reg"));
         assert_eq!(availability.cost.as_deref(), Some("$18.00"));
         assert_eq!(availability.renew_cost.as_deref(), Some("$18.00"));
-        assert_eq!(availability.raw_price, Some(Decimal2::from_hundredths(1800)));
+        assert_eq!(
+            availability.raw_price,
+            Some(Decimal2::from_hundredths(1800))
+        );
         assert_eq!(
             availability.renew_raw_price,
             Some(Decimal2::from_hundredths(1800))
@@ -823,7 +826,10 @@ mod tests {
             Some("domain_transfer")
         );
         assert_eq!(availability.cost.as_deref(), Some("$48.00"));
-        assert_eq!(availability.raw_price, Some(Decimal2::from_hundredths(4800)));
+        assert_eq!(
+            availability.raw_price,
+            Some(Decimal2::from_hundredths(4800))
+        );
         // Transferrable domains don't include renewal pricing.
         assert!(availability.renew_cost.is_none());
         assert!(availability.renew_raw_price.is_none());
@@ -837,7 +843,10 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
         assert_eq!(availability.is_supported_premium_domain, Some(true));
         assert_eq!(availability.is_price_limit_exceeded, Some(false));
-        assert_eq!(availability.raw_price, Some(Decimal2::from_hundredths(500000)));
+        assert_eq!(
+            availability.raw_price,
+            Some(Decimal2::from_hundredths(500000))
+        );
     }
 
     #[test]
@@ -850,7 +859,10 @@ mod tests {
             availability.other_site_domain.as_deref(),
             Some("myothersite.wordpress.com")
         );
-        assert_eq!(availability.transferrability.as_deref(), Some("transferrable"));
+        assert_eq!(
+            availability.transferrability.as_deref(),
+            Some("transferrable")
+        );
         assert!(availability.product_id.is_none());
     }
 
@@ -860,8 +872,14 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert_eq!(availability.sale_cost, Some(Decimal2::from_hundredths(1000)));
-        assert_eq!(availability.raw_price, Some(Decimal2::from_hundredths(2500)));
+        assert_eq!(
+            availability.sale_cost,
+            Some(Decimal2::from_hundredths(1000))
+        );
+        assert_eq!(
+            availability.raw_price,
+            Some(Decimal2::from_hundredths(2500))
+        );
     }
 
     #[test]

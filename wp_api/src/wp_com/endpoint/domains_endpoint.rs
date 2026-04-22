@@ -37,8 +37,8 @@ mod tests {
     use crate::{
         request::endpoint::ApiUrlResolver,
         wp_com::{
-            domains::{CountryCode, DomainAvailabilityParams, DomainName},
             WpComSiteId,
+            domains::{CountryCode, DomainAvailabilityParams, DomainName},
             endpoint::tests::{
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
                 validate_wp_com_rest_v1_3_endpoint,
