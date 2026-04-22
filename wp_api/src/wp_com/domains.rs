@@ -2,7 +2,7 @@ use crate::{
     decimal2::Decimal2,
     impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::segments::SegmentId,
+    wp_com::{WpComSiteId, segments::SegmentId},
 };
 use serde::{Deserialize, Serialize};
 
@@ -149,6 +149,29 @@ pub struct DomainPolicyNotice {
     pub label: String,
     /// Full human-readable message describing the notice.
     pub message: String,
+}
+
+/// Optional query parameters for `GET /domains/{name}/is-available/`.
+#[derive(Debug, Default, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct DomainAvailabilityParams {
+    /// Site ID to check domain availability against.
+    #[uniffi(default = None)]
+    pub blog_id: Option<WpComSiteId>,
+    /// Whether this is a pre-check before adding to cart.
+    #[uniffi(default = None)]
+    pub is_cart_pre_check: Option<bool>,
+    /// Vendor for the availability check (e.g. `"100-year-domains"`).
+    #[uniffi(default = None)]
+    pub vendor: Option<String>,
+}
+
+impl AppendUrlQueryPairs for DomainAvailabilityParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut
+            .append_option_query_value_pair("blog_id", self.blog_id.as_ref())
+            .append_option_query_value_pair("is_cart_pre_check", self.is_cart_pre_check.as_ref())
+            .append_option_query_value_pair("vendor", self.vendor.as_ref());
+    }
 }
 
 /// Response from `GET /domains/{name}/is-available/` (v1.3).

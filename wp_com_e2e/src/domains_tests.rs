@@ -1,7 +1,7 @@
 use crate::context::TestContext;
 use libtest_mimic::Trial;
 use std::sync::Arc;
-use wp_api::wp_com::domains::{CountryCode, DomainName};
+use wp_api::wp_com::domains::{CountryCode, DomainAvailabilityParams, DomainName};
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut trials = vec![];
@@ -90,7 +90,10 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 let availability = ctx
                     .client
                     .domains()
-                    .is_available(&DomainName("google.com".to_string()))
+                    .is_available(
+                        &DomainName("google.com".to_string()),
+                        &DomainAvailabilityParams::default(),
+                    )
                     .await
                     .map_err(|e| e.to_string())?
                     .data;
@@ -119,9 +122,10 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 let availability = ctx
                     .client
                     .domains()
-                    .is_available(&DomainName(
-                        "xyzzy-test-unlikely-taken-2025.com".to_string(),
-                    ))
+                    .is_available(
+                        &DomainName("xyzzy-test-unlikely-taken-2025.com".to_string()),
+                        &DomainAvailabilityParams::default(),
+                    )
                     .await
                     .map_err(|e| e.to_string())?
                     .data;
