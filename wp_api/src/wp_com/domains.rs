@@ -164,6 +164,12 @@ impl std::fmt::Display for CountryCode {
     }
 }
 
+impl From<&str> for CountryCode {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
 /// Structured response from `GET /domains/supported-countries`.
 ///
 /// The raw API response is a flat array where a sentinel entry (empty

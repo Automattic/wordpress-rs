@@ -44,7 +44,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 let states = ctx
                     .client
                     .domains()
-                    .supported_states(&CountryCode("US".to_string()))
+                    .supported_states(&CountryCode::from("US"))
                     .await
                     .map_err(|e| e.to_string())?
                     .data;
@@ -65,7 +65,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 let states = ctx
                     .client
                     .domains()
-                    .supported_states(&CountryCode("DE".to_string()))
+                    .supported_states(&CountryCode::from("DE"))
                     .await
                     .map_err(|e| e.to_string())?
                     .data;

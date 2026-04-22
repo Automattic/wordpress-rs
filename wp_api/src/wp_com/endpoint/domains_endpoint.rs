@@ -95,9 +95,9 @@ mod tests {
     }
 
     #[rstest]
-    #[case::us(CountryCode("US".to_string()), "/domains/supported-states/US")]
-    #[case::ca(CountryCode("CA".to_string()), "/domains/supported-states/CA")]
-    #[case::gb(CountryCode("GB".to_string()), "/domains/supported-states/GB")]
+    #[case::us(CountryCode::from("US"), "/domains/supported-states/US")]
+    #[case::ca(CountryCode::from("CA"), "/domains/supported-states/CA")]
+    #[case::gb(CountryCode::from("GB"), "/domains/supported-states/GB")]
     fn supported_states(
         endpoint: DomainsRequestEndpoint,
         #[case] country_code: CountryCode,
