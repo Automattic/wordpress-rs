@@ -1,0 +1,19 @@
+{
+  "domain_name": "newsite.info",
+  "tld": "info",
+  "status": "available",
+  "mappable": "mappable",
+  "supports_privacy": true,
+  "root_domain_provider": "unknown",
+  "product_id": 18,
+  "product_slug": "dotinfo_domain",
+  "cost": "$20.00",
+  "renew_cost": "$20.00",
+  "renew_raw_price": 20,
+  "raw_price": 20,
+  "currency_code": "USD",
+  "sale_cost": 7.00,
+  "match_reasons": ["exact-match", "tld-exact"],
+  "vendor": "availability",
+  "ownership_verification_type": "no_verification_required"
+}

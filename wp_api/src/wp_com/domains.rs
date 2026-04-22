@@ -158,62 +158,117 @@ pub struct DomainPolicyNotice {
 ///
 /// The set of fields present varies by `status`: available domains
 /// include full pricing, transferrable domains include partial
-/// pricing, and blacklisted/restricted domains have only the core
-/// fields.
+/// pricing, and unavailable domains have only the core fields.
+///
+/// Common `status` values: `"available"`, `"available_premium"`,
+/// `"transferrable"`, `"transferrable_premium"`,
+/// `"tld_not_supported"`, `"tld_in_maintenance"`,
+/// `"blacklisted_domain"`, `"mapped_domain"`,
+/// `"registered_domain"`, `"registered_on_other_site_same_user"`,
+/// `"mapped_to_other_site_same_user"`,
+/// `"recent_registration_lock_not_transferrable"`,
+/// `"dotblog_subdomain"`, `"unknown"`.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct DomainAvailability {
     /// The domain name that was checked.
     pub domain_name: String,
     /// The TLD portion of the domain (e.g. `"com"`, `"io"`, `"dev"`).
     pub tld: String,
-    /// Availability status (e.g. `"available"`, `"transferrable"`,
-    /// `"blacklisted_domain"`, `"tld_not_supported"`,
-    /// `"restricted_domain"`,
-    /// `"recent_registration_lock_not_transferrable"`).
+    /// Availability status — see struct-level docs for known values.
     pub status: String,
     /// Whether the domain can be mapped to a WordPress.com site
-    /// (e.g. `"mappable"`, `"blacklisted_domain"`,
-    /// `"restricted_domain"`).
+    /// (e.g. `"mappable"`, `"blacklisted_domain"`).
     pub mappable: String,
     /// Whether the domain supports WHOIS privacy protection.
     #[serde(default)]
     #[uniffi(default = false)]
     pub supports_privacy: bool,
-    /// Provider of the root domain (e.g. `"unknown"`).
+    /// Provider of the root domain (`"wpcom"` or `"unknown"`).
     pub root_domain_provider: String,
+    // -- Product/pricing fields (conditional on status) --
     /// WordPress.com product ID for purchasing this domain.
     pub product_id: Option<u64>,
     /// WordPress.com product slug (e.g. `"domain_reg"`,
-    /// `"domain_transfer"`, `"dotnet_domain"`).
+    /// `"domain_transfer"`).
     pub product_slug: Option<String>,
-    /// Formatted registration cost (e.g. `"TL 426"`, `"$18.00"`).
+    /// Formatted registration/transfer cost (e.g. `"$18.00"`).
     pub cost: Option<String>,
-    /// Formatted renewal cost (e.g. `"TL 426"`).
+    /// Formatted renewal cost.
     pub renew_cost: Option<String>,
     /// Raw numeric renewal price in `currency_code`.
     #[serde(default)]
     #[uniffi(default = None)]
     pub renew_raw_price: Option<Decimal2>,
-    /// Raw numeric registration price in `currency_code`.
+    /// Raw numeric registration/transfer price in `currency_code`.
     #[serde(default)]
     #[uniffi(default = None)]
     pub raw_price: Option<Decimal2>,
     /// ISO 4217 currency code (e.g. `"USD"`, `"TRY"`).
     pub currency_code: Option<String>,
+    /// Discounted sale price when a coupon applies.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub sale_cost: Option<Decimal2>,
+    /// `true` if a premium domain exceeds the price limit.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub is_price_limit_exceeded: Option<bool>,
+    // -- Match/vendor fields (available domains only) --
     /// Reasons the domain matched (e.g. `"exact-match"`,
     /// `"tld-exact"`, `"tld-common"`).
     pub match_reasons: Option<Vec<String>>,
     /// The registry vendor (e.g. `"availability"`).
     pub vendor: Option<String>,
+    /// `true` for status `"available_premium"`.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub is_supported_premium_domain: Option<bool>,
+    // -- Mapping/transfer fields --
     /// Type of ownership verification required (e.g.
     /// `"no_verification_required"`).
     pub ownership_verification_type: Option<String>,
+    /// Transfer status for mapped domains (e.g. `"transferrable"`,
+    /// `"recent_registration_lock_not_transferrable"`).
+    pub transferrability: Option<String>,
+    /// Primary domain of the other site where this domain is
+    /// registered or mapped (same user, different site).
+    pub other_site_domain: Option<String>,
+    // -- TLD-specific fields --
     /// `true` if the TLD requires HSTS (e.g. `.dev`).
     pub hsts_required: Option<bool>,
+    /// `true` if the `.gay` TLD policy notice is required.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub is_dot_gay_notice_required: Option<bool>,
+    /// `true` if premium domain transfers are unsupported for this TLD.
+    #[serde(default)]
+    #[uniffi(default = None)]
+    pub cannot_transfer_due_to_unsupported_premium_tld: Option<bool>,
     /// Policy notices attached to the domain (e.g. HSTS warnings).
     #[serde(default)]
     #[uniffi(default = [])]
     pub policy_notices: Vec<DomainPolicyNotice>,
+    // -- Maintenance --
+    /// When domain registration or TLD is in maintenance, the end time.
+    pub maintenance_end_time: Option<String>,
+    /// TMCH (Trademark Claims) notice info as a raw JSON string,
+    /// if applicable. Complex XML-derived structure that varies by TLD.
+    #[serde(
+        default,
+        deserialize_with = "crate::wp_com::domains::deserialize_json_value_as_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[uniffi(default = None)]
+    pub trademark_claims_notice_info: Option<String>,
+}
+
+/// Deserializes an arbitrary JSON value into its stringified form.
+fn deserialize_json_value_as_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Option<serde_json::Value> = Option::deserialize(deserializer)?;
+    Ok(value.map(|v| v.to_string()))
 }
 
 impl_as_query_value_for_new_type!(DomainName);
@@ -629,6 +684,38 @@ mod tests {
         "mappable",
         false
     )]
+    #[case::available_premium(
+        "tests/wpcom/domains/is_available/available-premium.json",
+        "luxury.com",
+        "com",
+        "available_premium",
+        "mappable",
+        true
+    )]
+    #[case::mapped_same_user(
+        "tests/wpcom/domains/is_available/mapped-same-user.json",
+        "myblog.com",
+        "com",
+        "mapped_to_other_site_same_user",
+        "mappable",
+        true
+    )]
+    #[case::sale_coupon(
+        "tests/wpcom/domains/is_available/sale-coupon.json",
+        "newsite.info",
+        "info",
+        "available",
+        "mappable",
+        true
+    )]
+    #[case::maintenance(
+        "tests/wpcom/domains/is_available/maintenance.json",
+        "mysite.example",
+        "example",
+        "tld_in_maintenance",
+        "mappable",
+        false
+    )]
     fn test_domain_availability_deserialization(
         #[case] json_file_path: &str,
         #[case] expected_domain: &str,
@@ -709,6 +796,54 @@ mod tests {
         // Transferrable domains don't include renewal pricing.
         assert!(availability.renew_cost.is_none());
         assert!(availability.renew_raw_price.is_none());
+    }
+
+    #[test]
+    fn test_domain_availability_premium_fields() {
+        let file = File::open("tests/wpcom/domains/is_available/available-premium.json")
+            .expect("Failed to open file");
+        let availability: DomainAvailability =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(availability.is_supported_premium_domain, Some(true));
+        assert_eq!(availability.is_price_limit_exceeded, Some(false));
+        assert_eq!(availability.raw_price, Some(Decimal2::from_hundredths(500000)));
+    }
+
+    #[test]
+    fn test_domain_availability_mapped_same_user() {
+        let file = File::open("tests/wpcom/domains/is_available/mapped-same-user.json")
+            .expect("Failed to open file");
+        let availability: DomainAvailability =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(
+            availability.other_site_domain.as_deref(),
+            Some("myothersite.wordpress.com")
+        );
+        assert_eq!(availability.transferrability.as_deref(), Some("transferrable"));
+        assert!(availability.product_id.is_none());
+    }
+
+    #[test]
+    fn test_domain_availability_sale_coupon() {
+        let file = File::open("tests/wpcom/domains/is_available/sale-coupon.json")
+            .expect("Failed to open file");
+        let availability: DomainAvailability =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(availability.sale_cost, Some(Decimal2::from_hundredths(700)));
+        assert_eq!(availability.raw_price, Some(Decimal2::from_hundredths(2000)));
+    }
+
+    #[test]
+    fn test_domain_availability_maintenance() {
+        let file = File::open("tests/wpcom/domains/is_available/maintenance.json")
+            .expect("Failed to open file");
+        let availability: DomainAvailability =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(
+            availability.maintenance_end_time.as_deref(),
+            Some("2026-05-01 12:00:00")
+        );
+        assert!(availability.product_id.is_none());
     }
 
     #[test]

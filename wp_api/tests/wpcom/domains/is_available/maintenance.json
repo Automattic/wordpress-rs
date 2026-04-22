@@ -1,0 +1,9 @@
+{
+  "domain_name": "mysite.example",
+  "tld": "example",
+  "status": "tld_in_maintenance",
+  "mappable": "mappable",
+  "supports_privacy": false,
+  "root_domain_provider": "unknown",
+  "maintenance_end_time": "2026-05-01 12:00:00"
+}
