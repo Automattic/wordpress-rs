@@ -2,7 +2,10 @@ use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
     wp_com::{
         WpComNamespace,
-        domains::{DomainSuggestion, DomainSuggestionsParams},
+        domains::{
+            CountryCode, DomainSuggestion, DomainSuggestionsParams, SupportedCountries,
+            SupportedState,
+        },
     },
 };
 use wp_derive_request_builder::WpDerivedRequest;
@@ -11,6 +14,10 @@ use wp_derive_request_builder::WpDerivedRequest;
 enum DomainsRequest {
     #[get(url = "/domains/suggestions", params = &DomainSuggestionsParams, output = Vec<DomainSuggestion>)]
     Suggestions,
+    #[get(url = "/domains/supported-countries", output = SupportedCountries)]
+    SupportedCountries,
+    #[get(url = "/domains/supported-states/<country_code>", output = Vec<SupportedState>)]
+    SupportedStates,
 }
 
 impl DerivedRequest for DomainsRequest {
@@ -25,6 +32,7 @@ mod tests {
     use crate::{
         request::endpoint::ApiUrlResolver,
         wp_com::{
+            domains::CountryCode,
             endpoint::tests::{
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
             },
@@ -76,6 +84,26 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_wp_com_rest_v1_1_endpoint(endpoint.suggestions(&params), expected_path);
+    }
+
+    #[rstest]
+    fn supported_countries(endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.supported_countries(),
+            "/domains/supported-countries",
+        );
+    }
+
+    #[rstest]
+    #[case::us(CountryCode::from("US"), "/domains/supported-states/US")]
+    #[case::ca(CountryCode::from("CA"), "/domains/supported-states/CA")]
+    #[case::gb(CountryCode::from("GB"), "/domains/supported-states/GB")]
+    fn supported_states(
+        endpoint: DomainsRequestEndpoint,
+        #[case] country_code: CountryCode,
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_com_rest_v1_1_endpoint(endpoint.supported_states(&country_code), expected_path);
     }
 
     fn base_domain_suggestions_params() -> DomainSuggestionsParams {

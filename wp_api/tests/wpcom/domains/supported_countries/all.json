@@ -1,0 +1,2227 @@
+[
+  {
+    "code": "AU",
+    "name": "Australia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "AU"
+    ],
+    "tax_name": "GST"
+  },
+  {
+    "code": "BR",
+    "name": "Brazil",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CA",
+    "name": "Canada",
+    "has_postal_codes": true,
+    "tax_needs_city": true,
+    "tax_needs_subdivision": true,
+    "vat_supported": false,
+    "tax_name": "GST"
+  },
+  {
+    "code": "FR",
+    "name": "France",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "FR"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "DE",
+    "name": "Germany",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "DE"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "IT",
+    "name": "Italy",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "IT"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "ES",
+    "name": "Spain",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "ES"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "SE",
+    "name": "Sweden",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "SE"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "GB",
+    "name": "United Kingdom",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "GB",
+      "XI"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "US",
+    "name": "United States",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "",
+    "name": "",
+    "has_postal_codes": false
+  },
+  {
+    "code": "AF",
+    "name": "Afghanistan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "AL",
+    "name": "Albania",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "DZ",
+    "name": "Algeria",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "AS",
+    "name": "American Samoa",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "AD",
+    "name": "Andorra",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "AO",
+    "name": "Angola",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "AI",
+    "name": "Anguilla",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "AG",
+    "name": "Antigua & Barbuda",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "AR",
+    "name": "Argentina",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "AM",
+    "name": "Armenia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "AW",
+    "name": "Aruba",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "AU",
+    "name": "Australia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "AU"
+    ],
+    "tax_name": "GST"
+  },
+  {
+    "code": "AT",
+    "name": "Austria",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "AT"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "AZ",
+    "name": "Azerbaijan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BS",
+    "name": "Bahamas",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BH",
+    "name": "Bahrain",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BD",
+    "name": "Bangladesh",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BB",
+    "name": "Barbados",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BY",
+    "name": "Belarus",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BE",
+    "name": "Belgium",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "BE"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "BZ",
+    "name": "Belize",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BJ",
+    "name": "Benin",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BM",
+    "name": "Bermuda",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BT",
+    "name": "Bhutan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BO",
+    "name": "Bolivia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BA",
+    "name": "Bosnia & Herzegovina",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BW",
+    "name": "Botswana",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BV",
+    "name": "Bouvet Island",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BR",
+    "name": "Brazil",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "IO",
+    "name": "British Indian Ocean Territory",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "VG",
+    "name": "British Virgin Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BN",
+    "name": "Brunei",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BG",
+    "name": "Bulgaria",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "BG"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "BF",
+    "name": "Burkina Faso",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "BI",
+    "name": "Burundi",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "KH",
+    "name": "Cambodia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CM",
+    "name": "Cameroon",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CA",
+    "name": "Canada",
+    "has_postal_codes": true,
+    "tax_needs_city": true,
+    "tax_needs_subdivision": true,
+    "vat_supported": false,
+    "tax_name": "GST"
+  },
+  {
+    "code": "CV",
+    "name": "Cape Verde",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "KY",
+    "name": "Cayman Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CF",
+    "name": "Central African Republic",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TD",
+    "name": "Chad",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CL",
+    "name": "Chile",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "CL"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "CN",
+    "name": "China",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CX",
+    "name": "Christmas Island",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CC",
+    "name": "Cocos (Keeling) Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CO",
+    "name": "Colombia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "KM",
+    "name": "Comoros",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CG",
+    "name": "Congo - Brazzaville",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CD",
+    "name": "Congo - Kinshasa",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CK",
+    "name": "Cook Islands",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CR",
+    "name": "Costa Rica",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CI",
+    "name": "Côte d’Ivoire",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "HR",
+    "name": "Croatia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "HR"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "CW",
+    "name": "Curaçao",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CY",
+    "name": "Cyprus",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "CY"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "CZ",
+    "name": "Czechia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "CZ"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "DK",
+    "name": "Denmark",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "DK"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "DJ",
+    "name": "Djibouti",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "DM",
+    "name": "Dominica",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "DO",
+    "name": "Dominican Republic",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "EC",
+    "name": "Ecuador",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "EG",
+    "name": "Egypt",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "EG"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "SV",
+    "name": "El Salvador",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GQ",
+    "name": "Equatorial Guinea",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "ER",
+    "name": "Eritrea",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "EE",
+    "name": "Estonia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "EE"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "SZ",
+    "name": "Eswatini",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "ET",
+    "name": "Ethiopia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "FK",
+    "name": "Falkland Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "FO",
+    "name": "Faroe Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "FJ",
+    "name": "Fiji",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "FI",
+    "name": "Finland",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "FI"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "FR",
+    "name": "France",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "FR"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "GF",
+    "name": "French Guiana",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PF",
+    "name": "French Polynesia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TF",
+    "name": "French Southern Territories",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GA",
+    "name": "Gabon",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GM",
+    "name": "Gambia",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GE",
+    "name": "Georgia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "DE",
+    "name": "Germany",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "DE"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "GH",
+    "name": "Ghana",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GI",
+    "name": "Gibraltar",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GR",
+    "name": "Greece",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "EL"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "GL",
+    "name": "Greenland",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GD",
+    "name": "Grenada",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GP",
+    "name": "Guadeloupe",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GU",
+    "name": "Guam",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GT",
+    "name": "Guatemala",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GG",
+    "name": "Guernsey",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GN",
+    "name": "Guinea",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GW",
+    "name": "Guinea-Bissau",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "GY",
+    "name": "Guyana",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "HT",
+    "name": "Haiti",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "HM",
+    "name": "Heard & McDonald Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "HN",
+    "name": "Honduras",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "HK",
+    "name": "Hong Kong SAR China",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "HU",
+    "name": "Hungary",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "HU"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "IS",
+    "name": "Iceland",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "IS"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "IN",
+    "name": "India",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": true,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "IN"
+    ],
+    "tax_name": "GST"
+  },
+  {
+    "code": "ID",
+    "name": "Indonesia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "ID"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "IQ",
+    "name": "Iraq",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "IE",
+    "name": "Ireland",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "IE"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "IM",
+    "name": "Isle of Man",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "IL",
+    "name": "Israel",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "IT",
+    "name": "Italy",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "IT"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "JM",
+    "name": "Jamaica",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "JP",
+    "name": "Japan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "tax_needs_organization": true,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "JP"
+    ],
+    "tax_name": "CT"
+  },
+  {
+    "code": "JE",
+    "name": "Jersey",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "JO",
+    "name": "Jordan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "KZ",
+    "name": "Kazakhstan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "KE",
+    "name": "Kenya",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "KE"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "KI",
+    "name": "Kiribati",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "KW",
+    "name": "Kuwait",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "KG",
+    "name": "Kyrgyzstan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "LA",
+    "name": "Laos",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "LV",
+    "name": "Latvia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "LV"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "LB",
+    "name": "Lebanon",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "LS",
+    "name": "Lesotho",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "LR",
+    "name": "Liberia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "LY",
+    "name": "Libya",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "LI",
+    "name": "Liechtenstein",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "LT",
+    "name": "Lithuania",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "LT"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "LU",
+    "name": "Luxembourg",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "LU"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "MO",
+    "name": "Macao SAR China",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MG",
+    "name": "Madagascar",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MW",
+    "name": "Malawi",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MY",
+    "name": "Malaysia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "MY"
+    ],
+    "tax_name": "SST"
+  },
+  {
+    "code": "MV",
+    "name": "Maldives",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "ML",
+    "name": "Mali",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MT",
+    "name": "Malta",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "MT"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "MH",
+    "name": "Marshall Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MQ",
+    "name": "Martinique",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MR",
+    "name": "Mauritania",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MU",
+    "name": "Mauritius",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "YT",
+    "name": "Mayotte",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MX",
+    "name": "Mexico",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "MX"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "FM",
+    "name": "Micronesia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MD",
+    "name": "Moldova",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MC",
+    "name": "Monaco",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MN",
+    "name": "Mongolia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "ME",
+    "name": "Montenegro",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MS",
+    "name": "Montserrat",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MA",
+    "name": "Morocco",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MZ",
+    "name": "Mozambique",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MM",
+    "name": "Myanmar (Burma)",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "NA",
+    "name": "Namibia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "NR",
+    "name": "Nauru",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "NP",
+    "name": "Nepal",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "NL",
+    "name": "Netherlands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "NL"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "NC",
+    "name": "New Caledonia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "NZ",
+    "name": "New Zealand",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "NZ"
+    ],
+    "tax_name": "GST"
+  },
+  {
+    "code": "NI",
+    "name": "Nicaragua",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "NE",
+    "name": "Niger",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "NG",
+    "name": "Nigeria",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "NU",
+    "name": "Niue",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "NF",
+    "name": "Norfolk Island",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MK",
+    "name": "North Macedonia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "MP",
+    "name": "Northern Mariana Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "NO",
+    "name": "Norway",
+    "has_postal_codes": true,
+    "tax_needs_city": true,
+    "tax_needs_subdivision": false,
+    "tax_needs_organization": true,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "NO"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "OM",
+    "name": "Oman",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PK",
+    "name": "Pakistan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PW",
+    "name": "Palau",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PS",
+    "name": "Palestinian Territories",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PA",
+    "name": "Panama",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PG",
+    "name": "Papua New Guinea",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PY",
+    "name": "Paraguay",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PE",
+    "name": "Peru",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PH",
+    "name": "Philippines",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PN",
+    "name": "Pitcairn Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PL",
+    "name": "Poland",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "PL"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "PT",
+    "name": "Portugal",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "PT"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "PR",
+    "name": "Puerto Rico",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "QA",
+    "name": "Qatar",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "RE",
+    "name": "Réunion",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "RO",
+    "name": "Romania",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "RO"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "RU",
+    "name": "Russia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "RU"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "RW",
+    "name": "Rwanda",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "WS",
+    "name": "Samoa",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "SM",
+    "name": "San Marino",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "ST",
+    "name": "São Tomé & Príncipe",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "CQ",
+    "name": "Sark",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "SA",
+    "name": "Saudi Arabia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "SA"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "SN",
+    "name": "Senegal",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "RS",
+    "name": "Serbia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "SC",
+    "name": "Seychelles",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "SL",
+    "name": "Sierra Leone",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "SG",
+    "name": "Singapore",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "SG"
+    ],
+    "tax_name": "GST"
+  },
+  {
+    "code": "SX",
+    "name": "Sint Maarten",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "SK",
+    "name": "Slovakia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "SK"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "SI",
+    "name": "Slovenia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "SI"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "SB",
+    "name": "Solomon Islands",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "SO",
+    "name": "Somalia",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "ZA",
+    "name": "South Africa",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "ZA"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "GS",
+    "name": "South Georgia & South Sandwich Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "KR",
+    "name": "South Korea",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "KR"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "ES",
+    "name": "Spain",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "ES"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "LK",
+    "name": "Sri Lanka",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "SH",
+    "name": "St. Helena",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "KN",
+    "name": "St. Kitts & Nevis",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "LC",
+    "name": "St. Lucia",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "PM",
+    "name": "St. Pierre & Miquelon",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "VC",
+    "name": "St. Vincent & Grenadines",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "SR",
+    "name": "Suriname",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "SE",
+    "name": "Sweden",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "SE"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "CH",
+    "name": "Switzerland",
+    "has_postal_codes": true,
+    "tax_needs_city": true,
+    "tax_needs_subdivision": false,
+    "tax_needs_address": true,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "CH"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "TW",
+    "name": "Taiwan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "TW"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "TJ",
+    "name": "Tajikistan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TZ",
+    "name": "Tanzania",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TH",
+    "name": "Thailand",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "TH"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "TL",
+    "name": "Timor-Leste",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TG",
+    "name": "Togo",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TK",
+    "name": "Tokelau",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TO",
+    "name": "Tonga",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TT",
+    "name": "Trinidad & Tobago",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TN",
+    "name": "Tunisia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TR",
+    "name": "Türkiye",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "TR"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "TM",
+    "name": "Turkmenistan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TC",
+    "name": "Turks & Caicos Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "TV",
+    "name": "Tuvalu",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "UM",
+    "name": "U.S. Outlying Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "VI",
+    "name": "U.S. Virgin Islands",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "UG",
+    "name": "Uganda",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "UA",
+    "name": "Ukraine",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "UA"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "AE",
+    "name": "United Arab Emirates",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false,
+    "tax_name": "VAT"
+  },
+  {
+    "code": "GB",
+    "name": "United Kingdom",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": true,
+    "tax_country_codes": [
+      "GB",
+      "XI"
+    ],
+    "tax_name": "VAT"
+  },
+  {
+    "code": "US",
+    "name": "United States",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "UY",
+    "name": "Uruguay",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "UZ",
+    "name": "Uzbekistan",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "VU",
+    "name": "Vanuatu",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "VA",
+    "name": "Vatican City",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "VE",
+    "name": "Venezuela",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "VN",
+    "name": "Vietnam",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "WF",
+    "name": "Wallis & Futuna",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "EH",
+    "name": "Western Sahara",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "YE",
+    "name": "Yemen",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "ZM",
+    "name": "Zambia",
+    "has_postal_codes": true,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  },
+  {
+    "code": "ZW",
+    "name": "Zimbabwe",
+    "has_postal_codes": false,
+    "tax_needs_city": false,
+    "tax_needs_subdivision": false,
+    "vat_supported": false
+  }
+]

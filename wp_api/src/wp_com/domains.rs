@@ -1,5 +1,6 @@
 use crate::{
     decimal2::Decimal2,
+    impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::segments::SegmentId,
 };
@@ -150,6 +151,134 @@ pub struct DomainPolicyNotice {
     pub message: String,
 }
 
+impl_as_query_value_for_new_type!(CountryCode);
+uniffi::custom_newtype!(CountryCode, String);
+/// ISO 3166-1 alpha-2 country code (e.g. `"US"`, `"CA"`, `"GB"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct CountryCode(pub String);
+
+impl std::fmt::Display for CountryCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for CountryCode {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+/// Structured response from `GET /domains/supported-countries`.
+///
+/// The raw API response is a flat array where a sentinel entry (empty
+/// `code`/`name`, `has_postal_codes: false`) separates "featured" countries
+/// from the full alphabetical list. This type deserializes that array and
+/// splits it into two vectors, filtering out the sentinel.
+///
+/// If no sentinel is found the full list is placed in `all` and `featured`
+/// is empty.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "Vec<SupportedCountryEntry>")]
+pub struct SupportedCountries {
+    /// Countries the API surfaces at the top of the picker, in the API's
+    /// priority order (not alphabetical).
+    pub featured: Vec<SupportedCountry>,
+    /// Every supported country, alphabetized by localized name.
+    pub all: Vec<SupportedCountry>,
+}
+
+impl From<Vec<SupportedCountryEntry>> for SupportedCountries {
+    fn from(mut entries: Vec<SupportedCountryEntry>) -> Self {
+        let into_countries = |v: Vec<SupportedCountryEntry>| {
+            v.into_iter()
+                .filter_map(|e| match e {
+                    SupportedCountryEntry::Country(c) => Some(c),
+                    SupportedCountryEntry::Divider { .. } => None,
+                })
+                .collect()
+        };
+
+        let divider_pos = entries
+            .iter()
+            .position(|e| matches!(e, SupportedCountryEntry::Divider { .. }));
+
+        match divider_pos {
+            Some(pos) => {
+                let all_entries = entries.split_off(pos + 1);
+                Self {
+                    featured: into_countries(entries),
+                    all: into_countries(all_entries),
+                }
+            }
+            None => Self {
+                featured: Vec::new(),
+                all: into_countries(entries),
+            },
+        }
+    }
+}
+
+/// Internal type used to deserialize the raw API array which mixes real
+/// country entries with sentinel dividers.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum SupportedCountryEntry {
+    Country(SupportedCountry),
+    Divider {
+        #[allow(dead_code)]
+        code: String,
+        #[allow(dead_code)]
+        name: String,
+        #[allow(dead_code)]
+        has_postal_codes: bool,
+    },
+}
+
+/// A country supported by the WordPress.com domain registration flow.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct SupportedCountry {
+    /// ISO 3166-1 alpha-2 code (e.g. `"US"`).
+    pub code: CountryCode,
+    /// Localized country name.
+    pub name: String,
+    /// Whether this country uses postal codes in addresses.
+    pub has_postal_codes: bool,
+    /// Whether VAT is collected for this country.
+    pub vat_supported: bool,
+    /// Whether a city is required in the tax address.
+    pub tax_needs_city: bool,
+    /// Whether a subdivision (state/province) is required in the tax address.
+    pub tax_needs_subdivision: bool,
+    /// Whether a street address is required for tax purposes.
+    #[serde(default)]
+    #[uniffi(default = false)]
+    pub tax_needs_address: bool,
+    /// Whether an organization name is required for tax purposes.
+    #[serde(default)]
+    #[uniffi(default = false)]
+    pub tax_needs_organization: bool,
+    /// Additional country codes whose tax rules apply alongside this one.
+    #[serde(default)]
+    #[uniffi(default = [])]
+    pub tax_country_codes: Vec<CountryCode>,
+    /// Localized tax name (e.g. `"GST"`, `"VAT"`).
+    pub tax_name: Option<String>,
+}
+
+/// A state, province, or other subdivision within a supported country.
+///
+/// Returned from `GET /domains/supported-states/<country_code>`. Countries
+/// without subdivision-level address requirements return an empty array.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct SupportedState {
+    /// Subdivision code (e.g. `"CA"` for California, `"ON"` for Ontario).
+    pub code: String,
+    /// Localized subdivision name.
+    pub name: String,
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;
@@ -286,6 +415,83 @@ mod tests {
                 "expected Paid variants after the first suggestion"
             );
         }
+    }
+
+    #[test]
+    fn test_supported_countries_deserialization() {
+        let file = File::open("tests/wpcom/domains/supported_countries/all.json")
+            .expect("Failed to open file");
+        let response: SupportedCountries =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(response.featured.len(), 10);
+        assert_eq!(response.all.len(), 238);
+
+        // US is in featured and has all optional tax fields populated.
+        let us = response
+            .featured
+            .iter()
+            .find(|c| c.code.0 == "US")
+            .expect("US missing from featured");
+        assert_eq!(us.name, "United States");
+        assert!(us.has_postal_codes);
+        assert!(!us.vat_supported);
+        assert!(!us.tax_needs_city);
+        assert!(!us.tax_needs_subdivision);
+
+        // Brazil has no `tax_country_codes` or `tax_name`.
+        let br = response
+            .all
+            .iter()
+            .find(|c| c.code.0 == "BR")
+            .expect("BR missing from all");
+        assert!(br.tax_country_codes.is_empty());
+        assert_eq!(br.tax_name, None);
+
+        // Australia has `tax_country_codes` and `tax_name`.
+        let au = response
+            .all
+            .iter()
+            .find(|c| c.code.0 == "AU")
+            .expect("AU missing from all");
+        assert_eq!(au.tax_country_codes, vec![CountryCode::from("AU")]);
+        assert_eq!(au.tax_name.as_deref(), Some("GST"));
+
+        // The separator entry should be filtered out.
+        let separator = response
+            .featured
+            .iter()
+            .chain(response.all.iter())
+            .find(|c| c.code.0.is_empty());
+        assert!(separator.is_none(), "separator should be filtered out");
+    }
+
+    #[rstest]
+    #[case("tests/wpcom/domains/supported_states/us.json", 61)]
+    #[case("tests/wpcom/domains/supported_states/ca.json", 13)]
+    #[case("tests/wpcom/domains/supported_states/de.json", 0)]
+    fn test_supported_states_deserialization(
+        #[case] json_file_path: &str,
+        #[case] expected_len: usize,
+    ) {
+        let file = File::open(json_file_path).expect("Failed to open file");
+        let states: Vec<SupportedState> =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(states.len(), expected_len);
+        states.iter().for_each(|state| {
+            assert!(!state.code.is_empty());
+            assert!(!state.name.is_empty());
+        });
+    }
+
+    #[test]
+    fn test_supported_states_deserialization_us_details() {
+        let file = File::open("tests/wpcom/domains/supported_states/us.json")
+            .expect("Failed to open file");
+        let states: Vec<SupportedState> =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        let alabama = states.iter().find(|s| s.code == "AL").expect("AL missing");
+        assert_eq!(alabama.name, "Alabama");
     }
 
     #[test]
