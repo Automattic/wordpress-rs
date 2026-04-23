@@ -1,10 +1,34 @@
 use crate::{
     decimal2::Decimal2,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    wp_com::language::WPComLanguage,
+    wp_com::{CurrencyCode, language::WPComLanguage},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+uniffi::custom_newtype!(ProductId, u64);
+/// WordPress.com product identifier.
+///
+/// Deserializes from both numeric (`6`) and string (`"6"`) representations,
+/// since the API is inconsistent about the encoding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(transparent)]
+pub struct ProductId(pub u64);
+
+impl<'de> Deserialize<'de> for ProductId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        wp_serde_helper::deserialize_u64_or_string(deserializer).map(Self)
+    }
+}
+
+impl std::fmt::Display for ProductId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// Filter for the `type` query parameter on `GET /products`.
 ///
@@ -55,7 +79,7 @@ pub type ProductMap = HashMap<String, Product>;
 /// A WordPress.com product.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct Product {
-    pub product_id: u64,
+    pub product_id: ProductId,
     pub product_name: String,
     pub product_slug: String,
     pub description: String,
@@ -72,7 +96,7 @@ pub struct Product {
     pub cost: Decimal2,
     /// Cost in the smallest currency unit (e.g. cents).
     pub cost_smallest_unit: u64,
-    pub currency_code: String,
+    pub currency_code: CurrencyCode,
     /// Billing period (e.g. `"year"`).
     pub product_term: String,
     /// Localized billing period label.
@@ -165,7 +189,7 @@ pub struct SaleCoupon {
     pub expires: String,
     /// Discount percentage (e.g. `65` means 65% off).
     pub discount: u32,
-    pub product_ids: Vec<u64>,
+    pub product_ids: Vec<ProductId>,
     #[serde(default)]
     #[uniffi(default = [])]
     pub purchase_types: Vec<u32>,
@@ -208,7 +232,7 @@ mod tests {
 
         // domain_map is a non-registration product without tld.
         let domain_map = products.get("domain_map").expect("domain_map missing");
-        assert_eq!(domain_map.product_id, 1001);
+        assert_eq!(domain_map.product_id, ProductId(1001));
         assert!(!domain_map.is_domain_registration);
         assert_eq!(domain_map.domain_info.tld, None);
 

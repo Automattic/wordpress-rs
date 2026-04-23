@@ -58,6 +58,18 @@ impl std::fmt::Display for WpComSiteId {
     }
 }
 
+uniffi::custom_newtype!(CurrencyCode, String);
+/// ISO 4217 currency code (e.g. `"USD"`, `"TRY"`, `"EUR"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct CurrencyCode(pub String);
+
+impl std::fmt::Display for CurrencyCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 pub(crate) enum WpComNamespace {
     Oauth2,
     RestV1_1,
