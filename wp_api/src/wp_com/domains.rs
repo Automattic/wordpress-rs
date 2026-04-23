@@ -2,7 +2,7 @@ use crate::{
     decimal2::Decimal2,
     impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::{WpComSiteId, segments::SegmentId},
+    wp_com::{CurrencyCode, WpComSiteId, segments::SegmentId},
 };
 use serde::{Deserialize, Serialize};
 
@@ -127,8 +127,8 @@ pub struct PaidDomainSuggestion {
     pub renew_raw_price: Decimal2,
     /// Raw numeric registration price in `currency_code`.
     pub raw_price: Decimal2,
-    /// ISO 4217 currency code for `raw_price`/`renew_raw_price` (e.g. `"USD"`).
-    pub currency_code: String,
+    /// ISO 4217 currency code for `raw_price`/`renew_raw_price`.
+    pub currency_code: CurrencyCode,
     /// Promotional sale price in `currency_code`, if the domain is on sale.
     pub sale_cost: Option<Decimal2>,
     /// `true` if the TLD requires HSTS (e.g. `.dev`).
@@ -282,8 +282,8 @@ pub struct DomainAvailability {
     pub renew_raw_price: Option<Decimal2>,
     /// Raw numeric registration/transfer price in `currency_code`.
     pub raw_price: Option<Decimal2>,
-    /// ISO 4217 currency code (e.g. `"USD"`, `"TRY"`).
-    pub currency_code: Option<String>,
+    /// ISO 4217 currency code.
+    pub currency_code: Option<CurrencyCode>,
     /// Discounted sale price when a coupon applies.
     pub sale_cost: Option<Decimal2>,
     /// `true` if a premium domain exceeds the price limit.
@@ -520,7 +520,7 @@ mod tests {
         assert_eq!(first.renew_cost, "$18.00");
         assert_eq!(first.renew_raw_price.hundredths(), 1800);
         assert_eq!(first.raw_price.hundredths(), 1800);
-        assert_eq!(first.currency_code, "USD");
+        assert_eq!(first.currency_code, CurrencyCode("USD".to_string()));
         assert!(first.sale_cost.is_none());
         assert!(first.hsts_required.is_none());
         assert!(first.policy_notices.is_empty());
@@ -787,7 +787,10 @@ mod tests {
             availability.renew_raw_price,
             Some(Decimal2::from_hundredths(1800))
         );
-        assert_eq!(availability.currency_code.as_deref(), Some("USD"));
+        assert_eq!(
+            availability.currency_code,
+            Some(CurrencyCode("USD".to_string()))
+        );
         assert_eq!(
             availability.match_reasons.as_deref(),
             Some(
