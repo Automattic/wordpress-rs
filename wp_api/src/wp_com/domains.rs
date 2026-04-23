@@ -182,62 +182,20 @@ pub enum DomainAvailabilityStatus {
     Available,
     /// Premium domain available at a higher price.
     AvailablePremium,
-    /// Available but reserved.
-    AvailableReserved,
-    /// Available but not registrable by current user.
-    AvailableButNotRegistrable,
     /// Domain can be transferred in.
     Transferrable,
     /// Premium domain can be transferred in.
     TransferrablePremium,
-    /// Registered on the same site being checked.
-    RegisteredOnSameSite,
-    /// Registered by the same user on a different site.
+    /// Already registered by the same user on a different site.
     RegisteredOnOtherSiteSameUser,
-    /// Registered by a different user.
-    RegisteredDomain,
-    /// Mapped to same site, can still be registered.
-    MappedToSameSiteRegistrable,
-    /// Mapped to same site, can be transferred.
-    MappedToSameSiteTransferrable,
-    /// Mapped to same site, cannot be transferred.
-    MappedToSameSiteNotTransferrable,
-    /// Mapped to another site by the same user, registrable.
-    MappedToOtherSiteSameUserRegistrable,
-    /// Mapped to another site by the same user.
+    /// Already mapped to another site by the same user.
     MappedToOtherSiteSameUser,
-    /// Mapped by a different user.
-    MappedDomain,
-    /// Transfer in progress by the same user.
-    TransferPendingSameUser,
-    /// Transfer in progress by a different user.
-    TransferPending,
-    /// Domain in redemption period.
-    InRedemption,
     /// TLD is not supported for registration.
     TldNotSupported,
     /// TLD is currently in maintenance.
     TldInMaintenance,
-    /// Domain registration is temporarily disabled.
-    DomainRegistrationUnavailable,
-    /// 60-day transfer lock active.
-    RecentRegistrationLockNotTransferrable,
-    /// EPP status prevents transfer.
-    ServerTransferProhibitedNotTransferrable,
     /// Domain is blacklisted.
     BlacklistedDomain,
-    /// Domain is restricted.
-    RestrictedDomain,
-    /// WordPress.com managed subdomain (.blog, .link, etc.).
-    DotblogSubdomain,
-    /// 100-year domain vendor but TLD not supported.
-    HundredYearDomainTldRestriction,
-    /// CNAME conflict prevents mapping.
-    ConflictingCnameExists,
-    /// Domain can be mapped (mappable-only status).
-    Mappable,
-    /// Unknown status.
-    Unknown,
     /// A status not covered by the known variants.
     #[serde(untagged)]
     Other(String),
@@ -722,7 +680,7 @@ mod tests {
     #[case::hsts_required(
         "tests/wpcom/domains/is_available/hsts-required.json",
         "myproject.dev",
-        DomainAvailabilityStatus::RecentRegistrationLockNotTransferrable,
+        DomainAvailabilityStatus::Other("recent_registration_lock_not_transferrable".to_string()),
         false
     )]
     #[case::available_premium(
@@ -752,7 +710,7 @@ mod tests {
     #[case::dot_gay_notice(
         "tests/wpcom/domains/is_available/dot-gay-notice.json",
         "testsite2025.gay",
-        DomainAvailabilityStatus::Mappable,
+        DomainAvailabilityStatus::Other("mappable".to_string()),
         true
     )]
     fn test_domain_availability_deserialization(
