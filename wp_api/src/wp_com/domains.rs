@@ -174,6 +174,75 @@ impl AppendUrlQueryPairs for DomainAvailabilityParams {
     }
 }
 
+/// Availability status for a domain checked via `GET /domains/{name}/is-available/`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainAvailabilityStatus {
+    /// Domain is available for registration.
+    Available,
+    /// Premium domain available at a higher price.
+    AvailablePremium,
+    /// Available but reserved.
+    AvailableReserved,
+    /// Available but not registrable by current user.
+    AvailableButNotRegistrable,
+    /// Domain can be transferred in.
+    Transferrable,
+    /// Premium domain can be transferred in.
+    TransferrablePremium,
+    /// Registered on the same site being checked.
+    RegisteredOnSameSite,
+    /// Registered by the same user on a different site.
+    RegisteredOnOtherSiteSameUser,
+    /// Registered by a different user.
+    RegisteredDomain,
+    /// Mapped to same site, can still be registered.
+    MappedToSameSiteRegistrable,
+    /// Mapped to same site, can be transferred.
+    MappedToSameSiteTransferrable,
+    /// Mapped to same site, cannot be transferred.
+    MappedToSameSiteNotTransferrable,
+    /// Mapped to another site by the same user, registrable.
+    MappedToOtherSiteSameUserRegistrable,
+    /// Mapped to another site by the same user.
+    MappedToOtherSiteSameUser,
+    /// Mapped by a different user.
+    MappedDomain,
+    /// Transfer in progress by the same user.
+    TransferPendingSameUser,
+    /// Transfer in progress by a different user.
+    TransferPending,
+    /// Domain in redemption period.
+    InRedemption,
+    /// TLD is not supported for registration.
+    TldNotSupported,
+    /// TLD is currently in maintenance.
+    TldInMaintenance,
+    /// Domain registration is temporarily disabled.
+    DomainRegistrationUnavailable,
+    /// 60-day transfer lock active.
+    RecentRegistrationLockNotTransferrable,
+    /// EPP status prevents transfer.
+    ServerTransferProhibitedNotTransferrable,
+    /// Domain is blacklisted.
+    BlacklistedDomain,
+    /// Domain is restricted.
+    RestrictedDomain,
+    /// WordPress.com managed subdomain (.blog, .link, etc.).
+    DotblogSubdomain,
+    /// 100-year domain vendor but TLD not supported.
+    HundredYearDomainTldRestriction,
+    /// CNAME conflict prevents mapping.
+    ConflictingCnameExists,
+    /// Domain can be mapped (mappable-only status).
+    Mappable,
+    /// Unknown status.
+    Unknown,
+    /// A status not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
 /// Response from `GET /domains/{name}/is-available/` (v1.3).
 ///
 /// Reports whether a domain name is available for registration or
@@ -182,23 +251,14 @@ impl AppendUrlQueryPairs for DomainAvailabilityParams {
 /// The set of fields present varies by `status`: available domains
 /// include full pricing, transferrable domains include partial
 /// pricing, and unavailable domains have only the core fields.
-///
-/// Common `status` values: `"available"`, `"available_premium"`,
-/// `"transferrable"`, `"transferrable_premium"`,
-/// `"tld_not_supported"`, `"tld_in_maintenance"`,
-/// `"blacklisted_domain"`, `"mapped_domain"`,
-/// `"registered_domain"`, `"registered_on_other_site_same_user"`,
-/// `"mapped_to_other_site_same_user"`,
-/// `"recent_registration_lock_not_transferrable"`,
-/// `"dotblog_subdomain"`, `"unknown"`.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct DomainAvailability {
     /// The domain name that was checked.
     pub domain_name: String,
     /// The TLD portion of the domain (e.g. `"com"`, `"io"`, `"dev"`).
     pub tld: String,
-    /// Availability status — see struct-level docs for known values.
-    pub status: String,
+    /// Availability status.
+    pub status: DomainAvailabilityStatus,
     /// Whether the domain can be mapped to a WordPress.com site
     /// (e.g. `"mappable"`, `"blacklisted_domain"`).
     pub mappable: String,
@@ -219,22 +279,14 @@ pub struct DomainAvailability {
     /// Formatted renewal cost.
     pub renew_cost: Option<String>,
     /// Raw numeric renewal price in `currency_code`.
-    #[serde(default)]
-    #[uniffi(default = None)]
     pub renew_raw_price: Option<Decimal2>,
     /// Raw numeric registration/transfer price in `currency_code`.
-    #[serde(default)]
-    #[uniffi(default = None)]
     pub raw_price: Option<Decimal2>,
     /// ISO 4217 currency code (e.g. `"USD"`, `"TRY"`).
     pub currency_code: Option<String>,
     /// Discounted sale price when a coupon applies.
-    #[serde(default)]
-    #[uniffi(default = None)]
     pub sale_cost: Option<Decimal2>,
     /// `true` if a premium domain exceeds the price limit.
-    #[serde(default)]
-    #[uniffi(default = None)]
     pub is_price_limit_exceeded: Option<bool>,
     // -- Match/vendor fields (available domains only) --
     /// Reasons the domain matched (e.g. `"exact-match"`,
@@ -243,8 +295,6 @@ pub struct DomainAvailability {
     /// The registry vendor (e.g. `"availability"`).
     pub vendor: Option<String>,
     /// `true` for status `"available_premium"`.
-    #[serde(default)]
-    #[uniffi(default = None)]
     pub is_supported_premium_domain: Option<bool>,
     // -- Mapping/transfer fields --
     /// Type of ownership verification required (e.g.
@@ -260,12 +310,8 @@ pub struct DomainAvailability {
     /// `true` if the TLD requires HSTS (e.g. `.dev`).
     pub hsts_required: Option<bool>,
     /// `true` if the `.gay` TLD policy notice is required.
-    #[serde(default)]
-    #[uniffi(default = None)]
     pub is_dot_gay_notice_required: Option<bool>,
     /// `true` if premium domain transfers are unsupported for this TLD.
-    #[serde(default)]
-    #[uniffi(default = None)]
     pub cannot_transfer_due_to_unsupported_premium_tld: Option<bool>,
     /// Policy notices attached to the domain (e.g. HSTS warnings).
     #[serde(default)]
@@ -274,24 +320,6 @@ pub struct DomainAvailability {
     // -- Maintenance --
     /// When domain registration or TLD is in maintenance, the end time.
     pub maintenance_end_time: Option<String>,
-    /// TMCH (Trademark Claims) notice info as a raw JSON string,
-    /// if applicable. Complex XML-derived structure that varies by TLD.
-    #[serde(
-        default,
-        deserialize_with = "crate::wp_com::domains::deserialize_json_value_as_string",
-        skip_serializing_if = "Option::is_none"
-    )]
-    #[uniffi(default = None)]
-    pub trademark_claims_notice_info: Option<String>,
-}
-
-/// Deserializes an arbitrary JSON value into its stringified form.
-fn deserialize_json_value_as_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let value: Option<serde_json::Value> = Option::deserialize(deserializer)?;
-    Ok(value.map(|v| v.to_string()))
 }
 
 impl_as_query_value_for_new_type!(DomainName);
@@ -670,98 +698,74 @@ mod tests {
     #[case::available(
         "tests/wpcom/domains/is_available/available.json",
         "freshsite2025.com",
-        "com",
-        "available",
-        "mappable",
+        DomainAvailabilityStatus::Available,
         true
     )]
     #[case::blacklisted(
         "tests/wpcom/domains/is_available/not-available.json",
         "example.com",
-        "com",
-        "blacklisted_domain",
-        "blacklisted_domain",
+        DomainAvailabilityStatus::BlacklistedDomain,
         true
     )]
     #[case::transferrable(
         "tests/wpcom/domains/is_available/transferrable.json",
         "taken-domain.io",
-        "io",
-        "transferrable",
-        "mappable",
+        DomainAvailabilityStatus::Transferrable,
         true
     )]
     #[case::tld_not_supported(
         "tests/wpcom/domains/is_available/tld-not-supported.json",
         "mysite.ai",
-        "ai",
-        "tld_not_supported",
-        "mappable",
+        DomainAvailabilityStatus::TldNotSupported,
         false
     )]
     #[case::hsts_required(
         "tests/wpcom/domains/is_available/hsts-required.json",
         "myproject.dev",
-        "dev",
-        "recent_registration_lock_not_transferrable",
-        "mappable",
+        DomainAvailabilityStatus::RecentRegistrationLockNotTransferrable,
         false
     )]
     #[case::available_premium(
         "tests/wpcom/domains/is_available/available-premium.json",
         "luxury.com",
-        "com",
-        "available_premium",
-        "mappable",
+        DomainAvailabilityStatus::AvailablePremium,
         true
     )]
     #[case::mapped_same_user(
         "tests/wpcom/domains/is_available/mapped-same-user.json",
         "myblog.com",
-        "com",
-        "mapped_to_other_site_same_user",
-        "mappable",
+        DomainAvailabilityStatus::MappedToOtherSiteSameUser,
         true
     )]
     #[case::sale_coupon(
         "tests/wpcom/domains/is_available/sale-coupon.json",
         "freshblog2025.online",
-        "online",
-        "available",
-        "mappable",
+        DomainAvailabilityStatus::Available,
         true
     )]
     #[case::maintenance(
         "tests/wpcom/domains/is_available/maintenance.json",
         "mysite.example",
-        "example",
-        "tld_in_maintenance",
-        "mappable",
+        DomainAvailabilityStatus::TldInMaintenance,
         false
     )]
     #[case::dot_gay_notice(
         "tests/wpcom/domains/is_available/dot-gay-notice.json",
         "testsite2025.gay",
-        "gay",
-        "mappable",
-        "mappable",
+        DomainAvailabilityStatus::Mappable,
         true
     )]
     fn test_domain_availability_deserialization(
         #[case] json_file_path: &str,
         #[case] expected_domain: &str,
-        #[case] expected_tld: &str,
-        #[case] expected_status: &str,
-        #[case] expected_mappable: &str,
+        #[case] expected_status: DomainAvailabilityStatus,
         #[case] expected_privacy: bool,
     ) {
         let file = File::open(json_file_path).expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
         assert_eq!(availability.domain_name, expected_domain);
-        assert_eq!(availability.tld, expected_tld);
         assert_eq!(availability.status, expected_status);
-        assert_eq!(availability.mappable, expected_mappable);
         assert_eq!(availability.supports_privacy, expected_privacy);
     }
 

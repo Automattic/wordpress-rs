@@ -1,7 +1,9 @@
 use crate::context::TestContext;
 use libtest_mimic::Trial;
 use std::sync::Arc;
-use wp_api::wp_com::domains::{CountryCode, DomainAvailabilityParams, DomainName};
+use wp_api::wp_com::domains::{
+    CountryCode, DomainAvailabilityParams, DomainAvailabilityStatus, DomainName,
+};
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut trials = vec![];
@@ -106,7 +108,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     .into());
                 }
 
-                if availability.status == "available" {
+                if availability.status == DomainAvailabilityStatus::Available {
                     return Err("expected google.com to not be available".into());
                 }
 
@@ -130,9 +132,9 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     .map_err(|e| e.to_string())?
                     .data;
 
-                if availability.status != "available" {
+                if availability.status != DomainAvailabilityStatus::Available {
                     return Err(format!(
-                        "expected status 'available', got '{}'",
+                        "expected status Available, got {:?}",
                         availability.status
                     )
                     .into());
