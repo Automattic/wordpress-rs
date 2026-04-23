@@ -2,7 +2,10 @@ use crate::{
     decimal2::Decimal2,
     impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::{CurrencyCode, WpComSiteId, products::ProductId, segments::SegmentId},
+    wp_com::{
+        CurrencyCode, WpComSiteId, products::ProductId, segments::SegmentId,
+        subscribers::SubscriptionId,
+    },
 };
 use serde::{Deserialize, Serialize};
 
@@ -336,6 +339,143 @@ pub struct DomainTransferInfo {
     pub transferrability: Option<DomainTransferrability>,
 }
 
+/// Optional query parameters for `GET /all-domains/` (v1.2).
+#[derive(Debug, Default, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct AllDomainsParams {
+    /// Filter domains by garden name.
+    #[uniffi(default = None)]
+    pub garden: Option<String>,
+}
+
+impl AppendUrlQueryPairs for AllDomainsParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut.append_option_query_value_pair("garden", self.garden.as_ref());
+    }
+}
+
+/// Response from `GET /all-domains/` (v1.2).
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct AllDomainsResponse {
+    /// List of domains across all sites for the authenticated user.
+    pub domains: Vec<AllDomainItem>,
+}
+
+/// A domain item returned by `GET /all-domains/` (v1.2).
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct AllDomainItem {
+    /// The domain name (e.g. `"example.com"`).
+    pub domain: DomainName,
+    /// Domain subtype indicating how the domain is associated with the site.
+    pub subtype: DomainSubtype,
+    /// The site ID this domain belongs to.
+    pub blog_id: WpComSiteId,
+    /// The site name.
+    pub blog_name: String,
+    /// The site slug used in URLs.
+    pub site_slug: String,
+    /// Whether the domain is configured for automatic renewal.
+    pub auto_renewing: bool,
+    /// Whether the current authenticated user owns this domain.
+    pub current_user_is_owner: bool,
+    /// Whether the site only has a domain (no content).
+    pub is_domain_only_site: bool,
+    /// Expiry date as a string (e.g. `"2026-03-24 00:00:00"`), or `null`
+    /// if the domain has no expiry.
+    pub expiry: Option<String>,
+    /// Whether the domain has expired.
+    pub expired: bool,
+    /// Whether this is the primary domain for the site.
+    pub primary_domain: bool,
+    /// Whether this domain can be set as the site's primary domain.
+    pub can_set_as_primary: bool,
+    /// Resolved status of the domain.
+    pub domain_status: DomainListItemStatus,
+    /// Subscription ID for the domain purchase, if any.
+    pub subscription_id: Option<SubscriptionId>,
+    /// Tags describing domain characteristics
+    /// (e.g. `"domain_only"`, `"wpcom_staging"`, `"hundred_year_domain"`).
+    #[serde(default)]
+    #[uniffi(default = [])]
+    pub tags: Vec<String>,
+}
+
+/// Domain subtype indicating how the domain is associated with the site.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct DomainSubtype {
+    /// Subtype identifier.
+    pub id: DomainSubtypeId,
+    /// Localized human-readable label.
+    pub label: String,
+}
+
+/// How a domain is associated with a WordPress.com site.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainSubtypeId {
+    /// Free WordPress.com address (e.g. `"mysite.wordpress.com"`).
+    DefaultAddress,
+    /// External domain connected/mapped to the site.
+    DomainConnection,
+    /// Domain registered through WordPress.com.
+    DomainRegistration,
+    /// Domain transfer in progress.
+    DomainTransfer,
+    /// Redirect-only domain.
+    SiteRedirect,
+    /// A subtype not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// Resolved status of a domain in `GET /all-domains/` (v1.2).
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct DomainListItemStatus {
+    /// Status identifier.
+    pub id: DomainListItemStatusId,
+    /// Localized human-readable status label.
+    pub label: String,
+    /// Status severity type.
+    #[serde(rename = "type")]
+    pub status_type: DomainListItemStatusType,
+    /// Optional call-to-action identifier (e.g. `"view_domain"`,
+    /// `"view_purchase"`, `"view_domain_setup"`, `"view_transfer_setup"`).
+    pub cta: Option<String>,
+}
+
+/// Status identifier for a domain in the all-domains list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainListItemStatusId {
+    /// Domain is active and working.
+    Active,
+    /// Domain is expiring soon.
+    ExpiringSoon,
+    /// Domain has expired.
+    Expired,
+    /// Domain transfer is in progress.
+    PendingTransfer,
+    /// Domain connection has an error.
+    ConnectionError,
+    /// A status not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// Severity type for a domain list item status.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainListItemStatusType {
+    /// Everything is working normally.
+    Success,
+    /// Attention may be needed soon.
+    Warning,
+    /// Action is required.
+    Error,
+    /// A status type not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
 impl_as_query_value_for_new_type!(DomainName);
 uniffi::custom_newtype!(DomainName, String);
 /// A domain name (e.g. `"example.com"`, `"myblog.org"`).
@@ -483,6 +623,94 @@ mod tests {
 
     use super::*;
     use rstest::*;
+
+    #[rstest]
+    #[case("tests/wpcom/domains/all_domains/basic.json", 3)]
+    #[case("tests/wpcom/domains/all_domains/mixed-statuses.json", 4)]
+    fn test_all_domains_deserialization(#[case] json_file_path: &str, #[case] expected_len: usize) {
+        let file = File::open(json_file_path).expect("Failed to open file");
+        let response: AllDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(response.domains.len(), expected_len);
+    }
+
+    #[test]
+    fn test_all_domains_basic_details() {
+        let file =
+            File::open("tests/wpcom/domains/all_domains/basic.json").expect("Failed to open file");
+        let response: AllDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let first = &response.domains[0];
+        assert_eq!(first.domain.0, "fake-blog-123.wordpress.com");
+        assert_eq!(first.subtype.id, DomainSubtypeId::DefaultAddress);
+        assert_eq!(first.blog_id, WpComSiteId(11111));
+        assert_eq!(first.blog_name, "Fake Blog 123");
+        assert!(!first.auto_renewing);
+        assert!(first.expiry.is_none());
+        assert!(!first.expired);
+        assert!(first.primary_domain);
+        assert!(first.subscription_id.is_none());
+        assert!(first.tags.is_empty());
+        assert_eq!(first.domain_status.id, DomainListItemStatusId::Active);
+        assert_eq!(
+            first.domain_status.status_type,
+            DomainListItemStatusType::Success
+        );
+        assert!(first.domain_status.cta.is_none());
+
+        // Empty blog_name is a real edge case from the API.
+        let empty_name = &response.domains[1];
+        assert_eq!(empty_name.blog_name, "");
+
+        let staging = &response.domains[2];
+        assert_eq!(staging.tags, vec!["wpcom_staging"]);
+    }
+
+    #[test]
+    fn test_all_domains_mixed_statuses() {
+        let file = File::open("tests/wpcom/domains/all_domains/mixed-statuses.json")
+            .expect("Failed to open file");
+        let response: AllDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let expiring = &response.domains[0];
+        assert_eq!(
+            expiring.domain_status.id,
+            DomainListItemStatusId::ExpiringSoon
+        );
+        assert_eq!(
+            expiring.domain_status.status_type,
+            DomainListItemStatusType::Warning
+        );
+        assert_eq!(expiring.domain_status.cta.as_deref(), Some("view_purchase"));
+        assert!(expiring.is_domain_only_site);
+        assert_eq!(expiring.tags, vec!["domain_only"]);
+
+        let expired = &response.domains[1];
+        assert_eq!(expired.domain_status.id, DomainListItemStatusId::Expired);
+        assert_eq!(
+            expired.domain_status.status_type,
+            DomainListItemStatusType::Error
+        );
+        assert!(expired.expired);
+
+        let transfer = &response.domains[2];
+        assert_eq!(transfer.subtype.id, DomainSubtypeId::DomainTransfer);
+        assert_eq!(
+            transfer.domain_status.id,
+            DomainListItemStatusId::PendingTransfer
+        );
+        assert_eq!(
+            transfer.domain_status.cta.as_deref(),
+            Some("view_transfer_setup")
+        );
+        assert!(!transfer.can_set_as_primary);
+
+        let century = &response.domains[3];
+        assert_eq!(century.tags, vec!["hundred_year_domain"]);
+        assert!(century.auto_renewing);
+    }
 
     #[rstest]
     #[case("tests/wpcom/domains/suggestions/basic-query.json", 5)]

@@ -3,8 +3,9 @@ use crate::{
     wp_com::{
         WpComNamespace,
         domains::{
-            CountryCode, DomainAvailability, DomainAvailabilityParams, DomainName,
-            DomainSuggestion, DomainSuggestionsParams, SupportedCountries, SupportedState,
+            AllDomainsParams, AllDomainsResponse, CountryCode, DomainAvailability,
+            DomainAvailabilityParams, DomainName, DomainSuggestion, DomainSuggestionsParams,
+            SupportedCountries, SupportedState,
         },
     },
 };
@@ -20,12 +21,15 @@ enum DomainsRequest {
     SupportedStates,
     #[get(url = "/domains/<domain_name>/is-available", params = &DomainAvailabilityParams, output = DomainAvailability)]
     IsAvailable,
+    #[get(url = "/all-domains", params = &AllDomainsParams, output = AllDomainsResponse)]
+    AllDomains,
 }
 
 impl DerivedRequest for DomainsRequest {
     fn namespace(&self) -> impl AsNamespace {
         match self {
             Self::IsAvailable => WpComNamespace::RestV1_3,
+            Self::AllDomains => WpComNamespace::RestV1_2,
             _ => WpComNamespace::RestV1_1,
         }
     }
@@ -38,10 +42,10 @@ mod tests {
         request::endpoint::ApiUrlResolver,
         wp_com::{
             WpComSiteId,
-            domains::{CountryCode, DomainAvailabilityParams, DomainName},
+            domains::{AllDomainsParams, CountryCode, DomainAvailabilityParams, DomainName},
             endpoint::tests::{
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
-                validate_wp_com_rest_v1_3_endpoint,
+                validate_wp_com_rest_v1_2_endpoint, validate_wp_com_rest_v1_3_endpoint,
             },
             segments::SegmentId,
         },
@@ -139,6 +143,24 @@ mod tests {
                 },
             ),
             "/domains/test.com/is-available?blog_id=12345&is_cart_pre_check=true&vendor=100-year-domains",
+        );
+    }
+
+    #[rstest]
+    fn all_domains(endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.all_domains(&AllDomainsParams::default()),
+            "/all-domains?",
+        );
+    }
+
+    #[rstest]
+    fn all_domains_with_garden(endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.all_domains(&AllDomainsParams {
+                garden: Some("starter".to_string()),
+            }),
+            "/all-domains?garden=starter",
         );
     }
 
