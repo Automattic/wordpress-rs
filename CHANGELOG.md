@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING:** [Condense error variants into `WpError`](https://github.com/Automattic/wordpress-rs/pull/230)
 - **BREAKING:** [Contextual filtering](https://github.com/Automattic/wordpress-rs/pull/176)
 - Reformat `CHANGELOG.md` to follow [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and enforce changelog updates on PRs via a Buildkite check that also surfaces the failure as a GitHub PR comment
+- Test entry, added to verify the changelog check deletes its own failure comment on a subsequent green run
 
 ### Fixed
 
