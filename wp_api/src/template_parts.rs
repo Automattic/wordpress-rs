@@ -74,6 +74,12 @@ pub struct SparseTemplatePart {
     pub area: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct TemplatePartDeleteResponse {
+    pub deleted: bool,
+    pub previous: TemplatePartWithEditContext,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

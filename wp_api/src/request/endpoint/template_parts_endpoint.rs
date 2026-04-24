@@ -8,9 +8,21 @@ enum TemplatePartsRequest {
     List,
     #[contextual_get(url = "/template-parts/<template_part_id>", output = crate::template_parts::SparseTemplatePart, filter_by = crate::template_parts::SparseTemplatePartField)]
     Retrieve,
+    #[delete(url = "/template-parts/<template_part_id>", output = crate::template_parts::TemplatePartDeleteResponse)]
+    Delete,
+    #[delete(url = "/template-parts/<template_part_id>", output = crate::template_parts::TemplatePartWithEditContext)]
+    Trash,
 }
 
 impl DerivedRequest for TemplatePartsRequest {
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        match self {
+            TemplatePartsRequest::Delete => vec![("force", true.to_string())],
+            TemplatePartsRequest::Trash => vec![("force", false.to_string())],
+            _ => vec![],
+        }
+    }
+
     fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
@@ -126,6 +138,22 @@ mod tests {
         validate_wp_v2_endpoint(
             endpoint.filter_retrieve_with_view_context(&TemplatePartId("foo".to_string()), fields),
             expected_path,
+        );
+    }
+
+    #[rstest]
+    fn delete_template_part(endpoint: TemplatePartsRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.delete(&TemplatePartId("foo".to_string())),
+            "/template-parts/foo?force=true",
+        );
+    }
+
+    #[rstest]
+    fn trash_template_part(endpoint: TemplatePartsRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.trash(&TemplatePartId("foo".to_string())),
+            "/template-parts/foo?force=false",
         );
     }
 

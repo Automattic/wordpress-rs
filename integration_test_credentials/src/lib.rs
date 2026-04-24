@@ -22,6 +22,7 @@ pub struct TestCredentials {
     pub first_post_date_gmt: &'static str,
     pub wordpress_core_version: &'static str,
     pub integration_test_custom_template_id: &'static str,
+    pub integration_test_custom_template_part_id: &'static str,
     pub revision_id_for_custom_template: i64,
     pub revisioned_post_id: i64,
     pub revision_id_for_revisioned_post_id: i64,

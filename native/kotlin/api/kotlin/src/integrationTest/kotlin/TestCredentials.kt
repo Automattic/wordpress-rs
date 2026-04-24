@@ -47,6 +47,8 @@ data class TestCredentials(
     val wordpressCoreVersion: String,
     @SerialName("integration_test_custom_template_id")
     val integrationTestCustomTemplateId: String,
+    @SerialName("integration_test_custom_template_part_id")
+    val integrationTestCustomTemplatePartId: String,
     @SerialName("revision_id_for_custom_template")
     val revisionIdForCustomTemplate: Long,
     @SerialName("revisioned_post_id")
