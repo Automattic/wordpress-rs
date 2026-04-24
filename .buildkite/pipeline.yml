@@ -52,6 +52,8 @@ steps:
         command: |
           echo "--- :rust: Validate localization files"
           make validate-localizations
+      - label: ":memo: Validate Changelog"
+        command: .buildkite/commands/validate-changelog.sh
 
   #
   # Swift Group
