@@ -8,6 +8,8 @@ enum TemplatePartsRequest {
     List,
     #[contextual_get(url = "/template-parts/<template_part_id>", output = crate::template_parts::SparseTemplatePart, filter_by = crate::template_parts::SparseTemplatePartField)]
     Retrieve,
+    #[post(url = "/template-parts", params = &crate::template_parts::TemplatePartCreateParams, output = crate::template_parts::TemplatePartWithEditContext)]
+    Create,
     #[delete(url = "/template-parts/<template_part_id>", output = crate::template_parts::TemplatePartDeleteResponse)]
     Delete,
     #[delete(url = "/template-parts/<template_part_id>", output = crate::template_parts::TemplatePartWithEditContext)]
@@ -139,6 +141,11 @@ mod tests {
             endpoint.filter_retrieve_with_view_context(&TemplatePartId("foo".to_string()), fields),
             expected_path,
         );
+    }
+
+    #[rstest]
+    fn create_template_part(endpoint: TemplatePartsRequestEndpoint) {
+        validate_wp_v2_endpoint(endpoint.create(), "/template-parts");
     }
 
     #[rstest]

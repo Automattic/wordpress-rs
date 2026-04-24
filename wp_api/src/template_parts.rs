@@ -74,6 +74,50 @@ pub struct SparseTemplatePart {
     pub area: Option<String>,
 }
 
+#[derive(Debug, Serialize, uniffi::Record)]
+pub struct TemplatePartCreateParams {
+    // Unique slug identifying the template part.
+    pub slug: String,
+    // Theme identifier for the template part.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
+    // Content of template part.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    // Title of template part.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    // Description of template part.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    // The ID for the author of the template part.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+    // Where the template part is intended for use (header, footer, etc.)
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub area: Option<String>,
+}
+
+impl TemplatePartCreateParams {
+    pub fn new(slug: String) -> Self {
+        Self {
+            slug,
+            theme: None,
+            content: None,
+            title: None,
+            description: None,
+            author: None,
+            area: None,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct TemplatePartDeleteResponse {
     pub deleted: bool,
