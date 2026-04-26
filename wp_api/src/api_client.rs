@@ -35,6 +35,9 @@ use crate::{
             search_endpoint::{SearchRequestBuilder, SearchRequestExecutor},
             site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
             taxonomies_endpoint::{TaxonomiesRequestBuilder, TaxonomiesRequestExecutor},
+            template_revisions_endpoint::{
+                TemplateRevisionsRequestBuilder, TemplateRevisionsRequestExecutor,
+            },
             templates_endpoint::{TemplatesRequestBuilder, TemplatesRequestExecutor},
             terms_endpoint::{TermsRequestBuilder, TermsRequestExecutor},
             themes_endpoint::{ThemesRequestBuilder, ThemesRequestExecutor},
@@ -72,6 +75,7 @@ pub struct WpApiRequestBuilder {
     site_settings: Arc<SiteSettingsRequestBuilder>,
     taxonomies: Arc<TaxonomiesRequestBuilder>,
     terms: Arc<TermsRequestBuilder>,
+    template_revisions: Arc<TemplateRevisionsRequestBuilder>,
     templates: Arc<TemplatesRequestBuilder>,
     themes: Arc<ThemesRequestBuilder>,
     users: Arc<UsersRequestBuilder>,
@@ -110,6 +114,7 @@ impl WpApiRequestBuilder {
             site_settings,
             taxonomies,
             terms,
+            template_revisions,
             templates,
             themes,
             users,
@@ -158,6 +163,7 @@ pub struct WpApiClient {
     site_settings: Arc<SiteSettingsRequestExecutor>,
     taxonomies: Arc<TaxonomiesRequestExecutor>,
     terms: Arc<TermsRequestExecutor>,
+    template_revisions: Arc<TemplateRevisionsRequestExecutor>,
     templates: Arc<TemplatesRequestExecutor>,
     themes: Arc<ThemesRequestExecutor>,
     users: Arc<UsersRequestExecutor>,
@@ -193,6 +199,7 @@ impl WpApiClient {
             site_settings,
             taxonomies,
             terms,
+            template_revisions,
             templates,
             themes,
             users,
@@ -238,6 +245,7 @@ api_client_generate_endpoint_impl!(WpApi, search);
 api_client_generate_endpoint_impl!(WpApi, site_settings);
 api_client_generate_endpoint_impl!(WpApi, taxonomies);
 api_client_generate_endpoint_impl!(WpApi, terms);
+api_client_generate_endpoint_impl!(WpApi, template_revisions);
 api_client_generate_endpoint_impl!(WpApi, templates);
 api_client_generate_endpoint_impl!(WpApi, themes);
 api_client_generate_endpoint_impl!(WpApi, users);
