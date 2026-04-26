@@ -105,10 +105,9 @@ pub struct Product {
     #[serde(default)]
     #[uniffi(default = [])]
     pub price_tier_list: Vec<PriceTier>,
-    /// Domain-specific fields. Fields are populated only for domain
-    /// registration products; all will be `None` for other product types.
+    /// Domain-specific fields, present only for domain registration products.
     #[serde(flatten)]
-    pub domain_info: DomainProductInfo,
+    pub domain_info: Option<DomainProductInfo>,
     /// Formatted monthly cost (e.g. `"$1.50"`).
     #[serde(default)]
     #[uniffi(default = None)]
@@ -133,25 +132,20 @@ pub struct Product {
 
 /// Domain-specific product metadata, only populated for domain registration
 /// products.
-#[derive(Debug, Default, Clone, Serialize, Deserialize, uniffi::Record)]
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct DomainProductInfo {
-    /// Top-level domain for registration products (e.g. `"com"`, `"net"`).
-    /// Absent for non-registration products like domain mapping.
-    #[serde(default)]
-    #[uniffi(default = None)]
-    pub tld: Option<String>,
+    /// Top-level domain (e.g. `"com"`, `"net"`).
+    pub tld: String,
     /// Whether WHOIS privacy can be purchased with this domain.
-    #[serde(default)]
-    #[uniffi(default = None)]
-    pub is_privacy_protection_product_purchase_allowed: Option<bool>,
+    pub is_privacy_protection_product_purchase_allowed: bool,
     /// Whether HSTS is required for this TLD (e.g. `.dev`, `.app`).
     #[serde(default)]
-    #[uniffi(default = None)]
-    pub is_hsts_required: Option<bool>,
+    #[uniffi(default = false)]
+    pub is_hsts_required: bool,
     /// Whether the `.gay` TLD policy notice is required.
     #[serde(default)]
-    #[uniffi(default = None)]
-    pub is_dot_gay_notice_required: Option<bool>,
+    #[uniffi(default = false)]
+    pub is_dot_gay_notice_required: bool,
 }
 
 /// A pricing tier for usage-based products.
@@ -230,28 +224,41 @@ mod tests {
 
         assert_eq!(products.len(), 5);
 
-        // domain_map is a non-registration product without tld.
+        // domain_map is a non-registration product without domain_info.
         let domain_map = products.get("domain_map").expect("domain_map missing");
         assert_eq!(domain_map.product_id, ProductId(1001));
         assert!(!domain_map.is_domain_registration);
-        assert_eq!(domain_map.domain_info.tld, None);
+        assert!(domain_map.domain_info.is_none());
 
-        // domain_reg is a registration product.
+        // domain_reg is a registration product with domain_info.
         let domain_reg = products.get("domain_reg").expect("domain_reg missing");
         assert!(domain_reg.is_domain_registration);
-        assert_eq!(domain_reg.domain_info.tld.as_deref(), Some("com"));
+        let domain_reg_info = domain_reg
+            .domain_info
+            .as_ref()
+            .expect("domain_reg should have domain_info");
+        assert_eq!(domain_reg_info.tld, "com");
+        assert!(domain_reg_info.is_privacy_protection_product_purchase_allowed);
 
         // dotdev_domain requires HSTS.
         let dotdev = products
             .get("dotdev_domain")
             .expect("dotdev_domain missing");
-        assert_eq!(dotdev.domain_info.is_hsts_required, Some(true));
+        let dotdev_info = dotdev
+            .domain_info
+            .as_ref()
+            .expect("dotdev_domain should have domain_info");
+        assert!(dotdev_info.is_hsts_required);
 
         // dotgay_domain requires the .gay policy notice.
         let dotgay = products
             .get("dotgay_domain")
             .expect("dotgay_domain missing");
-        assert_eq!(dotgay.domain_info.is_dot_gay_notice_required, Some(true));
+        let dotgay_info = dotgay
+            .domain_info
+            .as_ref()
+            .expect("dotgay_domain should have domain_info");
+        assert!(dotgay_info.is_dot_gay_notice_required);
     }
 
     #[test]
@@ -330,7 +337,14 @@ mod tests {
         // Domain registration fields still present with locale.
         let domain_reg = products.get("domain_reg").expect("domain_reg missing");
         assert!(domain_reg.is_domain_registration);
-        assert_eq!(domain_reg.domain_info.tld.as_deref(), Some("com"));
+        assert_eq!(
+            domain_reg
+                .domain_info
+                .as_ref()
+                .expect("domain_reg should have domain_info")
+                .tld,
+            "com"
+        );
     }
 
     #[test]
