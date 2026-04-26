@@ -49,6 +49,40 @@ fn template_id() -> TemplateId {
     )
 }
 
+fn revision_id() -> TemplateRevisionId {
+    TemplateRevisionId(TestCredentials::instance().revision_id_for_custom_template)
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_edit_context() {
+    api_client()
+        .template_revisions()
+        .retrieve_with_edit_context(&template_id(), &revision_id())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_embed_context() {
+    api_client()
+        .template_revisions()
+        .retrieve_with_embed_context(&template_id(), &revision_id())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_view_context() {
+    api_client()
+        .template_revisions()
+        .retrieve_with_view_context(&template_id(), &revision_id())
+        .await
+        .assert_response();
+}
+
 #[template]
 #[rstest]
 #[case::default(TemplateRevisionListParams::default())]
@@ -68,6 +102,22 @@ mod filter {
     wp_api::generate_sparse_template_revision_field_with_edit_context_test_cases!();
     wp_api::generate_sparse_template_revision_field_with_embed_context_test_cases!();
     wp_api::generate_sparse_template_revision_field_with_view_context_test_cases!();
+
+    #[apply(sparse_template_revision_field_with_edit_context_test_cases)]
+    #[case(&[SparseTemplateRevisionFieldWithEditContext::Id, SparseTemplateRevisionFieldWithEditContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_with_edit_context(
+        #[case] fields: &[SparseTemplateRevisionFieldWithEditContext],
+    ) {
+        api_client()
+            .template_revisions()
+            .filter_retrieve_with_edit_context(&template_id(), &revision_id(), fields)
+            .await
+            .assert_response()
+            .data
+            .assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
 
     #[apply(sparse_template_revision_field_with_edit_context_test_cases)]
     #[case(&[SparseTemplateRevisionFieldWithEditContext::Id, SparseTemplateRevisionFieldWithEditContext::Author])]
@@ -98,6 +148,22 @@ mod filter {
     #[case(&[SparseTemplateRevisionFieldWithEmbedContext::Id, SparseTemplateRevisionFieldWithEmbedContext::Author])]
     #[tokio::test]
     #[parallel]
+    async fn filter_retrieve_with_embed_context(
+        #[case] fields: &[SparseTemplateRevisionFieldWithEmbedContext],
+    ) {
+        api_client()
+            .template_revisions()
+            .filter_retrieve_with_embed_context(&template_id(), &revision_id(), fields)
+            .await
+            .assert_response()
+            .data
+            .assert_that_instance_fields_nullability_match_provided_fields(fields);
+    }
+
+    #[apply(sparse_template_revision_field_with_embed_context_test_cases)]
+    #[case(&[SparseTemplateRevisionFieldWithEmbedContext::Id, SparseTemplateRevisionFieldWithEmbedContext::Author])]
+    #[tokio::test]
+    #[parallel]
     async fn filter_list_with_embed_context(
         #[case] fields: &[SparseTemplateRevisionFieldWithEmbedContext],
         #[values(
@@ -117,6 +183,22 @@ mod filter {
             .for_each(|revision| {
                 revision.assert_that_instance_fields_nullability_match_provided_fields(fields)
             });
+    }
+
+    #[apply(sparse_template_revision_field_with_view_context_test_cases)]
+    #[case(&[SparseTemplateRevisionFieldWithViewContext::Id, SparseTemplateRevisionFieldWithViewContext::Author])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_with_view_context(
+        #[case] fields: &[SparseTemplateRevisionFieldWithViewContext],
+    ) {
+        api_client()
+            .template_revisions()
+            .filter_retrieve_with_view_context(&template_id(), &revision_id(), fields)
+            .await
+            .assert_response()
+            .data
+            .assert_that_instance_fields_nullability_match_provided_fields(fields);
     }
 
     #[apply(sparse_template_revision_field_with_view_context_test_cases)]

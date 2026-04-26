@@ -1,11 +1,13 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::templates::TemplateId;
+use crate::{template_revisions::TemplateRevisionId, templates::TemplateId};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum TemplateRevisionsRequest {
     #[contextual_paged(url = "/templates/<template_id>/revisions", params = &crate::template_revisions::TemplateRevisionListParams, output = Vec<crate::template_revisions::SparseTemplateRevision>, filter_by = crate::template_revisions::SparseTemplateRevisionField)]
     List,
+    #[contextual_get(url = "/templates/<template_id>/revisions/<template_revision_id>", output = crate::template_revisions::SparseTemplateRevision, filter_by = crate::template_revisions::SparseTemplateRevisionField)]
+    Retrieve,
 }
 
 impl DerivedRequest for TemplateRevisionsRequest {
@@ -80,6 +82,42 @@ mod tests {
     ) {
         validate_wp_v2_endpoint(
             endpoint.filter_list_with_view_context(&TemplateId("foo".to_string()), &params, fields),
+            expected_path,
+        );
+    }
+
+    #[rstest]
+    fn retrieve_template_revision(endpoint: TemplateRevisionsRequestEndpoint) {
+        let template_id = TemplateId("foo".to_string());
+        let revision_id = TemplateRevisionId(42);
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_edit_context(&template_id, &revision_id),
+            "/templates/foo/revisions/42?context=edit",
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_embed_context(&template_id, &revision_id),
+            "/templates/foo/revisions/42?context=embed",
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_view_context(&template_id, &revision_id),
+            "/templates/foo/revisions/42?context=view",
+        );
+    }
+
+    #[rstest]
+    #[case(&[], "/templates/foo/revisions/42?context=view&_fields=")]
+    #[case(&[SparseTemplateRevisionFieldWithViewContext::Slug], "/templates/foo/revisions/42?context=view&_fields=slug")]
+    fn filter_retrieve_template_revision_with_view_context(
+        endpoint: TemplateRevisionsRequestEndpoint,
+        #[case] fields: &[SparseTemplateRevisionFieldWithViewContext],
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_v2_endpoint(
+            endpoint.filter_retrieve_with_view_context(
+                &TemplateId("foo".to_string()),
+                &TemplateRevisionId(42),
+                fields,
+            ),
             expected_path,
         );
     }
