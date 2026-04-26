@@ -126,3 +126,9 @@ pub struct SparseTemplateRevision {
     #[WpContext(edit, embed, view)]
     pub parent: Option<PostId>,
 }
+
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct TemplateRevisionDeleteResponse {
+    pub deleted: bool,
+    pub previous: TemplateRevisionWithEditContext,
+}

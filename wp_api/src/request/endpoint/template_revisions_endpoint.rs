@@ -8,9 +8,18 @@ enum TemplateRevisionsRequest {
     List,
     #[contextual_get(url = "/templates/<template_id>/revisions/<template_revision_id>", output = crate::template_revisions::SparseTemplateRevision, filter_by = crate::template_revisions::SparseTemplateRevisionField)]
     Retrieve,
+    #[delete(url = "/templates/<template_id>/revisions/<template_revision_id>", output = crate::template_revisions::TemplateRevisionDeleteResponse)]
+    Delete,
 }
 
 impl DerivedRequest for TemplateRevisionsRequest {
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        match self {
+            TemplateRevisionsRequest::Delete => vec![("force", "true".to_string())],
+            _ => vec![],
+        }
+    }
+
     fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
@@ -119,6 +128,14 @@ mod tests {
                 fields,
             ),
             expected_path,
+        );
+    }
+
+    #[rstest]
+    fn delete_template_revision(endpoint: TemplateRevisionsRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.delete(&TemplateId("foo".to_string()), &TemplateRevisionId(42)),
+            "/templates/foo/revisions/42?force=true",
         );
     }
 
