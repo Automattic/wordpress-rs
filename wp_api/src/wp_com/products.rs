@@ -1,4 +1,5 @@
 use crate::{
+    date::WpGmtDateTime,
     decimal2::Decimal2,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
     wp_com::{CurrencyCode, TimeSpanUnit, language::WPComLanguage},
@@ -199,8 +200,8 @@ pub struct PriceTier {
 /// Details of an active sale coupon applied to a product.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct SaleCoupon {
-    pub start_date: String,
-    pub expires: String,
+    pub start_date: WpGmtDateTime,
+    pub expires: WpGmtDateTime,
     /// Discount percentage (e.g. `65` means 65% off).
     pub discount: u32,
     pub product_ids: Vec<ProductId>,
