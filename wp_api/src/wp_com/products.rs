@@ -73,6 +73,26 @@ impl AppendUrlQueryPairs for ProductsParams {
     }
 }
 
+/// Billing interval for a product.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+pub enum ProductTerm {
+    #[serde(rename = "month")]
+    Month,
+    #[serde(rename = "year")]
+    Year,
+    #[serde(rename = "two years")]
+    TwoYears,
+    #[serde(rename = "three years")]
+    ThreeYears,
+    #[serde(rename = "hundred years")]
+    HundredYears,
+    #[serde(rename = "one time")]
+    OneTime,
+    /// A billing term not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
 /// Map of product slug to product, as returned by `GET /products`.
 pub type ProductMap = HashMap<String, Product>;
 
@@ -97,8 +117,8 @@ pub struct Product {
     /// Cost in the smallest currency unit (e.g. cents).
     pub cost_smallest_unit: u64,
     pub currency_code: CurrencyCode,
-    /// Billing period (e.g. `"year"`).
-    pub product_term: String,
+    /// Billing period.
+    pub product_term: ProductTerm,
     /// Localized billing period label.
     pub product_term_localized: String,
     pub price_tier_slug: String,
