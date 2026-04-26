@@ -70,6 +70,22 @@ impl std::fmt::Display for CurrencyCode {
     }
 }
 
+/// Unit of a time span in the billing system.
+///
+/// Corresponds to the backend's `Time_Span_Unit` enum.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum TimeSpanUnit {
+    Day,
+    Week,
+    Month,
+    Year,
+    Indefinite,
+    /// A unit not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
 pub(crate) enum WpComNamespace {
     Oauth2,
     RestV1_1,

@@ -1,7 +1,7 @@
 use crate::{
     decimal2::Decimal2,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    wp_com::{CurrencyCode, language::WPComLanguage},
+    wp_com::{CurrencyCode, TimeSpanUnit, language::WPComLanguage},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -219,8 +219,8 @@ pub struct SaleCoupon {
 /// Introductory pricing offer for a product.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct IntroductoryOffer {
-    /// Unit of the offer interval (e.g. `"month"`).
-    pub interval_unit: String,
+    /// Unit of the offer interval.
+    pub interval_unit: TimeSpanUnit,
     pub interval_count: u32,
     #[serde(default)]
     #[uniffi(default = None)]
@@ -324,7 +324,7 @@ mod tests {
             .introductory_offer
             .as_ref()
             .expect("fake_mail_monthly should have introductory_offer");
-        assert_eq!(offer.interval_unit, "month");
+        assert_eq!(offer.interval_unit, TimeSpanUnit::Month);
         assert_eq!(offer.interval_count, 3);
     }
 
@@ -391,7 +391,7 @@ mod tests {
             .introductory_offer
             .as_ref()
             .expect("should have introductory_offer");
-        assert_eq!(offer.interval_unit, "year");
+        assert_eq!(offer.interval_unit, TimeSpanUnit::Year);
         assert_eq!(offer.cost_per_interval, Decimal2::from_hundredths(12000));
 
         // Bundle product also returned by jetpack filter.
