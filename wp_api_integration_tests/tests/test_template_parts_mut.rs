@@ -1,5 +1,9 @@
+use macro_helper::generate_update_test;
 use wp_api::{
-    template_parts::{TemplatePartCreateParams, TemplatePartId, TemplatePartWithEditContext},
+    template_parts::{
+        TemplatePartCreateParams, TemplatePartId, TemplatePartUpdateParams,
+        TemplatePartWithEditContext,
+    },
     templates::{
         SparseTemplateContent, SparseTemplateContentWrapper, SparseTemplateTitle,
         SparseTemplateTitleWrapper, TemplateStatus,
@@ -118,6 +122,60 @@ async fn trash_template_part() {
     RestoreServer::db().await;
 }
 
+generate_update_test!(
+    update_content,
+    content,
+    "new_content".to_string(),
+    |updated| {
+        assert_eq!(
+            updated.content,
+            SparseTemplateContentWrapper::Object(SparseTemplateContent {
+                raw: Some("new_content".to_string()),
+                rendered: None,
+                protected: None,
+                block_version: Some(0)
+            })
+        );
+    }
+);
+generate_update_test!(update_title, title, TEST_TITLE.to_string(), |updated| {
+    assert_title(&updated);
+});
+generate_update_test!(
+    update_description,
+    description,
+    "new_description".to_string(),
+    |updated| {
+        assert_eq!(updated.description, "new_description");
+    }
+);
+generate_update_test!(update_author, author, SECOND_USER_ID, |updated| {
+    assert_eq!(updated.author, SECOND_USER_ID);
+});
+generate_update_test!(update_area, area, "footer".to_string(), |updated| {
+    assert_eq!(updated.area, "footer");
+});
+
+async fn test_update_template_part<F>(params: &TemplatePartUpdateParams, assert: F)
+where
+    F: Fn(TemplatePartWithEditContext),
+{
+    let response = api_client()
+        .template_parts()
+        .update(
+            &TemplatePartId(
+                TestCredentials::instance()
+                    .integration_test_custom_template_part_id
+                    .to_string(),
+            ),
+            params,
+        )
+        .await
+        .assert_response();
+    assert(response.data);
+    RestoreServer::db().await;
+}
+
 async fn test_create_template_part<F>(params: &TemplatePartCreateParams, assert: F)
 where
     F: Fn(TemplatePartWithEditContext),
@@ -143,4 +201,26 @@ fn assert_title(template_part: &TemplatePartWithEditContext) {
             rendered: Some(TEST_TITLE.to_string())
         })
     );
+}
+
+mod macro_helper {
+    macro_rules! generate_update_test {
+        ($ident:ident, $field:ident, $new_value:expr, $assertion:expr) => {
+            paste::paste! {
+                #[tokio::test]
+                #[serial]
+                async fn $ident() {
+                    let updated_value = $new_value;
+                    test_update_template_part(
+                        &TemplatePartUpdateParams {
+                            $field: Some(updated_value),
+                            ..Default::default()
+                        }, $assertion)
+                    .await;
+                }
+            }
+        };
+    }
+
+    pub(super) use generate_update_test;
 }

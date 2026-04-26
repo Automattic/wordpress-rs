@@ -14,6 +14,8 @@ enum TemplatePartsRequest {
     Delete,
     #[delete(url = "/template-parts/<template_part_id>", output = crate::template_parts::TemplatePartWithEditContext)]
     Trash,
+    #[post(url = "/template-parts/<template_part_id>", params = &crate::template_parts::TemplatePartUpdateParams, output = crate::template_parts::TemplatePartWithEditContext)]
+    Update,
 }
 
 impl DerivedRequest for TemplatePartsRequest {
@@ -161,6 +163,14 @@ mod tests {
         validate_wp_v2_endpoint(
             endpoint.trash(&TemplatePartId("foo".to_string())),
             "/template-parts/foo?force=false",
+        );
+    }
+
+    #[rstest]
+    fn update_template_part(endpoint: TemplatePartsRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.update(&TemplatePartId("foo".to_string())),
+            "/template-parts/foo",
         );
     }
 

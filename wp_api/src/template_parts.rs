@@ -118,6 +118,30 @@ impl TemplatePartCreateParams {
     }
 }
 
+#[derive(Debug, Default, Serialize, uniffi::Record)]
+pub struct TemplatePartUpdateParams {
+    // Content of template part.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    // Title of template part.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    // Description of template part.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    // The ID for the author of the template part.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
+    // Where the template part is intended for use (header, footer, etc.)
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub area: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct TemplatePartDeleteResponse {
     pub deleted: bool,
