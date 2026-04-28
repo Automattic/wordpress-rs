@@ -1,0 +1,55 @@
+{
+  "connections": [
+    {
+      "ID": 98765,
+      "user_ID": 12345,
+      "type": "publicize",
+      "service": "mastodon",
+      "label": "Mastodon",
+      "issued": "2025-01-15 10:30:00",
+      "expires": null,
+      "external_ID": "116283451478301581",
+      "external_name": "@testuser@mastodon.social",
+      "external_display": "@testuser@mastodon.social",
+      "external_profile_picture": "https://mastodon.social/avatars/original/missing.png",
+      "status": "ok",
+      "refresh_URL": "https://public-api.wordpress.com/connect/?action=request&service=mastodon",
+      "sites": [234567],
+      "additional_external_users": []
+    },
+    {
+      "ID": 98766,
+      "user_ID": 12345,
+      "type": "publicize",
+      "service": "facebook",
+      "label": null,
+      "issued": null,
+      "expires": "2026-03-25 00:00:00",
+      "external_ID": "100012345678",
+      "external_name": "Test User",
+      "external_display": "Test User",
+      "external_profile_picture": null,
+      "status": "ok",
+      "refresh_URL": "https://public-api.wordpress.com/connect/?action=request&service=facebook",
+      "sites": [],
+      "additional_external_users": [
+        {
+          "external_ID": "200012345678",
+          "external_name": "My Page",
+          "external_profile_picture": "https://example.com/page-pic.jpg",
+          "external_description": "A test Facebook page",
+          "external_category": "Internet company",
+          "external_meta": {}
+        },
+        {
+          "external_ID": "300012345678",
+          "external_name": "Another Page",
+          "external_profile_picture": null,
+          "external_description": null,
+          "external_category": null,
+          "external_meta": {}
+        }
+      ]
+    }
+  ]
+}
