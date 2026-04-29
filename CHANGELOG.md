@@ -1,33 +1,39 @@
-## Trunk
+# Changelog
 
-### Breaking Changes
+All notable changes to this project will be documented in this file.
 
-- [Condense error variants into WpError](https://github.com/Automattic/wordpress-rs/pull/230)
-- [Contextual filtering](https://github.com/Automattic/wordpress-rs/pull/176)
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### New Features
+## [Unreleased]
+
+### Added
 
 - [Post Types](https://developer.wordpress.org/rest-api/reference/post-types/) endpoint
 - [Site Settings](https://developer.wordpress.org/rest-api/reference/settings/) endpoint
 - [Wp Site Health Tests](https://developer.wordpress.org/rest-api/reference/wp-site-health-tests/) endpoint
-
-### Bug Fixes
-
-- [Support both Integer and String for `WPApiDetails.gmt_offset`](https://github.com/Automattic/wordpress-rs/pull/209)
-
-### Internal Changes
-
 - `WpDerivedRequest` now supports plain `get` requests
 - `WpDerivedRequest` now supports `additional_query_pairs`
 
-## 0.1
+### Changed
 
-This first release includes the following for the Kotlin, Rust & Swift platforms:
+- **BREAKING:** [Condense error variants into `WpError`](https://github.com/Automattic/wordpress-rs/pull/230)
+- **BREAKING:** [Contextual filtering](https://github.com/Automattic/wordpress-rs/pull/176)
+- Reformat `CHANGELOG.md` to follow [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and enforce changelog updates on PRs via a Buildkite check that also surfaces the failure as a GitHub PR comment (using the shared `comment_on_pr` helper from `a8c-ci-toolkit`)
+
+### Fixed
+
+- [Support both Integer and String for `WPApiDetails.gmt_offset`](https://github.com/Automattic/wordpress-rs/pull/209)
+
+## [0.1]
+
+Initial release with support for Kotlin, Rust, and Swift platforms.
+
+### Added
+
 - Authentication using Application Passwords
 - [Application Passwords](https://developer.wordpress.org/rest-api/reference/application-passwords/) endpoint
 - [Users](https://developer.wordpress.org/rest-api/reference/users/) endpoint
 - [Plugins](https://developer.wordpress.org/rest-api/reference/plugins/) endpoint
-
-It also includes all of the underlying infrastructure for this – including:
-- `wp_contextual` – A proc macro that generates `Edit`, `Embed` & `View` contextual types from given Sparse type
-- `wp_derive_request_builder` – A proc macro that generates endpoint, request builder and request executor types
+- `wp_contextual` – a proc macro that generates `Edit`, `Embed` & `View` contextual types from a given Sparse type
+- `wp_derive_request_builder` – a proc macro that generates endpoint, request builder, and request executor types
