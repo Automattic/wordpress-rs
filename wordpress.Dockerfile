@@ -25,7 +25,8 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN chown -R www-data:www-data /var/www/.wp-cli/
 
 # Run this command as root user since that's what the Docker will use when we run --http=http://localhost commands
-RUN wp --allow-root package install wp-cli/restful
+# Pin to v0.4.1 — v0.4.2+ requires wp-cli ^2.13 which is not yet released
+RUN wp --allow-root package install wp-cli/restful:0.4.1
 
 # Setup Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
