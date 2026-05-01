@@ -41,6 +41,9 @@ use crate::{
             template_part_autosaves_endpoint::{
                 TemplatePartAutosavesRequestBuilder, TemplatePartAutosavesRequestExecutor,
             },
+            template_part_revisions_endpoint::{
+                TemplatePartRevisionsRequestBuilder, TemplatePartRevisionsRequestExecutor,
+            },
             template_parts_endpoint::{TemplatePartsRequestBuilder, TemplatePartsRequestExecutor},
             template_revisions_endpoint::{
                 TemplateRevisionsRequestBuilder, TemplateRevisionsRequestExecutor,
@@ -84,6 +87,7 @@ pub struct WpApiRequestBuilder {
     terms: Arc<TermsRequestBuilder>,
     template_autosaves: Arc<TemplateAutosavesRequestBuilder>,
     template_part_autosaves: Arc<TemplatePartAutosavesRequestBuilder>,
+    template_part_revisions: Arc<TemplatePartRevisionsRequestBuilder>,
     template_parts: Arc<TemplatePartsRequestBuilder>,
     template_revisions: Arc<TemplateRevisionsRequestBuilder>,
     templates: Arc<TemplatesRequestBuilder>,
@@ -126,6 +130,7 @@ impl WpApiRequestBuilder {
             terms,
             template_autosaves,
             template_part_autosaves,
+            template_part_revisions,
             template_parts,
             template_revisions,
             templates,
@@ -178,6 +183,7 @@ pub struct WpApiClient {
     terms: Arc<TermsRequestExecutor>,
     template_autosaves: Arc<TemplateAutosavesRequestExecutor>,
     template_part_autosaves: Arc<TemplatePartAutosavesRequestExecutor>,
+    template_part_revisions: Arc<TemplatePartRevisionsRequestExecutor>,
     template_parts: Arc<TemplatePartsRequestExecutor>,
     template_revisions: Arc<TemplateRevisionsRequestExecutor>,
     templates: Arc<TemplatesRequestExecutor>,
@@ -217,6 +223,7 @@ impl WpApiClient {
             terms,
             template_autosaves,
             template_part_autosaves,
+            template_part_revisions,
             template_parts,
             template_revisions,
             templates,
@@ -266,6 +273,7 @@ api_client_generate_endpoint_impl!(WpApi, taxonomies);
 api_client_generate_endpoint_impl!(WpApi, terms);
 api_client_generate_endpoint_impl!(WpApi, template_autosaves);
 api_client_generate_endpoint_impl!(WpApi, template_part_autosaves);
+api_client_generate_endpoint_impl!(WpApi, template_part_revisions);
 api_client_generate_endpoint_impl!(WpApi, template_parts);
 api_client_generate_endpoint_impl!(WpApi, template_revisions);
 api_client_generate_endpoint_impl!(WpApi, templates);

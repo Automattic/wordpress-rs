@@ -230,8 +230,16 @@ create_test_credentials () {
   REVISION_ID_FOR_CUSTOM_TEMPLATE=$((INTEGRATION_TEST_CUSTOM_TEMPLATE_WP_ID + 1))
 
   echo "Creating a custom template part for integration tests.."
-  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE_PART", "content": "Integration test custom template part content", "area": "header"}' http://localhost/wp-json/wp/v2/template-parts > /dev/null
+  TEMPLATE_PART_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE_PART", "content": "Integration test custom template part content", "area": "header"}' http://localhost/wp-json/wp/v2/template-parts)"
   INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_ID="twentytwentyfour//integration_test_custom_template_part"
+  INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_WP_ID="$(echo "$TEMPLATE_PART_RESPONSE" | jq -r '.wp_id')"
+
+  echo "Setting up template part with 10 revisions for integration tests.."
+  for i in {1..10};
+  do
+    curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"template_part_revision_content_$i\"}" "http://localhost/wp-json/wp/v2/template-parts/$INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_ID" > /dev/null
+  done
+  REVISION_ID_FOR_CUSTOM_TEMPLATE_PART=$((INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_WP_ID + 1))
 
   echo "Setting up a post with 10 revisions for integration tests.."
   REVISIONED_POST_ID="$(wp post create --post_type=post --post_title=Revisioned_POST_FOR_INTEGRATION_TESTS --porcelain)"
@@ -350,6 +358,7 @@ create_test_credentials () {
     integration_test_custom_template_part_id="$INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_ID" \
     autosaved_template_part_id="$AUTOSAVED_TEMPLATE_PART_ID" \
     autosave_id_for_autosaved_template_part="$AUTOSAVE_ID_FOR_AUTOSAVED_TEMPLATE_PART" \
+    revision_id_for_custom_template_part="$REVISION_ID_FOR_CUSTOM_TEMPLATE_PART" \
     revision_id_for_custom_template="$REVISION_ID_FOR_CUSTOM_TEMPLATE" \
     revisioned_post_id="$REVISIONED_POST_ID" \
     revision_id_for_revisioned_post_id="$REVISION_ID_FOR_REVISIONED_POST_ID" \

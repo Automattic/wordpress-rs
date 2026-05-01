@@ -29,6 +29,7 @@ pub struct TestCredentials {
     pub integration_test_custom_template_part_id: &'static str,
     pub autosaved_template_part_id: &'static str,
     pub autosave_id_for_autosaved_template_part: i64,
+    pub revision_id_for_custom_template_part: i64,
     pub revision_id_for_custom_template: i64,
     pub revisioned_post_id: i64,
     pub revision_id_for_revisioned_post_id: i64,

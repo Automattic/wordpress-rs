@@ -57,6 +57,8 @@ data class TestCredentials(
     val autosavedTemplatePartId: String,
     @SerialName("autosave_id_for_autosaved_template_part")
     val autosaveIdForAutosavedTemplatePart: Long,
+    @SerialName("revision_id_for_custom_template_part")
+    val revisionIdForCustomTemplatePart: Long,
     @SerialName("revision_id_for_custom_template")
     val revisionIdForCustomTemplate: Long,
     @SerialName("revisioned_post_id")
