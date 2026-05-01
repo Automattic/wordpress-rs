@@ -216,6 +216,10 @@ create_test_credentials () {
   done
   REVISION_ID_FOR_CUSTOM_TEMPLATE=$((INTEGRATION_TEST_CUSTOM_TEMPLATE_WP_ID + 1))
 
+  echo "Creating a custom template part for integration tests.."
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE_PART", "content": "Integration test custom template part content", "area": "header"}' http://localhost/wp-json/wp/v2/template-parts > /dev/null
+  INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_ID="twentytwentyfour//integration_test_custom_template_part"
+
   echo "Setting up a post with 10 revisions for integration tests.."
   REVISIONED_POST_ID="$(wp post create --post_type=post --post_title=Revisioned_POST_FOR_INTEGRATION_TESTS --porcelain)"
   # Create revisions
@@ -304,6 +308,7 @@ create_test_credentials () {
     first_post_date_gmt="$FIRST_POST_DATE_GMT" \
     wordpress_core_version="\"$WORDPRESS_VERSION\"" \
     integration_test_custom_template_id="$INTEGRATION_TEST_CUSTOM_TEMPLATE_ID" \
+    integration_test_custom_template_part_id="$INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_ID" \
     revision_id_for_custom_template="$REVISION_ID_FOR_CUSTOM_TEMPLATE" \
     revisioned_post_id="$REVISIONED_POST_ID" \
     revision_id_for_revisioned_post_id="$REVISION_ID_FOR_REVISIONED_POST_ID" \

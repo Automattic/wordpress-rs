@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Post Types](https://developer.wordpress.org/rest-api/reference/post-types/) endpoint
 - [Site Settings](https://developer.wordpress.org/rest-api/reference/settings/) endpoint
 - [Wp Site Health Tests](https://developer.wordpress.org/rest-api/reference/wp-site-health-tests/) endpoint
+- [Template Parts](https://developer.wordpress.org/rest-api/reference/wp_template_parts/) endpoint
+- [Template Revisions](https://developer.wordpress.org/rest-api/reference/wp_template-revisions/) endpoint
 - `WpDerivedRequest` now supports plain `get` requests
 - `WpDerivedRequest` now supports `additional_query_pairs`
 
