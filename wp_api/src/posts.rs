@@ -1,9 +1,10 @@
 use crate::{
-    AnyJson, UserId, WpApiParamOrder,
+    JsonValue, UserId, WpAdditionalFields, WpApiParamOrder,
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     media::MediaId,
     terms::TermId,
+    uniffi_serde::UniffiSerializationError,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -12,8 +13,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wp_contextual::WpContextual;
-use wp_derive::{WpDeriveParamsField, WpDeserialize};
-use wp_serde_helper::{deserialize_from_string_of_json_array, serialize_as_json_string};
+use wp_derive::WpDeriveParamsField;
 
 #[derive(
     Debug,
@@ -239,7 +239,9 @@ pub struct PostCreateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<PostFormat>,
     // Meta fields.
-    pub meta: Option<PostMeta>,
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Arc<PostMeta>>,
     // Whether or not the post should be treated as sticky.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -269,7 +271,7 @@ pub struct PostCreateParams {
     // (e.g., custom taxonomy term IDs keyed by rest_base).
     #[uniffi(default = None)]
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub additional_fields: Option<Arc<AnyJson>>,
+    pub additional_fields: Option<Arc<WpAdditionalFields>>,
 }
 
 #[derive(Debug, Default, Serialize, uniffi::Record)]
@@ -331,7 +333,9 @@ pub struct PostUpdateParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<PostFormat>,
     // Meta fields.
-    pub meta: Option<PostMeta>,
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<Arc<PostMeta>>,
     // Whether or not the post should be treated as sticky.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -361,7 +365,7 @@ pub struct PostUpdateParams {
     // (e.g., custom taxonomy term IDs keyed by rest_base).
     #[uniffi(default = None)]
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub additional_fields: Option<Arc<AnyJson>>,
+    pub additional_fields: Option<Arc<WpAdditionalFields>>,
 }
 
 wp_content_i64_id!(PostId);
@@ -425,7 +429,7 @@ pub struct SparseAnyPost {
     pub format: Option<PostFormat>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
-    pub meta: Option<PostMeta>,
+    pub meta: Option<Arc<PostMeta>>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
     pub sticky: Option<bool>,
@@ -450,7 +454,7 @@ pub struct SparseAnyPost {
     #[WpContext(edit, embed, view)]
     #[WpContextualOption]
     #[WpContextualExcludeFromFields]
-    pub additional_fields: Option<Arc<AnyJson>>,
+    pub additional_fields: Option<Arc<WpAdditionalFields>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
@@ -493,12 +497,91 @@ pub struct SparsePostExcerpt {
     pub protected: Option<bool>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, WpDeserialize, uniffi::Record)]
+/// Type-erased post metadata wrapping the raw JSON returned by WordPress under
+/// the `meta` key.
+///
+/// Why a `uniffi::Object` over a typed record: a post's `meta` payload is a
+/// heterogeneous string-keyed object whose values can be strings, numbers,
+/// booleans, arrays, objects, or — for keys like `footnotes` — JSON encoded
+/// inside a string. Modeling each key as a typed field would couple this
+/// crate to every meta key its consumers care about. Wrapping `serde_json::Value`
+/// preserves the wire payload losslessly while opt-in typed accessors (see
+/// `footnotes` / `with_footnotes`) layer on top.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Object)]
+#[uniffi::export(Eq, Hash)]
+#[serde(transparent)]
 pub struct PostMeta {
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_from_string_of_json_array")]
-    #[serde(serialize_with = "serialize_as_json_string")]
-    pub footnotes: Option<Vec<PostFootnote>>,
+    pub(crate) inner: serde_json::Value,
+}
+
+#[uniffi::export]
+impl PostMeta {
+    /// Constructs an empty `PostMeta` with no keys held. The serialized form
+    /// is `{}`.
+    #[uniffi::constructor]
+    pub fn new() -> Arc<Self> {
+        Arc::new(PostMeta {
+            inner: serde_json::Value::Object(serde_json::Map::new()),
+        })
+    }
+
+    /// Decodes the WordPress `footnotes` value, which is stored as a JSON
+    /// string holding a JSON-encoded array. Returns `None` for missing,
+    /// empty-string, or malformed payloads — preserving back-compat with
+    /// the prior typed-record API.
+    pub fn footnotes(&self) -> Option<Vec<PostFootnote>> {
+        let s = self.inner.get("footnotes")?.as_str()?;
+        if s.is_empty() {
+            return None;
+        }
+        serde_json::from_str(s).ok()
+    }
+
+    /// Returns a new `PostMeta` with the given footnotes encoded under the
+    /// `footnotes` key in the WordPress wire format (a JSON string holding
+    /// a JSON-encoded array). The receiver `Arc` is not mutated; callers
+    /// chain: `PostMeta::new().with_footnotes(vec![...])?`.
+    ///
+    /// Errors only if `Vec<PostFootnote>` fails to serialize, which today is
+    /// infallible — the surface exists so that future fallible additions to
+    /// `PostFootnote` don't become a panic site.
+    pub fn with_footnotes(
+        self: Arc<Self>,
+        footnotes: Vec<PostFootnote>,
+    ) -> Result<Arc<Self>, UniffiSerializationError> {
+        let mut new_inner = self.inner.clone();
+        let encoded = serde_json::to_string(&footnotes)?;
+        new_inner["footnotes"] = serde_json::Value::String(encoded);
+        Ok(Arc::new(PostMeta { inner: new_inner }))
+    }
+
+    /// Returns a new `PostMeta` with `key` set to `value`. Receiver `Arc`
+    /// is not mutated; callers chain:
+    /// `PostMeta::new().with_value("k".into(), JsonValue::String("v".into()))`.
+    ///
+    /// `JsonValue::Null` is stored verbatim. Server-side handling of
+    /// `{key: null}` against a registered meta key (some WP versions delete,
+    /// some no-op) is out of scope; this method does not interpret null.
+    ///
+    /// Defensive recovery: if `inner` is not a JSON object — which can only
+    /// happen when this `PostMeta` was deserialized from a non-object payload
+    /// — the result is a fresh object containing only `(key, value)`.
+    pub fn with_value(self: Arc<Self>, key: String, value: JsonValue) -> Arc<Self> {
+        let mut new_map = match &self.inner {
+            serde_json::Value::Object(map) => map.clone(),
+            _ => serde_json::Map::new(),
+        };
+        new_map.insert(key, value.into());
+        Arc::new(PostMeta {
+            inner: serde_json::Value::Object(new_map),
+        })
+    }
+
+    /// Returns the value at `key`, or `None` if `key` is absent or the inner
+    /// value is not a JSON object.
+    pub fn value_for_key(&self, key: &str) -> Option<JsonValue> {
+        self.inner.get(key).map(JsonValue::from)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, uniffi::Record)]
@@ -756,18 +839,169 @@ mod tests {
     #[case(r#"{"other": "values"}"#)]
     fn test_meta_without_footnotes(#[case] json_data: &str) {
         let meta: PostMeta = serde_json::from_str(json_data).unwrap();
-        assert_eq!(meta.footnotes, None);
+        assert_eq!(meta.footnotes(), None);
     }
 
     #[test]
     fn test_meta_footnotes() {
         let json_data = r#"{"footnotes": "[{\"content\":\"some_content\",\"id\":\"some_id\"}]"}"#;
         let meta: PostMeta = serde_json::from_str(json_data).unwrap();
-        let footnotes = meta.footnotes.unwrap();
+        let footnotes = meta.footnotes().unwrap();
 
         assert_eq!(footnotes.len(), 1);
         assert_eq!(footnotes[0].id, "some_id");
         assert_eq!(footnotes[0].content, "some_content");
+    }
+
+    // Deserialize, re-serialize, and re-deserialize across the 8 JSON
+    // value kinds; equality of the two PostMeta values proves
+    // byte-equivalence of keys, types, and content for every variant.
+    #[rstest]
+    #[case(r#"{"key": "string_value"}"#)]
+    #[case(r#"{"key": 42}"#)]
+    #[case(r#"{"key": 3.14}"#)]
+    #[case(r#"{"key": true}"#)]
+    #[case(r#"{"key": null}"#)]
+    #[case(r#"{"nested": {"a": 1}}"#)]
+    #[case(r#"{"arr": [1, 2, 3]}"#)]
+    #[case(r#"{"footnotes": "[{\"id\":\"x\",\"content\":\"y\"}]"}"#)]
+    fn test_meta_round_trip(#[case] json_data: &str) {
+        let meta: PostMeta = serde_json::from_str(json_data).unwrap();
+        let round_tripped = serde_json::to_string(&meta).unwrap();
+        let meta2: PostMeta = serde_json::from_str(&round_tripped).unwrap();
+        assert_eq!(meta, meta2);
+    }
+
+    // The builder returns a fresh Arc; the original is unchanged.
+    #[test]
+    fn test_meta_builder_immutability() {
+        let original = PostMeta::new();
+        let modified = Arc::clone(&original)
+            .with_footnotes(vec![PostFootnote {
+                id: "x".to_string(),
+                content: "y".to_string(),
+            }])
+            .unwrap();
+        assert_eq!(original.footnotes(), None);
+        assert!(modified.footnotes().is_some());
+    }
+
+    // Empty PostMeta serializes to `{}`; the parent-Option distinction
+    // (None vs Some(empty)) is covered by the *_params_meta_serialization
+    // tests below.
+    #[test]
+    fn test_meta_empty_serializes_as_object() {
+        let meta = PostMeta::new();
+        assert_eq!(serde_json::to_string(&*meta).unwrap(), "{}");
+    }
+
+    // `with_footnotes` encodes the WordPress wire format: a string
+    // under the `footnotes` key whose contents are a JSON-encoded array.
+    #[test]
+    fn test_meta_with_footnotes_writes_string_of_array() {
+        let meta = PostMeta::new()
+            .with_footnotes(vec![PostFootnote {
+                id: "x".to_string(),
+                content: "y".to_string(),
+            }])
+            .unwrap();
+        let value = serde_json::to_value(&*meta).unwrap();
+        let footnotes_str = value
+            .get("footnotes")
+            .and_then(|v| v.as_str())
+            .expect("footnotes must be a JSON string");
+        let decoded: Vec<PostFootnote> = serde_json::from_str(footnotes_str).unwrap();
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(decoded[0].id, "x");
+        assert_eq!(decoded[0].content, "y");
+    }
+
+    // None omits the `meta` key from the serialized request body;
+    // Some(empty PostMeta) emits `"meta":{}`; Some(populated PostMeta)
+    // emits the encoded payload.
+    #[test]
+    fn test_post_create_params_meta_serialization() {
+        // Case 1: meta: None → "meta" key omitted entirely.
+        let params_none = PostCreateParams {
+            meta: None,
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&params_none).unwrap();
+        assert!(
+            json.get("meta").is_none(),
+            "None meta must be omitted from request body, got: {json}",
+        );
+
+        // Case 2: meta: Some(PostMeta::new()) → "meta":{}
+        let params_empty = PostCreateParams {
+            meta: Some(PostMeta::new()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&params_empty).unwrap();
+        assert_eq!(json["meta"], serde_json::json!({}));
+
+        // Case 3: meta: Some(populated) → "meta" carries the encoded
+        // footnotes wire format.
+        let params_with_footnotes = PostCreateParams {
+            meta: Some(
+                PostMeta::new()
+                    .with_footnotes(vec![PostFootnote {
+                        id: "x".to_string(),
+                        content: "y".to_string(),
+                    }])
+                    .unwrap(),
+            ),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&params_with_footnotes).unwrap();
+        let footnotes_str = json["meta"]["footnotes"]
+            .as_str()
+            .expect("footnotes must serialize as a JSON string");
+        assert!(
+            footnotes_str.starts_with("[{"),
+            "footnotes wire format must be a JSON-encoded array, got: {footnotes_str}",
+        );
+    }
+
+    // Same shape contract on PostUpdateParams.
+    #[test]
+    fn test_post_update_params_meta_serialization() {
+        let params_none = PostUpdateParams {
+            meta: None,
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&params_none).unwrap();
+        assert!(
+            json.get("meta").is_none(),
+            "None meta must be omitted from request body, got: {json}",
+        );
+
+        let params_empty = PostUpdateParams {
+            meta: Some(PostMeta::new()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&params_empty).unwrap();
+        assert_eq!(json["meta"], serde_json::json!({}));
+
+        let params_with_footnotes = PostUpdateParams {
+            meta: Some(
+                PostMeta::new()
+                    .with_footnotes(vec![PostFootnote {
+                        id: "x".to_string(),
+                        content: "y".to_string(),
+                    }])
+                    .unwrap(),
+            ),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&params_with_footnotes).unwrap();
+        let footnotes_str = json["meta"]["footnotes"]
+            .as_str()
+            .expect("footnotes must serialize as a JSON string");
+        assert!(
+            footnotes_str.starts_with("[{"),
+            "footnotes wire format must be a JSON-encoded array, got: {footnotes_str}",
+        );
     }
 
     fn expected_query_pairs_for_post_list_params_with_all_fields() -> String {
@@ -824,7 +1058,7 @@ mod tests {
 
     #[test]
     fn test_post_create_params_serializes_additional_fields() {
-        let additional = AnyJson::from_term_id_map(HashMap::from([(
+        let additional = WpAdditionalFields::from_term_id_map(HashMap::from([(
             "genres".to_string(),
             vec![TermId(10), TermId(20)],
         )]));
@@ -853,7 +1087,7 @@ mod tests {
 
     #[test]
     fn test_post_update_params_serializes_additional_fields() {
-        let additional = AnyJson::from_term_id_map(HashMap::from([
+        let additional = WpAdditionalFields::from_term_id_map(HashMap::from([
             ("genres".to_string(), vec![TermId(10), TermId(20)]),
             ("ratings".to_string(), vec![TermId(5)]),
         ]));
@@ -905,6 +1139,126 @@ mod tests {
         );
         assert_eq!(additional.term_ids_for_key("ratings"), vec![TermId(3)]);
         assert_eq!(additional.term_ids_for_key("nonexistent"), vec![]);
+    }
+
+    #[test]
+    fn post_meta_with_value_writes_string() {
+        let meta = PostMeta::new().with_value(
+            "wp_rs_test_string".to_string(),
+            JsonValue::String("hello".to_string()),
+        );
+        let json = serde_json::to_value(&*meta).unwrap();
+        assert_eq!(json, serde_json::json!({"wp_rs_test_string": "hello"}));
+    }
+
+    #[test]
+    fn post_meta_with_value_writes_each_json_variant() {
+        let meta = PostMeta::new()
+            .with_value("s".to_string(), JsonValue::String("x".to_string()))
+            .with_value("i".to_string(), JsonValue::Int(42))
+            .with_value("f".to_string(), JsonValue::Float(1.5))
+            .with_value("b".to_string(), JsonValue::Bool(true))
+            .with_value("n".to_string(), JsonValue::Null)
+            .with_value(
+                "arr".to_string(),
+                JsonValue::Array(vec![JsonValue::Int(1), JsonValue::Int(2)]),
+            );
+        let json = serde_json::to_value(&*meta).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "s": "x",
+                "i": 42,
+                "f": 1.5,
+                "b": true,
+                "n": null,
+                "arr": [1, 2]
+            })
+        );
+    }
+
+    #[test]
+    fn post_meta_with_value_overwrites_existing_key() {
+        let meta = PostMeta::new()
+            .with_value("k".to_string(), JsonValue::String("first".to_string()))
+            .with_value("k".to_string(), JsonValue::String("second".to_string()));
+        let json = serde_json::to_value(&*meta).unwrap();
+        assert_eq!(json, serde_json::json!({"k": "second"}));
+    }
+
+    #[test]
+    fn post_meta_with_value_recovers_when_inner_is_not_object() {
+        // A PostMeta deserialized from a non-object payload (e.g. null) should
+        // not panic when written to; with_value replaces with a fresh
+        // single-key object.
+        let non_object: PostMeta = serde_json::from_str("null").unwrap();
+        let after =
+            Arc::new(non_object).with_value("k".to_string(), JsonValue::String("v".to_string()));
+        let json = serde_json::to_value(&*after).unwrap();
+        assert_eq!(json, serde_json::json!({"k": "v"}));
+    }
+
+    #[test]
+    fn post_meta_with_value_preserves_existing_footnotes() {
+        let meta = PostMeta::new()
+            .with_footnotes(vec![PostFootnote {
+                id: "a".to_string(),
+                content: "b".to_string(),
+            }])
+            .unwrap()
+            .with_value(
+                "wp_rs_test_string".to_string(),
+                JsonValue::String("hello".to_string()),
+            );
+        let json = serde_json::to_value(&*meta).unwrap();
+        // footnotes wire format is a JSON-encoded string; just check both keys exist.
+        assert!(json.get("footnotes").is_some());
+        assert_eq!(json["wp_rs_test_string"], serde_json::json!("hello"));
+    }
+
+    #[test]
+    fn post_meta_value_for_key_returns_written_value() {
+        let meta =
+            PostMeta::new().with_value("k".to_string(), JsonValue::String("hello".to_string()));
+        assert_eq!(
+            meta.value_for_key("k"),
+            Some(JsonValue::String("hello".to_string()))
+        );
+    }
+
+    #[test]
+    fn post_meta_value_for_key_none_for_missing_key() {
+        let meta = PostMeta::new();
+        assert_eq!(meta.value_for_key("absent"), None);
+    }
+
+    #[test]
+    fn post_meta_value_for_key_none_when_inner_not_object() {
+        let non_object: PostMeta = serde_json::from_str("null").unwrap();
+        assert_eq!(non_object.value_for_key("anything"), None);
+    }
+
+    #[test]
+    fn post_meta_value_for_key_round_trips_each_variant() {
+        let meta = PostMeta::new()
+            .with_value("s".to_string(), JsonValue::String("x".to_string()))
+            .with_value("i".to_string(), JsonValue::Int(42))
+            .with_value("f".to_string(), JsonValue::Float(1.5))
+            .with_value("b".to_string(), JsonValue::Bool(true))
+            .with_value("n".to_string(), JsonValue::Null)
+            .with_value("arr".to_string(), JsonValue::Array(vec![JsonValue::Int(1)]));
+        assert_eq!(
+            meta.value_for_key("s"),
+            Some(JsonValue::String("x".to_string()))
+        );
+        assert_eq!(meta.value_for_key("i"), Some(JsonValue::Int(42)));
+        assert_eq!(meta.value_for_key("f"), Some(JsonValue::Float(1.5)));
+        assert_eq!(meta.value_for_key("b"), Some(JsonValue::Bool(true)));
+        assert_eq!(meta.value_for_key("n"), Some(JsonValue::Null));
+        assert_eq!(
+            meta.value_for_key("arr"),
+            Some(JsonValue::Array(vec![JsonValue::Int(1)]))
+        );
     }
 
     #[test]

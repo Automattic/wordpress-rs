@@ -412,7 +412,7 @@ impl From<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 12] = [
+static MIGRATION_QUERIES: [&str; 13] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -425,6 +425,7 @@ static MIGRATION_QUERIES: [&str; 12] = [
     include_str!("../migrations/0010-create-wordpress-com-sites-table.sql"),
     include_str!("../migrations/0011-add-additional-fields-to-posts-tables.sql"),
     include_str!("../migrations/0012-invalidate-post-entity-states.sql"),
+    include_str!("../migrations/0013-invalidate-post-entity-states-for-meta.sql"),
 ];
 
 pub struct MigrationManager<'a> {

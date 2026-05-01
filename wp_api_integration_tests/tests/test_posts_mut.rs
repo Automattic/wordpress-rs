@@ -2,13 +2,13 @@ use macro_helper::{
     generate_update_post_format_test, generate_update_post_status_test, generate_update_test,
 };
 use std::collections::HashMap;
-use wp_api::AnyJson;
 use wp_api::posts::{
     AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostFormat,
-    PostListParams, PostMeta, PostPingStatus, PostStatus, PostUpdateParams,
+    PostListParams, PostMeta, PostPingStatus, PostRetrieveParams, PostStatus, PostUpdateParams,
 };
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api::terms::TermId;
+use wp_api::{JsonValue, WpAdditionalFields};
 use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliPost;
 
@@ -34,31 +34,146 @@ async fn create_post_with_just_title() {
 #[tokio::test]
 #[serial]
 async fn create_post_with_title_and_meta() {
-    test_create_post(
-        &PostCreateParams {
-            title: Some("foo".to_string()),
-            meta: Some(PostMeta {
-                footnotes: Some(vec![PostFootnote {
+    let params = PostCreateParams {
+        title: Some("foo".to_string()),
+        meta: Some(
+            PostMeta::new()
+                .with_footnotes(vec![PostFootnote {
                     id: "bar".to_string(),
                     content: "baz".to_string(),
-                }]),
-            }),
-            ..Default::default()
-        },
-        |created_post, post_from_wp_cli| {
-            let meta = created_post.meta.unwrap();
-            let footnotes = meta.footnotes.unwrap();
-            let footnote = footnotes.first().unwrap();
-            assert_eq!(
-                created_post.title.and_then(|t| t.raw),
-                Some("foo".to_string())
-            );
-            assert_eq!(post_from_wp_cli.title, "foo");
-            assert_eq!(footnote.id, "bar");
-            assert_eq!(footnote.content, "baz");
-        },
-    )
-    .await;
+                }])
+                .unwrap(),
+        ),
+        ..Default::default()
+    };
+    let created_post = api_client()
+        .posts()
+        .create(&PostEndpointType::Posts, &params)
+        .await
+        .assert_response()
+        .data;
+    // Bind the id first so it remains available after the response fields are consumed below.
+    let created_post_id = created_post.id;
+    let created_post_from_wp_cli = Backend::post(&created_post_id).await;
+
+    // Assertions on the create response.
+    assert_eq!(
+        created_post.title.and_then(|t| t.raw),
+        Some("foo".to_string())
+    );
+    assert_eq!(created_post_from_wp_cli.title, "foo");
+    {
+        let meta = created_post.meta.unwrap();
+        let footnotes = meta.footnotes().unwrap();
+        let footnote = footnotes.first().unwrap();
+        assert_eq!(footnote.id, "bar");
+        assert_eq!(footnote.content, "baz");
+    }
+
+    // Re-fetch via REST GET and assert footnotes round-trip end-to-end.
+    // The POST response can echo the request body without persisting it;
+    // the GET on the same id observes what actually landed in wp_postmeta.
+    let fetched = api_client()
+        .posts()
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &created_post_id,
+            &PostRetrieveParams::default(),
+        )
+        .await
+        .assert_response()
+        .data;
+    let meta = fetched.meta.unwrap();
+    let footnotes = meta.footnotes().unwrap();
+    let footnote = footnotes.first().unwrap();
+    assert_eq!(footnote.id, "bar");
+    assert_eq!(footnote.content, "baz");
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn update_post_meta_round_trips_single_key_via_with_value() {
+    let params = PostUpdateParams {
+        meta: Some(PostMeta::new().with_value(
+            "wp_rs_test_string".to_string(),
+            JsonValue::String("hello".to_string()),
+        )),
+        ..Default::default()
+    };
+    api_client()
+        .posts()
+        .update(&PostEndpointType::Posts, &FIRST_POST_ID, &params)
+        .await
+        .assert_response();
+
+    // Re-fetch and verify the value landed in wp_postmeta.
+    // The PATCH response can echo the request body without persisting it;
+    // the GET on the same id observes what actually persisted.
+    let fetched = api_client()
+        .posts()
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
+        .await
+        .assert_response()
+        .data;
+    let meta = fetched.meta.unwrap();
+    assert_eq!(
+        meta.value_for_key("wp_rs_test_string"),
+        Some(JsonValue::String("hello".to_string()))
+    );
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn update_post_meta_round_trips_two_keys_via_chained_with_value() {
+    let params = PostUpdateParams {
+        meta: Some(
+            PostMeta::new()
+                .with_value(
+                    "wp_rs_test_string".to_string(),
+                    JsonValue::String("hello".to_string()),
+                )
+                .with_value("wp_rs_test_number".to_string(), JsonValue::Int(42)),
+        ),
+        ..Default::default()
+    };
+    api_client()
+        .posts()
+        .update(&PostEndpointType::Posts, &FIRST_POST_ID, &params)
+        .await
+        .assert_response();
+
+    // Re-fetch and verify both values landed in wp_postmeta.
+    // The PATCH response can echo the request body without persisting it;
+    // the GET on the same id observes what actually persisted.
+    let fetched = api_client()
+        .posts()
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
+        .await
+        .assert_response()
+        .data;
+    let meta = fetched.meta.unwrap();
+    assert_eq!(
+        meta.value_for_key("wp_rs_test_string"),
+        Some(JsonValue::String("hello".to_string()))
+    );
+    assert_eq!(
+        meta.value_for_key("wp_rs_test_number"),
+        Some(JsonValue::Int(42))
+    );
+
+    RestoreServer::db().await;
 }
 
 #[tokio::test]
@@ -325,23 +440,57 @@ generate_update_test!(
     }
 );
 
-generate_update_test!(
-    update_meta_to_add_footnote,
-    meta,
-    PostMeta {
-        footnotes: Some(vec![PostFootnote {
-            id: "foo".to_string(),
-            content: "bar".to_string()
-        }])
-    },
-    |updated_post, _| {
+#[tokio::test]
+#[serial]
+async fn update_meta_to_add_footnote() {
+    let params = PostUpdateParams {
+        meta: Some(
+            PostMeta::new()
+                .with_footnotes(vec![PostFootnote {
+                    id: "foo".to_string(),
+                    content: "bar".to_string(),
+                }])
+                .unwrap(),
+        ),
+        ..Default::default()
+    };
+    let updated_post = api_client()
+        .posts()
+        .update(&PostEndpointType::Posts, &FIRST_POST_ID, &params)
+        .await
+        .assert_response()
+        .data;
+
+    // Assertion on the update response.
+    {
         let meta = updated_post.meta.unwrap();
-        let footnotes = meta.footnotes.unwrap();
+        let footnotes = meta.footnotes().unwrap();
         let footnote = footnotes.first().unwrap();
         assert_eq!(footnote.id, "foo");
         assert_eq!(footnote.content, "bar");
     }
-);
+
+    // Re-fetch via REST GET and assert footnotes round-trip end-to-end.
+    // The PATCH response can echo the request body without persisting it;
+    // the GET on the same id observes what actually landed in wp_postmeta.
+    let fetched = api_client()
+        .posts()
+        .retrieve_with_edit_context(
+            &PostEndpointType::Posts,
+            &FIRST_POST_ID,
+            &PostRetrieveParams::default(),
+        )
+        .await
+        .assert_response()
+        .data;
+    let meta = fetched.meta.unwrap();
+    let footnotes = meta.footnotes().unwrap();
+    let footnote = footnotes.first().unwrap();
+    assert_eq!(footnote.id, "foo");
+    assert_eq!(footnote.content, "bar");
+
+    RestoreServer::db().await;
+}
 
 #[tokio::test]
 #[serial]
@@ -570,8 +719,10 @@ async fn create_book_with_custom_taxonomy_terms() {
         .find(|ids| !ids.is_empty())
         .expect("Expected at least one book with genres");
 
-    let additional =
-        AnyJson::from_term_id_map(HashMap::from([("genre".to_string(), genre_ids.clone())]));
+    let additional = WpAdditionalFields::from_term_id_map(HashMap::from([(
+        "genre".to_string(),
+        genre_ids.clone(),
+    )]));
     let params = PostCreateParams {
         title: Some("Integration Test Book".to_string()),
         status: Some(PostStatus::Publish),
@@ -625,8 +776,10 @@ async fn update_book_custom_taxonomy_terms() {
     let book_id = books[0].id;
     let new_genres = vec![all_genre_ids[0], all_genre_ids[1]];
 
-    let additional =
-        AnyJson::from_term_id_map(HashMap::from([("genre".to_string(), new_genres.clone())]));
+    let additional = WpAdditionalFields::from_term_id_map(HashMap::from([(
+        "genre".to_string(),
+        new_genres.clone(),
+    )]));
     let params = PostUpdateParams {
         additional_fields: Some(additional),
         ..Default::default()

@@ -333,3 +333,30 @@ public typealias EncryptedPassword = WordPressAPIInternal.EncryptedPassword
 public typealias DecryptedPassword = WordPressAPIInternal.DecryptedPassword
 public typealias PasswordTransformer = WordPressAPIInternal.PasswordTransformer
 public typealias PasswordTransformerError = WordPressAPIInternal.PasswordTransformerError
+
+// MARK: - Publicize & Keyring
+
+public typealias PublicizeConnectionResponse = WordPressAPIInternal.PublicizeConnectionResponse
+public typealias PublicizeServiceResponse = WordPressAPIInternal.PublicizeServiceResponse
+public typealias PublicizeServiceSupports = WordPressAPIInternal.PublicizeServiceSupports
+public typealias KeyringConnectionResponse = WordPressAPIInternal.KeyringConnectionResponse
+public typealias KeyringExternalUser = WordPressAPIInternal.KeyringExternalUser
+public typealias PublicizeConnectionId = WordPressAPIInternal.PublicizeConnectionId
+public typealias CreatePublicizeConnectionParams = WordPressAPIInternal.CreatePublicizeConnectionParams
+public typealias UpdatePublicizeConnectionParams = WordPressAPIInternal.UpdatePublicizeConnectionParams
+public typealias PublicizeRequestListConnectionsResponse = WordPressAPIInternal.PublicizeRequestListConnectionsResponse
+public typealias PublicizeRequestListServicesResponse = WordPressAPIInternal.PublicizeRequestListServicesResponse
+public typealias PublicizeRequestCreateConnectionResponse = WordPressAPIInternal
+    .PublicizeRequestCreateConnectionResponse
+public typealias PublicizeRequestUpdateConnectionResponse = WordPressAPIInternal
+    .PublicizeRequestUpdateConnectionResponse
+public typealias PublicizeRequestDeleteConnectionResponse = WordPressAPIInternal
+    .PublicizeRequestDeleteConnectionResponse
+public typealias MeConnectionsRequestListResponse = WordPressAPIInternal.MeConnectionsRequestListResponse
+public typealias MeConnectionsResponse = WordPressAPIInternal.MeConnectionsResponse
+
+// MARK: - JSON helpers
+
+public typealias WpAdditionalFields = WordPressAPIInternal.WpAdditionalFields
+public typealias AdditionalFieldsParseError = WordPressAPIInternal.AdditionalFieldsParseError
+public typealias JsonValue = WordPressAPIInternal.JsonValue

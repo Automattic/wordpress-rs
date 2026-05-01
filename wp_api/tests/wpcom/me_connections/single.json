@@ -1,0 +1,17 @@
+{
+  "ID": 98765,
+  "user_ID": 12345,
+  "type": "publicize",
+  "service": "mastodon",
+  "label": "Mastodon",
+  "issued": "2025-01-15 10:30:00",
+  "expires": null,
+  "external_ID": "116283451478301581",
+  "external_name": "@testuser@mastodon.social",
+  "external_display": "@testuser@mastodon.social",
+  "external_profile_picture": "https://mastodon.social/avatars/original/missing.png",
+  "status": "ok",
+  "refresh_URL": "https://public-api.wordpress.com/connect/?action=request&service=mastodon",
+  "sites": [234567],
+  "additional_external_users": []
+}

@@ -4,8 +4,10 @@ use super::endpoint::{
     jetpack_connection_endpoint::{
         JetpackConnectionRequestBuilder, JetpackConnectionRequestExecutor,
     },
+    me_connections_endpoint::{MeConnectionsRequestBuilder, MeConnectionsRequestExecutor},
     me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
+    publicize_endpoint::{PublicizeRequestBuilder, PublicizeRequestExecutor},
     stats_city_views_endpoint::{StatsCityViewsRequestBuilder, StatsCityViewsRequestExecutor},
     stats_clicks_endpoint::{StatsClicksRequestBuilder, StatsClicksRequestExecutor},
     stats_country_views_endpoint::{
@@ -70,7 +72,9 @@ pub struct WpComApiRequestBuilder {
     jetpack_connection: Arc<JetpackConnectionRequestBuilder>,
     languages: Arc<LanguagesRequestBuilder>,
     me: Arc<MeRequestBuilder>,
+    me_connections: Arc<MeConnectionsRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
+    publicize: Arc<PublicizeRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
     stats_clicks: Arc<StatsClicksRequestBuilder>,
@@ -111,7 +115,9 @@ impl WpComApiRequestBuilder {
             jetpack_connection,
             languages,
             me,
+            me_connections,
             oauth2,
+            publicize,
             sites,
             stats_city_views,
             stats_clicks,
@@ -163,7 +169,9 @@ pub struct WpComApiClient {
     jetpack_connection: Arc<JetpackConnectionRequestExecutor>,
     languages: Arc<LanguagesRequestExecutor>,
     me: Arc<MeRequestExecutor>,
+    me_connections: Arc<MeConnectionsRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
+    publicize: Arc<PublicizeRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
     stats_clicks: Arc<StatsClicksRequestExecutor>,
@@ -205,7 +213,9 @@ impl WpComApiClient {
             jetpack_connection,
             languages,
             me,
+            me_connections,
             oauth2,
+            publicize,
             sites,
             stats_city_views,
             stats_clicks,
@@ -240,7 +250,9 @@ api_client_generate_endpoint_impl!(WpComApi, followers);
 api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
 api_client_generate_endpoint_impl!(WpComApi, languages);
 api_client_generate_endpoint_impl!(WpComApi, me);
+api_client_generate_endpoint_impl!(WpComApi, me_connections);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
+api_client_generate_endpoint_impl!(WpComApi, publicize);
 api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_clicks);

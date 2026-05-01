@@ -1,5 +1,5 @@
 use crate::{
-    AnyJson, UserAvatarSize, UserId, WpApiParamOrder, WpResponseString,
+    UserAvatarSize, UserId, WpAdditionalFields, WpApiParamOrder, WpResponseString,
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     posts::PostId,
@@ -407,7 +407,7 @@ pub struct SparseComment {
     #[serde(flatten)]
     #[WpContext(edit, embed, view)]
     #[WpContextualExcludeFromFields]
-    pub additional_fields: Option<Arc<AnyJson>>,
+    pub additional_fields: Option<Arc<WpAdditionalFields>>,
     // meta field is omitted for now: https://github.com/Automattic/wordpress-rs/issues/422
 }
 
