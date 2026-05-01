@@ -175,7 +175,8 @@ lane :publish_release_to_github do
     repository_name: GITHUB_REPO,
     name: version,
     tag_name: version,
-    description: "Release version #{version}",
+    description: github_release_description(version),
+    is_prerelease: version.include?('-'),
     upload_assets: [xcframework_file_path, xcframework_checksum_file_path]
   )
 end
@@ -672,4 +673,8 @@ def set_up_certificate_in_keychain(type:, readonly:)
     app_identifier: 'com.automattic.hostmgr',
     platform: 'macos'
   )
+end
+
+def github_release_description(version)
+  "See [CHANGELOG.md](https://github.com/#{GITHUB_REPO}/blob/#{version}/CHANGELOG.md) for what's in this release."
 end
