@@ -1,11 +1,13 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::template_parts::TemplatePartId;
+use crate::{template_part_revisions::TemplatePartRevisionId, template_parts::TemplatePartId};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum TemplatePartRevisionsRequest {
     #[contextual_paged(url = "/template-parts/<template_part_id>/revisions", params = &crate::template_part_revisions::TemplatePartRevisionListParams, output = Vec<crate::template_part_revisions::SparseTemplatePartRevision>, filter_by = crate::template_part_revisions::SparseTemplatePartRevisionField)]
     List,
+    #[contextual_get(url = "/template-parts/<template_part_id>/revisions/<template_part_revision_id>", output = crate::template_part_revisions::SparseTemplatePartRevision, filter_by = crate::template_part_revisions::SparseTemplatePartRevisionField)]
+    Retrieve,
 }
 
 impl DerivedRequest for TemplatePartRevisionsRequest {
@@ -84,6 +86,42 @@ mod tests {
             endpoint.filter_list_with_view_context(
                 &TemplatePartId("foo".to_string()),
                 &params,
+                fields,
+            ),
+            expected_path,
+        );
+    }
+
+    #[rstest]
+    fn retrieve_template_part_revision(endpoint: TemplatePartRevisionsRequestEndpoint) {
+        let template_part_id = TemplatePartId("foo".to_string());
+        let revision_id = TemplatePartRevisionId(42);
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_edit_context(&template_part_id, &revision_id),
+            "/template-parts/foo/revisions/42?context=edit",
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_embed_context(&template_part_id, &revision_id),
+            "/template-parts/foo/revisions/42?context=embed",
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_view_context(&template_part_id, &revision_id),
+            "/template-parts/foo/revisions/42?context=view",
+        );
+    }
+
+    #[rstest]
+    #[case(&[], "/template-parts/foo/revisions/42?context=view&_fields=")]
+    #[case(&[SparseTemplatePartRevisionFieldWithViewContext::Slug], "/template-parts/foo/revisions/42?context=view&_fields=slug")]
+    fn filter_retrieve_template_part_revision_with_view_context(
+        endpoint: TemplatePartRevisionsRequestEndpoint,
+        #[case] fields: &[SparseTemplatePartRevisionFieldWithViewContext],
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_v2_endpoint(
+            endpoint.filter_retrieve_with_view_context(
+                &TemplatePartId("foo".to_string()),
+                &TemplatePartRevisionId(42),
                 fields,
             ),
             expected_path,
