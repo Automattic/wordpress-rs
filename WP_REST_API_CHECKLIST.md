@@ -30,9 +30,9 @@
 - [ ] `/wp/v2/block-patterns/categories`
 - [ ] `/wp/v2/pattern-directory/patterns`
 - [x] `/wp/v2/templates`
-- [ ] `/wp/v2/templates/<id>/revisions`
-- [ ] `/wp/v2/templates/<id>/autosaves`
-- [ ] `/wp/v2/template-parts`
+- [x] `/wp/v2/templates/<id>/revisions`
+- [x] `/wp/v2/templates/<id>/autosaves`
+- [x] `/wp/v2/template-parts`
 - [ ] `/wp/v2/template-parts/<id>/revisions`
 - [ ] `/wp/v2/template-parts/<id>/autosaves`
 
