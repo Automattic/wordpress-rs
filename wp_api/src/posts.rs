@@ -4,6 +4,7 @@ use crate::{
     impl_as_query_value_from_to_string,
     media::MediaId,
     terms::TermId,
+    uniffi_serde::UniffiSerializationError,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -539,16 +540,19 @@ impl PostMeta {
     /// Returns a new `PostMeta` with the given footnotes encoded under the
     /// `footnotes` key in the WordPress wire format (a JSON string holding
     /// a JSON-encoded array). The receiver `Arc` is not mutated; callers
-    /// chain: `PostMeta::new().with_footnotes(vec![...])`.
-    pub fn with_footnotes(self: Arc<Self>, footnotes: Vec<PostFootnote>) -> Arc<Self> {
+    /// chain: `PostMeta::new().with_footnotes(vec![...])?`.
+    ///
+    /// Errors only if `Vec<PostFootnote>` fails to serialize, which today is
+    /// infallible — the surface exists so that future fallible additions to
+    /// `PostFootnote` don't become a panic site.
+    pub fn with_footnotes(
+        self: Arc<Self>,
+        footnotes: Vec<PostFootnote>,
+    ) -> Result<Arc<Self>, UniffiSerializationError> {
         let mut new_inner = self.inner.clone();
-        // FIXME: `Vec<PostFootnote>` is two String fields per element so
-        // serialization is infallible in practice; if `PostFootnote` ever
-        // grows a fallible Serialize impl this expect() must be revisited.
-        let encoded =
-            serde_json::to_string(&footnotes).expect("Vec<PostFootnote> is always serializable");
+        let encoded = serde_json::to_string(&footnotes)?;
         new_inner["footnotes"] = serde_json::Value::String(encoded);
-        Arc::new(PostMeta { inner: new_inner })
+        Ok(Arc::new(PostMeta { inner: new_inner }))
     }
 
     /// Returns a new `PostMeta` with `key` set to `value`. Receiver `Arc`
@@ -872,10 +876,12 @@ mod tests {
     #[test]
     fn test_meta_builder_immutability() {
         let original = PostMeta::new();
-        let modified = Arc::clone(&original).with_footnotes(vec![PostFootnote {
-            id: "x".to_string(),
-            content: "y".to_string(),
-        }]);
+        let modified = Arc::clone(&original)
+            .with_footnotes(vec![PostFootnote {
+                id: "x".to_string(),
+                content: "y".to_string(),
+            }])
+            .unwrap();
         assert_eq!(original.footnotes(), None);
         assert!(modified.footnotes().is_some());
     }
@@ -893,10 +899,12 @@ mod tests {
     // under the `footnotes` key whose contents are a JSON-encoded array.
     #[test]
     fn test_meta_with_footnotes_writes_string_of_array() {
-        let meta = PostMeta::new().with_footnotes(vec![PostFootnote {
-            id: "x".to_string(),
-            content: "y".to_string(),
-        }]);
+        let meta = PostMeta::new()
+            .with_footnotes(vec![PostFootnote {
+                id: "x".to_string(),
+                content: "y".to_string(),
+            }])
+            .unwrap();
         let value = serde_json::to_value(&*meta).unwrap();
         let footnotes_str = value
             .get("footnotes")
@@ -935,10 +943,14 @@ mod tests {
         // Case 3: meta: Some(populated) → "meta" carries the encoded
         // footnotes wire format.
         let params_with_footnotes = PostCreateParams {
-            meta: Some(PostMeta::new().with_footnotes(vec![PostFootnote {
-                id: "x".to_string(),
-                content: "y".to_string(),
-            }])),
+            meta: Some(
+                PostMeta::new()
+                    .with_footnotes(vec![PostFootnote {
+                        id: "x".to_string(),
+                        content: "y".to_string(),
+                    }])
+                    .unwrap(),
+            ),
             ..Default::default()
         };
         let json = serde_json::to_value(&params_with_footnotes).unwrap();
@@ -972,10 +984,14 @@ mod tests {
         assert_eq!(json["meta"], serde_json::json!({}));
 
         let params_with_footnotes = PostUpdateParams {
-            meta: Some(PostMeta::new().with_footnotes(vec![PostFootnote {
-                id: "x".to_string(),
-                content: "y".to_string(),
-            }])),
+            meta: Some(
+                PostMeta::new()
+                    .with_footnotes(vec![PostFootnote {
+                        id: "x".to_string(),
+                        content: "y".to_string(),
+                    }])
+                    .unwrap(),
+            ),
             ..Default::default()
         };
         let json = serde_json::to_value(&params_with_footnotes).unwrap();
@@ -1189,6 +1205,7 @@ mod tests {
                 id: "a".to_string(),
                 content: "b".to_string(),
             }])
+            .unwrap()
             .with_value(
                 "wp_rs_test_string".to_string(),
                 JsonValue::String("hello".to_string()),

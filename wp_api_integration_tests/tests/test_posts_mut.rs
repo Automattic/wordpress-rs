@@ -36,10 +36,14 @@ async fn create_post_with_just_title() {
 async fn create_post_with_title_and_meta() {
     let params = PostCreateParams {
         title: Some("foo".to_string()),
-        meta: Some(PostMeta::new().with_footnotes(vec![PostFootnote {
-            id: "bar".to_string(),
-            content: "baz".to_string(),
-        }])),
+        meta: Some(
+            PostMeta::new()
+                .with_footnotes(vec![PostFootnote {
+                    id: "bar".to_string(),
+                    content: "baz".to_string(),
+                }])
+                .unwrap(),
+        ),
         ..Default::default()
     };
     let created_post = api_client()
@@ -440,10 +444,14 @@ generate_update_test!(
 #[serial]
 async fn update_meta_to_add_footnote() {
     let params = PostUpdateParams {
-        meta: Some(PostMeta::new().with_footnotes(vec![PostFootnote {
-            id: "foo".to_string(),
-            content: "bar".to_string(),
-        }])),
+        meta: Some(
+            PostMeta::new()
+                .with_footnotes(vec![PostFootnote {
+                    id: "foo".to_string(),
+                    content: "bar".to_string(),
+                }])
+                .unwrap(),
+        ),
         ..Default::default()
     };
     let updated_post = api_client()

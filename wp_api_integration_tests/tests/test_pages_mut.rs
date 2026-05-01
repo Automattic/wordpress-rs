@@ -32,10 +32,14 @@ async fn create_page_with_title_and_meta() {
     test_create_page(
         &PostCreateParams {
             title: Some("foo".to_string()),
-            meta: Some(PostMeta::new().with_footnotes(vec![PostFootnote {
-                id: "bar".to_string(),
-                content: "baz".to_string(),
-            }])),
+            meta: Some(
+                PostMeta::new()
+                    .with_footnotes(vec![PostFootnote {
+                        id: "bar".to_string(),
+                        content: "baz".to_string(),
+                    }])
+                    .unwrap(),
+            ),
             ..Default::default()
         },
         |created_page, page_from_wp_cli| {
@@ -355,10 +359,12 @@ generate_update_test!(
 generate_update_test!(
     update_meta_to_add_footnote,
     meta,
-    PostMeta::new().with_footnotes(vec![PostFootnote {
-        id: "foo".to_string(),
-        content: "bar".to_string()
-    }]),
+    PostMeta::new()
+        .with_footnotes(vec![PostFootnote {
+            id: "foo".to_string(),
+            content: "bar".to_string()
+        }])
+        .unwrap(),
     |updated_page, _| {
         let meta = updated_page.meta.unwrap();
         let footnotes = meta.footnotes().unwrap();

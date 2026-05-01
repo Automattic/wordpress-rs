@@ -257,16 +257,20 @@ fn create_full_post() -> AnyPostWithEditContext {
         comment_status: Some(wp_api::posts::PostCommentStatus::Open),
         ping_status: Some(wp_api::posts::PostPingStatus::Closed),
         format: Some(wp_api::posts::PostFormat::Standard),
-        meta: Some(PostMeta::new().with_footnotes(vec![
-            PostFootnote {
-                id: "fn1".to_string(),
-                content: "Footnote 1".to_string(),
-            },
-            PostFootnote {
-                id: "fn2".to_string(),
-                content: "Footnote 2".to_string(),
-            },
-        ])),
+        meta: Some(
+            PostMeta::new()
+                .with_footnotes(vec![
+                    PostFootnote {
+                        id: "fn1".to_string(),
+                        content: "Footnote 1".to_string(),
+                    },
+                    PostFootnote {
+                        id: "fn2".to_string(),
+                        content: "Footnote 2".to_string(),
+                    },
+                ])
+                .unwrap(),
+        ),
         sticky: Some(true),
         template: "custom-template.php".to_string(),
         categories: Some(vec![TermId(1), TermId(2), TermId(3)]),
