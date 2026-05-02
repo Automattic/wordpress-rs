@@ -8,9 +8,18 @@ enum TemplatePartRevisionsRequest {
     List,
     #[contextual_get(url = "/template-parts/<template_part_id>/revisions/<template_part_revision_id>", output = crate::template_part_revisions::SparseTemplatePartRevision, filter_by = crate::template_part_revisions::SparseTemplatePartRevisionField)]
     Retrieve,
+    #[delete(url = "/template-parts/<template_part_id>/revisions/<template_part_revision_id>", output = crate::template_part_revisions::TemplatePartRevisionDeleteResponse)]
+    Delete,
 }
 
 impl DerivedRequest for TemplatePartRevisionsRequest {
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        match self {
+            TemplatePartRevisionsRequest::Delete => vec![("force", "true".to_string())],
+            _ => vec![],
+        }
+    }
+
     fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
@@ -125,6 +134,17 @@ mod tests {
                 fields,
             ),
             expected_path,
+        );
+    }
+
+    #[rstest]
+    fn delete_template_part_revision(endpoint: TemplatePartRevisionsRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.delete(
+                &TemplatePartId("foo".to_string()),
+                &TemplatePartRevisionId(42),
+            ),
+            "/template-parts/foo/revisions/42?force=true",
         );
     }
 
