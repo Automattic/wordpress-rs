@@ -34,7 +34,7 @@
 - [x] `/wp/v2/templates/<id>/autosaves`
 - [x] `/wp/v2/template-parts`
 - [ ] `/wp/v2/template-parts/<id>/revisions`
-- [ ] `/wp/v2/template-parts/<id>/autosaves`
+- [x] `/wp/v2/template-parts/<id>/autosaves`
 
 ## Navigation & Menus
 
