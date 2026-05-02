@@ -24,6 +24,7 @@ pub mod search_endpoint;
 pub mod site_settings_endpoint;
 pub mod taxonomies_endpoint;
 pub mod template_autosaves_endpoint;
+pub mod template_part_autosaves_endpoint;
 pub mod template_parts_endpoint;
 pub mod template_revisions_endpoint;
 pub mod templates_endpoint;
