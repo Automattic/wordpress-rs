@@ -600,8 +600,8 @@ impl DBManager {
 
 fn url_candidates(url: &ParsedUrl) -> [String; 2] {
     let s = url.url();
-    if s.ends_with('/') {
-        let stripped = s[..s.len() - 1].to_string();
+    if let Some(stripped) = s.strip_suffix('/') {
+        let stripped = stripped.to_string();
         [s, stripped]
     } else {
         let with_slash = format!("{}/", s);

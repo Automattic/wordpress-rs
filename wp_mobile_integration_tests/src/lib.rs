@@ -63,6 +63,18 @@ pub fn create_test_context() -> TestContext {
     }
 }
 
+/// Count rows in a table filtered by `db_site_id`.
+pub fn count_rows_for_site(cache: &WpApiCache, table: &str, db_site_id: i64) -> usize {
+    cache.execute(|conn| {
+        let sql = format!("SELECT COUNT(*) FROM {} WHERE db_site_id = ?", table);
+        let mut stmt = conn.prepare(&sql).expect("Failed to prepare count query");
+        let count: i64 = stmt
+            .query_row([db_site_id], |row| row.get(0))
+            .expect("Failed to count rows");
+        count as usize
+    })
+}
+
 pub fn create_test_context_with_site(
     site_url: &str,
     username: &str,

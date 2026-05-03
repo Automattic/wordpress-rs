@@ -3,21 +3,8 @@ use wp_api::parsed_url::ParsedUrl;
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api::wp_com::WpComSiteId;
 use wp_mobile::filters::PostListFilter;
-use wp_mobile_cache::WpApiCache;
 use wp_mobile_cache::repository::sites::SiteRepository;
 use wp_mobile_integration_tests::*;
-
-/// Helper to count rows in a table filtered by db_site_id.
-fn count_rows_for_site(cache: &WpApiCache, table: &str, db_site_id: i64) -> usize {
-    cache.execute(|conn| {
-        let sql = format!("SELECT COUNT(*) FROM {} WHERE db_site_id = ?", table);
-        let mut stmt = conn.prepare(&sql).expect("Failed to prepare count query");
-        let count: i64 = stmt
-            .query_row([db_site_id], |row| row.get(0))
-            .expect("Failed to count rows");
-        count as usize
-    })
-}
 
 #[tokio::test]
 #[serial]
