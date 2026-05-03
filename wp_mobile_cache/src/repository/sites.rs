@@ -237,7 +237,16 @@ impl SiteRepository {
             }
         };
 
-        // Delete from sites table
+        // Explicitly delete entity_state rows — this table has no CASCADE
+        // constraint on db_site_id.
+        let sql = format!(
+            "DELETE FROM {} WHERE db_site_id = ?",
+            DbTable::EntityState.table_name()
+        );
+        tx.execute(&sql, [site.row_id])?;
+
+        // Delete from sites table (CASCADE removes posts, post types,
+        // term relationships, and list metadata)
         let sites_deleted = {
             let sql = format!(
                 "DELETE FROM {} WHERE rowid = ?",
@@ -250,20 +259,23 @@ impl SiteRepository {
         Ok(sites_deleted > 0)
     }
 
-    /// Delete a self-hosted site by URL (convenience wrapper).
+    /// Delete a self-hosted site by trying multiple URL candidates.
     ///
-    /// Returns `true` if a site was deleted, `false` if no site with that URL exists.
+    /// Useful when the caller's URL representation may differ from the stored
+    /// form (e.g. trailing slash normalization). Returns `true` if a site was
+    /// deleted, `false` if none of the candidates matched.
     pub fn delete_self_hosted_site_by_url(
         &self,
         transaction_manager: &mut impl TransactionManager,
-        url: &str,
+        url_candidates: &[String],
     ) -> Result<bool, SqliteDbError> {
-        let site_data = self.select_self_hosted_site_by_url(transaction_manager, url)?;
-
-        match site_data {
-            Some(full_entity) => self.delete_site(transaction_manager, &full_entity.data.0),
-            None => Ok(false),
+        for candidate in url_candidates {
+            let site_data = self.select_self_hosted_site_by_url(transaction_manager, candidate)?;
+            if let Some(full_entity) = site_data {
+                return self.delete_site(transaction_manager, &full_entity.data.0);
+            }
         }
+        Ok(false)
     }
 
     /// Upsert a WordPress.com site and return its EntityId (atomic transaction).
@@ -818,27 +830,46 @@ mod tests {
             api_root: "https://example.com/wp-json".to_string(),
         };
 
-        // Create site
         repo.upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
-        // Verify site exists
-        let before_delete = repo
-            .select_self_hosted_site_by_url(&test_conn, url)
-            .expect("Failed to select site by URL");
-        assert!(before_delete.is_some());
-
-        // Delete by URL
         let deleted = repo
-            .delete_self_hosted_site_by_url(&mut test_conn, url)
-            .expect("Failed to delete site by URL");
+            .delete_self_hosted_site_by_url(&mut test_conn, &[url.to_string(), format!("{}/", url)])
+            .expect("Failed to delete site");
         assert!(deleted, "Should return true when site is deleted");
 
-        // Verify site is gone
         let after_delete = repo
             .select_self_hosted_site_by_url(&test_conn, url)
             .expect("Failed to select site by URL");
         assert_eq!(after_delete, None, "Site should be deleted");
+    }
+
+    #[rstest]
+    fn test_delete_self_hosted_site_by_url_with_trailing_slash_mismatch(mut test_conn: Connection) {
+        let repo = SiteRepository;
+        // Store WITHOUT trailing slash
+        let site = SelfHostedSite {
+            url: "https://example.com".to_string(),
+            api_root: "https://example.com/wp-json".to_string(),
+        };
+
+        repo.upsert_self_hosted_site(&mut test_conn, &site)
+            .expect("Failed to upsert site");
+
+        // Delete WITH trailing slash first (as ParsedUrl would produce)
+        let deleted = repo
+            .delete_self_hosted_site_by_url(
+                &mut test_conn,
+                &[
+                    "https://example.com/".to_string(),
+                    "https://example.com".to_string(),
+                ],
+            )
+            .expect("Failed to delete site");
+        assert!(
+            deleted,
+            "Should find and delete site despite trailing slash mismatch"
+        );
     }
 
     #[rstest]
@@ -848,8 +879,14 @@ mod tests {
         let repo = SiteRepository;
 
         let deleted = repo
-            .delete_self_hosted_site_by_url(&mut test_conn, "https://non-existent.com")
-            .expect("Failed to delete site by URL");
+            .delete_self_hosted_site_by_url(
+                &mut test_conn,
+                &[
+                    "https://non-existent.com".to_string(),
+                    "https://non-existent.com/".to_string(),
+                ],
+            )
+            .expect("Failed to delete site");
         assert!(!deleted, "Should return false when site doesn't exist");
     }
 

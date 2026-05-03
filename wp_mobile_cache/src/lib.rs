@@ -1,10 +1,13 @@
 use rusqlite::hooks::Action;
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use crate::repository::entity_state::EntityStateRepository;
 use crate::repository::list_metadata::ListMetadataRepository;
+use crate::repository::sites::SiteRepository;
+use wp_api::parsed_url::ParsedUrl;
+use wp_api::wp_com::WpComSiteId;
 
 pub mod context;
 pub mod db_types;
@@ -347,6 +350,27 @@ impl WpApiCache {
             connection.update_hook(None::<fn(Action, &str, &str, i64)>);
         });
     }
+
+    /// Remove a self-hosted site and all its cached data from the database.
+    ///
+    /// Returns `true` if the site was found and removed, `false` if no site
+    /// with the given URL exists.
+    pub fn remove_self_hosted_site(&self, url: Arc<ParsedUrl>) -> Result<bool, SqliteDbError> {
+        let candidates = url_candidates(&url);
+        self.execute(|connection| {
+            SiteRepository.delete_self_hosted_site_by_url(connection, &candidates)
+        })
+    }
+
+    /// Remove a WordPress.com site and all its cached data from the database.
+    ///
+    /// Returns `true` if the site was found and removed, `false` if no site
+    /// with the given site ID exists.
+    pub fn remove_wordpress_com_site(&self, site_id: WpComSiteId) -> Result<bool, SqliteDbError> {
+        self.execute(|connection| {
+            SiteRepository.delete_wordpress_com_site_by_site_id(connection, site_id)
+        })
+    }
 }
 
 impl WpApiCache {
@@ -574,6 +598,17 @@ impl DBManager {
     }
 }
 
+fn url_candidates(url: &ParsedUrl) -> [String; 2] {
+    let s = url.url();
+    if let Some(stripped) = s.strip_suffix('/') {
+        let stripped = stripped.to_string();
+        [s, stripped]
+    } else {
+        let with_slash = format!("{}/", s);
+        [s, with_slash]
+    }
+}
+
 uniffi::setup_scaffolding!();
 
 #[cfg(test)]
@@ -750,6 +785,23 @@ mod tests {
         assert!(
             result.is_err(),
             "Expected error when migration index exceeds available migrations"
+        );
+    }
+
+    #[test]
+    fn test_url_candidates_with_trailing_slash() {
+        let url = ParsedUrl::parse("https://example.com/").unwrap();
+        let candidates = url_candidates(&url);
+        assert_eq!(candidates, ["https://example.com/", "https://example.com"]);
+    }
+
+    #[test]
+    fn test_url_candidates_without_trailing_slash() {
+        let url = ParsedUrl::parse("https://example.com/path").unwrap();
+        let candidates = url_candidates(&url);
+        assert_eq!(
+            candidates,
+            ["https://example.com/path", "https://example.com/path/"]
         );
     }
 }
