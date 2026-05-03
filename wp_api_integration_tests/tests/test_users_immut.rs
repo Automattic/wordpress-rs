@@ -1,8 +1,8 @@
 use reusable_test_cases::list_users_cases;
 use wp_api::users::{
     SparseUserFieldWithEditContext, SparseUserFieldWithEmbedContext,
-    SparseUserFieldWithViewContext, UserId, UserListParams, WpApiParamUsersHasPublishedPosts,
-    WpApiParamUsersOrderBy, WpApiParamUsersWho,
+    SparseUserFieldWithViewContext, UserCapability, UserId, UserListParams,
+    WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -152,6 +152,14 @@ async fn retrieve_legacy_admin_with_edit_context_parses() {
         .assert_response()
         .data;
     assert_eq!(user_id, user.id);
+    let administrator = UserCapability::Custom("administrator".to_string());
+    assert!(user.extra_capabilities.map.contains_key(&administrator));
+    assert!(user.capabilities.map.contains_key(&administrator));
+    // The string `"1"` is not boolean `true`, so `has_cap` reports false even though
+    // the legacy site treats this user as an administrator. Other admin caps come from
+    // the role's defaults (booleans), so they still answer true.
+    assert!(!user.extra_capabilities.has_cap(administrator));
+    assert!(user.capabilities.has_cap(UserCapability::EditPosts));
 }
 
 // Regression test for PR #1263: plugins like WPBakery call `WP_User::add_cap($cap, $grant)`
@@ -169,6 +177,16 @@ async fn retrieve_wpbakery_admin_with_edit_context_parses() {
         .assert_response()
         .data;
     assert_eq!(user_id, user.id);
+    let plugin_key = UserCapability::Custom("vc_access_rules_post_types".to_string());
+    assert!(user.extra_capabilities.map.contains_key(&plugin_key));
+    assert!(user.capabilities.map.contains_key(&plugin_key));
+    // String `"custom"` is not boolean `true`, so `has_cap` reports false on the plugin
+    // entry, while the boolean administrator role still answers true.
+    assert!(!user.capabilities.has_cap(plugin_key));
+    assert!(
+        user.extra_capabilities
+            .has_cap(UserCapability::Custom("administrator".to_string()))
+    );
 }
 
 #[tokio::test]
