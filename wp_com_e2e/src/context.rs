@@ -8,6 +8,7 @@ use wp_api::{
     wp_com::{WpComSiteId, client::WpComApiClient},
 };
 use wp_mobile::service::WpService;
+use wp_mobile::service::sites::SiteInfo;
 use wp_mobile_cache::WpApiCache;
 
 pub struct TestContext {
@@ -52,8 +53,14 @@ impl TestContext {
             .perform_migrations()
             .expect("Migrations should succeed");
 
-        let service = WpService::new_wordpress_com(WpComSiteId(site_id), delegate, cache.clone())
-            .expect("Failed to create WpService");
+        let service = WpService::new(
+            SiteInfo::WordPressCom {
+                site_id: WpComSiteId(site_id),
+            },
+            delegate,
+            cache.clone(),
+        )
+        .expect("Failed to create WpService");
 
         Self {
             client,

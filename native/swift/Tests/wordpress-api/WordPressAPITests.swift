@@ -43,8 +43,9 @@ struct WordPressAPITests {
     func testExample() async throws {
         let stubs = try createStubs()
         let api = try WordPressAPI(
-            apiUrlResolver: WpOrgSiteApiUrlResolver(
-                apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json")
+            siteInfo: .selfHosted(
+                siteUrl: ParsedUrl.parse(input: "https://wordpress.org"),
+                apiRoot: ParsedUrl.parse(input: "https://wordpress.org/wp-json")
             ),
             authenticationProvider: .none(),
             executor: stubs,
@@ -60,8 +61,9 @@ struct WordPressAPITests {
         let stubs = try createStubs()
         let counter = CounterMiddleware()
         let api = try WordPressAPI(
-            apiUrlResolver: WpOrgSiteApiUrlResolver(
-                apiRootUrl: ParsedUrl.parse(input: "https://wordpress.org/wp-json")
+            siteInfo: .selfHosted(
+                siteUrl: ParsedUrl.parse(input: "https://wordpress.org"),
+                apiRoot: ParsedUrl.parse(input: "https://wordpress.org/wp-json")
             ),
             authenticationProvider: .none(),
             executor: stubs,
@@ -75,8 +77,9 @@ struct WordPressAPITests {
     @Test
     func testRoot() async throws {
         let api = try WordPressAPI(
-            apiUrlResolver: WpOrgSiteApiUrlResolver(
-                apiRootUrl: ParsedUrl.parse(input: "https://vanilla.wpmt.co/wp-json")
+            siteInfo: .selfHosted(
+                siteUrl: ParsedUrl.parse(input: "https://vanilla.wpmt.co"),
+                apiRoot: ParsedUrl.parse(input: "https://vanilla.wpmt.co/wp-json")
             ),
             authenticationProvider: .none(),
             executor: WpRequestExecutor(urlSession: .shared),

@@ -7,7 +7,9 @@ import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
+import uniffi.wp_api.ParsedUrl
 import uniffi.wp_mobile.MockPostService
+import uniffi.wp_mobile.SiteInfo
 import uniffi.wp_mobile.WpService
 import rs.wordpress.cache.kotlin.WordPressApiCache
 
@@ -51,10 +53,15 @@ fun createTestServiceContext(): TestServiceContext {
     // Extract site URL by removing /wp-json suffix
     val siteUrl = apiRootUrl.removeSuffix("/wp-json")
 
+    val parsedSiteUrl = ParsedUrl.parse(siteUrl)
+    val parsedApiRoot = ParsedUrl.parse(apiRootUrl)
+
     // Create self-hosted service
-    val service = WpService.selfHosted(
-        siteUrl = siteUrl,
-        apiRoot = apiRootUrl,
+    val service = WpService(
+        siteInfo = SiteInfo.SelfHosted(
+            siteUrl = parsedSiteUrl,
+            apiRoot = parsedApiRoot
+        ),
         delegate = WpApiClientDelegate(
             authProvider,
             requestExecutor = WpRequestExecutor(emptyList(), NetworkAvailabilityProvider { true }),
@@ -64,11 +71,12 @@ fun createTestServiceContext(): TestServiceContext {
         cache = wordPressApiCache.cache
     )
 
-    // Create mock post service with shared cache
+    // Create mock post service with shared cache.
+    // Use the parsed URL strings to ensure URL normalization matches the WpService's DbSite.
     val mockPostService = MockPostService(
         wordPressApiCache.cache,
-        siteUrl,
-        apiRootUrl
+        parsedSiteUrl.url(),
+        parsedApiRoot.url()
     )
 
     return TestServiceContext(service, mockPostService)

@@ -11,6 +11,11 @@ func restoreTestServer() async throws {
 }
 
 extension TestCredentials {
+    var siteURL: ParsedUrl {
+        // swiftlint:disable:next force_try
+        try! ParsedUrl.parse(input: siteUrl)
+    }
+
     var apiRootURL: ParsedUrl {
         // swiftlint:disable:next force_try
         try! ParsedUrl.parse(input: siteUrl + "/wp-json")
@@ -27,7 +32,10 @@ extension WordPressAPI {
         return WordPressAPI(
             urlSession: .init(configuration: .ephemeral),
             notifyingDelegate: notifyingDelegate,
-            apiRootUrl: credentials.apiRootURL,
+            siteInfo: .selfHosted(
+                siteUrl: credentials.siteURL,
+                apiRoot: credentials.apiRootURL
+            ),
             authentication: credentials.adminAuthentication
         )
     }
