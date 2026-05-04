@@ -39,6 +39,7 @@ pub mod site_settings;
 pub mod ssl;
 pub mod taxonomies;
 pub mod template_autosaves;
+pub mod template_part_autosaves;
 pub mod template_parts;
 pub mod template_revisions;
 pub mod templates;

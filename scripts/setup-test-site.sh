@@ -298,6 +298,17 @@ create_test_credentials () {
   AUTOSAVE_TEMPLATE_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"autosave_content\"}" "http://localhost/wp-json/wp/v2/templates/$AUTOSAVED_TEMPLATE_ID/autosaves")"
   AUTOSAVE_ID_FOR_AUTOSAVED_TEMPLATE="$(echo "$AUTOSAVE_TEMPLATE_RESPONSE" | jq -r '.wp_id')"
 
+  echo "Setting up template part with autosave for integration tests.."
+  # Create template part via REST API as admin, then change author
+  AUTOSAVED_TEMPLATE_PART_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"AUTOSAVED_TEMPLATE_PART", "content": "Autosaved template part content", "area": "header"}' http://localhost/wp-json/wp/v2/template-parts)"
+  AUTOSAVED_TEMPLATE_PART_ID="$(echo "$AUTOSAVED_TEMPLATE_PART_RESPONSE" | jq -r '.id')"
+  AUTOSAVED_TEMPLATE_PART_WP_ID="$(echo "$AUTOSAVED_TEMPLATE_PART_RESPONSE" | jq -r '.wp_id')"
+  # Change author to author user to enable proper autosave behavior (different user required)
+  wp post update "$AUTOSAVED_TEMPLATE_PART_WP_ID" --post_author="$AUTHOR_USER_ID"
+  # Create autosave as admin user (different from template part author) and capture its ID
+  AUTOSAVE_TEMPLATE_PART_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"autosave_content\"}" "http://localhost/wp-json/wp/v2/template-parts/$AUTOSAVED_TEMPLATE_PART_ID/autosaves")"
+  AUTOSAVE_ID_FOR_AUTOSAVED_TEMPLATE_PART="$(echo "$AUTOSAVE_TEMPLATE_PART_RESPONSE" | jq -r '.wp_id')"
+
   rm -rf /app/test_credentials.json
   jo -p \
     site_url="$SITE_URL" \
@@ -322,6 +333,8 @@ create_test_credentials () {
     autosaved_template_id="$AUTOSAVED_TEMPLATE_ID" \
     autosave_id_for_autosaved_template="$AUTOSAVE_ID_FOR_AUTOSAVED_TEMPLATE" \
     integration_test_custom_template_part_id="$INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_ID" \
+    autosaved_template_part_id="$AUTOSAVED_TEMPLATE_PART_ID" \
+    autosave_id_for_autosaved_template_part="$AUTOSAVE_ID_FOR_AUTOSAVED_TEMPLATE_PART" \
     revision_id_for_custom_template="$REVISION_ID_FOR_CUSTOM_TEMPLATE" \
     revisioned_post_id="$REVISIONED_POST_ID" \
     revision_id_for_revisioned_post_id="$REVISION_ID_FOR_REVISIONED_POST_ID" \
