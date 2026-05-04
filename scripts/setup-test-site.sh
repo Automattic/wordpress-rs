@@ -183,6 +183,19 @@ create_test_credentials () {
   AUTHOR_USERNAME="test_author"
   AUTHOR_PASSWORD="$(wp user application-password create test_author test --porcelain)"
 
+  # Fixture admin users with `wp_capabilities` shapes that exercise non-bool capability values.
+  # These reproduce the deserialization failures fixed by PR #1263 (`capabilities`) and
+  # issue #1313 (`extra_capabilities`).
+  LEGACY_ADMIN_USERNAME="legacy_admin"
+  LEGACY_ADMIN_USER_ID="$(wp user create "$LEGACY_ADMIN_USERNAME" legacy_admin@example.com --role=administrator --porcelain)"
+  # Pre-2012 sites stored role assignments as the string "1" rather than boolean true.
+  wp eval "update_user_meta( $LEGACY_ADMIN_USER_ID, 'wp_capabilities', array( 'administrator' => '1' ) );"
+
+  WPBAKERY_ADMIN_USERNAME="wpbakery_admin"
+  WPBAKERY_ADMIN_USER_ID="$(wp user create "$WPBAKERY_ADMIN_USERNAME" wpbakery_admin@example.com --role=administrator --porcelain)"
+  # WPBakery and similar plugins call `WP_User::add_cap($cap, $grant)` with non-bool grants.
+  wp eval "update_user_meta( $WPBAKERY_ADMIN_USER_ID, 'wp_capabilities', array( 'administrator' => true, 'vc_access_rules_post_types' => 'custom' ) );"
+
   PASSWORD_PROTECTED_POST_ID="$(wp post create --post_type=post --post_password=INTEGRATION_TEST --post_title=Password_Protected --porcelain)"
   TRASHED_POST_ID="$(wp post create --post_type=post --post_title=Trashed_Post --porcelain)"
 
@@ -321,6 +334,8 @@ create_test_credentials () {
     subscriber_password_uuid="$SUBSCRIBER_PASSWORD_UUID" \
     author_username="$AUTHOR_USERNAME" \
     author_password="$AUTHOR_PASSWORD" \
+    legacy_admin_user_id="$LEGACY_ADMIN_USER_ID" \
+    wpbakery_admin_user_id="$WPBAKERY_ADMIN_USER_ID" \
     password_protected_post_id="$PASSWORD_PROTECTED_POST_ID" \
     password_protected_post_password="INTEGRATION_TEST" \
     password_protected_post_title="Password_Protected" \

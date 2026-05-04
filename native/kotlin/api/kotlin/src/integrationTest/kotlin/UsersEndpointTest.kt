@@ -28,8 +28,7 @@ class UsersEndpointTest {
         val userList =
             client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
                 .assertSuccessAndRetrieveData().data
-        // One of the test users don't have any posts or pages
-        assertEquals(NUMBER_OF_USERS - 1, userList.count())
+        assertEquals(NUMBER_OF_USERS_WITH_PUBLISHED_POSTS, userList.count())
     }
 
     @Test

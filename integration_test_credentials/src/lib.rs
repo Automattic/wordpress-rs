@@ -13,6 +13,8 @@ pub struct TestCredentials {
     pub subscriber_password_uuid: &'static str,
     pub author_username: &'static str,
     pub author_password: &'static str,
+    pub legacy_admin_user_id: i64,
+    pub wpbakery_admin_user_id: i64,
     pub password_protected_post_id: i64,
     pub password_protected_post_password: &'static str,
     pub password_protected_post_title: &'static str,
