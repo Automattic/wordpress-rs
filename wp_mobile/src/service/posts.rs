@@ -1423,7 +1423,7 @@ mod tests {
             .expect("Site creation")
             .db_site;
 
-        let cache = Arc::new(WpApiCache::from(conn));
+        let cache = Arc::new(WpApiCache::try_from(conn).expect("Cache creation should succeed"));
         let db_site_arc = Arc::new(db_site);
         PostService::new(api_client, db_site_arc, cache)
     }
@@ -1500,7 +1500,7 @@ mod tests {
             .db_site;
 
         // Setup: Create PostService with cache
-        let cache = Arc::new(WpApiCache::from(conn));
+        let cache = Arc::new(WpApiCache::try_from(conn).expect("Cache creation should succeed"));
         let db_site_arc = Arc::new(db_site);
         let post_service = PostService::new(mock_api_client, db_site_arc.clone(), cache.clone());
 

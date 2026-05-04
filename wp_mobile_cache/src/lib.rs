@@ -427,18 +427,20 @@ impl WpApiCache {
     }
 }
 
-impl From<Connection> for WpApiCache {
+impl TryFrom<Connection> for WpApiCache {
+    type Error = SqliteDbError;
+
     /// Create a WpApiCache from an existing connection.
     ///
     /// This is typically used in tests to create a cache from an already-migrated
     /// in-memory database connection.
-    fn from(connection: Connection) -> Self {
-        register_url_functions(&connection).expect("Registering URL SQL functions should succeed");
-        Self {
+    fn try_from(connection: Connection) -> Result<Self, Self::Error> {
+        register_url_functions(&connection)?;
+        Ok(Self {
             inner: DBManager {
                 connection: Mutex::new(connection),
             },
-        }
+        })
     }
 }
 
