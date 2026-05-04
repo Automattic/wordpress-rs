@@ -692,7 +692,7 @@ mod tests {
             .expect("Site creation should succeed")
             .db_site;
 
-        let cache = Arc::new(WpApiCache::from(conn));
+        let cache = Arc::new(WpApiCache::try_from(conn).expect("Cache creation should succeed"));
         let db_site = Arc::new(db_site);
         let service = MetadataService::new(db_site, cache.clone());
 

@@ -71,6 +71,7 @@ Test credentials are configured in:
 ## Development Tips
 
 - Platform bindings are generated automatically - don't edit generated files directly
+- For URL columns in the `wp_mobile_cache` database (e.g. `self_hosted_sites.url`), compare with the `urls_eq(a, b)` scalar function rather than `=`. It compares via `ParsedUrl` parsing, so lookups tolerate trailing-slash and other URL-normalization differences.
 
 ## PR Description Format
 

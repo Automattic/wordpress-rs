@@ -1,3 +1,4 @@
+use rusqlite::functions::FunctionFlags;
 use rusqlite::hooks::Action;
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
@@ -356,9 +357,13 @@ impl WpApiCache {
     /// Returns `true` if the site was found and removed, `false` if no site
     /// with the given URL exists.
     pub fn remove_self_hosted_site(&self, url: Arc<ParsedUrl>) -> Result<bool, SqliteDbError> {
-        let candidates = url_candidates(&url);
         self.execute(|connection| {
-            SiteRepository.delete_self_hosted_site_by_url(connection, &candidates)
+            let Some(full_entity) =
+                SiteRepository.select_self_hosted_site_by_url(connection, &url.url())?
+            else {
+                return Ok(false);
+            };
+            SiteRepository.delete_site(connection, &full_entity.data.0)
         })
     }
 
@@ -422,17 +427,20 @@ impl WpApiCache {
     }
 }
 
-impl From<Connection> for WpApiCache {
+impl TryFrom<Connection> for WpApiCache {
+    type Error = SqliteDbError;
+
     /// Create a WpApiCache from an existing connection.
     ///
     /// This is typically used in tests to create a cache from an already-migrated
     /// in-memory database connection.
-    fn from(connection: Connection) -> Self {
-        Self {
+    fn try_from(connection: Connection) -> Result<Self, Self::Error> {
+        register_url_functions(&connection)?;
+        Ok(Self {
             inner: DBManager {
                 connection: Mutex::new(connection),
             },
-        }
+        })
     }
 }
 
@@ -458,6 +466,11 @@ pub struct MigrationManager<'a> {
 
 impl<'a> MigrationManager<'a> {
     pub fn new(connection: &'a Connection) -> Result<Self, SqliteDbError> {
+        // Cover raw-connection paths that bypass WpApiCache construction
+        // (test fixtures that hand a Connection straight to the repository
+        // layer). The registration is idempotent, so connections that were
+        // already prepared by DBManager / From<Connection> are unaffected.
+        register_url_functions(connection)?;
         Ok(Self { connection })
     }
 
@@ -592,21 +605,42 @@ impl DBManager {
             Connection::open_in_memory()?
         };
 
+        register_url_functions(&connection)?;
+
         Ok(Self {
             connection: Mutex::new(connection),
         })
     }
 }
 
-fn url_candidates(url: &ParsedUrl) -> [String; 2] {
-    let s = url.url();
-    if let Some(stripped) = s.strip_suffix('/') {
-        let stripped = stripped.to_string();
-        [s, stripped]
-    } else {
-        let with_slash = format!("{}/", s);
-        [s, with_slash]
-    }
+/// Register custom SQL functions on the given connection.
+///
+/// Currently registers `urls_eq(a, b)`: a deterministic, UTF-8 scalar that
+/// reports semantic URL equivalence (per `ParsedUrl == ParsedUrl`), with a
+/// raw-string fallback when either side fails to parse.
+///
+/// Why: the `self_hosted_sites.url` column may legitimately hold either
+/// `http://example.com` or `http://example.com/` depending on whether it
+/// was inserted before or after `ParsedUrl`-based normalization landed
+/// (see PR #1239). Lookups must tolerate either shape without forcing a
+/// data migration on existing user caches.
+pub(crate) fn register_url_functions(conn: &Connection) -> SqliteResult<()> {
+    conn.create_scalar_function(
+        "urls_eq",
+        2,
+        FunctionFlags::SQLITE_DETERMINISTIC | FunctionFlags::SQLITE_UTF8,
+        |ctx| {
+            let a: String = ctx.get(0)?;
+            let b: String = ctx.get(1)?;
+            if a == b {
+                return Ok(true);
+            }
+            Ok(match (ParsedUrl::parse(&a), ParsedUrl::parse(&b)) {
+                (Ok(parsed_a), Ok(parsed_b)) => parsed_a == parsed_b,
+                _ => false,
+            })
+        },
+    )
 }
 
 uniffi::setup_scaffolding!();
@@ -789,19 +823,71 @@ mod tests {
     }
 
     #[test]
-    fn test_url_candidates_with_trailing_slash() {
-        let url = ParsedUrl::parse("https://example.com/").unwrap();
-        let candidates = url_candidates(&url);
-        assert_eq!(candidates, ["https://example.com/", "https://example.com"]);
+    fn test_urls_eq_matches_across_trailing_slash() {
+        let conn = Connection::open_in_memory().unwrap();
+        register_url_functions(&conn).unwrap();
+
+        for (a, b) in [
+            ("https://example.com", "https://example.com/"),
+            ("https://example.com/", "https://example.com"),
+            ("https://example.com", "https://example.com"),
+        ] {
+            let result: bool = conn
+                .query_row("SELECT urls_eq(?, ?)", [a, b], |row| row.get(0))
+                .unwrap();
+            assert!(result, "{a:?} should equal {b:?}");
+        }
     }
 
     #[test]
-    fn test_url_candidates_without_trailing_slash() {
-        let url = ParsedUrl::parse("https://example.com/path").unwrap();
-        let candidates = url_candidates(&url);
-        assert_eq!(
-            candidates,
-            ["https://example.com/path", "https://example.com/path/"]
-        );
+    fn test_urls_eq_is_case_insensitive_in_scheme_and_host() {
+        let conn = Connection::open_in_memory().unwrap();
+        register_url_functions(&conn).unwrap();
+
+        let result: bool = conn
+            .query_row(
+                "SELECT urls_eq(?, ?)",
+                ["http://localhost", "HTTP://LOCALHOST"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_urls_eq_returns_false_for_different_hosts() {
+        let conn = Connection::open_in_memory().unwrap();
+        register_url_functions(&conn).unwrap();
+
+        let result: bool = conn
+            .query_row(
+                "SELECT urls_eq(?, ?)",
+                ["https://example.com", "https://other.example.com"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_urls_eq_falls_back_to_string_equality_for_unparseable_input() {
+        let conn = Connection::open_in_memory().unwrap();
+        register_url_functions(&conn).unwrap();
+
+        let same: bool = conn
+            .query_row("SELECT urls_eq(?, ?)", ["not a url", "not a url"], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert!(same, "identical unparseable strings should match");
+
+        let different: bool = conn
+            .query_row(
+                "SELECT urls_eq(?, ?)",
+                ["not a url", "also not a url"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!different, "distinct unparseable strings should not match");
     }
 }
