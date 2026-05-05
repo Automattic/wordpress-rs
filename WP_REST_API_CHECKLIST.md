@@ -33,8 +33,9 @@
 - [x] `/wp/v2/templates/<id>/revisions`
 - [x] `/wp/v2/templates/<id>/autosaves`
 - [x] `/wp/v2/template-parts`
-- [ ] `/wp/v2/template-parts/<id>/revisions`
+- [x] `/wp/v2/template-parts/<id>/revisions`
 - [x] `/wp/v2/template-parts/<id>/autosaves`
+>>>>>>> 84922b70 (Add `/template-parts/<id>/revisions` to changelog and checklist)
 
 ## Navigation & Menus
 
