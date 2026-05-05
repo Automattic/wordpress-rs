@@ -11,6 +11,7 @@ use crate::{
             application_passwords_endpoint::{
                 ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
             },
+            block_types_endpoint::{BlockTypesRequestBuilder, BlockTypesRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
             menu_locations_endpoint::{MenuLocationsRequestBuilder, MenuLocationsRequestExecutor},
@@ -66,6 +67,7 @@ use std::sync::Arc;
 pub struct WpApiRequestBuilder {
     api_root: Arc<ApiRootRequestBuilder>,
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
+    block_types: Arc<BlockTypesRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
     media: Arc<MediaRequestBuilder>,
@@ -109,6 +111,7 @@ impl WpApiRequestBuilder {
             auth_provider;
             api_root,
             application_passwords,
+            block_types,
             autosaves,
             comments,
             media,
@@ -162,6 +165,7 @@ impl UniffiWpApiClient {
 pub struct WpApiClient {
     api_root: Arc<ApiRootRequestExecutor>,
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
+    block_types: Arc<BlockTypesRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
     media: Arc<MediaRequestExecutor>,
@@ -202,6 +206,7 @@ impl WpApiClient {
             delegate;
             api_root,
             application_passwords,
+            block_types,
             autosaves,
             comments,
             media,
@@ -252,6 +257,7 @@ pub trait IsWpApiClientDelegate {
 
 api_client_generate_endpoint_impl!(WpApi, api_root);
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
+api_client_generate_endpoint_impl!(WpApi, block_types);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, comments);
 api_client_generate_endpoint_impl!(WpApi, media);

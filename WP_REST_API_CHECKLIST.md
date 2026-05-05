@@ -17,7 +17,7 @@
 
 ## Block Editor Endpoints
 
-- [ ] `/wp/v2/block-types`
+- [x] `/wp/v2/block-types`
 - [ ] `/wp/v2/blocks`
 - [ ] `/wp/v2/blocks/<id>/revisions`
 - [ ] `/wp/v2/blocks/<id>/autosaves`
