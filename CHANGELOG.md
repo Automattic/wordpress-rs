@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Template Part Revisions](https://developer.wordpress.org/rest-api/reference/wp_template_part-revisions/) endpoint
 - WordPress.com Publicize endpoints (`/sites/<site>/publicize/connections` and `/sites/<site>/publicize/services`) for listing, creating, updating, and deleting Jetpack Social connections
 - WordPress.com `/me/connections` (keyring) endpoint for listing third-party OAuth connections used by Jetpack Social
+- WordPress.com `/products` endpoint
 - `WpApiCache` APIs to remove cached data for a self-hosted site (by URL) or a WordPress.com site (by site ID), with matching Swift wrappers on `WordPressApiCache`
 - `WpDerivedRequest` now supports plain `get` requests
 - `WpDerivedRequest` now supports `additional_query_pairs`

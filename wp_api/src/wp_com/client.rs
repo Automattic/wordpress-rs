@@ -7,6 +7,7 @@ use super::endpoint::{
     me_connections_endpoint::{MeConnectionsRequestBuilder, MeConnectionsRequestExecutor},
     me_endpoint::{MeRequestBuilder, MeRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
+    products_endpoint::{ProductsRequestBuilder, ProductsRequestExecutor},
     publicize_endpoint::{PublicizeRequestBuilder, PublicizeRequestExecutor},
     stats_city_views_endpoint::{StatsCityViewsRequestBuilder, StatsCityViewsRequestExecutor},
     stats_clicks_endpoint::{StatsClicksRequestBuilder, StatsClicksRequestExecutor},
@@ -74,6 +75,7 @@ pub struct WpComApiRequestBuilder {
     me: Arc<MeRequestBuilder>,
     me_connections: Arc<MeConnectionsRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
+    products: Arc<ProductsRequestBuilder>,
     publicize: Arc<PublicizeRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
@@ -117,6 +119,7 @@ impl WpComApiRequestBuilder {
             me,
             me_connections,
             oauth2,
+            products,
             publicize,
             sites,
             stats_city_views,
@@ -171,6 +174,7 @@ pub struct WpComApiClient {
     me: Arc<MeRequestExecutor>,
     me_connections: Arc<MeConnectionsRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
+    products: Arc<ProductsRequestExecutor>,
     publicize: Arc<PublicizeRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
@@ -215,6 +219,7 @@ impl WpComApiClient {
             me,
             me_connections,
             oauth2,
+            products,
             publicize,
             sites,
             stats_city_views,
@@ -252,6 +257,7 @@ api_client_generate_endpoint_impl!(WpComApi, languages);
 api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, me_connections);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
+api_client_generate_endpoint_impl!(WpComApi, products);
 api_client_generate_endpoint_impl!(WpComApi, publicize);
 api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);

@@ -8,6 +8,7 @@ mod context;
 mod domains_tests;
 mod languages_tests;
 mod me_tests;
+mod products_tests;
 mod sites_tests;
 mod stats_city_views_tests;
 mod stats_country_views_tests;
@@ -67,6 +68,7 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(stats_subscribers_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_top_posts_tests::tests(Arc::clone(&ctx)));
     tests.extend(subscribers_by_user_type_tests::tests(Arc::clone(&ctx)));
+    tests.extend(products_tests::tests(Arc::clone(&ctx)));
     tests.extend(wp_service_tests::tests(Arc::clone(&ctx)));
     tests
 }

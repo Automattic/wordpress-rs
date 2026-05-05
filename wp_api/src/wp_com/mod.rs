@@ -12,6 +12,7 @@ pub mod language;
 pub mod me;
 pub mod me_connections;
 pub mod oauth2;
+pub mod products;
 pub mod publicize;
 pub mod segments;
 pub mod sites;
@@ -55,6 +56,34 @@ impl std::fmt::Display for WpComSiteId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
+}
+
+uniffi::custom_newtype!(CurrencyCode, String);
+/// ISO 4217 currency code (e.g. `"USD"`, `"TRY"`, `"EUR"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct CurrencyCode(pub String);
+
+impl std::fmt::Display for CurrencyCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Unit of a time span in the billing system.
+///
+/// Corresponds to the backend's `Time_Span_Unit` enum.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum TimeSpanUnit {
+    Day,
+    Week,
+    Month,
+    Year,
+    Indefinite,
+    /// A unit not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
 }
 
 pub(crate) enum WpComNamespace {
