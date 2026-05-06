@@ -27,7 +27,7 @@
 ## Block Patterns & Templates
 
 - [x] `/wp/v2/block-patterns/patterns`
-- [ ] `/wp/v2/block-patterns/categories`
+- [x] `/wp/v2/block-patterns/categories`
 - [ ] `/wp/v2/pattern-directory/patterns`
 - [x] `/wp/v2/templates`
 - [x] `/wp/v2/templates/<id>/revisions`
@@ -35,7 +35,6 @@
 - [x] `/wp/v2/template-parts`
 - [x] `/wp/v2/template-parts/<id>/revisions`
 - [x] `/wp/v2/template-parts/<id>/autosaves`
->>>>>>> 84922b70 (Add `/template-parts/<id>/revisions` to changelog and checklist)
 
 ## Navigation & Menus
 

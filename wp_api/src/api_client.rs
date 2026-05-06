@@ -14,6 +14,9 @@ use crate::{
             block_directory_endpoint::{
                 BlockDirectoryRequestBuilder, BlockDirectoryRequestExecutor,
             },
+            block_pattern_categories_endpoint::{
+                BlockPatternCategoriesRequestBuilder, BlockPatternCategoriesRequestExecutor,
+            },
             block_patterns_endpoint::{BlockPatternsRequestBuilder, BlockPatternsRequestExecutor},
             block_types_endpoint::{BlockTypesRequestBuilder, BlockTypesRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
@@ -72,6 +75,7 @@ pub struct WpApiRequestBuilder {
     api_root: Arc<ApiRootRequestBuilder>,
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
     block_directory: Arc<BlockDirectoryRequestBuilder>,
+    block_pattern_categories: Arc<BlockPatternCategoriesRequestBuilder>,
     block_patterns: Arc<BlockPatternsRequestBuilder>,
     block_types: Arc<BlockTypesRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
@@ -118,6 +122,7 @@ impl WpApiRequestBuilder {
             api_root,
             application_passwords,
             block_directory,
+            block_pattern_categories,
             block_patterns,
             block_types,
             autosaves,
@@ -174,6 +179,7 @@ pub struct WpApiClient {
     api_root: Arc<ApiRootRequestExecutor>,
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
     block_directory: Arc<BlockDirectoryRequestExecutor>,
+    block_pattern_categories: Arc<BlockPatternCategoriesRequestExecutor>,
     block_patterns: Arc<BlockPatternsRequestExecutor>,
     block_types: Arc<BlockTypesRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
@@ -217,6 +223,7 @@ impl WpApiClient {
             api_root,
             application_passwords,
             block_directory,
+            block_pattern_categories,
             block_patterns,
             block_types,
             autosaves,
@@ -270,6 +277,7 @@ pub trait IsWpApiClientDelegate {
 api_client_generate_endpoint_impl!(WpApi, api_root);
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
 api_client_generate_endpoint_impl!(WpApi, block_directory);
+api_client_generate_endpoint_impl!(WpApi, block_pattern_categories);
 api_client_generate_endpoint_impl!(WpApi, block_patterns);
 api_client_generate_endpoint_impl!(WpApi, block_types);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
