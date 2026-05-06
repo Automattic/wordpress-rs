@@ -11,6 +11,7 @@ use crate::{
             application_passwords_endpoint::{
                 ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
             },
+            block_patterns_endpoint::{BlockPatternsRequestBuilder, BlockPatternsRequestExecutor},
             block_types_endpoint::{BlockTypesRequestBuilder, BlockTypesRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
@@ -67,6 +68,7 @@ use std::sync::Arc;
 pub struct WpApiRequestBuilder {
     api_root: Arc<ApiRootRequestBuilder>,
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
+    block_patterns: Arc<BlockPatternsRequestBuilder>,
     block_types: Arc<BlockTypesRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
@@ -111,6 +113,7 @@ impl WpApiRequestBuilder {
             auth_provider;
             api_root,
             application_passwords,
+            block_patterns,
             block_types,
             autosaves,
             comments,
@@ -165,6 +168,7 @@ impl UniffiWpApiClient {
 pub struct WpApiClient {
     api_root: Arc<ApiRootRequestExecutor>,
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
+    block_patterns: Arc<BlockPatternsRequestExecutor>,
     block_types: Arc<BlockTypesRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
@@ -206,6 +210,7 @@ impl WpApiClient {
             delegate;
             api_root,
             application_passwords,
+            block_patterns,
             block_types,
             autosaves,
             comments,
@@ -257,6 +262,7 @@ pub trait IsWpApiClientDelegate {
 
 api_client_generate_endpoint_impl!(WpApi, api_root);
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
+api_client_generate_endpoint_impl!(WpApi, block_patterns);
 api_client_generate_endpoint_impl!(WpApi, block_types);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, comments);
