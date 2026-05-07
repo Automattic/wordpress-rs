@@ -14,6 +14,7 @@ pub mod api_client;
 pub mod api_error;
 pub mod application_passwords;
 pub mod auth;
+pub mod block_directory;
 pub mod block_patterns;
 pub mod block_types;
 pub mod comments;

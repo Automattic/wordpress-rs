@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [Block Directory Items](https://developer.wordpress.org/rest-api/reference/block-directory-items/) endpoint
 - [Block Patterns](https://developer.wordpress.org/rest-api/reference/block-patterns/) endpoint
 - [Block Types](https://developer.wordpress.org/rest-api/reference/block-types/) endpoint
 
