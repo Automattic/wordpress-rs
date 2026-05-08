@@ -22,7 +22,7 @@
 - [ ] `/wp/v2/blocks/<id>/revisions`
 - [ ] `/wp/v2/blocks/<id>/autosaves`
 - [ ] `/wp/v2/block-renderer/<id>`
-- [ ] `/wp/v2/block-directory/search`
+- [x] `/wp/v2/block-directory/search`
 
 ## Block Patterns & Templates
 
