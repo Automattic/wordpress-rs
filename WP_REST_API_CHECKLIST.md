@@ -26,7 +26,7 @@
 
 ## Block Patterns & Templates
 
-- [ ] `/wp/v2/block-patterns/patterns`
+- [x] `/wp/v2/block-patterns/patterns`
 - [ ] `/wp/v2/block-patterns/categories`
 - [ ] `/wp/v2/pattern-directory/patterns`
 - [x] `/wp/v2/templates`
