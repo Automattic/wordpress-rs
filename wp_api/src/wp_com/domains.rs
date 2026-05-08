@@ -2,7 +2,7 @@ use crate::{
     decimal2::Decimal2,
     impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::{CurrencyCode, WpComSiteId, segments::SegmentId},
+    wp_com::{CurrencyCode, WpComSiteId, products::ProductId, segments::SegmentId},
 };
 use serde::{Deserialize, Serialize};
 
@@ -116,7 +116,7 @@ pub struct PaidDomainSuggestion {
     /// Whether the domain supports multi-year registrations.
     pub multi_year_reg_allowed: bool,
     /// WordPress.com product ID used to purchase this domain.
-    pub product_id: u64,
+    pub product_id: ProductId,
     /// WordPress.com product slug used to purchase this domain.
     pub product_slug: String,
     /// Formatted registration cost (e.g. `"$18.00"`).
@@ -228,7 +228,7 @@ pub struct DomainAvailability {
     pub root_domain_provider: String,
     // -- Product/pricing fields (conditional on status) --
     /// WordPress.com product ID for purchasing this domain.
-    pub product_id: Option<u64>,
+    pub product_id: Option<ProductId>,
     /// WordPress.com product slug (e.g. `"domain_reg"`,
     /// `"domain_transfer"`).
     pub product_slug: Option<String>,
@@ -472,7 +472,7 @@ mod tests {
         );
         assert_eq!(first.max_reg_years, 10);
         assert!(first.multi_year_reg_allowed);
-        assert_eq!(first.product_id, 6);
+        assert_eq!(first.product_id, ProductId(6));
         assert_eq!(first.product_slug, "domain_reg");
         assert_eq!(first.cost, "$18.00");
         assert_eq!(first.renew_cost, "$18.00");
@@ -733,7 +733,7 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert_eq!(availability.product_id, Some(6));
+        assert_eq!(availability.product_id, Some(ProductId(6)));
         assert_eq!(availability.product_slug.as_deref(), Some("domain_reg"));
         assert_eq!(availability.cost.as_deref(), Some("$18.00"));
         assert_eq!(availability.renew_cost.as_deref(), Some("$18.00"));
@@ -785,7 +785,7 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert_eq!(availability.product_id, Some(1337));
+        assert_eq!(availability.product_id, Some(ProductId(1337)));
         assert_eq!(
             availability.product_slug.as_deref(),
             Some("domain_transfer")
