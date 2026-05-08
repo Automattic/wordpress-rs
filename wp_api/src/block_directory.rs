@@ -1,5 +1,6 @@
 use crate::{
     SparseField,
+    date::WpGmtDateTime,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,7 @@ pub struct SparseBlockDirectoryItem {
     pub author_block_count: Option<i64>,
     pub author: Option<String>,
     pub icon: Option<String>,
-    pub last_updated: Option<String>,
+    pub last_updated: Option<WpGmtDateTime>,
     pub humanized_updated: Option<String>,
 }
 
@@ -34,7 +35,7 @@ pub struct BlockDirectoryItem {
     pub author_block_count: i64,
     pub author: String,
     pub icon: String,
-    pub last_updated: String,
+    pub last_updated: WpGmtDateTime,
     pub humanized_updated: String,
 }
 
