@@ -9,7 +9,7 @@ class BlockPatternCategoriesEndpointTest {
     @Test
     fun testBlockPatternCategoryListRequest() = runTest {
         val categories = client.request { requestBuilder ->
-            requestBuilder.blockPatternCategories().list()
+            requestBuilder.blockPatternCategories().listWithEditContext()
         }.assertSuccessAndRetrieveData().data
         assert(categories.isNotEmpty())
     }
