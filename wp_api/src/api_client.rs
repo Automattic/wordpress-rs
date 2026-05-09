@@ -21,6 +21,7 @@ use crate::{
             block_types_endpoint::{BlockTypesRequestBuilder, BlockTypesRequestExecutor},
             blocks_endpoint::{BlocksRequestBuilder, BlocksRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
+            global_styles_endpoint::{GlobalStylesRequestBuilder, GlobalStylesRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
             menu_locations_endpoint::{MenuLocationsRequestBuilder, MenuLocationsRequestExecutor},
             nav_menu_item_autosaves_endpoint::{
@@ -85,6 +86,7 @@ pub struct WpApiRequestBuilder {
     blocks: Arc<BlocksRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
+    global_styles: Arc<GlobalStylesRequestBuilder>,
     media: Arc<MediaRequestBuilder>,
     menu_locations: Arc<MenuLocationsRequestBuilder>,
     nav_menu_item_autosaves: Arc<NavMenuItemAutosavesRequestBuilder>,
@@ -134,6 +136,7 @@ impl WpApiRequestBuilder {
             blocks,
             autosaves,
             comments,
+            global_styles,
             media,
             menu_locations,
             nav_menu_item_autosaves,
@@ -193,6 +196,7 @@ pub struct WpApiClient {
     blocks: Arc<BlocksRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
+    global_styles: Arc<GlobalStylesRequestExecutor>,
     media: Arc<MediaRequestExecutor>,
     menu_locations: Arc<MenuLocationsRequestExecutor>,
     nav_menu_item_autosaves: Arc<NavMenuItemAutosavesRequestExecutor>,
@@ -239,6 +243,7 @@ impl WpApiClient {
             blocks,
             autosaves,
             comments,
+            global_styles,
             media,
             menu_locations,
             nav_menu_item_autosaves,
@@ -295,6 +300,7 @@ api_client_generate_endpoint_impl!(WpApi, block_types);
 api_client_generate_endpoint_impl!(WpApi, blocks);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, comments);
+api_client_generate_endpoint_impl!(WpApi, global_styles);
 api_client_generate_endpoint_impl!(WpApi, media);
 api_client_generate_endpoint_impl!(WpApi, menu_locations);
 api_client_generate_endpoint_impl!(WpApi, nav_menu_item_autosaves);

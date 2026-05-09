@@ -11,6 +11,7 @@ pub mod block_patterns_endpoint;
 pub mod block_types_endpoint;
 pub mod blocks_endpoint;
 pub mod comments_endpoint;
+pub mod global_styles_endpoint;
 pub mod media_endpoint;
 pub mod menu_locations_endpoint;
 pub mod nav_menu_item_autosaves_endpoint;

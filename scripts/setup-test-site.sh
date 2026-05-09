@@ -335,6 +335,9 @@ create_test_credentials () {
   AUTOSAVE_TEMPLATE_PART_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"autosave_content\"}" "http://localhost/wp-json/wp/v2/template-parts/$AUTOSAVED_TEMPLATE_PART_ID/autosaves")"
   AUTOSAVE_ID_FOR_AUTOSAVED_TEMPLATE_PART="$(echo "$AUTOSAVE_TEMPLATE_PART_RESPONSE" | jq -r '.wp_id')"
 
+  echo "Getting global styles ID for integration tests.."
+  GLOBAL_STYLES_ID="$(wp eval 'echo WP_Theme_JSON_Resolver::get_user_global_styles_post_id();')"
+
   rm -rf /app/test_credentials.json
   jo -p \
     site_url="$SITE_URL" \
@@ -387,6 +390,7 @@ create_test_credentials () {
     autosaved_navigation_id="$AUTOSAVED_NAVIGATION_ID" \
     autosave_id_for_autosaved_navigation_id="$AUTOSAVE_ID_FOR_AUTOSAVED_NAVIGATION_ID" \
     block_id="$BLOCK_ID" \
+    global_styles_id="$GLOBAL_STYLES_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials
