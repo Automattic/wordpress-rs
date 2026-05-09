@@ -323,6 +323,8 @@ pub enum WpErrorCode {
     NoSearchTermDefined,
     #[serde(rename = "rest_orderby_include_missing_include")]
     OrderbyIncludeMissingInclude,
+    #[serde(rename = "rest_pattern_directory_cannot_view")]
+    PatternDirectoryCannotView,
     #[serde(rename = "rest_plugin_not_found")]
     PluginNotFound,
     #[serde(rename = "rest_post_incorrect_password")]

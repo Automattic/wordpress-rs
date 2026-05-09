@@ -34,6 +34,9 @@ use crate::{
                 NavigationRevisionsRequestBuilder, NavigationRevisionsRequestExecutor,
             },
             navigations_endpoint::{NavigationsRequestBuilder, NavigationsRequestExecutor},
+            pattern_directory_endpoint::{
+                PatternDirectoryRequestBuilder, PatternDirectoryRequestExecutor,
+            },
             plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
             post_autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             post_revisions_endpoint::{PostRevisionsRequestBuilder, PostRevisionsRequestExecutor},
@@ -88,6 +91,7 @@ pub struct WpApiRequestBuilder {
     navigation_autosaves: Arc<NavigationAutosavesRequestBuilder>,
     navigation_revisions: Arc<NavigationRevisionsRequestBuilder>,
     navigations: Arc<NavigationsRequestBuilder>,
+    pattern_directory: Arc<PatternDirectoryRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_revisions: Arc<PostRevisionsRequestBuilder>,
     post_statuses: Arc<PostStatusesRequestBuilder>,
@@ -135,6 +139,7 @@ impl WpApiRequestBuilder {
             navigation_autosaves,
             navigation_revisions,
             navigations,
+            pattern_directory,
             plugins,
             post_revisions,
             post_statuses,
@@ -192,6 +197,7 @@ pub struct WpApiClient {
     navigation_autosaves: Arc<NavigationAutosavesRequestExecutor>,
     navigation_revisions: Arc<NavigationRevisionsRequestExecutor>,
     navigations: Arc<NavigationsRequestExecutor>,
+    pattern_directory: Arc<PatternDirectoryRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_revisions: Arc<PostRevisionsRequestExecutor>,
     post_statuses: Arc<PostStatusesRequestExecutor>,
@@ -236,6 +242,7 @@ impl WpApiClient {
             navigation_autosaves,
             navigation_revisions,
             navigations,
+            pattern_directory,
             plugins,
             post_revisions,
             post_statuses,
@@ -290,6 +297,7 @@ api_client_generate_endpoint_impl!(WpApi, nav_menus);
 api_client_generate_endpoint_impl!(WpApi, navigation_autosaves);
 api_client_generate_endpoint_impl!(WpApi, navigation_revisions);
 api_client_generate_endpoint_impl!(WpApi, navigations);
+api_client_generate_endpoint_impl!(WpApi, pattern_directory);
 api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_revisions);
 api_client_generate_endpoint_impl!(WpApi, post_statuses);
