@@ -8,9 +8,21 @@ enum BlocksRequest {
     List,
     #[contextual_get(url = "/blocks/<block_id>", params = &BlockRetrieveParams, output = crate::blocks::SparseBlock, filter_by = crate::blocks::SparseBlockField)]
     Retrieve,
+    #[delete(url = "/blocks/<block_id>", output = crate::blocks::BlockDeleteResponse)]
+    Delete,
+    #[delete(url = "/blocks/<block_id>", output = crate::blocks::BlockWithEditContext)]
+    Trash,
 }
 
 impl DerivedRequest for BlocksRequest {
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        match self {
+            BlocksRequest::Delete => vec![("force", true.to_string())],
+            BlocksRequest::Trash => vec![("force", false.to_string())],
+            _ => vec![],
+        }
+    }
+
     fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
@@ -117,6 +129,16 @@ mod tests {
             endpoint.retrieve_with_view_context(&BlockId(54), &params),
             &expected_path("view"),
         );
+    }
+
+    #[rstest]
+    fn delete_block(endpoint: BlocksRequestEndpoint) {
+        validate_wp_v2_endpoint(endpoint.delete(&BlockId(54)), "/blocks/54?force=true");
+    }
+
+    #[rstest]
+    fn trash_block(endpoint: BlocksRequestEndpoint) {
+        validate_wp_v2_endpoint(endpoint.trash(&BlockId(54)), "/blocks/54?force=false");
     }
 
     #[fixture]
