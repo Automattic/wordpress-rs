@@ -14,6 +14,8 @@ enum BlocksRequest {
     Delete,
     #[delete(url = "/blocks/<block_id>", output = crate::blocks::BlockWithEditContext)]
     Trash,
+    #[post(url = "/blocks/<block_id>", params = &crate::blocks::BlockUpdateParams, output = crate::blocks::BlockWithEditContext)]
+    Update,
 }
 
 impl DerivedRequest for BlocksRequest {
@@ -146,6 +148,11 @@ mod tests {
     #[rstest]
     fn trash_block(endpoint: BlocksRequestEndpoint) {
         validate_wp_v2_endpoint(endpoint.trash(&BlockId(54)), "/blocks/54?force=false");
+    }
+
+    #[rstest]
+    fn update_block(endpoint: BlocksRequestEndpoint) {
+        validate_wp_v2_endpoint(endpoint.update(&BlockId(54)), "/blocks/54");
     }
 
     #[fixture]
