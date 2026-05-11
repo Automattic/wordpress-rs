@@ -308,9 +308,10 @@ create_test_credentials () {
   AUTOSAVE_NAVIGATION_RESPONSE="$(create_navigation_autosave "1" "$AUTOSAVED_NAVIGATION_ID")"
   AUTOSAVE_ID_FOR_AUTOSAVED_NAVIGATION_ID="$(echo "$AUTOSAVE_NAVIGATION_RESPONSE" | jq -r '.id')"
 
-  echo "Creating a reusable block for integration tests.."
+  echo "Creating reusable blocks for integration tests.."
   BLOCK_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"title":"Integration Test Block","content":"<!-- wp:paragraph --><p>Integration test block content</p><!-- /wp:paragraph -->","status":"publish"}' http://localhost/wp-json/wp/v2/blocks)"
   BLOCK_ID="$(echo "$BLOCK_RESPONSE" | jq -r '.id')"
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"title":"Integration Test Block 2","content":"<!-- wp:paragraph --><p>Second block</p><!-- /wp:paragraph -->","status":"publish"}' http://localhost/wp-json/wp/v2/blocks > /dev/null
 
   echo "Setting up template with autosave for integration tests.."
   # Create template via REST API as admin (required for proper template registration), then change author

@@ -1,11 +1,13 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
-use crate::blocks::BlockListParams;
+use crate::blocks::{BlockId, BlockListParams, BlockRetrieveParams};
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum BlocksRequest {
     #[contextual_paged(url = "/blocks", params = &BlockListParams, output = Vec<crate::blocks::SparseBlock>, filter_by = crate::blocks::SparseBlockField)]
     List,
+    #[contextual_get(url = "/blocks/<block_id>", params = &BlockRetrieveParams, output = crate::blocks::SparseBlock, filter_by = crate::blocks::SparseBlockField)]
+    Retrieve,
 }
 
 impl DerivedRequest for BlocksRequest {
@@ -19,7 +21,9 @@ mod tests {
     use super::*;
     use crate::{
         WpApiParamOrder,
-        blocks::{BlockId, BlockListParams, BlockStatus, WpApiParamBlocksOrderBy},
+        blocks::{
+            BlockId, BlockListParams, BlockRetrieveParams, BlockStatus, WpApiParamBlocksOrderBy,
+        },
         generate,
         request::endpoint::{
             ApiUrlResolver,
@@ -82,6 +86,35 @@ mod tests {
         );
         validate_wp_v2_endpoint(
             endpoint.list_with_view_context(&params),
+            &expected_path("view"),
+        );
+    }
+
+    #[rstest]
+    #[case(BlockRetrieveParams::default(), "")]
+    #[case(generate!(BlockRetrieveParams, (password, Some("secret".to_string()))), "password=secret")]
+    fn retrieve_block(
+        endpoint: BlocksRequestEndpoint,
+        #[case] params: BlockRetrieveParams,
+        #[case] expected_additional_params: &str,
+    ) {
+        let expected_path = |context: &str| {
+            if expected_additional_params.is_empty() {
+                format!("/blocks/54?context={context}")
+            } else {
+                format!("/blocks/54?context={context}&{expected_additional_params}")
+            }
+        };
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_edit_context(&BlockId(54), &params),
+            &expected_path("edit"),
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_embed_context(&BlockId(54), &params),
+            &expected_path("embed"),
+        );
+        validate_wp_v2_endpoint(
+            endpoint.retrieve_with_view_context(&BlockId(54), &params),
             &expected_path("view"),
         );
     }

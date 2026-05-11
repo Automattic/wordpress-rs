@@ -1,5 +1,5 @@
 use wp_api::blocks::{
-    BlockId, BlockListParams, BlockStatus, SparseBlockFieldWithEditContext,
+    BlockId, BlockListParams, BlockRetrieveParams, BlockStatus, SparseBlockFieldWithEditContext,
     SparseBlockFieldWithEmbedContext, SparseBlockFieldWithViewContext, WpApiParamBlocksOrderBy,
 };
 use wp_api_integration_tests::prelude::*;
@@ -37,6 +37,69 @@ async fn list_with_view_context(#[case] params: BlockListParams) {
         .assert_response();
 }
 
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_edit_context() {
+    api_client()
+        .blocks()
+        .retrieve_with_edit_context(&block_id(), &BlockRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_embed_context() {
+    api_client()
+        .blocks()
+        .retrieve_with_embed_context(&block_id(), &BlockRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[parallel]
+async fn retrieve_with_view_context() {
+    api_client()
+        .blocks()
+        .retrieve_with_view_context(&block_id(), &BlockRetrieveParams::default())
+        .await
+        .assert_response();
+}
+
+#[tokio::test]
+#[rstest]
+#[parallel]
+#[case(BlockListParams { per_page: Some(1), ..Default::default() })]
+#[case(BlockListParams { per_page: Some(1), order: Some(WpApiParamOrder::Desc), ..Default::default() })]
+#[case(BlockListParams { per_page: Some(1), order_by: Some(WpApiParamBlocksOrderBy::Modified), ..Default::default() })]
+async fn paginate_list_blocks_with_edit_context(#[case] params: BlockListParams) {
+    let first_page_response = api_client()
+        .blocks()
+        .list_with_edit_context(&params)
+        .await
+        .assert_response();
+    assert!(!first_page_response.data.is_empty());
+    let next_page_params = first_page_response.next_page_params.unwrap();
+    let next_page_response = api_client()
+        .blocks()
+        .list_with_edit_context(&next_page_params)
+        .await
+        .assert_response();
+    assert!(!next_page_response.data.is_empty());
+    let prev_page_params = next_page_response.prev_page_params.unwrap();
+    let prev_page_response = api_client()
+        .blocks()
+        .list_with_edit_context(&prev_page_params)
+        .await
+        .assert_response();
+    assert!(!prev_page_response.data.is_empty());
+}
+
+fn block_id() -> BlockId {
+    BlockId(TestCredentials::instance().block_id)
+}
+
 #[template]
 #[rstest]
 #[case::default(BlockListParams::default())]
@@ -68,6 +131,22 @@ mod filter {
     #[case(&[SparseBlockFieldWithEditContext::Id, SparseBlockFieldWithEditContext::Slug])]
     #[tokio::test]
     #[parallel]
+    async fn filter_retrieve_blocks_with_edit_context(
+        #[case] fields: &[SparseBlockFieldWithEditContext],
+    ) {
+        let block = api_client()
+            .blocks()
+            .filter_retrieve_with_edit_context(&block_id(), &BlockRetrieveParams::default(), fields)
+            .await
+            .assert_response()
+            .data;
+        block.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
+    #[apply(sparse_block_field_with_edit_context_test_cases)]
+    #[case(&[SparseBlockFieldWithEditContext::Id, SparseBlockFieldWithEditContext::Slug])]
+    #[tokio::test]
+    #[parallel]
     async fn filter_blocks_with_edit_context(
         #[case] fields: &[SparseBlockFieldWithEditContext],
         #[values(
@@ -93,6 +172,26 @@ mod filter {
     #[case(&[SparseBlockFieldWithEmbedContext::Id, SparseBlockFieldWithEmbedContext::Slug])]
     #[tokio::test]
     #[parallel]
+    async fn filter_retrieve_blocks_with_embed_context(
+        #[case] fields: &[SparseBlockFieldWithEmbedContext],
+    ) {
+        let block = api_client()
+            .blocks()
+            .filter_retrieve_with_embed_context(
+                &block_id(),
+                &BlockRetrieveParams::default(),
+                fields,
+            )
+            .await
+            .assert_response()
+            .data;
+        block.assert_that_instance_fields_nullability_match_provided_fields(fields)
+    }
+
+    #[apply(sparse_block_field_with_embed_context_test_cases)]
+    #[case(&[SparseBlockFieldWithEmbedContext::Id, SparseBlockFieldWithEmbedContext::Slug])]
+    #[tokio::test]
+    #[parallel]
     async fn filter_blocks_with_embed_context(
         #[case] fields: &[SparseBlockFieldWithEmbedContext],
         #[values(
@@ -112,6 +211,22 @@ mod filter {
             .for_each(|block| {
                 block.assert_that_instance_fields_nullability_match_provided_fields(fields)
             });
+    }
+
+    #[apply(sparse_block_field_with_view_context_test_cases)]
+    #[case(&[SparseBlockFieldWithViewContext::Id, SparseBlockFieldWithViewContext::Slug])]
+    #[tokio::test]
+    #[parallel]
+    async fn filter_retrieve_blocks_with_view_context(
+        #[case] fields: &[SparseBlockFieldWithViewContext],
+    ) {
+        let block = api_client()
+            .blocks()
+            .filter_retrieve_with_view_context(&block_id(), &BlockRetrieveParams::default(), fields)
+            .await
+            .assert_response()
+            .data;
+        block.assert_that_instance_fields_nullability_match_provided_fields(fields)
     }
 
     #[apply(sparse_block_field_with_view_context_test_cases)]

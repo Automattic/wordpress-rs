@@ -189,6 +189,14 @@ pub enum WpApiParamBlocksOrderBy {
 
 impl_as_query_value_from_to_string!(WpApiParamBlocksOrderBy);
 
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)]
+pub struct BlockRetrieveParams {
+    /// The password for the post if it is password protected.
+    #[uniffi(default = None)]
+    pub password: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct BlockDeleteResponse {
     pub deleted: bool,
