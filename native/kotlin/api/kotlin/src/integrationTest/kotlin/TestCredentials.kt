@@ -67,6 +67,8 @@ data class TestCredentials(
     val primaryMenuLocation: String,
     @SerialName("nav_menu_item_id")
     val navMenuItemId: Long,
+    @SerialName("block_id")
+    val blockId: Long,
 ) {
     companion object {
         private val json by lazy {
