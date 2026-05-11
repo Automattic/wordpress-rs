@@ -8,6 +8,8 @@ enum BlocksRequest {
     List,
     #[contextual_get(url = "/blocks/<block_id>", params = &BlockRetrieveParams, output = crate::blocks::SparseBlock, filter_by = crate::blocks::SparseBlockField)]
     Retrieve,
+    #[post(url = "/blocks", params = &crate::blocks::BlockCreateParams, output = crate::blocks::BlockWithEditContext)]
+    Create,
     #[delete(url = "/blocks/<block_id>", output = crate::blocks::BlockDeleteResponse)]
     Delete,
     #[delete(url = "/blocks/<block_id>", output = crate::blocks::BlockWithEditContext)]
@@ -129,6 +131,11 @@ mod tests {
             endpoint.retrieve_with_view_context(&BlockId(54), &params),
             &expected_path("view"),
         );
+    }
+
+    #[rstest]
+    fn create_block(endpoint: BlocksRequestEndpoint) {
+        validate_wp_v2_endpoint(endpoint.create(), "/blocks");
     }
 
     #[rstest]
