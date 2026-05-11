@@ -54,6 +54,7 @@ pub struct TestCredentials {
     pub autosave_id_for_autosaved_navigation_id: i64,
     pub block_id: i64,
     pub global_styles_id: i64,
+    pub revision_id_for_block_id: i64,
 }
 
 impl TestCredentials {

@@ -18,6 +18,7 @@ pub mod block_directory;
 pub mod block_pattern_categories;
 pub mod block_patterns;
 pub mod block_renderer;
+pub mod block_revisions;
 pub mod block_types;
 pub mod blocks;
 pub mod comments;
