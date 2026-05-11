@@ -5,6 +5,7 @@ use url::Url;
 
 pub mod api_root_endpoint;
 pub mod application_passwords_endpoint;
+pub mod block_autosaves_endpoint;
 pub mod block_directory_endpoint;
 pub mod block_pattern_categories_endpoint;
 pub mod block_patterns_endpoint;
