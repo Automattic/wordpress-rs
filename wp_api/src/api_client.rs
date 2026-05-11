@@ -19,6 +19,7 @@ use crate::{
             },
             block_patterns_endpoint::{BlockPatternsRequestBuilder, BlockPatternsRequestExecutor},
             block_types_endpoint::{BlockTypesRequestBuilder, BlockTypesRequestExecutor},
+            blocks_endpoint::{BlocksRequestBuilder, BlocksRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
             menu_locations_endpoint::{MenuLocationsRequestBuilder, MenuLocationsRequestExecutor},
@@ -78,6 +79,7 @@ pub struct WpApiRequestBuilder {
     block_pattern_categories: Arc<BlockPatternCategoriesRequestBuilder>,
     block_patterns: Arc<BlockPatternsRequestBuilder>,
     block_types: Arc<BlockTypesRequestBuilder>,
+    blocks: Arc<BlocksRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
     media: Arc<MediaRequestBuilder>,
@@ -125,6 +127,7 @@ impl WpApiRequestBuilder {
             block_pattern_categories,
             block_patterns,
             block_types,
+            blocks,
             autosaves,
             comments,
             media,
@@ -182,6 +185,7 @@ pub struct WpApiClient {
     block_pattern_categories: Arc<BlockPatternCategoriesRequestExecutor>,
     block_patterns: Arc<BlockPatternsRequestExecutor>,
     block_types: Arc<BlockTypesRequestExecutor>,
+    blocks: Arc<BlocksRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
     media: Arc<MediaRequestExecutor>,
@@ -226,6 +230,7 @@ impl WpApiClient {
             block_pattern_categories,
             block_patterns,
             block_types,
+            blocks,
             autosaves,
             comments,
             media,
@@ -280,6 +285,7 @@ api_client_generate_endpoint_impl!(WpApi, block_directory);
 api_client_generate_endpoint_impl!(WpApi, block_pattern_categories);
 api_client_generate_endpoint_impl!(WpApi, block_patterns);
 api_client_generate_endpoint_impl!(WpApi, block_types);
+api_client_generate_endpoint_impl!(WpApi, blocks);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, comments);
 api_client_generate_endpoint_impl!(WpApi, media);

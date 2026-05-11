@@ -308,6 +308,10 @@ create_test_credentials () {
   AUTOSAVE_NAVIGATION_RESPONSE="$(create_navigation_autosave "1" "$AUTOSAVED_NAVIGATION_ID")"
   AUTOSAVE_ID_FOR_AUTOSAVED_NAVIGATION_ID="$(echo "$AUTOSAVE_NAVIGATION_RESPONSE" | jq -r '.id')"
 
+  echo "Creating a reusable block for integration tests.."
+  BLOCK_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"title":"Integration Test Block","content":"<!-- wp:paragraph --><p>Integration test block content</p><!-- /wp:paragraph -->","status":"publish"}' http://localhost/wp-json/wp/v2/blocks)"
+  BLOCK_ID="$(echo "$BLOCK_RESPONSE" | jq -r '.id')"
+
   echo "Setting up template with autosave for integration tests.."
   # Create template via REST API as admin (required for proper template registration), then change author
   AUTOSAVED_TEMPLATE_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"AUTOSAVED_TEMPLATE", "content": "Autosaved template content"}' http://localhost/wp-json/wp/v2/templates)"
@@ -381,6 +385,7 @@ create_test_credentials () {
     revision_id_for_navigation_id="$REVISION_ID_FOR_NAVIGATION_ID" \
     autosaved_navigation_id="$AUTOSAVED_NAVIGATION_ID" \
     autosave_id_for_autosaved_navigation_id="$AUTOSAVE_ID_FOR_AUTOSAVED_NAVIGATION_ID" \
+    block_id="$BLOCK_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials
