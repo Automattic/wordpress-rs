@@ -33,9 +33,9 @@ mod tests {
     use std::sync::Arc;
 
     #[rstest]
-    #[case("core/paragraph".parse().unwrap(), "/block-renderer/core/paragraph?context=edit")]
-    #[case("core/latest-posts".parse().unwrap(), "/block-renderer/core/latest-posts?context=edit")]
-    #[case("my-plugin/custom-block".parse().unwrap(), "/block-renderer/my-plugin/custom-block?context=edit")]
+    #[case(BlockName("core/paragraph".to_string()), "/block-renderer/core/paragraph?context=edit")]
+    #[case(BlockName("core/latest-posts".to_string()), "/block-renderer/core/latest-posts?context=edit")]
+    #[case(BlockName("my-plugin/custom-block".to_string()), "/block-renderer/my-plugin/custom-block?context=edit")]
     fn render_block(
         endpoint: BlockRendererRequestEndpoint,
         #[case] block_name: BlockName,
