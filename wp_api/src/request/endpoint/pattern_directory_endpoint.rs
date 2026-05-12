@@ -48,7 +48,7 @@ mod tests {
     fn list_pattern_directory_with_params(endpoint: PatternDirectoryRequestEndpoint) {
         let params = PatternDirectoryListParams {
             per_page: Some(10),
-            category: Some(5),
+            category: Some(crate::pattern_directory::PatternDirectoryCategoryId(5)),
             ..Default::default()
         };
         validate_wp_v2_endpoint(

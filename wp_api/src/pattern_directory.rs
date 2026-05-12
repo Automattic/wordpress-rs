@@ -3,7 +3,12 @@ use crate::{
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
+    wp_content_u64_id,
 };
+
+wp_content_u64_id!(PatternDirectoryItemId);
+wp_content_u64_id!(PatternDirectoryCategoryId);
+wp_content_u64_id!(PatternDirectoryKeywordId);
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 use wp_derive::WpDeriveParamsField;
@@ -40,7 +45,7 @@ impl_as_query_value_from_to_string!(WpApiParamPatternDirectoryOrderBy);
 #[derive(Debug, Serialize, Deserialize, WpContextual)]
 pub struct SparsePatternDirectoryItem {
     #[WpContext(edit, embed, view)]
-    pub id: Option<i64>,
+    pub id: Option<PatternDirectoryItemId>,
     #[WpContext(edit, embed, view)]
     pub title: Option<String>,
     #[WpContext(edit, embed, view)]
@@ -56,7 +61,7 @@ pub struct SparsePatternDirectoryItem {
     pub description: Option<String>,
     #[WpContext(edit, embed, view)]
     #[WpContextualOption]
-    pub viewport_width: Option<i64>,
+    pub viewport_width: Option<u64>,
     #[WpContext(embed, view)]
     #[WpContextualOption]
     pub block_types: Option<Vec<String>>,
@@ -78,10 +83,10 @@ pub struct PatternDirectoryListParams {
     pub search: Option<String>,
     /// Limit results to those matching a category ID.
     #[uniffi(default = None)]
-    pub category: Option<u32>,
+    pub category: Option<PatternDirectoryCategoryId>,
     /// Limit results to those matching a keyword ID.
     #[uniffi(default = None)]
-    pub keyword: Option<u32>,
+    pub keyword: Option<PatternDirectoryKeywordId>,
     /// Limit results to those matching a pattern slug.
     #[uniffi(default = [])]
     pub slug: Vec<String>,
@@ -111,8 +116,8 @@ mod tests {
     #[case(generate!(PatternDirectoryListParams, (page, Some(2))), "page=2")]
     #[case(generate!(PatternDirectoryListParams, (per_page, Some(50))), "per_page=50")]
     #[case(generate!(PatternDirectoryListParams, (search, Some("hero".to_string()))), "search=hero")]
-    #[case(generate!(PatternDirectoryListParams, (category, Some(5))), "category=5")]
-    #[case(generate!(PatternDirectoryListParams, (keyword, Some(3))), "keyword=3")]
+    #[case(generate!(PatternDirectoryListParams, (category, Some(PatternDirectoryCategoryId(5)))), "category=5")]
+    #[case(generate!(PatternDirectoryListParams, (keyword, Some(PatternDirectoryKeywordId(3)))), "keyword=3")]
     #[case(generate!(PatternDirectoryListParams, (slug, vec!["my-pattern".to_string()])), "slug=my-pattern")]
     #[case(generate!(PatternDirectoryListParams, (slug, vec!["pattern-a".to_string(), "pattern-b".to_string()])), "slug=pattern-a%2Cpattern-b")]
     #[case(generate!(PatternDirectoryListParams, (offset, Some(10))), "offset=10")]
@@ -133,8 +138,8 @@ mod tests {
             page: Some(2),
             per_page: Some(10),
             search: Some("hero".to_string()),
-            category: Some(5),
-            keyword: Some(3),
+            category: Some(PatternDirectoryCategoryId(5)),
+            keyword: Some(PatternDirectoryKeywordId(3)),
             slug: vec!["my-pattern".to_string()],
             offset: Some(10),
             order: Some(WpApiParamOrder::Asc),
