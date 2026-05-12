@@ -8,6 +8,7 @@ pub mod application_passwords_endpoint;
 pub mod block_directory_endpoint;
 pub mod block_pattern_categories_endpoint;
 pub mod block_patterns_endpoint;
+pub mod block_renderer_endpoint;
 pub mod block_types_endpoint;
 pub mod blocks_endpoint;
 pub mod comments_endpoint;

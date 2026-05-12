@@ -203,8 +203,12 @@ pub enum WpErrorCode {
     AlreadyTrashed,
     #[serde(rename = "rest_application_password_not_found")]
     ApplicationPasswordNotFound,
+    #[serde(rename = "block_cannot_read")]
+    BlockCannotRead,
     #[serde(rename = "rest_block_directory_cannot_view")]
     BlockDirectoryCannotView,
+    #[serde(rename = "block_invalid")]
+    BlockInvalid,
     #[serde(rename = "rest_block_type_cannot_view")]
     BlockTypeCannotView,
     #[serde(rename = "rest_block_type_invalid")]
