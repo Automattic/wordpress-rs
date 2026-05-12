@@ -1,7 +1,6 @@
 use crate::{JsonValue, posts::PostId, wp_content_string_id};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use wp_contextual::WpContextual;
 
 wp_content_string_id!(BlockName);
 
@@ -15,8 +14,7 @@ pub struct BlockRendererPostParams {
     pub post_id: Option<PostId>,
 }
 
-#[derive(Debug, Serialize, Deserialize, WpContextual)]
-pub struct SparseBlockRenderer {
-    #[WpContext(edit)]
-    pub rendered: Option<String>,
+#[derive(Debug, Serialize, Deserialize, uniffi::Record)]
+pub struct BlockRendererResponse {
+    pub rendered: String,
 }

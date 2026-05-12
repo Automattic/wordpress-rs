@@ -4,11 +4,19 @@ use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum BlockRendererRequest {
-    #[post(url = "/block-renderer/<block_name>", params = &crate::block_renderer::BlockRendererPostParams, output = crate::block_renderer::BlockRendererWithEditContext)]
+    #[post(url = "/block-renderer/<block_name>", params = &crate::block_renderer::BlockRendererPostParams, output = crate::block_renderer::BlockRendererResponse)]
     Render,
 }
 
 impl DerivedRequest for BlockRendererRequest {
+    // The block-renderer schema only defines `rendered` in the `edit` context,
+    // so the allowed `context` enum is `["edit"]`. WordPress defaults `context`
+    // to `"view"` which is not in the enum, causing a validation error. We must
+    // always send `context=edit` explicitly.
+    fn additional_query_pairs(&self) -> Vec<(&str, String)> {
+        vec![("context", "edit".to_string())]
+    }
+
     fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
@@ -25,9 +33,9 @@ mod tests {
     use std::sync::Arc;
 
     #[rstest]
-    #[case("core/paragraph".parse().unwrap(), "/block-renderer/core/paragraph")]
-    #[case("core/latest-posts".parse().unwrap(), "/block-renderer/core/latest-posts")]
-    #[case("my-plugin/custom-block".parse().unwrap(), "/block-renderer/my-plugin/custom-block")]
+    #[case("core/paragraph".parse().unwrap(), "/block-renderer/core/paragraph?context=edit")]
+    #[case("core/latest-posts".parse().unwrap(), "/block-renderer/core/latest-posts?context=edit")]
+    #[case("my-plugin/custom-block".parse().unwrap(), "/block-renderer/my-plugin/custom-block?context=edit")]
     fn render_block(
         endpoint: BlockRendererRequestEndpoint,
         #[case] block_name: BlockName,
