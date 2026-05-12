@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 use wp_derive::WpDeriveParamsField;
 
-wp_content_i64_id!(NavigationId);
+wp_content_i64_id!(BlockId);
 
 #[derive(
     Debug,
@@ -30,7 +30,7 @@ wp_content_i64_id!(NavigationId);
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-pub enum NavigationStatus {
+pub enum BlockStatus {
     Draft,
     Future,
     Pending,
@@ -42,19 +42,19 @@ pub enum NavigationStatus {
     Custom(String),
 }
 
-impl_as_query_value_from_to_string!(NavigationStatus);
+impl_as_query_value_from_to_string!(BlockStatus);
 
 #[derive(Debug, Serialize, Deserialize, WpContextual)]
-pub struct SparseNavigation {
+pub struct SparseBlock {
     #[WpContext(edit, embed, view)]
     pub date: Option<String>,
     #[WpContext(edit, view)]
     pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, view)]
     #[WpContextualField]
-    pub guid: Option<SparseNavigationGuid>,
+    pub guid: Option<SparseBlockGuid>,
     #[WpContext(edit, embed, view)]
-    pub id: Option<NavigationId>,
+    pub id: Option<BlockId>,
     #[WpContext(edit, embed, view)]
     pub link: Option<String>,
     #[WpContext(edit, view)]
@@ -63,28 +63,28 @@ pub struct SparseNavigation {
     pub modified_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
-    #[WpContext(edit, embed, view)]
-    pub status: Option<NavigationStatus>,
+    #[WpContext(edit, view)]
+    pub status: Option<BlockStatus>,
     #[WpContext(edit, embed, view)]
     #[serde(rename = "type")]
-    pub navigation_type: Option<String>,
+    pub block_type: Option<String>,
     #[WpContext(edit)]
     #[WpContextualOption]
     pub password: Option<String>,
     #[WpContext(edit, embed, view)]
-    #[WpContextualField]
-    pub title: Option<SparseNavigationTitle>,
-    #[WpContext(edit, embed, view)]
-    #[WpContextualField]
-    pub content: Option<SparseNavigationContent>,
+    pub title: Option<SparseBlockTitle>,
+    #[WpContext(edit, view)]
+    pub content: Option<SparseBlockContent>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
     pub template: Option<String>,
-    // _meta field omitted
+    #[WpContext(edit, view)]
+    #[WpContextualOption]
+    pub wp_pattern_sync_status: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, WpContextual, uniffi::Record)]
-pub struct SparseNavigationGuid {
+pub struct SparseBlockGuid {
     #[WpContext(edit)]
     #[WpContextualOption]
     pub raw: Option<String>,
@@ -92,33 +92,21 @@ pub struct SparseNavigationGuid {
     pub rendered: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, WpContextual, uniffi::Record)]
-pub struct SparseNavigationTitle {
-    #[WpContext(edit)]
-    #[WpContextualOption]
+#[derive(Debug, PartialEq, Serialize, wp_derive::WpDeserialize, uniffi::Record)]
+pub struct SparseBlockTitle {
     pub raw: Option<String>,
-    #[WpContext(edit, embed, view)]
-    pub rendered: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, WpContextual, uniffi::Record)]
-pub struct SparseNavigationContent {
-    #[WpContext(edit)]
-    #[WpContextualOption]
+#[derive(Debug, PartialEq, Serialize, wp_derive::WpDeserialize, uniffi::Record)]
+pub struct SparseBlockContent {
     pub raw: Option<String>,
-    #[WpContext(edit, embed, view)]
-    pub rendered: Option<String>,
-    #[WpContext(edit, embed, view)]
-    #[WpContextualOption]
     pub protected: Option<bool>,
-    #[WpContext(edit, embed, view)]
-    #[WpContextualOption]
     pub block_version: Option<u32>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(true)]
-pub struct NavigationListParams {
+pub struct BlockListParams {
     /// Current page of the collection.
     #[uniffi(default = None)]
     pub page: Option<u32>,
@@ -130,22 +118,22 @@ pub struct NavigationListParams {
     pub search: Option<String>,
     /// Limit response to posts published after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub after: Option<String>,
+    pub after: Option<WpGmtDateTime>,
     /// Limit response to posts modified after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_after: Option<String>,
+    pub modified_after: Option<WpGmtDateTime>,
     /// Limit response to posts published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub before: Option<String>,
+    pub before: Option<WpGmtDateTime>,
     /// Limit response to posts modified before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_before: Option<String>,
+    pub modified_before: Option<WpGmtDateTime>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
-    pub exclude: Vec<NavigationId>,
+    pub exclude: Vec<BlockId>,
     /// Limit result set to specific IDs.
     #[uniffi(default = [])]
-    pub include: Vec<NavigationId>,
+    pub include: Vec<BlockId>,
     /// Offset the result set by a specific number of items.
     #[uniffi(default = None)]
     pub offset: Option<u32>,
@@ -155,7 +143,7 @@ pub struct NavigationListParams {
     /// Sort collection by post attribute.
     #[uniffi(default = None)]
     #[field_name("orderby")]
-    pub order_by: Option<WpApiParamNavigationsOrderBy>,
+    pub order_by: Option<WpApiParamBlocksOrderBy>,
     /// Array of column names to be searched.
     #[uniffi(default = [])]
     pub search_columns: Vec<String>,
@@ -164,7 +152,7 @@ pub struct NavigationListParams {
     pub slug: Vec<String>,
     /// Limit result set to posts assigned one or more statuses.
     #[uniffi(default = [])]
-    pub status: Vec<NavigationStatus>,
+    pub status: Vec<BlockStatus>,
 }
 
 #[derive(
@@ -184,7 +172,7 @@ pub struct NavigationListParams {
 )]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-pub enum WpApiParamNavigationsOrderBy {
+pub enum WpApiParamBlocksOrderBy {
     Author,
     #[default]
     Date,
@@ -198,92 +186,92 @@ pub enum WpApiParamNavigationsOrderBy {
     Title,
 }
 
-impl_as_query_value_from_to_string!(WpApiParamNavigationsOrderBy);
+impl_as_query_value_from_to_string!(WpApiParamBlocksOrderBy);
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(false)]
-pub struct NavigationRetrieveParams {
+pub struct BlockRetrieveParams {
     /// The password for the post if it is password protected.
     #[uniffi(default = None)]
     pub password: Option<String>,
 }
 
+#[derive(Debug, Default, Serialize, uniffi::Record)]
+pub struct BlockCreateParams {
+    /// The date the post was published, in the site's timezone.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<WpGmtDateTime>,
+    /// The date the post was published, as GMT.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_gmt: Option<WpGmtDateTime>,
+    /// An alphanumeric identifier for the post unique to its type.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slug: Option<String>,
+    /// A named status for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<BlockStatus>,
+    /// A password to protect access to the content and excerpt.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
+    /// The title for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The content for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// The theme file to use to display the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
+}
+
+#[derive(Debug, Default, Serialize, uniffi::Record)]
+pub struct BlockUpdateParams {
+    /// The date the post was published, in the site's timezone.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<WpGmtDateTime>,
+    /// The date the post was published, as GMT.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_gmt: Option<WpGmtDateTime>,
+    /// An alphanumeric identifier for the post unique to its type.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slug: Option<String>,
+    /// A named status for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<BlockStatus>,
+    /// A password to protect access to the content and excerpt.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
+    /// The title for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The content for the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// The theme file to use to display the post.
+    #[uniffi(default = None)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
-pub struct NavigationDeleteResponse {
+pub struct BlockDeleteResponse {
     pub deleted: bool,
-    pub previous: NavigationWithEditContext,
-}
-
-#[derive(Debug, Default, Serialize, uniffi::Record)]
-pub struct NavigationUpdateParams {
-    /// The date the post was published, in the site's timezone.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
-    /// The date the post was published, as GMT.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_gmt: Option<WpGmtDateTime>,
-    /// An alphanumeric identifier for the post unique to its type.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub slug: Option<String>,
-    /// A named status for the post.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<NavigationStatus>,
-    /// A password to protect access to the content and excerpt.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub password: Option<String>,
-    /// The title for the post.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    /// The content for the post.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
-    /// The theme file to use to display the post.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub template: Option<String>,
-}
-
-#[derive(Debug, Default, Serialize, uniffi::Record)]
-pub struct NavigationCreateParams {
-    /// The date the post was published, in the site's timezone.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
-    /// The date the post was published, as GMT.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub date_gmt: Option<WpGmtDateTime>,
-    /// An alphanumeric identifier for the post unique to its type.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub slug: Option<String>,
-    /// A named status for the post.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<NavigationStatus>,
-    /// A password to protect access to the content and excerpt.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub password: Option<String>,
-    /// The title for the post.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    /// The content for the post.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
-    /// The theme file to use to display the post.
-    #[uniffi(default = None)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub template: Option<String>,
+    pub previous: BlockWithEditContext,
 }
 
 #[cfg(test)]
@@ -293,30 +281,30 @@ mod tests {
     use rstest::*;
 
     #[rstest]
-    #[case(SparseNavigationFieldWithEditContext::Id, "id")]
-    #[case(SparseNavigationFieldWithEditContext::NavigationType, "type")]
+    #[case(SparseBlockFieldWithEditContext::Id, "id")]
+    #[case(SparseBlockFieldWithEditContext::BlockType, "type")]
     fn test_as_mapped_field_name_for_edit_context(
-        #[case] field: SparseNavigationFieldWithEditContext,
+        #[case] field: SparseBlockFieldWithEditContext,
         #[case] expected_mapped_field_name: &str,
     ) {
         assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
-    #[case(SparseNavigationFieldWithEmbedContext::Id, "id")]
-    #[case(SparseNavigationFieldWithEmbedContext::NavigationType, "type")]
+    #[case(SparseBlockFieldWithEmbedContext::Id, "id")]
+    #[case(SparseBlockFieldWithEmbedContext::BlockType, "type")]
     fn test_as_mapped_field_name_for_embed_context(
-        #[case] field: SparseNavigationFieldWithEmbedContext,
+        #[case] field: SparseBlockFieldWithEmbedContext,
         #[case] expected_mapped_field_name: &str,
     ) {
         assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
     }
 
     #[rstest]
-    #[case(SparseNavigationFieldWithViewContext::Id, "id")]
-    #[case(SparseNavigationFieldWithViewContext::NavigationType, "type")]
+    #[case(SparseBlockFieldWithViewContext::Id, "id")]
+    #[case(SparseBlockFieldWithViewContext::BlockType, "type")]
     fn test_as_mapped_field_name_for_view_context(
-        #[case] field: SparseNavigationFieldWithViewContext,
+        #[case] field: SparseBlockFieldWithViewContext,
         #[case] expected_mapped_field_name: &str,
     ) {
         assert_eq!(field.as_mapped_field_name(), expected_mapped_field_name);
