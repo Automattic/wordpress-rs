@@ -1,5 +1,6 @@
 use wp_api::pattern_directory::{
-    PatternDirectoryListParams, SparsePatternDirectoryItemFieldWithEditContext,
+    PatternDirectoryCategoryId, PatternDirectoryListParams,
+    SparsePatternDirectoryItemFieldWithEditContext,
     SparsePatternDirectoryItemFieldWithEmbedContext,
     SparsePatternDirectoryItemFieldWithViewContext,
 };
@@ -44,7 +45,7 @@ async fn list_with_view_context() {
 #[parallel]
 async fn list_with_category_param() {
     let params = PatternDirectoryListParams {
-        category: Some(2),
+        category: Some(PatternDirectoryCategoryId(2)),
         per_page: Some(5),
         ..Default::default()
     };
