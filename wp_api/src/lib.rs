@@ -22,6 +22,7 @@ pub mod blocks;
 pub mod comments;
 pub mod date;
 pub mod decimal2;
+pub mod global_styles;
 pub mod login;
 pub mod media;
 pub mod menu_locations;

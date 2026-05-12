@@ -62,7 +62,7 @@
 
 ## Global Styles
 
-- [ ] `/wp/v2/global-styles/<id>`
+- [x] `/wp/v2/global-styles/<id>`
 - [ ] `/wp/v2/global-styles/<id>/revisions`
 
 ## Additional Implemented Endpoints
