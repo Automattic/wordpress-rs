@@ -20,7 +20,9 @@ use crate::{
             block_patterns_endpoint::{BlockPatternsRequestBuilder, BlockPatternsRequestExecutor},
             block_renderer_endpoint::{BlockRendererRequestBuilder, BlockRendererRequestExecutor},
             block_types_endpoint::{BlockTypesRequestBuilder, BlockTypesRequestExecutor},
+            blocks_endpoint::{BlocksRequestBuilder, BlocksRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
+            global_styles_endpoint::{GlobalStylesRequestBuilder, GlobalStylesRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
             menu_locations_endpoint::{MenuLocationsRequestBuilder, MenuLocationsRequestExecutor},
             nav_menu_item_autosaves_endpoint::{
@@ -35,6 +37,9 @@ use crate::{
                 NavigationRevisionsRequestBuilder, NavigationRevisionsRequestExecutor,
             },
             navigations_endpoint::{NavigationsRequestBuilder, NavigationsRequestExecutor},
+            pattern_directory_endpoint::{
+                PatternDirectoryRequestBuilder, PatternDirectoryRequestExecutor,
+            },
             plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
             post_autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             post_revisions_endpoint::{PostRevisionsRequestBuilder, PostRevisionsRequestExecutor},
@@ -80,8 +85,10 @@ pub struct WpApiRequestBuilder {
     block_pattern_categories: Arc<BlockPatternCategoriesRequestBuilder>,
     block_patterns: Arc<BlockPatternsRequestBuilder>,
     block_types: Arc<BlockTypesRequestBuilder>,
+    blocks: Arc<BlocksRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
+    global_styles: Arc<GlobalStylesRequestBuilder>,
     media: Arc<MediaRequestBuilder>,
     menu_locations: Arc<MenuLocationsRequestBuilder>,
     nav_menu_item_autosaves: Arc<NavMenuItemAutosavesRequestBuilder>,
@@ -90,6 +97,7 @@ pub struct WpApiRequestBuilder {
     navigation_autosaves: Arc<NavigationAutosavesRequestBuilder>,
     navigation_revisions: Arc<NavigationRevisionsRequestBuilder>,
     navigations: Arc<NavigationsRequestBuilder>,
+    pattern_directory: Arc<PatternDirectoryRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_revisions: Arc<PostRevisionsRequestBuilder>,
     post_statuses: Arc<PostStatusesRequestBuilder>,
@@ -128,8 +136,10 @@ impl WpApiRequestBuilder {
             block_pattern_categories,
             block_patterns,
             block_types,
+            blocks,
             autosaves,
             comments,
+            global_styles,
             media,
             menu_locations,
             nav_menu_item_autosaves,
@@ -138,6 +148,7 @@ impl WpApiRequestBuilder {
             navigation_autosaves,
             navigation_revisions,
             navigations,
+            pattern_directory,
             plugins,
             post_revisions,
             post_statuses,
@@ -186,8 +197,10 @@ pub struct WpApiClient {
     block_pattern_categories: Arc<BlockPatternCategoriesRequestExecutor>,
     block_patterns: Arc<BlockPatternsRequestExecutor>,
     block_types: Arc<BlockTypesRequestExecutor>,
+    blocks: Arc<BlocksRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
+    global_styles: Arc<GlobalStylesRequestExecutor>,
     media: Arc<MediaRequestExecutor>,
     menu_locations: Arc<MenuLocationsRequestExecutor>,
     nav_menu_item_autosaves: Arc<NavMenuItemAutosavesRequestExecutor>,
@@ -196,6 +209,7 @@ pub struct WpApiClient {
     navigation_autosaves: Arc<NavigationAutosavesRequestExecutor>,
     navigation_revisions: Arc<NavigationRevisionsRequestExecutor>,
     navigations: Arc<NavigationsRequestExecutor>,
+    pattern_directory: Arc<PatternDirectoryRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_revisions: Arc<PostRevisionsRequestExecutor>,
     post_statuses: Arc<PostStatusesRequestExecutor>,
@@ -231,8 +245,10 @@ impl WpApiClient {
             block_pattern_categories,
             block_patterns,
             block_types,
+            blocks,
             autosaves,
             comments,
+            global_styles,
             media,
             menu_locations,
             nav_menu_item_autosaves,
@@ -241,6 +257,7 @@ impl WpApiClient {
             navigation_autosaves,
             navigation_revisions,
             navigations,
+            pattern_directory,
             plugins,
             post_revisions,
             post_statuses,
@@ -286,8 +303,10 @@ api_client_generate_endpoint_impl!(WpApi, block_renderer);
 api_client_generate_endpoint_impl!(WpApi, block_pattern_categories);
 api_client_generate_endpoint_impl!(WpApi, block_patterns);
 api_client_generate_endpoint_impl!(WpApi, block_types);
+api_client_generate_endpoint_impl!(WpApi, blocks);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, comments);
+api_client_generate_endpoint_impl!(WpApi, global_styles);
 api_client_generate_endpoint_impl!(WpApi, media);
 api_client_generate_endpoint_impl!(WpApi, menu_locations);
 api_client_generate_endpoint_impl!(WpApi, nav_menu_item_autosaves);
@@ -296,6 +315,7 @@ api_client_generate_endpoint_impl!(WpApi, nav_menus);
 api_client_generate_endpoint_impl!(WpApi, navigation_autosaves);
 api_client_generate_endpoint_impl!(WpApi, navigation_revisions);
 api_client_generate_endpoint_impl!(WpApi, navigations);
+api_client_generate_endpoint_impl!(WpApi, pattern_directory);
 api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_revisions);
 api_client_generate_endpoint_impl!(WpApi, post_statuses);

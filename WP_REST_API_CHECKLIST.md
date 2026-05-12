@@ -18,7 +18,7 @@
 ## Block Editor Endpoints
 
 - [x] `/wp/v2/block-types`
-- [ ] `/wp/v2/blocks`
+- [x] `/wp/v2/blocks`
 - [ ] `/wp/v2/blocks/<id>/revisions`
 - [ ] `/wp/v2/blocks/<id>/autosaves`
 - [x] `/wp/v2/block-renderer/<id>`
@@ -28,7 +28,7 @@
 
 - [x] `/wp/v2/block-patterns/patterns`
 - [x] `/wp/v2/block-patterns/categories`
-- [ ] `/wp/v2/pattern-directory/patterns`
+- [x] `/wp/v2/pattern-directory/patterns`
 - [x] `/wp/v2/templates`
 - [x] `/wp/v2/templates/<id>/revisions`
 - [x] `/wp/v2/templates/<id>/autosaves`
@@ -62,7 +62,7 @@
 
 ## Global Styles
 
-- [ ] `/wp/v2/global-styles/<id>`
+- [x] `/wp/v2/global-styles/<id>`
 - [ ] `/wp/v2/global-styles/<id>/revisions`
 
 ## Additional Implemented Endpoints
