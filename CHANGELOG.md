@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Global Styles](https://developer.wordpress.org/rest-api/reference/wp_global_styles/) endpoint
 - [Pattern Directory Items](https://developer.wordpress.org/rest-api/reference/pattern-directory-items/) endpoint
 
+### Removed
+
+- Investigation artifacts for Nav Menu Item Autosaves
+
 ## [0.2.0] - 2026-05-05
 
 ### Added
