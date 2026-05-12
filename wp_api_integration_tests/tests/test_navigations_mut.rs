@@ -95,11 +95,11 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    "2024-09-09T12:00:00".to_string(),
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
     |updated_navigation| {
         assert_eq!(
             updated_navigation.date_gmt,
-            "2024-09-09T12:00:00".to_string()
+            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
         );
     }
 );

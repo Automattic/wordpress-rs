@@ -49,7 +49,7 @@ pub struct SparseBlock {
     #[WpContext(edit, embed, view)]
     pub date: Option<String>,
     #[WpContext(edit, view)]
-    pub date_gmt: Option<String>,
+    pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, view)]
     #[WpContextualField]
     pub guid: Option<SparseBlockGuid>,
@@ -60,7 +60,7 @@ pub struct SparseBlock {
     #[WpContext(edit, view)]
     pub modified: Option<String>,
     #[WpContext(edit, view)]
-    pub modified_gmt: Option<String>,
+    pub modified_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit, view)]
@@ -81,7 +81,6 @@ pub struct SparseBlock {
     #[WpContext(edit, view)]
     #[WpContextualOption]
     pub wp_pattern_sync_status: Option<String>,
-    // _meta field omitted
 }
 
 #[derive(Debug, Serialize, Deserialize, WpContextual, uniffi::Record)]
