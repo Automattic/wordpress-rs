@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Block Types](https://developer.wordpress.org/rest-api/reference/block-types/) endpoint
 - [Editor Blocks](https://developer.wordpress.org/rest-api/reference/blocks/) endpoint
 - [Block Revisions](https://developer.wordpress.org/rest-api/reference/block-revisions/) endpoint
+- [Block Autosaves](https://developer.wordpress.org/rest-api/reference/block-revisions/) endpoint
 - [Global Styles](https://developer.wordpress.org/rest-api/reference/wp_global_styles/) endpoint
 - [Global Styles Revisions](https://developer.wordpress.org/rest-api/reference/wp_global_styles-revisions/) endpoint
 - [Pattern Directory Items](https://developer.wordpress.org/rest-api/reference/pattern-directory-items/) endpoint
