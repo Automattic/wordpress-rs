@@ -75,6 +75,10 @@ data class TestCredentials(
     val revisionIdForBlockId: Long,
     @SerialName("revision_id_for_global_styles_id")
     val revisionIdForGlobalStylesId: Long,
+    @SerialName("autosaved_block_id")
+    val autosavedBlockId: Long,
+    @SerialName("autosave_id_for_autosaved_block_id")
+    val autosaveIdForAutosavedBlockId: Long,
 ) {
     companion object {
         private val json by lazy {
