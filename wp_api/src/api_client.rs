@@ -18,6 +18,7 @@ use crate::{
                 BlockPatternCategoriesRequestBuilder, BlockPatternCategoriesRequestExecutor,
             },
             block_patterns_endpoint::{BlockPatternsRequestBuilder, BlockPatternsRequestExecutor},
+            block_renderer_endpoint::{BlockRendererRequestBuilder, BlockRendererRequestExecutor},
             block_types_endpoint::{BlockTypesRequestBuilder, BlockTypesRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
@@ -75,6 +76,7 @@ pub struct WpApiRequestBuilder {
     api_root: Arc<ApiRootRequestBuilder>,
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
     block_directory: Arc<BlockDirectoryRequestBuilder>,
+    block_renderer: Arc<BlockRendererRequestBuilder>,
     block_pattern_categories: Arc<BlockPatternCategoriesRequestBuilder>,
     block_patterns: Arc<BlockPatternsRequestBuilder>,
     block_types: Arc<BlockTypesRequestBuilder>,
@@ -122,6 +124,7 @@ impl WpApiRequestBuilder {
             api_root,
             application_passwords,
             block_directory,
+            block_renderer,
             block_pattern_categories,
             block_patterns,
             block_types,
@@ -179,6 +182,7 @@ pub struct WpApiClient {
     api_root: Arc<ApiRootRequestExecutor>,
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
     block_directory: Arc<BlockDirectoryRequestExecutor>,
+    block_renderer: Arc<BlockRendererRequestExecutor>,
     block_pattern_categories: Arc<BlockPatternCategoriesRequestExecutor>,
     block_patterns: Arc<BlockPatternsRequestExecutor>,
     block_types: Arc<BlockTypesRequestExecutor>,
@@ -223,6 +227,7 @@ impl WpApiClient {
             api_root,
             application_passwords,
             block_directory,
+            block_renderer,
             block_pattern_categories,
             block_patterns,
             block_types,
@@ -277,6 +282,7 @@ pub trait IsWpApiClientDelegate {
 api_client_generate_endpoint_impl!(WpApi, api_root);
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
 api_client_generate_endpoint_impl!(WpApi, block_directory);
+api_client_generate_endpoint_impl!(WpApi, block_renderer);
 api_client_generate_endpoint_impl!(WpApi, block_pattern_categories);
 api_client_generate_endpoint_impl!(WpApi, block_patterns);
 api_client_generate_endpoint_impl!(WpApi, block_types);
