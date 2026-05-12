@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Block Patterns](https://developer.wordpress.org/rest-api/reference/block-patterns/) endpoint
 - [Block Types](https://developer.wordpress.org/rest-api/reference/block-types/) endpoint
 - [Editor Blocks](https://developer.wordpress.org/rest-api/reference/blocks/) endpoint
+- [Pattern Directory Items](https://developer.wordpress.org/rest-api/reference/pattern-directory-items/) endpoint
 
 ## [0.2.0] - 2026-05-05
 

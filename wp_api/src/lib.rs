@@ -32,6 +32,7 @@ pub mod nav_menus;
 pub mod navigation_revisions;
 pub mod navigations;
 pub mod parsed_url;
+pub mod pattern_directory;
 pub mod plugins;
 pub mod post_revisions;
 pub mod post_statuses;
