@@ -5,13 +5,13 @@ use crate::{
     },
     wp_content_u64_id,
 };
+use serde::{Deserialize, Serialize};
+use wp_contextual::WpContextual;
+use wp_derive::WpDeriveParamsField;
 
 wp_content_u64_id!(PatternDirectoryItemId);
 wp_content_u64_id!(PatternDirectoryCategoryId);
 wp_content_u64_id!(PatternDirectoryKeywordId);
-use serde::{Deserialize, Serialize};
-use wp_contextual::WpContextual;
-use wp_derive::WpDeriveParamsField;
 
 #[derive(
     Debug,
