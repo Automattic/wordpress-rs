@@ -108,9 +108,6 @@ pub fn post_list_filter_cache_key(filter: &PostListFilter) -> String {
 /// All fields in `MediaListFilter` are included in the cache key since it only
 /// contains filter-relevant fields (pagination, instance-specific, and date
 /// range fields are excluded by design in `MediaListFilter`).
-// TODO: Remove `allow(dead_code)` once `MediaService` (added in a follow-up task)
-// consumes this function.
-#[allow(dead_code)]
 pub fn media_list_filter_cache_key(filter: &MediaListFilter) -> String {
     let mut url = Url::parse("https://cache-key-generator.local").expect("valid base URL");
 
