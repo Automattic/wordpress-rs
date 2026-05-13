@@ -42,8 +42,8 @@ impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {
 #[derive(uniffi::Object)]
 pub struct WpService {
     media: Arc<MediaService>,
-    posts: Arc<PostService>,
     post_types: Arc<PostTypeService>,
+    posts: Arc<PostService>,
     sites: Arc<SiteService>,
 }
 
@@ -58,12 +58,12 @@ impl WpService {
         let api_client = Arc::new(WpApiClient::new(api_url_resolver, delegate));
         let db_site_arc = Arc::new(db_site);
 
-        let posts = Arc::new(PostService::new(
+        let media = Arc::new(MediaService::new(
             api_client.clone(),
             db_site_arc.clone(),
             cache.clone(),
         ));
-        let media = Arc::new(MediaService::new(
+        let posts = Arc::new(PostService::new(
             api_client.clone(),
             db_site_arc.clone(),
             cache.clone(),
@@ -72,8 +72,8 @@ impl WpService {
 
         Self {
             media,
-            posts,
             post_types,
+            posts,
             sites: site_service,
         }
     }
@@ -111,9 +111,9 @@ impl WpService {
         ))
     }
 
-    /// Get the post service for this WordPress site
-    pub fn posts(&self) -> Arc<PostService> {
-        self.posts.clone()
+    /// Get the media service for this WordPress site
+    pub fn media(&self) -> Arc<MediaService> {
+        self.media.clone()
     }
 
     /// Get the post type service for this WordPress site
@@ -121,9 +121,9 @@ impl WpService {
         self.post_types.clone()
     }
 
-    /// Get the media service for this WordPress site
-    pub fn media(&self) -> Arc<MediaService> {
-        self.media.clone()
+    /// Get the post service for this WordPress site
+    pub fn posts(&self) -> Arc<PostService> {
+        self.posts.clone()
     }
 
     /// Get the site service for this WordPress site
