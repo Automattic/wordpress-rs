@@ -937,6 +937,94 @@ mod tests {
             .create_media_metadata_collection_with_edit_context(MediaListFilter::default(), 20);
     }
 
+    /// Tests the cleanup helper directly (approach b in the bug-fix spec).
+    ///
+    /// Going through `delete_media_permanently` would require mocking a valid
+    /// `MediaDeleteResponse` JSON which adds a lot of brittle setup, so this
+    /// test covers the cleanup helper that `delete_media_permanently` calls.
+    #[rstest]
+    fn test_remove_entity_from_lists_with_key_prefix_only_removes_from_matching_keys(
+        ctx: MediaServiceTestContext,
+    ) {
+        use wp_mobile_cache::repository::list_metadata::{
+            ListMetadataItemInput, ListMetadataRepository,
+        };
+
+        let media_key: ListKey =
+            format!("site_{:?}:edit:media:filter=fake", ctx.db_site.row_id).into();
+        let posts_key: ListKey = format!("site_{:?}:edit:posts:foo", ctx.db_site.row_id).into();
+        let entity_id: i64 = 42;
+
+        // Seed two list_metadata rows (one media-prefixed, one posts-prefixed)
+        // and put `entity_id` into both.
+        ctx.cache
+            .execute(|conn| {
+                let item = ListMetadataItemInput {
+                    entity_id,
+                    modified_gmt: None,
+                    parent: None,
+                    menu_order: None,
+                };
+                ListMetadataRepository::set_items_by_list_key(
+                    conn,
+                    &ctx.db_site,
+                    &media_key,
+                    25,
+                    std::slice::from_ref(&item),
+                )?;
+                ListMetadataRepository::set_items_by_list_key(
+                    conn,
+                    &ctx.db_site,
+                    &posts_key,
+                    25,
+                    std::slice::from_ref(&item),
+                )
+            })
+            .expect("Seeding list metadata should succeed");
+
+        // Sanity: both lists reference the entity before cleanup.
+        assert!(
+            ctx.media_service
+                .metadata_service
+                .list_contains_entity(&media_key, entity_id)
+                .expect("contains check"),
+            "media list should contain the entity before cleanup"
+        );
+        assert!(
+            ctx.media_service
+                .metadata_service
+                .list_contains_entity(&posts_key, entity_id)
+                .expect("contains check"),
+            "posts list should contain the entity before cleanup"
+        );
+
+        // Act: scrub the entity from media-prefixed lists only.
+        let media_list_prefix = format!("site_{:?}:edit:media:", ctx.db_site.row_id);
+        let removed = ctx
+            .media_service
+            .metadata_service
+            .remove_entity_from_lists_with_key_prefix(&media_list_prefix, entity_id)
+            .expect("cleanup should succeed");
+        assert_eq!(removed, 1, "should remove exactly one row");
+
+        // Media list no longer references 42.
+        assert!(
+            !ctx.media_service
+                .metadata_service
+                .list_contains_entity(&media_key, entity_id)
+                .expect("contains check"),
+            "media list should NOT contain the entity after cleanup"
+        );
+        // Posts list still references 42 (no over-match on the prefix).
+        assert!(
+            ctx.media_service
+                .metadata_service
+                .list_contains_entity(&posts_key, entity_id)
+                .expect("contains check"),
+            "posts list should still contain the entity (prefix-scoped delete must not over-match)"
+        );
+    }
+
     #[fixture]
     fn ctx(mock_api_client: Arc<WpApiClient>) -> MediaServiceTestContext {
         let mut conn = Connection::open_in_memory().expect("Failed to create in-memory database");
