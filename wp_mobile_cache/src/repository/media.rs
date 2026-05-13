@@ -476,18 +476,12 @@ mod tests {
     use super::*;
     use crate::{
         MigrationManager, db_types::self_hosted_site::SelfHostedSite,
-        repository::sites::SiteRepository,
+        repository::sites::SiteRepository, test_fixtures::media::MediaBuilder,
     };
     use rusqlite::Connection;
     use wp_api::{
-        media::{
-            MediaCaptionWithEditContext, MediaDescriptionWithEditContext, MediaDetails, MediaId,
-            MediaStatus, MediaType, MediaWithEditContext,
-        },
-        posts::{
-            PostCommentStatus, PostGuidWithEditContext, PostPingStatus, PostTitleWithEditContext,
-        },
-        users::UserId,
+        media::{MediaId, MediaStatus},
+        posts::PostTitleWithEditContext,
     };
 
     fn setup_db() -> (Connection, DbSite) {
@@ -507,52 +501,6 @@ mod tests {
         (conn, db_site)
     }
 
-    fn make_media(id: i64) -> MediaWithEditContext {
-        MediaWithEditContext {
-            id: MediaId(id),
-            date: "2026-01-01T00:00:00".into(),
-            date_gmt: "2026-01-01T00:00:00Z".parse().unwrap(),
-            guid: PostGuidWithEditContext {
-                raw: None,
-                rendered: format!("https://example.com/?p={id}"),
-            },
-            link: format!("https://example.com/{id}"),
-            modified: "2026-01-01T00:00:00".into(),
-            modified_gmt: "2026-01-01T00:00:00Z".parse().unwrap(),
-            slug: format!("media-{id}"),
-            status: MediaStatus::Inherit,
-            post_type: "attachment".into(),
-            password: None,
-            permalink_template: format!("https://example.com/?attachment_id={id}"),
-            generated_slug: format!("media-{id}"),
-            title: PostTitleWithEditContext {
-                raw: None,
-                rendered: format!("Media {id}"),
-            },
-            author: UserId(1),
-            comment_status: PostCommentStatus::Open,
-            ping_status: PostPingStatus::Open,
-            template: String::new(),
-            alt_text: String::new(),
-            caption: MediaCaptionWithEditContext {
-                raw: String::new(),
-                rendered: String::new(),
-            },
-            description: MediaDescriptionWithEditContext {
-                raw: String::new(),
-                rendered: String::new(),
-            },
-            media_type: MediaType::File,
-            mime_type: "application/octet-stream".into(),
-            media_details: Arc::new(MediaDetails {
-                payload: serde_json::value::RawValue::from_string("{}".into()).unwrap(),
-            }),
-            post_id: None,
-            source_url: format!("https://example.com/media-{id}.bin"),
-            missing_image_sizes: Vec::new(),
-        }
-    }
-
     #[test]
     fn select_by_media_id_returns_none_when_empty() {
         let (conn, site) = setup_db();
@@ -567,7 +515,10 @@ mod tests {
     fn upsert_then_select_by_media_id_round_trips_fields() {
         let (mut conn, site) = setup_db();
         let repo = MediaRepository::<EditContext>::new();
-        let media = make_media(42);
+        let media = MediaBuilder::minimal()
+            .with_id(42)
+            .with_slug("media-42")
+            .build();
 
         repo.upsert(&mut conn, &site, &media).expect("upsert");
         let retrieved = repo
@@ -585,10 +536,10 @@ mod tests {
         let (mut conn, site) = setup_db();
         let repo = MediaRepository::<EditContext>::new();
 
-        let first = make_media(7);
+        let first = MediaBuilder::minimal().with_id(7).build();
         repo.upsert(&mut conn, &site, &first).expect("first upsert");
 
-        let mut second = make_media(7);
+        let mut second = MediaBuilder::minimal().with_id(7).build();
         second.title = PostTitleWithEditContext {
             raw: Some("Updated raw".into()),
             rendered: "Updated rendered".into(),
@@ -613,8 +564,8 @@ mod tests {
         let (mut conn, site) = setup_db();
         let repo = MediaRepository::<EditContext>::new();
         for id in 1..=3 {
-            repo.upsert(&mut conn, &site, &make_media(id))
-                .expect("upsert");
+            let media = MediaBuilder::minimal().with_id(id).build();
+            repo.upsert(&mut conn, &site, &media).expect("upsert");
         }
         assert_eq!(repo.count(&conn, &site).expect("count"), 3);
     }
@@ -623,8 +574,8 @@ mod tests {
     fn delete_by_media_id_returns_one_and_removes_row() {
         let (mut conn, site) = setup_db();
         let repo = MediaRepository::<EditContext>::new();
-        repo.upsert(&mut conn, &site, &make_media(1))
-            .expect("upsert");
+        let media = MediaBuilder::minimal().with_id(1).build();
+        repo.upsert(&mut conn, &site, &media).expect("upsert");
 
         let deleted = repo
             .delete_by_media_id(&conn, &site, MediaId(1))
