@@ -85,6 +85,8 @@ pub enum DbTable {
     PostsEmbedContext,
     /// Post types with edit context (post type configuration data)
     PostTypesEditContext,
+    /// Media with edit context (full media data for editing)
+    MediaEditContext,
     /// Self-hosted WordPress sites
     SelfHostedSites,
     /// Database sites mapping table
@@ -114,6 +116,7 @@ impl DbTable {
             DbTable::PostsViewContext => "posts_view_context",
             DbTable::PostsEmbedContext => "posts_embed_context",
             DbTable::PostTypesEditContext => "post_types_edit_context",
+            DbTable::MediaEditContext => "media_edit_context",
             DbTable::SelfHostedSites => "self_hosted_sites",
             DbTable::DbSites => "db_sites",
             DbTable::TermRelationships => "term_relationships",
@@ -148,6 +151,7 @@ impl TryFrom<&str> for DbTable {
             "posts_view_context" => Ok(DbTable::PostsViewContext),
             "posts_embed_context" => Ok(DbTable::PostsEmbedContext),
             "post_types_edit_context" => Ok(DbTable::PostTypesEditContext),
+            "media_edit_context" => Ok(DbTable::MediaEditContext),
             "self_hosted_sites" => Ok(DbTable::SelfHostedSites),
             "db_sites" => Ok(DbTable::DbSites),
             "term_relationships" => Ok(DbTable::TermRelationships),
@@ -444,7 +448,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 13] = [
+static MIGRATION_QUERIES: [&str; 14] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -458,6 +462,7 @@ static MIGRATION_QUERIES: [&str; 13] = [
     include_str!("../migrations/0011-add-additional-fields-to-posts-tables.sql"),
     include_str!("../migrations/0012-invalidate-post-entity-states.sql"),
     include_str!("../migrations/0013-invalidate-post-entity-states-for-meta.sql"),
+    include_str!("../migrations/0014-create-media-edit-context-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {
