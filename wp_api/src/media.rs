@@ -359,7 +359,6 @@ impl From<MediaCreateParams> for HashMap<String, String> {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
-#[WpContextualDontDerivePartialEq]
 pub struct SparseMedia {
     #[WpContext(edit, embed, view)]
     pub id: Option<MediaId>,
@@ -428,6 +427,7 @@ pub struct SparseMedia {
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Object)]
 #[serde(transparent)]
+#[uniffi::export(Eq, Hash)]
 pub struct MediaDetails {
     pub payload: Box<RawValue>,
 }
@@ -454,6 +454,20 @@ impl MediaDetails {
         serde_json::from_str::<DocumentMediaDetails>(self.payload.get())
             .ok()
             .map(MediaDetailsPayload::Document)
+    }
+}
+
+impl PartialEq for MediaDetails {
+    fn eq(&self, other: &Self) -> bool {
+        self.payload.get() == other.payload.get()
+    }
+}
+
+impl Eq for MediaDetails {}
+
+impl std::hash::Hash for MediaDetails {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.payload.get().hash(state);
     }
 }
 
