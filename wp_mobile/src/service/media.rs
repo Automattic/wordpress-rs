@@ -855,6 +855,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_load_media_by_ids_includes_all_attachment_statuses_in_request() {
+        // The metadata pass can use `MediaListFilter.status = [Private]`, so the
+        // hydration follow-up via `include` must explicitly pass every core
+        // attachment status to bypass the REST controller's `status=inherit`
+        // default. Otherwise the included IDs get filtered back out and end up
+        // marked Failed("Not found").
+        let service = service_with_network_error();
+
+        let result = service
+            .load_media_by_ids(vec![MediaId(1), MediaId(2)])
+            .await;
+
+        let request_url = match result {
+            Err(FetchError::Api(WpApiError::RequestExecutionFailed { request_url, .. })) => {
+                request_url
+            }
+            Err(other) => panic!("Expected RequestExecutionFailed, got: {:?}", other),
+            Ok(_) => panic!("Expected network error, got Ok"),
+        };
+
+        // URL-encoded comma is %2C
+        assert!(
+            request_url.contains("status=inherit%2Cprivate%2Ctrash"),
+            "expected request URL to include status=inherit,private,trash; got {}",
+            request_url
+        );
+    }
+
+    #[tokio::test]
     async fn test_load_media_by_ids_marks_all_as_failed_on_network_error() {
         let service = service_with_network_error();
 
