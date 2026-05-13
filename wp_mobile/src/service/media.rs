@@ -619,6 +619,23 @@ impl MediaService {
                 err_message: e.to_string(),
             })?;
 
+        // Scrub the deleted media from every cached media list. Without this,
+        // collection load_items would return a phantom row that converts to
+        // `Missing`/`Stale` until the next full refresh. Failure here is
+        // logged but not propagated: the REST delete and local row delete
+        // already succeeded.
+        let media_list_prefix = format!("site_{:?}:edit:media:", self.db_site.row_id);
+        if let Err(e) = self
+            .metadata_service
+            .remove_entity_from_lists_with_key_prefix(&media_list_prefix, media_id.0)
+        {
+            log::warn!(
+                "Failed to remove deleted media id {} from list metadata: {}",
+                media_id.0,
+                e
+            );
+        }
+
         Ok(response)
     }
 
