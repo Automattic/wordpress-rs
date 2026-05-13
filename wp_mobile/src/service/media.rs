@@ -31,10 +31,16 @@ use wp_mobile_cache::{
 /// Maximum number of media items to fetch in a single batch request
 const BATCH_FETCH_SIZE: usize = 100;
 
-/// All core WordPress attachment statuses. Used by `load_media_by_ids` to
+/// All WordPress *core* attachment statuses. Used by `load_media_by_ids` to
 /// bypass the REST default of `status=inherit` so we can hydrate items the
 /// metadata pass returned via a status filter on the user's `MediaListFilter`.
-const ALL_ATTACHMENT_STATUSES: &[MediaStatus] = &[
+///
+/// Limitation: plugin-defined custom attachment statuses (`MediaStatus::Custom`)
+/// are not enumerated here, so a metadata-pass hit on a custom-status item
+/// would still fall through to `Failed("Not found")` on hydration. Threading
+/// the caller's filter statuses through `load_media_by_ids` would close that
+/// gap; not worth the signature change until a real consumer requires it.
+const ALL_CORE_ATTACHMENT_STATUSES: &[MediaStatus] = &[
     MediaStatus::Inherit,
     MediaStatus::Private,
     MediaStatus::Trash,
@@ -378,7 +384,7 @@ impl MediaService {
 
     /// Load media items by IDs from network to cache with state tracking.
     ///
-    /// Mirrors `PostService::load_posts_by_ids`. Passes `ALL_ATTACHMENT_STATUSES`
+    /// Mirrors `PostService::load_posts_by_ids`. Passes `ALL_CORE_ATTACHMENT_STATUSES`
     /// explicitly so the REST controller's `status=inherit` default doesn't filter
     /// out IDs the metadata pass surfaced via a `status` filter (e.g. `Private` or
     /// `Trash`).
@@ -421,7 +427,7 @@ impl MediaService {
         let params = MediaListParams {
             include: media_ids,
             per_page: Some(BATCH_FETCH_SIZE as u32),
-            status: ALL_ATTACHMENT_STATUSES.to_vec(),
+            status: ALL_CORE_ATTACHMENT_STATUSES.to_vec(),
             ..Default::default()
         };
 
