@@ -31,15 +31,10 @@ use wp_mobile_cache::{
 /// Maximum number of media items to fetch in a single batch request
 const BATCH_FETCH_SIZE: usize = 100;
 
-/// All WordPress *core* attachment statuses. Used by `load_media_by_ids` to
-/// bypass the REST default of `status=inherit` so we can hydrate items the
-/// metadata pass returned via a status filter on the user's `MediaListFilter`.
-///
-/// Limitation: plugin-defined custom attachment statuses (`MediaStatus::Custom`)
-/// are not enumerated here, so a metadata-pass hit on a custom-status item
-/// would still fall through to `Failed("Not found")` on hydration. Threading
-/// the caller's filter statuses through `load_media_by_ids` would close that
-/// gap; not worth the signature change until a real consumer requires it.
+/// Core WordPress attachment statuses. Used by `load_media_by_ids` as the
+/// baseline for hydration requests; the caller's filter statuses are unioned
+/// in so a `MediaListFilter` containing `MediaStatus::Custom(...)` still
+/// produces a hydration request that matches what the metadata pass returned.
 const ALL_CORE_ATTACHMENT_STATUSES: &[MediaStatus] = &[
     MediaStatus::Inherit,
     MediaStatus::Private,
@@ -308,7 +303,7 @@ impl MediaService {
                 failed_count: 0,
             },
             SyncStrategy::Full => {
-                self.fetch_missing_and_stale_media(&metadata_result.metadata)
+                self.fetch_missing_and_stale_media(&metadata_result.metadata, filter)
                     .await
             }
         };
@@ -339,6 +334,7 @@ impl MediaService {
     pub(crate) async fn fetch_missing_and_stale_media(
         &self,
         metadata: &[EntityMetadata],
+        filter: &MediaListFilter,
     ) -> FetchStats {
         let ids_to_fetch: Vec<MediaId> = metadata
             .iter()
@@ -359,7 +355,7 @@ impl MediaService {
 
         if !ids_to_fetch.is_empty() {
             for chunk in ids_to_fetch.chunks(BATCH_FETCH_SIZE) {
-                match self.load_media_by_ids(chunk.to_vec()).await {
+                match self.load_media_by_ids(chunk.to_vec(), &filter.status).await {
                     Ok(result) => {
                         failed_count += result.failed_count;
                     }
@@ -384,13 +380,15 @@ impl MediaService {
 
     /// Load media items by IDs from network to cache with state tracking.
     ///
-    /// Mirrors `PostService::load_posts_by_ids`. Passes `ALL_CORE_ATTACHMENT_STATUSES`
-    /// explicitly so the REST controller's `status=inherit` default doesn't filter
-    /// out IDs the metadata pass surfaced via a `status` filter (e.g. `Private` or
-    /// `Trash`).
+    /// Mirrors `PostService::load_posts_by_ids`. The request's `status` query
+    /// param is the union of `ALL_CORE_ATTACHMENT_STATUSES` and
+    /// `additional_statuses`, so the hydration request matches whatever the
+    /// metadata pass returned (including plugin-defined `MediaStatus::Custom`
+    /// values from the caller's filter).
     pub async fn load_media_by_ids(
         &self,
         ids: Vec<MediaId>,
+        additional_statuses: &[MediaStatus],
     ) -> Result<LoadByIdsResult, FetchError> {
         if ids.is_empty() {
             return Ok(LoadByIdsResult {
@@ -424,10 +422,17 @@ impl MediaService {
 
         let media_ids: Vec<MediaId> = fetchable.iter().map(|&id| MediaId(id)).collect();
 
+        let mut statuses: Vec<MediaStatus> = ALL_CORE_ATTACHMENT_STATUSES.to_vec();
+        for status in additional_statuses {
+            if !statuses.contains(status) {
+                statuses.push(status.clone());
+            }
+        }
+
         let params = MediaListParams {
             include: media_ids,
             per_page: Some(BATCH_FETCH_SIZE as u32),
-            status: ALL_CORE_ATTACHMENT_STATUSES.to_vec(),
+            status: statuses,
             ..Default::default()
         };
 
@@ -899,7 +904,7 @@ mod tests {
         let service = service_with_network_error();
 
         let result = service
-            .load_media_by_ids(vec![MediaId(1), MediaId(2)])
+            .load_media_by_ids(vec![MediaId(1), MediaId(2)], &[])
             .await;
 
         let request_url = match result {
@@ -962,7 +967,7 @@ mod tests {
         let service = service_with_network_error();
 
         let result = service
-            .load_media_by_ids(vec![MediaId(1), MediaId(2)])
+            .load_media_by_ids(vec![MediaId(1), MediaId(2)], &[])
             .await;
 
         assert!(result.is_err(), "Network error should return Err");
