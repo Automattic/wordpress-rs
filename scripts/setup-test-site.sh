@@ -161,6 +161,13 @@ create_navigation_autosave() {
   curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/navigation/$navigation_id/autosaves"
 }
 
+create_global_styles_revision() {
+  local revision_number="$1"
+  local global_styles_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -X POST -H "Content-Type: application/json" -d "{\"settings\":{\"color\":{\"palette\":{\"custom\":[{\"slug\":\"rev-$revision_number\",\"color\":\"#00${revision_number}000\",\"name\":\"Revision $revision_number\"}]}}}}" "http://localhost/wp-json/wp/v2/global-styles/$global_styles_id" > /dev/null
+}
+
 create_test_credentials () {
   local SITE_URL
   local ADMIN_USERNAME
@@ -354,6 +361,13 @@ create_test_credentials () {
   echo "Getting global styles ID for integration tests.."
   GLOBAL_STYLES_ID="$(wp eval 'echo WP_Theme_JSON_Resolver::get_user_global_styles_post_id();')"
 
+  echo "Setting up global styles with 10 revisions for integration tests.."
+  for i in {1..10};
+  do
+    create_global_styles_revision "$i" "$GLOBAL_STYLES_ID"
+  done
+  REVISION_ID_FOR_GLOBAL_STYLES_ID=$((GLOBAL_STYLES_ID + 1))
+
   rm -rf /app/test_credentials.json
   jo -p \
     site_url="$SITE_URL" \
@@ -408,6 +422,7 @@ create_test_credentials () {
     block_id="$BLOCK_ID" \
     global_styles_id="$GLOBAL_STYLES_ID" \
     revision_id_for_block_id="$REVISION_ID_FOR_BLOCK_ID" \
+    revision_id_for_global_styles_id="$REVISION_ID_FOR_GLOBAL_STYLES_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials
