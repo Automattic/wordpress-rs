@@ -919,6 +919,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_load_media_by_ids_includes_custom_status_from_filter() {
+        // Regression test for code-review-2 Finding 2: custom attachment statuses
+        // from the caller's filter must be included in the hydration request so
+        // custom-status items don't fall through to Failed("Not found").
+        let service = service_with_network_error();
+        let custom_status = wp_api::media::MediaStatus::Custom("workflow".to_string());
+        let result = service
+            .load_media_by_ids(vec![wp_api::media::MediaId(1)], &[custom_status])
+            .await;
+
+        let url = match result {
+            Err(FetchError::Api(WpApiError::RequestExecutionFailed { request_url, .. })) => {
+                request_url
+            }
+            Err(other) => panic!("expected RequestExecutionFailed; got {:?}", other),
+            Ok(_) => panic!("Expected network error, got Ok"),
+        };
+
+        // URL-encoded comma is %2C. The hydration request must include the custom
+        // status in addition to the core defaults.
+        assert!(
+            url.contains("status="),
+            "expected request URL to include status= param; got {}",
+            url
+        );
+        assert!(
+            url.contains("workflow"),
+            "expected request URL to include the custom status `workflow`; got {}",
+            url
+        );
+        // Core statuses must still be present so this doesn't regress Finding 1.
+        assert!(
+            url.contains("inherit") && url.contains("private") && url.contains("trash"),
+            "expected request URL to include all core statuses; got {}",
+            url
+        );
+    }
+
+    #[tokio::test]
     async fn test_load_media_by_ids_marks_all_as_failed_on_network_error() {
         let service = service_with_network_error();
 
