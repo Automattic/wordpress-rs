@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Global Styles Revisions](https://developer.wordpress.org/rest-api/reference/wp_global_styles-revisions/) endpoint
 - [Pattern Directory Items](https://developer.wordpress.org/rest-api/reference/pattern-directory-items/) endpoint
 - [Rendered Blocks](https://developer.wordpress.org/rest-api/reference/rendered-blocks/) endpoint
+- [Sidebars](https://developer.wordpress.org/rest-api/reference/sidebars/) endpoint
 - `MediaService` on `WpService` (sync, fetch, state tracking, `delete_media_permanently`) and `MediaMetadataCollectionWithEditContext`, mirroring the existing `PostService` / `PostMetadataCollectionWithEditContext` pattern for a cached, paginated, observable media list
 - `MediaListFilter`, the subset of `MediaListParams` that backs `MediaService.create_media_metadata_collection_with_edit_context` (excludes pagination, include/exclude, and date ranges)
 - `wp_mobile_cache` storage for media: `media_edit_context` table (migration 0014), `DbTable::MediaEditContext`, `EntityType::MediaEditContext`, and a `MediaRepository<EditContext>` mirroring `PostRepository` minus term relationships
