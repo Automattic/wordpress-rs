@@ -3,6 +3,7 @@ use rusqlite::Connection;
 
 pub mod entity_state;
 pub mod list_metadata;
+pub mod media;
 pub mod post_types;
 pub mod posts;
 pub mod sites;
