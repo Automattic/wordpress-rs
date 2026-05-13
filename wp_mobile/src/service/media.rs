@@ -1,7 +1,9 @@
 use crate::{
     EntityMediaWithEditContext,
     cache_key::media_list_filter_cache_key,
-    collection::{FetchError, FetchResult, MetadataCollectionCore},
+    collection::{
+        FetchError, FetchResult, MediaMetadataCollectionWithEditContext, MetadataCollectionCore,
+    },
     filters::MediaListFilter,
     service::{
         entity_state_service::{EntityStateReader, EntityStateReaderImpl, EntityStateService},
@@ -45,31 +47,6 @@ pub(crate) struct FetchStats {
     pub(crate) fetched_count: usize,
     /// Number of media items that failed to fetch
     pub(crate) failed_count: usize,
-}
-
-/// Stub for `MediaMetadataCollectionWithEditContext`.
-///
-/// TODO: replaced by Task 7. This placeholder lets `MediaService` expose the
-/// collection factory now; the real type lands with the collection module.
-#[derive(uniffi::Object)]
-pub struct MediaMetadataCollectionWithEditContext {
-    _core: MetadataCollectionCore,
-    _service: Arc<MediaService>,
-    _filter: MediaListFilter,
-}
-
-impl MediaMetadataCollectionWithEditContext {
-    pub fn new(
-        core: MetadataCollectionCore,
-        service: Arc<MediaService>,
-        filter: MediaListFilter,
-    ) -> Self {
-        Self {
-            _core: core,
-            _service: service,
-            _filter: filter,
-        }
-    }
 }
 
 /// Service layer for media operations
@@ -913,7 +890,7 @@ mod tests {
     fn test_create_media_metadata_collection_with_edit_context_returns_arc(
         ctx: MediaServiceTestContext,
     ) {
-        // Sanity check: the factory wires the stub collection without panicking.
+        // Sanity check: the factory wires the collection without panicking.
         let _collection = ctx
             .media_service
             .create_media_metadata_collection_with_edit_context(MediaListFilter::default(), 20);
