@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Editor Blocks](https://developer.wordpress.org/rest-api/reference/blocks/) endpoint
 - [Block Revisions](https://developer.wordpress.org/rest-api/reference/block-revisions/) endpoint
 - [Global Styles](https://developer.wordpress.org/rest-api/reference/wp_global_styles/) endpoint
+- [Global Styles Revisions](https://developer.wordpress.org/rest-api/reference/wp_global_styles-revisions/) endpoint
 - [Pattern Directory Items](https://developer.wordpress.org/rest-api/reference/pattern-directory-items/) endpoint
 - [Rendered Blocks](https://developer.wordpress.org/rest-api/reference/rendered-blocks/) endpoint
 - `MediaService` on `WpService` (sync, fetch, state tracking, `delete_media_permanently`) and `MediaMetadataCollectionWithEditContext`, mirroring the existing `PostService` / `PostMetadataCollectionWithEditContext` pattern for a cached, paginated, observable media list
