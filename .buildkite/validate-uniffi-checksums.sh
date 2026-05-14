@@ -106,10 +106,6 @@ extract_so_checksums() {
         return
     fi
 
-    # Build comma-separated symbol list for --disassemble-symbols
-    local sym_list
-    sym_list=$(echo "$symbols" | tr '\n' ',' | sed 's/,$//')
-
     # Determine the right triple for correct disassembly
     local triple_args=()
     if [ -n "$abi" ]; then
@@ -120,36 +116,33 @@ extract_so_checksums() {
         fi
     fi
 
-    # Disassemble only the checksum functions and extract return values.
-    # Each checksum function is a single immediate load + return:
-    #   aarch64: mov w0, #0x1234 ; ret
-    #   thumb2:  movw/mov.w/movs r0, #0x1234 ; bx lr
-    #   x86:     movl $0x1234, %eax ; retl/retq
-    "$OBJDUMP" -d "${triple_args[@]}" --disassemble-symbols="$sym_list" "$so_file" 2>/dev/null \
-    | python3 -c "
-import re, sys
+    # Disassemble checksum functions in batches to avoid command-line length limits.
+    local script_dir
+    script_dir="$(cd "$(dirname "$0")" && pwd)"
+    local batch_size=200
+    local sym_array
+    IFS=$'\n' read -r -d '' -a sym_array <<< "$symbols" || true
 
-current_fn = None
-for line in sys.stdin:
-    # Match function labels: <uniffi_wp_api_checksum_func_foo>:
-    fn_match = re.search(r'<_?(uniffi_\w*checksum_\w+)>:', line)
-    if fn_match:
-        current_fn = fn_match.group(1)
-        continue
-    if current_fn:
-        # ARM/AArch64: #0xNNNN
-        m = re.search(r'#(0x[0-9a-fA-F]+)', line)
-        if not m:
-            # x86 Intel syntax: mov eax, 0xNNNN or movabs rax, 0xNNNN
-            m = re.search(r'(?:mov\w*)\s+\w+,\s*(0x[0-9a-fA-F]+)', line)
-        if not m:
-            # x86 AT&T syntax: movl \$0xNNNN, %eax
-            m = re.search(r'\\\$(0x[0-9a-fA-F]+)', line)
-        if m:
-            val = int(m.group(1), 16)
-            print(f'{current_fn} {val}')
-            current_fn = None
-" | sort > "$out_file"
+    : > "$out_file.raw"
+    local i=0
+    while [ "$i" -lt "${#sym_array[@]}" ]; do
+        local batch=()
+        local j=0
+        while [ "$j" -lt "$batch_size" ] && [ "$((i + j))" -lt "${#sym_array[@]}" ]; do
+            batch+=("${sym_array[$((i + j))]}")
+            j=$((j + 1))
+        done
+        local sym_list
+        sym_list=$(IFS=,; echo "${batch[*]}")
+
+        "$OBJDUMP" -d "${triple_args[@]}" --disassemble-symbols="$sym_list" "$so_file" 2>/dev/null \
+        >> "$out_file.raw"
+
+        i=$((i + batch_size))
+    done
+
+    python3 "$script_dir/parse-uniffi-checksums.py" < "$out_file.raw" | sort > "$out_file"
+    rm -f "$out_file.raw"
 }
 
 compare_checksums() {
@@ -170,49 +163,65 @@ compare_checksums() {
         return 1
     fi
 
-    local diff_output
-    diff_output=$(diff "$kotlin_file" "$so_file" || true)
+    # UniFFI generates checksum functions in the .so for record field accessors
+    # that the Kotlin side doesn't validate. Extra functions in the .so are
+    # harmless. What matters for the runtime crash is:
+    #   1. Functions Kotlin expects that are MISSING from the .so
+    #   2. Functions present in BOTH with DIFFERENT values
+    local kotlin_names so_names
+    kotlin_names=$(awk '{print $1}' "$kotlin_file")
+    so_names=$(awk '{print $1}' "$so_file")
 
-    if [ -z "$diff_output" ]; then
-        echo "  $abi: OK ($so_count/$kotlin_count checksums match)"
-        return 0
-    else
-        local only_in_kotlin only_in_so value_mismatches
-        only_in_kotlin=$(echo "$diff_output" | grep -c '^< ' || true)
-        only_in_so=$(echo "$diff_output" | grep -c '^> ' || true)
+    local missing_from_so
+    missing_from_so=$(comm -23 <(echo "$kotlin_names") <(echo "$so_names"))
+    local missing_count
+    missing_count=$(echo "$missing_from_so" | grep -c . || true)
 
-        # Separate missing functions from value mismatches
-        local kotlin_names so_names
-        kotlin_names=$(awk '{print $1}' "$kotlin_file")
-        so_names=$(awk '{print $1}' "$so_file")
-        local missing_from_so missing_from_kotlin
-        missing_from_so=$(comm -23 <(echo "$kotlin_names") <(echo "$so_names") | wc -l | tr -d ' ')
-        missing_from_kotlin=$(comm -13 <(echo "$kotlin_names") <(echo "$so_names") | wc -l | tr -d ' ')
-        local common_names
-        common_names=$(comm -12 <(echo "$kotlin_names") <(echo "$so_names"))
-        value_mismatches=0
-        if [ -n "$common_names" ]; then
-            value_mismatches=$(
-                diff \
-                    <(echo "$common_names" | while read -r name; do grep "^$name " "$kotlin_file"; done) \
-                    <(echo "$common_names" | while read -r name; do grep "^$name " "$so_file"; done) \
-                | grep -c '^[<>]' || true
-            )
+    local extra_in_so
+    extra_in_so=$(comm -13 <(echo "$kotlin_names") <(echo "$so_names") | wc -l | tr -d ' ')
+
+    # Check value mismatches on shared functions
+    local common_names
+    common_names=$(comm -12 <(echo "$kotlin_names") <(echo "$so_names"))
+    local value_mismatches=0
+    local value_diff=""
+    if [ -n "$common_names" ]; then
+        value_diff=$(
+            diff \
+                <(echo "$common_names" | while read -r name; do grep "^$name " "$kotlin_file"; done) \
+                <(echo "$common_names" | while read -r name; do grep "^$name " "$so_file"; done) \
+            || true
+        )
+        if [ -n "$value_diff" ]; then
+            value_mismatches=$(echo "$value_diff" | grep -c '^[<>]' || true)
             value_mismatches=$((value_mismatches / 2))
         fi
+    fi
+    local common_count
+    common_count=$(echo "$common_names" | grep -c . || true)
+    local matched_count=$((common_count - value_mismatches))
 
-        echo "  $abi: MISMATCH (kotlin=$kotlin_count, so=$so_count)"
-        if [ "$missing_from_so" -gt 0 ]; then
-            echo "    Functions in Kotlin but not in .so: $missing_from_so"
-        fi
-        if [ "$missing_from_kotlin" -gt 0 ]; then
-            echo "    Functions in .so but not in Kotlin: $missing_from_kotlin"
+    local failed=0
+    if [ "$missing_count" -gt 0 ] || [ "$value_mismatches" -gt 0 ]; then
+        failed=1
+    fi
+
+    if [ "$failed" -eq 0 ]; then
+        echo "  $abi: OK ($matched_count/$kotlin_count checksums verified, $extra_in_so extra in .so)"
+        return 0
+    else
+        echo "  $abi: FAILED"
+        if [ "$missing_count" -gt 0 ]; then
+            echo "    Functions in Kotlin but missing from .so: $missing_count"
+            echo "$missing_from_so" | head -10 | sed 's/^/      /'
         fi
         if [ "$value_mismatches" -gt 0 ]; then
             echo "    Value mismatches on shared functions: $value_mismatches"
+            echo "$value_diff" | head -20 | sed 's/^/      /'
         fi
-        echo "    First differences:"
-        echo "$diff_output" | head -20 | sed 's/^/      /'
+        if [ "$extra_in_so" -gt 0 ]; then
+            echo "    (Also $extra_in_so extra functions in .so — these are harmless)"
+        fi
         return 1
     fi
 }
