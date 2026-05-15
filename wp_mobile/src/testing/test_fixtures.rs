@@ -51,7 +51,9 @@ impl RequestExecutor for MockExecutor {
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
         let mut q = self.upload_queue.lock().unwrap();
         if q.is_empty() {
-            panic!("MockExecutor::upload called with no queued response — did the test call `enqueue_upload_response` first?");
+            panic!(
+                "MockExecutor::upload called with no queued response — did the test call `enqueue_upload_response` first?"
+            );
         }
         q.remove(0)
     }

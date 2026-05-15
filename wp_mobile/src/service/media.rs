@@ -11,7 +11,10 @@ use crate::{
     },
     sync::{DbEntityState, EntityMetadata, MetadataFetchResult, SyncResult, SyncStrategy},
 };
-use std::{collections::HashSet, sync::{Arc, Mutex, Weak}};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex, Weak},
+};
 use wp_api::{
     api_client::WpApiClient,
     media::{
@@ -754,9 +757,7 @@ impl MediaService {
         };
 
         for collection in &live_collections {
-            if let Err(e) =
-                collection.update_media_membership(wp_api::media::MediaId(media_id))
-            {
+            if let Err(e) = collection.update_media_membership(wp_api::media::MediaId(media_id)) {
                 log::error!(
                     "Failed to update media membership for media {}: {}",
                     media_id,
@@ -770,22 +771,22 @@ impl MediaService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::filters::MediaListFilter;
     use crate::testing::{EmptyAppNotifier, MockExecutor, mock_api_client};
     use rstest::*;
     use rusqlite::Connection;
+    use wp_api::media::MediaStatus;
+    use wp_api::posts::WpApiParamPostsOrderBy;
     use wp_api::{media::MediaId, prelude::*};
+    use wp_mobile_cache::repository::list_metadata::{
+        ListMetadataItemInput, ListMetadataRepository,
+    };
     use wp_mobile_cache::{
         MigrationManager, WpApiCache,
         db_types::self_hosted_site::SelfHostedSite,
         repository::{media::MediaRepository, sites::SiteRepository},
         test_fixtures::media::MediaBuilder,
     };
-    use wp_api::media::MediaStatus;
-    use wp_api::posts::WpApiParamPostsOrderBy;
-    use wp_mobile_cache::repository::list_metadata::{
-        ListMetadataItemInput, ListMetadataRepository,
-    };
-    use crate::filters::MediaListFilter;
 
     /// Test context bundling MediaService with database and site setup
     pub struct MediaServiceTestContext {
@@ -1007,7 +1008,9 @@ mod tests {
 
         let mut conn = Connection::open_in_memory().expect("Create in-memory database");
         let mut migration_manager = MigrationManager::new(&conn).expect("Create migration manager");
-        migration_manager.perform_migrations().expect("Migrations succeed");
+        migration_manager
+            .perform_migrations()
+            .expect("Migrations succeed");
 
         let site_repo = SiteRepository;
         let self_hosted_site = SelfHostedSite {
@@ -1356,9 +1359,7 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    async fn update_media_membership_no_op_when_already_consistent(
-        ctx: MediaServiceTestContext,
-    ) {
+    async fn update_media_membership_no_op_when_already_consistent(ctx: MediaServiceTestContext) {
         let service = ctx.media_service.clone();
         let filter = MediaListFilter {
             orderby: Some(WpApiParamPostsOrderBy::Id),
@@ -1400,9 +1401,7 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    async fn update_media_membership_silent_skip_under_active_search(
-        ctx: MediaServiceTestContext,
-    ) {
+    async fn update_media_membership_silent_skip_under_active_search(ctx: MediaServiceTestContext) {
         let service = ctx.media_service.clone();
         // Active search filter → non-deterministic ordering by default (relevance).
         let filter = MediaListFilter {
@@ -1430,7 +1429,10 @@ mod tests {
             .unwrap();
 
         let items = collection.load_items().await.unwrap();
-        assert!(items.is_empty(), "silent-skip under relevance: list stays empty");
+        assert!(
+            items.is_empty(),
+            "silent-skip under relevance: list stays empty"
+        );
     }
 
     #[rstest]
@@ -1565,17 +1567,15 @@ mod tests {
 
         // Queue a network-style failure on the next upload(...). All five
         // fields of RequestExecutionFailed are required (wp_api/src/api_error.rs:586-593).
-        mock_executor.enqueue_upload_response(Err(
-            RequestExecutionError::RequestExecutionFailed {
-                status_code: None,
-                redirects: None,
-                reason: RequestExecutionErrorReason::GenericError {
-                    error_message: "simulated network failure".to_string(),
-                },
-                request_url: "https://test.local/wp-json/wp/v2/media".to_string(),
-                request_method: RequestMethod::POST,
+        mock_executor.enqueue_upload_response(Err(RequestExecutionError::RequestExecutionFailed {
+            status_code: None,
+            redirects: None,
+            reason: RequestExecutionErrorReason::GenericError {
+                error_message: "simulated network failure".to_string(),
             },
-        ));
+            request_url: "https://test.local/wp-json/wp/v2/media".to_string(),
+            request_method: RequestMethod::POST,
+        }));
 
         let params = MediaCreateParams {
             file_path: "/tmp/nonexistent.jpg".to_string(),

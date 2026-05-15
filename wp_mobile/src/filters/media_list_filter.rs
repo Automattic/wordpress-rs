@@ -152,10 +152,7 @@ impl MediaListFilter {
         }
         // Media type check.
         if let Some(param) = &self.media_type {
-            let media_mime_top = media
-                .mime_type
-                .split_once('/')
-                .map(|(top, _)| top);
+            let media_mime_top = media.mime_type.split_once('/').map(|(top, _)| top);
             let matches = match (param, &media.media_type) {
                 (MediaTypeParam::Image, MediaType::Image) => true,
                 (MediaTypeParam::Image, MediaType::File) => false,
@@ -520,17 +517,26 @@ mod tests {
 
     #[test]
     fn deterministic_ordering_returns_true_for_date() {
-        let filter = MediaListFilter { orderby: Some(WpApiParamPostsOrderBy::Date), ..Default::default() };
+        let filter = MediaListFilter {
+            orderby: Some(WpApiParamPostsOrderBy::Date),
+            ..Default::default()
+        };
         assert!(filter.has_deterministic_ordering());
     }
     #[test]
     fn deterministic_ordering_returns_false_for_relevance() {
-        let filter = MediaListFilter { orderby: Some(WpApiParamPostsOrderBy::Relevance), ..Default::default() };
+        let filter = MediaListFilter {
+            orderby: Some(WpApiParamPostsOrderBy::Relevance),
+            ..Default::default()
+        };
         assert!(!filter.has_deterministic_ordering());
     }
     #[test]
     fn deterministic_ordering_default_with_search_is_false() {
-        let filter = MediaListFilter { search: Some("hello".to_string()), ..Default::default() };
+        let filter = MediaListFilter {
+            search: Some("hello".to_string()),
+            ..Default::default()
+        };
         assert!(!filter.has_deterministic_ordering());
     }
     #[test]
@@ -553,35 +559,44 @@ mod tests {
     fn compare_media_by_id_asc() {
         let a = MediaBuilder::minimal().with_id(1).build();
         let b = MediaBuilder::minimal().with_id(2).build();
-        let result = compare_media_by_order(&a, &b, WpApiParamPostsOrderBy::Id, WpApiParamOrder::Asc);
+        let result =
+            compare_media_by_order(&a, &b, WpApiParamPostsOrderBy::Id, WpApiParamOrder::Asc);
         assert_eq!(result, Some(Ordering::Less));
     }
     #[test]
     fn compare_media_by_id_desc_reverses() {
         let a = MediaBuilder::minimal().with_id(1).build();
         let b = MediaBuilder::minimal().with_id(2).build();
-        let result = compare_media_by_order(&a, &b, WpApiParamPostsOrderBy::Id, WpApiParamOrder::Desc);
+        let result =
+            compare_media_by_order(&a, &b, WpApiParamPostsOrderBy::Id, WpApiParamOrder::Desc);
         assert_eq!(result, Some(Ordering::Greater));
     }
     #[test]
     fn compare_media_by_slug() {
         let a = MediaBuilder::minimal().with_slug("apple").build();
         let b = MediaBuilder::minimal().with_slug("banana").build();
-        let result = compare_media_by_order(&a, &b, WpApiParamPostsOrderBy::Slug, WpApiParamOrder::Asc);
+        let result =
+            compare_media_by_order(&a, &b, WpApiParamPostsOrderBy::Slug, WpApiParamOrder::Asc);
         assert_eq!(result, Some(Ordering::Less));
     }
     #[test]
     fn compare_media_by_title_uses_raw_when_present() {
         let a = MediaBuilder::minimal().with_title("aardvark").build();
         let b = MediaBuilder::minimal().with_title("zebra").build();
-        let result = compare_media_by_order(&a, &b, WpApiParamPostsOrderBy::Title, WpApiParamOrder::Asc);
+        let result =
+            compare_media_by_order(&a, &b, WpApiParamPostsOrderBy::Title, WpApiParamOrder::Asc);
         assert_eq!(result, Some(Ordering::Less));
     }
     #[test]
     fn compare_media_by_relevance_returns_none() {
         let a = MediaBuilder::minimal().with_id(1).build();
         let b = MediaBuilder::minimal().with_id(2).build();
-        let result = compare_media_by_order(&a, &b, WpApiParamPostsOrderBy::Relevance, WpApiParamOrder::Asc);
+        let result = compare_media_by_order(
+            &a,
+            &b,
+            WpApiParamPostsOrderBy::Relevance,
+            WpApiParamOrder::Asc,
+        );
         assert_eq!(result, None);
     }
 }

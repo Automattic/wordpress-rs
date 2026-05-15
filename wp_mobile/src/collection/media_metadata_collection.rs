@@ -4,9 +4,7 @@ use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 
 use wp_api::media::{MediaId, MediaWithEditContext};
 use wp_mobile_cache::{
-    UpdateHook,
-    entity::FullEntity,
-    repository::list_metadata::ListMetadataItemInput,
+    UpdateHook, entity::FullEntity, repository::list_metadata::ListMetadataItemInput,
 };
 
 use crate::{
@@ -306,10 +304,7 @@ impl MediaMetadataCollectionWithEditContext {
     /// `compute_final_list` is the same pattern; under non-deterministic ordering
     /// (active search / relevance) this function silently skips the list write
     /// and the new item appears only after the next `refresh()`.
-    pub(crate) fn update_media_membership(
-        &self,
-        media_id: MediaId,
-    ) -> Result<(), CollectionError> {
+    pub(crate) fn update_media_membership(&self, media_id: MediaId) -> Result<(), CollectionError> {
         let media_id_i64 = media_id.0;
 
         // Phase 1: Lightweight membership check.
@@ -393,8 +388,10 @@ impl MediaMetadataCollectionWithEditContext {
             .map_err(|e| CollectionError::DatabaseError {
                 err_message: e.to_string(),
             })?;
-        let media_by_id: HashMap<i64, MediaWithEditContext> =
-            all_media.into_iter().map(|m| (m.data.id.0, m.data)).collect();
+        let media_by_id: HashMap<i64, MediaWithEditContext> = all_media
+            .into_iter()
+            .map(|m| (m.data.id.0, m.data))
+            .collect();
 
         let Some(media_to_insert) = media_by_id.get(&media_id) else {
             return Ok(());
