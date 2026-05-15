@@ -286,14 +286,11 @@ enum MembershipAction {
     Insert,
 }
 
-// TODO: Remove allow(dead_code) once Task 4 wires notify_collections into
-// production upload path, making key() and update_media_membership() reachable
-// from non-test code.
-#[allow(dead_code)]
 impl MediaMetadataCollectionWithEditContext {
     /// Crate-internal accessor for the cache key. Used by service-side
     /// integration tests that seed `list_metadata_items` directly via the
     /// repo's `set_items_by_list_key` helper. Not exported to UniFFI.
+    #[allow(dead_code)]
     pub(crate) fn key(&self) -> wp_mobile_cache::list_metadata::ListKey {
         self.core.key().clone()
     }

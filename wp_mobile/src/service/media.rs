@@ -15,9 +15,10 @@ use std::{collections::HashSet, sync::{Arc, Mutex, Weak}};
 use wp_api::{
     api_client::WpApiClient,
     media::{
-        MediaDeleteResponse, MediaId, MediaListParams, MediaStatus, MediaWithEditContext,
-        SparseMediaFieldWithEditContext,
+        MediaCreateParams, MediaDeleteResponse, MediaId, MediaListParams, MediaStatus,
+        MediaWithEditContext, SparseMediaFieldWithEditContext,
     },
+    request::RequestContext,
 };
 use wp_mobile_cache::{
     DbTable, WpApiCache,
@@ -699,12 +700,43 @@ impl MediaService {
 
         collection
     }
+
+    /// Create a new media item via REST POST and upsert it into the cache.
+    ///
+    /// Mirrors `PostService::create_post`. The `context` parameter threads a
+    /// `RequestContext` from Swift (via `WordPressAPI::fulfill(progress:withApiCall:)`)
+    /// through to the generated `MediaRequestExecutor::create_cancellation`,
+    /// which routes through `perform_upload(request, context.clone())`. That's
+    /// what enables byte-level upload progress and request-level cancellation
+    /// on the Swift side without any new Rust-side progress infrastructure.
+    pub async fn create_media(
+        self: &Arc<Self>,
+        params: &MediaCreateParams,
+        context: Option<Arc<RequestContext>>,
+    ) -> Result<MediaWithEditContext, FetchError> {
+        let response = self
+            .api_client
+            .media()
+            .create_cancellation(params, context)
+            .await
+            .map_err(FetchError::from)?;
+        let media = response.data;
+
+        self.cache.execute(|conn| {
+            MediaRepository::<EditContext>::new()
+                .upsert(conn, &self.db_site, &media)
+                .map_err(|e| FetchError::Database {
+                    err_message: e.to_string(),
+                })
+        })?;
+
+        self.notify_collections(media.id.0);
+
+        Ok(media)
+    }
 }
 
 impl MediaService {
-    // TODO: Remove allow(dead_code) once Task 4 wires notify_collections into
-    // production upload path, making notify_collections reachable from non-test code.
-    #[allow(dead_code)]
     /// Notify all active collections about a changed media ID.
     ///
     /// Upgrades weak references, prunes dead ones, then calls
@@ -952,6 +984,48 @@ mod tests {
         let cache = Arc::new(WpApiCache::try_from(conn).expect("Cache creation should succeed"));
         let db_site_arc = Arc::new(db_site);
         Arc::new(MediaService::new(api_client, db_site_arc, cache))
+    }
+
+    /// Build a `MediaService` plus the matching cache and db_site, wired to a
+    /// caller-provided `MockExecutor`. Mirrors `service_with_network_error`
+    /// but returns enough state to seed the cache and inspect the result.
+    fn service_with_mock_executor(
+        mock_executor: Arc<MockExecutor>,
+    ) -> (Arc<MediaService>, Arc<DbSite>, Arc<WpApiCache>) {
+        let api_root_url =
+            Arc::new(ParsedUrl::parse("https://test.local/wp-json").expect("Parse URL"));
+        let api_client = Arc::new(WpApiClient::new(
+            Arc::new(WpOrgSiteApiUrlResolver::new(api_root_url)),
+            WpApiClientDelegate {
+                auth_provider: Arc::new(WpAuthenticationProvider::none()),
+                request_executor: mock_executor,
+                middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+                app_notifier: Arc::new(EmptyAppNotifier),
+            },
+        ));
+
+        let mut conn = Connection::open_in_memory().expect("Create in-memory database");
+        let mut migration_manager = MigrationManager::new(&conn).expect("Create migration manager");
+        migration_manager.perform_migrations().expect("Migrations succeed");
+
+        let site_repo = SiteRepository;
+        let self_hosted_site = SelfHostedSite {
+            url: "https://test.local".to_string(),
+            api_root: "https://test.local/wp-json".to_string(),
+        };
+        let db_site = site_repo
+            .upsert_self_hosted_site(&mut conn, &self_hosted_site)
+            .expect("Site creation")
+            .db_site;
+
+        let cache = Arc::new(WpApiCache::try_from(conn).expect("Cache creation should succeed"));
+        let db_site_arc = Arc::new(db_site);
+        let service = Arc::new(MediaService::new(
+            api_client,
+            db_site_arc.clone(),
+            cache.clone(),
+        ));
+        (service, db_site_arc, cache)
     }
 
     #[tokio::test]
@@ -1393,6 +1467,131 @@ mod tests {
         let items = collection.load_items().await.unwrap();
         let ids: Vec<i64> = items.iter().map(|i| i.id).collect();
         assert!(ids.contains(&media_id));
+    }
+
+    // MockExecutor is already imported via the existing media test module
+    // (`use crate::testing::{EmptyAppNotifier, MockExecutor, mock_api_client};`).
+    // Do NOT re-import — that would be a duplicate-name error.
+    use wp_api::request::endpoint::WpEndpointUrl;
+
+    #[tokio::test]
+    async fn create_media_inserts_into_deterministic_collection() {
+        let mock_executor = Arc::new(MockExecutor::with_execute_fn(|_| {
+            panic!("create_media should go through upload(), not execute()")
+        }));
+        let (service, db_site, cache) = service_with_mock_executor(mock_executor.clone());
+        let filter = MediaListFilter {
+            orderby: Some(WpApiParamPostsOrderBy::Id),
+            ..Default::default()
+        };
+        let collection = service.create_media_metadata_collection_with_edit_context(filter, 10);
+        let collection_key = collection.key();
+
+        // Pre-seed an empty list header so update_media_membership's
+        // metadata_service.replace_list_items call has a header to mutate.
+        cache
+            .execute(|conn| {
+                ListMetadataRepository::set_items_by_list_key(
+                    conn,
+                    &db_site,
+                    &collection_key,
+                    10,
+                    &[],
+                )
+            })
+            .expect("seed empty list header");
+
+        let new_media_id: i64 = 700;
+        let mock_response_media = MediaBuilder::minimal().with_id(new_media_id).build();
+        let header_map = Arc::new(WpNetworkHeaderMap::default());
+        let canned_response = WpNetworkResponse {
+            body: serde_json::to_vec(&mock_response_media).expect("serialize media"),
+            status_code: 201,
+            response_header_map: header_map.clone(),
+            // `request_url` and `request_method` echo whatever the executor
+            // saw; for a canned response, placeholders matching the media
+            // endpoint are fine.
+            request_url: WpEndpointUrl("https://test.local/wp-json/wp/v2/media".to_string()),
+            request_method: RequestMethod::POST,
+            request_header_map: header_map,
+        };
+        mock_executor.enqueue_upload_response(Ok(canned_response));
+
+        let params = MediaCreateParams {
+            file_path: "/tmp/nonexistent.jpg".to_string(),
+            ..Default::default()
+        };
+
+        let result = service
+            .create_media(&params, None)
+            .await
+            .expect("create_media should succeed against the mocked executor");
+
+        assert_eq!(result.id.0, new_media_id);
+
+        // Collection should now contain it via notify_collections.
+        let items = collection.load_items().await.unwrap();
+        let ids: Vec<i64> = items.iter().map(|i| i.id).collect();
+        assert!(ids.contains(&new_media_id));
+    }
+
+    #[tokio::test]
+    async fn create_media_failure_leaves_cache_and_list_untouched() {
+        let mock_executor = Arc::new(MockExecutor::with_execute_fn(|_| {
+            panic!("create_media should go through upload(), not execute()")
+        }));
+        let (service, db_site, cache) = service_with_mock_executor(mock_executor.clone());
+        let filter = MediaListFilter {
+            orderby: Some(WpApiParamPostsOrderBy::Id),
+            ..Default::default()
+        };
+        let collection = service.create_media_metadata_collection_with_edit_context(filter, 10);
+        let collection_key = collection.key();
+
+        // Pre-seed an empty list header so we can later assert it remained
+        // empty (rather than asserting against a never-existed list).
+        cache
+            .execute(|conn| {
+                ListMetadataRepository::set_items_by_list_key(
+                    conn,
+                    &db_site,
+                    &collection_key,
+                    10,
+                    &[],
+                )
+            })
+            .unwrap();
+
+        // Queue a network-style failure on the next upload(...). All five
+        // fields of RequestExecutionFailed are required (wp_api/src/api_error.rs:586-593).
+        mock_executor.enqueue_upload_response(Err(
+            RequestExecutionError::RequestExecutionFailed {
+                status_code: None,
+                redirects: None,
+                reason: RequestExecutionErrorReason::GenericError {
+                    error_message: "simulated network failure".to_string(),
+                },
+                request_url: "https://test.local/wp-json/wp/v2/media".to_string(),
+                request_method: RequestMethod::POST,
+            },
+        ));
+
+        let params = MediaCreateParams {
+            file_path: "/tmp/nonexistent.jpg".to_string(),
+            ..Default::default()
+        };
+
+        let err = service
+            .create_media(&params, None)
+            .await
+            .expect_err("create_media should propagate the executor error");
+        // FetchError wraps WpApiError as FetchError::Api (no Network variant
+        // on the current enum at wp_mobile/src/collection/fetch_error.rs:10-16).
+        assert!(matches!(err, FetchError::Api(_)));
+
+        // Cache untouched: collection still empty.
+        let items = collection.load_items().await.unwrap();
+        assert!(items.is_empty());
     }
 
     #[fixture]
