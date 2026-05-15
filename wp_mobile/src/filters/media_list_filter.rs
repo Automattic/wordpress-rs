@@ -222,7 +222,8 @@ impl MediaListFilter {
     }
 }
 
-// Task 2 will add the media collection that calls this function.
+// TODO: Remove allow(dead_code) once Task 3 adds notify_collections, which
+// calls update_media_membership() → compare_media_by_order() from production code.
 #[allow(dead_code)]
 pub(crate) fn compare_media_by_order(
     a: &MediaWithEditContext,

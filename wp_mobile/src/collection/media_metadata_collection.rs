@@ -1,15 +1,19 @@
 //! Media-specific metadata collection for efficient list syncing.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 
-use wp_api::media::MediaWithEditContext;
-use wp_mobile_cache::{UpdateHook, entity::FullEntity};
+use wp_api::media::{MediaId, MediaWithEditContext};
+use wp_mobile_cache::{
+    UpdateHook,
+    entity::FullEntity,
+    repository::list_metadata::ListMetadataItemInput,
+};
 
 use crate::{
     collection::{CollectionError, FetchError, MetadataCollectionCore},
-    filters::MediaListFilter,
+    filters::{MediaListFilter, compare_media_by_order},
     service::media::MediaService,
-    sync::{ListInfo, SyncResult},
+    sync::{EntityMetadata, ListInfo, SyncResult},
 };
 
 // Generate MediaItemState enum, MediaMetadataCollectionItem struct, and From trait
@@ -27,9 +31,8 @@ crate::wp_mobile_metadata_item!(
 /// 1. Fetch lightweight metadata (id + modified_gmt) to define list structure
 /// 2. Selectively fetch full data for missing or stale items
 ///
-/// Mirrors `PostMetadataCollectionWithEditContext` but without the membership-update
-/// path, since `MediaService` does not expose mutation methods that would
-/// notify collections of changes.
+/// Mirrors `PostMetadataCollectionWithEditContext` including the membership-update
+/// path.
 #[derive(uniffi::Object)]
 pub struct MediaMetadataCollectionWithEditContext {
     /// Core collection infrastructure (shared query logic)
@@ -269,6 +272,235 @@ impl MediaMetadataCollectionWithEditContext {
     /// Get the filter parameters for this collection.
     pub fn filter(&self) -> MediaListFilter {
         self.filter.clone()
+    }
+}
+
+/// Action to take when a media item's membership in a filtered list changes.
+///
+/// Mirrors `MembershipAction` in `post_metadata_collection.rs`. The two-variant
+/// design is intentional: when local ordering cannot be resolved (non-deterministic
+/// filter, missing sort keys), `compute_final_list` returns `None` and the caller
+/// silently skips the list write — there is no third "needs refresh" variant.
+enum MembershipAction {
+    Remove,
+    Insert,
+}
+
+// TODO: Remove allow(dead_code) once Task 3 adds notify_collections, which
+// calls key() and update_media_membership() from production code.
+#[allow(dead_code)]
+impl MediaMetadataCollectionWithEditContext {
+    /// Crate-internal accessor for the cache key. Used by service-side
+    /// integration tests that seed `list_metadata_items` directly via the
+    /// repo's `set_items_by_list_key` helper. Not exported to UniFFI.
+    pub(crate) fn key(&self) -> wp_mobile_cache::list_metadata::ListKey {
+        self.core.key().clone()
+    }
+
+    /// Update list membership for a single media item.
+    ///
+    /// Should be called after the media database is modified externally
+    /// (e.g. by `MediaService::create_media`). Re-evaluates whether the media
+    /// matches this collection's filter and updates the stored list accordingly.
+    ///
+    /// Mirrors `PostMetadataCollectionWithEditContext::update_post_membership`
+    /// exactly. The two-variant `MembershipAction` plus `Option`-returning
+    /// `compute_final_list` is the same pattern; under non-deterministic ordering
+    /// (active search / relevance) this function silently skips the list write
+    /// and the new item appears only after the next `refresh()`.
+    pub(crate) fn update_media_membership(
+        &self,
+        media_id: MediaId,
+    ) -> Result<(), CollectionError> {
+        let media_id_i64 = media_id.0;
+
+        // Phase 1: Lightweight membership check.
+        let is_in_list = self
+            .service
+            .metadata_service
+            .list_contains_entity(self.core.key(), media_id_i64)
+            .map_err(|e| CollectionError::DatabaseError {
+                err_message: e.to_string(),
+            })?;
+
+        let changed_media = self
+            .service
+            .read_media_by_ids_from_db(&[media_id_i64])
+            .map_err(|e| CollectionError::DatabaseError {
+                err_message: e.to_string(),
+            })?
+            .into_iter()
+            .next()
+            .map(|m| m.data);
+
+        // Phase 2: Determine action.
+        let action = if let Some(ref cached_media) = changed_media {
+            let matches_filter = self.filter.loosely_matches_media(cached_media);
+            if is_in_list && !matches_filter {
+                Some(MembershipAction::Remove)
+            } else if !is_in_list && matches_filter {
+                Some(MembershipAction::Insert)
+            } else {
+                None
+            }
+        } else if is_in_list {
+            // No longer in DB — remove from list.
+            Some(MembershipAction::Remove)
+        } else {
+            None
+        };
+
+        let action = match action {
+            Some(a) => a,
+            None => return Ok(()),
+        };
+
+        // Phase 3: Apply.
+        match action {
+            MembershipAction::Remove => self
+                .service
+                .metadata_service
+                .remove_list_items(self.core.key(), &[media_id_i64])
+                .map_err(|e| CollectionError::DatabaseError {
+                    err_message: e.to_string(),
+                }),
+            MembershipAction::Insert => self.insert_media_into_list(media_id_i64),
+        }
+    }
+
+    /// Insert a media into the stored list, maintaining sort order.
+    ///
+    /// Mirrors `PostMetadataCollectionWithEditContext::insert_post_into_list`.
+    fn insert_media_into_list(&self, media_id: i64) -> Result<(), CollectionError> {
+        let current_metadata = self
+            .service
+            .metadata_service
+            .get_metadata(self.core.key())
+            .map_err(|e| CollectionError::DatabaseError {
+                err_message: e.to_string(),
+            })?
+            .unwrap_or_default();
+        let current_ids: Vec<i64> = current_metadata.iter().map(|m| m.id).collect();
+        let metadata_by_id: HashMap<i64, &EntityMetadata> =
+            current_metadata.iter().map(|m| (m.id, m)).collect();
+
+        let all_media_ids: Vec<i64> = current_ids
+            .iter()
+            .copied()
+            .chain(std::iter::once(media_id))
+            .collect();
+        let all_media = self
+            .service
+            .read_media_by_ids_from_db(&all_media_ids)
+            .map_err(|e| CollectionError::DatabaseError {
+                err_message: e.to_string(),
+            })?;
+        let media_by_id: HashMap<i64, MediaWithEditContext> =
+            all_media.into_iter().map(|m| (m.data.id.0, m.data)).collect();
+
+        let Some(media_to_insert) = media_by_id.get(&media_id) else {
+            return Ok(());
+        };
+
+        let final_items = match self.compute_final_list(
+            &current_ids,
+            media_to_insert,
+            &media_by_id,
+            &metadata_by_id,
+        ) {
+            Some(items) => items,
+            // Non-deterministic ordering or missing sort-key data: silently skip,
+            // matching the post-side behaviour. The new media will appear on the
+            // next explicit collection refresh.
+            None => return Ok(()),
+        };
+
+        self.service
+            .metadata_service
+            .replace_list_items(self.core.key(), &final_items)
+            .map_err(|e| CollectionError::DatabaseError {
+                err_message: e.to_string(),
+            })?;
+
+        Ok(())
+    }
+
+    /// Build a `ListMetadataItemInput` from a media's cached data.
+    fn media_to_item_input(media: &MediaWithEditContext) -> ListMetadataItemInput {
+        ListMetadataItemInput {
+            entity_id: media.id.0,
+            modified_gmt: Some(media.modified_gmt.to_string()),
+            parent: media.post_id.map(|p| p.0),
+            menu_order: None,
+        }
+    }
+
+    /// Build a `ListMetadataItemInput` for an entity ID, falling back from fresh
+    /// data to stored metadata to minimal entry. Mirrors the post-side helper.
+    fn id_to_item_input(
+        id: i64,
+        media_by_id: &HashMap<i64, MediaWithEditContext>,
+        metadata_by_id: &HashMap<i64, &EntityMetadata>,
+    ) -> ListMetadataItemInput {
+        if let Some(media) = media_by_id.get(&id) {
+            Self::media_to_item_input(media)
+        } else if let Some(metadata) = metadata_by_id.get(&id) {
+            ListMetadataItemInput {
+                entity_id: id,
+                modified_gmt: metadata.modified_gmt.as_ref().map(|d| d.to_string()),
+                parent: metadata.parent,
+                menu_order: metadata.menu_order,
+            }
+        } else {
+            ListMetadataItemInput {
+                entity_id: id,
+                modified_gmt: None,
+                parent: None,
+                menu_order: None,
+            }
+        }
+    }
+
+    /// Compute the final ordered list by merging retained items with new insertion.
+    ///
+    /// Returns `None` if ordering cannot be determined (non-deterministic filter
+    /// or missing sort-key data), signaling that a full list refresh is needed.
+    /// Caller silently skips the list write in that case.
+    fn compute_final_list(
+        &self,
+        current_ids: &[i64],
+        media_to_insert: &MediaWithEditContext,
+        media_by_id: &HashMap<i64, MediaWithEditContext>,
+        metadata_by_id: &HashMap<i64, &EntityMetadata>,
+    ) -> Option<Vec<ListMetadataItemInput>> {
+        if !self.filter.has_deterministic_ordering() {
+            return None;
+        }
+
+        let orderby = self.filter.effective_orderby();
+        let order = self.filter.effective_order();
+
+        // Find where the new media belongs in the existing list.
+        let mut insert_at = current_ids.len();
+        for (i, &id) in current_ids.iter().enumerate() {
+            let existing = media_by_id.get(&id)?;
+            match compare_media_by_order(media_to_insert, existing, orderby, order) {
+                Some(Ordering::Less) => {
+                    insert_at = i;
+                    break;
+                }
+                Some(_) => {}
+                None => return None,
+            }
+        }
+
+        let mut result: Vec<_> = current_ids
+            .iter()
+            .map(|&id| Self::id_to_item_input(id, media_by_id, metadata_by_id))
+            .collect();
+        result.insert(insert_at, Self::media_to_item_input(media_to_insert));
+
+        Some(result)
     }
 }
 

@@ -699,6 +699,12 @@ mod tests {
         repository::{media::MediaRepository, sites::SiteRepository},
         test_fixtures::media::MediaBuilder,
     };
+    use wp_api::media::MediaStatus;
+    use wp_api::posts::WpApiParamPostsOrderBy;
+    use wp_mobile_cache::repository::list_metadata::{
+        ListMetadataItemInput, ListMetadataRepository,
+    };
+    use crate::filters::MediaListFilter;
 
     /// Test context bundling MediaService with database and site setup
     pub struct MediaServiceTestContext {
@@ -1096,6 +1102,212 @@ mod tests {
                 .expect("contains check"),
             "posts list should still contain the entity (prefix-scoped delete must not over-match)"
         );
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn update_media_membership_inserts_matching_media_for_deterministic_filter(
+        ctx: MediaServiceTestContext,
+    ) {
+        let service = ctx.media_service.clone();
+        // Deterministic filter: orderby = Id (avoids needing date_gmt setters).
+        let filter = MediaListFilter {
+            orderby: Some(WpApiParamPostsOrderBy::Id),
+            order: Some(wp_api::WpApiParamOrder::Asc),
+            ..Default::default()
+        };
+        let collection = service.create_media_metadata_collection_with_edit_context(filter, 10);
+        let collection_key = collection.key();
+
+        let existing_media_id: i64 = 100;
+        let existing = MediaBuilder::minimal().with_id(existing_media_id).build();
+        let seed_items = vec![ListMetadataItemInput {
+            entity_id: existing_media_id,
+            modified_gmt: None,
+            parent: None,
+            menu_order: None,
+        }];
+        ctx.cache
+            .execute(|conn| {
+                // Seed media row + create the list header with one item. Using
+                // ListMetadataRepository::set_items_by_list_key here (instead
+                // of MetadataService::replace_list_items) calls get_or_create
+                // internally, so the header doesn't need to pre-exist.
+                MediaRepository::<EditContext>::new()
+                    .upsert(conn, &ctx.db_site, &existing)
+                    .map_err(|e| wp_mobile_cache::SqliteDbError::SqliteError(e.to_string()))?;
+                ListMetadataRepository::set_items_by_list_key(
+                    conn,
+                    &ctx.db_site,
+                    &collection_key,
+                    10,
+                    &seed_items,
+                )
+            })
+            .expect("seed succeeds");
+
+        let new_media_id: i64 = 200;
+        let new_media = MediaBuilder::minimal().with_id(new_media_id).build();
+        ctx.cache
+            .execute(|conn| {
+                MediaRepository::<EditContext>::new()
+                    .upsert(conn, &ctx.db_site, &new_media)
+                    .map(|_| ())
+                    .map_err(|e| wp_mobile_cache::SqliteDbError::SqliteError(e.to_string()))
+            })
+            .unwrap();
+
+        collection
+            .update_media_membership(MediaId(new_media_id))
+            .expect("membership update should succeed");
+
+        let items = collection.load_items().await.expect("load_items ok");
+        let ids: Vec<i64> = items.iter().map(|i| i.id).collect();
+        assert!(ids.contains(&new_media_id));
+        assert!(ids.contains(&existing_media_id));
+        // Asc-by-Id: existing (100) precedes new (200).
+        assert_eq!(ids, vec![existing_media_id, new_media_id]);
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn update_media_membership_removes_no_longer_matching_media(
+        ctx: MediaServiceTestContext,
+    ) {
+        let service = ctx.media_service.clone();
+        let filter = MediaListFilter {
+            status: vec![MediaStatus::Private],
+            orderby: Some(WpApiParamPostsOrderBy::Id),
+            ..Default::default()
+        };
+        let collection = service.create_media_metadata_collection_with_edit_context(filter, 10);
+        let collection_key = collection.key();
+
+        let media_id: i64 = 300;
+        let media_initial = MediaBuilder::minimal()
+            .with_id(media_id)
+            .with_status(MediaStatus::Private)
+            .build();
+        ctx.cache
+            .execute(|conn| {
+                MediaRepository::<EditContext>::new()
+                    .upsert(conn, &ctx.db_site, &media_initial)
+                    .map_err(|e| wp_mobile_cache::SqliteDbError::SqliteError(e.to_string()))?;
+                ListMetadataRepository::set_items_by_list_key(
+                    conn,
+                    &ctx.db_site,
+                    &collection_key,
+                    10,
+                    &[ListMetadataItemInput {
+                        entity_id: media_id,
+                        modified_gmt: None,
+                        parent: None,
+                        menu_order: None,
+                    }],
+                )
+            })
+            .unwrap();
+
+        // Re-upsert with status Inherit → no longer matches the filter.
+        let media_updated = MediaBuilder::minimal()
+            .with_id(media_id)
+            .with_status(MediaStatus::Inherit)
+            .build();
+        ctx.cache
+            .execute(|conn| {
+                MediaRepository::<EditContext>::new()
+                    .upsert(conn, &ctx.db_site, &media_updated)
+                    .map(|_| ())
+                    .map_err(|e| wp_mobile_cache::SqliteDbError::SqliteError(e.to_string()))
+            })
+            .unwrap();
+
+        collection
+            .update_media_membership(MediaId(media_id))
+            .expect("membership update should succeed");
+
+        let items = collection.load_items().await.unwrap();
+        let ids: Vec<i64> = items.iter().map(|i| i.id).collect();
+        assert!(!ids.contains(&media_id));
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn update_media_membership_no_op_when_already_consistent(
+        ctx: MediaServiceTestContext,
+    ) {
+        let service = ctx.media_service.clone();
+        let filter = MediaListFilter {
+            orderby: Some(WpApiParamPostsOrderBy::Id),
+            ..Default::default()
+        };
+        let collection = service.create_media_metadata_collection_with_edit_context(filter, 10);
+        let collection_key = collection.key();
+
+        let media_id: i64 = 400;
+        let media = MediaBuilder::minimal().with_id(media_id).build();
+        ctx.cache
+            .execute(|conn| {
+                MediaRepository::<EditContext>::new()
+                    .upsert(conn, &ctx.db_site, &media)
+                    .map_err(|e| wp_mobile_cache::SqliteDbError::SqliteError(e.to_string()))?;
+                ListMetadataRepository::set_items_by_list_key(
+                    conn,
+                    &ctx.db_site,
+                    &collection_key,
+                    10,
+                    &[ListMetadataItemInput {
+                        entity_id: media_id,
+                        modified_gmt: None,
+                        parent: None,
+                        menu_order: None,
+                    }],
+                )
+            })
+            .unwrap();
+
+        collection
+            .update_media_membership(MediaId(media_id))
+            .unwrap();
+
+        let items = collection.load_items().await.unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, media_id);
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn update_media_membership_silent_skip_under_active_search(
+        ctx: MediaServiceTestContext,
+    ) {
+        let service = ctx.media_service.clone();
+        // Active search filter → non-deterministic ordering by default (relevance).
+        let filter = MediaListFilter {
+            search: Some("hello".to_string()),
+            ..Default::default()
+        };
+        let collection = service.create_media_metadata_collection_with_edit_context(filter, 10);
+
+        // No header seeding needed: silent-skip under relevance means
+        // `compute_final_list` returns `None` and `replace_list_items` is
+        // never called.
+        let new_media_id: i64 = 500;
+        let new_media = MediaBuilder::minimal().with_id(new_media_id).build();
+        ctx.cache
+            .execute(|conn| {
+                MediaRepository::<EditContext>::new()
+                    .upsert(conn, &ctx.db_site, &new_media)
+                    .map(|_| ())
+                    .map_err(|e| wp_mobile_cache::SqliteDbError::SqliteError(e.to_string()))
+            })
+            .unwrap();
+
+        collection
+            .update_media_membership(MediaId(new_media_id))
+            .unwrap();
+
+        let items = collection.load_items().await.unwrap();
+        assert!(items.is_empty(), "silent-skip under relevance: list stays empty");
     }
 
     #[fixture]
