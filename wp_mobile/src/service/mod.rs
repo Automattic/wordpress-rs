@@ -4,6 +4,7 @@ use crate::service::{
 };
 use std::sync::Arc;
 use wp_api::prelude::{ApiUrlResolver, WpApiClient, WpApiClientDelegate};
+use wp_api::request::RequestExecutor;
 use wp_mobile_cache::{WpApiCache, db_types::db_site::DbSite};
 
 pub mod entity_state_service;
@@ -45,6 +46,7 @@ pub struct WpService {
     post_types: Arc<PostTypeService>,
     posts: Arc<PostService>,
     sites: Arc<SiteService>,
+    request_executor: Arc<dyn RequestExecutor>,
 }
 
 impl WpService {
@@ -55,6 +57,7 @@ impl WpService {
         db_site: DbSite,
         site_service: Arc<SiteService>,
     ) -> Self {
+        let request_executor = delegate.request_executor.clone();
         let api_client = Arc::new(WpApiClient::new(api_url_resolver, delegate));
         let db_site_arc = Arc::new(db_site);
 
@@ -75,6 +78,7 @@ impl WpService {
             post_types,
             posts,
             sites: site_service,
+            request_executor,
         }
     }
 }
@@ -129,5 +133,10 @@ impl WpService {
     /// Get the site service for this WordPress site
     pub fn sites(&self) -> Arc<SiteService> {
         self.sites.clone()
+    }
+
+    /// Get the request executor used by this service.
+    pub fn request_executor(&self) -> Arc<dyn RequestExecutor> {
+        self.request_executor.clone()
     }
 }

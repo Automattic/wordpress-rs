@@ -248,6 +248,32 @@ public final class WordPressAPI: Sendable {
         progress: Progress,
         withApiCall apiCall: sending @escaping (RequestContext) async throws -> R
     ) async throws -> R {
+        try await requestExecutor.fulfill(progress: progress, withApiCall: apiCall)
+    }
+
+    public func uploadMedia(
+        params: MediaCreateParams,
+        fulfilling progress: Progress
+    ) async throws -> MediaRequestCreateResponse {
+        try await fulfill(progress: progress) { [media] in
+            try await media.createCancellation(params: params, context: $0)
+        }
+    }
+    #endif
+
+    enum ParseError: Error {
+        case invalidUrl
+        case invalidHtml
+    }
+}
+
+#if PROGRESS_REPORTING_ENABLED
+
+extension SafeRequestExecutor {
+    func fulfill<R: Sendable>(
+        progress: Progress,
+        withApiCall apiCall: sending @escaping (RequestContext) async throws -> R
+    ) async throws -> R {
         precondition(progress.completedUnitCount == 0 && progress.totalUnitCount > 0)
         precondition(progress.cancellationHandler == nil)
 
@@ -257,12 +283,12 @@ public final class WordPressAPI: Sendable {
             try await withTaskCancellationHandler {
                 try await apiCall(context)
             } onCancel: {
-                requestExecutor.cancel(context: context)
+                cancel(context: context)
             }
         }
 
         let progressObserver = Task {
-            for await task in requestExecutor.progresses(for: context).values {
+            for await task in progresses(for: context).values {
                 // For one single request call, the Rust layer should send HTTP requests sequentially.
                 // For example, the retry mechanism in the Rust layer only send the retry call when the initial
                 // call fails.
@@ -287,22 +313,9 @@ public final class WordPressAPI: Sendable {
             progress.cancel()
         }
     }
-
-    public func uploadMedia(
-        params: MediaCreateParams,
-        fulfilling progress: Progress
-    ) async throws -> MediaRequestCreateResponse {
-        try await fulfill(progress: progress) { [media] in
-            try await media.createCancellation(params: params, context: $0)
-        }
-    }
-    #endif
-
-    enum ParseError: Error {
-        case invalidUrl
-        case invalidHtml
-    }
 }
+
+#endif
 
 public extension WpNetworkHeaderMap {
     func toFlatMap() -> [String: String] {
