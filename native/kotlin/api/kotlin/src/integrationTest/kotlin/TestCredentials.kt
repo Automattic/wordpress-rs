@@ -73,6 +73,8 @@ data class TestCredentials(
     val globalStylesId: Long,
     @SerialName("revision_id_for_block_id")
     val revisionIdForBlockId: Long,
+    @SerialName("revision_id_for_global_styles_id")
+    val revisionIdForGlobalStylesId: Long,
 ) {
     companion object {
         private val json by lazy {

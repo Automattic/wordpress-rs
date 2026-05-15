@@ -55,6 +55,7 @@ pub struct TestCredentials {
     pub block_id: i64,
     pub global_styles_id: i64,
     pub revision_id_for_block_id: i64,
+    pub revision_id_for_global_styles_id: i64,
 }
 
 impl TestCredentials {
