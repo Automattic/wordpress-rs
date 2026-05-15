@@ -286,8 +286,9 @@ enum MembershipAction {
     Insert,
 }
 
-// TODO: Remove allow(dead_code) once Task 3 adds notify_collections, which
-// calls key() and update_media_membership() from production code.
+// TODO: Remove allow(dead_code) once Task 4 wires notify_collections into
+// production upload path, making key() and update_media_membership() reachable
+// from non-test code.
 #[allow(dead_code)]
 impl MediaMetadataCollectionWithEditContext {
     /// Crate-internal accessor for the cache key. Used by service-side

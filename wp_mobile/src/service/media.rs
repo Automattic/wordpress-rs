@@ -11,7 +11,7 @@ use crate::{
     },
     sync::{DbEntityState, EntityMetadata, MetadataFetchResult, SyncResult, SyncStrategy},
 };
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, sync::{Arc, Mutex, Weak}};
 use wp_api::{
     api_client::WpApiClient,
     media::{
@@ -82,6 +82,12 @@ pub struct MediaService {
     /// Database-backed list metadata service.
     /// Persists list structure across app restarts.
     pub(crate) metadata_service: Arc<MetadataService>,
+
+    /// Weak references to active metadata collections.
+    /// Used to notify collections directly when media items change,
+    /// bypassing the SQLite update hook → rowid resolution path. Mirrors
+    /// the post-side `collections` registry.
+    collections: Mutex<Vec<Weak<MediaMetadataCollectionWithEditContext>>>,
 }
 
 impl MediaService {
@@ -93,6 +99,7 @@ impl MediaService {
             db_site,
             cache,
             metadata_service,
+            collections: Mutex::new(Vec::new()),
         }
     }
 
@@ -678,11 +685,52 @@ impl MediaService {
             per_page,
         );
 
-        Arc::new(MediaMetadataCollectionWithEditContext::new(
+        let collection = Arc::new(MediaMetadataCollectionWithEditContext::new(
             core,
             self.clone(),
             filter,
-        ))
+        ));
+
+        // Register weak reference so notify_collections can drive
+        // update_media_membership when media changes.
+        if let Ok(mut collections) = self.collections.lock() {
+            collections.push(Arc::downgrade(&collection));
+        }
+
+        collection
+    }
+}
+
+impl MediaService {
+    // TODO: Remove allow(dead_code) once Task 4 wires notify_collections into
+    // production upload path, making notify_collections reachable from non-test code.
+    #[allow(dead_code)]
+    /// Notify all active collections about a changed media ID.
+    ///
+    /// Upgrades weak references, prunes dead ones, then calls
+    /// `update_media_membership` on each live collection. Mirrors
+    /// `PostService::notify_collections`.
+    pub(crate) fn notify_collections(&self, media_id: i64) {
+        let live_collections: Vec<Arc<MediaMetadataCollectionWithEditContext>> = {
+            let mut guard = match self.collections.lock() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            guard.retain(|w| w.strong_count() > 0);
+            guard.iter().filter_map(|w| w.upgrade()).collect()
+        };
+
+        for collection in &live_collections {
+            if let Err(e) =
+                collection.update_media_membership(wp_api::media::MediaId(media_id))
+            {
+                log::error!(
+                    "Failed to update media membership for media {}: {}",
+                    media_id,
+                    e
+                );
+            }
+        }
     }
 }
 
@@ -1308,6 +1356,43 @@ mod tests {
 
         let items = collection.load_items().await.unwrap();
         assert!(items.is_empty(), "silent-skip under relevance: list stays empty");
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn notify_collections_drives_membership_update_on_registered_collection(
+        ctx: MediaServiceTestContext,
+    ) {
+        let service = ctx.media_service.clone();
+        let filter = MediaListFilter {
+            orderby: Some(WpApiParamPostsOrderBy::Id),
+            ..Default::default()
+        };
+        let collection = service.create_media_metadata_collection_with_edit_context(filter, 10);
+        let collection_key = collection.key();
+
+        let media_id: i64 = 600;
+        let media = MediaBuilder::minimal().with_id(media_id).build();
+        ctx.cache
+            .execute(|conn| {
+                MediaRepository::<EditContext>::new()
+                    .upsert(conn, &ctx.db_site, &media)
+                    .map_err(|e| wp_mobile_cache::SqliteDbError::SqliteError(e.to_string()))?;
+                ListMetadataRepository::set_items_by_list_key(
+                    conn,
+                    &ctx.db_site,
+                    &collection_key,
+                    10,
+                    &[],
+                )
+            })
+            .unwrap();
+
+        service.notify_collections(media_id);
+
+        let items = collection.load_items().await.unwrap();
+        let ids: Vec<i64> = items.iter().map(|i| i.id).collect();
+        assert!(ids.contains(&media_id));
     }
 
     #[fixture]
