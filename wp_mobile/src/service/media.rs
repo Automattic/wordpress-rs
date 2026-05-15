@@ -615,6 +615,14 @@ impl MediaService {
         })
     }
 
+    /// Shared prefix for every cached edit-context media list key on this site.
+    /// Used both when constructing a list's `ListKey` and when scrubbing a
+    /// deleted entity from every media list for the site, so the two paths
+    /// can't drift apart.
+    fn media_list_key_prefix(&self) -> String {
+        format!("site_{:?}:edit:media:", self.db_site.row_id)
+    }
+
     /// Permanently delete a media item via the REST API and remove it from the local cache.
     ///
     /// REST DELETE on media always passes `force=true` (the server rejects `force=false`),
@@ -635,10 +643,9 @@ impl MediaService {
         // `Missing`/`Stale` until the next full refresh. Failure here is
         // logged but not propagated: the REST delete and local row delete
         // already succeeded.
-        let media_list_prefix = format!("site_{:?}:edit:media:", self.db_site.row_id);
         if let Err(e) = self
             .metadata_service
-            .remove_entity_from_lists_with_key_prefix(&media_list_prefix, media_id.0)
+            .remove_entity_from_lists_with_key_prefix(&self.media_list_key_prefix(), media_id.0)
         {
             log::warn!(
                 "Failed to remove deleted media id {} from list metadata: {}",
@@ -661,8 +668,7 @@ impl MediaService {
         per_page: u32,
     ) -> Arc<MediaMetadataCollectionWithEditContext> {
         let cache_key = media_list_filter_cache_key(&filter);
-        let key: ListKey =
-            format!("site_{:?}:edit:media:{}", self.db_site.row_id, cache_key).into();
+        let key: ListKey = format!("{}{}", self.media_list_key_prefix(), cache_key).into();
 
         let core = MetadataCollectionCore::new(
             key,
