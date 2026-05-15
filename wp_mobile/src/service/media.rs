@@ -63,8 +63,9 @@ pub(crate) struct FetchStats {
 /// Service layer for media operations
 ///
 /// Provides a bridge between clients and the underlying network/cache layers.
-/// Handles fetching and deleting media. Mutations that iOS performs directly
-/// against the API client (create/update/upload) are deliberately not exposed here.
+/// Handles fetching, deleting, and creating media. Only `create_media` is
+/// exposed here for progress-aware upload via `RequestContext` threading;
+/// `update_media` still goes through `MediaRequestExecutor` directly.
 ///
 /// # Metadata Sync Infrastructure
 ///
@@ -742,7 +743,7 @@ impl MediaService {
     /// Upgrades weak references, prunes dead ones, then calls
     /// `update_media_membership` on each live collection. Mirrors
     /// `PostService::notify_collections`.
-    pub(crate) fn notify_collections(&self, media_id: i64) {
+    fn notify_collections(&self, media_id: i64) {
         let live_collections: Vec<Arc<MediaMetadataCollectionWithEditContext>> = {
             let mut guard = match self.collections.lock() {
                 Ok(g) => g,
