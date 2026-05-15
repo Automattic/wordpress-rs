@@ -19,6 +19,8 @@ use std::collections::HashMap;
 pub enum EntityType {
     /// Posts with edit context (table: posts_edit_context)
     PostsEditContext = 0,
+    /// Media with edit context (table: media_edit_context)
+    MediaEditContext = 1,
 }
 
 impl EntityType {
@@ -29,6 +31,7 @@ impl EntityType {
     pub fn table_name(self) -> &'static str {
         match self {
             EntityType::PostsEditContext => "posts_edit_context",
+            EntityType::MediaEditContext => "media_edit_context",
         }
     }
 }
@@ -43,6 +46,7 @@ impl FromSql for EntityType {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> FromSqlResult<Self> {
         i64::column_result(value).and_then(|i| match i {
             0 => Ok(EntityType::PostsEditContext),
+            1 => Ok(EntityType::MediaEditContext),
             _ => Err(FromSqlError::OutOfRange(i)),
         })
     }
@@ -473,6 +477,20 @@ mod tests {
         // IMPORTANT: Changing these values requires a database migration.
         // These integer values are persisted in the entity_state table.
         assert_eq!(EntityType::PostsEditContext as i64, 0);
+    }
+
+    #[test]
+    fn test_entity_type_media_edit_context_sql_round_trip() {
+        let conn = Connection::open_in_memory().unwrap();
+        // discriminant guard: ensure on-disk value doesn't drift
+        assert_eq!(EntityType::MediaEditContext as i64, 1);
+
+        // SQL round-trip: i64 -> EntityType
+        let value: i64 = 1;
+        let result: EntityType = conn
+            .query_row("SELECT ?", [value], |row| row.get(0))
+            .unwrap();
+        assert_eq!(result, EntityType::MediaEditContext);
     }
 
     #[test]

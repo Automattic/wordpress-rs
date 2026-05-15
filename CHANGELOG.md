@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Global Styles](https://developer.wordpress.org/rest-api/reference/wp_global_styles/) endpoint
 - [Pattern Directory Items](https://developer.wordpress.org/rest-api/reference/pattern-directory-items/) endpoint
 - [Rendered Blocks](https://developer.wordpress.org/rest-api/reference/rendered-blocks/) endpoint
+- `MediaService` on `WpService` (sync, fetch, state tracking, `delete_media_permanently`) and `MediaMetadataCollectionWithEditContext`, mirroring the existing `PostService` / `PostMetadataCollectionWithEditContext` pattern for a cached, paginated, observable media list
+- `MediaListFilter`, the subset of `MediaListParams` that backs `MediaService.create_media_metadata_collection_with_edit_context` (excludes pagination, include/exclude, and date ranges)
+- `wp_mobile_cache` storage for media: `media_edit_context` table (migration 0014), `DbTable::MediaEditContext`, `EntityType::MediaEditContext`, and a `MediaRepository<EditContext>` mirroring `PostRepository` minus term relationships
+- `MetadataService::remove_entity_from_lists_with_key_prefix` so service-level deletes can scrub a deleted entity from every cached list for a site without waiting for a refresh
+
+### Changed
+
+- `MediaDetails` now derives `Eq + Hash` (raw-JSON-string comparison) and is exported via `#[uniffi::export(Eq, Hash)]`; `SparseMedia`'s `#[WpContextualDontDerivePartialEq]` opt-out is removed so `MediaWithEditContext` and the generated `FullEntityMediaWithEditContext` Swift wrapper synthesize `Equatable + Hashable`
 
 ### Removed
 

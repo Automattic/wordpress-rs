@@ -2,6 +2,7 @@ mod collection_error;
 mod core;
 mod fetch_error;
 mod fetch_result;
+pub(crate) mod media_metadata_collection;
 pub(crate) mod post_collection;
 pub(crate) mod post_metadata_collection;
 pub(crate) mod post_type_collection;
@@ -11,6 +12,9 @@ pub use collection_error::CollectionError;
 pub use core::MetadataCollectionCore;
 pub use fetch_error::FetchError;
 pub use fetch_result::FetchResult;
+pub use media_metadata_collection::{
+    MediaItemState, MediaMetadataCollectionItem, MediaMetadataCollectionWithEditContext,
+};
 pub use post_metadata_collection::{
     PostItemState, PostMetadataCollectionItem, PostMetadataCollectionWithEditContext,
 };

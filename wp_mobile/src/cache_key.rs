@@ -6,11 +6,11 @@
 
 use url::Url;
 use wp_api::{
-    posts::PostListParamsField, request::endpoint::posts_endpoint::PostEndpointType,
-    url_query::QueryPairsExtension,
+    media::MediaListParamsField, posts::PostListParamsField,
+    request::endpoint::posts_endpoint::PostEndpointType, url_query::QueryPairsExtension,
 };
 
-use crate::filters::PostListFilter;
+use crate::filters::{MediaListFilter, PostListFilter};
 
 /// Generates a cache key segment from a `PostEndpointType`.
 ///
@@ -103,6 +103,38 @@ pub fn post_list_filter_cache_key(filter: &PostListFilter) -> String {
     url.query().unwrap_or("").to_string()
 }
 
+/// Generates a deterministic cache key from `MediaListFilter`.
+///
+/// All fields in `MediaListFilter` are included in the cache key since it only
+/// contains filter-relevant fields (pagination, instance-specific, and date
+/// range fields are excluded by design in `MediaListFilter`).
+pub fn media_list_filter_cache_key(filter: &MediaListFilter) -> String {
+    let mut url = Url::parse("https://cache-key-generator.local").expect("valid base URL");
+
+    {
+        let mut q = url.query_pairs_mut();
+
+        // Alphabetically ordered for determinism.
+        q.append_vec_query_value_pair(MediaListParamsField::Author, &filter.author);
+        q.append_vec_query_value_pair(MediaListParamsField::AuthorExclude, &filter.author_exclude);
+        q.append_option_query_value_pair(
+            MediaListParamsField::MediaType,
+            filter.media_type.as_ref(),
+        );
+        q.append_option_query_value_pair(MediaListParamsField::MimeType, filter.mime_type.as_ref());
+        q.append_option_query_value_pair(MediaListParamsField::Order, filter.order.as_ref());
+        q.append_option_query_value_pair(MediaListParamsField::Orderby, filter.orderby.as_ref());
+        q.append_vec_query_value_pair(MediaListParamsField::Parent, &filter.parent);
+        q.append_vec_query_value_pair(MediaListParamsField::ParentExclude, &filter.parent_exclude);
+        q.append_option_query_value_pair(MediaListParamsField::Search, filter.search.as_ref());
+        q.append_vec_query_value_pair(MediaListParamsField::SearchColumns, &filter.search_columns);
+        q.append_vec_query_value_pair(MediaListParamsField::Slug, &filter.slug);
+        q.append_vec_query_value_pair(MediaListParamsField::Status, &filter.status);
+    }
+
+    url.query().unwrap_or("").to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,5 +198,38 @@ mod tests {
     fn test_endpoint_type_custom() {
         let key = endpoint_type_cache_key(&PostEndpointType::Custom("products".to_string()));
         assert_eq!(key, "post_type_custom_products");
+    }
+
+    #[test]
+    fn media_empty_filter_produces_empty_key() {
+        let filter = MediaListFilter::default();
+        let key = media_list_filter_cache_key(&filter);
+        assert_eq!(key, "");
+    }
+
+    #[test]
+    fn media_status_filter() {
+        use wp_api::media::MediaStatus;
+        let filter = MediaListFilter {
+            status: vec![MediaStatus::Inherit],
+            ..Default::default()
+        };
+        let key = media_list_filter_cache_key(&filter);
+        assert_eq!(key, "status=inherit");
+    }
+
+    #[test]
+    fn media_multi_field_sorted() {
+        use wp_api::media::{MediaStatus, MediaTypeParam};
+        use wp_api::users::UserId;
+        let filter = MediaListFilter {
+            status: vec![MediaStatus::Inherit],
+            author: vec![UserId(5)],
+            media_type: Some(MediaTypeParam::Image),
+            ..Default::default()
+        };
+        let key = media_list_filter_cache_key(&filter);
+        // Fields in alphabetical order: author, media_type, status
+        assert_eq!(key, "author=5&media_type=image&status=inherit");
     }
 }

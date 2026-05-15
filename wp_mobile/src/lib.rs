@@ -22,6 +22,11 @@ wp_mobile_entity!(
 );
 
 wp_mobile_entity!(
+    EntityMediaWithEditContext,
+    wp_api::media::MediaWithEditContext
+);
+
+wp_mobile_entity!(
     EntityPostTypeDetailsWithEditContext,
     wp_api::post_types::PostTypeDetailsWithEditContext
 );

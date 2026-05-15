@@ -1,10 +1,13 @@
 use crate::service::sites::SiteInfo;
-use crate::service::{post_types::PostTypeService, posts::PostService, sites::SiteService};
+use crate::service::{
+    media::MediaService, post_types::PostTypeService, posts::PostService, sites::SiteService,
+};
 use std::sync::Arc;
 use wp_api::prelude::{ApiUrlResolver, WpApiClient, WpApiClientDelegate};
 use wp_mobile_cache::{WpApiCache, db_types::db_site::DbSite};
 
 pub mod entity_state_service;
+pub mod media;
 pub mod metadata;
 pub mod mock_post_service;
 pub mod post_types;
@@ -38,8 +41,9 @@ impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {
 /// domain-specific services like PostService, PostTypeService, etc.
 #[derive(uniffi::Object)]
 pub struct WpService {
-    posts: Arc<PostService>,
+    media: Arc<MediaService>,
     post_types: Arc<PostTypeService>,
+    posts: Arc<PostService>,
     sites: Arc<SiteService>,
 }
 
@@ -54,6 +58,11 @@ impl WpService {
         let api_client = Arc::new(WpApiClient::new(api_url_resolver, delegate));
         let db_site_arc = Arc::new(db_site);
 
+        let media = Arc::new(MediaService::new(
+            api_client.clone(),
+            db_site_arc.clone(),
+            cache.clone(),
+        ));
         let posts = Arc::new(PostService::new(
             api_client.clone(),
             db_site_arc.clone(),
@@ -62,8 +71,9 @@ impl WpService {
         let post_types = Arc::new(PostTypeService::new(api_client, db_site_arc, cache));
 
         Self {
-            posts,
+            media,
             post_types,
+            posts,
             sites: site_service,
         }
     }
@@ -101,14 +111,19 @@ impl WpService {
         ))
     }
 
-    /// Get the post service for this WordPress site
-    pub fn posts(&self) -> Arc<PostService> {
-        self.posts.clone()
+    /// Get the media service for this WordPress site
+    pub fn media(&self) -> Arc<MediaService> {
+        self.media.clone()
     }
 
     /// Get the post type service for this WordPress site
     pub fn post_types(&self) -> Arc<PostTypeService> {
         self.post_types.clone()
+    }
+
+    /// Get the post service for this WordPress site
+    pub fn posts(&self) -> Arc<PostService> {
+        self.posts.clone()
     }
 
     /// Get the site service for this WordPress site
