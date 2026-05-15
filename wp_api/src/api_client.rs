@@ -19,6 +19,9 @@ use crate::{
             },
             block_patterns_endpoint::{BlockPatternsRequestBuilder, BlockPatternsRequestExecutor},
             block_renderer_endpoint::{BlockRendererRequestBuilder, BlockRendererRequestExecutor},
+            block_revisions_endpoint::{
+                BlockRevisionsRequestBuilder, BlockRevisionsRequestExecutor,
+            },
             block_types_endpoint::{BlockTypesRequestBuilder, BlockTypesRequestExecutor},
             blocks_endpoint::{BlocksRequestBuilder, BlocksRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
@@ -85,6 +88,7 @@ pub struct WpApiRequestBuilder {
     block_pattern_categories: Arc<BlockPatternCategoriesRequestBuilder>,
     block_patterns: Arc<BlockPatternsRequestBuilder>,
     block_types: Arc<BlockTypesRequestBuilder>,
+    block_revisions: Arc<BlockRevisionsRequestBuilder>,
     blocks: Arc<BlocksRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
@@ -136,6 +140,7 @@ impl WpApiRequestBuilder {
             block_pattern_categories,
             block_patterns,
             block_types,
+            block_revisions,
             blocks,
             autosaves,
             comments,
@@ -197,6 +202,7 @@ pub struct WpApiClient {
     block_pattern_categories: Arc<BlockPatternCategoriesRequestExecutor>,
     block_patterns: Arc<BlockPatternsRequestExecutor>,
     block_types: Arc<BlockTypesRequestExecutor>,
+    block_revisions: Arc<BlockRevisionsRequestExecutor>,
     blocks: Arc<BlocksRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
@@ -245,6 +251,7 @@ impl WpApiClient {
             block_pattern_categories,
             block_patterns,
             block_types,
+            block_revisions,
             blocks,
             autosaves,
             comments,
@@ -303,6 +310,7 @@ api_client_generate_endpoint_impl!(WpApi, block_renderer);
 api_client_generate_endpoint_impl!(WpApi, block_pattern_categories);
 api_client_generate_endpoint_impl!(WpApi, block_patterns);
 api_client_generate_endpoint_impl!(WpApi, block_types);
+api_client_generate_endpoint_impl!(WpApi, block_revisions);
 api_client_generate_endpoint_impl!(WpApi, blocks);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, comments);

@@ -19,7 +19,7 @@
 
 - [x] `/wp/v2/block-types`
 - [x] `/wp/v2/blocks`
-- [ ] `/wp/v2/blocks/<id>/revisions`
+- [x] `/wp/v2/blocks/<id>/revisions`
 - [ ] `/wp/v2/blocks/<id>/autosaves`
 - [x] `/wp/v2/block-renderer/<id>`
 - [x] `/wp/v2/block-directory/search`
