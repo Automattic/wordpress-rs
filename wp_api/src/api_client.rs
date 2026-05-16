@@ -53,6 +53,7 @@ use crate::{
             post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
             posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
             search_endpoint::{SearchRequestBuilder, SearchRequestExecutor},
+            sidebars_endpoint::{SidebarsRequestBuilder, SidebarsRequestExecutor},
             site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
             taxonomies_endpoint::{TaxonomiesRequestBuilder, TaxonomiesRequestExecutor},
             template_autosaves_endpoint::{
@@ -112,6 +113,7 @@ pub struct WpApiRequestBuilder {
     post_types: Arc<PostTypesRequestBuilder>,
     posts: Arc<PostsRequestBuilder>,
     search: Arc<SearchRequestBuilder>,
+    sidebars: Arc<SidebarsRequestBuilder>,
     site_settings: Arc<SiteSettingsRequestBuilder>,
     taxonomies: Arc<TaxonomiesRequestBuilder>,
     terms: Arc<TermsRequestBuilder>,
@@ -165,6 +167,7 @@ impl WpApiRequestBuilder {
             post_types,
             posts,
             search,
+            sidebars,
             site_settings,
             taxonomies,
             terms,
@@ -228,6 +231,7 @@ pub struct WpApiClient {
     post_types: Arc<PostTypesRequestExecutor>,
     posts: Arc<PostsRequestExecutor>,
     search: Arc<SearchRequestExecutor>,
+    sidebars: Arc<SidebarsRequestExecutor>,
     site_settings: Arc<SiteSettingsRequestExecutor>,
     taxonomies: Arc<TaxonomiesRequestExecutor>,
     terms: Arc<TermsRequestExecutor>,
@@ -278,6 +282,7 @@ impl WpApiClient {
             post_types,
             posts,
             search,
+            sidebars,
             site_settings,
             taxonomies,
             terms,
@@ -338,6 +343,7 @@ api_client_generate_endpoint_impl!(WpApi, post_statuses);
 api_client_generate_endpoint_impl!(WpApi, post_types);
 api_client_generate_endpoint_impl!(WpApi, posts);
 api_client_generate_endpoint_impl!(WpApi, search);
+api_client_generate_endpoint_impl!(WpApi, sidebars);
 api_client_generate_endpoint_impl!(WpApi, site_settings);
 api_client_generate_endpoint_impl!(WpApi, taxonomies);
 api_client_generate_endpoint_impl!(WpApi, terms);

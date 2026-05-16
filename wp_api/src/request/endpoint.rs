@@ -31,6 +31,7 @@ pub mod post_statuses_endpoint;
 pub mod post_types_endpoint;
 pub mod posts_endpoint;
 pub mod search_endpoint;
+pub mod sidebars_endpoint;
 pub mod site_settings_endpoint;
 pub mod taxonomies_endpoint;
 pub mod template_autosaves_endpoint;

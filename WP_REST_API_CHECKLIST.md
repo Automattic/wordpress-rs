@@ -50,7 +50,7 @@
 
 - [x] `/wp/v2/widgets`
 - [x] `/wp/v2/widget-types`
-- [ ] `/wp/v2/sidebars`
+- [x] `/wp/v2/sidebars`
 
 ## System Endpoints
 

@@ -347,6 +347,8 @@ pub enum WpErrorCode {
     RevisionInvalidOffsetNumber,
     #[serde(rename = "rest_revision_invalid_page_number")]
     RevisionInvalidPageNumber,
+    #[serde(rename = "rest_sidebar_not_found")]
+    SidebarNotFound,
     #[serde(rename = "rest_status_invalid")]
     StatusInvalid,
     #[serde(rename = "rest_taxonomy_invalid")]
