@@ -11,6 +11,9 @@ use crate::{
             application_passwords_endpoint::{
                 ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
             },
+            block_autosaves_endpoint::{
+                BlockAutosavesRequestBuilder, BlockAutosavesRequestExecutor,
+            },
             block_directory_endpoint::{
                 BlockDirectoryRequestBuilder, BlockDirectoryRequestExecutor,
             },
@@ -92,6 +95,7 @@ pub struct WpApiRequestBuilder {
     block_pattern_categories: Arc<BlockPatternCategoriesRequestBuilder>,
     block_patterns: Arc<BlockPatternsRequestBuilder>,
     block_types: Arc<BlockTypesRequestBuilder>,
+    block_autosaves: Arc<BlockAutosavesRequestBuilder>,
     block_revisions: Arc<BlockRevisionsRequestBuilder>,
     blocks: Arc<BlocksRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
@@ -146,6 +150,7 @@ impl WpApiRequestBuilder {
             block_pattern_categories,
             block_patterns,
             block_types,
+            block_autosaves,
             block_revisions,
             blocks,
             autosaves,
@@ -210,6 +215,7 @@ pub struct WpApiClient {
     block_pattern_categories: Arc<BlockPatternCategoriesRequestExecutor>,
     block_patterns: Arc<BlockPatternsRequestExecutor>,
     block_types: Arc<BlockTypesRequestExecutor>,
+    block_autosaves: Arc<BlockAutosavesRequestExecutor>,
     block_revisions: Arc<BlockRevisionsRequestExecutor>,
     blocks: Arc<BlocksRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
@@ -261,6 +267,7 @@ impl WpApiClient {
             block_pattern_categories,
             block_patterns,
             block_types,
+            block_autosaves,
             block_revisions,
             blocks,
             autosaves,
@@ -322,6 +329,7 @@ api_client_generate_endpoint_impl!(WpApi, block_renderer);
 api_client_generate_endpoint_impl!(WpApi, block_pattern_categories);
 api_client_generate_endpoint_impl!(WpApi, block_patterns);
 api_client_generate_endpoint_impl!(WpApi, block_types);
+api_client_generate_endpoint_impl!(WpApi, block_autosaves);
 api_client_generate_endpoint_impl!(WpApi, block_revisions);
 api_client_generate_endpoint_impl!(WpApi, blocks);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
