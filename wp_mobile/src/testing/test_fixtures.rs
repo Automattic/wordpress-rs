@@ -5,34 +5,20 @@
 
 use async_trait::async_trait;
 use rstest::*;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use wp_api::prelude::*;
 use wp_api::request::{RequestContext, WpMultipartFormRequest};
 
 #[derive(Debug)]
 pub struct MockExecutor {
     execute_fn: fn(Arc<WpNetworkRequest>) -> Result<WpNetworkResponse, RequestExecutionError>,
-    // Queued multipart-upload responses, popped FIFO on each `upload(...)` call.
-    // Wrapped in Mutex because `upload(...)` takes `&self`.
-    upload_queue: Mutex<Vec<Result<WpNetworkResponse, RequestExecutionError>>>,
 }
 
 impl MockExecutor {
     pub fn with_execute_fn(
         execute_fn: fn(Arc<WpNetworkRequest>) -> Result<WpNetworkResponse, RequestExecutionError>,
     ) -> Self {
-        Self {
-            execute_fn,
-            upload_queue: Mutex::new(Vec::new()),
-        }
-    }
-
-    /// Queue a multipart-upload response. FIFO; one entry consumed per `upload(...)` call.
-    pub fn enqueue_upload_response(
-        &self,
-        response: Result<WpNetworkResponse, RequestExecutionError>,
-    ) {
-        self.upload_queue.lock().unwrap().push(response);
+        Self { execute_fn }
     }
 }
 
@@ -49,13 +35,7 @@ impl RequestExecutor for MockExecutor {
         &self,
         _request: Arc<WpMultipartFormRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        let mut q = self.upload_queue.lock().unwrap();
-        if q.is_empty() {
-            panic!(
-                "MockExecutor::upload called with no queued response — did the test call `enqueue_upload_response` first?"
-            );
-        }
-        q.remove(0)
+        unimplemented!("upload not implemented in MockExecutor")
     }
 
     async fn sleep(&self, _: u64) {}
