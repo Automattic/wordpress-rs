@@ -19,7 +19,7 @@ use wp_api::{
     api_client::WpApiClient,
     media::{
         MediaCreateParams, MediaDeleteResponse, MediaId, MediaListParams, MediaStatus,
-        MediaWithEditContext, SparseMediaFieldWithEditContext,
+        MediaUpdateParams, MediaWithEditContext, SparseMediaFieldWithEditContext,
     },
     request::RequestContext,
 };
@@ -66,9 +66,10 @@ pub(crate) struct FetchStats {
 /// Service layer for media operations
 ///
 /// Provides a bridge between clients and the underlying network/cache layers.
-/// Handles fetching, deleting, and creating media. Only `create_media` is
-/// exposed here for progress-aware upload via `RequestContext` threading;
-/// `update_media` still goes through `MediaRequestExecutor` directly.
+/// Handles fetching, creating, updating, and deleting media. `create_media`
+/// is exposed here for progress-aware upload via `RequestContext` threading;
+/// `update_media` and `delete_media_permanently` are cache-aware wrappers
+/// around the underlying `MediaRequestExecutor`.
 ///
 /// # Metadata Sync Infrastructure
 ///
@@ -650,9 +651,17 @@ impl MediaService {
                 err_message: e.to_string(),
             })?;
 
-        // Scrub the deleted media from every cached media list. Without this,
-        // collection load_items would return a phantom row that converts to
-        // `Missing`/`Stale` until the next full refresh. Failure here is
+        // Notify live collections first so their targeted
+        // `update_media_membership` runs while the entity is still present
+        // in each collection's stored list. If the prefix scrub ran first,
+        // every collection's `list_contains_entity` check would already be
+        // false and the membership update would do nothing. Mirrors
+        // `PostService::delete_post_permanently`.
+        self.notify_collections(media_id.0);
+
+        // Scrub the deleted media from every cached media list as a
+        // fallback for dormant collections (whose `update_media_membership`
+        // wasn't called above because no live Arc exists). Failure here is
         // logged but not propagated: the REST delete and local row delete
         // already succeeded.
         if let Err(e) = self
@@ -722,6 +731,37 @@ impl MediaService {
             .api_client
             .media()
             .create_cancellation(params, context)
+            .await
+            .map_err(FetchError::from)?;
+        let media = response.data;
+
+        self.cache.execute(|conn| {
+            MediaRepository::<EditContext>::new()
+                .upsert(conn, &self.db_site, &media)
+                .map_err(|e| FetchError::Database {
+                    err_message: e.to_string(),
+                })
+        })?;
+
+        self.notify_collections(media.id.0);
+
+        Ok(media)
+    }
+
+    /// Update a media item via REST POST and upsert it into the cache.
+    ///
+    /// Mirrors `PostService::update_post`. Successful HTTP response is
+    /// upserted into the cache and fanned out via `notify_collections`
+    /// so live collections refresh their membership without a full reload.
+    pub async fn update_media(
+        self: &Arc<Self>,
+        media_id: &MediaId,
+        params: &MediaUpdateParams,
+    ) -> Result<MediaWithEditContext, FetchError> {
+        let response = self
+            .api_client
+            .media()
+            .update(media_id, params)
             .await
             .map_err(FetchError::from)?;
         let media = response.data;
