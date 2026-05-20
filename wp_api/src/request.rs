@@ -224,7 +224,7 @@ impl WpNetworkRequestBody {
 #[derive(uniffi::Object)]
 pub struct WpNetworkRequest {
     pub(crate) uuid: String,
-    pub(crate) retry_count: u8,
+    pub(crate) retry_count: u32,
     pub(crate) method: RequestMethod,
     pub(crate) url: WpEndpointUrl,
     pub(crate) header_map: Arc<WpNetworkHeaderMap>,
@@ -246,7 +246,7 @@ impl WpNetworkRequest {
     }
 
     /// How many times this request has this request been attempted?
-    pub fn retry_count(&self) -> u8 {
+    pub fn retry_count(&self) -> u32 {
         self.retry_count
     }
 
@@ -462,7 +462,7 @@ impl NetworkRequestAccessor for WpMultipartFormRequest {
 #[derive(uniffi::Record)]
 pub struct WpNetworkResponse {
     pub body: Vec<u8>,
-    pub status_code: u16,
+    pub status_code: u32,
     pub response_header_map: Arc<WpNetworkHeaderMap>,
     pub request_url: WpEndpointUrl,
     pub request_method: RequestMethod,

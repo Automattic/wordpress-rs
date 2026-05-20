@@ -35,7 +35,7 @@ use wp_mobile_cache::{
 };
 
 /// Maximum number of posts to fetch in a single batch request
-const BATCH_FETCH_SIZE: usize = 100;
+const BATCH_FETCH_SIZE: u32 = 100;
 
 // Internal types
 
@@ -44,15 +44,15 @@ pub struct LoadByIdsResult {
     /// Entity IDs of successfully loaded posts
     pub entity_ids: Vec<EntityId>,
     /// Number of posts that were requested but failed to load
-    pub failed_count: usize,
+    pub failed_count: u32,
 }
 
 /// Statistics from fetching missing and stale posts.
 pub(crate) struct FetchStats {
     /// Number of posts that needed fetching (Missing or Stale state)
-    pub(crate) fetched_count: usize,
+    pub(crate) fetched_count: u32,
     /// Number of posts that failed to fetch
-    pub(crate) failed_count: usize,
+    pub(crate) failed_count: u32,
 }
 
 /// Service layer for post operations
@@ -377,7 +377,7 @@ impl PostService {
         let total_items = self
             .metadata_service
             .get_entity_ids(key)
-            .map(|ids| ids.len())
+            .map(|ids| ids.len() as u32)
             .unwrap_or(0);
 
         // Get pagination info from DB
@@ -421,12 +421,12 @@ impl PostService {
             .map(|m| PostId(m.id))
             .collect();
 
-        let fetched_count = ids_to_fetch.len();
-        let mut failed_count = 0;
+        let fetched_count = ids_to_fetch.len() as u32;
+        let mut failed_count: u32 = 0;
 
         if !ids_to_fetch.is_empty() {
             // Batch into chunks
-            for chunk in ids_to_fetch.chunks(BATCH_FETCH_SIZE) {
+            for chunk in ids_to_fetch.chunks(BATCH_FETCH_SIZE as usize) {
                 match self.load_posts_by_ids(endpoint_type, chunk.to_vec()).await {
                     Ok(result) => {
                         // Accumulate failures reported by load_posts_by_ids
@@ -440,7 +440,7 @@ impl PostService {
                             e
                         );
                         // Network/DB error - all items in this chunk failed
-                        failed_count += chunk.len();
+                        failed_count += chunk.len() as u32;
                     }
                 }
             }
@@ -580,7 +580,7 @@ impl PostService {
                     .filter(|id| !fetched_set.contains(id))
                     .copied()
                     .collect();
-                let failed_count = failed_ids.len();
+                let failed_count = failed_ids.len() as u32;
                 if !failed_ids.is_empty() {
                     EntityStateService::save_batch(
                         &self.cache,

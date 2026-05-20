@@ -169,14 +169,14 @@ where
 
 #[derive(Debug, uniffi::Object)]
 pub struct RetryAfterMiddleware {
-    max_retries: u8,
+    max_retries: u32,
     max_retry_wait_seconds: u64,
 }
 
 #[uniffi::export]
 impl RetryAfterMiddleware {
     #[uniffi::constructor]
-    pub fn new(max_retries: u8, max_retry_wait_seconds: u64) -> Self {
+    pub fn new(max_retries: u32, max_retry_wait_seconds: u64) -> Self {
         println!("Creating retry middleware");
         Self {
             max_retries,
@@ -401,7 +401,7 @@ mod tests {
                     request_executor,
                     WpNetworkResponse {
                         body: vec![],
-                        status_code: initial_response_status_code,
+                        status_code: initial_response_status_code as u32,
                         response_header_map: Arc::new(WpNetworkHeaderMap::default()),
                         request_url: WpEndpointUrl("http://example.com".to_string()),
                         request_method: RequestMethod::GET,
@@ -496,7 +496,7 @@ mod tests {
         }
 
         async fn execute_retry_after_middleware(
-            max_retries: u8,
+            max_retries: u32,
         ) -> Result<WpNetworkResponse, RequestExecutionError> {
             let foo_executor = FooExecutor {
                 first_request: AtomicBool::new(true),

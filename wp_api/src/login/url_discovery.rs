@@ -407,7 +407,7 @@ impl AutoDiscoveryAttemptFailure {
     /// to how how much progress was made into api discovery before this failure happened.
     ///
     /// The numbers are for comparison only and otherwise meaningless.
-    pub(in crate::login::url_discovery) fn importance(&self) -> usize {
+    pub(in crate::login::url_discovery) fn importance(&self) -> u32 {
         let parse_site_url_multipler = 1;
         let find_api_root_failure_multipler = 10;
         let fetch_and_parse_api_root_failure_multiplier = 1000;
@@ -416,13 +416,13 @@ impl AutoDiscoveryAttemptFailure {
             AutoDiscoveryAttemptFailure::FindApiRoot {
                 find_api_root_failure,
                 ..
-            } => find_api_root_failure_multipler * find_api_root_failure.importance().get(),
+            } => find_api_root_failure_multipler * find_api_root_failure.importance().get() as u32,
             AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
                 fetch_and_parse_api_root_failure,
                 ..
             } => {
                 fetch_and_parse_api_root_failure_multiplier
-                    * fetch_and_parse_api_root_failure.importance().get()
+                    * fetch_and_parse_api_root_failure.importance().get() as u32
             }
         }
     }
@@ -503,7 +503,7 @@ pub enum FetchAndParseApiRootFailure {
     WpError {
         error_code: WpErrorCode,
         error_message: String,
-        status_code: u16,
+        status_code: u32,
     },
     ApplicationPasswordsNotSupported {
         api_details: Arc<WpApiDetails>,
@@ -703,7 +703,7 @@ pub(crate) fn construct_attempts(input_site_url: String) -> Vec<AutoDiscoveryAtt
 #[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum FetchApiDetailsError {
     RequestExecutionFailed {
-        status_code: Option<u16>,
+        status_code: Option<u32>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },

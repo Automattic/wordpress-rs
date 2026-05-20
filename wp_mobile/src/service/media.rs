@@ -29,7 +29,7 @@ use wp_mobile_cache::{
 };
 
 /// Maximum number of media items to fetch in a single batch request
-const BATCH_FETCH_SIZE: usize = 100;
+const BATCH_FETCH_SIZE: u32 = 100;
 
 /// Core WordPress attachment statuses. Used by `load_media_by_ids` as the
 /// baseline for hydration requests; the caller's filter statuses are unioned
@@ -48,15 +48,15 @@ pub struct LoadByIdsResult {
     /// Entity IDs of successfully loaded media
     pub entity_ids: Vec<EntityId>,
     /// Number of media items that were requested but failed to load
-    pub failed_count: usize,
+    pub failed_count: u32,
 }
 
 /// Statistics from fetching missing and stale media.
 pub(crate) struct FetchStats {
     /// Number of media items that needed fetching (Missing or Stale state)
-    pub(crate) fetched_count: usize,
+    pub(crate) fetched_count: u32,
     /// Number of media items that failed to fetch
-    pub(crate) failed_count: usize,
+    pub(crate) failed_count: u32,
 }
 
 /// Service layer for media operations
@@ -311,7 +311,7 @@ impl MediaService {
         let total_items = self
             .metadata_service
             .get_entity_ids(key)
-            .map(|ids| ids.len())
+            .map(|ids| ids.len() as u32)
             .unwrap_or(0);
 
         let pagination = self.metadata_service.get_pagination(key).ok().flatten();
@@ -350,11 +350,11 @@ impl MediaService {
             .map(|m| MediaId(m.id))
             .collect();
 
-        let fetched_count = ids_to_fetch.len();
-        let mut failed_count = 0;
+        let fetched_count = ids_to_fetch.len() as u32;
+        let mut failed_count: u32 = 0;
 
         if !ids_to_fetch.is_empty() {
-            for chunk in ids_to_fetch.chunks(BATCH_FETCH_SIZE) {
+            for chunk in ids_to_fetch.chunks(BATCH_FETCH_SIZE as usize) {
                 match self.load_media_by_ids(chunk.to_vec(), &filter.status).await {
                     Ok(result) => {
                         failed_count += result.failed_count;
@@ -366,7 +366,7 @@ impl MediaService {
                             chunk,
                             e
                         );
-                        failed_count += chunk.len();
+                        failed_count += chunk.len() as u32;
                     }
                 }
             }
@@ -431,7 +431,7 @@ impl MediaService {
 
         let params = MediaListParams {
             include: media_ids,
-            per_page: Some(BATCH_FETCH_SIZE as u32),
+            per_page: Some(BATCH_FETCH_SIZE),
             status: statuses,
             ..Default::default()
         };
@@ -485,7 +485,7 @@ impl MediaService {
                     .filter(|id| !fetched_set.contains(id))
                     .copied()
                     .collect();
-                let failed_count = failed_ids.len();
+                let failed_count = failed_ids.len() as u32;
                 if !failed_ids.is_empty() {
                     EntityStateService::save_batch(
                         &self.cache,

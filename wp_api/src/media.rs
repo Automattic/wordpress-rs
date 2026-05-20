@@ -490,8 +490,8 @@ pub struct AudioMediaDetails {
     pub data_format: Option<String>,
     pub codec: Option<String>,
     pub sample_rate: Option<u32>,
-    pub channels: Option<u8>,
-    pub bits_per_sample: Option<u8>,
+    pub channels: Option<u32>,
+    pub bits_per_sample: Option<u32>,
     pub lossless: Option<bool>,
     #[serde(rename = "channelmode")]
     pub channel_mode: Option<String>,

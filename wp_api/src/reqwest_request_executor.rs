@@ -86,7 +86,7 @@ impl ReqwestRequestExecutor {
         let body = response.bytes().await?;
 
         Ok(WpNetworkResponse {
-            status_code: status.as_u16(),
+            status_code: status.as_u16() as u32,
             body: body.to_vec(),
             response_header_map: Arc::new(WpNetworkHeaderMap::new(response_header_map)),
             request_url: wp_request.url(),
@@ -165,7 +165,7 @@ impl RequestExecutor for ReqwestRequestExecutor {
 
         let header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
-            status_code: response.status().as_u16(),
+            status_code: response.status().as_u16() as u32,
             body: response.bytes().await.unwrap().to_vec(),
             response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
             request_url: upload_request.url(),
@@ -188,7 +188,7 @@ fn request_execution_error_from_reqwest(
     request_url: String,
     request_method: RequestMethod,
 ) -> RequestExecutionError {
-    let status_code = error.status().map(|s| s.as_u16());
+    let status_code = error.status().map(|s| s.as_u16() as u32);
     let reason = if error.is_timeout() {
         RequestExecutionErrorReason::HttpTimeoutError
     } else if let Some(tls_error) = error.as_tls_error() {
