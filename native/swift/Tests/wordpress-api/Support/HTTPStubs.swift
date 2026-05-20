@@ -119,7 +119,7 @@ extension WpNetworkResponse {
         )
     }
 
-    static func jsonResponse(named name: String, statusCode: UInt16 = 200) throws -> WpNetworkResponse {
+    static func jsonResponse(named name: String, statusCode: UInt32 = 200) throws -> WpNetworkResponse {
 
         guard
             let resourceUrl = Bundle
