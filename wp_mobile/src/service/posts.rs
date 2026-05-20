@@ -518,7 +518,7 @@ impl PostService {
         let params = PostListParams {
             include: post_ids,
             // Ensure we get all requested posts regardless of default per_page
-            per_page: Some(BATCH_FETCH_SIZE as u32),
+            per_page: Some(BATCH_FETCH_SIZE),
             // Request all available post statuses as defined in the WordPress REST API.
             // Use "any" to match all post statuses (including custom ones), plus
             // "trash" which WordPress excludes from "any" because it has
