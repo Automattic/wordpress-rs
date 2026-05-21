@@ -285,14 +285,6 @@ enum MembershipAction {
 }
 
 impl MediaMetadataCollectionWithEditContext {
-    /// Crate-internal accessor for the cache key. Used by service-side
-    /// integration tests that seed `list_metadata_items` directly via the
-    /// repo's `set_items_by_list_key` helper. Not exported to UniFFI.
-    #[allow(dead_code)]
-    pub(crate) fn key(&self) -> wp_mobile_cache::list_metadata::ListKey {
-        self.core.key().clone()
-    }
-
     /// Update list membership for a single media item.
     ///
     /// Should be called after the media database is modified externally
