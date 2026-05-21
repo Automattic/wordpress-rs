@@ -144,8 +144,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     return Err("expected .com domain to support privacy".into());
                 }
 
-                if availability.product_id.is_none() {
-                    return Err("expected product_id for available domain".into());
+                if availability.pricing.is_none() {
+                    return Err("expected pricing for available domain".into());
                 }
 
                 Ok(())

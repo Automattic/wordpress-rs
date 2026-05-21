@@ -248,45 +248,20 @@ pub struct DomainAvailability {
     pub supports_privacy: bool,
     /// Provider of the root domain (`"wpcom"` or `"unknown"`).
     pub root_domain_provider: String,
-    // -- Product/pricing fields (conditional on status) --
-    /// WordPress.com product ID for purchasing this domain.
-    pub product_id: Option<ProductId>,
-    /// WordPress.com product slug (e.g. `"domain_reg"`,
-    /// `"domain_transfer"`).
-    pub product_slug: Option<String>,
-    /// Formatted registration/transfer cost (e.g. `"$18.00"`).
-    pub cost: Option<String>,
-    /// Formatted renewal cost.
-    pub renew_cost: Option<String>,
-    /// Raw numeric renewal price in `currency_code`.
-    pub renew_raw_price: Option<Decimal2>,
-    /// Raw numeric registration/transfer price in `currency_code`.
-    pub raw_price: Option<Decimal2>,
-    /// ISO 4217 currency code.
-    pub currency_code: Option<CurrencyCode>,
-    /// Discounted sale price when a coupon applies.
-    pub sale_cost: Option<Decimal2>,
-    /// `true` if a premium domain exceeds the price limit.
-    pub is_price_limit_exceeded: Option<bool>,
-    // -- Match/vendor fields (available domains only) --
-    /// Reasons the domain matched (e.g. `"exact-match"`,
-    /// `"tld-exact"`, `"tld-common"`).
-    pub match_reasons: Option<Vec<String>>,
-    /// The registry vendor (e.g. `"availability"`).
-    pub vendor: Option<String>,
-    /// `true` for status `"available_premium"`.
-    pub is_supported_premium_domain: Option<bool>,
-    // -- Mapping/transfer fields --
+    /// Product and pricing details. Present for available and
+    /// transferrable domains, absent for unavailable domains.
+    #[serde(flatten)]
+    pub pricing: Option<DomainPricing>,
+    /// Match and vendor info. Present for available domains.
+    #[serde(flatten)]
+    pub match_info: Option<DomainMatchInfo>,
+    /// Transfer and mapping details. Present when the domain is
+    /// already registered or mapped by the same user on another site.
+    #[serde(flatten)]
+    pub transfer_info: Option<DomainTransferInfo>,
     /// Type of ownership verification required (e.g.
     /// `"no_verification_required"`).
     pub ownership_verification_type: Option<String>,
-    /// Transfer status for mapped domains (e.g. `"transferrable"`,
-    /// `"recent_registration_lock_not_transferrable"`).
-    pub transferrability: Option<String>,
-    /// Primary domain of the other site where this domain is
-    /// registered or mapped (same user, different site).
-    pub other_site_domain: Option<String>,
-    // -- TLD-specific fields --
     /// `true` if the TLD requires HSTS (e.g. `.dev`).
     pub hsts_required: Option<bool>,
     /// `true` if the `.gay` TLD policy notice is required.
@@ -297,9 +272,56 @@ pub struct DomainAvailability {
     #[serde(default)]
     #[uniffi(default = [])]
     pub policy_notices: Vec<DomainPolicyNotice>,
-    // -- Maintenance --
     /// When domain registration or TLD is in maintenance, the end time.
     pub maintenance_end_time: Option<String>,
+}
+
+/// Product and pricing details for an available or transferrable domain.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct DomainPricing {
+    /// WordPress.com product ID for purchasing this domain.
+    pub product_id: ProductId,
+    /// WordPress.com product slug (e.g. `"domain_reg"`,
+    /// `"domain_transfer"`).
+    pub product_slug: String,
+    /// Formatted registration/transfer cost (e.g. `"$18.00"`).
+    pub cost: String,
+    /// Raw numeric registration/transfer price in `currency_code`.
+    pub raw_price: Decimal2,
+    /// ISO 4217 currency code.
+    pub currency_code: CurrencyCode,
+    /// Formatted renewal cost. Not present for transfer-only domains.
+    pub renew_cost: Option<String>,
+    /// Raw numeric renewal price in `currency_code`.
+    pub renew_raw_price: Option<Decimal2>,
+    /// Discounted sale price when a coupon applies.
+    pub sale_cost: Option<Decimal2>,
+    /// `true` if a premium domain exceeds the price limit.
+    pub is_price_limit_exceeded: Option<bool>,
+    /// `true` for supported premium domains.
+    pub is_supported_premium_domain: Option<bool>,
+}
+
+/// Match and vendor information for an available domain.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct DomainMatchInfo {
+    /// Reasons the domain matched (e.g. `"exact-match"`,
+    /// `"tld-exact"`, `"tld-common"`).
+    pub match_reasons: Vec<String>,
+    /// The registry vendor (e.g. `"availability"`).
+    pub vendor: String,
+}
+
+/// Transfer and mapping details for a domain registered or mapped
+/// by the same user on another site.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct DomainTransferInfo {
+    /// Primary domain of the other site where this domain is
+    /// registered or mapped.
+    pub other_site_domain: String,
+    /// Transfer status (e.g. `"transferrable"`,
+    /// `"recent_registration_lock_not_transferrable"`).
+    pub transferrability: Option<String>,
 }
 
 impl_as_query_value_for_new_type!(DomainName);
@@ -755,31 +777,32 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert_eq!(availability.product_id, Some(ProductId(6)));
-        assert_eq!(availability.product_slug.as_deref(), Some("domain_reg"));
-        assert_eq!(availability.cost.as_deref(), Some("$18.00"));
-        assert_eq!(availability.renew_cost.as_deref(), Some("$18.00"));
+
+        let pricing = availability
+            .pricing
+            .as_ref()
+            .expect("available domain should have pricing");
+        assert_eq!(pricing.product_id, ProductId(6));
+        assert_eq!(pricing.product_slug, "domain_reg");
+        assert_eq!(pricing.cost, "$18.00");
+        assert_eq!(pricing.raw_price, Decimal2::from_hundredths(1800));
+        assert_eq!(pricing.currency_code, CurrencyCode("USD".to_string()));
+        assert_eq!(pricing.renew_cost.as_deref(), Some("$18.00"));
         assert_eq!(
-            availability.raw_price,
+            pricing.renew_raw_price,
             Some(Decimal2::from_hundredths(1800))
         );
+
+        let match_info = availability
+            .match_info
+            .as_ref()
+            .expect("available domain should have match info");
         assert_eq!(
-            availability.renew_raw_price,
-            Some(Decimal2::from_hundredths(1800))
+            match_info.match_reasons,
+            ["exact-match", "tld-exact", "tld-common"].map(String::from)
         );
-        assert_eq!(
-            availability.currency_code,
-            Some(CurrencyCode("USD".to_string()))
-        );
-        assert_eq!(
-            availability.match_reasons.as_deref(),
-            Some(
-                ["exact-match", "tld-exact", "tld-common"]
-                    .map(String::from)
-                    .as_slice()
-            )
-        );
-        assert_eq!(availability.vendor.as_deref(), Some("availability"));
+        assert_eq!(match_info.vendor, "availability");
+
         assert_eq!(
             availability.ownership_verification_type.as_deref(),
             Some("no_verification_required")
@@ -792,12 +815,8 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert!(availability.product_id.is_none());
-        assert!(availability.product_slug.is_none());
-        assert!(availability.cost.is_none());
-        assert!(availability.raw_price.is_none());
-        assert!(availability.currency_code.is_none());
-        assert!(availability.match_reasons.is_none());
+        assert!(availability.pricing.is_none());
+        assert!(availability.match_info.is_none());
         assert!(availability.policy_notices.is_empty());
     }
 
@@ -807,19 +826,18 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert_eq!(availability.product_id, Some(ProductId(1337)));
-        assert_eq!(
-            availability.product_slug.as_deref(),
-            Some("domain_transfer")
-        );
-        assert_eq!(availability.cost.as_deref(), Some("$48.00"));
-        assert_eq!(
-            availability.raw_price,
-            Some(Decimal2::from_hundredths(4800))
-        );
+
+        let pricing = availability
+            .pricing
+            .as_ref()
+            .expect("transferrable domain should have pricing");
+        assert_eq!(pricing.product_id, ProductId(1337));
+        assert_eq!(pricing.product_slug, "domain_transfer");
+        assert_eq!(pricing.cost, "$48.00");
+        assert_eq!(pricing.raw_price, Decimal2::from_hundredths(4800));
         // Transferrable domains don't include renewal pricing.
-        assert!(availability.renew_cost.is_none());
-        assert!(availability.renew_raw_price.is_none());
+        assert!(pricing.renew_cost.is_none());
+        assert!(pricing.renew_raw_price.is_none());
     }
 
     #[test]
@@ -828,12 +846,14 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert_eq!(availability.is_supported_premium_domain, Some(true));
-        assert_eq!(availability.is_price_limit_exceeded, Some(false));
-        assert_eq!(
-            availability.raw_price,
-            Some(Decimal2::from_hundredths(500000))
-        );
+
+        let pricing = availability
+            .pricing
+            .as_ref()
+            .expect("premium domain should have pricing");
+        assert_eq!(pricing.is_supported_premium_domain, Some(true));
+        assert_eq!(pricing.is_price_limit_exceeded, Some(false));
+        assert_eq!(pricing.raw_price, Decimal2::from_hundredths(500000));
     }
 
     #[test]
@@ -842,15 +862,17 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let transfer_info = availability
+            .transfer_info
+            .as_ref()
+            .expect("mapped-same-user should have transfer info");
+        assert_eq!(transfer_info.other_site_domain, "myothersite.wordpress.com");
         assert_eq!(
-            availability.other_site_domain.as_deref(),
-            Some("myothersite.wordpress.com")
-        );
-        assert_eq!(
-            availability.transferrability.as_deref(),
+            transfer_info.transferrability.as_deref(),
             Some("transferrable")
         );
-        assert!(availability.product_id.is_none());
+        assert!(availability.pricing.is_none());
     }
 
     #[test]
@@ -859,14 +881,13 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert_eq!(
-            availability.sale_cost,
-            Some(Decimal2::from_hundredths(1000))
-        );
-        assert_eq!(
-            availability.raw_price,
-            Some(Decimal2::from_hundredths(2500))
-        );
+
+        let pricing = availability
+            .pricing
+            .as_ref()
+            .expect("sale domain should have pricing");
+        assert_eq!(pricing.sale_cost, Some(Decimal2::from_hundredths(1000)));
+        assert_eq!(pricing.raw_price, Decimal2::from_hundredths(2500));
     }
 
     #[test]
@@ -893,7 +914,7 @@ mod tests {
             availability.maintenance_end_time.as_deref(),
             Some("2026-05-01 12:00:00")
         );
-        assert!(availability.product_id.is_none());
+        assert!(availability.pricing.is_none());
     }
 
     #[test]
