@@ -272,8 +272,8 @@ pub struct DomainAvailability {
     #[serde(default)]
     #[uniffi(default = [])]
     pub policy_notices: Vec<DomainPolicyNotice>,
-    /// When domain registration or TLD is in maintenance, the end time.
-    pub maintenance_end_time: Option<String>,
+    /// Unix timestamp of when maintenance ends for this domain or TLD.
+    pub maintenance_end_time: Option<u64>,
 }
 
 /// Product and pricing details for an available or transferrable domain.
@@ -910,10 +910,7 @@ mod tests {
             .expect("Failed to open file");
         let availability: DomainAvailability =
             serde_json::from_reader(file).expect("Unable to parse JSON");
-        assert_eq!(
-            availability.maintenance_end_time.as_deref(),
-            Some("2026-05-01 12:00:00")
-        );
+        assert_eq!(availability.maintenance_end_time, Some(1777651200));
         assert!(availability.pricing.is_none());
     }
 
