@@ -78,7 +78,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
                     // Verify popularity rank consistency
                     match (language.popular_rank(), remote_language.popularity_rank) {
-                        (Some(local), Some(remote)) if local != remote as u8 => {
+                        (Some(local), Some(remote)) if local != remote => {
                             return Err(format!(
                                 "Popularity rank mismatch for {}: expected {}, got {}",
                                 slug, remote, local

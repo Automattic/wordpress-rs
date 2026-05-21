@@ -28,12 +28,12 @@ pub trait MaybeWpError {
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpApiError {
     InvalidHttpStatusCode {
-        status_code: u16,
+        status_code: u32,
         request_url: String,
         request_method: RequestMethod,
     },
     RequestExecutionFailed {
-        status_code: Option<u16>,
+        status_code: Option<u32>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
         request_url: String,
@@ -52,7 +52,7 @@ pub enum WpApiError {
         reason: String,
     },
     UnknownError {
-        status_code: u16,
+        status_code: u32,
         response: String,
         request_url: String,
         request_method: RequestMethod,
@@ -60,7 +60,7 @@ pub enum WpApiError {
     WpError {
         error_code: WpErrorCode,
         error_message: String,
-        status_code: u16,
+        status_code: u32,
         response: String,
         request_url: String,
         request_method: RequestMethod,
@@ -143,7 +143,7 @@ impl ParsedRequestError for WpApiError {
                 });
             }
 
-            match http::StatusCode::from_u16(response.status_code) {
+            match http::StatusCode::from_u16(response.status_code as u16) {
                 Ok(status) => {
                     if status.is_client_error() || status.is_server_error() {
                         Some(Self::UnknownError {
@@ -587,7 +587,7 @@ impl WpErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum RequestExecutionError {
     RequestExecutionFailed {
-        status_code: Option<u16>,
+        status_code: Option<u32>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
         request_url: String,

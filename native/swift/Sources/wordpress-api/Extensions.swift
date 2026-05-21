@@ -19,7 +19,7 @@ extension WpNetworkResponse {
 
         self = WpNetworkResponse(
             body: data,
-            statusCode: UInt16(response.statusCode),
+            statusCode: UInt32(response.statusCode),
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders),
             requestUrl: request.url(),
             requestMethod: request.method(),

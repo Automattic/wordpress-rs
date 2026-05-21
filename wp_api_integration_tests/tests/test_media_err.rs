@@ -241,7 +241,7 @@ impl RequestExecutor for MediaErrNetworking {
                 .send()
                 .await
                 .map_err(|e| RequestExecutionError::RequestExecutionFailed {
-                    status_code: e.status().map(|s| s.as_u16()),
+                    status_code: e.status().map(|s| s.as_u16() as u32),
                     redirects: None,
                     reason: RequestExecutionErrorReason::GenericError {
                         error_message: e.to_string(),
@@ -252,7 +252,7 @@ impl RequestExecutor for MediaErrNetworking {
 
         let header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
-            status_code: response.status().as_u16(),
+            status_code: response.status().as_u16() as u32,
             body: response.bytes().await.unwrap().to_vec(),
             response_header_map: Arc::new(WpNetworkHeaderMap::new(header_map)),
             request_url: upload_request.url(),

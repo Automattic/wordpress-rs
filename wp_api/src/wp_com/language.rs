@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WpComRemoteLanguage {
-    pub id: u16,
+    pub id: u32,
     pub localized: String,
     pub name: String,
-    pub popularity_rank: Option<u16>,
+    pub popularity_rank: Option<u32>,
 }
 
 pub type WpComRemoteLanguageMap = HashMap<String, WpComRemoteLanguage>;
@@ -33,7 +33,7 @@ impl AppendUrlQueryPairs for LanguagesGetParams {
 
 /// WordPress.com language codes with their IDs as discriminants
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, uniffi::Enum)]
-#[repr(u16)]
+#[repr(u32)]
 pub enum WPComLanguage {
     English = 1,
     Afrikaans = 2,
@@ -217,7 +217,7 @@ impl WPComLanguage {
 
     /// Returns the popularity rank if this is a popular language
     /// Returns None if the language is not marked as popular
-    pub fn popular_rank(&self) -> Option<u8> {
+    pub fn popular_rank(&self) -> Option<u32> {
         self.popular_rank_internal()
     }
 
@@ -227,14 +227,14 @@ impl WPComLanguage {
     }
 
     /// Returns the numeric language ID as used by WordPress.com
-    pub fn language_id(&self) -> u16 {
-        *self as u16
+    pub fn language_id(&self) -> u32 {
+        *self as u32
     }
 }
 
 /// Lookup a WPComLanguage by its numeric ID
 #[uniffi::export]
-pub fn wp_com_language_from_id(id: u16) -> Option<WPComLanguage> {
+pub fn wp_com_language_from_id(id: u32) -> Option<WPComLanguage> {
     WPComLanguage::from_id(id)
 }
 
@@ -258,12 +258,12 @@ pub fn wp_com_language_popular() -> Vec<WPComLanguage> {
 
 impl WPComLanguage {
     /// Lookup a language by its numeric ID (discriminant)
-    pub fn from_id(id: u16) -> Option<Self> {
+    pub fn from_id(id: u32) -> Option<Self> {
         Self::from_discriminant(id)
     }
 
     /// Lookup a language by its discriminant value
-    pub fn from_discriminant(id: u16) -> Option<Self> {
+    pub fn from_discriminant(id: u32) -> Option<Self> {
         match id {
             1 => Some(Self::English),
             2 => Some(Self::Afrikaans),
@@ -1198,7 +1198,7 @@ impl WPComLanguage {
 
     /// Returns the popularity rank if this is a popular language (internal method)
     /// Returns None if the language is not marked as popular
-    fn popular_rank_internal(&self) -> Option<u8> {
+    fn popular_rank_internal(&self) -> Option<u32> {
         match self {
             Self::English => Some(1),
             Self::Spanish => Some(2),

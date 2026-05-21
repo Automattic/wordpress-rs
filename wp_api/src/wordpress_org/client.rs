@@ -199,7 +199,7 @@ pub enum WordPressOrgApiClientError {
         reason: String,
     },
     RequestExecutionFailed {
-        status_code: Option<u16>,
+        status_code: Option<u32>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
     },
@@ -208,7 +208,7 @@ pub enum WordPressOrgApiClientError {
         response: String,
     },
     UnexpectedStatusCodeError {
-        status_code: u16,
+        status_code: u32,
         response: String,
     },
 }

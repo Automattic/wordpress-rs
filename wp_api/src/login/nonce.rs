@@ -170,7 +170,7 @@ impl WpRestNonceRetrieval {
 #[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum NonceRetrievalError {
     AlreadyLoggedIn { username: String },
-    UnexpectedResponse { status_code: u16, body: String },
+    UnexpectedResponse { status_code: u32, body: String },
     ApiError { error: WpApiError },
 }
 

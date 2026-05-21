@@ -238,7 +238,7 @@ impl MetadataCollectionCore {
         let Some(current_page) = current_page else {
             log::debug!("MetadataCollection: No pages loaded yet, need refresh first");
             return Ok(crate::sync::SyncResult::no_op(
-                self.items().map(|items| items.len()).unwrap_or(0),
+                self.items().map(|items| items.len() as u32).unwrap_or(0),
                 Some(true), // has_more_pages = true, but need refresh first
                 None,       // current_page = None (not loaded)
                 None,       // total_pages = None
@@ -249,7 +249,7 @@ impl MetadataCollectionCore {
         if total_pages.is_some_and(|total| current_page >= total) {
             log::debug!("MetadataCollection: Already at last page, nothing to load");
             return Ok(crate::sync::SyncResult::no_op(
-                self.items().map(|items| items.len()).unwrap_or(0),
+                self.items().map(|items| items.len() as u32).unwrap_or(0),
                 Some(false), // has_more_pages = false (on last page)
                 Some(current_page),
                 total_pages,

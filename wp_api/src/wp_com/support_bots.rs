@@ -192,7 +192,7 @@ pub struct CreateBotConversationFeedbackParams {
 }
 
 #[derive(Debug, PartialEq, Eq, uniffi::Enum, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[repr(u32)]
 pub enum FeedbackRating {
     Positive = 1,
     Negative = 0,

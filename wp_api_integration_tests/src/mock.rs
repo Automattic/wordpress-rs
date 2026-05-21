@@ -107,7 +107,7 @@ pub mod response_helpers {
         }
     }
 
-    pub fn empty_response(status_code: u16) -> WpNetworkResponse {
+    pub fn empty_response(status_code: u32) -> WpNetworkResponse {
         WpNetworkResponse {
             body: vec![],
             status_code,
