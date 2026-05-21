@@ -11,13 +11,17 @@ use crate::{
     },
     sync::{DbEntityState, EntityMetadata, MetadataFetchResult, SyncResult, SyncStrategy},
 };
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex, Weak},
+};
 use wp_api::{
     api_client::WpApiClient,
     media::{
-        MediaDeleteResponse, MediaId, MediaListParams, MediaStatus, MediaWithEditContext,
-        SparseMediaFieldWithEditContext,
+        MediaCreateParams, MediaDeleteResponse, MediaId, MediaListParams, MediaStatus,
+        MediaUpdateParams, MediaWithEditContext, SparseMediaFieldWithEditContext,
     },
+    request::RequestContext,
 };
 use wp_mobile_cache::{
     DbTable, WpApiCache,
@@ -62,8 +66,10 @@ pub(crate) struct FetchStats {
 /// Service layer for media operations
 ///
 /// Provides a bridge between clients and the underlying network/cache layers.
-/// Handles fetching and deleting media. Mutations that iOS performs directly
-/// against the API client (create/update/upload) are deliberately not exposed here.
+/// Handles fetching, creating, updating, and deleting media. `create_media`
+/// is exposed here for progress-aware upload via `RequestContext` threading;
+/// `update_media` and `delete_media_permanently` are cache-aware wrappers
+/// around the underlying `MediaRequestExecutor`.
 ///
 /// # Metadata Sync Infrastructure
 ///
@@ -82,6 +88,12 @@ pub struct MediaService {
     /// Database-backed list metadata service.
     /// Persists list structure across app restarts.
     pub(crate) metadata_service: Arc<MetadataService>,
+
+    /// Weak references to active metadata collections.
+    /// Used to notify collections directly when media items change,
+    /// bypassing the SQLite update hook → rowid resolution path. Mirrors
+    /// the post-side `collections` registry.
+    collections: Mutex<Vec<Weak<MediaMetadataCollectionWithEditContext>>>,
 }
 
 impl MediaService {
@@ -93,6 +105,7 @@ impl MediaService {
             db_site,
             cache,
             metadata_service,
+            collections: Mutex::new(Vec::new()),
         }
     }
 
@@ -638,9 +651,17 @@ impl MediaService {
                 err_message: e.to_string(),
             })?;
 
-        // Scrub the deleted media from every cached media list. Without this,
-        // collection load_items would return a phantom row that converts to
-        // `Missing`/`Stale` until the next full refresh. Failure here is
+        // Notify live collections first so their targeted
+        // `update_media_membership` runs while the entity is still present
+        // in each collection's stored list. If the prefix scrub ran first,
+        // every collection's `list_contains_entity` check would already be
+        // false and the membership update would do nothing. Mirrors
+        // `PostService::delete_post_permanently`.
+        self.notify_collections(media_id.0);
+
+        // Scrub the deleted media from every cached media list as a
+        // fallback for dormant collections (whose `update_media_membership`
+        // wasn't called above because no live Arc exists). Failure here is
         // logged but not propagated: the REST delete and local row delete
         // already succeeded.
         if let Err(e) = self
@@ -678,11 +699,112 @@ impl MediaService {
             per_page,
         );
 
-        Arc::new(MediaMetadataCollectionWithEditContext::new(
+        let collection = Arc::new(MediaMetadataCollectionWithEditContext::new(
             core,
             self.clone(),
             filter,
-        ))
+        ));
+
+        // Register weak reference so notify_collections can drive
+        // update_media_membership when media changes.
+        if let Ok(mut collections) = self.collections.lock() {
+            collections.push(Arc::downgrade(&collection));
+        }
+
+        collection
+    }
+
+    /// Create a new media item via REST POST and upsert it into the cache.
+    ///
+    /// Mirrors `PostService::create_post`. The `context` parameter threads a
+    /// `RequestContext` from Swift (via `WordPressAPI::fulfill(progress:withApiCall:)`)
+    /// through to the generated `MediaRequestExecutor::create_cancellation`,
+    /// which routes through `perform_upload(request, context.clone())`. That's
+    /// what enables byte-level upload progress and request-level cancellation
+    /// on the Swift side without any new Rust-side progress infrastructure.
+    pub async fn create_media(
+        self: &Arc<Self>,
+        params: &MediaCreateParams,
+        context: Option<Arc<RequestContext>>,
+    ) -> Result<MediaWithEditContext, FetchError> {
+        let response = self
+            .api_client
+            .media()
+            .create_cancellation(params, context)
+            .await
+            .map_err(FetchError::from)?;
+        let media = response.data;
+
+        self.cache.execute(|conn| {
+            MediaRepository::<EditContext>::new()
+                .upsert(conn, &self.db_site, &media)
+                .map_err(|e| FetchError::Database {
+                    err_message: e.to_string(),
+                })
+        })?;
+
+        self.notify_collections(media.id.0);
+
+        Ok(media)
+    }
+
+    /// Update a media item via REST POST and upsert it into the cache.
+    ///
+    /// Mirrors `PostService::update_post`. Successful HTTP response is
+    /// upserted into the cache and fanned out via `notify_collections`
+    /// so live collections refresh their membership without a full reload.
+    pub async fn update_media(
+        self: &Arc<Self>,
+        media_id: &MediaId,
+        params: &MediaUpdateParams,
+    ) -> Result<MediaWithEditContext, FetchError> {
+        let response = self
+            .api_client
+            .media()
+            .update(media_id, params)
+            .await
+            .map_err(FetchError::from)?;
+        let media = response.data;
+
+        self.cache.execute(|conn| {
+            MediaRepository::<EditContext>::new()
+                .upsert(conn, &self.db_site, &media)
+                .map_err(|e| FetchError::Database {
+                    err_message: e.to_string(),
+                })
+        })?;
+
+        self.notify_collections(media.id.0);
+
+        Ok(media)
+    }
+}
+
+impl MediaService {
+    /// Notify all active collections about a changed media ID.
+    ///
+    /// Upgrades weak references, prunes dead ones, then calls
+    /// `update_media_membership` on each live collection. Mirrors
+    /// `PostService::notify_collections`.
+    fn notify_collections(&self, media_id: i64) {
+        let live_collections: Vec<Arc<MediaMetadataCollectionWithEditContext>> = {
+            let mut guard = match self.collections.lock() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            guard.retain(|w| w.strong_count() > 0);
+            guard.iter().filter_map(|w| w.upgrade()).collect()
+        };
+
+        for collection in &live_collections {
+            if let Err(e) = collection.update_media_membership(wp_api::media::MediaId(media_id)) {
+                log::error!(
+                    "Failed to update media membership for media {}: {}",
+                    media_id,
+                    e
+                );
+            }
+        }
     }
 }
 

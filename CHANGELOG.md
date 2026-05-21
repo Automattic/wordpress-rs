@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `MediaService.create_media` for uploading media, with a Swift `WpService.uploadMedia` wrapper that streams upload progress
+- `MediaService.update_media` for editing media items
+- Sort/ordering predicates on `MediaListFilter`
+- Live membership updates on `MediaMetadataCollectionWithEditContext`, so cached media lists reflect items moving in or out of the filter without a full refresh
+
+### Changed
+
+- `MediaService.delete_media_permanently` now updates live media collections in place, so deletes appear without a refresh round-trip
+
 ## [0.3.0] - 2026-05-18
 
 ### Added
