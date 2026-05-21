@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `MediaService.delete_media_permanently` now updates live media collections in place, so deletes appear without a refresh round-trip
+- **Internal:** Buildkite step on trunk pushes that prunes `pr-build/<n>` branches whose PR is closed, sweeping orphans accumulated since `publish_pr_xcframework` started creating them.
 
 ## [0.3.0] - 2026-05-18
 
