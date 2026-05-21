@@ -385,7 +385,7 @@ mod tests {
         async fn execute_api_discovery_authentication_middleware(
             request_executor: Arc<FooExecutor>,
             initial_request_has_authorization_header: bool,
-            initial_response_status_code: u16,
+            initial_response_status_code: u32,
         ) -> Result<WpNetworkResponse, RequestExecutionError> {
             let middleware =
                 ApiDiscoveryAuthenticationMiddleware::new("foo".to_string(), "bar".to_string());
@@ -401,7 +401,7 @@ mod tests {
                     request_executor,
                     WpNetworkResponse {
                         body: vec![],
-                        status_code: initial_response_status_code as u32,
+                        status_code: initial_response_status_code,
                         response_header_map: Arc::new(WpNetworkHeaderMap::default()),
                         request_url: WpEndpointUrl("http://example.com".to_string()),
                         request_method: RequestMethod::GET,
