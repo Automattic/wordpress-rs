@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `MediaService.create_media` for uploading media, with a Swift `WpService.uploadMedia` wrapper that streams upload progress
+- `MediaService.update_media` for editing media items
+- Sort/ordering predicates on `MediaListFilter`
+- Live membership updates on `MediaMetadataCollectionWithEditContext`, so cached media lists reflect items moving in or out of the filter without a full refresh
+
 ### Changed
 
 - **BREAKING:** Replace `u8`, `u16` types with `u32` across struct fields, function parameters, return types, and enum reprs as a defensive measure against an [Android ART AOT compiler bug](https://github.com/jkmassel/uniffi-armv7-aot-checksum-bug) that mishandles small integer JNI return values on ARM32 ([#1339](https://github.com/Automattic/wordpress-rs/issues/1339))
+- `MediaService.delete_media_permanently` now updates live media collections in place, so deletes appear without a refresh round-trip
+- **Internal:** Buildkite step on trunk pushes that prunes `pr-build/<n>` branches whose PR is closed, sweeping orphans accumulated since `publish_pr_xcframework` started creating them.
 
 ## [0.3.0] - 2026-05-18
 
