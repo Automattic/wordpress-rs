@@ -201,6 +201,29 @@ pub enum DomainAvailabilityStatus {
     Other(String),
 }
 
+/// Whether a domain can be mapped to a WordPress.com site.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainMappableStatus {
+    /// Domain can be mapped.
+    Mappable,
+    /// Domain is blacklisted and cannot be mapped.
+    BlacklistedDomain,
+    /// Domain is already mapped to another site.
+    MappedDomain,
+    /// Domain format is invalid.
+    InvalidDomain,
+    /// TLD is invalid.
+    InvalidTld,
+    /// Domain is restricted and cannot be mapped.
+    RestrictedDomain,
+    /// Domain has a pending transfer.
+    TransferPending,
+    /// A status not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
 /// Response from `GET /domains/{name}/is-available/` (v1.3).
 ///
 /// Reports whether a domain name is available for registration or
@@ -217,9 +240,8 @@ pub struct DomainAvailability {
     pub tld: String,
     /// Availability status.
     pub status: DomainAvailabilityStatus,
-    /// Whether the domain can be mapped to a WordPress.com site
-    /// (e.g. `"mappable"`, `"blacklisted_domain"`).
-    pub mappable: String,
+    /// Whether the domain can be mapped to a WordPress.com site.
+    pub mappable: DomainMappableStatus,
     /// Whether the domain supports WHOIS privacy protection.
     #[serde(default)]
     #[uniffi(default = false)]
