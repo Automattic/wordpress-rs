@@ -312,6 +312,19 @@ pub struct DomainMatchInfo {
     pub vendor: String,
 }
 
+/// Transfer status of a domain.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainTransferrability {
+    /// Domain can be transferred in.
+    Transferrable,
+    /// Premium domain can be transferred in.
+    TransferrablePremium,
+    /// A status not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
 /// Transfer and mapping details for a domain registered or mapped
 /// by the same user on another site.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
@@ -319,9 +332,8 @@ pub struct DomainTransferInfo {
     /// Primary domain of the other site where this domain is
     /// registered or mapped.
     pub other_site_domain: String,
-    /// Transfer status (e.g. `"transferrable"`,
-    /// `"recent_registration_lock_not_transferrable"`).
-    pub transferrability: Option<String>,
+    /// Transfer status of this domain.
+    pub transferrability: Option<DomainTransferrability>,
 }
 
 impl_as_query_value_for_new_type!(DomainName);
@@ -869,8 +881,8 @@ mod tests {
             .expect("mapped-same-user should have transfer info");
         assert_eq!(transfer_info.other_site_domain, "myothersite.wordpress.com");
         assert_eq!(
-            transfer_info.transferrability.as_deref(),
-            Some("transferrable")
+            transfer_info.transferrability,
+            Some(DomainTransferrability::Transferrable)
         );
         assert!(availability.pricing.is_none());
     }
