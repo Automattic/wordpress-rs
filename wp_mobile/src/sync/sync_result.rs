@@ -56,7 +56,7 @@ impl SyncResult {
         total_pages: Option<u32>,
     ) -> Self {
         Self {
-            total_items: total_items.into(),
+            total_items: total_items as u64,
             fetched_count: 0,
             failed_count: 0,
             has_more_pages,
