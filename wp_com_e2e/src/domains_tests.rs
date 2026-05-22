@@ -2,7 +2,8 @@ use crate::context::TestContext;
 use libtest_mimic::Trial;
 use std::sync::Arc;
 use wp_api::wp_com::domains::{
-    CountryCode, DomainAvailabilityParams, DomainAvailabilityStatus, DomainName,
+    AllDomainsParams, CountryCode, DomainAvailabilityParams, DomainAvailabilityStatus,
+    DomainListItemStatusType, DomainName, DomainSubtypeId,
 };
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
@@ -146,6 +147,59 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
                 if availability.pricing.is_none() {
                     return Err("expected pricing for available domain".into());
+                }
+
+                Ok(())
+            })
+        }
+    }));
+
+    trials.push(Trial::test("domains::all_domains", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                let response = ctx
+                    .client
+                    .domains()
+                    .all_domains(&AllDomainsParams::default())
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .data;
+
+                if response.domains.is_empty() {
+                    return Err("expected at least one domain".into());
+                }
+
+                // Every domain must have a non-empty domain name.
+                for domain in &response.domains {
+                    if domain.domain.0.is_empty() {
+                        return Err("expected non-empty domain name".into());
+                    }
+                }
+
+                // The test account should have at least one default_address
+                let has_default = response
+                    .domains
+                    .iter()
+                    .any(|d| d.subtype.id == DomainSubtypeId::DefaultAddress);
+                if !has_default {
+                    return Err("expected at least one domain with subtype default_address".into());
+                }
+
+                // All status types should be known values.
+                for domain in &response.domains {
+                    match &domain.domain_status.status_type {
+                        DomainListItemStatusType::Success
+                        | DomainListItemStatusType::Warning
+                        | DomainListItemStatusType::Error => {}
+                        DomainListItemStatusType::Other(s) => {
+                            return Err(format!(
+                                "unexpected status type '{}' for domain '{}'",
+                                s, domain.domain.0
+                            )
+                            .into());
+                        }
+                    }
                 }
 
                 Ok(())

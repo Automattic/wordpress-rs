@@ -1,0 +1,103 @@
+{
+  "domains": [
+    {
+      "domain": "expiring-soon.com",
+      "subtype": {
+        "id": "domain_registration",
+        "label": "Domain name registration"
+      },
+      "blog_id": 11111,
+      "blog_name": "Expiring Site",
+      "site_slug": "expiring.wordpress.com",
+      "auto_renewing": false,
+      "current_user_is_owner": true,
+      "is_domain_only_site": true,
+      "expiry": "2026-05-01 00:00:00",
+      "expired": false,
+      "primary_domain": true,
+      "can_set_as_primary": true,
+      "domain_status": {
+        "id": "expiring_soon",
+        "label": "Expiring soon",
+        "type": "warning",
+        "cta": "view_purchase"
+      },
+      "subscription_id": 22222,
+      "tags": ["domain_only"]
+    },
+    {
+      "domain": "old-domain.net",
+      "subtype": {
+        "id": "domain_registration",
+        "label": "Domain name registration"
+      },
+      "blog_id": 33333,
+      "blog_name": "Expired Site",
+      "site_slug": "expired.wordpress.com",
+      "auto_renewing": false,
+      "current_user_is_owner": true,
+      "is_domain_only_site": false,
+      "expiry": "2025-01-15 00:00:00",
+      "expired": true,
+      "primary_domain": false,
+      "can_set_as_primary": true,
+      "domain_status": {
+        "id": "expired",
+        "label": "Expired",
+        "type": "error",
+        "cta": "view_purchase"
+      },
+      "subscription_id": 44444,
+      "tags": []
+    },
+    {
+      "domain": "transferring.org",
+      "subtype": {
+        "id": "domain_transfer",
+        "label": "Domain name transfer"
+      },
+      "blog_id": 55555,
+      "blog_name": "Transfer Site",
+      "site_slug": "transfer.wordpress.com",
+      "auto_renewing": false,
+      "current_user_is_owner": true,
+      "is_domain_only_site": false,
+      "expiry": null,
+      "expired": false,
+      "primary_domain": false,
+      "can_set_as_primary": false,
+      "domain_status": {
+        "id": "pending_transfer",
+        "label": "Transfer in progress",
+        "type": "success",
+        "cta": "view_transfer_setup"
+      },
+      "subscription_id": 66666,
+      "tags": []
+    },
+    {
+      "domain": "century.blog",
+      "subtype": {
+        "id": "domain_registration",
+        "label": "Domain name registration"
+      },
+      "blog_id": 77777,
+      "blog_name": "100 Year Site",
+      "site_slug": "century.wordpress.com",
+      "auto_renewing": true,
+      "current_user_is_owner": true,
+      "is_domain_only_site": false,
+      "expiry": "2125-06-15 00:00:00",
+      "expired": false,
+      "primary_domain": true,
+      "can_set_as_primary": true,
+      "domain_status": {
+        "id": "active",
+        "label": "Active",
+        "type": "success"
+      },
+      "subscription_id": 88888,
+      "tags": ["hundred_year_domain"]
+    }
+  ]
+}

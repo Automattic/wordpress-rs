@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sort/ordering predicates on `MediaListFilter`
 - Live membership updates on `MediaMetadataCollectionWithEditContext`, so cached media lists reflect items moving in or out of the filter without a full refresh
 - WordPress.com `/domains/{name}/is-available` endpoint for checking domain availability, pricing, and transfer status
+- WordPress.com `/all-domains` endpoint for listing all domains across a user's sites
 
 ### Changed
 

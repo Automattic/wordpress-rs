@@ -1,0 +1,78 @@
+{
+  "domains": [
+    {
+      "domain": "fake-blog-123.wordpress.com",
+      "subtype": {
+        "id": "default_address",
+        "label": "Included site address"
+      },
+      "blog_id": 11111,
+      "blog_name": "Fake Blog 123",
+      "site_slug": "fake-blog-123.wordpress.com",
+      "auto_renewing": false,
+      "current_user_is_owner": false,
+      "is_domain_only_site": false,
+      "expiry": null,
+      "expired": false,
+      "primary_domain": true,
+      "can_set_as_primary": true,
+      "domain_status": {
+        "id": "active",
+        "label": "Active",
+        "type": "success"
+      },
+      "subscription_id": null,
+      "tags": []
+    },
+    {
+      "domain": "fake-empty-name.wordpress.com",
+      "subtype": {
+        "id": "default_address",
+        "label": "Included site address"
+      },
+      "blog_id": 22222,
+      "blog_name": "",
+      "site_slug": "fake-empty-name.wordpress.com",
+      "auto_renewing": false,
+      "current_user_is_owner": false,
+      "is_domain_only_site": false,
+      "expiry": null,
+      "expired": false,
+      "primary_domain": true,
+      "can_set_as_primary": true,
+      "domain_status": {
+        "id": "active",
+        "label": "Active",
+        "type": "success"
+      },
+      "subscription_id": null,
+      "tags": []
+    },
+    {
+      "domain": "fake-staging-site.wpcomstaging.com",
+      "subtype": {
+        "id": "default_address",
+        "label": "Included site address"
+      },
+      "blog_id": 33333,
+      "blog_name": "Site Title",
+      "site_slug": "fake-staging-site.wpcomstaging.com",
+      "auto_renewing": false,
+      "current_user_is_owner": false,
+      "is_domain_only_site": false,
+      "expiry": null,
+      "expired": false,
+      "primary_domain": true,
+      "can_set_as_primary": true,
+      "domain_status": {
+        "id": "active",
+        "label": "Active",
+        "type": "success"
+      },
+      "subscription_id": null,
+      "tags": [
+        "wpcom_staging"
+      ]
+    }
+  ]
+}
