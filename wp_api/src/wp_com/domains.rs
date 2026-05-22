@@ -435,9 +435,25 @@ pub struct DomainListItemStatus {
     /// Status severity type.
     #[serde(rename = "type")]
     pub status_type: DomainListItemStatusType,
-    /// Optional call-to-action identifier (e.g. `"view_domain"`,
-    /// `"view_purchase"`, `"view_domain_setup"`, `"view_transfer_setup"`).
-    pub cta: Option<String>,
+    /// Call-to-action for the user, if any action is needed.
+    pub cta: Option<DomainStatusCta>,
+}
+
+/// Call-to-action for a domain status.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainStatusCta {
+    /// View the domain settings.
+    ViewDomain,
+    /// View the purchase/subscription.
+    ViewPurchase,
+    /// View the domain connection setup.
+    ViewDomainSetup,
+    /// View the domain transfer setup.
+    ViewTransferSetup,
+    /// A CTA not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
 }
 
 /// Status identifier for a domain in the all-domains list.
@@ -691,7 +707,10 @@ mod tests {
             expiring.domain_status.status_type,
             DomainListItemStatusType::Warning
         );
-        assert_eq!(expiring.domain_status.cta.as_deref(), Some("view_purchase"));
+        assert_eq!(
+            expiring.domain_status.cta,
+            Some(DomainStatusCta::ViewPurchase)
+        );
         assert!(expiring.is_domain_only_site);
         assert_eq!(expiring.tags, vec!["domain_only"]);
 
@@ -710,8 +729,8 @@ mod tests {
             DomainListItemStatusId::PendingTransfer
         );
         assert_eq!(
-            transfer.domain_status.cta.as_deref(),
-            Some("view_transfer_setup")
+            transfer.domain_status.cta,
+            Some(DomainStatusCta::ViewTransferSetup)
         );
         assert!(!transfer.can_set_as_primary);
 

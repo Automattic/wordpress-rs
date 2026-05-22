@@ -177,8 +177,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     }
                 }
 
-                // At least one domain should be a default_address
-                // (every WP.com account has a free .wordpress.com address).
+                // The test account should have at least one default_address
                 let has_default = response
                     .domains
                     .iter()
