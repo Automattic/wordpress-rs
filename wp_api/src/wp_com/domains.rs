@@ -4,7 +4,7 @@ use crate::{
     impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::{
-        CurrencyCode, WpComSiteId, products::ProductId, segments::SegmentId,
+        CurrencyCode, WpComSiteId, products::ProductId, segments::SegmentId, sites::WpComSiteSlug,
         subscribers::SubscriptionId,
     },
 };
@@ -373,7 +373,7 @@ pub struct AllDomainItem {
     /// The site name.
     pub blog_name: String,
     /// The site slug used in URLs.
-    pub site_slug: String,
+    pub site_slug: WpComSiteSlug,
     /// Whether the domain is configured for automatic renewal.
     pub auto_renewing: bool,
     /// Whether the current authenticated user owns this domain.
