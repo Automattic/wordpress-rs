@@ -1,4 +1,5 @@
 use crate::{
+    date::WpGmtDateTime,
     decimal2::Decimal2,
     impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
@@ -379,9 +380,8 @@ pub struct AllDomainItem {
     pub current_user_is_owner: bool,
     /// Whether the site only has a domain (no content).
     pub is_domain_only_site: bool,
-    /// Expiry date as a string (e.g. `"2026-03-24 00:00:00"`), or `null`
-    /// if the domain has no expiry.
-    pub expiry: Option<String>,
+    /// Expiry date of the domain, or `None` if it has no expiry.
+    pub expiry: Option<WpGmtDateTime>,
     /// Whether the domain has expired.
     pub expired: bool,
     /// Whether this is the primary domain for the site.
@@ -420,8 +420,6 @@ pub enum DomainSubtypeId {
     DomainRegistration,
     /// Domain transfer in progress.
     DomainTransfer,
-    /// Redirect-only domain.
-    SiteRedirect,
     /// A subtype not covered by the known variants.
     #[serde(untagged)]
     Other(String),
@@ -448,12 +446,22 @@ pub struct DomainListItemStatus {
 pub enum DomainListItemStatusId {
     /// Domain is active and working.
     Active,
+    /// Domain setup is in progress.
+    InProgress,
     /// Domain is expiring soon.
     ExpiringSoon,
     /// Domain has expired.
     Expired,
+    /// Domain is pending renewal.
+    PendingRenewal,
+    /// Domain registration is pending.
+    PendingRegistration,
     /// Domain transfer is in progress.
     PendingTransfer,
+    /// Domain transfer has completed.
+    TransferCompleted,
+    /// Domain transfer encountered an error.
+    TransferError,
     /// Domain connection has an error.
     ConnectionError,
     /// A status not covered by the known variants.
