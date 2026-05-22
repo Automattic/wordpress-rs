@@ -3,8 +3,8 @@ use crate::{
     wp_com::{
         WpComNamespace,
         domains::{
-            CountryCode, DomainSuggestion, DomainSuggestionsParams, SupportedCountries,
-            SupportedState,
+            CountryCode, DomainAvailability, DomainAvailabilityParams, DomainName,
+            DomainSuggestion, DomainSuggestionsParams, SupportedCountries, SupportedState,
         },
     },
 };
@@ -18,11 +18,16 @@ enum DomainsRequest {
     SupportedCountries,
     #[get(url = "/domains/supported-states/<country_code>", output = Vec<SupportedState>)]
     SupportedStates,
+    #[get(url = "/domains/<domain_name>/is-available", params = &DomainAvailabilityParams, output = DomainAvailability)]
+    IsAvailable,
 }
 
 impl DerivedRequest for DomainsRequest {
     fn namespace(&self) -> impl AsNamespace {
-        WpComNamespace::RestV1_1
+        match self {
+            Self::IsAvailable => WpComNamespace::RestV1_3,
+            _ => WpComNamespace::RestV1_1,
+        }
     }
 }
 
@@ -32,9 +37,11 @@ mod tests {
     use crate::{
         request::endpoint::ApiUrlResolver,
         wp_com::{
-            domains::CountryCode,
+            WpComSiteId,
+            domains::{CountryCode, DomainAvailabilityParams, DomainName},
             endpoint::tests::{
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
+                validate_wp_com_rest_v1_3_endpoint,
             },
             segments::SegmentId,
         },
@@ -104,6 +111,35 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_wp_com_rest_v1_1_endpoint(endpoint.supported_states(&country_code), expected_path);
+    }
+
+    #[rstest]
+    #[case::com(DomainName("example.com".to_string()), "/domains/example.com/is-available?")]
+    #[case::org(DomainName("myblog.org".to_string()), "/domains/myblog.org/is-available?")]
+    fn is_available(
+        endpoint: DomainsRequestEndpoint,
+        #[case] domain_name: DomainName,
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_com_rest_v1_3_endpoint(
+            endpoint.is_available(&domain_name, &DomainAvailabilityParams::default()),
+            expected_path,
+        );
+    }
+
+    #[rstest]
+    fn is_available_with_params(endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_3_endpoint(
+            endpoint.is_available(
+                &DomainName("test.com".to_string()),
+                &DomainAvailabilityParams {
+                    blog_id: Some(WpComSiteId(12345)),
+                    is_cart_pre_check: Some(true),
+                    vendor: Some("100-year-domains".to_string()),
+                },
+            ),
+            "/domains/test.com/is-available?blog_id=12345&is_cart_pre_check=true&vendor=100-year-domains",
+        );
     }
 
     fn base_domain_suggestions_params() -> DomainSuggestionsParams {

@@ -1,0 +1,22 @@
+{
+  "domain_name": "freshsite2025.com",
+  "tld": "com",
+  "status": "available",
+  "mappable": "mappable",
+  "supports_privacy": true,
+  "root_domain_provider": "unknown",
+  "product_id": 6,
+  "product_slug": "domain_reg",
+  "cost": "$18.00",
+  "renew_cost": "$18.00",
+  "renew_raw_price": 18,
+  "raw_price": 18,
+  "currency_code": "USD",
+  "match_reasons": [
+    "exact-match",
+    "tld-exact",
+    "tld-common"
+  ],
+  "vendor": "availability",
+  "ownership_verification_type": "no_verification_required"
+}

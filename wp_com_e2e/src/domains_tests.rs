@@ -1,7 +1,9 @@
 use crate::context::TestContext;
 use libtest_mimic::Trial;
 use std::sync::Arc;
-use wp_api::wp_com::domains::CountryCode;
+use wp_api::wp_com::domains::{
+    CountryCode, DomainAvailabilityParams, DomainAvailabilityStatus, DomainName,
+};
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut trials = vec![];
@@ -76,6 +78,74 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         states.len()
                     )
                     .into());
+                }
+
+                Ok(())
+            })
+        }
+    }));
+
+    trials.push(Trial::test("domains::is_available_taken", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                let availability = ctx
+                    .client
+                    .domains()
+                    .is_available(
+                        &DomainName("google.com".to_string()),
+                        &DomainAvailabilityParams::default(),
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .data;
+
+                if availability.domain_name != "google.com" {
+                    return Err(format!(
+                        "expected domain_name 'google.com', got '{}'",
+                        availability.domain_name
+                    )
+                    .into());
+                }
+
+                if availability.status == DomainAvailabilityStatus::Available {
+                    return Err("expected google.com to not be available".into());
+                }
+
+                Ok(())
+            })
+        }
+    }));
+
+    trials.push(Trial::test("domains::is_available_likely_available", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                let availability = ctx
+                    .client
+                    .domains()
+                    .is_available(
+                        &DomainName("xyzzy-test-unlikely-taken-2025.com".to_string()),
+                        &DomainAvailabilityParams::default(),
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .data;
+
+                if availability.status != DomainAvailabilityStatus::Available {
+                    return Err(format!(
+                        "expected status Available, got {:?}",
+                        availability.status
+                    )
+                    .into());
+                }
+
+                if !availability.supports_privacy {
+                    return Err("expected .com domain to support privacy".into());
+                }
+
+                if availability.pricing.is_none() {
+                    return Err("expected pricing for available domain".into());
                 }
 
                 Ok(())

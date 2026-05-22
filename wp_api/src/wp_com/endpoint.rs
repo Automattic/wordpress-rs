@@ -169,6 +169,10 @@ pub(crate) mod tests {
         validate_endpoint(WpComNamespace::RestV1_1, endpoint_url, path);
     }
 
+    pub fn validate_wp_com_rest_v1_3_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint(WpComNamespace::RestV1_3, endpoint_url, path);
+    }
+
     pub fn validate_wp_com_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
         validate_endpoint(WpComNamespace::V2, endpoint_url, path);
     }

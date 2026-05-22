@@ -1,0 +1,11 @@
+{
+  "domain_name": "myblog.com",
+  "tld": "com",
+  "status": "mapped_to_other_site_same_user",
+  "mappable": "mappable",
+  "supports_privacy": true,
+  "root_domain_provider": "unknown",
+  "other_site_domain": "myothersite.wordpress.com",
+  "transferrability": "transferrable",
+  "ownership_verification_type": "no_verification_required"
+}
