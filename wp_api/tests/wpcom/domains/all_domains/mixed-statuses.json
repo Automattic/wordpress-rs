@@ -98,6 +98,79 @@
       },
       "subscription_id": 88888,
       "tags": ["hundred_year_domain"]
+    },
+    {
+      "domain": "mapped-wrong.example.com",
+      "subtype": {
+        "id": "domain_mapping",
+        "label": "Domain mapping"
+      },
+      "blog_id": 99999,
+      "blog_name": "Mapped Site",
+      "site_slug": "mapped.wordpress.com",
+      "auto_renewing": false,
+      "current_user_is_owner": true,
+      "is_domain_only_site": false,
+      "expiry": null,
+      "expired": false,
+      "primary_domain": false,
+      "can_set_as_primary": true,
+      "domain_status": {
+        "id": "not_pointing_correctly",
+        "label": "Not pointing correctly",
+        "type": "alert",
+        "cta": "view_domain_setup"
+      },
+      "subscription_id": null,
+      "tags": []
+    },
+    {
+      "domain": "parked-domain.com",
+      "subtype": {
+        "id": "domain_registration",
+        "label": "Domain name registration"
+      },
+      "blog_id": 10101,
+      "blog_name": "",
+      "site_slug": "parked.wordpress.com",
+      "auto_renewing": false,
+      "current_user_is_owner": true,
+      "is_domain_only_site": true,
+      "expiry": "2027-03-01 00:00:00",
+      "expired": false,
+      "primary_domain": true,
+      "can_set_as_primary": true,
+      "domain_status": {
+        "id": "parked",
+        "label": "Parked",
+        "type": "neutral"
+      },
+      "subscription_id": 20202,
+      "tags": ["domain_only"]
+    },
+    {
+      "domain": "fancy-name.luxury",
+      "subtype": {
+        "id": "domain_registration",
+        "label": "Domain name registration"
+      },
+      "blog_id": 30303,
+      "blog_name": "Premium Site",
+      "site_slug": "premium.wordpress.com",
+      "auto_renewing": true,
+      "current_user_is_owner": true,
+      "is_domain_only_site": false,
+      "expiry": "2027-08-01 00:00:00",
+      "expired": false,
+      "primary_domain": true,
+      "can_set_as_primary": true,
+      "domain_status": {
+        "id": "premium",
+        "label": "Premium",
+        "type": "premium"
+      },
+      "subscription_id": 40404,
+      "tags": []
     }
   ]
 }
