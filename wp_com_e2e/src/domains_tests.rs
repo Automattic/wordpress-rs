@@ -191,7 +191,10 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     match &domain.domain_status.status_type {
                         DomainListItemStatusType::Success
                         | DomainListItemStatusType::Warning
-                        | DomainListItemStatusType::Error => {}
+                        | DomainListItemStatusType::Error
+                        | DomainListItemStatusType::Alert
+                        | DomainListItemStatusType::Neutral
+                        | DomainListItemStatusType::Premium => {}
                         DomainListItemStatusType::Other(s) => {
                             return Err(format!(
                                 "unexpected status type '{}' for domain '{}'",

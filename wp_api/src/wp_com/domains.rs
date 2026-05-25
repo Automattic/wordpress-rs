@@ -495,6 +495,12 @@ pub enum DomainListItemStatusType {
     Warning,
     /// Action is required.
     Error,
+    /// Domain mapping not pointing correctly.
+    Alert,
+    /// Domain is parked (domain-only site with no active status).
+    Neutral,
+    /// Premium domain.
+    Premium,
     /// A status type not covered by the known variants.
     #[serde(untagged)]
     Other(String),
@@ -650,7 +656,7 @@ mod tests {
 
     #[rstest]
     #[case("tests/wpcom/domains/all_domains/basic.json", 3)]
-    #[case("tests/wpcom/domains/all_domains/mixed-statuses.json", 4)]
+    #[case("tests/wpcom/domains/all_domains/mixed-statuses.json", 7)]
     fn test_all_domains_deserialization(#[case] json_file_path: &str, #[case] expected_len: usize) {
         let file = File::open(json_file_path).expect("Failed to open file");
         let response: AllDomainsResponse =
@@ -737,6 +743,29 @@ mod tests {
         let century = &response.domains[3];
         assert_eq!(century.tags, vec!["hundred_year_domain"]);
         assert!(century.auto_renewing);
+
+        let mapped = &response.domains[4];
+        assert_eq!(
+            mapped.domain_status.status_type,
+            DomainListItemStatusType::Alert
+        );
+        assert_eq!(
+            mapped.domain_status.cta,
+            Some(DomainStatusCta::ViewDomainSetup)
+        );
+
+        let parked = &response.domains[5];
+        assert_eq!(
+            parked.domain_status.status_type,
+            DomainListItemStatusType::Neutral
+        );
+        assert!(parked.is_domain_only_site);
+
+        let premium = &response.domains[6];
+        assert_eq!(
+            premium.domain_status.status_type,
+            DomainListItemStatusType::Premium
+        );
     }
 
     #[rstest]
