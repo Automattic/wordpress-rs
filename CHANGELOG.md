@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **BREAKING:** Add `Alert`, `Neutral`, and `Premium` variants to `DomainListItemStatusType`. Values that previously deserialized as `Other(String)` will now match their own variants, which may affect exhaustive `match`/`when` expressions.
+- **BREAKING:** Add `SiteRedirect` variant to `DomainSubtypeId` for redirect domains. Previously deserialized as `Other("site_redirect")`.
 - **BREAKING:** Replace `u8`, `u16` types with `u32` across struct fields, function parameters, return types, and enum reprs as a defensive measure against an [Android ART AOT compiler bug](https://github.com/jkmassel/uniffi-armv7-aot-checksum-bug) that mishandles small integer JNI return values on ARM32 ([#1339](https://github.com/Automattic/wordpress-rs/issues/1339))
 - `MediaService.delete_media_permanently` now updates live media collections in place, so deletes appear without a refresh round-trip
 - **Internal:** Buildkite step on trunk pushes that prunes `pr-build/<n>` branches whose PR is closed, sweeping orphans accumulated since `publish_pr_xcframework` started creating them.

@@ -420,6 +420,8 @@ pub enum DomainSubtypeId {
     DomainRegistration,
     /// Domain transfer in progress.
     DomainTransfer,
+    /// Site redirect to another URL.
+    SiteRedirect,
     /// A subtype not covered by the known variants.
     #[serde(untagged)]
     Other(String),
@@ -655,7 +657,7 @@ mod tests {
     use rstest::*;
 
     #[rstest]
-    #[case("tests/wpcom/domains/all_domains/basic.json", 3)]
+    #[case("tests/wpcom/domains/all_domains/basic.json", 4)]
     #[case("tests/wpcom/domains/all_domains/mixed-statuses.json", 7)]
     fn test_all_domains_deserialization(#[case] json_file_path: &str, #[case] expected_len: usize) {
         let file = File::open(json_file_path).expect("Failed to open file");
@@ -695,6 +697,10 @@ mod tests {
 
         let staging = &response.domains[2];
         assert_eq!(staging.tags, vec!["wpcom_staging"]);
+
+        let redirect = &response.domains[3];
+        assert_eq!(redirect.subtype.id, DomainSubtypeId::SiteRedirect);
+        assert_eq!(redirect.subtype.label, "Site redirect");
     }
 
     #[test]

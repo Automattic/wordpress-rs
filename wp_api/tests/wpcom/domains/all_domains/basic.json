@@ -73,6 +73,30 @@
       "tags": [
         "wpcom_staging"
       ]
+    },
+    {
+      "domain": "old-domain.com",
+      "subtype": {
+        "id": "site_redirect",
+        "label": "Site redirect"
+      },
+      "blog_id": 44444,
+      "blog_name": "Redirect Target",
+      "site_slug": "redirect-target.wordpress.com",
+      "auto_renewing": false,
+      "current_user_is_owner": true,
+      "is_domain_only_site": false,
+      "expiry": "2027-01-01 00:00:00",
+      "expired": false,
+      "primary_domain": false,
+      "can_set_as_primary": false,
+      "domain_status": {
+        "id": "active",
+        "label": "Active",
+        "type": "success"
+      },
+      "subscription_id": 55555,
+      "tags": []
     }
   ]
 }
