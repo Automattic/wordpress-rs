@@ -22,7 +22,7 @@ enum UnifiedConversationsRequest {
 }
 
 impl DerivedRequest for UnifiedConversationsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::V2
     }
 }
