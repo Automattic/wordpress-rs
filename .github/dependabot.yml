@@ -33,4 +33,6 @@ updates:
     groups:
       ruby-minor-and-patch:
         update-types: [minor, patch]
+    reviewers:
+      - "Automattic/apps-infra-tooling"
     open-pull-requests-limit: 5
