@@ -339,8 +339,11 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
         let url_parts = variant.attr.url_parts.as_slice();
         let params_type = &variant.attr.params;
         let request_type = variant.attr.request_type;
-        let url_from_api_url_resolver =
-            fn_body_get_url_from_api_url_resolver(&parsed_enum.enum_ident, url_parts);
+        let url_from_api_url_resolver = fn_body_get_url_from_api_url_resolver(
+            &parsed_enum.enum_ident,
+            &variant.variant_ident,
+            url_parts,
+        );
         let query_pairs =
             fn_body_query_pairs(&config.crate_ident, params_type.as_ref(), request_type);
         let additional_query_pairs =

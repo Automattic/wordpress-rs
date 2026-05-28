@@ -1,0 +1,36 @@
+[
+  {
+    "connection_id": "25868837",
+    "display_name": "@tonya8c@mastodon.social",
+    "external_handle": "@tonya8c@mastodon.social",
+    "external_id": "116283451478301581",
+    "profile_link": "https://mastodon.social/@tonya8c",
+    "profile_picture": "https://mastodon.social/avatars/original/missing.png",
+    "service_label": "Mastodon",
+    "service_name": "mastodon",
+    "shared": true,
+    "wpcom_user_id": 0,
+    "id": "32006110",
+    "username": "@tonya8c@mastodon.social",
+    "profile_display_name": "",
+    "global": true,
+    "status": null
+  },
+  {
+    "connection_id": "25868865",
+    "display_name": "tonya8c.bsky.social",
+    "external_handle": "tonya8c.bsky.social",
+    "external_id": "did:plc:6jo6m3rdhritnb3qhxbrdshq",
+    "profile_link": "https://bsky.app/profile/did:plc:6jo6m3rdhritnb3qhxbrdshq",
+    "profile_picture": "https://cdn.bsky.app/img/avatar/plain/did:plc:6jo6m3rdhritnb3qhxbrdshq/bafkreiebaps2pr4v2qhfbjfywi3f2wcatf3d6mtu3fsobye22vos7auldi",
+    "service_label": "Bluesky",
+    "service_name": "bluesky",
+    "shared": true,
+    "wpcom_user_id": 0,
+    "id": "32006200",
+    "username": "tonya8c.bsky.social",
+    "profile_display_name": "",
+    "global": true,
+    "status": "broken"
+  }
+]

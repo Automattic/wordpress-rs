@@ -28,12 +28,12 @@ pub trait MaybeWpError {
 #[derive(Debug, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum WpApiError {
     InvalidHttpStatusCode {
-        status_code: u16,
+        status_code: u32,
         request_url: String,
         request_method: RequestMethod,
     },
     RequestExecutionFailed {
-        status_code: Option<u16>,
+        status_code: Option<u32>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
         request_url: String,
@@ -52,7 +52,7 @@ pub enum WpApiError {
         reason: String,
     },
     UnknownError {
-        status_code: u16,
+        status_code: u32,
         response: String,
         request_url: String,
         request_method: RequestMethod,
@@ -60,7 +60,7 @@ pub enum WpApiError {
     WpError {
         error_code: WpErrorCode,
         error_message: String,
-        status_code: u16,
+        status_code: u32,
         response: String,
         request_url: String,
         request_method: RequestMethod,
@@ -143,7 +143,7 @@ impl ParsedRequestError for WpApiError {
                 });
             }
 
-            match http::StatusCode::from_u16(response.status_code) {
+            match http::StatusCode::from_u16(response.status_code as u16) {
                 Ok(status) => {
                     if status.is_client_error() || status.is_server_error() {
                         Some(Self::UnknownError {
@@ -203,6 +203,16 @@ pub enum WpErrorCode {
     AlreadyTrashed,
     #[serde(rename = "rest_application_password_not_found")]
     ApplicationPasswordNotFound,
+    #[serde(rename = "block_cannot_read")]
+    BlockCannotRead,
+    #[serde(rename = "rest_block_directory_cannot_view")]
+    BlockDirectoryCannotView,
+    #[serde(rename = "block_invalid")]
+    BlockInvalid,
+    #[serde(rename = "rest_block_type_cannot_view")]
+    BlockTypeCannotView,
+    #[serde(rename = "rest_block_type_invalid")]
+    BlockTypeInvalid,
     #[serde(rename = "rest_cannot_create")]
     CannotCreate,
     #[serde(rename = "rest_cannot_create_application_passwords")]
@@ -317,6 +327,8 @@ pub enum WpErrorCode {
     NoSearchTermDefined,
     #[serde(rename = "rest_orderby_include_missing_include")]
     OrderbyIncludeMissingInclude,
+    #[serde(rename = "rest_pattern_directory_cannot_view")]
+    PatternDirectoryCannotView,
     #[serde(rename = "rest_plugin_not_found")]
     PluginNotFound,
     #[serde(rename = "rest_post_incorrect_password")]
@@ -335,6 +347,8 @@ pub enum WpErrorCode {
     RevisionInvalidOffsetNumber,
     #[serde(rename = "rest_revision_invalid_page_number")]
     RevisionInvalidPageNumber,
+    #[serde(rename = "rest_sidebar_not_found")]
+    SidebarNotFound,
     #[serde(rename = "rest_status_invalid")]
     StatusInvalid,
     #[serde(rename = "rest_taxonomy_invalid")]
@@ -573,7 +587,7 @@ impl WpErrorCode {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
 pub enum RequestExecutionError {
     RequestExecutionFailed {
-        status_code: Option<u16>,
+        status_code: Option<u32>,
         redirects: Option<Vec<WpRedirect>>,
         reason: RequestExecutionErrorReason,
         request_url: String,

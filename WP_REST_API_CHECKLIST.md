@@ -17,40 +17,40 @@
 
 ## Block Editor Endpoints
 
-- [ ] `/wp/v2/block-types`
-- [ ] `/wp/v2/blocks`
-- [ ] `/wp/v2/blocks/<id>/revisions`
-- [ ] `/wp/v2/blocks/<id>/autosaves`
-- [ ] `/wp/v2/block-renderer/<id>`
-- [ ] `/wp/v2/block-directory/search`
+- [x] `/wp/v2/block-types`
+- [x] `/wp/v2/blocks`
+- [x] `/wp/v2/blocks/<id>/revisions`
+- [x] `/wp/v2/blocks/<id>/autosaves`
+- [x] `/wp/v2/block-renderer/<id>`
+- [x] `/wp/v2/block-directory/search`
 
 ## Block Patterns & Templates
 
-- [ ] `/wp/v2/block-patterns/patterns`
-- [ ] `/wp/v2/block-patterns/categories`
-- [ ] `/wp/v2/pattern-directory/patterns`
+- [x] `/wp/v2/block-patterns/patterns`
+- [x] `/wp/v2/block-patterns/categories`
+- [x] `/wp/v2/pattern-directory/patterns`
 - [x] `/wp/v2/templates`
-- [ ] `/wp/v2/templates/<id>/revisions`
-- [ ] `/wp/v2/templates/<id>/autosaves`
-- [ ] `/wp/v2/template-parts`
-- [ ] `/wp/v2/template-parts/<id>/revisions`
-- [ ] `/wp/v2/template-parts/<id>/autosaves`
+- [x] `/wp/v2/templates/<id>/revisions`
+- [x] `/wp/v2/templates/<id>/autosaves`
+- [x] `/wp/v2/template-parts`
+- [x] `/wp/v2/template-parts/<id>/revisions`
+- [x] `/wp/v2/template-parts/<id>/autosaves`
 
 ## Navigation & Menus
 
-- [ ] `/wp/v2/navigation`
-- [ ] `/wp/v2/navigation/<id>/revisions`
-- [ ] `/wp/v2/navigation/<id>/autosaves`
+- [x] `/wp/v2/navigation`
+- [x] `/wp/v2/navigation/<id>/revisions`
+- [x] `/wp/v2/navigation/<id>/autosaves`
 - [x] `/wp/v2/menus`
 - [x] `/wp/v2/menu-items`
-- [ ] `/wp/v2/menu-items/<id>/autosaves`
+- [x] `/wp/v2/menu-items/<id>/autosaves`
 - [x] `/wp/v2/menu-locations`
 
 ## Widgets & Sidebars
 
 - [x] `/wp/v2/widgets`
 - [x] `/wp/v2/widget-types`
-- [ ] `/wp/v2/sidebars`
+- [x] `/wp/v2/sidebars`
 
 ## System Endpoints
 
@@ -62,8 +62,8 @@
 
 ## Global Styles
 
-- [ ] `/wp/v2/global-styles/<id>`
-- [ ] `/wp/v2/global-styles/<id>/revisions`
+- [x] `/wp/v2/global-styles/<id>`
+- [x] `/wp/v2/global-styles/<id>/revisions`
 
 ## Additional Implemented Endpoints
 

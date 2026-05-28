@@ -87,7 +87,7 @@ public extension WpComLanguage {
         self = selfValue
     }
 
-    init(id: UInt16) {
+    init(id: UInt32) {
         guard let selfValue = wpComLanguageFromId(id: id) else {
             preconditionFailure("Invalid WP.com Language ID: \(id)")
         }

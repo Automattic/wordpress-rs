@@ -269,6 +269,7 @@ fn fn_arg_fields(context_and_filter_handler: &ContextAndFilterHandler) -> TokenS
 
 pub fn fn_body_get_url_from_api_url_resolver(
     enum_ident: &Ident,
+    variant_ident: &Ident,
     url_parts: &[UrlPart],
 ) -> TokenStream {
     let url_parts = url_parts
@@ -282,7 +283,7 @@ pub fn fn_body_get_url_from_api_url_resolver(
         })
         .collect::<Vec<TokenStream>>();
     quote! {
-        let mut url = std::sync::Arc::unwrap_or_clone(self.api_url_resolver.resolve( #enum_ident::namespace().namespace_value().to_string() , vec![#(#url_parts,)*])).inner;
+        let mut url = std::sync::Arc::unwrap_or_clone(self.api_url_resolver.resolve( #enum_ident::namespace(&#enum_ident::#variant_ident).namespace_value().to_string() , vec![#(#url_parts,)*])).inner;
     }
 }
 
@@ -1002,34 +1003,39 @@ mod tests {
     #[rstest]
     #[case(
         url_static_users(),
-        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [\"users\" . to_string () ,])) . inner ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace (& Foo :: Bar) . namespace_value () . to_string () , vec ! [\"users\" . to_string () ,])) . inner ;"
     )]
     #[case(
         url_users_with_user_id(),
-        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [\"users\" . to_string () , user_id . to_string () ,])) . inner ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace (& Foo :: Bar) . namespace_value () . to_string () , vec ! [\"users\" . to_string () , user_id . to_string () ,])) . inner ;"
     )]
     #[case(
         url_users_with_user_id(),
-        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [\"users\" . to_string () , user_id . to_string () ,])) . inner ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace (& Foo :: Bar) . namespace_value () . to_string () , vec ! [\"users\" . to_string () , user_id . to_string () ,])) . inner ;"
     )]
     #[case(
         vec![UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string())],
-        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [user_id . to_string () , user_type . to_string () ,])) . inner ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace (& Foo :: Bar) . namespace_value () . to_string () , vec ! [user_id . to_string () , user_type . to_string () ,])) . inner ;"
     )]
     #[case(
         vec![UrlPart::Static("users".to_string()), UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string()), ],
-        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [\"users\" . to_string () , user_id . to_string () , user_type . to_string () ,])) . inner ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace (& Foo :: Bar) . namespace_value () . to_string () , vec ! [\"users\" . to_string () , user_id . to_string () , user_type . to_string () ,])) . inner ;"
     )]
     #[case(
         vec![UrlPart::Static("users".to_string()), UrlPart::Static("me".to_string()), UrlPart::Dynamic("user_id".to_string()), UrlPart::Dynamic("user_type".to_string()), ],
-        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace () . namespace_value () . to_string () , vec ! [\"users\" . to_string () , \"me\" . to_string () , user_id . to_string () , user_type . to_string () ,])) . inner ;"
+        "let mut url = std :: sync :: Arc :: unwrap_or_clone (self . api_url_resolver . resolve (Foo :: namespace (& Foo :: Bar) . namespace_value () . to_string () , vec ! [\"users\" . to_string () , \"me\" . to_string () , user_id . to_string () , user_type . to_string () ,])) . inner ;"
     )]
     fn test_fn_body_get_url_from_api_root_url(
         #[case] url_parts: Vec<UrlPart>,
         #[case] expected_str: &str,
     ) {
         assert_eq!(
-            fn_body_get_url_from_api_url_resolver(&format_ident!("Foo"), &url_parts).to_string(),
+            fn_body_get_url_from_api_url_resolver(
+                &format_ident!("Foo"),
+                &format_ident!("Bar"),
+                &url_parts
+            )
+            .to_string(),
             expected_str
         );
     }

@@ -8,7 +8,7 @@ enum SearchRequest {
 }
 
 impl DerivedRequest for SearchRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

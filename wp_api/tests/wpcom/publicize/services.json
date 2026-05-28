@@ -1,0 +1,35 @@
+[
+  {
+    "id": "bluesky",
+    "description": "Publish your posts to Bluesky.",
+    "label": "Bluesky",
+    "status": "ok",
+    "supports": {
+      "additional_users": false,
+      "additional_users_only": false
+    },
+    "url": "https://public-api.wordpress.com/connect/?action=request&service=bluesky"
+  },
+  {
+    "id": "facebook",
+    "description": "Publish your posts to your Facebook timeline or page.",
+    "label": "Facebook",
+    "status": "ok",
+    "supports": {
+      "additional_users": true,
+      "additional_users_only": true
+    },
+    "url": "https://public-api.wordpress.com/connect/?action=request&service=facebook"
+  },
+  {
+    "id": "mastodon",
+    "description": "Publish your posts to your Mastodon instance.",
+    "label": "Mastodon",
+    "status": "ok",
+    "supports": {
+      "additional_users": false,
+      "additional_users_only": false
+    },
+    "url": "https://public-api.wordpress.com/connect/?action=request&service=mastodon"
+  }
+]

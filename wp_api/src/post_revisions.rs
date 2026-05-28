@@ -9,6 +9,7 @@ use crate::{
     wp_content_i64_id,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use wp_contextual::WpContextual;
 use wp_derive::WpDeriveParamsField;
 
@@ -106,7 +107,7 @@ pub struct SparseAnyPostRevision {
     pub excerpt: Option<crate::posts::SparsePostExcerpt>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
-    pub meta: Option<crate::posts::PostMeta>,
+    pub meta: Option<Arc<crate::posts::PostMeta>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]

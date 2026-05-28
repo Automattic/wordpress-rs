@@ -510,6 +510,47 @@ impl ListMetadataRepository {
         Ok(())
     }
 
+    /// Remove a single entity ID from every list metadata items row whose
+    /// containing list_metadata row matches the given site and key prefix.
+    ///
+    /// Used by service-level deletes to scrub a deleted entity from every
+    /// collection's stored list (so the collection doesn't return a phantom
+    /// `Missing` row until the next full refresh).
+    ///
+    /// Returns the number of rows deleted.
+    pub fn remove_entity_from_lists_with_key_prefix(
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        key_prefix: &str,
+        entity_id: i64,
+    ) -> Result<usize, SqliteDbError> {
+        // SQLite's `LIKE` treats `_` as "any single character" and `%` as
+        // "any sequence". The expected prefix has no SQL wildcards by design
+        // (e.g. `site_RowId(1):edit:media:`), but escape defensively so an
+        // unexpected caller can't widen the match.
+        let escaped_prefix = key_prefix
+            .replace('\\', r"\\")
+            .replace('%', r"\%")
+            .replace('_', r"\_");
+        let like_pattern = format!("{}%", escaped_prefix);
+
+        let sql = format!(
+            "DELETE FROM {items} \
+             WHERE entity_id = ? \
+             AND list_metadata_id IN (\
+                 SELECT rowid FROM {header} \
+                 WHERE db_site_id = ? AND key LIKE ? ESCAPE '\\'\
+             )",
+            items = Self::items_table().table_name(),
+            header = Self::header_table().table_name(),
+        );
+
+        executor.execute(
+            &sql,
+            rusqlite::params![entity_id, site.row_id, like_pattern],
+        )
+    }
+
     /// Delete all data for a list (header, items, and state).
     pub fn delete_list(
         executor: &impl QueryExecutor,
@@ -1269,6 +1310,72 @@ mod tests {
             )
             .expect("query should succeed"),
             0
+        );
+    }
+
+    #[rstest]
+    fn test_remove_entity_from_lists_with_key_prefix_scopes_by_prefix(test_ctx: TestContext) {
+        // The `_` character in a LIKE pattern matches any single character by
+        // default. Without an ESCAPE clause, the prefix `site_1:edit:media:`
+        // would also match `siteX:edit:media:` (or anything where `_` is some
+        // other char). This test guards both correct prefix matching and the
+        // escape behaviour.
+        let media_key = ListKey::from("site_1:edit:media:filter=fake");
+        let posts_key = ListKey::from("site_1:edit:posts:foo");
+        let entity_id: i64 = 42;
+
+        let item = ListMetadataItemInput {
+            entity_id,
+            modified_gmt: None,
+            parent: None,
+            menu_order: None,
+        };
+
+        ListMetadataRepository::set_items_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &media_key,
+            TEST_PER_PAGE,
+            std::slice::from_ref(&item),
+        )
+        .expect("should succeed");
+        ListMetadataRepository::set_items_by_list_key(
+            &test_ctx.conn,
+            &test_ctx.site,
+            &posts_key,
+            TEST_PER_PAGE,
+            std::slice::from_ref(&item),
+        )
+        .expect("should succeed");
+
+        let removed = ListMetadataRepository::remove_entity_from_lists_with_key_prefix(
+            &test_ctx.conn,
+            &test_ctx.site,
+            "site_1:edit:media:",
+            entity_id,
+        )
+        .expect("should succeed");
+        assert_eq!(removed, 1, "should remove exactly the media row");
+
+        // Media list no longer references the entity.
+        assert!(
+            !ListMetadataRepository::contains_entity(
+                &test_ctx.conn,
+                &test_ctx.site,
+                &media_key,
+                entity_id,
+            )
+            .expect("should succeed")
+        );
+        // Posts list still references the entity (prefix did not over-match).
+        assert!(
+            ListMetadataRepository::contains_entity(
+                &test_ctx.conn,
+                &test_ctx.site,
+                &posts_key,
+                entity_id,
+            )
+            .expect("should succeed")
         );
     }
 

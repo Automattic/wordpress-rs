@@ -10,7 +10,10 @@ pub mod followers;
 pub mod jetpack_connection;
 pub mod language;
 pub mod me;
+pub mod me_connections;
 pub mod oauth2;
+pub mod products;
+pub mod publicize;
 pub mod segments;
 pub mod sites;
 pub mod stats_city_views;
@@ -56,10 +59,39 @@ impl std::fmt::Display for WpComSiteId {
     }
 }
 
+uniffi::custom_newtype!(CurrencyCode, String);
+/// ISO 4217 currency code (e.g. `"USD"`, `"TRY"`, `"EUR"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct CurrencyCode(pub String);
+
+impl std::fmt::Display for CurrencyCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Unit of a time span in the billing system.
+///
+/// Corresponds to the backend's `Time_Span_Unit` enum.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum TimeSpanUnit {
+    Day,
+    Week,
+    Month,
+    Year,
+    Indefinite,
+    /// A unit not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
 pub(crate) enum WpComNamespace {
     Oauth2,
     RestV1_1,
     RestV1_2,
+    RestV1_3,
     V2,
 }
 
@@ -69,6 +101,7 @@ impl AsNamespace for WpComNamespace {
             WpComNamespace::Oauth2 => "/oauth2",
             WpComNamespace::RestV1_1 => "/rest/v1.1",
             WpComNamespace::RestV1_2 => "/rest/v1.2",
+            WpComNamespace::RestV1_3 => "/rest/v1.3",
             WpComNamespace::V2 => "/wpcom/v2",
         }
     }

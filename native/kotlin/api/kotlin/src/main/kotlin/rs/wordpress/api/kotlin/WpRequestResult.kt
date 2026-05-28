@@ -10,20 +10,20 @@ sealed class WpRequestResult<T> {
     data class WpError<T>(
         val errorCode: WpErrorCode,
         val errorMessage: String,
-        val statusCode: UShort,
+        val statusCode: UInt,
         val response: String,
         val requestUrl: String,
         val requestMethod: RequestMethod,
     ) : WpRequestResult<T>()
 
     data class InvalidHttpStatusCode<T>(
-        val statusCode: UShort,
+        val statusCode: UInt,
         val requestUrl: String,
         val requestMethod: RequestMethod,
     ) : WpRequestResult<T>()
 
     data class RequestExecutionFailed<T>(
-        val statusCode: UShort?,
+        val statusCode: UInt?,
         val redirects: List<WpRedirect>?,
         val reason: RequestExecutionErrorReason,
         val requestUrl: String,
@@ -46,7 +46,7 @@ sealed class WpRequestResult<T> {
     ) : WpRequestResult<T>()
 
     data class UnknownError<T>(
-        val statusCode: UShort,
+        val statusCode: UInt,
         val response: String,
         val requestUrl: String,
         val requestMethod: RequestMethod,

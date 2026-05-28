@@ -140,6 +140,30 @@ impl MetadataService {
         })?)
     }
 
+    /// Remove `entity_id` from every list whose key starts with `key_prefix`
+    /// for this site.
+    ///
+    /// Used by service-level deletes (e.g. `MediaService::delete_media_permanently`)
+    /// to scrub the deleted entity from every cached list immediately, so observers
+    /// see the removal without waiting for a full refresh.
+    ///
+    /// Returns the number of rows removed across all lists. Returns `Ok(0)` if the
+    /// entity wasn't referenced in any matching list.
+    pub fn remove_entity_from_lists_with_key_prefix(
+        &self,
+        key_prefix: &str,
+        entity_id: i64,
+    ) -> Result<usize, WpServiceError> {
+        Ok(self.cache.execute(|conn| {
+            ListMetadataRepository::remove_entity_from_lists_with_key_prefix(
+                conn,
+                &self.db_site,
+                key_prefix,
+                entity_id,
+            )
+        })?)
+    }
+
     /// Get list metadata as EntityMetadata structs (for ListMetadataReader trait).
     ///
     /// Converts database items to the format expected by MetadataCollection.
@@ -692,7 +716,7 @@ mod tests {
             .expect("Site creation should succeed")
             .db_site;
 
-        let cache = Arc::new(WpApiCache::from(conn));
+        let cache = Arc::new(WpApiCache::try_from(conn).expect("Cache creation should succeed"));
         let db_site = Arc::new(db_site);
         let service = MetadataService::new(db_site, cache.clone());
 

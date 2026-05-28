@@ -2,7 +2,11 @@ use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
     wp_com::{
         WpComNamespace,
-        domains::{DomainSuggestion, DomainSuggestionsParams},
+        domains::{
+            AllDomainsParams, AllDomainsResponse, CountryCode, DomainAvailability,
+            DomainAvailabilityParams, DomainName, DomainSuggestion, DomainSuggestionsParams,
+            SupportedCountries, SupportedState,
+        },
     },
 };
 use wp_derive_request_builder::WpDerivedRequest;
@@ -11,11 +15,23 @@ use wp_derive_request_builder::WpDerivedRequest;
 enum DomainsRequest {
     #[get(url = "/domains/suggestions", params = &DomainSuggestionsParams, output = Vec<DomainSuggestion>)]
     Suggestions,
+    #[get(url = "/domains/supported-countries", output = SupportedCountries)]
+    SupportedCountries,
+    #[get(url = "/domains/supported-states/<country_code>", output = Vec<SupportedState>)]
+    SupportedStates,
+    #[get(url = "/domains/<domain_name>/is-available", params = &DomainAvailabilityParams, output = DomainAvailability)]
+    IsAvailable,
+    #[get(url = "/all-domains", params = &AllDomainsParams, output = AllDomainsResponse)]
+    AllDomains,
 }
 
 impl DerivedRequest for DomainsRequest {
-    fn namespace() -> impl AsNamespace {
-        WpComNamespace::RestV1_1
+    fn namespace(&self) -> impl AsNamespace {
+        match self {
+            Self::IsAvailable => WpComNamespace::RestV1_3,
+            Self::AllDomains => WpComNamespace::RestV1_2,
+            _ => WpComNamespace::RestV1_1,
+        }
     }
 }
 
@@ -25,8 +41,11 @@ mod tests {
     use crate::{
         request::endpoint::ApiUrlResolver,
         wp_com::{
+            WpComSiteId,
+            domains::{AllDomainsParams, CountryCode, DomainAvailabilityParams, DomainName},
             endpoint::tests::{
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
+                validate_wp_com_rest_v1_2_endpoint, validate_wp_com_rest_v1_3_endpoint,
             },
             segments::SegmentId,
         },
@@ -76,6 +95,73 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_wp_com_rest_v1_1_endpoint(endpoint.suggestions(&params), expected_path);
+    }
+
+    #[rstest]
+    fn supported_countries(endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.supported_countries(),
+            "/domains/supported-countries",
+        );
+    }
+
+    #[rstest]
+    #[case::us(CountryCode::from("US"), "/domains/supported-states/US")]
+    #[case::ca(CountryCode::from("CA"), "/domains/supported-states/CA")]
+    #[case::gb(CountryCode::from("GB"), "/domains/supported-states/GB")]
+    fn supported_states(
+        endpoint: DomainsRequestEndpoint,
+        #[case] country_code: CountryCode,
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_com_rest_v1_1_endpoint(endpoint.supported_states(&country_code), expected_path);
+    }
+
+    #[rstest]
+    #[case::com(DomainName("example.com".to_string()), "/domains/example.com/is-available?")]
+    #[case::org(DomainName("myblog.org".to_string()), "/domains/myblog.org/is-available?")]
+    fn is_available(
+        endpoint: DomainsRequestEndpoint,
+        #[case] domain_name: DomainName,
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_com_rest_v1_3_endpoint(
+            endpoint.is_available(&domain_name, &DomainAvailabilityParams::default()),
+            expected_path,
+        );
+    }
+
+    #[rstest]
+    fn is_available_with_params(endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_3_endpoint(
+            endpoint.is_available(
+                &DomainName("test.com".to_string()),
+                &DomainAvailabilityParams {
+                    blog_id: Some(WpComSiteId(12345)),
+                    is_cart_pre_check: Some(true),
+                    vendor: Some("100-year-domains".to_string()),
+                },
+            ),
+            "/domains/test.com/is-available?blog_id=12345&is_cart_pre_check=true&vendor=100-year-domains",
+        );
+    }
+
+    #[rstest]
+    fn all_domains(endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.all_domains(&AllDomainsParams::default()),
+            "/all-domains?",
+        );
+    }
+
+    #[rstest]
+    fn all_domains_with_garden(endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.all_domains(&AllDomainsParams {
+                garden: Some("starter".to_string()),
+            }),
+            "/all-domains?garden=starter",
+        );
     }
 
     fn base_domain_suggestions_params() -> DomainSuggestionsParams {

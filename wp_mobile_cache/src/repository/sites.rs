@@ -125,9 +125,11 @@ impl SiteRepository {
         executor: &impl QueryExecutor,
         url: &str,
     ) -> Result<Option<FullEntity<(DbSite, DbSelfHostedSite)>>, SqliteDbError> {
-        // First get the self_hosted_site
+        // First get the self_hosted_site. Use the `urls_eq` UDF so the lookup
+        // tolerates trailing-slash and other URL-normalization differences
+        // between the stored value and the caller-provided string.
         let sql = format!(
-            "SELECT * FROM {} WHERE url = ?",
+            "SELECT * FROM {} WHERE urls_eq(url, ?)",
             DbTable::SelfHostedSites.table_name()
         );
         let mut stmt = executor.prepare(&sql)?;
@@ -237,7 +239,16 @@ impl SiteRepository {
             }
         };
 
-        // Delete from sites table
+        // Explicitly delete entity_state rows — this table has no CASCADE
+        // constraint on db_site_id.
+        let sql = format!(
+            "DELETE FROM {} WHERE db_site_id = ?",
+            DbTable::EntityState.table_name()
+        );
+        tx.execute(&sql, [site.row_id])?;
+
+        // Delete from sites table (CASCADE removes posts, post types,
+        // term relationships, and list metadata)
         let sites_deleted = {
             let sql = format!(
                 "DELETE FROM {} WHERE rowid = ?",
@@ -248,22 +259,6 @@ impl SiteRepository {
 
         tx.commit().map_err(SqliteDbError::from)?;
         Ok(sites_deleted > 0)
-    }
-
-    /// Delete a self-hosted site by URL (convenience wrapper).
-    ///
-    /// Returns `true` if a site was deleted, `false` if no site with that URL exists.
-    pub fn delete_self_hosted_site_by_url(
-        &self,
-        transaction_manager: &mut impl TransactionManager,
-        url: &str,
-    ) -> Result<bool, SqliteDbError> {
-        let site_data = self.select_self_hosted_site_by_url(transaction_manager, url)?;
-
-        match site_data {
-            Some(full_entity) => self.delete_site(transaction_manager, &full_entity.data.0),
-            None => Ok(false),
-        }
     }
 
     /// Upsert a WordPress.com site and return its EntityId (atomic transaction).
@@ -810,47 +805,24 @@ mod tests {
     }
 
     #[rstest]
-    fn test_delete_self_hosted_site_by_url_deletes_site(mut test_conn: Connection) {
+    fn test_select_self_hosted_site_by_url_tolerates_trailing_slash(mut test_conn: Connection) {
         let repo = SiteRepository;
-        let url = "https://example.com";
+        // Store WITHOUT trailing slash (the shape historical caches may have).
         let site = SelfHostedSite {
-            url: url.to_string(),
+            url: "https://example.com".to_string(),
             api_root: "https://example.com/wp-json".to_string(),
         };
-
-        // Create site
         repo.upsert_self_hosted_site(&mut test_conn, &site)
             .expect("Failed to upsert site");
 
-        // Verify site exists
-        let before_delete = repo
-            .select_self_hosted_site_by_url(&test_conn, url)
-            .expect("Failed to select site by URL");
-        assert!(before_delete.is_some());
-
-        // Delete by URL
-        let deleted = repo
-            .delete_self_hosted_site_by_url(&mut test_conn, url)
-            .expect("Failed to delete site by URL");
-        assert!(deleted, "Should return true when site is deleted");
-
-        // Verify site is gone
-        let after_delete = repo
-            .select_self_hosted_site_by_url(&test_conn, url)
-            .expect("Failed to select site by URL");
-        assert_eq!(after_delete, None, "Site should be deleted");
-    }
-
-    #[rstest]
-    fn test_delete_self_hosted_site_by_url_returns_false_for_non_existent(
-        mut test_conn: Connection,
-    ) {
-        let repo = SiteRepository;
-
-        let deleted = repo
-            .delete_self_hosted_site_by_url(&mut test_conn, "https://non-existent.com")
-            .expect("Failed to delete site by URL");
-        assert!(!deleted, "Should return false when site doesn't exist");
+        // Look up WITH trailing slash (what ParsedUrl::url() produces today).
+        let retrieved = repo
+            .select_self_hosted_site_by_url(&test_conn, "https://example.com/")
+            .expect("select should succeed");
+        assert!(
+            retrieved.is_some(),
+            "lookup with trailing slash should match a row stored without one"
+        );
     }
 
     // WordPress.com site tests

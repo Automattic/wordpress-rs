@@ -1,47 +1,47 @@
 [
   {
-    "id": 2,
-    "slug": "blog",
+    "id": 101,
+    "slug": "unicorn-ranch",
     "mobile": true,
-    "segment_type_title": "Blog",
-    "segment_type_subtitle": "Share and discuss ideas, updates, or creations.",
-    "icon_URL": "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_blogger.png",
-    "icon_color": "#3d4145"
+    "segment_type_title": "Unicorn Ranch",
+    "segment_type_subtitle": "Manage your mythical creature farm online.",
+    "icon_URL": "https://example.invalid/icons/ic_unicorn.png",
+    "icon_color": "#ff00ff"
   },
   {
-    "id": 1,
-    "slug": "business",
+    "id": 102,
+    "slug": "time-travel-agency",
     "mobile": true,
-    "segment_type_title": "Business",
-    "segment_type_subtitle": "Promote products and services.",
-    "icon_URL": "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_business.png",
-    "icon_color": "#3d4145"
+    "segment_type_title": "Time Travel Agency",
+    "segment_type_subtitle": "Book trips to the past and future.",
+    "icon_URL": "https://example.invalid/icons/ic_time_travel.png",
+    "icon_color": "#00ff00"
   },
   {
-    "id": 3,
-    "slug": "online-store",
+    "id": 103,
+    "slug": "cloud-bakery",
     "mobile": false,
-    "segment_type_title": "Online store",
-    "segment_type_subtitle": "Sell your collection of products online.",
-    "icon_URL": "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_store.png",
-    "icon_color": "#3d4145"
+    "segment_type_title": "Cloud Bakery",
+    "segment_type_subtitle": "Sell pastries made from actual clouds.",
+    "icon_URL": "https://example.invalid/icons/ic_cloud_bakery.png",
+    "icon_color": "#0000ff"
   },
   {
-    "id": 4,
-    "slug": "professional",
+    "id": 104,
+    "slug": "dragon-daycare",
     "mobile": true,
-    "segment_type_title": "Professional",
-    "segment_type_subtitle": "Showcase your portfolio, skills or work.",
-    "icon_URL": "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_professional.png",
-    "icon_color": "#3d4145"
+    "segment_type_title": "Dragon Daycare",
+    "segment_type_subtitle": "Professional dragon sitting services.",
+    "icon_URL": "https://example.invalid/icons/ic_dragon.png",
+    "icon_color": "#ff0000"
   },
   {
-    "id": 6,
-    "slug": "blank-canvas",
+    "id": 105,
+    "slug": "blank-scroll",
     "mobile": true,
-    "segment_type_title": "Blank Canvas",
-    "segment_type_subtitle": "Start with a blank site.",
-    "icon_URL": "https://s.wp.com/i/mobile_segmentation_icons/monochrome/ic_blank_canvas.png",
-    "icon_color": "#3d4145"
+    "segment_type_title": "Blank Scroll",
+    "segment_type_subtitle": "Start with an empty enchanted scroll.",
+    "icon_URL": "https://example.invalid/icons/ic_scroll.png",
+    "icon_color": "#abcdef"
   }
 ]

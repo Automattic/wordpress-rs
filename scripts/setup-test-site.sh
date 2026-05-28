@@ -147,11 +147,32 @@ create_navigation_revision() {
   curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$revision_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/navigation/$navigation_id" > /dev/null
 }
 
+create_block_revision() {
+  local revision_number="$1"
+  local block_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_revision_$revision_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/blocks/$block_id" > /dev/null
+}
+
+create_block_autosave() {
+  local autosave_number="$1"
+  local block_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/blocks/$block_id/autosaves"
+}
+
 create_navigation_autosave() {
   local autosave_number="$1"
   local navigation_id="$2"
 
   curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"content_autosave_$autosave_number\", \"author\": $ADMIN_USER_ID}" "http://localhost/wp-json/wp/v2/navigation/$navigation_id/autosaves"
+}
+
+create_global_styles_revision() {
+  local revision_number="$1"
+  local global_styles_id="$2"
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -X POST -H "Content-Type: application/json" -d "{\"settings\":{\"color\":{\"palette\":{\"custom\":[{\"slug\":\"rev-$revision_number\",\"color\":\"#00${revision_number}000\",\"name\":\"Revision $revision_number\"}]}}}}" "http://localhost/wp-json/wp/v2/global-styles/$global_styles_id" > /dev/null
 }
 
 create_test_credentials () {
@@ -183,6 +204,19 @@ create_test_credentials () {
   AUTHOR_USERNAME="test_author"
   AUTHOR_PASSWORD="$(wp user application-password create test_author test --porcelain)"
 
+  # Fixture admin users with `wp_capabilities` shapes that exercise non-bool capability values.
+  # These reproduce the deserialization failures fixed by PR #1263 (`capabilities`) and
+  # issue #1313 (`extra_capabilities`).
+  LEGACY_ADMIN_USERNAME="legacy_admin"
+  LEGACY_ADMIN_USER_ID="$(wp user create "$LEGACY_ADMIN_USERNAME" legacy_admin@example.com --role=administrator --porcelain)"
+  # Pre-2012 sites stored role assignments as the string "1" rather than boolean true.
+  wp eval "update_user_meta( $LEGACY_ADMIN_USER_ID, 'wp_capabilities', array( 'administrator' => '1' ) );"
+
+  WPBAKERY_ADMIN_USERNAME="wpbakery_admin"
+  WPBAKERY_ADMIN_USER_ID="$(wp user create "$WPBAKERY_ADMIN_USERNAME" wpbakery_admin@example.com --role=administrator --porcelain)"
+  # WPBakery and similar plugins call `WP_User::add_cap($cap, $grant)` with non-bool grants.
+  wp eval "update_user_meta( $WPBAKERY_ADMIN_USER_ID, 'wp_capabilities', array( 'administrator' => true, 'vc_access_rules_post_types' => 'custom' ) );"
+
   PASSWORD_PROTECTED_POST_ID="$(wp post create --post_type=post --post_password=INTEGRATION_TEST --post_title=Password_Protected --porcelain)"
   TRASHED_POST_ID="$(wp post create --post_type=post --post_title=Trashed_Post --porcelain)"
 
@@ -205,8 +239,28 @@ create_test_credentials () {
   wp post delete "$TRASHED_PAGE_ID"
 
   echo "Creating a custom template for integration tests.."
-  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE", "content": "Integration test custom template content"}' http://localhost/wp-json/wp/v2/templates > /dev/null
+  TEMPLATE_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE", "content": "Integration test custom template content"}' http://localhost/wp-json/wp/v2/templates)"
   INTEGRATION_TEST_CUSTOM_TEMPLATE_ID="twentytwentyfour//integration_test_custom_template"
+  INTEGRATION_TEST_CUSTOM_TEMPLATE_WP_ID="$(echo "$TEMPLATE_RESPONSE" | jq -r '.wp_id')"
+
+  echo "Setting up template with 10 revisions for integration tests.."
+  for i in {1..10};
+  do
+    curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"template_revision_content_$i\"}" "http://localhost/wp-json/wp/v2/templates/$INTEGRATION_TEST_CUSTOM_TEMPLATE_ID" > /dev/null
+  done
+  REVISION_ID_FOR_CUSTOM_TEMPLATE=$((INTEGRATION_TEST_CUSTOM_TEMPLATE_WP_ID + 1))
+
+  echo "Creating a custom template part for integration tests.."
+  TEMPLATE_PART_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"INTEGRATION_TEST_CUSTOM_TEMPLATE_PART", "content": "Integration test custom template part content", "area": "header"}' http://localhost/wp-json/wp/v2/template-parts)"
+  INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_ID="twentytwentyfour//integration_test_custom_template_part"
+  INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_WP_ID="$(echo "$TEMPLATE_PART_RESPONSE" | jq -r '.wp_id')"
+
+  echo "Setting up template part with 10 revisions for integration tests.."
+  for i in {1..10};
+  do
+    curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"template_part_revision_content_$i\"}" "http://localhost/wp-json/wp/v2/template-parts/$INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_ID" > /dev/null
+  done
+  REVISION_ID_FOR_CUSTOM_TEMPLATE_PART=$((INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_WP_ID + 1))
 
   echo "Setting up a post with 10 revisions for integration tests.."
   REVISIONED_POST_ID="$(wp post create --post_type=post --post_title=Revisioned_POST_FOR_INTEGRATION_TESTS --porcelain)"
@@ -275,6 +329,59 @@ create_test_credentials () {
   AUTOSAVE_NAVIGATION_RESPONSE="$(create_navigation_autosave "1" "$AUTOSAVED_NAVIGATION_ID")"
   AUTOSAVE_ID_FOR_AUTOSAVED_NAVIGATION_ID="$(echo "$AUTOSAVE_NAVIGATION_RESPONSE" | jq -r '.id')"
 
+  echo "Creating reusable blocks for integration tests.."
+  BLOCK_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"title":"Integration Test Block","content":"<!-- wp:paragraph --><p>Integration test block content</p><!-- /wp:paragraph -->","status":"publish"}' http://localhost/wp-json/wp/v2/blocks)"
+  BLOCK_ID="$(echo "$BLOCK_RESPONSE" | jq -r '.id')"
+
+  echo "Setting up block with 10 revisions for integration tests.."
+  for i in {1..10};
+  do
+    create_block_revision "$i" "$BLOCK_ID"
+  done
+  # Generating revisions don't return an id, but since we just created the `BLOCK_ID`, we can use it to calculate the revision id
+  REVISION_ID_FOR_BLOCK_ID=$((BLOCK_ID + 1))
+
+  curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"title":"Integration Test Block 2","content":"<!-- wp:paragraph --><p>Second block</p><!-- /wp:paragraph -->","status":"publish"}' http://localhost/wp-json/wp/v2/blocks > /dev/null
+
+  echo "Setting up block with autosave for integration tests.."
+  # Create block as author user to enable proper autosave behavior (same requirement as posts/pages)
+  AUTOSAVED_BLOCK_ID="$(wp post create --post_type=wp_block --post_title='Autosaved Block FOR INTEGRATION TESTS' --post_content='<!-- wp:paragraph --><p>Autosaved block content</p><!-- /wp:paragraph -->' --post_status=publish --post_author="$AUTHOR_USER_ID" --porcelain)"
+  # Create autosave as admin user (different from block author) and capture its ID
+  AUTOSAVE_BLOCK_RESPONSE="$(create_block_autosave "1" "$AUTOSAVED_BLOCK_ID")"
+  AUTOSAVE_ID_FOR_AUTOSAVED_BLOCK_ID="$(echo "$AUTOSAVE_BLOCK_RESPONSE" | jq -r '.id')"
+
+  echo "Setting up template with autosave for integration tests.."
+  # Create template via REST API as admin (required for proper template registration), then change author
+  AUTOSAVED_TEMPLATE_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"AUTOSAVED_TEMPLATE", "content": "Autosaved template content"}' http://localhost/wp-json/wp/v2/templates)"
+  AUTOSAVED_TEMPLATE_ID="$(echo "$AUTOSAVED_TEMPLATE_RESPONSE" | jq -r '.id')"
+  AUTOSAVED_TEMPLATE_WP_ID="$(echo "$AUTOSAVED_TEMPLATE_RESPONSE" | jq -r '.wp_id')"
+  # Change author to author user to enable proper autosave behavior (different user required)
+  wp post update "$AUTOSAVED_TEMPLATE_WP_ID" --post_author="$AUTHOR_USER_ID"
+  # Create autosave as admin user (different from template author) and capture its ID
+  AUTOSAVE_TEMPLATE_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"autosave_content\"}" "http://localhost/wp-json/wp/v2/templates/$AUTOSAVED_TEMPLATE_ID/autosaves")"
+  AUTOSAVE_ID_FOR_AUTOSAVED_TEMPLATE="$(echo "$AUTOSAVE_TEMPLATE_RESPONSE" | jq -r '.wp_id')"
+
+  echo "Setting up template part with autosave for integration tests.."
+  # Create template part via REST API as admin, then change author
+  AUTOSAVED_TEMPLATE_PART_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d '{"slug":"AUTOSAVED_TEMPLATE_PART", "content": "Autosaved template part content", "area": "header"}' http://localhost/wp-json/wp/v2/template-parts)"
+  AUTOSAVED_TEMPLATE_PART_ID="$(echo "$AUTOSAVED_TEMPLATE_PART_RESPONSE" | jq -r '.id')"
+  AUTOSAVED_TEMPLATE_PART_WP_ID="$(echo "$AUTOSAVED_TEMPLATE_PART_RESPONSE" | jq -r '.wp_id')"
+  # Change author to author user to enable proper autosave behavior (different user required)
+  wp post update "$AUTOSAVED_TEMPLATE_PART_WP_ID" --post_author="$AUTHOR_USER_ID"
+  # Create autosave as admin user (different from template part author) and capture its ID
+  AUTOSAVE_TEMPLATE_PART_RESPONSE="$(curl --silent --user "$ADMIN_USERNAME":"$ADMIN_PASSWORD" -H "Content-Type: application/json" -d "{\"content\":\"autosave_content\"}" "http://localhost/wp-json/wp/v2/template-parts/$AUTOSAVED_TEMPLATE_PART_ID/autosaves")"
+  AUTOSAVE_ID_FOR_AUTOSAVED_TEMPLATE_PART="$(echo "$AUTOSAVE_TEMPLATE_PART_RESPONSE" | jq -r '.wp_id')"
+
+  echo "Getting global styles ID for integration tests.."
+  GLOBAL_STYLES_ID="$(wp eval 'echo WP_Theme_JSON_Resolver::get_user_global_styles_post_id();')"
+
+  echo "Setting up global styles with 10 revisions for integration tests.."
+  for i in {1..10};
+  do
+    create_global_styles_revision "$i" "$GLOBAL_STYLES_ID"
+  done
+  REVISION_ID_FOR_GLOBAL_STYLES_ID=$((GLOBAL_STYLES_ID + 1))
+
   rm -rf /app/test_credentials.json
   jo -p \
     site_url="$SITE_URL" \
@@ -287,6 +394,8 @@ create_test_credentials () {
     subscriber_password_uuid="$SUBSCRIBER_PASSWORD_UUID" \
     author_username="$AUTHOR_USERNAME" \
     author_password="$AUTHOR_PASSWORD" \
+    legacy_admin_user_id="$LEGACY_ADMIN_USER_ID" \
+    wpbakery_admin_user_id="$WPBAKERY_ADMIN_USER_ID" \
     password_protected_post_id="$PASSWORD_PROTECTED_POST_ID" \
     password_protected_post_password="INTEGRATION_TEST" \
     password_protected_post_title="Password_Protected" \
@@ -296,6 +405,13 @@ create_test_credentials () {
     first_post_date_gmt="$FIRST_POST_DATE_GMT" \
     wordpress_core_version="\"$WORDPRESS_VERSION\"" \
     integration_test_custom_template_id="$INTEGRATION_TEST_CUSTOM_TEMPLATE_ID" \
+    autosaved_template_id="$AUTOSAVED_TEMPLATE_ID" \
+    autosave_id_for_autosaved_template="$AUTOSAVE_ID_FOR_AUTOSAVED_TEMPLATE" \
+    integration_test_custom_template_part_id="$INTEGRATION_TEST_CUSTOM_TEMPLATE_PART_ID" \
+    autosaved_template_part_id="$AUTOSAVED_TEMPLATE_PART_ID" \
+    autosave_id_for_autosaved_template_part="$AUTOSAVE_ID_FOR_AUTOSAVED_TEMPLATE_PART" \
+    revision_id_for_custom_template_part="$REVISION_ID_FOR_CUSTOM_TEMPLATE_PART" \
+    revision_id_for_custom_template="$REVISION_ID_FOR_CUSTOM_TEMPLATE" \
     revisioned_post_id="$REVISIONED_POST_ID" \
     revision_id_for_revisioned_post_id="$REVISION_ID_FOR_REVISIONED_POST_ID" \
     autosaved_post_id="$AUTOSAVED_POST_ID" \
@@ -317,6 +433,12 @@ create_test_credentials () {
     revision_id_for_navigation_id="$REVISION_ID_FOR_NAVIGATION_ID" \
     autosaved_navigation_id="$AUTOSAVED_NAVIGATION_ID" \
     autosave_id_for_autosaved_navigation_id="$AUTOSAVE_ID_FOR_AUTOSAVED_NAVIGATION_ID" \
+    block_id="$BLOCK_ID" \
+    global_styles_id="$GLOBAL_STYLES_ID" \
+    revision_id_for_block_id="$REVISION_ID_FOR_BLOCK_ID" \
+    revision_id_for_global_styles_id="$REVISION_ID_FOR_GLOBAL_STYLES_ID" \
+    autosaved_block_id="$AUTOSAVED_BLOCK_ID" \
+    autosave_id_for_autosaved_block_id="$AUTOSAVE_ID_FOR_AUTOSAVED_BLOCK_ID" \
     > /app/test_credentials.json
 }
 create_test_credentials

@@ -11,7 +11,7 @@ enum ThemesRequest {
 }
 
 impl DerivedRequest for ThemesRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

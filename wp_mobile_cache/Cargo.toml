@@ -9,7 +9,7 @@ test-helpers = ["dep:chrono", "dep:integration_test_credentials", "dep:rstest"]
 
 [dependencies]
 log = { workspace = true }
-rusqlite = { workspace = true, features = ["hooks"] }
+rusqlite = { workspace = true, features = ["functions", "hooks"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

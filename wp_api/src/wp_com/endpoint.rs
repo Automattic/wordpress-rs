@@ -11,8 +11,11 @@ pub mod extensions;
 pub mod followers_endpoint;
 pub mod jetpack_connection_endpoint;
 pub mod languages_endpoint;
+pub mod me_connections_endpoint;
 pub mod me_endpoint;
 pub mod oauth2;
+pub mod products_endpoint;
+pub mod publicize_endpoint;
 pub mod segments_endpoint;
 pub mod sites_endpoint;
 pub mod stats_city_views_endpoint;
@@ -92,6 +95,15 @@ impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
                 .into(),
         )
     }
+
+    fn route_path(&self, namespace: String, endpoint_path: String) -> String {
+        format!(
+            "{}/sites/{}/{}",
+            namespace.trim_end_matches('/'),
+            self.site_id,
+            endpoint_path.trim_start_matches('/')
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -130,6 +142,14 @@ impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
                 .into(),
         )
     }
+
+    fn route_path(&self, namespace: String, endpoint_path: String) -> String {
+        format!(
+            "{}/{}",
+            namespace.trim_end_matches('/'),
+            endpoint_path.trim_start_matches('/')
+        )
+    }
 }
 
 #[cfg(test)]
@@ -148,6 +168,14 @@ pub(crate) mod tests {
 
     pub fn validate_wp_com_rest_v1_1_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
         validate_endpoint(WpComNamespace::RestV1_1, endpoint_url, path);
+    }
+
+    pub fn validate_wp_com_rest_v1_2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint(WpComNamespace::RestV1_2, endpoint_url, path);
+    }
+
+    pub fn validate_wp_com_rest_v1_3_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint(WpComNamespace::RestV1_3, endpoint_url, path);
     }
 
     pub fn validate_wp_com_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {

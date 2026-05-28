@@ -509,7 +509,7 @@ pub struct SparseUser {
     #[WpContext(edit)]
     pub capabilities: Option<UserCapabilitiesMap>,
     #[WpContext(edit)]
-    pub extra_capabilities: Option<HashMap<String, bool>>,
+    pub extra_capabilities: Option<UserCapabilitiesMap>,
     #[WpContext(edit, embed, view)]
     // According to our tests, `avatar_urls` is not available for all site types. It's marked with
     // `#[WpContextual]` which will make it an `Option` in the generated contextual types.

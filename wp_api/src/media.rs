@@ -359,7 +359,6 @@ impl From<MediaCreateParams> for HashMap<String, String> {
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
-#[WpContextualDontDerivePartialEq]
 pub struct SparseMedia {
     #[WpContext(edit, embed, view)]
     pub id: Option<MediaId>,
@@ -428,6 +427,7 @@ pub struct SparseMedia {
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Object)]
 #[serde(transparent)]
+#[uniffi::export(Eq, Hash)]
 pub struct MediaDetails {
     pub payload: Box<RawValue>,
 }
@@ -457,6 +457,20 @@ impl MediaDetails {
     }
 }
 
+impl PartialEq for MediaDetails {
+    fn eq(&self, other: &Self) -> bool {
+        self.payload.get() == other.payload.get()
+    }
+}
+
+impl Eq for MediaDetails {}
+
+impl std::hash::Hash for MediaDetails {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.payload.get().hash(state);
+    }
+}
+
 #[derive(Debug, uniffi::Enum)]
 pub enum MediaDetailsPayload {
     Audio(AudioMediaDetails),
@@ -476,8 +490,8 @@ pub struct AudioMediaDetails {
     pub data_format: Option<String>,
     pub codec: Option<String>,
     pub sample_rate: Option<u32>,
-    pub channels: Option<u8>,
-    pub bits_per_sample: Option<u8>,
+    pub channels: Option<u32>,
+    pub bits_per_sample: Option<u32>,
     pub lossless: Option<bool>,
     #[serde(rename = "channelmode")]
     pub channel_mode: Option<String>,

@@ -22,7 +22,7 @@ use crate::{
 use rusqlite::{OptionalExtension, Row};
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 use wp_api::{
-    AnyJson,
+    WpAdditionalFields,
     posts::{
         AnyPostWithEditContext, AnyPostWithEmbedContext, AnyPostWithViewContext,
         PostContentWithEditContext, PostContentWithViewContext, PostGuidWithEditContext,
@@ -518,7 +518,7 @@ impl PostContext for EditContext {
             tags: if tags.is_empty() { None } else { Some(tags) },
             parent: get_optional_id(row, Parent)?,
             menu_order: row.get_column(MenuOrder)?,
-            additional_fields: deserialize_json_value::<AnyJson>(
+            additional_fields: deserialize_json_value::<WpAdditionalFields>(
                 row.get_column(AdditionalFields)?,
             )?
             .map(Arc::new),
@@ -607,7 +607,7 @@ impl PostContext for ViewContext {
             tags: if tags.is_empty() { None } else { Some(tags) },
             parent: get_optional_id(row, Parent)?,
             menu_order: row.get_column(MenuOrder)?,
-            additional_fields: deserialize_json_value::<AnyJson>(
+            additional_fields: deserialize_json_value::<WpAdditionalFields>(
                 row.get_column(AdditionalFields)?,
             )?
             .map(Arc::new),
@@ -669,7 +669,7 @@ impl PostContext for EmbedContext {
                 }
             },
             featured_media: get_optional_id(row, FeaturedMedia)?,
-            additional_fields: deserialize_json_value::<AnyJson>(
+            additional_fields: deserialize_json_value::<WpAdditionalFields>(
                 row.get_column(AdditionalFields)?,
             )?
             .map(Arc::new),

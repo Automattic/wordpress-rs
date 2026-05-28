@@ -1,10 +1,14 @@
+use rusqlite::functions::FunctionFlags;
 use rusqlite::hooks::Action;
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use rusqlite::{Connection, Result as SqliteResult, params};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use crate::repository::entity_state::EntityStateRepository;
 use crate::repository::list_metadata::ListMetadataRepository;
+use crate::repository::sites::SiteRepository;
+use wp_api::parsed_url::ParsedUrl;
+use wp_api::wp_com::WpComSiteId;
 
 pub mod context;
 pub mod db_types;
@@ -81,6 +85,8 @@ pub enum DbTable {
     PostsEmbedContext,
     /// Post types with edit context (post type configuration data)
     PostTypesEditContext,
+    /// Media with edit context (full media data for editing)
+    MediaEditContext,
     /// Self-hosted WordPress sites
     SelfHostedSites,
     /// Database sites mapping table
@@ -110,6 +116,7 @@ impl DbTable {
             DbTable::PostsViewContext => "posts_view_context",
             DbTable::PostsEmbedContext => "posts_embed_context",
             DbTable::PostTypesEditContext => "post_types_edit_context",
+            DbTable::MediaEditContext => "media_edit_context",
             DbTable::SelfHostedSites => "self_hosted_sites",
             DbTable::DbSites => "db_sites",
             DbTable::TermRelationships => "term_relationships",
@@ -144,6 +151,7 @@ impl TryFrom<&str> for DbTable {
             "posts_view_context" => Ok(DbTable::PostsViewContext),
             "posts_embed_context" => Ok(DbTable::PostsEmbedContext),
             "post_types_edit_context" => Ok(DbTable::PostTypesEditContext),
+            "media_edit_context" => Ok(DbTable::MediaEditContext),
             "self_hosted_sites" => Ok(DbTable::SelfHostedSites),
             "db_sites" => Ok(DbTable::DbSites),
             "term_relationships" => Ok(DbTable::TermRelationships),
@@ -347,6 +355,31 @@ impl WpApiCache {
             connection.update_hook(None::<fn(Action, &str, &str, i64)>);
         });
     }
+
+    /// Remove a self-hosted site and all its cached data from the database.
+    ///
+    /// Returns `true` if the site was found and removed, `false` if no site
+    /// with the given URL exists.
+    pub fn remove_self_hosted_site(&self, url: Arc<ParsedUrl>) -> Result<bool, SqliteDbError> {
+        self.execute(|connection| {
+            let Some(full_entity) =
+                SiteRepository.select_self_hosted_site_by_url(connection, &url.url())?
+            else {
+                return Ok(false);
+            };
+            SiteRepository.delete_site(connection, &full_entity.data.0)
+        })
+    }
+
+    /// Remove a WordPress.com site and all its cached data from the database.
+    ///
+    /// Returns `true` if the site was found and removed, `false` if no site
+    /// with the given site ID exists.
+    pub fn remove_wordpress_com_site(&self, site_id: WpComSiteId) -> Result<bool, SqliteDbError> {
+        self.execute(|connection| {
+            SiteRepository.delete_wordpress_com_site_by_site_id(connection, site_id)
+        })
+    }
 }
 
 impl WpApiCache {
@@ -398,21 +431,24 @@ impl WpApiCache {
     }
 }
 
-impl From<Connection> for WpApiCache {
+impl TryFrom<Connection> for WpApiCache {
+    type Error = SqliteDbError;
+
     /// Create a WpApiCache from an existing connection.
     ///
     /// This is typically used in tests to create a cache from an already-migrated
     /// in-memory database connection.
-    fn from(connection: Connection) -> Self {
-        Self {
+    fn try_from(connection: Connection) -> Result<Self, Self::Error> {
+        register_url_functions(&connection)?;
+        Ok(Self {
             inner: DBManager {
                 connection: Mutex::new(connection),
             },
-        }
+        })
     }
 }
 
-static MIGRATION_QUERIES: [&str; 12] = [
+static MIGRATION_QUERIES: [&str; 14] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -425,6 +461,8 @@ static MIGRATION_QUERIES: [&str; 12] = [
     include_str!("../migrations/0010-create-wordpress-com-sites-table.sql"),
     include_str!("../migrations/0011-add-additional-fields-to-posts-tables.sql"),
     include_str!("../migrations/0012-invalidate-post-entity-states.sql"),
+    include_str!("../migrations/0013-invalidate-post-entity-states-for-meta.sql"),
+    include_str!("../migrations/0014-create-media-edit-context-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {
@@ -433,6 +471,11 @@ pub struct MigrationManager<'a> {
 
 impl<'a> MigrationManager<'a> {
     pub fn new(connection: &'a Connection) -> Result<Self, SqliteDbError> {
+        // Cover raw-connection paths that bypass WpApiCache construction
+        // (test fixtures that hand a Connection straight to the repository
+        // layer). The registration is idempotent, so connections that were
+        // already prepared by DBManager / From<Connection> are unaffected.
+        register_url_functions(connection)?;
         Ok(Self { connection })
     }
 
@@ -567,10 +610,42 @@ impl DBManager {
             Connection::open_in_memory()?
         };
 
+        register_url_functions(&connection)?;
+
         Ok(Self {
             connection: Mutex::new(connection),
         })
     }
+}
+
+/// Register custom SQL functions on the given connection.
+///
+/// Currently registers `urls_eq(a, b)`: a deterministic, UTF-8 scalar that
+/// reports semantic URL equivalence (per `ParsedUrl == ParsedUrl`), with a
+/// raw-string fallback when either side fails to parse.
+///
+/// Why: the `self_hosted_sites.url` column may legitimately hold either
+/// `http://example.com` or `http://example.com/` depending on whether it
+/// was inserted before or after `ParsedUrl`-based normalization landed
+/// (see PR #1239). Lookups must tolerate either shape without forcing a
+/// data migration on existing user caches.
+pub(crate) fn register_url_functions(conn: &Connection) -> SqliteResult<()> {
+    conn.create_scalar_function(
+        "urls_eq",
+        2,
+        FunctionFlags::SQLITE_DETERMINISTIC | FunctionFlags::SQLITE_UTF8,
+        |ctx| {
+            let a: String = ctx.get(0)?;
+            let b: String = ctx.get(1)?;
+            if a == b {
+                return Ok(true);
+            }
+            Ok(match (ParsedUrl::parse(&a), ParsedUrl::parse(&b)) {
+                (Ok(parsed_a), Ok(parsed_b)) => parsed_a == parsed_b,
+                _ => false,
+            })
+        },
+    )
 }
 
 uniffi::setup_scaffolding!();
@@ -750,5 +825,74 @@ mod tests {
             result.is_err(),
             "Expected error when migration index exceeds available migrations"
         );
+    }
+
+    #[test]
+    fn test_urls_eq_matches_across_trailing_slash() {
+        let conn = Connection::open_in_memory().unwrap();
+        register_url_functions(&conn).unwrap();
+
+        for (a, b) in [
+            ("https://example.com", "https://example.com/"),
+            ("https://example.com/", "https://example.com"),
+            ("https://example.com", "https://example.com"),
+        ] {
+            let result: bool = conn
+                .query_row("SELECT urls_eq(?, ?)", [a, b], |row| row.get(0))
+                .unwrap();
+            assert!(result, "{a:?} should equal {b:?}");
+        }
+    }
+
+    #[test]
+    fn test_urls_eq_is_case_insensitive_in_scheme_and_host() {
+        let conn = Connection::open_in_memory().unwrap();
+        register_url_functions(&conn).unwrap();
+
+        let result: bool = conn
+            .query_row(
+                "SELECT urls_eq(?, ?)",
+                ["http://localhost", "HTTP://LOCALHOST"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_urls_eq_returns_false_for_different_hosts() {
+        let conn = Connection::open_in_memory().unwrap();
+        register_url_functions(&conn).unwrap();
+
+        let result: bool = conn
+            .query_row(
+                "SELECT urls_eq(?, ?)",
+                ["https://example.com", "https://other.example.com"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_urls_eq_falls_back_to_string_equality_for_unparseable_input() {
+        let conn = Connection::open_in_memory().unwrap();
+        register_url_functions(&conn).unwrap();
+
+        let same: bool = conn
+            .query_row("SELECT urls_eq(?, ?)", ["not a url", "not a url"], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert!(same, "identical unparseable strings should match");
+
+        let different: bool = conn
+            .query_row(
+                "SELECT urls_eq(?, ?)",
+                ["not a url", "also not a url"],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!different, "distinct unparseable strings should not match");
     }
 }

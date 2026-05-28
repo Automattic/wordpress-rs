@@ -80,6 +80,12 @@ import SQLite3\
 extension AnyPostWithEditContext: Hashable {}
 extension AnyPostWithEmbedContext: Hashable {}
 extension AnyPostWithViewContext: Hashable {}
+
+// MediaWith*Context types contain `MediaDetails` (a reference type) which
+// prevents automatic Hashable synthesis. Add the conformance manually.
+extension MediaWithEditContext: Hashable {}
+extension MediaWithEmbedContext: Hashable {}
+extension MediaWithViewContext: Hashable {}
 PATCH
 }
 

@@ -3,9 +3,12 @@ use libtest_mimic::{Arguments, Trial, run};
 use std::env;
 use std::sync::Arc;
 
+mod api_root_tests;
 mod context;
+mod domains_tests;
 mod languages_tests;
 mod me_tests;
+mod products_tests;
 mod sites_tests;
 mod stats_city_views_tests;
 mod stats_country_views_tests;
@@ -46,6 +49,8 @@ fn main() {
 
 fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut tests = vec![];
+    tests.extend(api_root_tests::tests(Arc::clone(&ctx)));
+    tests.extend(domains_tests::tests(Arc::clone(&ctx)));
     tests.extend(languages_tests::tests(Arc::clone(&ctx)));
     tests.extend(me_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_city_views_tests::tests(Arc::clone(&ctx)));
@@ -63,6 +68,7 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(stats_subscribers_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_top_posts_tests::tests(Arc::clone(&ctx)));
     tests.extend(subscribers_by_user_type_tests::tests(Arc::clone(&ctx)));
+    tests.extend(products_tests::tests(Arc::clone(&ctx)));
     tests.extend(wp_service_tests::tests(Arc::clone(&ctx)));
     tests
 }

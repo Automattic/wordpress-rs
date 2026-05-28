@@ -52,6 +52,9 @@ steps:
         command: |
           echo "--- :rust: Validate localization files"
           make validate-localizations
+      - label: ":memo: Validate Changelog"
+        command: .buildkite/commands/validate-changelog.sh
+        plugins: [$CI_TOOLKIT]
 
   #
   # Swift Group
@@ -338,6 +341,11 @@ steps:
           cargo run --bin wp_com_e2e
         agents:
           queue: android
+
+  - label: ":wastebasket: Clean up `pr-build/*` branches for closed PRs"
+    command: .buildkite/cleanup-pr-build-branches.sh
+    plugins: [$CI_TOOLKIT]
+    if: build.branch == "trunk" && build.env("NEW_VERSION") == null
 
   - label: ":rocket: Publish Swift release $NEW_VERSION"
     command: .buildkite/release.sh $NEW_VERSION

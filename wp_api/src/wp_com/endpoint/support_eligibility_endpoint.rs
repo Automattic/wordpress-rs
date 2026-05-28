@@ -12,7 +12,7 @@ enum SupportEligibilityRequest {
 }
 
 impl DerivedRequest for SupportEligibilityRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::V2
     }
 }

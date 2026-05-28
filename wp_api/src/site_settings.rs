@@ -4,7 +4,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
-use crate::AnyJson;
+use crate::WpAdditionalFields;
 
 #[derive(Debug, Default, Serialize, uniffi::Record)]
 pub struct SiteSettingsUpdateParams {
@@ -120,7 +120,7 @@ pub struct SparseSiteSettings {
     #[serde(flatten)]
     #[WpContext(edit, embed, view)]
     #[WpContextualExcludeFromFields]
-    pub additional_fields: Option<Arc<AnyJson>>,
+    pub additional_fields: Option<Arc<WpAdditionalFields>>,
 }
 
 #[derive(

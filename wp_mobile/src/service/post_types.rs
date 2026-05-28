@@ -223,7 +223,7 @@ mod tests {
         };
         let db_site = create_test_site(&mut conn, &self_hosted_site);
 
-        let cache = Arc::new(WpApiCache::from(conn));
+        let cache = Arc::new(WpApiCache::try_from(conn).expect("Cache creation should succeed"));
         let api_client = mock_api_client();
 
         let post_type_service = PostTypeService::new(api_client, Arc::new(db_site), cache.clone());

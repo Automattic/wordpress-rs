@@ -89,8 +89,17 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                                 navController.navigate("site")
                             }
                             is Account.WpCom -> {
-                                currentWpComClient = createWpComApiClient(account)
-                                navController.navigate("wpcom_site")
+                                if (account.siteApiRoot.isNotEmpty()) {
+                                    // Site-specific WP.com account with a blog ID
+                                    currentWpService = createWpService(account, cache)
+                                    val apiClient = createWpApiClient(account)
+                                    currentApiClient = apiClient
+                                    currentSiteViewModel = SiteViewModel(apiClient)
+                                    navController.navigate("site")
+                                } else {
+                                    currentWpComClient = createWpComApiClient(account)
+                                    navController.navigate("wpcom_site")
+                                }
                             }
                         }
                     }
