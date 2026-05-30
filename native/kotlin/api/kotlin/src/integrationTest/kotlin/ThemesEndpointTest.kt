@@ -1,5 +1,7 @@
 package rs.wordpress.api.kotlin
 
+import kotlin.test.assertEquals
+
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import uniffi.wp_api.SparseThemeFieldWithEditContext
@@ -8,7 +10,6 @@ import uniffi.wp_api.ThemeStylesheet
 import uniffi.wp_api.WpErrorCode
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-
 private const val THEME_TWENTY_TWENTY_FIVE: String = "twentytwentyfive"
 
 class ThemesEndpointTest {
@@ -67,6 +68,6 @@ class ThemesEndpointTest {
                 requestBuilder.themes()
                     .retrieveWithEditContext(ThemeStylesheet("invalid_stylesheet"))
             }
-        assert(result.wpErrorCode() is WpErrorCode.ThemeNotFound)
+        assertEquals(WpErrorCode.THEME_NOT_FOUND, result.wpErrorCode())
     }
 }

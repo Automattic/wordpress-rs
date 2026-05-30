@@ -1,6 +1,6 @@
 use crate::{
     api_client::WpApiClientDelegate,
-    api_error::{WpApiError, WpErrorCode},
+    api_error::WpApiError,
     auth::{WpAuthentication, WpAuthenticationProvider},
     jetpack::client::JetpackApiClient,
     parsed_url::ParsedUrl,
@@ -217,11 +217,8 @@ impl JetpackConnectionClient {
             .await;
 
         // At the time of writing, `"code": "success"` is parsed as an error case.
-        if let Err(WpApiError::WpError {
-            error_code: WpErrorCode::CustomError(code),
-            ..
-        }) = &result
-            && (code == "success" || code == "already_connected")
+        if let Err(WpApiError::WpError { error_code, .. }) = &result
+            && (error_code.raw == "success" || error_code.raw == "already_connected")
         {
             return Ok(blog_id);
         }

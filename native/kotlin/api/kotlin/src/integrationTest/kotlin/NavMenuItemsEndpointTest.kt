@@ -1,5 +1,7 @@
 package rs.wordpress.api.kotlin
 
+import kotlin.test.assertEquals
+
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
@@ -7,7 +9,6 @@ import uniffi.wp_api.NavMenuItemListParams
 import uniffi.wp_api.SparseNavMenuItemFieldWithEditContext
 import uniffi.wp_api.WpErrorCode
 import kotlin.test.assertNotNull
-
 class NavMenuItemsEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
     private val client = defaultApiClient()
@@ -66,6 +67,6 @@ class NavMenuItemsEndpointTest {
             client.request { requestBuilder ->
                 requestBuilder.navMenuItems().listWithEditContext(params)
             }
-        assert(result.wpErrorCode() is WpErrorCode.PostInvalidPageNumber)
+        assertEquals(WpErrorCode.POST_INVALID_PAGE_NUMBER, result.wpErrorCode())
     }
 }

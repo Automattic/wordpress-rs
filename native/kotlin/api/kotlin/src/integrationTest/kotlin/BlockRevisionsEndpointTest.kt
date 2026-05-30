@@ -77,6 +77,6 @@ class BlockRevisionsEndpointTest {
                 BlockRevisionListParams()
             )
         }
-        assert(result.wpErrorCode() is WpErrorCode.PostInvalidParent)
+        assertEquals(WpErrorCode.POST_INVALID_PARENT, result.wpErrorCode())
     }
 }

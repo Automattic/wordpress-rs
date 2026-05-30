@@ -2,13 +2,13 @@ package rs.wordpress.api.kotlin
 
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestMethod
-import uniffi.wp_api.WpErrorCode
+import uniffi.wp_api.WpErrorCodeValue
 import uniffi.wp_api.WpRedirect
 
 sealed class WpRequestResult<T> {
     data class Success<T>(val response: T) : WpRequestResult<T>()
     data class WpError<T>(
-        val errorCode: WpErrorCode,
+        val errorCode: WpErrorCodeValue,
         val errorMessage: String,
         val statusCode: UInt,
         val response: String,

@@ -116,6 +116,6 @@ class TemplatePartsEndpointTest {
                 requestBuilder.templateParts()
                     .delete(TEMPLATE_PART_TWENTY_TWENTY_FOUR_HEADER)
             }
-        assert(result.wpErrorCode() is WpErrorCode.InvalidTemplate)
+        assertEquals(WpErrorCode.INVALID_TEMPLATE, result.wpErrorCode())
     }
 }

@@ -63,7 +63,7 @@ class PostStatusesEndpointTest {
             requestBuilder.postStatuses()
                 .retrieveWithViewContext(PostStatusSlug("non_existent_status"))
         }
-        assert(result.wpErrorCode() is WpErrorCode.StatusInvalid)
+        assertEquals(WpErrorCode.STATUS_INVALID, result.wpErrorCode())
     }
 
     @Test
@@ -71,7 +71,7 @@ class PostStatusesEndpointTest {
         val result = client.request { requestBuilder ->
             requestBuilder.postStatuses().retrieveWithViewContext(PostStatusSlug("auto-draft"))
         }
-        assert(result.wpErrorCode() is WpErrorCode.CannotReadStatus)
+        assertEquals(WpErrorCode.CANNOT_READ_STATUS, result.wpErrorCode())
     }
 
     @Test

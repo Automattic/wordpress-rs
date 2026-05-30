@@ -73,6 +73,6 @@ class BlocksEndpointTest {
                 BlockListParams(page = 99999999u)
             )
         }
-        assert(result.wpErrorCode() is WpErrorCode.PostInvalidPageNumber)
+        assertEquals(WpErrorCode.POST_INVALID_PAGE_NUMBER, result.wpErrorCode())
     }
 }

@@ -1,6 +1,6 @@
 use self::endpoint::WpEndpointUrl;
 use crate::{
-    api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpErrorCode},
+    api_error::{ParsedRequestError, RequestExecutionError, WpApiError},
     auth::WpAuthenticationProvider,
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
@@ -957,10 +957,8 @@ pub async fn fetch_authentication_state(
     match parsed_res {
         Ok(_) => Ok(AuthenticationState::Authenticated),
         Err(wp_api_error) => {
-            if let WpApiError::WpError {
-                error_code: WpErrorCode::Unauthorized,
-                ..
-            } = wp_api_error
+            if let WpApiError::WpError { error_code, .. } = &wp_api_error
+                && error_code.is_unauthorized()
             {
                 Ok(AuthenticationState::Unauthorized)
             } else {

@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import rs.wordpress.api.kotlin.WpRequestResult
 import uniffi.wp_api.RequestExecutionErrorReason
-import uniffi.wp_api.WpErrorCode
+import uniffi.wp_api.WpErrorCodeValue
 
 fun <T> WpRequestResult<T>.errorDescription(): String = when (this) {
     is WpRequestResult.Success -> ""
@@ -29,10 +29,8 @@ fun <T> WpRequestResult<T>.errorDescription(): String = when (this) {
         "Unknown error (HTTP $statusCode)"
 }
 
-private fun WpErrorCode.displayName(): String = when (this) {
-    is WpErrorCode.CustomException -> v1
-    else -> this::class.simpleName ?: "Unknown"
-}
+private fun WpErrorCodeValue.displayName(): String =
+    value?.name ?: raw
 
 private fun RequestExecutionErrorReason.description(): String = when (this) {
     is RequestExecutionErrorReason.DeviceIsOfflineError -> "Device is offline: $errorMessage"

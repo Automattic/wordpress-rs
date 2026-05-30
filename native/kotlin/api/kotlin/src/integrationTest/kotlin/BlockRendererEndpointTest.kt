@@ -1,11 +1,12 @@
 package rs.wordpress.api.kotlin
 
+import kotlin.test.assertEquals
+
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import uniffi.wp_api.BlockRendererPostParams
 import uniffi.wp_api.WpErrorCode
 import kotlin.test.assertTrue
-
 class BlockRendererEndpointTest {
     private val client = defaultApiClient()
 
@@ -41,7 +42,7 @@ class BlockRendererEndpointTest {
                 params = BlockRendererPostParams()
             )
         }
-        assert(result.wpErrorCode() is WpErrorCode.BlockInvalid)
+        assertEquals(WpErrorCode.BLOCK_INVALID, result.wpErrorCode())
     }
 
     @Test
@@ -52,6 +53,6 @@ class BlockRendererEndpointTest {
                 params = BlockRendererPostParams()
             )
         }
-        assert(result.wpErrorCode() is WpErrorCode.BlockInvalid)
+        assertEquals(WpErrorCode.BLOCK_INVALID, result.wpErrorCode())
     }
 }

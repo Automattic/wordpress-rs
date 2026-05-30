@@ -123,7 +123,7 @@ class CategoriesEndpointTest {
                         termId = 9999999,
                     )
             }
-        assert(result.wpErrorCode() is WpErrorCode.TermInvalid)
+        assertEquals(WpErrorCode.TERM_INVALID, result.wpErrorCode())
     }
 
     @Test
@@ -136,6 +136,6 @@ class CategoriesEndpointTest {
                         TermCreateParams(name = "foo", parent = 9999999)
                     )
             }
-        assert(result.wpErrorCode() is WpErrorCode.TermInvalid)
+        assertEquals(WpErrorCode.TERM_INVALID, result.wpErrorCode())
     }
 }

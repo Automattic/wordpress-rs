@@ -200,7 +200,8 @@ impl<T: std::fmt::Debug> AssertWpError<T> for Result<T, WpApiError> {
         } = err
         {
             assert_eq!(
-                expected_error_code, error_code,
+                Some(&expected_error_code),
+                error_code.value.as_ref(),
                 "Incorrect error code. Expected '{expected_error_code:?}', found '{error_code:?}'. Response was: '{response:?}'"
             );
         } else {

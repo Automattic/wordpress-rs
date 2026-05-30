@@ -1,12 +1,13 @@
 package rs.wordpress.api.kotlin
 
+import kotlin.test.assertEquals
+
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import uniffi.wp_api.SidebarUpdateParams
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
 import kotlin.test.assertTrue
-
 class SidebarsEndpointTest {
     private val testCredentials = TestCredentials.INSTANCE
     private val client = defaultApiClient()
@@ -54,7 +55,7 @@ class SidebarsEndpointTest {
             requestBuilder.sidebars()
                 .retrieveWithViewContext("nonexistent_sidebar_that_does_not_exist")
         }
-        assert(result.wpErrorCode() is WpErrorCode.SidebarNotFound)
+        assertEquals(WpErrorCode.SIDEBAR_NOT_FOUND, result.wpErrorCode())
     }
 
     @Test
@@ -62,6 +63,6 @@ class SidebarsEndpointTest {
         val result = clientAsSubscriber.request { requestBuilder ->
             requestBuilder.sidebars().listWithEditContext()
         }
-        assert(result.wpErrorCode() is WpErrorCode.CannotManageWidgets)
+        assertEquals(WpErrorCode.CANNOT_MANAGE_WIDGETS, result.wpErrorCode())
     }
 }
