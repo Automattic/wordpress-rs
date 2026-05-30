@@ -2,10 +2,10 @@ package rs.wordpress.api.kotlin
 
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.PostType
 import uniffi.wp_api.WpErrorCode
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 
 class ErrorCodeForwardCompatTest {
     private val client = defaultApiClient()
@@ -14,7 +14,7 @@ class ErrorCodeForwardCompatTest {
     fun testKnownErrorCodeHasValueAndRaw() = runTest {
         // Trigger a known error: retrieving a non-existent post type
         val result = client.request { requestBuilder ->
-            requestBuilder.postTypes().retrieveWithEditContext("nonexistent_type")
+            requestBuilder.postTypes().retrieveWithEditContext(PostType.Custom("nonexistent_type"))
         }
 
         val errorCodeValue = result.wpErrorCodeValue()
@@ -28,7 +28,7 @@ class ErrorCodeForwardCompatTest {
     fun testWpErrorCodeHelperReturnsKnownVariant() = runTest {
         // The wpErrorCode() helper extracts .value for convenience
         val result = client.request { requestBuilder ->
-            requestBuilder.postTypes().retrieveWithEditContext("nonexistent_type")
+            requestBuilder.postTypes().retrieveWithEditContext(PostType.Custom("nonexistent_type"))
         }
 
         // This is the migration path: use == instead of `is` for enum comparison
@@ -42,7 +42,7 @@ class ErrorCodeForwardCompatTest {
         // a variant existed, they could check the raw string. After the variant
         // is added, their raw string check still works.
         val result = client.request { requestBuilder ->
-            requestBuilder.postTypes().retrieveWithEditContext("nonexistent_type")
+            requestBuilder.postTypes().retrieveWithEditContext(PostType.Custom("nonexistent_type"))
         }
 
         val errorCodeValue = result.wpErrorCodeValue()
