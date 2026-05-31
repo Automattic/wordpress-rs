@@ -198,7 +198,7 @@ pub struct PostCreateParams {
     // One of: publish, future, draft, pending, private
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<PostStatus>,
+    pub status: Option<Arc<PostStatusValue>>,
     // A password to protect access to the content and excerpt.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -292,7 +292,7 @@ pub struct PostUpdateParams {
     // One of: publish, future, draft, pending, private
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<PostStatus>,
+    pub status: Option<Arc<PostStatusValue>>,
     // A password to protect access to the content and excerpt.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -390,7 +390,7 @@ pub struct SparseAnyPost {
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit, view)]
-    pub status: Option<PostStatus>,
+    pub status: Option<Arc<PostStatusValue>>,
     #[serde(rename = "type")]
     #[WpContext(edit, embed, view)]
     pub post_type: Option<String>,

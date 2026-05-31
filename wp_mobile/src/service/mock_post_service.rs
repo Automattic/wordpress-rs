@@ -11,7 +11,7 @@ use std::thread;
 use std::time::Duration;
 use wp_api::posts::{
     AnyPostWithEditContext, PostContentWithEditContext, PostGuidWithEditContext, PostId,
-    PostStatus, PostTitleWithEditContext,
+    PostStatus, PostStatusValue, PostTitleWithEditContext,
 };
 use wp_mobile_cache::{
     WpApiCache, context::EditContext, db_types::db_site::DbSite,
@@ -77,7 +77,9 @@ fn stress_test_batch_update(
                 // Randomize the post status
                 let mut rng = rand::rng();
                 let status_index = rng.random_range(0..STRESS_TEST_STATUS_VALUES.len());
-                post.status = STRESS_TEST_STATUS_VALUES[status_index].clone();
+                post.status = Arc::new(PostStatusValue::new_from_value(
+                    STRESS_TEST_STATUS_VALUES[status_index].clone(),
+                ));
 
                 repo.upsert(conn, db_site, &post)?;
             }
@@ -142,7 +144,7 @@ fn create_test_post(
         modified: "2025-01-01T00:00:00".to_string(),
         modified_gmt: "2025-01-01T00:00:00Z".parse().unwrap(),
         slug: slug.to_string(),
-        status: PostStatus::Publish,
+        status: Arc::new(PostStatusValue::new_from_value(PostStatus::Publish)),
         post_type: "post".to_string(),
         password: Some("".to_string()),
         permalink_template: None,

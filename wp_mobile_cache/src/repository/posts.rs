@@ -26,8 +26,8 @@ use wp_api::{
     posts::{
         AnyPostWithEditContext, AnyPostWithEmbedContext, AnyPostWithViewContext,
         PostContentWithEditContext, PostContentWithViewContext, PostGuidWithEditContext,
-        PostGuidWithViewContext, PostId, PostTitleWithEditContext, PostTitleWithEmbedContext,
-        PostTitleWithViewContext, SparsePostExcerpt,
+        PostGuidWithViewContext, PostId, PostStatusValue, PostTitleWithEditContext,
+        PostTitleWithEmbedContext, PostTitleWithViewContext, SparsePostExcerpt,
     },
     prelude::WpGmtDateTime,
     taxonomies::TaxonomyType,
@@ -472,7 +472,7 @@ impl PostContext for EditContext {
             modified: row.get_column(Modified)?,
             modified_gmt: parse_datetime(row, ModifiedGmt)?,
             slug: row.get_column(Slug)?,
-            status: parse_enum(row, Status)?,
+            status: Arc::new(parse_enum::<PostStatusValue, _>(row, Status)?),
             post_type: row.get_column(PostType)?,
             password: row.get_column(Password)?,
             permalink_template: row.get_column(PermalinkTemplate)?,
@@ -569,7 +569,7 @@ impl PostContext for ViewContext {
             modified: row.get_column(Modified)?,
             modified_gmt: parse_datetime(row, ModifiedGmt)?,
             slug: row.get_column(Slug)?,
-            status: parse_enum(row, Status)?,
+            status: Arc::new(parse_enum::<PostStatusValue, _>(row, Status)?),
             post_type: row.get_column(PostType)?,
             title: {
                 let title_rendered: Option<String> = row.get_column(TitleRendered)?;
@@ -1252,7 +1252,10 @@ mod tests {
             .expect("Failed to select post by entity_id")
             .expect("Post should exist");
 
-        assert_eq!(retrieved.data.post.status, post_status);
+        assert!(
+            retrieved.data.post.status.is_code(post_status),
+            "Post status mismatch"
+        );
     }
 
     #[rstest]

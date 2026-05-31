@@ -113,6 +113,20 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             }
         }
 
+        impl crate::url_query::AsQueryValue for std::sync::Arc<#value_name> {
+            fn as_query_value(&self) -> impl AsRef<str> {
+                self.inner_raw.clone()
+            }
+        }
+
+        impl crate::OptionFromStr for std::sync::Arc<#value_name> {
+            type Err = std::convert::Infallible;
+
+            fn option_from_str(s: &str) -> Result<Option<Self>, Self::Err> {
+                Ok(Some(std::sync::Arc::new(#value_name::new_from_raw(s.to_string()))))
+            }
+        }
+
         #[uniffi::export]
         impl #value_name {
             /// Create from a raw API string. Resolves to the known enum variant if possible.
