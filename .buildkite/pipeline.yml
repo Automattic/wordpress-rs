@@ -309,6 +309,20 @@ steps:
           echo "--- :rust: Testing"
           make test-rust-integration-wordpress-org-api
 
+      - label: ":wordpress: :rust: Plain Permalinks Login (#1366)"
+        command: |
+          chmod -R a+rw ./
+
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+          source "$$HOME/.cargo/env"
+
+          echo "--- :docker: Setting up plain-permalinks WordPress server"
+          make start-plain-permalinks-test-server
+
+          echo "--- 🧪 Running plain-permalinks integration test"
+          make test-rust-integration-plain-permalinks
+
       - label: ":wordpress: :kotlin: WordPress {{matrix}}"
         command: ".buildkite/commands/run-kotlin-integration-tests.sh"
         env:

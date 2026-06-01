@@ -214,6 +214,10 @@ test-rust-integration:
 test-rust-integration-wordpress-org-api:
 	$(rust_docker_run) cargo test --package wp_api_integration_tests --test test_plugin_directory -- --nocapture
 
+test-rust-integration-plain-permalinks:
+	@# Help: Run the plain-permalinks integration test against the dedicated WordPress server.
+	cargo test -p wp_api_integration_tests --test test_login_plain_permalinks -- --nocapture
+
 test-kotlin-integration:
 	@# Help: Run Kotlin integration tests in test server.
 	docker exec -i wordpress /bin/bash < ./scripts/run-kotlin-integration-tests.sh
