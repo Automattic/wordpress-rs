@@ -50,7 +50,7 @@ wp_rs_cli fetch-post \
   --bearer "$WP_BEARER_TOKEN" \
   --pretty
 
-# WordPress.org/Jetpack (Application Password) by post URL (auto-discover /wp-json)
+# WordPress.org/Jetpack (Application Password) by post URL (auto-discovers API root)
 wp_rs_cli fetch-post \
   --url https://yoursite.com/blog/2024/07/01/my-post \
   --username "$WP_USERNAME" \
@@ -60,6 +60,15 @@ wp_rs_cli fetch-post \
 # WordPress.org/Jetpack (Application Password) by explicit API root and post id
 wp_rs_cli fetch-post \
   --api-root https://yoursite.com/wp-json \
+  --post-id 123 \
+  --username "$WP_USERNAME" \
+  --password "$WP_APP_PASSWORD" \
+  --pretty
+
+# Same, but for a plain-permalinks site (WordPress advertises the
+# `?rest_route=/` form when Settings → Permalinks is set to Plain)
+wp_rs_cli fetch-post \
+  --api-root 'https://yoursite.com/index.php?rest_route=/' \
   --post-id 123 \
   --username "$WP_USERNAME" \
   --password "$WP_APP_PASSWORD" \
