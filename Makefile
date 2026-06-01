@@ -215,8 +215,11 @@ test-rust-integration-wordpress-org-api:
 	$(rust_docker_run) cargo test --package wp_api_integration_tests --test test_plugin_directory -- --nocapture
 
 test-rust-integration-plain-permalinks:
-	@# Help: Run the plain-permalinks integration test against the dedicated WordPress server.
-	cargo test -p wp_api_integration_tests --test test_login_plain_permalinks -- --nocapture
+	@# Help: Run the plain-permalinks integration test inside the dedicated WordPress server.
+	# Runs cargo *inside* the container (which has the Rust toolchain + libssl-dev),
+	# matching the main `test-rust-integration` flow. The site is reachable there at
+	# `http://localhost`, so the test connects on the container's own Apache port.
+	$(plain-permalinks-compose) exec -T wordpress /bin/bash -c "cd /app && cargo test -p wp_api_integration_tests --test test_login_plain_permalinks -- --nocapture"
 
 test-kotlin-integration:
 	@# Help: Run Kotlin integration tests in test server.

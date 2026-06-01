@@ -311,11 +311,8 @@ steps:
 
       - label: ":wordpress: :rust: Plain Permalinks Login (#1366)"
         command: |
+          # Give read/write permissions to `./` for all users
           chmod -R a+rw ./
-
-          echo "--- :rust: Installing Rust"
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
-          source "$$HOME/.cargo/env"
 
           echo "--- :docker: Setting up plain-permalinks WordPress server"
           make start-plain-permalinks-test-server

@@ -37,8 +37,13 @@ echo "--- Setting up WordPress (plain permalinks)"
 ADMIN_USERNAME="test@example.com"
 ADMIN_ACCOUNT_PASSWORD="strongpassword"
 
+# Configure WordPress at `http://localhost` (port 80). The integration test runs
+# *inside* this container — matching the main `test-rust-integration` flow — so the
+# site must be reachable on the container's own Apache port, not the host-mapped
+# `:8081`. The `8081:80` mapping in docker-compose.plain-permalinks.yml exists only
+# so a developer can browse the instance from the host while debugging.
 wp core install \
-	--url=http://localhost:8081 \
+	--url=http://localhost \
 	--title=plain-permalinks-test-site \
 	--admin_user="$ADMIN_USERNAME" \
 	--admin_email="$ADMIN_USERNAME" \
@@ -52,7 +57,7 @@ ADMIN_PASSWORD="$(wp user application-password create "$ADMIN_USERNAME" test --p
 
 rm -f /app/test_credentials_plain_permalinks.json
 jo -p \
-	site_url="http://localhost:8081" \
+	site_url="http://localhost" \
 	admin_username="$ADMIN_USERNAME" \
 	admin_password="$ADMIN_PASSWORD" \
 	> /app/test_credentials_plain_permalinks.json
