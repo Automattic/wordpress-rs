@@ -44,6 +44,7 @@ native/swift/Sources/wordpress-api-wrapper/*.swift
 .wordpress
 test_credentials
 test_credentials.json
+test_credentials_plain_permalinks.json
 /logs
 dump.sql
 

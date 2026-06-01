@@ -1,0 +1,36 @@
+services:
+    wordpress:
+        build:
+            context: .
+            dockerfile: wordpress.Dockerfile
+            args:
+                WORDPRESS_VERSION: ${WORDPRESS_VERSION:-6.8.1}
+        container_name: 'wordpress-plain-permalinks'
+        ports:
+            - '8081:80'
+        volumes:
+            - ./:/app
+        environment:
+            WORDPRESS_DB_HOST: database
+            WORDPRESS_DB_USER: wordpress
+            WORDPRESS_DB_PASSWORD: wordpress
+            WORDPRESS_DB_NAME: wordpress
+            WORDPRESS_CONFIG_EXTRA: |
+                # Allow application passwords to be used without HTTPS
+                define( 'WP_ENVIRONMENT_TYPE', 'local' );
+
+                # Disable auto-update – it makes Dockerized tests super unstable
+                define( 'WP_AUTO_UPDATE_CORE', false );
+        healthcheck:
+            test: ["CMD", "bash" ,"-c", "[ -f /var/www/html/wp-config.php ]"]
+            interval: 4s
+            timeout: 1s
+            retries: 30
+
+    database:
+        image: 'public.ecr.aws/docker/library/mariadb:11.2'
+        environment:
+            MYSQL_DATABASE: 'wordpress'
+            MYSQL_USER: 'wordpress'
+            MYSQL_PASSWORD: 'wordpress'
+            MYSQL_RANDOM_ROOT_PASSWORD: true

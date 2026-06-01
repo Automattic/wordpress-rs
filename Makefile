@@ -246,6 +246,17 @@ stop-server:
 	@# Help: Stop the running server.
 	docker-compose down
 
+plain-permalinks-compose := docker-compose -f docker-compose.plain-permalinks.yml -p wordpress-rs-plain-permalinks
+
+start-plain-permalinks-test-server: stop-plain-permalinks-test-server
+	@# Help: Start the dedicated WordPress instance used by the plain-permalinks integration test (on :8081).
+	$(plain-permalinks-compose) up -d --build
+	$(plain-permalinks-compose) exec -T wordpress /bin/bash < ./scripts/setup-plain-permalinks-test-site.sh
+
+stop-plain-permalinks-test-server:
+	@# Help: Stop the plain-permalinks WordPress instance.
+	$(plain-permalinks-compose) down
+
 lint: lint-rust lint-swift
 	@# Help: Run the linter for all languages.
 
