@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Internal:** Route Dependabot Ruby dependency reviews through `CODEOWNERS` instead of the retired `reviewers` key.
+
 ### Fixed
 
 - Fixed a typo in a public doc comment (`maintainance` → `maintenance`)
