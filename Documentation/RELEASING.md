@@ -1,6 +1,6 @@
 # Releasing wordpress-rs
 
-A release is triggered manually after a version bump PR is merged to `trunk`.
+A release is published automatically when a version bump PR is merged to `trunk`.
 
 ## Steps
 
@@ -11,11 +11,21 @@ A release is triggered manually after a version bump PR is merged to `trunk`.
    - Add a fresh empty `## [Unreleased]` section above the new version.
    - Apply the `Release` GitHub label.
    - PR title: `Release X.Y.Z`.
+2. **Review and merge** the PR. The `trunk` build detects the new version and
+   publishes the release automatically.
 
-2. **Review and merge** the PR.
+## Requirements
 
-3. **Trigger the release** from the [Buildkite pipeline page][bk]: click
-   **New Build**, leave the branch as `trunk`, and add an env var
-   `NEW_VERSION=X.Y.Z` matching the version header you just added.
+The release is detected from the version bump commit, so:
+
+- PRs must be **squash-merged** to `trunk`.
+- The header must be exactly `## [X.Y.Z] - YYYY-MM-DD`, with `## [Unreleased]`
+  kept above it.
+
+## Manual release
+
+To re-run or force a release (for example after a failed publish), start a
+[Buildkite][bk] build with **New Build**, branch `trunk`, and an env var
+`NEW_VERSION=X.Y.Z`.
 
 [bk]: https://buildkite.com/automattic/wordpress-rs

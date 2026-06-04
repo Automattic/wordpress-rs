@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed a typo in a public doc comment (`maintainance` → `maintenance`)
 
+### Changed
+
+- Publish releases automatically on version-bump in the changelog file
+
 ## [0.4.0] - 2026-05-29
 
 ### Added
