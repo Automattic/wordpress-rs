@@ -26,6 +26,19 @@ uniffi::custom_newtype!(PurchaseId, u64);
 #[serde(transparent)]
 pub struct PurchaseId(pub u64);
 
+/// Whether a cart product is a new purchase or a renewal.
+///
+/// The backend only uses `"renewal"` as a value; `null` means a new
+/// purchase. Modelled as an enum with an `Other` fallback.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum PurchaseType {
+    Renewal,
+    /// A purchase type not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
 /// Identifies whose cart this is: a specific site or no site.
 ///
 /// Used both as a URL path segment (`/me/shopping-cart/<cart_key>`)
@@ -238,7 +251,7 @@ pub struct ShoppingCartProductExtra {
     pub purchase_id: Option<PurchaseId>,
     #[serde(default, rename = "purchaseType")]
     #[uniffi(default = None)]
-    pub purchase_type: Option<String>,
+    pub purchase_type: Option<PurchaseType>,
     /// Domain registration details, present only for domain registration
     /// products (e.g. `domain_reg`). Absent for plans and `domain_map`.
     #[serde(flatten)]
