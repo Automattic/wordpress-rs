@@ -56,6 +56,16 @@ else
   fi
 fi
 
+# Both trigger paths feed $version into a tag and a release command, so reject
+# anything that is not a semver (e.g. a typo'd NEW_VERSION) before it reaches
+# them. The auto path's extraction already enforces this shape, but a manual
+# NEW_VERSION is taken verbatim, so validate here to cover both. Pattern is
+# X.Y.Z with an optional pre-release/build suffix.
+if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([0-9A-Za-z.+-]*)$ ]]; then
+  echo "Version '$version' is not a valid semantic version; aborting." >&2
+  exit 1
+fi
+
 # shared-pipeline-vars defines CI_TOOLKIT (and IMAGE_ID) for interpolation below;
 # it is also sourced before the top-level pipeline upload.
 # shellcheck source=.buildkite/shared-pipeline-vars
