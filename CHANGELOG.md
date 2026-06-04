@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `WpDeriveParsedValue` proc macro that generates `{Enum}Value` wrapper types for enums with fallback variants. The generated type is a `uniffi::Object` that pairs a parsed `Option<Enum>` with the raw API string, ensuring forward-compatible comparisons when new enum variants are added.
+
+### Changed
+
+- **BREAKING:** `PostStatus` fields in response and params types (`SparseAnyPost.status`, `PostCreateParams.status`, `PostUpdateParams.status`, `MediaCreateParams.status`, `MediaUpdateParams.status`) are now `Arc<PostStatusValue>` instead of `PostStatus`. Use `PostStatusValue.newFromRaw(string)` or `PostStatusValue.newFromValue(variant)` to construct, and `parsed()`, `raw()`, `matches()`, `matchesRaw()`, `matchesAny()` to inspect and compare values.
+
 ## [0.4.0] - 2026-05-29
 
 ### Added
