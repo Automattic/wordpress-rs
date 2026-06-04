@@ -405,7 +405,7 @@ async fn test_delete_permanently_removes_from_collection() {
         .trash_post(&PostEndpointType::Posts, &created.id)
         .await
         .expect("trash_post should succeed");
-    assert!(trashed.status.is_code(PostStatus::Trash));
+    assert!(trashed.status.matches(PostStatus::Trash));
 
     // Build a trash collection
     let filter = PostListFilter {
@@ -486,7 +486,7 @@ async fn test_load_posts_by_ids_includes_trashed_post() {
         .trash_post(&PostEndpointType::Posts, &created.id)
         .await
         .expect("trash_post should succeed");
-    assert!(trashed.status.is_code(PostStatus::Trash));
+    assert!(trashed.status.matches(PostStatus::Trash));
 
     let result = ctx
         .service
@@ -505,7 +505,7 @@ async fn test_load_posts_by_ids_includes_trashed_post() {
         .expect("read_posts_by_ids_from_db should succeed");
     assert_eq!(cached_posts.len(), 1, "should have 1 cached post");
     assert!(
-        cached_posts[0].data.status.is_code(PostStatus::Trash),
+        cached_posts[0].data.status.matches(PostStatus::Trash),
         "cached post should have Trash status"
     );
 
@@ -585,11 +585,11 @@ async fn test_load_posts_by_ids_includes_mixed_status_posts() {
         .expect("trashed post should be in cache");
 
     assert!(
-        draft_post.data.status.is_code(PostStatus::Draft),
+        draft_post.data.status.matches(PostStatus::Draft),
         "draft post should have Draft status"
     );
     assert!(
-        trashed_post.data.status.is_code(PostStatus::Trash),
+        trashed_post.data.status.matches(PostStatus::Trash),
         "trashed post should have Trash status"
     );
 

@@ -142,7 +142,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             }
 
             /// The parsed enum variant, or `None` if the raw string is unknown.
-            pub fn value(&self) -> Option<#enum_name> {
+            pub fn parsed(&self) -> Option<#enum_name> {
                 self.inner_value.clone()
             }
 
@@ -152,18 +152,18 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             }
 
             /// Check if this matches a known enum variant.
-            pub fn is_code(&self, code: #enum_name) -> bool {
-                self.inner_raw == Self::new_from_value(code).inner_raw
+            pub fn matches(&self, variant: #enum_name) -> bool {
+                self.inner_raw == Self::new_from_value(variant).inner_raw
             }
 
             /// Check if the raw string matches.
-            pub fn is_raw(&self, raw: String) -> bool {
+            pub fn matches_raw(&self, raw: String) -> bool {
                 self.inner_raw == raw
             }
 
             /// Check if this matches any of the given enum variants.
-            pub fn is_any_code(&self, codes: Vec<#enum_name>) -> bool {
-                codes.into_iter().any(|c| self.is_code(c))
+            pub fn matches_any(&self, variants: Vec<#enum_name>) -> bool {
+                variants.into_iter().any(|v| self.matches(v))
             }
         }
 

@@ -386,7 +386,7 @@ async fn update_status_to_future() {
             ..Default::default()
         },
         |updated_page, updated_page_from_wp_cli| {
-            assert!(updated_page.status.is_code(PostStatus::Future));
+            assert!(updated_page.status.matches(PostStatus::Future));
             assert_eq!(
                 updated_page_from_wp_cli.post_status,
                 PostStatus::Future.to_string()
@@ -468,7 +468,7 @@ mod macro_helper {
                             ..Default::default()
                         },
                         |updated_page, updated_page_from_wp_cli| {
-                            assert!(updated_page.status.is_code(PostStatus::$status));
+                            assert!(updated_page.status.matches(PostStatus::$status));
                             assert_eq!(
                                 updated_page_from_wp_cli.post_status,
                                 PostStatus::$status.to_string()
