@@ -1,4 +1,5 @@
 use crate::{
+    date::WpGmtDateTime,
     decimal2::Decimal2,
     wp_com::{
         CurrencyCode, WpComSiteId, domains::DomainName, products::ProductId,
@@ -207,10 +208,10 @@ pub struct ShoppingCartProduct {
     pub stored_details_id: Option<String>,
     #[serde(default)]
     #[uniffi(default = None)]
-    pub subscription_current_expiry_date: Option<String>,
+    pub subscription_current_expiry_date: Option<WpGmtDateTime>,
     #[serde(default)]
     #[uniffi(default = None)]
-    pub subscription_post_purchase_expiry_date: Option<String>,
+    pub subscription_post_purchase_expiry_date: Option<WpGmtDateTime>,
 }
 
 /// Extra fields on a shopping cart product in the response.
