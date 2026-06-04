@@ -154,6 +154,18 @@ pub fn wp_com_client() -> WpComApiClient {
     })
 }
 
+pub fn wp_com_client_with_invalid_token() -> WpComApiClient {
+    WpComApiClient::new(WpApiClientDelegate {
+        auth_provider: WpAuthenticationProvider::static_with_auth(WpAuthentication::Bearer {
+            token: "invalid_token".to_string(),
+        })
+        .into(),
+        request_executor: Arc::new(ReqwestRequestExecutor::default()),
+        middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+        app_notifier: Arc::new(EmptyAppNotifier),
+    })
+}
+
 pub fn api_client_backed_by_wp_com(site_id: String) -> WpApiClient {
     WpApiClient::new(
         Arc::new(WpComDotOrgApiUrlResolver::new(
