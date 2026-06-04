@@ -1,7 +1,8 @@
 use macro_helper::generate_update_test;
+use std::sync::Arc;
 use wp_api::{
     media::{MediaCreateParams, MediaUpdateParams},
-    posts::{PostCommentStatus, PostPingStatus, PostStatus},
+    posts::{PostCommentStatus, PostPingStatus, PostStatus, PostStatusValue},
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -43,11 +44,31 @@ generate_update_test!(
 
 generate_update_test!(update_slug, slug, "new_slug".to_string());
 
-generate_update_test!(update_status_to_draft, status, PostStatus::Draft);
-generate_update_test!(update_status_to_future, status, PostStatus::Future);
-generate_update_test!(update_status_to_pending, status, PostStatus::Pending);
-generate_update_test!(update_status_to_private, status, PostStatus::Private);
-generate_update_test!(update_status_to_publish, status, PostStatus::Publish);
+generate_update_test!(
+    update_status_to_draft,
+    status,
+    Arc::new(PostStatusValue::from(PostStatus::Draft))
+);
+generate_update_test!(
+    update_status_to_future,
+    status,
+    Arc::new(PostStatusValue::from(PostStatus::Future))
+);
+generate_update_test!(
+    update_status_to_pending,
+    status,
+    Arc::new(PostStatusValue::from(PostStatus::Pending))
+);
+generate_update_test!(
+    update_status_to_private,
+    status,
+    Arc::new(PostStatusValue::from(PostStatus::Private))
+);
+generate_update_test!(
+    update_status_to_publish,
+    status,
+    Arc::new(PostStatusValue::from(PostStatus::Publish))
+);
 
 generate_update_test!(update_title, title, "new_title".to_string());
 

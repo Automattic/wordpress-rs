@@ -1396,9 +1396,12 @@ mod tests {
             )
             .unwrap();
         assert_eq!(published.len(), 1);
-        assert_eq!(
-            published[0].data.post.status,
-            wp_api::posts::PostStatus::Publish
+        assert!(
+            published[0]
+                .data
+                .post
+                .status
+                .is_code(wp_api::posts::PostStatus::Publish)
         );
 
         // Filter by draft status
@@ -1411,7 +1414,13 @@ mod tests {
             )
             .unwrap();
         assert_eq!(drafts.len(), 1);
-        assert_eq!(drafts[0].data.post.status, wp_api::posts::PostStatus::Draft);
+        assert!(
+            drafts[0]
+                .data
+                .post
+                .status
+                .is_code(wp_api::posts::PostStatus::Draft)
+        );
 
         // No filter - returns all
         let all = test_ctx
@@ -1625,7 +1634,7 @@ mod tests {
             .expect("Post should exist after insert");
         assert_eq!(retrieved.data.row_id, entity_id.rowid);
         assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
-        assert_eq!(retrieved.data.post.status, PostStatus::Draft);
+        assert!(retrieved.data.post.status.is_code(PostStatus::Draft));
     }
 
     #[rstest]
@@ -1663,7 +1672,7 @@ mod tests {
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
             .expect("Failed to select post by post_id")
             .expect("Post should exist after update");
-        assert_eq!(retrieved.data.post.status, PostStatus::Publish);
+        assert!(retrieved.data.post.status.is_code(PostStatus::Publish));
         assert_eq!(retrieved.data.post.slug, "updated-slug");
 
         // Verify only one post exists with this ID

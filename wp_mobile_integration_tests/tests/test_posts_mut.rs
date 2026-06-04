@@ -1,5 +1,6 @@
+use std::sync::Arc;
 use wp_api::posts::{
-    PostCreateParams, PostId, PostStatus, PostUpdateParams, WpApiParamPostsOrderBy,
+    PostCreateParams, PostId, PostStatus, PostStatusValue, PostUpdateParams, WpApiParamPostsOrderBy,
 };
 use wp_api::prelude::*;
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
@@ -44,7 +45,7 @@ async fn test_load_next_page_with_duplicate_items_all_fresh() {
         let params = PostCreateParams {
             title: Some(format!("Test Post {}", i)),
             date: Some(format!("{}{:02}T12:00:00", base_date, i)),
-            status: Some(PostStatus::Future),
+            status: Some(Arc::new(PostStatusValue::from(PostStatus::Future))),
             ..Default::default()
         };
         ctx.api
@@ -79,7 +80,7 @@ async fn test_load_next_page_with_duplicate_items_all_fresh() {
     let new_post_params = PostCreateParams {
         title: Some("New Post That Pushes One to Page 2".to_string()),
         date: Some(new_post_date),
-        status: Some(PostStatus::Future),
+        status: Some(Arc::new(PostStatusValue::from(PostStatus::Future))),
         ..Default::default()
     };
     ctx.api
@@ -157,7 +158,7 @@ async fn test_publish_draft_in_first_page_updates_collection() {
             &PostEndpointType::Posts,
             &PostId(published_id),
             &PostUpdateParams {
-                status: Some(PostStatus::Publish),
+                status: Some(Arc::new(PostStatusValue::from(PostStatus::Publish))),
                 ..Default::default()
             },
         )
@@ -228,7 +229,7 @@ async fn test_publish_draft_in_second_page_updates_collection() {
             &PostEndpointType::Posts,
             &PostId(published_id),
             &PostUpdateParams {
-                status: Some(PostStatus::Publish),
+                status: Some(Arc::new(PostStatusValue::from(PostStatus::Publish))),
                 ..Default::default()
             },
         )
@@ -288,7 +289,7 @@ async fn test_create_draft_inserts_into_draft_collection() {
             &PostEndpointType::Posts,
             &PostCreateParams {
                 title: Some("Integration Test Draft".to_string()),
-                status: Some(PostStatus::Draft),
+                status: Some(Arc::new(PostStatusValue::from(PostStatus::Draft))),
                 ..Default::default()
             },
         )
@@ -391,7 +392,7 @@ async fn test_delete_permanently_removes_from_collection() {
             &PostEndpointType::Posts,
             &PostCreateParams {
                 title: Some("Post To Delete Permanently".to_string()),
-                status: Some(PostStatus::Draft),
+                status: Some(Arc::new(PostStatusValue::from(PostStatus::Draft))),
                 ..Default::default()
             },
         )
@@ -404,7 +405,7 @@ async fn test_delete_permanently_removes_from_collection() {
         .trash_post(&PostEndpointType::Posts, &created.id)
         .await
         .expect("trash_post should succeed");
-    assert_eq!(trashed.status, PostStatus::Trash);
+    assert!(trashed.status.is_code(PostStatus::Trash));
 
     // Build a trash collection
     let filter = PostListFilter {
@@ -472,7 +473,7 @@ async fn test_load_posts_by_ids_includes_trashed_post() {
             &PostEndpointType::Posts,
             &PostCreateParams {
                 title: Some("Post To Trash Then Load By ID".to_string()),
-                status: Some(PostStatus::Draft),
+                status: Some(Arc::new(PostStatusValue::from(PostStatus::Draft))),
                 ..Default::default()
             },
         )
@@ -485,7 +486,7 @@ async fn test_load_posts_by_ids_includes_trashed_post() {
         .trash_post(&PostEndpointType::Posts, &created.id)
         .await
         .expect("trash_post should succeed");
-    assert_eq!(trashed.status, PostStatus::Trash);
+    assert!(trashed.status.is_code(PostStatus::Trash));
 
     let result = ctx
         .service
@@ -503,9 +504,8 @@ async fn test_load_posts_by_ids_includes_trashed_post() {
         .read_posts_by_ids_from_db(&[created.id.0])
         .expect("read_posts_by_ids_from_db should succeed");
     assert_eq!(cached_posts.len(), 1, "should have 1 cached post");
-    assert_eq!(
-        cached_posts[0].data.status,
-        PostStatus::Trash,
+    assert!(
+        cached_posts[0].data.status.is_code(PostStatus::Trash),
         "cached post should have Trash status"
     );
 
@@ -531,7 +531,7 @@ async fn test_load_posts_by_ids_includes_mixed_status_posts() {
             &PostEndpointType::Posts,
             &PostCreateParams {
                 title: Some("Draft Post For Mixed Status Test".to_string()),
-                status: Some(PostStatus::Draft),
+                status: Some(Arc::new(PostStatusValue::from(PostStatus::Draft))),
                 ..Default::default()
             },
         )
@@ -545,7 +545,7 @@ async fn test_load_posts_by_ids_includes_mixed_status_posts() {
             &PostEndpointType::Posts,
             &PostCreateParams {
                 title: Some("Post To Trash For Mixed Status Test".to_string()),
-                status: Some(PostStatus::Draft),
+                status: Some(Arc::new(PostStatusValue::from(PostStatus::Draft))),
                 ..Default::default()
             },
         )
@@ -584,14 +584,12 @@ async fn test_load_posts_by_ids_includes_mixed_status_posts() {
         .find(|p| p.data.id == to_trash.id)
         .expect("trashed post should be in cache");
 
-    assert_eq!(
-        draft_post.data.status,
-        PostStatus::Draft,
+    assert!(
+        draft_post.data.status.is_code(PostStatus::Draft),
         "draft post should have Draft status"
     );
-    assert_eq!(
-        trashed_post.data.status,
-        PostStatus::Trash,
+    assert!(
+        trashed_post.data.status.is_code(PostStatus::Trash),
         "trashed post should have Trash status"
     );
 

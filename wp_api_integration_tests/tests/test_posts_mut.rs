@@ -2,9 +2,11 @@ use macro_helper::{
     generate_update_post_format_test, generate_update_post_status_test, generate_update_test,
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 use wp_api::posts::{
     AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostFormat,
-    PostListParams, PostMeta, PostPingStatus, PostRetrieveParams, PostStatus, PostUpdateParams,
+    PostListParams, PostMeta, PostPingStatus, PostRetrieveParams, PostStatus, PostStatusValue,
+    PostUpdateParams,
 };
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api::terms::TermId;
@@ -559,13 +561,13 @@ async fn update_tags() {
 async fn update_status_to_future() {
     test_update_post(
         &PostUpdateParams {
-            status: Some(PostStatus::Future),
+            status: Some(Arc::new(PostStatusValue::from(PostStatus::Future))),
             // Publish date has to be in the future
             date: Some("2026-09-09T12:00:00".to_string()),
             ..Default::default()
         },
         |updated_post, updated_post_from_wp_cli| {
-            assert_eq!(updated_post.status, PostStatus::Future);
+            assert!(updated_post.status.is_code(PostStatus::Future));
             assert_eq!(
                 updated_post_from_wp_cli.post_status,
                 PostStatus::Future.to_string()
@@ -652,11 +654,11 @@ mod macro_helper {
                 async fn [<update_post_status_to_ $status:lower>]() {
                     test_update_post(
                         &PostUpdateParams {
-                            status: Some(PostStatus::$status),
+                            status: Some(Arc::new(PostStatusValue::from(PostStatus::$status))),
                             ..Default::default()
                         },
                         |updated_post, updated_post_from_wp_cli| {
-                            assert_eq!(updated_post.status, PostStatus::$status);
+                            assert!(updated_post.status.is_code(PostStatus::$status));
                             assert_eq!(
                                 updated_post_from_wp_cli.post_status,
                                 PostStatus::$status.to_string()
@@ -725,7 +727,7 @@ async fn create_book_with_custom_taxonomy_terms() {
     )]));
     let params = PostCreateParams {
         title: Some("Integration Test Book".to_string()),
-        status: Some(PostStatus::Publish),
+        status: Some(Arc::new(PostStatusValue::from(PostStatus::Publish))),
         additional_fields: Some(additional),
         ..Default::default()
     };
