@@ -2,7 +2,9 @@ use crate::{
     date::WpGmtDateTime,
     decimal2::Decimal2,
     wp_com::{
-        CurrencyCode, WpComSiteId, domains::DomainName, products::ProductId,
+        CurrencyCode, WpComSiteId,
+        domains::DomainName,
+        products::{ProductId, ProductSlug},
         subscribers::SubscriptionId,
     },
 };
@@ -178,7 +180,7 @@ pub struct ShoppingCartProduct {
     pub billing_plan_id: BillingPlanId,
     pub product_name: String,
     pub product_name_en: String,
-    pub product_slug: String,
+    pub product_slug: ProductSlug,
     /// Domain name for domain products, empty string for other products.
     pub meta: String,
     pub cost: Decimal2,
@@ -284,7 +286,7 @@ pub struct ShoppingCartProductVariant {
     pub bill_period_in_months: u32,
     pub currency: CurrencyCode,
     pub product_id: ProductId,
-    pub product_slug: String,
+    pub product_slug: ProductSlug,
     pub volume: u32,
 }
 
@@ -370,7 +372,7 @@ mod tests {
 
         let product = &cart.products[0];
         assert_eq!(product.product_id, ProductId(6));
-        assert_eq!(product.product_slug, "domain_reg");
+        assert_eq!(product.product_slug, ProductSlug("domain_reg".to_string()));
         assert_eq!(product.meta, "fake-test-domain.com");
         assert!(product.is_domain_registration);
         assert!(!product.is_bundled);
@@ -413,7 +415,10 @@ mod tests {
         // Plan product — no domain registration info.
         let plan = &cart.products[0];
         assert_eq!(plan.product_id, ProductId(1009));
-        assert_eq!(plan.product_slug, "personal-bundle");
+        assert_eq!(
+            plan.product_slug,
+            ProductSlug("personal-bundle".to_string())
+        );
         assert!(!plan.is_domain_registration);
         assert!(plan.extra.domain_registration_info.is_none());
         assert_eq!(

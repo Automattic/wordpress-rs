@@ -4,7 +4,10 @@ use crate::{
     impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::{
-        CurrencyCode, WpComSiteId, products::ProductId, segments::SegmentId, sites::WpComSiteSlug,
+        CurrencyCode, WpComSiteId,
+        products::{ProductId, ProductSlug},
+        segments::SegmentId,
+        sites::WpComSiteSlug,
         subscribers::SubscriptionId,
     },
 };
@@ -122,7 +125,7 @@ pub struct PaidDomainSuggestion {
     /// WordPress.com product ID used to purchase this domain.
     pub product_id: ProductId,
     /// WordPress.com product slug used to purchase this domain.
-    pub product_slug: String,
+    pub product_slug: ProductSlug,
     /// Formatted registration cost (e.g. `"$18.00"`).
     pub cost: String,
     /// Formatted renewal cost (e.g. `"$18.00"`).
@@ -287,7 +290,7 @@ pub struct DomainPricing {
     pub product_id: ProductId,
     /// WordPress.com product slug (e.g. `"domain_reg"`,
     /// `"domain_transfer"`).
-    pub product_slug: String,
+    pub product_slug: ProductSlug,
     /// Formatted registration/transfer cost (e.g. `"$18.00"`).
     pub cost: String,
     /// Raw numeric registration/transfer price in `currency_code`.
@@ -819,7 +822,7 @@ mod tests {
         assert_eq!(first.max_reg_years, 10);
         assert!(first.multi_year_reg_allowed);
         assert_eq!(first.product_id, ProductId(6));
-        assert_eq!(first.product_slug, "domain_reg");
+        assert_eq!(first.product_slug, ProductSlug("domain_reg".to_string()));
         assert_eq!(first.cost, "$18.00");
         assert_eq!(first.renew_cost, "$18.00");
         assert_eq!(first.renew_raw_price.hundredths(), 1800);
@@ -1085,7 +1088,7 @@ mod tests {
             .as_ref()
             .expect("available domain should have pricing");
         assert_eq!(pricing.product_id, ProductId(6));
-        assert_eq!(pricing.product_slug, "domain_reg");
+        assert_eq!(pricing.product_slug, ProductSlug("domain_reg".to_string()));
         assert_eq!(pricing.cost, "$18.00");
         assert_eq!(pricing.raw_price, Decimal2::from_hundredths(1800));
         assert_eq!(pricing.currency_code, CurrencyCode("USD".to_string()));
@@ -1134,7 +1137,10 @@ mod tests {
             .as_ref()
             .expect("transferrable domain should have pricing");
         assert_eq!(pricing.product_id, ProductId(1337));
-        assert_eq!(pricing.product_slug, "domain_transfer");
+        assert_eq!(
+            pricing.product_slug,
+            ProductSlug("domain_transfer".to_string())
+        );
         assert_eq!(pricing.cost, "$48.00");
         assert_eq!(pricing.raw_price, Decimal2::from_hundredths(4800));
         // Transferrable domains don't include renewal pricing.
