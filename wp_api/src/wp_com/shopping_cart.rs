@@ -231,21 +231,27 @@ pub struct ShoppingCartProductExtra {
     #[serde(default, rename = "purchaseType")]
     #[uniffi(default = None)]
     pub purchase_type: Option<String>,
-    #[serde(default)]
-    #[uniffi(default = None)]
-    pub registrar: Option<String>,
-    #[serde(default)]
-    #[uniffi(default = None)]
-    pub domain_registration_agreement_url: Option<String>,
-    #[serde(default)]
-    #[uniffi(default = None)]
-    pub privacy_available: Option<bool>,
-    #[serde(default)]
-    #[uniffi(default = None)]
-    pub premium: Option<bool>,
+    /// Domain registration details, present only for domain registration
+    /// products (e.g. `domain_reg`). Absent for plans and `domain_map`.
+    #[serde(flatten)]
+    pub domain_registration_info: Option<DomainRegistrationExtraInfo>,
     #[serde(default)]
     #[uniffi(default = None)]
     pub domain_to_bundle: Option<DomainName>,
+}
+
+/// Domain registration-specific extra fields on a cart product.
+///
+/// Present when the product is a domain registration (`domain_reg`);
+/// absent for plans and domain mappings. The required `registrar` field
+/// acts as the anchor — when it's missing, serde deserializes the whole
+/// group as `None`.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct DomainRegistrationExtraInfo {
+    pub registrar: String,
+    pub domain_registration_agreement_url: String,
+    pub privacy_available: bool,
+    pub premium: bool,
 }
 
 /// A pricing variant for a product in the cart.
@@ -348,7 +354,14 @@ mod tests {
         assert!(product.is_domain_registration);
         assert!(!product.is_bundled);
         assert_eq!(product.extra.privacy, Some(true));
-        assert_eq!(product.extra.registrar.as_deref(), Some("FAKE_REGISTRAR"));
+        let domain_info = product
+            .extra
+            .domain_registration_info
+            .as_ref()
+            .expect("domain_reg product should have domain_registration_info");
+        assert_eq!(domain_info.registrar, "FAKE_REGISTRAR");
+        assert!(domain_info.privacy_available);
+        assert!(!domain_info.premium);
     }
 
     #[test]
@@ -376,11 +389,12 @@ mod tests {
             Some("fake-plan-domain.com")
         );
 
-        // Plan product.
+        // Plan product — no domain registration info.
         let plan = &cart.products[0];
         assert_eq!(plan.product_id, ProductId(1009));
         assert_eq!(plan.product_slug, "personal-bundle");
         assert!(!plan.is_domain_registration);
+        assert!(plan.extra.domain_registration_info.is_none());
         assert_eq!(
             plan.extra.domain_to_bundle.as_ref().map(|d| d.0.as_str()),
             Some("fake-plan-domain.com")
