@@ -5,7 +5,6 @@ use wp_contextual::WpContextual;
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 #[serde(transparent)]
 pub struct SparsePostStatusesResponse {
-    #[serde(flatten)]
     #[WpContext(edit, embed, view)]
     #[WpContextualField]
     pub post_statuses: Option<HashMap<PostStatusSlug, SparsePostStatus>>,

@@ -1,0 +1,47 @@
+[
+  {
+    "id": 101,
+    "slug": "unicorn-ranch",
+    "mobile": true,
+    "segment_type_title": "Unicorn Ranch",
+    "segment_type_subtitle": "Manage your mythical creature farm online.",
+    "icon_URL": "https://example.invalid/icons/ic_unicorn.png",
+    "icon_color": "#ff00ff"
+  },
+  {
+    "id": 102,
+    "slug": "time-travel-agency",
+    "mobile": true,
+    "segment_type_title": "Time Travel Agency",
+    "segment_type_subtitle": "Book trips to the past and future.",
+    "icon_URL": "https://example.invalid/icons/ic_time_travel.png",
+    "icon_color": "#00ff00"
+  },
+  {
+    "id": 103,
+    "slug": "cloud-bakery",
+    "mobile": false,
+    "segment_type_title": "Cloud Bakery",
+    "segment_type_subtitle": "Sell pastries made from actual clouds.",
+    "icon_URL": "https://example.invalid/icons/ic_cloud_bakery.png",
+    "icon_color": "#0000ff"
+  },
+  {
+    "id": 104,
+    "slug": "dragon-daycare",
+    "mobile": true,
+    "segment_type_title": "Dragon Daycare",
+    "segment_type_subtitle": "Professional dragon sitting services.",
+    "icon_URL": "https://example.invalid/icons/ic_dragon.png",
+    "icon_color": "#ff0000"
+  },
+  {
+    "id": 105,
+    "slug": "blank-scroll",
+    "mobile": true,
+    "segment_type_title": "Blank Scroll",
+    "segment_type_subtitle": "Start with an empty enchanted scroll.",
+    "icon_URL": "https://example.invalid/icons/ic_scroll.png",
+    "icon_color": "#abcdef"
+  }
+]

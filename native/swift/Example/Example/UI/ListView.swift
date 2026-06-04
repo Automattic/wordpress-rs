@@ -17,11 +17,15 @@ struct ListView: View {
             error: viewModel.error,
             actions: { error in // 2
                 if let suggestion = error.recoverySuggestion {
-                    Button(suggestion, action: {
-                        // Recover from an error
-                    })
+                    Button(
+                        suggestion,
+                        action: {
+                            // Recover from an error
+                        }
+                    )
                 }
-            }, message: { error in // 3
+            },
+            message: { error in // 3
                 if let failureReason = error.failureReason {
                     Text(failureReason)
                 } else {

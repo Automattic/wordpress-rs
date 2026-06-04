@@ -19,7 +19,7 @@ extension WpNetworkResponse {
 
         self = WpNetworkResponse(
             body: data,
-            statusCode: UInt16(response.statusCode),
+            statusCode: UInt32(response.statusCode),
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders),
             requestUrl: request.url(),
             requestMethod: request.method(),
@@ -37,8 +37,11 @@ extension MiddlewarePipeline {
 extension WpApiError {
     public var isCancellationError: Bool {
         if case .RequestExecutionFailed(
-            statusCode: _, redirects: _, reason: .cancellationError,
-            requestUrl: _, requestMethod: _
+            statusCode: _,
+            redirects: _,
+            reason: .cancellationError,
+            requestUrl: _,
+            requestMethod: _
         ) = self {
             return true
         }
@@ -112,7 +115,7 @@ extension UserCapability: ExpressibleByStringLiteral {
 }
 
 public extension PostType {
-    init (_ type: String) {
+    init(_ type: String) {
         self = postTypeFromString(value: type)
     }
 

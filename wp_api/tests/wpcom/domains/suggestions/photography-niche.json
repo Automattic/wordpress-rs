@@ -1,0 +1,98 @@
+[
+  {
+    "domain_name": "traveljournalism.blog",
+    "relevance": 0.99,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 76,
+    "product_slug": "dotblog_domain",
+    "cost": "$20.00",
+    "renew_cost": "$20.00",
+    "renew_raw_price": 20,
+    "raw_price": 20,
+    "currency_code": "USD",
+    "sale_cost": 2.0
+  },
+  {
+    "domain_name": "newcooking.art",
+    "relevance": 0.8,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-similar"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 355,
+    "product_slug": "dotart_domain",
+    "cost": "$33.00",
+    "renew_cost": "$33.00",
+    "renew_raw_price": 33,
+    "raw_price": 33,
+    "currency_code": "USD",
+    "sale_cost": 1.64
+  },
+  {
+    "domain_name": "newcooking.org",
+    "relevance": 0.4,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 5126,
+    "product_slug": "dotorg_domain",
+    "cost": "$11.00",
+    "renew_cost": "$11.00",
+    "renew_raw_price": 11,
+    "raw_price": 11,
+    "currency_code": "USD",
+    "sale_cost": 8.63
+  },
+  {
+    "domain_name": "cooking.design",
+    "relevance": 0.4,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "exact-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 358,
+    "product_slug": "dotdesign_domain",
+    "cost": "$65.00",
+    "renew_cost": "$65.00",
+    "renew_raw_price": 65,
+    "raw_price": 65,
+    "currency_code": "USD",
+    "sale_cost": 16.36
+  },
+  {
+    "domain_name": "cookeries.club",
+    "relevance": 0.4,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common",
+      "tld-similar"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 80,
+    "product_slug": "dotclub_domain",
+    "cost": "$24.00",
+    "renew_cost": "$24.00",
+    "renew_raw_price": 24,
+    "raw_price": 24,
+    "currency_code": "USD",
+    "sale_cost": 7.25
+  }
+]

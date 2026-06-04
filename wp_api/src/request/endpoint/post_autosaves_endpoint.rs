@@ -16,7 +16,7 @@ enum AutosavesRequest {
 }
 
 impl DerivedRequest for AutosavesRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

@@ -43,7 +43,7 @@ pub fn unit_test_example_date_as_query_value(key: &str) -> String {
 }
 
 #[cfg(test)]
-pub fn wp_network_response_from_json(json: &str, status_code: u16) -> WpNetworkResponse {
+pub fn wp_network_response_from_json(json: &str, status_code: u32) -> WpNetworkResponse {
     WpNetworkResponse {
         body: json.into(),
         status_code,

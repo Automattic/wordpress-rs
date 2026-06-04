@@ -19,8 +19,20 @@ updates:
     directory: "native/kotlin" # Location of package manifests
     schedule:
       interval: "weekly"
+    groups:
+      kotlin-ecosystem:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.compose"
+          - "io.insert-koin:*"
 
   - package-ecosystem: "bundler"
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+    groups:
+      ruby-minor-and-patch:
+        update-types: [minor, patch]
+    reviewers:
+      - "Automattic/apps-infra-tooling"
+    open-pull-requests-limit: 5

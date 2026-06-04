@@ -42,8 +42,8 @@ impl MetadataFetchResult {
     }
 
     /// Returns the number of items in this page.
-    pub fn page_count(&self) -> usize {
-        self.metadata.len()
+    pub fn page_count(&self) -> u32 {
+        self.metadata.len() as u32
     }
 }
 

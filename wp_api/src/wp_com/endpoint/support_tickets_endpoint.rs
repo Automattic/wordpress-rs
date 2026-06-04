@@ -23,7 +23,7 @@ enum SupportTicketsRequest {
 }
 
 impl DerivedRequest for SupportTicketsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::V2
     }
 }

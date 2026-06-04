@@ -27,7 +27,7 @@ enum Oauth2Request {
 }
 
 impl DerivedRequest for Oauth2Request {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::Oauth2
     }
 }

@@ -60,7 +60,6 @@ impl PostTypeDetailsWithEditContext {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 #[serde(transparent)]
 pub struct SparsePostTypesResponse {
-    #[serde(flatten)]
     #[WpContext(edit, embed, view)]
     #[WpContextualField]
     pub post_types: Option<HashMap<PostType, SparsePostTypeDetails>>,
@@ -103,8 +102,6 @@ pub struct SparsePostTypeDetails {
 #[serde(transparent)]
 pub struct PostTypeSupportsMap {
     #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
-    #[serde(flatten)]
-    #[serde(rename = "supports")]
     pub map: HashMap<PostTypeSupports, JsonValue>,
 }
 
@@ -223,5 +220,15 @@ mod test {
         let parsed: PostTypesResponseWithEditContext =
             serde_json::from_str(data).expect("Failed to parse post types response");
         assert_eq!(parsed.post_types.len(), 2);
+    }
+
+    #[test]
+    fn test_post_type_supports_map_from_empty_array() {
+        // WordPress returns `[]` instead of `{}` when a post type has no
+        // supported features (e.g. `register_post_type('foo', ['supports' => false])`).
+        let json = r#"[]"#;
+        let supports: PostTypeSupportsMap =
+            serde_json::from_str(json).expect("Should handle empty array from WordPress API");
+        assert!(supports.map.is_empty());
     }
 }

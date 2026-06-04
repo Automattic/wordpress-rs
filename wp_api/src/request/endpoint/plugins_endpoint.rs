@@ -18,7 +18,7 @@ enum PluginsRequest {
 }
 
 impl DerivedRequest for PluginsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

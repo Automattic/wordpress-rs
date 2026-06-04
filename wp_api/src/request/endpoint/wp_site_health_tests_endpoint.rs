@@ -27,7 +27,7 @@ enum WpSiteHealthTestsRequest {
 }
 
 impl DerivedRequest for WpSiteHealthTestsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpSiteHealthV1
     }
 }

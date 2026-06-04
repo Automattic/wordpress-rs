@@ -47,7 +47,7 @@ impl DerivedRequest for PostsRequest {
         }
     }
 
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

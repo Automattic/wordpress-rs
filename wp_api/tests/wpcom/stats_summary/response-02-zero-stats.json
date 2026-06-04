@@ -1,0 +1,34 @@
+{
+    "date": "2026-03-10",
+    "stats": {
+        "visitors_today": 0,
+        "visitors_yesterday": 0,
+        "visitors": 0,
+        "views_today": 0,
+        "views_yesterday": 0,
+        "views_best_day": "",
+        "views_best_day_total": 0,
+        "views": 0,
+        "comments": 0,
+        "posts": 0,
+        "followers_blog": 0,
+        "followers_comments": 0,
+        "comments_per_month": 0,
+        "comments_most_active_recent_day": "",
+        "comments_most_active_time": "N/A",
+        "comments_spam": 0,
+        "categories": 0,
+        "tags": 0,
+        "shares": 0
+    },
+    "visits": {
+        "date": "2026-03-10",
+        "unit": "day",
+        "fields": [
+            "period",
+            "views",
+            "visitors"
+        ],
+        "data": []
+    }
+}

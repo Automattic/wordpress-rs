@@ -1,6 +1,7 @@
 import Foundation
-@testable import WordPressAPI
 import Testing
+import WordPressApiCache
+@testable import WordPressAPI
 
 @Suite(.serialized)
 struct MediaTests {
@@ -34,7 +35,7 @@ struct MediaTests {
         try await restoreTestServer()
     }
 
-#if os(macOS)
+    #if os(macOS)
     @Test
     func uploadProgress() async throws {
         let progress = Progress.discreteProgress(totalUnitCount: 100)
@@ -52,12 +53,34 @@ struct MediaTests {
     }
 
     @Test
+    func uploadProgressWithService() async throws {
+        let cache = try WordPressApiCache()
+        _ = try cache.performMigrations()
+        let service = try api.createService(cache: cache)
+
+        let progress = Progress.discreteProgress(totalUnitCount: 100)
+        #expect(progress.fractionCompleted == 0)
+
+        let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
+        let response = try await service.uploadMedia(
+            params: .init(filePath: file.path),
+            fulfilling: progress
+        )
+        #expect(response.mimeType == "image/jpeg")
+        #expect(progress.fractionCompleted == 1)
+
+        try await restoreTestServer()
+    }
+
+    @Test
     func cancelProgress() async throws {
         let progress = Progress.discreteProgress(totalUnitCount: 100)
         #expect(progress.fractionCompleted == 0)
 
         let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
-        let error = await #expect(throws: WpApiError.self, performing: {
+        let error = await #expect(
+            throws: WpApiError.self,
+            performing: {
                 let task = Task {
                     _ = try await api.uploadMedia(
                         params: .init(filePath: file.path),
@@ -66,9 +89,10 @@ struct MediaTests {
                     Issue.record("The creating post function should throw")
                 }
 
-                let cancellable = progress.publisher(for: \.fractionCompleted).first { $0 > 0 }.sink { _ in
-                    progress.cancel()
-                }
+                let cancellable = progress.publisher(for: \.fractionCompleted).first { $0 > 0 }
+                    .sink { _ in
+                        progress.cancel()
+                    }
                 defer { cancellable.cancel() }
 
                 try await task.value
@@ -84,7 +108,9 @@ struct MediaTests {
         let progress = Progress.discreteProgress(totalUnitCount: 100)
         #expect(progress.fractionCompleted == 0)
         let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
-        let error = await #expect(throws: WpApiError.self, performing: {
+        let error = await #expect(
+            throws: WpApiError.self,
+            performing: {
                 let task = Task {
                     _ = try await api.uploadMedia(
                         params: .init(filePath: file.path),
@@ -93,9 +119,10 @@ struct MediaTests {
                     Issue.record("The creating post function should throw")
                 }
 
-                let cancellable = progress.publisher(for: \.fractionCompleted).first { $0 > 0 }.sink { _ in
-                    task.cancel()
-                }
+                let cancellable = progress.publisher(for: \.fractionCompleted).first { $0 > 0 }
+                    .sink { _ in
+                        task.cancel()
+                    }
                 defer { cancellable.cancel() }
 
                 try await task.value
@@ -105,5 +132,5 @@ struct MediaTests {
 
         try await restoreTestServer()
     }
-#endif
+    #endif
 }

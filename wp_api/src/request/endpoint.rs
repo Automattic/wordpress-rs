@@ -5,7 +5,17 @@ use url::Url;
 
 pub mod api_root_endpoint;
 pub mod application_passwords_endpoint;
+pub mod block_autosaves_endpoint;
+pub mod block_directory_endpoint;
+pub mod block_pattern_categories_endpoint;
+pub mod block_patterns_endpoint;
+pub mod block_renderer_endpoint;
+pub mod block_revisions_endpoint;
+pub mod block_types_endpoint;
+pub mod blocks_endpoint;
 pub mod comments_endpoint;
+pub mod global_styles_endpoint;
+pub mod global_styles_revisions_endpoint;
 pub mod media_endpoint;
 pub mod menu_locations_endpoint;
 pub mod nav_menu_item_autosaves_endpoint;
@@ -14,6 +24,7 @@ pub mod nav_menus_endpoint;
 pub mod navigation_autosaves_endpoint;
 pub mod navigation_revisions_endpoint;
 pub mod navigations_endpoint;
+pub mod pattern_directory_endpoint;
 pub mod plugins_endpoint;
 pub mod post_autosaves_endpoint;
 pub mod post_revisions_endpoint;
@@ -21,8 +32,14 @@ pub mod post_statuses_endpoint;
 pub mod post_types_endpoint;
 pub mod posts_endpoint;
 pub mod search_endpoint;
+pub mod sidebars_endpoint;
 pub mod site_settings_endpoint;
 pub mod taxonomies_endpoint;
+pub mod template_autosaves_endpoint;
+pub mod template_part_autosaves_endpoint;
+pub mod template_part_revisions_endpoint;
+pub mod template_parts_endpoint;
+pub mod template_revisions_endpoint;
 pub mod templates_endpoint;
 pub mod terms_endpoint;
 pub mod themes_endpoint;
@@ -90,7 +107,7 @@ pub trait DerivedRequest {
         Vec::new()
     }
 
-    fn namespace() -> impl AsNamespace;
+    fn namespace(&self) -> impl AsNamespace;
 }
 
 pub trait AsNamespace: Send + Sync {
@@ -121,6 +138,11 @@ pub trait ApiUrlResolver: Send + Sync {
     fn can_resolve(&self, namespace: String) -> bool;
 
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl>;
+
+    /// Returns the route key for an endpoint, matching the keys used in
+    /// `WpApiDetails.routes`. Implementations must produce the same path
+    /// structure that `resolve` would produce after the base URL.
+    fn route_path(&self, namespace: String, endpoint_path: String) -> String;
 }
 
 #[derive(Debug, uniffi::Object)]
@@ -153,6 +175,14 @@ impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
                     [namespace].into_iter().chain(endpoint_segments),
                 )
                 .into(),
+        )
+    }
+
+    fn route_path(&self, namespace: String, endpoint_path: String) -> String {
+        format!(
+            "{}/{}",
+            namespace.trim_end_matches('/'),
+            endpoint_path.trim_start_matches('/')
         )
     }
 }

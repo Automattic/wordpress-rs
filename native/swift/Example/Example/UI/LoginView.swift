@@ -31,7 +31,8 @@ struct LoginView: View {
 
             TextField(text: $url) {
                 Text("Website URL")
-            }.onSubmit {
+            }
+            .onSubmit {
                 self.startLogin()
             }
             #if os(iOS)
@@ -42,22 +43,28 @@ struct LoginView: View {
         }
         .padding()
         .toolbar {
-            Button(action: self.startLogin, label: {
-                if isLoggingIn {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .controlSize(.small)
-                        .padding()
-                } else {
-                    Text("Sign In")
-                        .padding(.horizontal)
+            Button(
+                action: self.startLogin,
+                label: {
+                    if isLoggingIn {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .controlSize(.small)
+                            .padding()
+                    } else {
+                        Text("Sign In")
+                            .padding(.horizontal)
+                    }
                 }
-            })
+            )
 
             if loginManager.wpComOAuthConfiguration != nil {
-                Button(action: self.startLoginWithWPCom, label: {
-                    Text("Sign in with WordPress.com")
-                })
+                Button(
+                    action: self.startLoginWithWPCom,
+                    label: {
+                        Text("Sign in with WordPress.com")
+                    }
+                )
             }
         }
     }

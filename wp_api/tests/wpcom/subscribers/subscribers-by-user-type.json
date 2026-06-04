@@ -1,0 +1,42 @@
+{
+    "total": 88,
+    "pages": 9,
+    "page": 1,
+    "per_page": 10,
+    "subscribers": [
+        {
+            "user_id": 33840434,
+            "subscription_id": 792200219,
+            "email_address": "user1@example.com",
+            "date_subscribed": "2024-12-26T10:08:55+00:00",
+            "is_email_subscriber": false,
+            "subscription_status": null,
+            "avatar": "https://0.gravatar.com/avatar/example1",
+            "display_name": "Nik",
+            "url": "https://nikhilc.dev"
+        },
+        {
+            "user_id": 257457202,
+            "subscription_id": 790270118,
+            "email_address": "user2@example.com",
+            "date_subscribed": "2024-12-02T14:34:36+00:00",
+            "is_email_subscriber": false,
+            "subscription_status": null,
+            "avatar": "https://2.gravatar.com/avatar/example2",
+            "display_name": "User Two",
+            "url": "https://example.com"
+        },
+        {
+            "user_id": 179649005,
+            "subscription_id": 786241236,
+            "email_address": "user3@example.com",
+            "date_subscribed": "2024-10-19T10:32:44+00:00",
+            "is_email_subscriber": false,
+            "subscription_status": null,
+            "avatar": "https://0.gravatar.com/avatar/example3",
+            "display_name": "User Three",
+            "url": "https://example.org"
+        }
+    ],
+    "is_owner_subscribed": false
+}

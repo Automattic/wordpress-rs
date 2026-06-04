@@ -66,6 +66,25 @@ public final class WordPressApiCache: Sendable {
     }
     #endif
 
+    /// Remove a self-hosted site and all its cached data from the database.
+    ///
+    /// Returns `true` if the site was found and removed, `false` if no site
+    /// with the given URL exists.
+    @discardableResult
+    public func removeSelfHostedSite(url: URL) throws -> Bool {
+        let parsed = try ParsedUrl.parse(input: url.absoluteString)
+        return try self.cache.removeSelfHostedSite(url: parsed)
+    }
+
+    /// Remove a WordPress.com site and all its cached data from the database.
+    ///
+    /// Returns `true` if the site was found and removed, `false` if no site
+    /// with the given site ID exists.
+    @discardableResult
+    public func removeWordpressComSite(siteId: WpComSiteId) throws -> Bool {
+        try self.cache.removeWordpressComSite(siteId: siteId)
+    }
+
     deinit {
         self.cache.stopListeningForUpdates()
 

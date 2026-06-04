@@ -1,0 +1,29 @@
+{
+  "total": 2,
+  "pages": 1,
+  "page": 1,
+  "per_page": 100,
+  "subscribers": [
+    {
+      "user_id": 123456789,
+      "subscription_id": 900000001,
+      "email_address": "user1@example.com",
+      "date_subscribed": "2025-02-03T09:09:12+00:00",
+      "is_email_subscriber": true,
+      "subscription_status": "Subscribed",
+      "avatar": "https://2.gravatar.com/avatar/placeholder1?s=128",
+      "display_name": "Test User One"
+    },
+    {
+      "user_id": 3251794,
+      "subscription_id": 10660,
+      "email_address": "user2@example.com",
+      "date_subscribed": "-001-11-30T00:00:00+00:00",
+      "is_email_subscriber": false,
+      "subscription_status": null,
+      "avatar": "https://2.gravatar.com/avatar/placeholder2?s=128",
+      "display_name": "User With Invalid Date"
+    }
+  ],
+  "is_owner_subscribed": false
+}

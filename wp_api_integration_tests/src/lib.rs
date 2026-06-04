@@ -40,6 +40,7 @@ pub const CATEGORY_ID_59: TermId = TermId(59);
 pub const TAG_ID_100: TermId = TermId(100);
 pub const TERM_ID_INVALID: TermId = TermId(99999999);
 pub const TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE: &str = "twentytwentyfour//single";
+pub const TEMPLATE_PART_TWENTY_TWENTY_FOUR_HEADER: &str = "twentytwentyfour//header";
 pub const POST_TEMPLATE_SINGLE_WITH_SIDEBAR: &str = "single-with-sidebar";
 pub const PAGE_TEMPLATE_WITH_SIDEBAR: &str = "page-with-sidebar";
 pub const THEME_TWENTY_TWENTY_FIVE: &str = "twentytwentyfive";

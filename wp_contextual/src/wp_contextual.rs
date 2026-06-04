@@ -32,6 +32,15 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
     // Check if PartialEq should be derived
     let should_derive_partial_eq = !has_dont_derive_partial_eq_attr(&ast.attrs);
 
+    // Collect serde struct-level attributes (e.g. #[serde(transparent)]) to propagate
+    // to generated types. Field-level serde attributes are already propagated as
+    // ExternalAttr; struct-level ones need explicit forwarding.
+    let serde_struct_attrs: Vec<&syn::Attribute> = ast
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("serde"))
+        .collect();
+
     let contextual_token_streams = WpContextAttr::iter().map(|current_context| {
         let generate_type = |is_sparse, ident, generated_fields: &Vec<GeneratedContextualField>| {
             if !generated_fields.is_empty() {
@@ -60,6 +69,7 @@ pub fn wp_contextual(ast: DeriveInput) -> Result<TokenStream, syn::Error> {
                 let fields_to_add = generated_fields.iter().map(|f| &f.field);
                 quote! {
                     #[derive(#(#derives),*)]
+                    #(#serde_struct_attrs)*
                     pub struct #ident {
                         #(#fields_to_add,)*
                     }

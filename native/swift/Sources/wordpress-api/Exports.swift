@@ -33,6 +33,7 @@ public typealias UserRole = WordPressAPIInternal.UserRole
 
 // MARK: - Service Layer
 public typealias WpService = WordPressAPIInternal.WpService
+public typealias SiteInfo = WordPressAPIInternal.SiteInfo
 public typealias AnyPostFilter = WordPressAPIInternal.AnyPostFilter
 public typealias WpApiCache = WordPressAPIInternal.WpApiCache
 
@@ -68,7 +69,8 @@ public typealias UsersRequestExecutor = WordPressAPIInternal.UsersRequestExecuto
 
 public typealias UsersRequestListWithEditContextResponse = WordPressAPIInternal.UsersRequestListWithEditContextResponse
 public typealias UsersRequestListWithViewContextResponse = WordPressAPIInternal.UsersRequestListWithViewContextResponse
-public typealias UsersRequestListWithEmbedContextResponse = WordPressAPIInternal.UsersRequestListWithEmbedContextResponse
+public typealias UsersRequestListWithEmbedContextResponse = WordPressAPIInternal
+    .UsersRequestListWithEmbedContextResponse
 
 // MARK: - Plugins
 
@@ -120,9 +122,12 @@ public typealias PostStatusWithViewContext = WordPressAPIInternal.PostStatusWith
 public typealias PostStatusWithEmbedContext = WordPressAPIInternal.PostStatusWithEmbedContext
 public typealias PostStatusesRequestExecutor = WordPressAPIInternal.PostStatusesRequestExecutor
 
-public typealias PostStatusesRequestListWithEditContextResponse = WordPressAPIInternal.PostStatusesRequestListWithEditContextResponse
-public typealias PostStatusesRequestListWithViewContextResponse = WordPressAPIInternal.PostStatusesRequestListWithViewContextResponse
-public typealias PostStatusesRequestListWithEmbedContextResponse = WordPressAPIInternal.PostStatusesRequestListWithEmbedContextResponse
+public typealias PostStatusesRequestListWithEditContextResponse = WordPressAPIInternal
+    .PostStatusesRequestListWithEditContextResponse
+public typealias PostStatusesRequestListWithViewContextResponse = WordPressAPIInternal
+    .PostStatusesRequestListWithViewContextResponse
+public typealias PostStatusesRequestListWithEmbedContextResponse = WordPressAPIInternal
+    .PostStatusesRequestListWithEmbedContextResponse
 
 // MARK: - Posts
 public typealias SparseAnyPost = WordPressAPIInternal.SparseAnyPost
@@ -130,12 +135,14 @@ public typealias AnyPostWithEditContext = WordPressAPIInternal.AnyPostWithEditCo
 public typealias AnyPostWithViewContext = WordPressAPIInternal.AnyPostWithViewContext
 public typealias AnyPostWithEmbedContext = WordPressAPIInternal.AnyPostWithEmbedContext
 public typealias PostListParams = WordPressAPIInternal.PostListParams
+public typealias PostUpdateParams = WordPressAPIInternal.PostUpdateParams
 public typealias PostsRequestExecutor = WordPressAPIInternal.PostsRequestExecutor
 public typealias PostEndpointType = WordPressAPIInternal.PostEndpointType
 
 public typealias PostsRequestListWithEditContextResponse = WordPressAPIInternal.PostsRequestListWithEditContextResponse
 public typealias PostsRequestListWithViewContextResponse = WordPressAPIInternal.PostsRequestListWithViewContextResponse
-public typealias PostsRequestListWithEmbedContextResponse = WordPressAPIInternal.PostsRequestListWithEmbedContextResponse
+public typealias PostsRequestListWithEmbedContextResponse = WordPressAPIInternal
+    .PostsRequestListWithEmbedContextResponse
 
 extension AnyPostWithEditContext: Identifiable {}
 
@@ -147,9 +154,12 @@ public typealias RevisionWithEmbedContext = WordPressAPIInternal.AnyPostRevision
 public typealias RevisionListParams = WordPressAPIInternal.AnyPostRevisionListParams
 public typealias RevisionsRequestExecutor = WordPressAPIInternal.PostRevisionsRequestExecutor
 
-public typealias RevisionsRequestListWithEditContextResponse = WordPressAPIInternal.PostRevisionsRequestListWithEditContextResponse
-public typealias RevisionsRequestListWithViewContextResponse = WordPressAPIInternal.PostRevisionsRequestListWithViewContextResponse
-public typealias RevisionsRequestListWithEmbedContextResponse = WordPressAPIInternal.PostRevisionsRequestListWithEmbedContextResponse
+public typealias RevisionsRequestListWithEditContextResponse = WordPressAPIInternal
+    .PostRevisionsRequestListWithEditContextResponse
+public typealias RevisionsRequestListWithViewContextResponse = WordPressAPIInternal
+    .PostRevisionsRequestListWithViewContextResponse
+public typealias RevisionsRequestListWithEmbedContextResponse = WordPressAPIInternal
+    .PostRevisionsRequestListWithEmbedContextResponse
 
 // MARK: - Media
 public typealias SparseMedia = WordPressAPIInternal.SparseMedia
@@ -163,7 +173,8 @@ public typealias MediaRequestExecutor = WordPressAPIInternal.MediaRequestExecuto
 
 public typealias MediaRequestListWithEditContextResponse = WordPressAPIInternal.MediaRequestListWithEditContextResponse
 public typealias MediaRequestListWithViewContextResponse = WordPressAPIInternal.MediaRequestListWithViewContextResponse
-public typealias MediaRequestListWithEmbedContextResponse = WordPressAPIInternal.MediaRequestListWithEmbedContextResponse
+public typealias MediaRequestListWithEmbedContextResponse = WordPressAPIInternal
+    .MediaRequestListWithEmbedContextResponse
 
 // MARK: - Comments
 public typealias SparseComment = WordPressAPIInternal.SparseComment
@@ -178,9 +189,12 @@ public typealias CommentStatus = WordPressAPIInternal.CommentStatus
 public typealias CommentType = WordPressAPIInternal.CommentType
 public typealias CommentsRequestExecutor = WordPressAPIInternal.CommentsRequestExecutor
 
-public typealias CommentsRequestListWithEditContextResponse = WordPressAPIInternal.CommentsRequestListWithEditContextResponse
-public typealias CommentsRequestListWithViewContextResponse = WordPressAPIInternal.CommentsRequestListWithViewContextResponse
-public typealias CommentsRequestListWithEmbedContextResponse = WordPressAPIInternal.CommentsRequestListWithEmbedContextResponse
+public typealias CommentsRequestListWithEditContextResponse = WordPressAPIInternal
+    .CommentsRequestListWithEditContextResponse
+public typealias CommentsRequestListWithViewContextResponse = WordPressAPIInternal
+    .CommentsRequestListWithViewContextResponse
+public typealias CommentsRequestListWithEmbedContextResponse = WordPressAPIInternal
+    .CommentsRequestListWithEmbedContextResponse
 
 // MARK: - Terms
 public typealias TermId = WordPressAPIInternal.TermId
@@ -196,7 +210,8 @@ public typealias TermEndpointType = WordPressAPIInternal.TermEndpointType
 public typealias TermsRequestExecutor = WordPressAPIInternal.TermsRequestExecutor
 public typealias TermsRequestListWithEditContextResponse = WordPressAPIInternal.TermsRequestListWithEditContextResponse
 public typealias TermsRequestListWithViewContextResponse = WordPressAPIInternal.TermsRequestListWithViewContextResponse
-public typealias TermsRequestListWithEmbedContextResponse = WordPressAPIInternal.TermsRequestListWithEmbedContextResponse
+public typealias TermsRequestListWithEmbedContextResponse = WordPressAPIInternal
+    .TermsRequestListWithEmbedContextResponse
 
 // MARK: - Taxonomies
 public typealias TaxonomyListParams = WordPressAPIInternal.TaxonomyListParams
@@ -234,9 +249,12 @@ public typealias NavMenuItemWithEditContext = WordPressAPIInternal.NavMenuItemWi
 public typealias NavMenuItemWithViewContext = WordPressAPIInternal.NavMenuItemWithViewContext
 public typealias NavMenuItemWithEmbedContext = WordPressAPIInternal.NavMenuItemWithEmbedContext
 public typealias NavMenuItemsRequestExecutor = WordPressAPIInternal.NavMenuItemsRequestExecutor
-public typealias NavMenuItemsRequestListWithEditContextResponse = WordPressAPIInternal.NavMenuItemsRequestListWithEditContextResponse
-public typealias NavMenuItemsRequestListWithViewContextResponse = WordPressAPIInternal.NavMenuItemsRequestListWithViewContextResponse
-public typealias NavMenuItemsRequestListWithEmbedContextResponse = WordPressAPIInternal.NavMenuItemsRequestListWithEmbedContextResponse
+public typealias NavMenuItemsRequestListWithEditContextResponse = WordPressAPIInternal
+    .NavMenuItemsRequestListWithEditContextResponse
+public typealias NavMenuItemsRequestListWithViewContextResponse = WordPressAPIInternal
+    .NavMenuItemsRequestListWithViewContextResponse
+public typealias NavMenuItemsRequestListWithEmbedContextResponse = WordPressAPIInternal
+    .NavMenuItemsRequestListWithEmbedContextResponse
 
 // MARK: Menu Item Autosaves
 public typealias NavMenuItemRevisionCreateParams = WordPressAPIInternal.NavMenuItemRevisionCreateParams
@@ -316,3 +334,30 @@ public typealias EncryptedPassword = WordPressAPIInternal.EncryptedPassword
 public typealias DecryptedPassword = WordPressAPIInternal.DecryptedPassword
 public typealias PasswordTransformer = WordPressAPIInternal.PasswordTransformer
 public typealias PasswordTransformerError = WordPressAPIInternal.PasswordTransformerError
+
+// MARK: - Publicize & Keyring
+
+public typealias PublicizeConnectionResponse = WordPressAPIInternal.PublicizeConnectionResponse
+public typealias PublicizeServiceResponse = WordPressAPIInternal.PublicizeServiceResponse
+public typealias PublicizeServiceSupports = WordPressAPIInternal.PublicizeServiceSupports
+public typealias KeyringConnectionResponse = WordPressAPIInternal.KeyringConnectionResponse
+public typealias KeyringExternalUser = WordPressAPIInternal.KeyringExternalUser
+public typealias PublicizeConnectionId = WordPressAPIInternal.PublicizeConnectionId
+public typealias CreatePublicizeConnectionParams = WordPressAPIInternal.CreatePublicizeConnectionParams
+public typealias UpdatePublicizeConnectionParams = WordPressAPIInternal.UpdatePublicizeConnectionParams
+public typealias PublicizeRequestListConnectionsResponse = WordPressAPIInternal.PublicizeRequestListConnectionsResponse
+public typealias PublicizeRequestListServicesResponse = WordPressAPIInternal.PublicizeRequestListServicesResponse
+public typealias PublicizeRequestCreateConnectionResponse = WordPressAPIInternal
+    .PublicizeRequestCreateConnectionResponse
+public typealias PublicizeRequestUpdateConnectionResponse = WordPressAPIInternal
+    .PublicizeRequestUpdateConnectionResponse
+public typealias PublicizeRequestDeleteConnectionResponse = WordPressAPIInternal
+    .PublicizeRequestDeleteConnectionResponse
+public typealias MeConnectionsRequestListResponse = WordPressAPIInternal.MeConnectionsRequestListResponse
+public typealias MeConnectionsResponse = WordPressAPIInternal.MeConnectionsResponse
+
+// MARK: - JSON helpers
+
+public typealias WpAdditionalFields = WordPressAPIInternal.WpAdditionalFields
+public typealias AdditionalFieldsParseError = WordPressAPIInternal.AdditionalFieldsParseError
+public typealias JsonValue = WordPressAPIInternal.JsonValue

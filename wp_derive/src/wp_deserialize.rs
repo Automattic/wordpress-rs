@@ -11,13 +11,20 @@ use syn::{
 
 pub(crate) fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let parsed_struct = parse_macro_input!(input as ParsedStruct);
-    TokenStream::from_iter([
-        parsed_struct.generate_cloned_type_with_new_name(),
-        parsed_struct.generate_all_fields_set_to_none_implementation(),
-        parsed_struct.generate_from_implementation_for_cloned_type(),
-        parsed_struct.generate_custom_deserializer(),
-    ])
-    .into()
+    if parsed_struct.has_serde_transparent() {
+        match parsed_struct.generate_transparent_deserializer() {
+            Ok(tokens) => tokens.into(),
+            Err(err) => err.to_compile_error().into(),
+        }
+    } else {
+        TokenStream::from_iter([
+            parsed_struct.generate_cloned_type_with_new_name(),
+            parsed_struct.generate_all_fields_set_to_none_implementation(),
+            parsed_struct.generate_from_implementation_for_cloned_type(),
+            parsed_struct.generate_custom_deserializer(),
+        ])
+        .into()
+    }
 }
 
 #[derive(Debug)]
@@ -30,6 +37,48 @@ struct ParsedStruct {
 impl ParsedStruct {
     fn cloned_type_ident(&self) -> Ident {
         format_ident!("DeserializeHelper{}", self.struct_ident.to_string())
+    }
+
+    fn has_serde_transparent(&self) -> bool {
+        self.attrs.iter().any(|attr| {
+            if let syn::Meta::List(meta_list) = &attr.meta
+                && let Some(ident) = meta_list.path.get_ident()
+                && *ident == "serde"
+            {
+                meta_list.tokens.clone().into_iter().any(|token| {
+                    matches!(token, proc_macro2::TokenTree::Ident(ident) if ident == "transparent")
+                })
+            } else {
+                false
+            }
+        })
+    }
+
+    /// Extracts the inner type `T` from a field typed `Option<T>`.
+    fn extract_option_inner_type(field: &Field) -> Option<&syn::Type> {
+        if let syn::Type::Path(type_path) = &field.ty
+            && let Some(first_segment) = type_path.path.segments.first()
+            && first_segment.ident == "Option"
+            && let syn::PathArguments::AngleBracketed(args) = &first_segment.arguments
+            && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+        {
+            return Some(inner_ty);
+        }
+        None
+    }
+
+    /// Checks whether a type's last path segment is `HashMap`.
+    /// Handles both `HashMap<K, V>` and `std::collections::HashMap<K, V>`.
+    fn is_hashmap(ty: &syn::Type) -> bool {
+        if let syn::Type::Path(type_path) = ty {
+            type_path
+                .path
+                .segments
+                .last()
+                .is_some_and(|seg| seg.ident == "HashMap")
+        } else {
+            false
+        }
     }
 
     fn generate_cloned_type_with_new_name(&self) -> TokenStream {
@@ -110,6 +159,89 @@ impl ParsedStruct {
             }
         }
     }
+
+    /// Generates a custom `Deserialize` impl for `#[serde(transparent)]` structs.
+    ///
+    /// Standard `WpDeserialize` uses `DeserializeEmptyVecOrT<DeserializeHelper>`, but
+    /// `#[serde(transparent)]` on the helper causes `Option<T>::deserialize` to call
+    /// `deserialize_option` on a `MapAccessDeserializer`, which can't distinguish
+    /// null from present. Instead, we generate an inline visitor that resolves the
+    /// `Option` directly at the `visit_map`/`visit_seq` dispatch point.
+    ///
+    /// Only supports `Option<HashMap<K, V>>` fields — the generated visitor only
+    /// handles `visit_map` (for map inputs) and `visit_seq` (for empty arrays).
+    fn generate_transparent_deserializer(&self) -> syn::Result<TokenStream> {
+        let struct_ident = &self.struct_ident;
+        let field = self
+            .fields
+            .first()
+            .expect("transparent struct must have exactly one field");
+        let field_ident = field
+            .ident
+            .as_ref()
+            .expect("transparent field must have an ident");
+        let inner_type =
+            Self::extract_option_inner_type(field).expect("transparent field must be Option<T>");
+
+        if !Self::is_hashmap(inner_type) {
+            return Err(
+                WpDeserializeParseError::TransparentRequiresHashMap.into_syn_error(field.ty.span())
+            );
+        }
+
+        let visitor_ident = format_ident!("{}TransparentVisitor", self.struct_ident);
+
+        Ok(quote! {
+            struct #visitor_ident;
+
+            impl<'de> serde::de::Visitor<'de> for #visitor_ident {
+                type Value = #struct_ident;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str("empty array or map")
+                }
+
+                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where
+                    A: serde::de::SeqAccess<'de>,
+                {
+                    if serde::de::SeqAccess::next_element::<Self::Value>(&mut seq)?.is_none() {
+                        Ok(#struct_ident { #field_ident: None })
+                    } else {
+                        Err(serde::de::Error::invalid_type(
+                            serde::de::Unexpected::Seq,
+                            &self,
+                        ))
+                    }
+                }
+
+                fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+                where
+                    A: serde::de::MapAccess<'de>,
+                {
+                    // Safe to wrap in Some: deserialize_any dispatches visit_map only
+                    // for actual map inputs, never for null. The null-vs-present
+                    // decision is already made at the deserialize_any call site.
+                    serde::Deserialize::deserialize(
+                        serde::de::value::MapAccessDeserializer::new(map),
+                    )
+                    .map(|inner: #inner_type| #struct_ident { #field_ident: Some(inner) })
+                }
+            }
+
+            impl<'de> serde::Deserialize<'de> for #struct_ident {
+                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where
+                    D: serde::Deserializer<'de>,
+                {
+                    // Uses deserialize_any so the format-level deserializer (e.g. serde_json)
+                    // dispatches to visit_map/visit_seq based on the actual input token.
+                    // This is what makes the Some-wrapping in visit_map safe — see comment there.
+                    deserializer.deserialize_any(#visitor_ident)
+                }
+            }
+        })
+    }
 }
 
 impl ParsedStruct {
@@ -141,36 +273,11 @@ impl ParsedStruct {
 
         Ok(fields)
     }
-
-    // Fails if attributes include `#[serde(transparent)]`
-    fn parse_outer(input: ParseStream) -> syn::Result<Vec<Attribute>> {
-        let attrs = Attribute::parse_outer(input)?;
-        for attr in &attrs {
-            if let syn::Meta::List(meta_list) = &attr.meta
-                && let Some(ident) = meta_list.path.get_ident()
-            {
-                if *ident != "serde" {
-                    continue;
-                }
-
-                if let Some(proc_macro2::TokenTree::Ident(first_token_ident)) =
-                    meta_list.tokens.clone().into_iter().next()
-                    && first_token_ident.to_string().as_str() == "transparent"
-                {
-                    return Err(
-                        WpDeserializeParseError::SerdeTransparentAttributeNotSupported
-                            .into_syn_error(first_token_ident.span()),
-                    );
-                }
-            }
-        }
-        Ok(attrs)
-    }
 }
 
 impl Parse for ParsedStruct {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let attrs = Self::parse_outer(input)?;
+        let attrs = Attribute::parse_outer(input)?;
 
         let _vis: syn::Visibility = input.parse()?;
         let _struct_token: Token![struct] = input.parse()?;
@@ -194,8 +301,12 @@ enum WpDeserializeParseError {
         original_type
     )]
     NonOptionalField { original_type: String },
-    #[error("{}", SERDE_TRANSPARENT_PARSING_ERROR)]
-    SerdeTransparentAttributeNotSupported,
+    #[error(
+        "`WpDeserialize` with `#[serde(transparent)]` only supports `Option<HashMap<K, V>>` fields. \
+         The generated deserializer uses `visit_map` to deserialize the inner type from a map input, \
+         which only works for map-deserializable types like `HashMap`."
+    )]
+    TransparentRequiresHashMap,
 }
 
 impl WpDeserializeParseError {
@@ -203,10 +314,3 @@ impl WpDeserializeParseError {
         syn::Error::new(span, self.to_string())
     }
 }
-
-const SERDE_TRANSPARENT_PARSING_ERROR: &str = r#"`#[serde(transparent)]` attribute is not supported.
-
-`wp_derive::WpDeserialize` and `#[serde(transparent)]` can't be combined. However, you can use `wp_serde_helper::DeserializeEmptyVecOrT` to manually replicate the same behaviour.
-
-Here is an example of how to do this:
-https://github.com/Automattic/wordpress-rs/pull/532/commits/1027e6ed6c8bd0e4cd9aec5ec0595f64f5e925b7#diff-139286995fa3539fe509c87c0b832e974c87c687d64330c6a9c0bd117cdf54f7"#;

@@ -14,7 +14,7 @@ enum StatsClicksRequest {
 }
 
 impl DerivedRequest for StatsClicksRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::RestV1_1
     }
 }

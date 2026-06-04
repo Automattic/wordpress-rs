@@ -16,7 +16,9 @@ struct CancellationTests {
         let content = try String(data: Data(contentsOf: file).base64EncodedData(), encoding: .utf8)!
 
         let title = UUID().uuidString
-        let error = await #expect(throws: WpApiError.self, performing: {
+        let error = await #expect(
+            throws: WpApiError.self,
+            performing: {
                 let task = Task {
                     let params = PostCreateParams(
                         title: title,

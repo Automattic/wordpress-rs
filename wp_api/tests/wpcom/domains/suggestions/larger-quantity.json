@@ -1,0 +1,393 @@
+[
+  {
+    "domain_name": "brightspace.com",
+    "relevance": 1,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 6,
+    "product_slug": "domain_reg",
+    "cost": "$18.00",
+    "renew_cost": "$18.00",
+    "renew_raw_price": 18,
+    "raw_price": 18,
+    "currency_code": "USD"
+  },
+  {
+    "domain_name": "testsite.blog",
+    "relevance": 0.99,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common",
+      "exact-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 76,
+    "product_slug": "dotblog_domain",
+    "cost": "$20.00",
+    "renew_cost": "$20.00",
+    "renew_raw_price": 20,
+    "raw_price": 20,
+    "currency_code": "USD",
+    "sale_cost": 2.0
+  },
+  {
+    "domain_name": "freshpage.art",
+    "relevance": 0.8,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 355,
+    "product_slug": "dotart_domain",
+    "cost": "$33.00",
+    "renew_cost": "$33.00",
+    "renew_raw_price": 33,
+    "raw_price": 33,
+    "currency_code": "USD",
+    "sale_cost": 1.64
+  },
+  {
+    "domain_name": "testsite.dev",
+    "relevance": 0.6,
+    "supports_privacy": false,
+    "vendor": "donuts",
+    "hsts_required": true,
+    "policy_notices": [
+      {
+        "type": "hsts",
+        "label": "HSTS required",
+        "message": "All domains with this ending require an SSL certificate to host a website."
+      }
+    ],
+    "match_reasons": [
+      "exact-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 373,
+    "product_slug": "dotdev_domain",
+    "cost": "$20.00",
+    "renew_cost": "$20.00",
+    "renew_raw_price": 20,
+    "raw_price": 20,
+    "currency_code": "USD"
+  },
+  {
+    "domain_name": "test-web.org",
+    "relevance": 0.4,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 5126,
+    "product_slug": "dotorg_domain",
+    "cost": "$11.00",
+    "renew_cost": "$11.00",
+    "renew_raw_price": 11,
+    "raw_price": 11,
+    "currency_code": "USD",
+    "sale_cost": 8.63
+  },
+  {
+    "domain_name": "test-site.store",
+    "relevance": 0.4,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "similar-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 274,
+    "product_slug": "dotstore_domain",
+    "cost": "$43.00",
+    "renew_cost": "$43.00",
+    "renew_raw_price": 43,
+    "raw_price": 43,
+    "currency_code": "USD",
+    "sale_cost": 1.3
+  },
+  {
+    "domain_name": "testsite.xyz",
+    "relevance": 0.4,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "exact-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 86,
+    "product_slug": "dotxyz_domain",
+    "cost": "$18.00",
+    "renew_cost": "$18.00",
+    "renew_raw_price": 18,
+    "raw_price": 18,
+    "currency_code": "USD"
+  },
+  {
+    "domain_name": "testsite.design",
+    "relevance": 0.4,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "exact-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 358,
+    "product_slug": "dotdesign_domain",
+    "cost": "$65.00",
+    "renew_cost": "$65.00",
+    "renew_raw_price": 65,
+    "raw_price": 65,
+    "currency_code": "USD",
+    "sale_cost": 16.36
+  },
+  {
+    "domain_name": "test-site.online",
+    "relevance": 0.1,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "similar-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 271,
+    "product_slug": "dotonline_domain",
+    "cost": "$27.00",
+    "renew_cost": "$27.00",
+    "renew_raw_price": 27,
+    "raw_price": 27,
+    "currency_code": "USD",
+    "sale_cost": 1.08
+  },
+  {
+    "domain_name": "testsite.tech",
+    "relevance": 0.4,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "exact-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 275,
+    "product_slug": "dottech_domain",
+    "cost": "$72.00",
+    "renew_cost": "$72.00",
+    "renew_raw_price": 72,
+    "raw_price": 72,
+    "currency_code": "USD",
+    "sale_cost": 14.45
+  },
+  {
+    "domain_name": "testsite.club",
+    "relevance": 0.4,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common",
+      "exact-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 80,
+    "product_slug": "dotclub_domain",
+    "cost": "$24.00",
+    "renew_cost": "$24.00",
+    "renew_raw_price": 24,
+    "raw_price": 24,
+    "currency_code": "USD",
+    "sale_cost": 7.25
+  },
+  {
+    "domain_name": "testsites.site",
+    "relevance": 0.04,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common",
+      "similar-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 78,
+    "product_slug": "dotsite_domain",
+    "cost": "$18.00",
+    "renew_cost": "$18.00",
+    "renew_raw_price": 18,
+    "raw_price": 18,
+    "currency_code": "USD",
+    "sale_cost": 1.08
+  },
+  {
+    "domain_name": "test-site.dev",
+    "relevance": 0.15,
+    "supports_privacy": false,
+    "vendor": "donuts",
+    "hsts_required": true,
+    "policy_notices": [
+      {
+        "type": "hsts",
+        "label": "HSTS required",
+        "message": "All domains with this ending require an SSL certificate to host a website."
+      }
+    ],
+    "match_reasons": [
+      "similar-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 373,
+    "product_slug": "dotdev_domain",
+    "cost": "$20.00",
+    "renew_cost": "$20.00",
+    "renew_raw_price": 20,
+    "raw_price": 20,
+    "currency_code": "USD"
+  },
+  {
+    "domain_name": "test-site.design",
+    "relevance": 0.13,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "similar-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 358,
+    "product_slug": "dotdesign_domain",
+    "cost": "$65.00",
+    "renew_cost": "$65.00",
+    "renew_raw_price": 65,
+    "raw_price": 65,
+    "currency_code": "USD",
+    "sale_cost": 16.36
+  },
+  {
+    "domain_name": "test-site.blog",
+    "relevance": 0.11,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common",
+      "similar-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 76,
+    "product_slug": "dotblog_domain",
+    "cost": "$20.00",
+    "renew_cost": "$20.00",
+    "renew_raw_price": 20,
+    "raw_price": 20,
+    "currency_code": "USD",
+    "sale_cost": 2.0
+  },
+  {
+    "domain_name": "test-site.club",
+    "relevance": 0.09,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common",
+      "similar-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 80,
+    "product_slug": "dotclub_domain",
+    "cost": "$24.00",
+    "renew_cost": "$24.00",
+    "renew_raw_price": 24,
+    "raw_price": 24,
+    "currency_code": "USD",
+    "sale_cost": 7.25
+  },
+  {
+    "domain_name": "testweb.tech",
+    "relevance": 0.05,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 275,
+    "product_slug": "dottech_domain",
+    "cost": "$72.00",
+    "renew_cost": "$72.00",
+    "renew_raw_price": 72,
+    "raw_price": 72,
+    "currency_code": "USD",
+    "sale_cost": 14.45
+  },
+  {
+    "domain_name": "testweb.blog",
+    "relevance": 0.05,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 76,
+    "product_slug": "dotblog_domain",
+    "cost": "$20.00",
+    "renew_cost": "$20.00",
+    "renew_raw_price": 20,
+    "raw_price": 20,
+    "currency_code": "USD",
+    "sale_cost": 2.0
+  },
+  {
+    "domain_name": "testsites.design",
+    "relevance": 0.04,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "similar-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 358,
+    "product_slug": "dotdesign_domain",
+    "cost": "$65.00",
+    "renew_cost": "$65.00",
+    "renew_raw_price": 65,
+    "raw_price": 65,
+    "currency_code": "USD",
+    "sale_cost": 16.36
+  },
+  {
+    "domain_name": "testweb.club",
+    "relevance": 0.04,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 80,
+    "product_slug": "dotclub_domain",
+    "cost": "$24.00",
+    "renew_cost": "$24.00",
+    "renew_raw_price": 24,
+    "raw_price": 24,
+    "currency_code": "USD",
+    "sale_cost": 7.25
+  }
+]

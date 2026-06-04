@@ -31,9 +31,9 @@ pub struct SyncResult {
 
 impl SyncResult {
     pub fn new(
-        total_items: usize,
-        fetched_count: usize,
-        failed_count: usize,
+        total_items: u32,
+        fetched_count: u32,
+        failed_count: u32,
         has_more_pages: Option<bool>,
         current_page: Option<u32>,
         total_pages: Option<u32>,
@@ -50,7 +50,7 @@ impl SyncResult {
 
     /// Create a result indicating no sync was needed.
     pub fn no_op(
-        total_items: usize,
+        total_items: u32,
         has_more_pages: Option<bool>,
         current_page: Option<u32>,
         total_pages: Option<u32>,

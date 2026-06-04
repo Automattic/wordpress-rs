@@ -26,7 +26,7 @@ enum UsersRequest {
 }
 
 impl DerivedRequest for UsersRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

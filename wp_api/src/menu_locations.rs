@@ -8,7 +8,6 @@ wp_content_string_id!(MenuLocation);
 #[derive(Debug, Serialize, Deserialize, uniffi::Record, WpContextual)]
 #[serde(transparent)]
 pub struct SparseMenuLocationsResponse {
-    #[serde(flatten)]
     #[WpContext(edit, embed, view)]
     #[WpContextualField]
     pub locations: Option<HashMap<MenuLocation, SparseMenuLocation>>,

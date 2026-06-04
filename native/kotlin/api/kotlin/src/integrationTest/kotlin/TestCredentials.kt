@@ -47,12 +47,38 @@ data class TestCredentials(
     val wordpressCoreVersion: String,
     @SerialName("integration_test_custom_template_id")
     val integrationTestCustomTemplateId: String,
+    @SerialName("autosaved_template_id")
+    val autosavedTemplateId: String,
+    @SerialName("autosave_id_for_autosaved_template")
+    val autosaveIdForAutosavedTemplate: Long,
+    @SerialName("integration_test_custom_template_part_id")
+    val integrationTestCustomTemplatePartId: String,
+    @SerialName("autosaved_template_part_id")
+    val autosavedTemplatePartId: String,
+    @SerialName("autosave_id_for_autosaved_template_part")
+    val autosaveIdForAutosavedTemplatePart: Long,
+    @SerialName("revision_id_for_custom_template_part")
+    val revisionIdForCustomTemplatePart: Long,
+    @SerialName("revision_id_for_custom_template")
+    val revisionIdForCustomTemplate: Long,
     @SerialName("revisioned_post_id")
     val revisionedPostId: Long,
     @SerialName("primary_menu_location")
     val primaryMenuLocation: String,
     @SerialName("nav_menu_item_id")
     val navMenuItemId: Long,
+    @SerialName("block_id")
+    val blockId: Long,
+    @SerialName("global_styles_id")
+    val globalStylesId: Long,
+    @SerialName("revision_id_for_block_id")
+    val revisionIdForBlockId: Long,
+    @SerialName("revision_id_for_global_styles_id")
+    val revisionIdForGlobalStylesId: Long,
+    @SerialName("autosaved_block_id")
+    val autosavedBlockId: Long,
+    @SerialName("autosave_id_for_autosaved_block_id")
+    val autosaveIdForAutosavedBlockId: Long,
 ) {
     companion object {
         private val json by lazy {

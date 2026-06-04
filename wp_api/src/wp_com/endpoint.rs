@@ -6,12 +6,17 @@ use crate::{
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 
+pub mod domains_endpoint;
 pub mod extensions;
 pub mod followers_endpoint;
 pub mod jetpack_connection_endpoint;
 pub mod languages_endpoint;
+pub mod me_connections_endpoint;
 pub mod me_endpoint;
 pub mod oauth2;
+pub mod products_endpoint;
+pub mod publicize_endpoint;
+pub mod segments_endpoint;
 pub mod sites_endpoint;
 pub mod stats_city_views_endpoint;
 pub mod stats_clicks_endpoint;
@@ -19,12 +24,18 @@ pub mod stats_country_views_endpoint;
 pub mod stats_devices_browser_endpoint;
 pub mod stats_devices_platform_endpoint;
 pub mod stats_devices_screensize_endpoint;
+pub mod stats_emails_summary_endpoint;
 pub mod stats_file_downloads_endpoint;
+pub mod stats_insights_endpoint;
 pub mod stats_referrers_endpoint;
 pub mod stats_region_views_endpoint;
 pub mod stats_search_terms_endpoint;
+pub mod stats_subscribers_endpoint;
+pub mod stats_summary_endpoint;
+pub mod stats_tags_endpoint;
 pub mod stats_top_authors_endpoint;
 pub mod stats_top_posts_endpoint;
+pub mod stats_utm_endpoint;
 pub mod stats_video_plays_endpoint;
 pub mod stats_visits_endpoint;
 pub mod subscribers_endpoint;
@@ -84,6 +95,15 @@ impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
                 .into(),
         )
     }
+
+    fn route_path(&self, namespace: String, endpoint_path: String) -> String {
+        format!(
+            "{}/sites/{}/{}",
+            namespace.trim_end_matches('/'),
+            self.site_id,
+            endpoint_path.trim_start_matches('/')
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -123,12 +143,52 @@ impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
                 .into(),
         )
     }
+
+    fn route_path(&self, namespace: String, endpoint_path: String) -> String {
+        format!(
+            "{}/{}",
+            namespace.trim_end_matches('/'),
+            endpoint_path.trim_start_matches('/')
+        )
+    }
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    use rstest::rstest;
+    use crate::{request::endpoint::ApiEndpointUrl, wp_com::WpComNamespace};
+    use rstest::*;
+    use std::sync::Arc;
+
+    const WP_COM_BASE_URL: &str = "https://public-api.wordpress.com";
+
+    #[fixture]
+    pub fn fixture_wp_com_api_url_resolver() -> Arc<dyn ApiUrlResolver> {
+        Arc::new(WpComApiClientInternalUrlResolver::default())
+    }
+
+    pub fn validate_wp_com_rest_v1_1_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint(WpComNamespace::RestV1_1, endpoint_url, path);
+    }
+
+    pub fn validate_wp_com_rest_v1_2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint(WpComNamespace::RestV1_2, endpoint_url, path);
+    }
+
+    pub fn validate_wp_com_rest_v1_3_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint(WpComNamespace::RestV1_3, endpoint_url, path);
+    }
+
+    pub fn validate_wp_com_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+        validate_endpoint(WpComNamespace::V2, endpoint_url, path);
+    }
+
+    fn validate_endpoint(namespace: WpComNamespace, endpoint_url: ApiEndpointUrl, path: &str) {
+        assert_eq!(
+            endpoint_url.as_str(),
+            format!("{}{}{}", WP_COM_BASE_URL, namespace.namespace_value(), path)
+        );
+    }
 
     #[rstest]
     #[case("/wp/v2", vec!["posts".to_string()], "https://public-api.wordpress.com/wp/v2/sites/example.wordpress.com/posts")]

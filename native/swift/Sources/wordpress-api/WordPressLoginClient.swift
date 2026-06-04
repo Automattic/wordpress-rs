@@ -72,7 +72,10 @@ public final class WordPressLoginClient: @unchecked Sendable {
         let nonceRetrieval = WpRestNonceRetrieval(details: details, requestExecutor: requestExecutor)
         let nonce = try await nonceRetrieval.getNonce(username: username, password: password)
         return WordPressAPI(
-            apiUrlResolver: WpOrgSiteApiUrlResolver(apiRootUrl: details.apiRootUrl),
+            siteInfo: .selfHosted(
+                siteUrl: details.parsedSiteUrl,
+                apiRoot: details.apiRootUrl
+            ),
             authenticationProvider: .staticWithAuth(auth: .nonce(nonce: nonce)),
             executor: requestExecutor,
             middlewarePipeline: middleware,
@@ -92,7 +95,8 @@ extension DiscoveredAuthenticationMechanism {
                 appId: application.id,
                 successUrl: application.successCallbackUrl,
                 rejectUrl: application.failureCallbackUrl
-            ).asURL()
+            )
+            .asURL()
         default: nil
         }
     }

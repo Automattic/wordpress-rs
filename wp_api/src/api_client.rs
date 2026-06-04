@@ -11,7 +11,27 @@ use crate::{
             application_passwords_endpoint::{
                 ApplicationPasswordsRequestBuilder, ApplicationPasswordsRequestExecutor,
             },
+            block_autosaves_endpoint::{
+                BlockAutosavesRequestBuilder, BlockAutosavesRequestExecutor,
+            },
+            block_directory_endpoint::{
+                BlockDirectoryRequestBuilder, BlockDirectoryRequestExecutor,
+            },
+            block_pattern_categories_endpoint::{
+                BlockPatternCategoriesRequestBuilder, BlockPatternCategoriesRequestExecutor,
+            },
+            block_patterns_endpoint::{BlockPatternsRequestBuilder, BlockPatternsRequestExecutor},
+            block_renderer_endpoint::{BlockRendererRequestBuilder, BlockRendererRequestExecutor},
+            block_revisions_endpoint::{
+                BlockRevisionsRequestBuilder, BlockRevisionsRequestExecutor,
+            },
+            block_types_endpoint::{BlockTypesRequestBuilder, BlockTypesRequestExecutor},
+            blocks_endpoint::{BlocksRequestBuilder, BlocksRequestExecutor},
             comments_endpoint::{CommentsRequestBuilder, CommentsRequestExecutor},
+            global_styles_endpoint::{GlobalStylesRequestBuilder, GlobalStylesRequestExecutor},
+            global_styles_revisions_endpoint::{
+                GlobalStylesRevisionsRequestBuilder, GlobalStylesRevisionsRequestExecutor,
+            },
             media_endpoint::{MediaRequestBuilder, MediaRequestExecutor},
             menu_locations_endpoint::{MenuLocationsRequestBuilder, MenuLocationsRequestExecutor},
             nav_menu_item_autosaves_endpoint::{
@@ -26,6 +46,9 @@ use crate::{
                 NavigationRevisionsRequestBuilder, NavigationRevisionsRequestExecutor,
             },
             navigations_endpoint::{NavigationsRequestBuilder, NavigationsRequestExecutor},
+            pattern_directory_endpoint::{
+                PatternDirectoryRequestBuilder, PatternDirectoryRequestExecutor,
+            },
             plugins_endpoint::{PluginsRequestBuilder, PluginsRequestExecutor},
             post_autosaves_endpoint::{AutosavesRequestBuilder, AutosavesRequestExecutor},
             post_revisions_endpoint::{PostRevisionsRequestBuilder, PostRevisionsRequestExecutor},
@@ -33,8 +56,22 @@ use crate::{
             post_types_endpoint::{PostTypesRequestBuilder, PostTypesRequestExecutor},
             posts_endpoint::{PostsRequestBuilder, PostsRequestExecutor},
             search_endpoint::{SearchRequestBuilder, SearchRequestExecutor},
+            sidebars_endpoint::{SidebarsRequestBuilder, SidebarsRequestExecutor},
             site_settings_endpoint::{SiteSettingsRequestBuilder, SiteSettingsRequestExecutor},
             taxonomies_endpoint::{TaxonomiesRequestBuilder, TaxonomiesRequestExecutor},
+            template_autosaves_endpoint::{
+                TemplateAutosavesRequestBuilder, TemplateAutosavesRequestExecutor,
+            },
+            template_part_autosaves_endpoint::{
+                TemplatePartAutosavesRequestBuilder, TemplatePartAutosavesRequestExecutor,
+            },
+            template_part_revisions_endpoint::{
+                TemplatePartRevisionsRequestBuilder, TemplatePartRevisionsRequestExecutor,
+            },
+            template_parts_endpoint::{TemplatePartsRequestBuilder, TemplatePartsRequestExecutor},
+            template_revisions_endpoint::{
+                TemplateRevisionsRequestBuilder, TemplateRevisionsRequestExecutor,
+            },
             templates_endpoint::{TemplatesRequestBuilder, TemplatesRequestExecutor},
             terms_endpoint::{TermsRequestBuilder, TermsRequestExecutor},
             themes_endpoint::{ThemesRequestBuilder, ThemesRequestExecutor},
@@ -53,8 +90,18 @@ use std::sync::Arc;
 pub struct WpApiRequestBuilder {
     api_root: Arc<ApiRootRequestBuilder>,
     application_passwords: Arc<ApplicationPasswordsRequestBuilder>,
+    block_directory: Arc<BlockDirectoryRequestBuilder>,
+    block_renderer: Arc<BlockRendererRequestBuilder>,
+    block_pattern_categories: Arc<BlockPatternCategoriesRequestBuilder>,
+    block_patterns: Arc<BlockPatternsRequestBuilder>,
+    block_types: Arc<BlockTypesRequestBuilder>,
+    block_autosaves: Arc<BlockAutosavesRequestBuilder>,
+    block_revisions: Arc<BlockRevisionsRequestBuilder>,
+    blocks: Arc<BlocksRequestBuilder>,
     autosaves: Arc<AutosavesRequestBuilder>,
     comments: Arc<CommentsRequestBuilder>,
+    global_styles: Arc<GlobalStylesRequestBuilder>,
+    global_styles_revisions: Arc<GlobalStylesRevisionsRequestBuilder>,
     media: Arc<MediaRequestBuilder>,
     menu_locations: Arc<MenuLocationsRequestBuilder>,
     nav_menu_item_autosaves: Arc<NavMenuItemAutosavesRequestBuilder>,
@@ -63,15 +110,22 @@ pub struct WpApiRequestBuilder {
     navigation_autosaves: Arc<NavigationAutosavesRequestBuilder>,
     navigation_revisions: Arc<NavigationRevisionsRequestBuilder>,
     navigations: Arc<NavigationsRequestBuilder>,
+    pattern_directory: Arc<PatternDirectoryRequestBuilder>,
     plugins: Arc<PluginsRequestBuilder>,
     post_revisions: Arc<PostRevisionsRequestBuilder>,
     post_statuses: Arc<PostStatusesRequestBuilder>,
     post_types: Arc<PostTypesRequestBuilder>,
     posts: Arc<PostsRequestBuilder>,
     search: Arc<SearchRequestBuilder>,
+    sidebars: Arc<SidebarsRequestBuilder>,
     site_settings: Arc<SiteSettingsRequestBuilder>,
     taxonomies: Arc<TaxonomiesRequestBuilder>,
     terms: Arc<TermsRequestBuilder>,
+    template_autosaves: Arc<TemplateAutosavesRequestBuilder>,
+    template_part_autosaves: Arc<TemplatePartAutosavesRequestBuilder>,
+    template_part_revisions: Arc<TemplatePartRevisionsRequestBuilder>,
+    template_parts: Arc<TemplatePartsRequestBuilder>,
+    template_revisions: Arc<TemplateRevisionsRequestBuilder>,
     templates: Arc<TemplatesRequestBuilder>,
     themes: Arc<ThemesRequestBuilder>,
     users: Arc<UsersRequestBuilder>,
@@ -91,8 +145,18 @@ impl WpApiRequestBuilder {
             auth_provider;
             api_root,
             application_passwords,
+            block_directory,
+            block_renderer,
+            block_pattern_categories,
+            block_patterns,
+            block_types,
+            block_autosaves,
+            block_revisions,
+            blocks,
             autosaves,
             comments,
+            global_styles,
+            global_styles_revisions,
             media,
             menu_locations,
             nav_menu_item_autosaves,
@@ -101,15 +165,22 @@ impl WpApiRequestBuilder {
             navigation_autosaves,
             navigation_revisions,
             navigations,
+            pattern_directory,
             plugins,
             post_revisions,
             post_statuses,
             post_types,
             posts,
             search,
+            sidebars,
             site_settings,
             taxonomies,
             terms,
+            template_autosaves,
+            template_part_autosaves,
+            template_part_revisions,
+            template_parts,
+            template_revisions,
             templates,
             themes,
             users,
@@ -139,8 +210,18 @@ impl UniffiWpApiClient {
 pub struct WpApiClient {
     api_root: Arc<ApiRootRequestExecutor>,
     application_passwords: Arc<ApplicationPasswordsRequestExecutor>,
+    block_directory: Arc<BlockDirectoryRequestExecutor>,
+    block_renderer: Arc<BlockRendererRequestExecutor>,
+    block_pattern_categories: Arc<BlockPatternCategoriesRequestExecutor>,
+    block_patterns: Arc<BlockPatternsRequestExecutor>,
+    block_types: Arc<BlockTypesRequestExecutor>,
+    block_autosaves: Arc<BlockAutosavesRequestExecutor>,
+    block_revisions: Arc<BlockRevisionsRequestExecutor>,
+    blocks: Arc<BlocksRequestExecutor>,
     autosaves: Arc<AutosavesRequestExecutor>,
     comments: Arc<CommentsRequestExecutor>,
+    global_styles: Arc<GlobalStylesRequestExecutor>,
+    global_styles_revisions: Arc<GlobalStylesRevisionsRequestExecutor>,
     media: Arc<MediaRequestExecutor>,
     menu_locations: Arc<MenuLocationsRequestExecutor>,
     nav_menu_item_autosaves: Arc<NavMenuItemAutosavesRequestExecutor>,
@@ -149,15 +230,22 @@ pub struct WpApiClient {
     navigation_autosaves: Arc<NavigationAutosavesRequestExecutor>,
     navigation_revisions: Arc<NavigationRevisionsRequestExecutor>,
     navigations: Arc<NavigationsRequestExecutor>,
+    pattern_directory: Arc<PatternDirectoryRequestExecutor>,
     plugins: Arc<PluginsRequestExecutor>,
     post_revisions: Arc<PostRevisionsRequestExecutor>,
     post_statuses: Arc<PostStatusesRequestExecutor>,
     post_types: Arc<PostTypesRequestExecutor>,
     posts: Arc<PostsRequestExecutor>,
     search: Arc<SearchRequestExecutor>,
+    sidebars: Arc<SidebarsRequestExecutor>,
     site_settings: Arc<SiteSettingsRequestExecutor>,
     taxonomies: Arc<TaxonomiesRequestExecutor>,
     terms: Arc<TermsRequestExecutor>,
+    template_autosaves: Arc<TemplateAutosavesRequestExecutor>,
+    template_part_autosaves: Arc<TemplatePartAutosavesRequestExecutor>,
+    template_part_revisions: Arc<TemplatePartRevisionsRequestExecutor>,
+    template_parts: Arc<TemplatePartsRequestExecutor>,
+    template_revisions: Arc<TemplateRevisionsRequestExecutor>,
     templates: Arc<TemplatesRequestExecutor>,
     themes: Arc<ThemesRequestExecutor>,
     users: Arc<UsersRequestExecutor>,
@@ -174,8 +262,18 @@ impl WpApiClient {
             delegate;
             api_root,
             application_passwords,
+            block_directory,
+            block_renderer,
+            block_pattern_categories,
+            block_patterns,
+            block_types,
+            block_autosaves,
+            block_revisions,
+            blocks,
             autosaves,
             comments,
+            global_styles,
+            global_styles_revisions,
             media,
             menu_locations,
             nav_menu_item_autosaves,
@@ -184,15 +282,22 @@ impl WpApiClient {
             navigation_autosaves,
             navigation_revisions,
             navigations,
+            pattern_directory,
             plugins,
             post_revisions,
             post_statuses,
             post_types,
             posts,
             search,
+            sidebars,
             site_settings,
             taxonomies,
             terms,
+            template_autosaves,
+            template_part_autosaves,
+            template_part_revisions,
+            template_parts,
+            template_revisions,
             templates,
             themes,
             users,
@@ -219,8 +324,18 @@ pub trait IsWpApiClientDelegate {
 
 api_client_generate_endpoint_impl!(WpApi, api_root);
 api_client_generate_endpoint_impl!(WpApi, application_passwords);
+api_client_generate_endpoint_impl!(WpApi, block_directory);
+api_client_generate_endpoint_impl!(WpApi, block_renderer);
+api_client_generate_endpoint_impl!(WpApi, block_pattern_categories);
+api_client_generate_endpoint_impl!(WpApi, block_patterns);
+api_client_generate_endpoint_impl!(WpApi, block_types);
+api_client_generate_endpoint_impl!(WpApi, block_autosaves);
+api_client_generate_endpoint_impl!(WpApi, block_revisions);
+api_client_generate_endpoint_impl!(WpApi, blocks);
 api_client_generate_endpoint_impl!(WpApi, autosaves);
 api_client_generate_endpoint_impl!(WpApi, comments);
+api_client_generate_endpoint_impl!(WpApi, global_styles);
+api_client_generate_endpoint_impl!(WpApi, global_styles_revisions);
 api_client_generate_endpoint_impl!(WpApi, media);
 api_client_generate_endpoint_impl!(WpApi, menu_locations);
 api_client_generate_endpoint_impl!(WpApi, nav_menu_item_autosaves);
@@ -229,15 +344,22 @@ api_client_generate_endpoint_impl!(WpApi, nav_menus);
 api_client_generate_endpoint_impl!(WpApi, navigation_autosaves);
 api_client_generate_endpoint_impl!(WpApi, navigation_revisions);
 api_client_generate_endpoint_impl!(WpApi, navigations);
+api_client_generate_endpoint_impl!(WpApi, pattern_directory);
 api_client_generate_endpoint_impl!(WpApi, plugins);
 api_client_generate_endpoint_impl!(WpApi, post_revisions);
 api_client_generate_endpoint_impl!(WpApi, post_statuses);
 api_client_generate_endpoint_impl!(WpApi, post_types);
 api_client_generate_endpoint_impl!(WpApi, posts);
 api_client_generate_endpoint_impl!(WpApi, search);
+api_client_generate_endpoint_impl!(WpApi, sidebars);
 api_client_generate_endpoint_impl!(WpApi, site_settings);
 api_client_generate_endpoint_impl!(WpApi, taxonomies);
 api_client_generate_endpoint_impl!(WpApi, terms);
+api_client_generate_endpoint_impl!(WpApi, template_autosaves);
+api_client_generate_endpoint_impl!(WpApi, template_part_autosaves);
+api_client_generate_endpoint_impl!(WpApi, template_part_revisions);
+api_client_generate_endpoint_impl!(WpApi, template_parts);
+api_client_generate_endpoint_impl!(WpApi, template_revisions);
 api_client_generate_endpoint_impl!(WpApi, templates);
 api_client_generate_endpoint_impl!(WpApi, themes);
 api_client_generate_endpoint_impl!(WpApi, users);

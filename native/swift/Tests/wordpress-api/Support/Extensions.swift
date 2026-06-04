@@ -9,7 +9,7 @@ extension WpNetworkHeaderMap {
 
     static func withLinkHeader(_ value: String) -> WpNetworkHeaderMap {
         // swiftlint:disable:next force_try
-            try! WpNetworkHeaderMap.fromMap(hashMap: ["Link": value])
+        try! WpNetworkHeaderMap.fromMap(hashMap: ["Link": value])
     }
 }
 

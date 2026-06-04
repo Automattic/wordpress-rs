@@ -10,7 +10,7 @@ enum SiteSettingsRequest {
 }
 
 impl DerivedRequest for SiteSettingsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 }

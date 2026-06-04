@@ -16,7 +16,7 @@ enum NavigationRevisionsRequest {
 }
 
 impl DerivedRequest for NavigationRevisionsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpV2
     }
 

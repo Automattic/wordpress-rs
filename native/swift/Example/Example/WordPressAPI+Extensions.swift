@@ -15,14 +15,18 @@ extension WordPressAPI {
             throw CocoaError(.xpcConnectionInvalid)
         }
 
+        let siteUrl = try ParsedUrl.parse(input: apiRootUrl.asURL().deletingLastPathComponent().absoluteString)
         return WordPressAPI(
-           urlSession: .shared,
-           apiRootUrl: apiRootUrl,
-           authentication: loginCredentials,
-           middlewarePipeline: MiddlewarePipeline(middlewares: [
+            urlSession: .shared,
+            siteInfo: .selfHosted(
+                siteUrl: siteUrl,
+                apiRoot: apiRootUrl
+            ),
+            authentication: loginCredentials,
+            middlewarePipeline: MiddlewarePipeline(middlewares: [
                 DebugMiddleware()
-           ])
-       )
+            ])
+        )
     }
 
 }

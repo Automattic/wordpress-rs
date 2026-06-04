@@ -72,7 +72,7 @@
 //!
 //! This is a much better solution, because we have strongly typed values. However, that's a lot
 //! of code just for 2 types with only 2 fields. Furthermore, it's very difficult to tell which
-//! fields are available for each `context` and has a higher maintainance cost.
+//! fields are available for each `context` and has a higher maintenance cost.
 //!
 //! In order to address this, we have [`WpContextual`] derive macro. Let's start from simple, and
 //! build up to the example:

@@ -9,7 +9,7 @@ enum WpBlockEditorRequest {
 }
 
 impl DerivedRequest for WpBlockEditorRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpNamespace::WpBlockEditorV1
     }
 }

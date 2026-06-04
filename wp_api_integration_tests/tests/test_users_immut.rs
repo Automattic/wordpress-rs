@@ -1,8 +1,8 @@
 use reusable_test_cases::list_users_cases;
 use wp_api::users::{
     SparseUserFieldWithEditContext, SparseUserFieldWithEmbedContext,
-    SparseUserFieldWithViewContext, UserId, UserListParams, WpApiParamUsersHasPublishedPosts,
-    WpApiParamUsersOrderBy, WpApiParamUsersWho,
+    SparseUserFieldWithViewContext, UserCapability, UserId, UserListParams,
+    WpApiParamUsersHasPublishedPosts, WpApiParamUsersOrderBy, WpApiParamUsersWho,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -134,6 +134,59 @@ async fn retrieve_user_with_view_context(#[values(FIRST_USER_ID, SECOND_USER_ID)
         .assert_response()
         .data;
     assert_eq!(user_id, user.id);
+}
+
+// Regression test for issue #1313: legacy WordPress sites can store the role assignment
+// in `wp_capabilities` as the string `"1"` instead of boolean `true`. The fixture user
+// `legacy_admin` has its `wp_capabilities` poisoned to `{"administrator": "1"}` so the
+// REST response carries the legacy string shape on `extra_capabilities` (raw user meta)
+// and on `capabilities` (allcaps merged with the user-level overlay).
+#[tokio::test]
+#[parallel]
+async fn retrieve_legacy_admin_with_edit_context_parses() {
+    let user_id = UserId(TestCredentials::instance().legacy_admin_user_id);
+    let user = api_client()
+        .users()
+        .retrieve_with_edit_context(&user_id)
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(user_id, user.id);
+    let administrator = UserCapability::Custom("administrator".to_string());
+    assert!(user.extra_capabilities.map.contains_key(&administrator));
+    assert!(user.capabilities.map.contains_key(&administrator));
+    // The string `"1"` is not boolean `true`, so `has_cap` reports false even though
+    // the legacy site treats this user as an administrator. Other admin caps come from
+    // the role's defaults (booleans), so they still answer true.
+    assert!(!user.extra_capabilities.has_cap(administrator));
+    assert!(user.capabilities.has_cap(UserCapability::EditPosts));
+}
+
+// Regression test for PR #1263: plugins like WPBakery call `WP_User::add_cap($cap, $grant)`
+// with non-bool grants, leaving entries such as `"vc_access_rules_post_types": "custom"` in
+// `wp_capabilities`. The fixture user `wpbakery_admin` carries both a boolean role entry
+// and a plugin-style string entry, exercising the deserializer on both response fields.
+#[tokio::test]
+#[parallel]
+async fn retrieve_wpbakery_admin_with_edit_context_parses() {
+    let user_id = UserId(TestCredentials::instance().wpbakery_admin_user_id);
+    let user = api_client()
+        .users()
+        .retrieve_with_edit_context(&user_id)
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(user_id, user.id);
+    let plugin_key = UserCapability::Custom("vc_access_rules_post_types".to_string());
+    assert!(user.extra_capabilities.map.contains_key(&plugin_key));
+    assert!(user.capabilities.map.contains_key(&plugin_key));
+    // String `"custom"` is not boolean `true`, so `has_cap` reports false on the plugin
+    // entry, while the boolean administrator role still answers true.
+    assert!(!user.capabilities.has_cap(plugin_key));
+    assert!(
+        user.extra_capabilities
+            .has_cap(UserCapability::Custom("administrator".to_string()))
+    );
 }
 
 #[tokio::test]

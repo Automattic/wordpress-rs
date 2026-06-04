@@ -16,6 +16,10 @@ import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.AccountRepository
+import uniffi.wp_api.ParsedUrl
+import uniffi.wp_api.WpComBaseUrl
+import uniffi.wp_api.WpComDotOrgApiUrlResolver
+import uniffi.wp_mobile.SiteInfo
 import uniffi.wp_mobile.WpService
 import java.io.File
 import java.net.URI
@@ -47,11 +51,35 @@ fun createWpService(
     } else {
         wpAuthenticationFromUsernameAndPassword(account.username, account.password)
     }
-    return WpService.selfHosted(
-        siteUrl = account.domain,
-        apiRoot = account.siteApiRoot,
+    return WpService(
+        siteInfo = SiteInfo.SelfHosted(
+            siteUrl = ParsedUrl.parse(account.domain),
+            apiRoot = ParsedUrl.parse(account.siteApiRoot)
+        ),
         delegate = WpApiClientDelegate(
             WpAuthenticationProvider.staticWithAuth(auth),
+            requestExecutor = WpRequestExecutor(emptyList(), networkAvailabilityProvider),
+            middlewarePipeline = WpApiMiddlewarePipeline(listOf(DebugMiddleware())),
+            appNotifier = EmptyAppNotifier()
+        ),
+        cache = cache.cache
+    )
+}
+
+fun createWpService(
+    account: Account.WpCom,
+    cache: WordPressApiCache,
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): WpService {
+    val siteId = account.siteApiRoot.toULong()
+    return WpService(
+        siteInfo = SiteInfo.WordPressCom(
+            siteId = siteId
+        ),
+        delegate = WpApiClientDelegate(
+            WpAuthenticationProvider.staticWithAuth(
+                WpAuthentication.Bearer(token = account.token)
+            ),
             requestExecutor = WpRequestExecutor(emptyList(), networkAvailabilityProvider),
             middlewarePipeline = WpApiMiddlewarePipeline(listOf(DebugMiddleware())),
             appNotifier = EmptyAppNotifier()
@@ -74,6 +102,22 @@ fun createWpApiClient(
         authProvider = WpAuthenticationProvider.staticWithAuth(auth),
         interceptors = emptyList(),
         networkAvailabilityProvider = networkAvailabilityProvider
+    )
+}
+
+fun createWpApiClient(
+    account: Account.WpCom,
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): WpApiClient {
+    return WpApiClient(
+        apiUrlResolver = WpComDotOrgApiUrlResolver(
+            siteId = account.siteApiRoot,
+            baseUrl = WpComBaseUrl.Production
+        ),
+        authProvider = WpAuthenticationProvider.staticWithAuth(
+            WpAuthentication.Bearer(token = account.token)
+        ),
+        requestExecutor = WpRequestExecutor(emptyList(), networkAvailabilityProvider)
     )
 }
 

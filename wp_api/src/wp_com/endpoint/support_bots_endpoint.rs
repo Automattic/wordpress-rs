@@ -30,7 +30,7 @@ enum SupportBotsRequest {
 }
 
 impl DerivedRequest for SupportBotsRequest {
-    fn namespace() -> impl AsNamespace {
+    fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::V2
     }
 }

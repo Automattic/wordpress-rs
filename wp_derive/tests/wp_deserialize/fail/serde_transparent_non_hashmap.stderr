@@ -1,0 +1,5 @@
+error: `WpDeserialize` with `#[serde(transparent)]` only supports `Option<HashMap<K, V>>` fields. The generated deserializer uses `visit_map` to deserialize the inner type from a map input, which only works for map-deserializable types like `HashMap`.
+ --> tests/wp_deserialize/fail/serde_transparent_non_hashmap.rs:7:14
+  |
+7 |     pub bar: Option<String>,
+  |              ^^^^^^

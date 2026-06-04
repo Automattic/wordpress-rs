@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::{AnyJson, uniffi_serde::UniffiSerializationError};
+use crate::{WpAdditionalFields, uniffi_serde::UniffiSerializationError};
 
 #[derive(Debug, Deserialize, uniffi::Record)]
 pub struct WpComCommentExtension {
@@ -31,7 +31,7 @@ pub trait WpComCommentExtensionProvider: Send + Sync {
 }
 
 #[uniffi::export]
-impl WpComCommentExtensionProvider for AnyJson {
+impl WpComCommentExtensionProvider for WpAdditionalFields {
     fn parse_wpcom_comments_extension(
         &self,
     ) -> Result<WpComCommentExtension, UniffiSerializationError> {

@@ -1,0 +1,98 @@
+[
+  {
+    "domain_name": "test-web.org",
+    "relevance": 0.98,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 5126,
+    "product_slug": "dotorg_domain",
+    "cost": "$11.00",
+    "renew_cost": "$11.00",
+    "renew_raw_price": 11,
+    "raw_price": 11,
+    "currency_code": "USD",
+    "sale_cost": 8.63
+  },
+  {
+    "domain_name": "freshpage.org",
+    "relevance": 0,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 5126,
+    "product_slug": "dotorg_domain",
+    "cost": "$11.00",
+    "renew_cost": "$11.00",
+    "renew_raw_price": 11,
+    "raw_price": 11,
+    "currency_code": "USD",
+    "sale_cost": 8.63
+  },
+  {
+    "domain_name": "brightspace.org",
+    "relevance": 0,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 5126,
+    "product_slug": "dotorg_domain",
+    "cost": "$11.00",
+    "renew_cost": "$11.00",
+    "renew_raw_price": 11,
+    "raw_price": 11,
+    "currency_code": "USD",
+    "sale_cost": 8.63
+  },
+  {
+    "domain_name": "quietpage.org",
+    "relevance": 0,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 5126,
+    "product_slug": "dotorg_domain",
+    "cost": "$11.00",
+    "renew_cost": "$11.00",
+    "renew_raw_price": 11,
+    "raw_price": 11,
+    "currency_code": "USD",
+    "sale_cost": 8.63
+  },
+  {
+    "domain_name": "test-sites.org",
+    "relevance": 0,
+    "supports_privacy": true,
+    "vendor": "donuts",
+    "match_reasons": [
+      "tld-common",
+      "similar-match"
+    ],
+    "max_reg_years": 10,
+    "multi_year_reg_allowed": true,
+    "product_id": 5126,
+    "product_slug": "dotorg_domain",
+    "cost": "$11.00",
+    "renew_cost": "$11.00",
+    "renew_raw_price": 11,
+    "raw_price": 11,
+    "currency_code": "USD",
+    "sale_cost": 8.63
+  }
+]

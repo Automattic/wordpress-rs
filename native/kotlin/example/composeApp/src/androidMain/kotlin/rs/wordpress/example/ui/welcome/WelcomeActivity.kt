@@ -32,7 +32,6 @@ import uniffi.wp_api.parseAuthorizationUrl
 import uniffi.wp_api.wordpressComOauth2Configuration
 import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.AccountRepository
-import uniffi.wp_mobile.wordpressComSiteApiRoot
 
 class WelcomeActivity : ComponentActivity() {
     private val accountRepository: AccountRepository by inject()
@@ -212,16 +211,14 @@ class WelcomeActivity : ComponentActivity() {
                             val tokenResponse = tokenResult.response.data
                             val blogId = tokenResponse.blogId
                                 ?: throw IllegalStateException("Expected blog_id in site-specific token response")
-                            val siteUrl = discoveredSiteHost
-                                ?: tokenResponse.blogUrl
-                                ?: "WordPress.com"
                             accountRepository.store(
-                                Account.SelfHostedSite(
+                                Account.WpCom(
                                     id = 0uL,
-                                    domain = siteUrl,
-                                    username = siteUrl,
-                                    password = tokenResponse.accessToken,
-                                    siteApiRoot = wordpressComSiteApiRoot(blogId)
+                                    username = discoveredSiteHost
+                                        ?: tokenResponse.blogUrl
+                                        ?: "WordPress.com",
+                                    token = tokenResponse.accessToken,
+                                    siteApiRoot = blogId.toString()
                                 )
                             )
                             siteSpecificOAuthState = null
