@@ -1,7 +1,8 @@
 use macro_helper::{generate_update_page_status_test, generate_update_test};
+use std::sync::Arc;
 use wp_api::posts::{
     AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostMeta,
-    PostPingStatus, PostStatus, PostUpdateParams,
+    PostPingStatus, PostStatus, PostStatusValue, PostUpdateParams,
 };
 use wp_api::request::endpoint::posts_endpoint::PostEndpointType;
 use wp_api_integration_tests::{PAGE_TEMPLATE_WITH_SIDEBAR, prelude::*};
@@ -379,13 +380,13 @@ generate_update_test!(
 async fn update_status_to_future() {
     test_update_page(
         &PostUpdateParams {
-            status: Some(PostStatus::Future),
+            status: Some(Arc::new(PostStatusValue::from(PostStatus::Future))),
             // Publish date has to be in the future
             date: Some("2026-09-09T12:00:00".to_string()),
             ..Default::default()
         },
         |updated_page, updated_page_from_wp_cli| {
-            assert_eq!(updated_page.status, PostStatus::Future);
+            assert!(updated_page.status.matches(PostStatus::Future));
             assert_eq!(
                 updated_page_from_wp_cli.post_status,
                 PostStatus::Future.to_string()
@@ -463,11 +464,11 @@ mod macro_helper {
                 async fn [<update_page_status_to_ $status:lower>]() {
                     test_update_page(
                         &PostUpdateParams {
-                            status: Some(PostStatus::$status),
+                            status: Some(Arc::new(PostStatusValue::from(PostStatus::$status))),
                             ..Default::default()
                         },
                         |updated_page, updated_page_from_wp_cli| {
-                            assert_eq!(updated_page.status, PostStatus::$status);
+                            assert!(updated_page.status.matches(PostStatus::$status));
                             assert_eq!(
                                 updated_page_from_wp_cli.post_status,
                                 PostStatus::$status.to_string()

@@ -13,7 +13,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wp_contextual::WpContextual;
-use wp_derive::WpDeriveParamsField;
+use wp_derive::{WpDeriveParamsField, WpDeriveParsedValue};
 
 #[derive(
     Debug,
@@ -198,7 +198,7 @@ pub struct PostCreateParams {
     // One of: publish, future, draft, pending, private
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<PostStatus>,
+    pub status: Option<Arc<PostStatusValue>>,
     // A password to protect access to the content and excerpt.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -292,7 +292,7 @@ pub struct PostUpdateParams {
     // One of: publish, future, draft, pending, private
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<PostStatus>,
+    pub status: Option<Arc<PostStatusValue>>,
     // A password to protect access to the content and excerpt.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -390,7 +390,7 @@ pub struct SparseAnyPost {
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit, view)]
-    pub status: Option<PostStatus>,
+    pub status: Option<Arc<PostStatusValue>>,
     #[serde(rename = "type")]
     #[WpContext(edit, embed, view)]
     pub post_type: Option<String>,
@@ -604,6 +604,7 @@ pub struct PostFootnote {
     uniffi::Enum,
     strum_macros::EnumString,
     strum_macros::Display,
+    WpDeriveParsedValue,
 )]
 #[uniffi::export(Display)]
 #[serde(rename_all = "snake_case")]

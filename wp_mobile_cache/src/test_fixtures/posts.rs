@@ -1,9 +1,10 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 use wp_api::{
     media::MediaId,
     posts::{
         AnyPostWithEditContext, PostContentWithEditContext, PostFootnote, PostGuidWithEditContext,
-        PostId, PostMeta, PostStatus, PostTitleWithEditContext, SparsePostExcerpt,
+        PostId, PostMeta, PostStatus, PostStatusValue, PostTitleWithEditContext, SparsePostExcerpt,
     },
     terms::TermId,
     users::UserId,
@@ -106,7 +107,7 @@ impl PostBuilder {
 
     /// Set the post status.
     pub fn with_status(mut self, status: PostStatus) -> Self {
-        self.post.status = status;
+        self.post.status = Arc::new(PostStatusValue::from(status));
         self
     }
 
@@ -187,7 +188,7 @@ fn create_minimal_post() -> AnyPostWithEditContext {
         modified: "2024-01-01T00:00:00".to_string(),
         modified_gmt: "2024-01-01T00:00:00Z".parse().unwrap(),
         slug: "minimal-post".to_string(),
-        status: PostStatus::Publish,
+        status: Arc::new(PostStatusValue::from(PostStatus::Publish)),
         post_type: "post".to_string(),
         password: Some("".to_string()),
         permalink_template: None,
@@ -232,7 +233,7 @@ fn create_full_post() -> AnyPostWithEditContext {
         modified: "2024-01-16T14:20:00".to_string(),
         modified_gmt: "2024-01-16T14:20:00Z".parse().unwrap(),
         slug: "full-post".to_string(),
-        status: PostStatus::Draft,
+        status: Arc::new(PostStatusValue::from(PostStatus::Draft)),
         post_type: "post".to_string(),
         password: Some("secret".to_string()),
         permalink_template: Some("https://example.com/%postname%/".to_string()),
@@ -294,7 +295,7 @@ fn create_custom_post() -> AnyPostWithEditContext {
         modified: "2024-01-16T14:20:00".to_string(),
         modified_gmt: "2024-01-16T14:20:00Z".parse().unwrap(),
         slug: "1000".to_string(),
-        status: PostStatus::Draft,
+        status: Arc::new(PostStatusValue::from(PostStatus::Draft)),
         post_type: "jetpack-social-note".to_string(),
         password: None,
         permalink_template: None,

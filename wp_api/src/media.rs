@@ -3,7 +3,7 @@ use crate::{
     date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     posts::{
-        PostCommentStatus, PostId, PostPingStatus, PostStatus, WpApiParamPostsOrderBy,
+        PostCommentStatus, PostId, PostPingStatus, PostStatusValue, WpApiParamPostsOrderBy,
         WpApiParamPostsSearchColumn,
     },
     request::{MultipartFormFile, RequiresMultipartForm},
@@ -203,7 +203,7 @@ pub struct MediaUpdateParams {
     /// One of: publish, future, draft, pending, private
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<PostStatus>,
+    pub status: Option<Arc<PostStatusValue>>,
     /// The title for the post.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -270,7 +270,7 @@ pub struct MediaCreateParams {
     /// One of: publish, future, draft, pending, private
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<PostStatus>,
+    pub status: Option<Arc<PostStatusValue>>,
     /// The title for the post.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]

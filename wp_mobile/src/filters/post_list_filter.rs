@@ -169,12 +169,12 @@ impl PostListFilter {
             if self.status.contains(&PostStatus::Any) {
                 // "any" excludes statuses with `exclude_from_search = true`.
                 // In WordPress core, `trash` and `auto-draft` have this flag set by default.
-                if post.status == PostStatus::Trash
-                    || post.status == PostStatus::Custom("auto-draft".to_string())
+                if post.status.matches(PostStatus::Trash)
+                    || post.status.matches_raw("auto-draft".to_string())
                 {
                     return false;
                 }
-            } else if !self.status.contains(&post.status) {
+            } else if !self.status.iter().any(|s| post.status.matches(s.clone())) {
                 return false;
             }
         }

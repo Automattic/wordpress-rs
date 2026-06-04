@@ -1,11 +1,17 @@
 use proc_macro::TokenStream;
 
 mod params_field;
+mod parsed_value;
 mod wp_deserialize;
 
 #[proc_macro_derive(WpDeserialize)]
 pub fn derive_wp_deserialize(input: TokenStream) -> TokenStream {
     wp_deserialize::derive(input)
+}
+
+#[proc_macro_derive(WpDeriveParsedValue, attributes(parsed_value))]
+pub fn derive_parsed_value(input: TokenStream) -> TokenStream {
+    parsed_value::derive(input)
 }
 
 #[proc_macro_derive(

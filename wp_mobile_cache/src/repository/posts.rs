@@ -26,8 +26,8 @@ use wp_api::{
     posts::{
         AnyPostWithEditContext, AnyPostWithEmbedContext, AnyPostWithViewContext,
         PostContentWithEditContext, PostContentWithViewContext, PostGuidWithEditContext,
-        PostGuidWithViewContext, PostId, PostTitleWithEditContext, PostTitleWithEmbedContext,
-        PostTitleWithViewContext, SparsePostExcerpt,
+        PostGuidWithViewContext, PostId, PostStatusValue, PostTitleWithEditContext,
+        PostTitleWithEmbedContext, PostTitleWithViewContext, SparsePostExcerpt,
     },
     prelude::WpGmtDateTime,
     taxonomies::TaxonomyType,
@@ -472,7 +472,7 @@ impl PostContext for EditContext {
             modified: row.get_column(Modified)?,
             modified_gmt: parse_datetime(row, ModifiedGmt)?,
             slug: row.get_column(Slug)?,
-            status: parse_enum(row, Status)?,
+            status: Arc::new(parse_enum::<PostStatusValue, _>(row, Status)?),
             post_type: row.get_column(PostType)?,
             password: row.get_column(Password)?,
             permalink_template: row.get_column(PermalinkTemplate)?,
@@ -569,7 +569,7 @@ impl PostContext for ViewContext {
             modified: row.get_column(Modified)?,
             modified_gmt: parse_datetime(row, ModifiedGmt)?,
             slug: row.get_column(Slug)?,
-            status: parse_enum(row, Status)?,
+            status: Arc::new(parse_enum::<PostStatusValue, _>(row, Status)?),
             post_type: row.get_column(PostType)?,
             title: {
                 let title_rendered: Option<String> = row.get_column(TitleRendered)?;
@@ -1252,7 +1252,10 @@ mod tests {
             .expect("Failed to select post by entity_id")
             .expect("Post should exist");
 
-        assert_eq!(retrieved.data.post.status, post_status);
+        assert!(
+            retrieved.data.post.status.matches(post_status),
+            "Post status mismatch"
+        );
     }
 
     #[rstest]
@@ -1393,9 +1396,12 @@ mod tests {
             )
             .unwrap();
         assert_eq!(published.len(), 1);
-        assert_eq!(
-            published[0].data.post.status,
-            wp_api::posts::PostStatus::Publish
+        assert!(
+            published[0]
+                .data
+                .post
+                .status
+                .matches(wp_api::posts::PostStatus::Publish)
         );
 
         // Filter by draft status
@@ -1408,7 +1414,13 @@ mod tests {
             )
             .unwrap();
         assert_eq!(drafts.len(), 1);
-        assert_eq!(drafts[0].data.post.status, wp_api::posts::PostStatus::Draft);
+        assert!(
+            drafts[0]
+                .data
+                .post
+                .status
+                .matches(wp_api::posts::PostStatus::Draft)
+        );
 
         // No filter - returns all
         let all = test_ctx
@@ -1622,7 +1634,7 @@ mod tests {
             .expect("Post should exist after insert");
         assert_eq!(retrieved.data.row_id, entity_id.rowid);
         assert_eq!(retrieved.data.db_site_id, test_ctx.site.row_id);
-        assert_eq!(retrieved.data.post.status, PostStatus::Draft);
+        assert!(retrieved.data.post.status.matches(PostStatus::Draft));
     }
 
     #[rstest]
@@ -1660,7 +1672,7 @@ mod tests {
             .select_by_post_id(&test_ctx.conn, &test_ctx.site, PostId(200))
             .expect("Failed to select post by post_id")
             .expect("Post should exist after update");
-        assert_eq!(retrieved.data.post.status, PostStatus::Publish);
+        assert!(retrieved.data.post.status.matches(PostStatus::Publish));
         assert_eq!(retrieved.data.post.slug, "updated-slug");
 
         // Verify only one post exists with this ID
