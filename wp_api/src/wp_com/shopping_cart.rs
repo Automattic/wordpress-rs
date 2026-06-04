@@ -15,9 +15,16 @@ uniffi::custom_newtype!(CartItemId, String);
 pub struct CartItemId(pub String);
 
 uniffi::custom_newtype!(BillingPlanId, String);
+/// Billing plan identifier, returned as a numeric string by the API.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct BillingPlanId(pub String);
+
+uniffi::custom_newtype!(PurchaseId, u64);
+/// Identifies an existing purchase/subscription for renewals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PurchaseId(pub u64);
 
 /// Identifies whose cart this is: a specific site or no site.
 ///
@@ -228,7 +235,7 @@ pub struct ShoppingCartProductExtra {
     pub added_from_shopping_cart: Option<bool>,
     #[serde(default, rename = "purchaseId")]
     #[uniffi(default = None)]
-    pub purchase_id: Option<u64>,
+    pub purchase_id: Option<PurchaseId>,
     #[serde(default, rename = "purchaseType")]
     #[uniffi(default = None)]
     pub purchase_type: Option<String>,
