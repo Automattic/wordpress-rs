@@ -24,6 +24,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun WpComSiteScreen(
     onMeClicked: () -> Unit,
     onSupportConversationsClicked: () -> Unit,
+    onUnifiedConversationsClicked: () -> Unit,
     onBotConversationsClicked: () -> Unit,
     onBackClicked: () -> Unit = {}
 ) {
@@ -58,6 +59,15 @@ fun WpComSiteScreen(
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                     },
                     modifier = Modifier.clickable(onClick = onSupportConversationsClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Unified Conversations") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onUnifiedConversationsClicked)
                 )
             }
             item {

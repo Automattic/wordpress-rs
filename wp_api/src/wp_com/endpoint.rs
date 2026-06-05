@@ -42,6 +42,7 @@ pub mod subscribers_endpoint;
 pub mod support_bots_endpoint;
 pub mod support_eligibility_endpoint;
 pub mod support_tickets_endpoint;
+pub mod unified_conversations_endpoint;
 
 #[derive(uniffi::Object)]
 pub struct WpComDotOrgApiUrlResolver {

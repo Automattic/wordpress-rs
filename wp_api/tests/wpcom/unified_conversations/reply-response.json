@@ -1,0 +1,231 @@
+{
+  "id": 4396575,
+  "title": "Would it be possible to chat with a human about this?",
+  "description": "Would it be possible to chat with a human about this?",
+  "status": "new",
+  "can_accept_reply": true,
+  "created_at": "2026-04-15T00:08:14+00:00",
+  "updated_at": "2026-04-16T18:05:12+00:00",
+  "messages": [
+    {
+      "id": 17661874,
+      "message": "Would it be possible to chat with a human about this?",
+      "author_role": "user",
+      "author_name": "jkmassel",
+      "created_at": "2026-04-16T16:54:23+00:00",
+      "attachments": []
+    },
+    {
+      "id": 17661877,
+      "message": "Sure! Help is on the way!",
+      "author_role": "bot",
+      "author_name": "bot",
+      "created_at": "2026-04-16T16:54:24+00:00",
+      "attachments": []
+    },
+    {
+      "id": 17661906,
+      "message": "Would it be possible to chat with a human about this?",
+      "author_role": "user",
+      "author_name": "jkmassel",
+      "created_at": "2026-04-16T16:54:49+00:00",
+      "attachments": []
+    },
+    {
+      "id": 17661908,
+      "message": "Sure! Help is on the way!",
+      "author_role": "bot",
+      "author_name": "bot",
+      "created_at": "2026-04-16T16:54:50+00:00",
+      "attachments": []
+    },
+    {
+      "id": 17662078,
+      "message": "Would it be possible to chat with a human about this?",
+      "author_role": "user",
+      "author_name": "jkmassel",
+      "created_at": "2026-04-16T16:56:18+00:00",
+      "attachments": []
+    },
+    {
+      "id": 17662081,
+      "message": "Sure! Help is on the way!",
+      "author_role": "bot",
+      "author_name": "bot",
+      "created_at": "2026-04-16T16:56:20+00:00",
+      "attachments": []
+    },
+    {
+      "id": 17668954,
+      "message": "What's the best way to use the app?",
+      "author_role": "user",
+      "author_name": "jkmassel",
+      "created_at": "2026-04-16T17:54:09+00:00",
+      "attachments": []
+    },
+    {
+      "id": 17668974,
+      "message": "Great question! The Jetpack app is perfect for managing your site on the go - you can create posts, check your stats, respond to comments, and handle basic site management.\n\nWhat's your main goal with the app? Are you looking to publish content, track your site's performance, or manage something specific?",
+      "author_role": "bot",
+      "author_name": "bot",
+      "created_at": "2026-04-16T17:54:18+00:00",
+      "attachments": [
+        {
+          "id": 20115252203262,
+          "filename": "Get help with the Jetpack app",
+          "content_type": "text/html",
+          "size": 2260,
+          "url": "http://jetpack.com/?p=203262",
+          "metadata": {
+            "score": 0.27002066
+          }
+        },
+        {
+          "id": 1080686167000,
+          "filename": "Getting Started",
+          "content_type": "text/html",
+          "size": 16835,
+          "url": "https://apps.wordpress.com/support/mobile/getting-started/",
+          "metadata": {
+            "score": 0.25811708
+          }
+        },
+        {
+          "id": 1080686168999,
+          "filename": "How can I create a Post?",
+          "content_type": "text/html",
+          "size": 1392,
+          "url": "https://apps.wordpress.com/support/mobile/posts-and-pages/how-can-i-create-a-post/",
+          "metadata": {
+            "score": 0.26508412
+          }
+        },
+        {
+          "id": 1080686169071,
+          "filename": "How to Install and Uninstall WordPress and Jetpack Apps",
+          "content_type": "text/html",
+          "size": 1061,
+          "url": "https://apps.wordpress.com/support/mobile/login-signup/install-uninstal-jetpack-worpress-app/",
+          "metadata": {
+            "score": 0.2639684
+          }
+        },
+        {
+          "id": 1080686165225,
+          "filename": "Mobile App Support",
+          "content_type": "text/html",
+          "size": 34,
+          "url": "https://apps.wordpress.com/support/mobile/",
+          "metadata": {
+            "score": 0.26189515
+          }
+        },
+        {
+          "id": 20115252202482,
+          "filename": "Switch to the Jetpack app",
+          "content_type": "text/html",
+          "size": 2275,
+          "url": "http://jetpack.com/?p=202482",
+          "metadata": {
+            "score": 0.2606449
+          }
+        },
+        {
+          "id": 1080686169013,
+          "filename": "How to find App Logs in Jetpack App",
+          "content_type": "text/html",
+          "size": 1305,
+          "url": "https://apps.wordpress.com/support/mobile/login-signup/how-to-find-app-logs-in-jetpack-app/",
+          "metadata": {
+            "score": 0.2566855
+          }
+        },
+        {
+          "id": 1080686165623,
+          "filename": "Image, Video, and Audio",
+          "content_type": "text/html",
+          "size": 314,
+          "url": "https://apps.wordpress.com/support/mobile/images-video-and-audio/",
+          "metadata": {
+            "score": 0.25576228
+          }
+        }
+      ]
+    },
+    {
+      "id": 17669825,
+      "message": "What's the best way to use the app?",
+      "author_role": "user",
+      "author_name": "jkmassel",
+      "created_at": "2026-04-16T18:00:55+00:00",
+      "attachments": []
+    },
+    {
+      "id": 17669849,
+      "message": "The Jetpack app works best for day-to-day site management - creating posts, checking stats, managing comments, and updating content while you're away from your computer.\n\nWhat type of site are you managing, and what do you most want to accomplish with the app?",
+      "author_role": "bot",
+      "author_name": "bot",
+      "created_at": "2026-04-16T18:01:05+00:00",
+      "attachments": [
+        {
+          "id": 1080686161843,
+          "filename": "Contribute",
+          "content_type": "text/html",
+          "size": 3388,
+          "url": "https://apps.wordpress.com/contribute/",
+          "metadata": {
+            "score": 0.27968985
+          }
+        },
+        {
+          "id": 1080686165225,
+          "filename": "Mobile App Support",
+          "content_type": "text/html",
+          "size": 34,
+          "url": "https://apps.wordpress.com/support/mobile/",
+          "metadata": {
+            "score": 0.2944926
+          }
+        },
+        {
+          "id": 20115252203262,
+          "filename": "Get help with the Jetpack app",
+          "content_type": "text/html",
+          "size": 2260,
+          "url": "http://jetpack.com/?p=203262",
+          "metadata": {
+            "score": 0.29033327
+          }
+        },
+        {
+          "id": 1080686169013,
+          "filename": "How to find App Logs in Jetpack App",
+          "content_type": "text/html",
+          "size": 1305,
+          "url": "https://apps.wordpress.com/support/mobile/login-signup/how-to-find-app-logs-in-jetpack-app/",
+          "metadata": {
+            "score": 0.28003126
+          }
+        },
+        {
+          "id": 1080686167000,
+          "filename": "Getting Started",
+          "content_type": "text/html",
+          "size": 16835,
+          "url": "https://apps.wordpress.com/support/mobile/getting-started/",
+          "metadata": {
+            "score": 0.28022778
+          }
+        }
+      ]
+    },
+    {
+      "id": 17670102,
+      "message": "Thanks! I'm managing a personal blog and mostly want to publish posts from my phone.",
+      "author_role": "user",
+      "author_name": "jkmassel",
+      "created_at": "2026-04-16T18:05:12+00:00",
+      "attachments": []
+    }
+  ]
+}
