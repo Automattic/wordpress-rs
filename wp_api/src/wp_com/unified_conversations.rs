@@ -2,7 +2,12 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{JsonValue, date::WpGmtDateTime, wp_com::support_tickets::ConversationId};
+use crate::{
+    JsonValue,
+    date::WpGmtDateTime,
+    request::{MultipartFormFile, RequiresMultipartForm},
+    wp_com::support_tickets::ConversationId,
+};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct UnifiedConversationSummary {
@@ -50,6 +55,28 @@ pub struct UnifiedAttachment {
 #[derive(Debug, PartialEq, Eq, Serialize, uniffi::Record)]
 pub struct ReplyToUnifiedConversationParams {
     pub message: String,
+    #[serde(skip)]
+    #[uniffi(default = [])]
+    pub attachments: Vec<String>,
+}
+
+impl RequiresMultipartForm for ReplyToUnifiedConversationParams {
+    fn multipart_form_files(&self) -> HashMap<String, MultipartFormFile> {
+        self.attachments
+            .iter()
+            .enumerate()
+            .map(|(i, file_path)| {
+                (
+                    format!("attachment_{i}"),
+                    MultipartFormFile {
+                        file_path: file_path.clone(),
+                        mime_type: None,
+                        file_name: None,
+                    },
+                )
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]

@@ -17,7 +17,7 @@ enum UnifiedConversationsRequest {
     GetUnifiedConversationList,
     #[get(url = "/mobile-support/unified-conversations/<conversation_id>", output = UnifiedConversation)]
     GetUnifiedConversation,
-    #[post(url = "/mobile-support/unified-conversations/<conversation_id>", params = &ReplyToUnifiedConversationParams, output = UnifiedConversation)]
+    #[post(url = "/mobile-support/unified-conversations/<conversation_id>", params = &ReplyToUnifiedConversationParams, output = UnifiedConversation, multipart = true)]
     ReplyToUnifiedConversation,
 }
 
