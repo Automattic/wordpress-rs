@@ -55,6 +55,8 @@ pub struct UnifiedAttachment {
 #[derive(Debug, PartialEq, Eq, Serialize, uniffi::Record)]
 pub struct ReplyToUnifiedConversationParams {
     pub message: String,
+    #[uniffi(default = [])]
+    pub encrypted_log_ids: Vec<String>,
     #[serde(skip)]
     #[uniffi(default = [])]
     pub attachments: Vec<String>,
