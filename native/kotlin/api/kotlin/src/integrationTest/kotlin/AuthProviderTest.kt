@@ -57,7 +57,7 @@ class AuthProviderTest {
         // Assert that initial unauthorized request fails
         assert(client.request { requestBuilder ->
             requestBuilder.users().retrieveMeWithEditContext()
-        }.wpErrorCode() is WpErrorCode.Unauthorized)
+        }.wpErrorCode() == WpErrorCode.UNAUTHORIZED)
 
         // Assert that request succeeds after setting `is_authorized = true`
         dynamicAuthProvider.isAuthorized = true
@@ -80,7 +80,7 @@ class AuthProviderTest {
         // Assert that request fails without authentication
         assert(client.request { requestBuilder ->
             requestBuilder.users().retrieveMeWithEditContext()
-        }.wpErrorCode() is WpErrorCode.Unauthorized)
+        }.wpErrorCode() == WpErrorCode.UNAUTHORIZED)
 
         // Assert that request succeeds after authentication is modified
         modifiableAuthenticationProvider.setAuthentication(

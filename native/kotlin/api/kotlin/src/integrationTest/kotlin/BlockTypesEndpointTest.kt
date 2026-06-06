@@ -37,6 +37,6 @@ class BlockTypesEndpointTest {
         val result = client.request { requestBuilder ->
             requestBuilder.blockTypes().retrieveWithEditContext("nonexistent", "nonexistent")
         }
-        assert(result.wpErrorCode() is WpErrorCode.BlockTypeInvalid)
+        assertEquals(WpErrorCode.BLOCK_TYPE_INVALID, result.wpErrorCode())
     }
 }

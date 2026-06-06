@@ -539,7 +539,10 @@ impl PerformsRequests for WpLoginClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{api_error::WpErrorCode, unit_test_common::wp_network_response_from_json};
+    use crate::{
+        api_error::{WpErrorCode, WpErrorCodeValue},
+        unit_test_common::wp_network_response_from_json,
+    };
 
     #[test]
     fn test_parse_api_details_wp_error_rest_forbidden() {
@@ -553,7 +556,10 @@ mod tests {
             matches!(
                 result,
                 Err(FetchAndParseApiRootFailure::WpError {
-                    error_code: WpErrorCode::Forbidden,
+                    error_code: WpErrorCodeValue {
+                        value: Some(WpErrorCode::Forbidden),
+                        ..
+                    },
                     status_code: 403,
                     ..
                 })

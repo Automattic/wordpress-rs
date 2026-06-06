@@ -115,6 +115,6 @@ class TemplatesEndpointTest {
             client.request { requestBuilder ->
                 requestBuilder.templates().delete(TEMPLATE_TWENTY_TWENTY_FOUR_SINGLE)
             }
-        assert(result.wpErrorCode() is WpErrorCode.InvalidTemplate)
+        assertEquals(WpErrorCode.INVALID_TEMPLATE, result.wpErrorCode())
     }
 }

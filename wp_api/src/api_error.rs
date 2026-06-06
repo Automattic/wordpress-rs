@@ -2,7 +2,7 @@ use crate::request::WpRedirect;
 use crate::request::{
     HttpAuthMethod, HttpAuthMethodParsingError, RequestMethod, WpNetworkResponse,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
@@ -20,7 +20,7 @@ where
 }
 
 pub trait MaybeWpError {
-    fn wp_error_code(&self) -> Option<&WpErrorCode>;
+    fn wp_error_code(&self) -> Option<&WpErrorCodeValue>;
 
     fn is_unauthorized_error(&self) -> Option<bool>;
 }
@@ -58,7 +58,7 @@ pub enum WpApiError {
         request_method: RequestMethod,
     },
     WpError {
-        error_code: WpErrorCode,
+        error_code: WpErrorCodeValue,
         error_message: String,
         status_code: u32,
         response: String,
@@ -68,7 +68,7 @@ pub enum WpApiError {
 }
 
 impl MaybeWpError for WpApiError {
-    fn wp_error_code(&self) -> Option<&WpErrorCode> {
+    fn wp_error_code(&self) -> Option<&WpErrorCodeValue> {
         match self {
             WpApiError::WpError { error_code, .. } => Some(error_code),
             _ => None,
@@ -84,7 +84,7 @@ impl<T, E> MaybeWpError for Result<T, E>
 where
     E: MaybeWpError,
 {
-    fn wp_error_code(&self) -> Option<&WpErrorCode> {
+    fn wp_error_code(&self) -> Option<&WpErrorCodeValue> {
         if let Err(e) = self {
             e.wp_error_code()
         } else {
@@ -183,7 +183,7 @@ impl ParsedRequestError for WpApiError {
 // This type is used to parse the API errors. It then gets converted to `WpApiError::WpError`.
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct WpError {
-    pub code: WpErrorCode,
+    pub code: WpErrorCodeValue,
     pub message: String,
 }
 
@@ -197,7 +197,7 @@ impl WpError {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq, uniffi::Error)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, uniffi::Enum)]
 pub enum WpErrorCode {
     #[serde(rename = "rest_already_trashed")]
     AlreadyTrashed,
@@ -571,16 +571,50 @@ pub enum WpErrorCode {
     WpCoreUnableToDetermineInstalledPlugin,
     #[serde(rename = "unexpected_output")]
     WpCoreUnexpectedOutput,
-    // ------------------------------------------------------------------------------------
-    // Fallback to a `String` error code
-    // ------------------------------------------------------------------------------------
-    #[serde(untagged)]
-    CustomError(String),
 }
 
-impl WpErrorCode {
-    fn is_unauthorized(&self) -> bool {
-        self == &Self::Unauthorized
+/// A parsed error code value that always preserves the raw string from the API.
+///
+/// `value` is `Some` when the raw string matches a known `WpErrorCode` variant,
+/// and `None` for unknown error codes. The `raw` string is always available,
+/// making this type forward-compatible: adding new `WpErrorCode` variants does
+/// not break client code that checks the `raw` string.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct WpErrorCodeValue {
+    pub value: Option<WpErrorCode>,
+    pub raw: String,
+}
+
+impl WpErrorCodeValue {
+    pub fn is_unauthorized(&self) -> bool {
+        self.value.as_ref() == Some(&WpErrorCode::Unauthorized)
+    }
+}
+
+#[uniffi::export]
+impl WpErrorCodeValue {
+    /// Check if this error code matches a known enum variant.
+    fn is_code(&self, code: WpErrorCode) -> bool {
+        self.value.as_ref() == Some(&code)
+    }
+
+    /// Check if the raw API string matches the given string.
+    fn is_raw(&self, raw: String) -> bool {
+        self.raw == raw
+    }
+
+    /// Check if this error code matches any of the given known variants.
+    fn is_any_code(&self, codes: Vec<WpErrorCode>) -> bool {
+        self.value.as_ref().is_some_and(|v| codes.contains(v))
+    }
+}
+
+impl<'de> Deserialize<'de> for WpErrorCodeValue {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = String::deserialize(deserializer)?;
+        let value =
+            serde_json::from_value::<WpErrorCode>(serde_json::Value::String(raw.clone())).ok();
+        Ok(Self { value, raw })
     }
 }
 

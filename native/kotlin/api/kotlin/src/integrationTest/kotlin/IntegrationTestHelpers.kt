@@ -7,6 +7,7 @@ import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
+import uniffi.wp_api.WpErrorCodeValue
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_mobile.MockPostService
 import uniffi.wp_mobile.SiteInfo
@@ -94,7 +95,12 @@ fun <T> WpRequestResult<T>.assertSuccessAndRetrieveData(): T {
     return (this as WpRequestResult.Success).response
 }
 
-fun <T> WpRequestResult<T>.wpErrorCode(): WpErrorCode {
+fun <T> WpRequestResult<T>.wpErrorCode(): WpErrorCode? {
+    assert(this is WpRequestResult.WpError)
+    return (this as WpRequestResult.WpError).errorCode.value
+}
+
+fun <T> WpRequestResult<T>.wpErrorCodeValue(): WpErrorCodeValue {
     assert(this is WpRequestResult.WpError)
     return (this as WpRequestResult.WpError).errorCode
 }

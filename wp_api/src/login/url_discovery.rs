@@ -1,6 +1,6 @@
 use super::{OAuth2Endpoints, WpApiDetails};
 use crate::{
-    api_error::{RequestExecutionError, RequestExecutionErrorReason, WpErrorCode},
+    api_error::{RequestExecutionError, RequestExecutionErrorReason, WpErrorCodeValue},
     login::KnownAuthenticationBlockingPlugin,
     parsed_url::{ParseUrlError, ParsedUrl},
     request::{ResponseBodyType, WpRedirect},
@@ -501,7 +501,7 @@ pub enum FetchAndParseApiRootFailure {
         reason: Option<ParseApiRootFailureReason>,
     },
     WpError {
-        error_code: WpErrorCode,
+        error_code: WpErrorCodeValue,
         error_message: String,
         status_code: u32,
     },
@@ -834,6 +834,7 @@ impl ParseApiRootFailureReason {
 mod tests {
     use super::AutoDiscoveryAttempt as A;
     use super::*;
+    use crate::api_error::{WpErrorCode, WpErrorCodeValue};
     use crate::request::RequestMethod;
     use rstest::*;
 
@@ -1122,7 +1123,10 @@ mod tests {
                 parsed_site_url: example_parsed_url(),
                 api_root_url: example_parsed_url(),
                 fetch_and_parse_api_root_failure: FetchAndParseApiRootFailure::WpError {
-                    error_code: WpErrorCode::Forbidden,
+                    error_code: WpErrorCodeValue {
+                        value: Some(WpErrorCode::Forbidden),
+                        raw: "rest_forbidden".to_string(),
+                    },
                     error_message: "".to_string(),
                     status_code: 403,
                 },

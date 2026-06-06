@@ -115,6 +115,6 @@ class TagsEndpointTest {
                 requestBuilder.terms()
                     .retrieveWithEditContext(TermEndpointType.Tags, 9999999)
             }
-        assert(result.wpErrorCode() is WpErrorCode.TermInvalid)
+        assertEquals(WpErrorCode.TERM_INVALID, result.wpErrorCode())
     }
 }

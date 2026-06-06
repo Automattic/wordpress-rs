@@ -72,7 +72,7 @@ class PostsEndpointTest {
             client.request { requestBuilder ->
                 requestBuilder.posts().listWithEditContext(PostEndpointType.Posts, params)
             }
-        assert(result.wpErrorCode() is WpErrorCode.PostInvalidPageNumber)
+        assertEquals(WpErrorCode.POST_INVALID_PAGE_NUMBER, result.wpErrorCode())
     }
 
     @Test

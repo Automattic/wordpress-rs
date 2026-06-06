@@ -82,7 +82,7 @@ class UsersEndpointTest {
         )
         val result =
             client.request { requestBuilder -> requestBuilder.users().listWithEditContext(params) }
-        assert(result.wpErrorCode() is WpErrorCode.InvalidParam)
+        assertEquals(WpErrorCode.INVALID_PARAM, result.wpErrorCode())
     }
 
     @Test

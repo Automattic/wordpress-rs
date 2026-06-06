@@ -56,6 +56,6 @@ class BlockAutosavesEndpointTest {
         val result = client.request { requestBuilder ->
             requestBuilder.blockAutosaves().listWithEditContext(99999999L)
         }
-        assert(result.wpErrorCode() is WpErrorCode.PostInvalidParent)
+        assertEquals(WpErrorCode.POST_INVALID_PARENT, result.wpErrorCode())
     }
 }

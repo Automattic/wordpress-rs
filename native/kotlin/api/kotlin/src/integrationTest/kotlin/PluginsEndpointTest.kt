@@ -92,7 +92,7 @@ class PluginsEndpointTest {
                 )
             )
         }
-        assert(result.wpErrorCode() is WpErrorCode.CannotInstallPlugin)
+        assertEquals(WpErrorCode.CANNOT_INSTALL_PLUGIN, result.wpErrorCode())
     }
 
     @Test
@@ -100,6 +100,6 @@ class PluginsEndpointTest {
         val result = client.request { requestBuilder ->
             requestBuilder.plugins().delete(PluginSlug(HELLO_DOLLY_PLUGIN_SLUG))
         }
-        assert(result.wpErrorCode() is WpErrorCode.CannotDeleteActivePlugin)
+        assertEquals(WpErrorCode.CANNOT_DELETE_ACTIVE_PLUGIN, result.wpErrorCode())
     }
 }

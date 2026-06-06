@@ -43,6 +43,6 @@ class PostTypesEndpointTest {
         val result = client.request { requestBuilder ->
             requestBuilder.postTypes().retrieveWithEditContext(PostType.Custom("does_not_exist"))
         }
-        assert(result.wpErrorCode() is WpErrorCode.TypeInvalid)
+        assertEquals(WpErrorCode.TYPE_INVALID, result.wpErrorCode())
     }
 }
