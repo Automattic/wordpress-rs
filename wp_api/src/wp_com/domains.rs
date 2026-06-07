@@ -784,7 +784,7 @@ pub struct GoogleAppsSubscription {
     /// Whether the domain is eligible for an introductory pricing offer.
     pub is_eligible_for_introductory_offer: Option<bool>,
     /// Date the subscription was created, if active.
-    #[serde(deserialize_with = "deserialize_optional_date_string")]
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
     pub subscribed_date: Option<WpDateString>,
     /// WordPress.com billing subscription ID, if active.
     pub subscription_id: Option<SubscriptionId>,
@@ -799,7 +799,7 @@ pub struct GoogleAppsSubscription {
     /// Product slug for the subscription.
     pub product_slug: Option<ProductSlug>,
     /// Subscription expiry date.
-    #[serde(deserialize_with = "deserialize_optional_date_string")]
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
     pub expiry_date: Option<WpDateString>,
     /// Cost per mailbox at initial purchase.
     pub purchase_cost_per_mailbox: Option<EmailCostPerMailbox>,
@@ -829,7 +829,7 @@ pub struct TitanMailSubscription {
     /// URL for the Titan webmail interface.
     pub apps_url: Option<String>,
     /// Subscription expiry date.
-    #[serde(deserialize_with = "deserialize_optional_date_string")]
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
     pub expiry_date: Option<WpDateString>,
     /// Cost per mailbox at initial purchase.
     pub purchase_cost_per_mailbox: Option<EmailCostPerMailbox>,
@@ -859,7 +859,7 @@ pub struct SiteDomain {
     /// Whether the domain has expired.
     pub expired: Option<bool>,
     /// Expiry date, if applicable.
-    #[serde(deserialize_with = "deserialize_optional_date_string")]
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
     pub expiry: Option<WpDateString>,
     /// Whether the domain is expiring soon.
     pub expiry_soon: Option<bool>,
@@ -868,7 +868,7 @@ pub struct SiteDomain {
     /// Whether WHOIS privacy is enabled on the registration.
     pub has_private_registration: Option<bool>,
     /// Registration date.
-    #[serde(deserialize_with = "deserialize_optional_date_string")]
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
     pub registration_date: Option<WpDateString>,
     /// Whether this is a subdomain (e.g. `"blog.example.com"`).
     pub is_subdomain: Option<bool>,
@@ -945,7 +945,7 @@ pub struct SiteDomain {
     /// A records required for domain mapping, if any.
     pub a_records_required_for_mapping: Option<Vec<String>>,
     /// Auto-renewal date.
-    #[serde(deserialize_with = "deserialize_optional_date_string")]
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
     pub auto_renewal_date: Option<WpDateString>,
     /// Subscription ID of the bundled plan, if any.
     pub bundled_plan_subscription_id: Option<String>,
@@ -960,17 +960,17 @@ pub struct SiteDomain {
     /// Whether a WHOIS update is pending.
     pub pending_whois_update: Option<bool>,
     /// Date until the domain can be redeemed.
-    #[serde(deserialize_with = "deserialize_optional_date_string")]
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
     pub redeemable_until: Option<WpDateString>,
     /// Date until the domain can be renewed.
-    #[serde(deserialize_with = "deserialize_optional_date_string")]
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
     pub renewable_until: Option<WpDateString>,
     /// Subdomain portion, if this is a subdomain.
     pub subdomain_part: Option<String>,
     /// Unix timestamp of when TLD maintenance ends.
     pub tld_maintenance_end_time: Option<u64>,
     /// Earliest date the domain can be transferred away.
-    #[serde(deserialize_with = "deserialize_optional_date_string")]
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
     pub transfer_away_eligible_at: Option<WpDateString>,
     /// Inbound transfer status.
     pub transfer_status: Option<DomainTransferStatus>,
