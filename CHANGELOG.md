@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed a typo in a public doc comment (`maintainance` → `maintenance`)
+- Fixed a crash when using an invalid token in `WpComApiClient`
 
 ### Changed
 
