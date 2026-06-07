@@ -1,9 +1,11 @@
 use crate::context::TestContext;
+use integration_test_credentials::WpComTestCredentials;
 use libtest_mimic::Trial;
 use std::sync::Arc;
+use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::domains::{
     AllDomainsParams, CountryCode, DomainAvailabilityParams, DomainAvailabilityStatus,
-    DomainListItemStatusType, DomainName, DomainSubtypeId,
+    DomainListItemStatusType, DomainName, DomainSubtypeId, SiteDomainType,
 };
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
@@ -198,6 +200,79 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         DomainListItemStatusType::Other(s) => {
                             return Err(format!(
                                 "unexpected status type '{}' for domain '{}'",
+                                s, domain.domain.0
+                            )
+                            .into());
+                        }
+                    }
+                }
+
+                Ok(())
+            })
+        }
+    }));
+
+    // GET /sites/{siteId}/domains/
+
+    let site_id = WpComSiteId(WpComTestCredentials::instance().site_id);
+
+    trials.push(Trial::test("domains::site_domains", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                let response = ctx
+                    .client
+                    .domains()
+                    .site_domains(&site_id)
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .data;
+
+                if response.domains.is_empty() {
+                    return Err("expected at least one domain for the test site".into());
+                }
+
+                // Every domain must have a non-empty domain name.
+                for domain in &response.domains {
+                    if domain.domain.0.is_empty() {
+                        return Err("expected non-empty domain name".into());
+                    }
+                }
+
+                // The test site should have at least one wpcom subdomain.
+                let has_wpcom = response
+                    .domains
+                    .iter()
+                    .any(|d| d.domain_type == SiteDomainType::Wpcom);
+                if !has_wpcom {
+                    return Err("expected at least one domain with type 'wpcom'".into());
+                }
+
+                // Exactly one domain should be primary.
+                let primary_count = response
+                    .domains
+                    .iter()
+                    .filter(|d| d.primary_domain == Some(true))
+                    .count();
+                if primary_count != 1 {
+                    return Err(format!(
+                        "expected exactly 1 primary domain, got {}",
+                        primary_count
+                    )
+                    .into());
+                }
+
+                // All domain types should be known values.
+                for domain in &response.domains {
+                    match &domain.domain_type {
+                        SiteDomainType::Registered
+                        | SiteDomainType::Mapping
+                        | SiteDomainType::Transfer
+                        | SiteDomainType::Redirect
+                        | SiteDomainType::Wpcom => {}
+                        SiteDomainType::Other(s) => {
+                            return Err(format!(
+                                "unexpected domain type '{}' for domain '{}'",
                                 s, domain.domain.0
                             )
                             .into());
