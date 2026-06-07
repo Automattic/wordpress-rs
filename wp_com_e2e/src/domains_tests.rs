@@ -1,8 +1,6 @@
 use crate::context::TestContext;
-use integration_test_credentials::WpComTestCredentials;
 use libtest_mimic::Trial;
 use std::sync::Arc;
-use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::domains::{
     AllDomainsParams, CountryCode, DomainAvailabilityParams, DomainAvailabilityStatus,
     DomainListItemStatusType, DomainName, DomainSubtypeId, SiteDomainType,
@@ -214,7 +212,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
     // GET /sites/{siteId}/domains/
 
-    let site_id = WpComSiteId(WpComTestCredentials::instance().site_id);
+    let site_id = ctx.site_id;
 
     trials.push(Trial::test("domains::site_domains", {
         let ctx = Arc::clone(&ctx);
