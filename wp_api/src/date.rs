@@ -36,6 +36,10 @@ uniffi::custom_type!(WpGmtDateTime, i64, {
 uniffi::custom_newtype!(WpDateString, String);
 /// A date string in `"YYYY-MM-DD"` format as returned by some WordPress.com
 /// API fields (e.g. domain expiry, registration date).
+///
+/// Some PHP endpoints return `false` instead of `null` when a date is not
+/// applicable. Use [`deserialize_optional_date_string`] on fields that
+/// exhibit this pattern.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct WpDateString(pub String);
@@ -43,6 +47,34 @@ pub struct WpDateString(pub String);
 impl Display for WpDateString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+/// Deserialize an `Option<WpDateString>` that may be a string, `null`, or
+/// boolean `false` (a common PHP pattern for "not applicable").
+pub fn deserialize_optional_date_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<WpDateString>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NullFalseOrString {
+        Null,
+        Bool(bool),
+        String(String),
+    }
+
+    match NullFalseOrString::deserialize(deserializer)? {
+        NullFalseOrString::Null | NullFalseOrString::Bool(false) => Ok(None),
+        NullFalseOrString::Bool(true) => Err(serde::de::Error::custom(
+            "expected a date string, `null`, or `false`, got `true`",
+        )),
+        NullFalseOrString::String(s) if s.to_lowercase().trim() == "false" => Ok(None),
+        NullFalseOrString::String(s) => Ok(Some(WpDateString(s))),
     }
 }
 
