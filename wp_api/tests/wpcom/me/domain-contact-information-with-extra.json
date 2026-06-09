@@ -1,0 +1,19 @@
+{
+  "first_name": "Hans",
+  "last_name": "Mueller",
+  "organization": "Beispiel GmbH",
+  "address_1": "Musterstr. 42",
+  "address_2": null,
+  "postal_code": "10115",
+  "city": "Berlin",
+  "state": null,
+  "country_code": "DE",
+  "email": "hans@beispiel.example",
+  "phone": "+49.3012345678",
+  "fax": null,
+  "extra": {
+    "de": {
+      "address_1_de": "Musterstraße 42"
+    }
+  }
+}

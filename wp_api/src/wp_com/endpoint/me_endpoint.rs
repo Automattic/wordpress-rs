@@ -1,5 +1,5 @@
 use crate::wp_com::domains::SupportedCountries;
-use crate::wp_com::me::WPComUserInfo;
+use crate::wp_com::me::{DomainContactInformation, WPComUserInfo};
 use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
     wp_com::WpComNamespace,
@@ -12,6 +12,8 @@ enum MeRequest {
     Get,
     #[get(url = "/me/transactions/supported-countries", output = SupportedCountries)]
     TransactionsSupportedCountries,
+    #[get(url = "/me/domain-contact-information", output = DomainContactInformation)]
+    DomainContactInformation,
 }
 
 impl DerivedRequest for MeRequest {
@@ -47,6 +49,14 @@ mod tests {
         validate_wp_com_rest_v1_1_endpoint(
             endpoint.transactions_supported_countries(),
             "/me/transactions/supported-countries",
+        );
+    }
+
+    #[rstest]
+    fn domain_contact_information(endpoint: MeRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.domain_contact_information(),
+            "/me/domain-contact-information",
         );
     }
 }
