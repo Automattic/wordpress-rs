@@ -58,24 +58,8 @@ pub fn deserialize_optional_date_string<'de, D>(
 where
     D: serde::Deserializer<'de>,
 {
-    use serde::Deserialize;
-
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum NullFalseOrString {
-        Null,
-        Bool(bool),
-        String(String),
-    }
-
-    match NullFalseOrString::deserialize(deserializer)? {
-        NullFalseOrString::Null | NullFalseOrString::Bool(false) => Ok(None),
-        NullFalseOrString::Bool(true) => Err(serde::de::Error::custom(
-            "expected a date string, `null`, or `false`, got `true`",
-        )),
-        NullFalseOrString::String(s) if s.to_lowercase().trim() == "false" => Ok(None),
-        NullFalseOrString::String(s) => Ok(Some(WpDateString(s))),
-    }
+    wp_serde_helper::deserialize_false_or_string_or_null(deserializer)
+        .map(|opt| opt.map(WpDateString))
 }
 
 // Assertion functions that should only be used by the native test suite

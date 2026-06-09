@@ -62,6 +62,42 @@ where
     }
 }
 
+/// Deserialize a value that can be `null`, boolean `false`, or a string.
+///
+/// Returns `None` if the value is:
+/// - `null`
+/// - Boolean `false`
+/// - The string `"false"` (case-insensitive, whitespace-trimmed)
+///
+/// Returns `Some(String)` for any other string value.
+///
+/// This is the null-aware counterpart of [`deserialize_false_or_string`],
+/// intended for `Option<T>` fields where the API may return `null`, `false`,
+/// or a string.
+pub fn deserialize_false_or_string_or_null<'de, D>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NullFalseOrString {
+        Null,
+        Bool(bool),
+        String(String),
+    }
+
+    match NullFalseOrString::deserialize(deserializer)? {
+        NullFalseOrString::Null | NullFalseOrString::Bool(false) => Ok(None),
+        NullFalseOrString::Bool(true) => Err(de::Error::custom(
+            "expected a string, `null`, or `false`, got `true`",
+        )),
+        NullFalseOrString::String(s) if s.to_lowercase().trim() == "false" => Ok(None),
+        NullFalseOrString::String(s) => Ok(Some(s)),
+    }
+}
+
 /// Deserialize a value that can be either a single string or an array of strings.
 ///
 /// - A single string `"foo"` becomes `vec!["foo"]`
@@ -175,6 +211,41 @@ mod tests {
         let option_string_vec_or_string: OptionStringVecOrString =
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, option_string_vec_or_string.string);
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct NullStringOrBool {
+        #[serde(default, deserialize_with = "deserialize_false_or_string_or_null")]
+        pub value: Option<String>,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": "foo"}"#, Some("foo".to_string()))]
+    #[case(r#"{"value": "false"}"#, None)]
+    #[case(r#"{"value": false}"#, None)]
+    #[case(r#"{"value": null}"#, None)]
+    #[case(r#"{}"#, None)]
+    fn test_deserialize_false_or_string_or_null(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<String>,
+    ) {
+        let result: NullStringOrBool =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, result.value);
+    }
+
+    #[rstest]
+    #[case(
+        r#"{"value": true}"#,
+        r#"expected a string, `null`, or `false`, got `true` at line 1 column 15"#
+    )]
+    fn test_deserialize_false_or_string_or_null_errors(
+        #[case] test_case: &str,
+        #[case] expected_error_message: &str,
+    ) {
+        let result: Result<NullStringOrBool, serde_json::Error> = serde_json::from_str(test_case);
+        assert!(result.is_err(), "The deserializer should emit an error");
+        assert_eq!(result.err().unwrap().to_string(), expected_error_message);
     }
 
     #[rstest]
