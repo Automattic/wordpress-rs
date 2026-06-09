@@ -15,6 +15,8 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/autosave` — autosave post revision
 - [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/delete` — delete/trash post
 - [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/restore` — restore trashed post
+- [ ] `GET /rest/v1.1/sites/$site/posts/$post_id/autosave` — retrieve autosave
+- [ ] `GET /rest/v1.1/sites/$site/post-types` — list post types
 
 ## Revisions
 
@@ -40,10 +42,19 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `POST /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/new` — create term
 - [ ] `POST /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/$slug` — update term
 - [ ] `POST /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/$slug/delete` — delete term
+- [ ] `GET /rest/v1.1/sites/$site/categories` — list categories (iOS path)
+- [ ] `POST /rest/v1.1/sites/$site/categories/new` — create category (iOS path)
+- [ ] `GET /rest/v1.1/sites/$site/tags` — list tags (iOS path)
+- [ ] `POST /rest/v1.1/sites/$site/tags/new` — create tag (iOS path)
+- [ ] `POST /rest/v1.1/sites/$site/tags/slug:$slug` — update tag (iOS path)
+- [ ] `POST /rest/v1.1/sites/$site/tags/slug:$slug/delete` — delete tag (iOS path)
 
 ## Blogging Prompts
 
-- [ ] `GET /wpcom/v3/sites/$site/blogging-prompts` — fetch blogging prompts
+- [ ] `GET /wpcom/v3/sites/$site/blogging-prompts` — fetch blogging prompts (Android v3)
+- [ ] `GET /wpcom/v2/sites/$site/blogging-prompts` — fetch blogging prompts (iOS v2)
+- [ ] `GET /wpcom/v2/sites/$site/blogging-prompts/settings` — fetch prompts settings
+- [ ] `POST /wpcom/v2/sites/$site/blogging-prompts/settings` — update prompts settings
 
 ## Stats — Insights
 
@@ -75,6 +86,19 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [x] `GET /rest/v1.1/sites/$site/stats/search-terms` — search engine terms
 - [x] `GET /rest/v1.1/sites/$site/stats/video-plays` — video play stats
 - [ ] `GET /rest/v1.1/sites/$site/stats/location-views/country` — views by country
+- [x] `GET /rest/v1.1/sites/$site/stats/location-views/region` — views by region
+- [x] `GET /rest/v1.1/sites/$site/stats/location-views/city` — views by city
+- [ ] `GET /rest/v1.1/sites/$site/stats/archives` — archive stats
+- [x] `GET /rest/v1.1/sites/$site/stats/devices/screensize` — device stats by screen size
+- [x] `GET /rest/v1.1/sites/$site/stats/devices/platform` — device stats by platform
+- [x] `GET /rest/v1.1/sites/$site/stats/devices/browser` — device stats by browser
+- [x] `GET /rest/v1.1/sites/$site/stats/utm/$grouping` — UTM stats
+- [ ] `GET /rest/v1.1/sites/$site/stats/opens/emails/$post/rate` — email open rate
+
+## Stats — WordAds
+
+- [ ] `GET /rest/v1.1/sites/$site/wordads/stats` — WordAds stats (impressions, revenue)
+- [ ] `GET /rest/v1.1/sites/$site/wordads/earnings` — WordAds earnings
 
 ## Blaze
 
@@ -124,8 +148,11 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `GET /rest/v1.1/me/settings/` — fetch account settings
 - [ ] `POST /rest/v1.1/me/settings/` — update account settings
 - [ ] `POST /rest/v1.1/me/username/` — change username
+- [ ] `GET /rest/v1.1/me/username/validate/$username` — validate username
+- [ ] `POST /rest/v1.1/me/sites` — update blogs visibility
 - [ ] `POST /rest/v1.1/me/send-verification-email/` — send verification email
 - [ ] `GET /rest/v1.1/me/domain-contact-information/` — fetch domain contact info
+- [ ] `POST /rest/v1.1/me/domain-contact-information/validate` — validate domain contact info
 - [ ] `POST /rest/v1.1/me/account/close/` — close/delete account
 - [ ] `GET /rest/v1.1/me/notifications/settings/` — get push notification settings
 - [ ] `POST /rest/v1.1/me/notifications/settings/` — save notification settings
@@ -153,6 +180,7 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `POST wp-login.php?action=webauthn-challenge-endpoint` — WebAuthn challenge
 - [ ] `POST wp-login.php?action=webauthn-authentication-endpoint` — WebAuthn auth
 - [ ] `POST /rest/v1.1/me/social-login/connect/` — connect social account
+- [ ] `POST /rest/v1.1/me/social-login/disconnect` — disconnect social account
 - [ ] `POST /rest/v1.1/users/social/new/` — create account via social provider
 
 ## Account — Signup
@@ -183,6 +211,7 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `POST /rest/v1.1/sites/$site/homepage/` — update homepage settings
 - [ ] `POST /rest/v1.1/sites/$site/mobile-quick-start/` — complete Quick Start
 - [ ] `GET /rest/v1.1/sites/$site/purchases` — get site purchases
+- [ ] `GET /rest/v1.1/sites/$site/follows` — list site followers
 - [ ] `GET /rest/v1.1/connect/site-info/` — fetch connection info for URL
 - [x] `GET /rest/v1.1/sites/$site_url/` — fetch site by URL (unauthenticated)
 
@@ -208,6 +237,8 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `GET /wpcom/v2/sites/$site/atomic-auth-proxy/read-access-cookies/` — fetch access cookies
 - [ ] `GET /wpcom/v2/sites/$site/rewind/capabilities/` — Jetpack Backup capabilities
 - [ ] `GET /wpcom/v2/sites/$site/jetpack-social/` — Jetpack Social info
+- [ ] `GET /wpcom/v2/sites/$site/hosting/error-logs/` — Atomic PHP error logs
+- [ ] `GET /wpcom/v2/sites/$site/hosting/logs/` — Atomic web server logs
 - [ ] `GET /rest/v1.1/sites/$site/jetpack/modules` — get Jetpack module settings
 - [ ] `POST /rest/v1.1/sites/$site/jetpack/modules/$module` — set Jetpack module
 - [ ] `GET /rest/v1.1/jetpack-blogs/$site` — get Jetpack monitor settings
@@ -229,6 +260,13 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `GET /rest/v1.1/domains/$domain/price/` — domain price
 - [ ] `POST /rest/v1.1/sites/$site/domains/primary/` — set primary domain
 
+## Menus
+
+- [ ] `GET /rest/v1.1/sites/$site/menus` — list menus and locations
+- [ ] `POST /rest/v1.1/sites/$site/menus/new` — create menu
+- [ ] `POST /rest/v1.1/sites/$site/menus/$menu` — update menu
+- [ ] `POST /rest/v1.1/sites/$site/menus/$menu/delete` — delete menu
+
 ## Dashboard
 
 - [ ] `GET /wpcom/v2/sites/$site/dashboard/cards-data/` — fetch dashboard cards
@@ -247,6 +285,8 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 ## Verticals
 
 - [x] `GET /wpcom/v2/segments/` — fetch site creation segments
+- [ ] `GET /wpcom/v2/verticals` — search site verticals
+- [ ] `GET /wpcom/v2/verticals/prompt` — verticals prompt text
 
 ## Timezones
 
@@ -278,10 +318,14 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `GET /rest/v1.3/read/menu` — get Reader menu (tags)
 - [ ] `GET /wpcom/v2/read/interests` — fetch interest/onboarding tags
 - [ ] `GET /wpcom/v2/read/streams/discover` — Discover recommended posts
+- [ ] `GET /wpcom/v2/read/streams/$stream` — named discover streams (generic)
+- [ ] `GET /wpcom/v2/read/tags/cards` — reader cards for tags
 - [ ] `GET /wpcom/v2/read/tags/posts` — Discover latest posts
 
 ## Reader — Tags
 
+- [ ] `GET /rest/v1.2/read/tags/$slug` — fetch tag info by slug
+- [ ] `POST /rest/v1.1/read/tags/$tag/mine/new` — follow a tag
 - [ ] `POST /rest/v1.1/read/tags/$tag/mine/delete` — delete followed tag
 - [ ] `POST /rest/v1.2/read/tags/mine/new` — add followed tags (batch)
 
@@ -302,6 +346,14 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `POST /wpcom/v2/seen-posts/seen/blog/new` — mark blog post as seen
 - [ ] `POST /wpcom/v2/seen-posts/seen/delete` — mark feed post as unseen
 - [ ] `POST /wpcom/v2/seen-posts/seen/blog/delete` — mark blog post as unseen
+
+## Reader — URL Resolution
+
+- [ ] `GET /wpcom/v2/mobile/resolve-reader-url` — resolve URL to reader post/site
+
+## Reader — Following Status
+
+- [ ] `GET /rest/v1.1/sites/$site/follows/mine` — check if following site
 
 ## Reader — Tracking
 
@@ -332,10 +384,19 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `POST /wpcom/v2/sites/$site/invites/links/disable` — disable invite links
 - [ ] `GET /rest/v1.1/batch/` — batch user lookups
 
+## Subscribers Management
+
+- [x] `GET /wpcom/v2/sites/$site/subscribers` — list subscribers
+- [x] `GET /wpcom/v2/sites/$site/subscribers/individual` — subscriber details
+- [x] `GET /wpcom/v2/sites/$site/individual-subscriber-stats` — subscriber stats
+- [x] `POST /wpcom/v2/sites/$site/subscribers/import` — import subscribers by email
+
 ## Publicize (Social Sharing)
 
+- [ ] `GET /rest/v1.1/meta/external-services` — list publicize services (global)
 - [ ] `GET /rest/v1.1/sites/$site/publicize-connections` — list connections
 - [ ] `POST /rest/v1.1/sites/$site/publicize-connections/new` — create connection
+- [ ] `POST /rest/v1.1/sites/$site/publicize-connections/$conn_id` — update connection
 - [ ] `POST /rest/v1.1/sites/$site/publicize-connections/$conn_id/delete` — disconnect
 - [ ] `GET /wpcom/v2/sites/$site/external-services?type=publicize` — list services
 - [ ] `GET /rest/v1.1/sites/$site/sharing-buttons` — get sharing buttons
@@ -354,6 +415,8 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `POST /rest/v1.1/sites/$site/media/new` — upload media file
 - [ ] `POST /rest/v1.1/sites/$site/media/$media_id/delete` — delete media item
 - [ ] `POST /rest/v1.1/sites/$site/external-media-upload` — upload stock media by URL
+- [ ] `GET /rest/v1.1/videos/$videopress_id` — VideoPress metadata
+- [ ] `POST /rest/v2.0/sites/$site/media/videopress-playback-jwt/$videopress_id` — VideoPress JWT
 
 ## Stock Media
 
@@ -366,6 +429,7 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin/delete` — delete plugin
 - [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin/install` — install plugin
 - [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin/update` — update plugin
+- [ ] `GET /wpcom/v2/plugins/featured` — featured plugins list
 
 ## Plans & Products
 
@@ -393,10 +457,14 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `POST /rest/v1.1/sites/$site/themes/$theme/install` — install theme
 - [ ] `POST /rest/v1.1/sites/$site/themes/$theme/delete` — delete theme
 - [ ] `GET /wpcom/v2/common-starter-site-designs` — fetch starter designs
+- [ ] `GET /rest/v1.1/themes/$theme` — fetch single theme by ID
+- [ ] `GET /wpcom/v2/themes` — list WPCom themes (v2)
+- [ ] `GET /rest/v1.1/sites/$site/themes/purchased` — purchased themes
 
 ## Activity Log
 
 - [ ] `GET /wpcom/v2/sites/$site/activity/` — fetch activity log (paginated)
+- [ ] `GET /wpcom/v2/sites/$site/activity/rewindable` — rewindable activity only
 - [ ] `GET /wpcom/v2/sites/$site/activity/count/group/` — activity type counts
 - [ ] `GET /wpcom/v2/sites/$site/rewind/` — fetch rewind/backup status
 - [ ] `POST /rest/v1/activity-log/$site/rewind/to/$rewind_id/` — rewind to point
