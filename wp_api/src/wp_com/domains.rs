@@ -1,10 +1,11 @@
 use crate::{
-    date::WpGmtDateTime,
+    date::{WpDateString, WpGmtDateTime, deserialize_optional_date_string},
     decimal2::Decimal2,
     impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::{
         CurrencyCode, WpComSiteId,
+        me::WpComUserId,
         products::{ProductId, ProductSlug},
         segments::SegmentId,
         sites::WpComSiteSlug,
@@ -652,6 +653,333 @@ pub struct SupportedState {
     pub name: String,
 }
 
+/// Response from `GET /rest/v1.1/sites/{siteId}/domains/`.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct SiteDomainsResponse {
+    /// List of domains associated with the site.
+    pub domains: Vec<SiteDomain>,
+}
+
+/// How a domain is associated with a WordPress.com site.
+///
+/// Values returned by the `type` field in
+/// `GET /rest/v1.1/sites/{siteId}/domains/`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum SiteDomainType {
+    /// Domain registered through WordPress.com.
+    Registered,
+    /// Domain mapping to an external domain.
+    Mapping,
+    /// Domain transfer in progress.
+    Transfer,
+    /// Site redirect to another URL.
+    Redirect,
+    /// Free WordPress.com subdomain (e.g. `"mysite.wordpress.com"`).
+    Wpcom,
+    /// A type not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// SSL certificate provisioning status for a domain.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainSslStatus {
+    /// SSL certificate is provisioned and active.
+    Active,
+    /// SSL certificate is pending provisioning.
+    Pending,
+    /// Domain was recently registered; SSL is transitional.
+    NewlyRegistered,
+    /// SSL is disabled (e.g. domain expired).
+    Disabled,
+    /// A status not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// Inbound transfer status for a domain.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainTransferStatus {
+    /// Transfer has not yet started.
+    PendingStart,
+    /// Transfer is awaiting registry approval.
+    PendingRegistry,
+    /// Transfer is being processed asynchronously.
+    PendingAsync,
+    /// Transfer has completed.
+    Completed,
+    /// A status not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// How a mapped domain's DNS is configured.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainConnectionMode {
+    /// Default DNS configuration recommended by WordPress.com.
+    Suggested,
+    /// Custom DNS configuration managed by the user.
+    Advanced,
+    /// A mode not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// Google Workspace email subscription status.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum GoogleAppsSubscriptionStatus {
+    /// No Google Workspace subscription exists.
+    NoSubscription,
+    /// Subscription is active.
+    Active,
+    /// Pending Terms of Service acceptance.
+    PendingTosAcceptance,
+    /// Subscription is suspended.
+    Suspended,
+    /// Status could not be determined.
+    Unknown,
+    /// A status not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// Titan Mail subscription status.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum TitanMailSubscriptionStatus {
+    /// No Titan Mail subscription exists.
+    NoSubscription,
+    /// Subscription is active.
+    Active,
+    /// Subscription is suspended.
+    Suspended,
+    /// Subscription has been cancelled.
+    Cancelled,
+    /// A status not covered by the known variants.
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// Per-mailbox cost information for an email subscription.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct EmailCostPerMailbox {
+    /// Numeric cost amount.
+    pub amount: Decimal2,
+    /// ISO 4217 currency code.
+    pub currency: CurrencyCode,
+    /// Formatted cost string (e.g. `"$6.00"`).
+    pub text: String,
+}
+
+/// Google Workspace subscription details for a domain.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct GoogleAppsSubscription {
+    /// Subscription status.
+    pub status: GoogleAppsSubscriptionStatus,
+    /// Whether the domain is eligible for an introductory pricing offer.
+    pub is_eligible_for_introductory_offer: Option<bool>,
+    /// Date the subscription was created, if active.
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
+    pub subscribed_date: Option<WpDateString>,
+    /// WordPress.com billing subscription ID, if active.
+    pub subscription_id: Option<SubscriptionId>,
+    /// WordPress.com user ID of the subscription owner, if active.
+    pub owned_by_user_id: Option<WpComUserId>,
+    /// Whether Terms of Service acceptance is pending.
+    pub pending_tos_acceptance: Option<bool>,
+    /// Whether the expected DNS records are present.
+    pub has_expected_dns_records: Option<bool>,
+    /// Total number of provisioned mailboxes, if active.
+    pub total_user_count: Option<u32>,
+    /// Product slug for the subscription.
+    pub product_slug: Option<ProductSlug>,
+    /// Subscription expiry date.
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
+    pub expiry_date: Option<WpDateString>,
+    /// Cost per mailbox at initial purchase.
+    pub purchase_cost_per_mailbox: Option<EmailCostPerMailbox>,
+    /// Cost per mailbox at renewal.
+    pub renewal_cost_per_mailbox: Option<EmailCostPerMailbox>,
+}
+
+/// Titan Mail subscription details for a domain.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct TitanMailSubscription {
+    /// Subscription status.
+    pub status: TitanMailSubscriptionStatus,
+    /// Whether the domain is eligible for an introductory pricing offer.
+    pub is_eligible_for_introductory_offer: Option<bool>,
+    /// Order ID for the subscription, if active.
+    pub order_id: Option<String>,
+    /// Whether the expected DNS records are present.
+    pub has_expected_dns_records: Option<bool>,
+    /// Maximum number of mailboxes allowed.
+    pub maximum_mailbox_count: Option<u32>,
+    /// Current number of active mailboxes.
+    pub number_of_mailboxes: Option<u32>,
+    /// WordPress.com user ID of the subscription owner.
+    pub owned_by_user_id: Option<WpComUserId>,
+    /// WordPress.com billing subscription ID, if active.
+    pub subscription_id: Option<SubscriptionId>,
+    /// URL for the Titan webmail interface.
+    pub apps_url: Option<String>,
+    /// Subscription expiry date.
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
+    pub expiry_date: Option<WpDateString>,
+    /// Cost per mailbox at initial purchase.
+    pub purchase_cost_per_mailbox: Option<EmailCostPerMailbox>,
+    /// Cost per mailbox at renewal.
+    pub renewal_cost_per_mailbox: Option<EmailCostPerMailbox>,
+    /// Product slug for the subscription.
+    pub product_slug: Option<ProductSlug>,
+}
+
+/// A domain associated with a specific WordPress.com site, as returned by
+/// `GET /rest/v1.1/sites/{siteId}/domains/`.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct SiteDomain {
+    /// The domain name (e.g. `"example.com"`).
+    pub domain: DomainName,
+    /// The site ID this domain belongs to.
+    pub blog_id: WpComSiteId,
+    /// How the domain is associated with the site.
+    #[serde(rename = "type")]
+    pub domain_type: SiteDomainType,
+    /// Whether this is the primary domain for the site.
+    pub primary_domain: Option<bool>,
+    /// Whether this is a free WordPress.com subdomain.
+    pub wpcom_domain: Option<bool>,
+    /// Whether automatic renewal is enabled.
+    pub auto_renewing: Option<bool>,
+    /// Whether the domain has expired.
+    pub expired: Option<bool>,
+    /// Expiry date, if applicable.
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
+    pub expiry: Option<WpDateString>,
+    /// Whether the domain is expiring soon.
+    pub expiry_soon: Option<bool>,
+    /// Whether the domain has an active registration.
+    pub has_registration: Option<bool>,
+    /// Whether WHOIS privacy is enabled on the registration.
+    pub has_private_registration: Option<bool>,
+    /// Registration date.
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
+    pub registration_date: Option<WpDateString>,
+    /// Whether this is a subdomain (e.g. `"blog.example.com"`).
+    pub is_subdomain: Option<bool>,
+    /// Whether this is a premium domain.
+    pub is_premium: Option<bool>,
+    /// Whether the domain registrar lock is active.
+    pub is_locked: Option<bool>,
+    /// Whether the domain can be renewed.
+    pub is_renewable: Option<bool>,
+    /// Whether the domain is in the redemption grace period.
+    pub is_redeemable: Option<bool>,
+    /// Whether ICANN verification is pending.
+    pub is_pending_icann_verification: Option<bool>,
+    /// Whether this is a WordPress.com staging domain.
+    pub is_wpcom_staging_domain: Option<bool>,
+    /// Whether the domain is eligible for inbound transfer.
+    pub is_eligible_for_inbound_transfer: Option<bool>,
+    /// Whether the WHOIS contact information can be edited.
+    pub is_whois_editable: Option<bool>,
+    /// Email address of the domain owner.
+    pub owner: Option<String>,
+    /// Domain registrar (e.g. `"OPENSRS"`).
+    pub registrar: Option<String>,
+    /// Product slug for the domain subscription (e.g. `"domain_reg"`).
+    pub product_slug: Option<ProductSlug>,
+    /// WordPress.com billing subscription ID for the domain purchase.
+    pub subscription_id: Option<SubscriptionId>,
+    /// Whether domain registration is pending.
+    pub pending_registration: Option<bool>,
+    /// Whether a domain transfer is pending.
+    pub pending_transfer: Option<bool>,
+    /// Whether the domain's DNS is pointed to WordPress.com.
+    pub points_to_wpcom: Option<bool>,
+    /// Whether the domain uses WordPress.com nameservers.
+    pub has_wpcom_nameservers: Option<bool>,
+    /// Whether a DNS zone exists for this domain.
+    pub has_zone: Option<bool>,
+    /// Whether this domain can be set as the site's primary domain.
+    pub can_set_as_primary: Option<bool>,
+    /// Whether the domain supports Domain Connect protocol.
+    pub supports_domain_connect: Option<bool>,
+    /// Whether GDPR consent management is supported.
+    pub supports_gdpr_consent_management: Option<bool>,
+    /// Whether transfer approval is supported.
+    pub supports_transfer_approval: Option<bool>,
+    /// Whether registrar-level domain locking is available.
+    pub domain_locking_available: Option<bool>,
+    /// Whether the transfer lock on WHOIS update is optional.
+    pub transfer_lock_on_whois_update_optional: Option<bool>,
+    /// Whether WHOIS privacy protection is available.
+    pub privacy_available: Option<bool>,
+    /// Whether the domain has been set to private.
+    pub private_domain: Option<bool>,
+    /// Whether contact information is publicly disclosed.
+    pub contact_info_disclosed: Option<bool>,
+    /// Whether contact info disclosure settings can be changed.
+    pub contact_info_disclosure_available: Option<bool>,
+    /// Whether the current user can manage this domain.
+    pub current_user_can_manage: Option<bool>,
+    /// Whether the current user can add email to this domain.
+    pub current_user_can_add_email: Option<bool>,
+    /// Whether the current user can create a site from this domain.
+    pub current_user_can_create_site_from_domain_only: Option<bool>,
+    /// SSL certificate status.
+    pub ssl_status: Option<DomainSslStatus>,
+    /// Number of email forwards configured.
+    pub email_forwards_count: Option<u32>,
+    /// Whether this is a newly registered domain.
+    pub new_registration: Option<bool>,
+    /// Whether a manual transfer is required.
+    pub manual_transfer_required: Option<bool>,
+    /// Whether this domain was provided by a partner program.
+    pub partner_domain: Option<bool>,
+    /// A records required for domain mapping, if any.
+    pub a_records_required_for_mapping: Option<Vec<String>>,
+    /// Auto-renewal date.
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
+    pub auto_renewal_date: Option<WpDateString>,
+    /// Subscription ID of the bundled plan, if any.
+    pub bundled_plan_subscription_id: Option<String>,
+    /// DNS connection mode for mapped domains.
+    pub connection_mode: Option<DomainConnectionMode>,
+    /// URL to the domain registration agreement.
+    pub domain_registration_agreement_url: Option<String>,
+    /// Google Workspace email subscription, if configured.
+    pub google_apps_subscription: Option<GoogleAppsSubscription>,
+    /// Time when domain registration becomes pending, if applicable.
+    pub pending_registration_time: Option<String>,
+    /// Whether a WHOIS update is pending.
+    pub pending_whois_update: Option<bool>,
+    /// Date until the domain can be redeemed.
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
+    pub redeemable_until: Option<WpDateString>,
+    /// Date until the domain can be renewed.
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
+    pub renewable_until: Option<WpDateString>,
+    /// Subdomain portion, if this is a subdomain.
+    pub subdomain_part: Option<String>,
+    /// Unix timestamp of when TLD maintenance ends.
+    pub tld_maintenance_end_time: Option<u64>,
+    /// Earliest date the domain can be transferred away.
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
+    pub transfer_away_eligible_at: Option<WpDateString>,
+    /// Inbound transfer status.
+    pub transfer_status: Option<DomainTransferStatus>,
+    /// Titan Mail email subscription, if configured.
+    pub titan_mail_subscription: Option<TitanMailSubscription>,
+    /// WHOIS fields that cannot be modified, if any.
+    pub whois_update_unmodifiable_fields: Option<Vec<String>>,
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;
@@ -1237,5 +1565,199 @@ mod tests {
                 .message
                 .contains("SSL certificate")
         );
+    }
+
+    #[rstest]
+    #[case("tests/wpcom/domains/site_domains/basic.json", 2)]
+    #[case("tests/wpcom/domains/site_domains/with-email-subscriptions.json", 3)]
+    fn test_site_domains_deserialization(
+        #[case] json_file_path: &str,
+        #[case] expected_len: usize,
+    ) {
+        let file = File::open(json_file_path).expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert_eq!(response.domains.len(), expected_len);
+    }
+
+    #[test]
+    fn test_site_domains_basic_wpcom_subdomain() {
+        let file =
+            File::open("tests/wpcom/domains/site_domains/basic.json").expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let wpcom = &response.domains[0];
+        assert_eq!(wpcom.domain.0, "fake-example-site.wordpress.com");
+        assert_eq!(wpcom.blog_id, WpComSiteId(11111));
+        assert_eq!(wpcom.domain_type, SiteDomainType::Wpcom);
+        assert_eq!(wpcom.primary_domain, Some(false));
+        assert_eq!(wpcom.wpcom_domain, Some(true));
+        assert_eq!(wpcom.auto_renewing, Some(false));
+        assert_eq!(wpcom.expired, Some(false));
+        assert!(wpcom.expiry.is_none());
+        assert_eq!(wpcom.has_registration, Some(false));
+        assert_eq!(wpcom.ssl_status.as_ref(), Some(&DomainSslStatus::Active));
+        assert!(wpcom.google_apps_subscription.is_none());
+        assert!(wpcom.titan_mail_subscription.is_none());
+        assert!(wpcom.subscription_id.is_none());
+    }
+
+    #[test]
+    fn test_site_domains_basic_registered_domain() {
+        let file =
+            File::open("tests/wpcom/domains/site_domains/basic.json").expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let registered = &response.domains[1];
+        assert_eq!(registered.domain.0, "fake-example.com");
+        assert_eq!(registered.domain_type, SiteDomainType::Registered);
+        assert_eq!(registered.primary_domain, Some(true));
+        assert_eq!(registered.wpcom_domain, Some(false));
+        assert_eq!(registered.auto_renewing, Some(true));
+        assert_eq!(registered.expired, Some(false));
+        assert_eq!(
+            registered.expiry,
+            Some(WpDateString("2027-03-15".to_string()))
+        );
+        assert_eq!(registered.expiry_soon, Some(false));
+        assert_eq!(registered.has_registration, Some(true));
+        assert_eq!(registered.has_private_registration, Some(true));
+        assert_eq!(
+            registered.registration_date,
+            Some(WpDateString("2024-03-15".to_string()))
+        );
+        assert_eq!(registered.is_renewable, Some(true));
+        assert_eq!(registered.is_redeemable, Some(false));
+        assert_eq!(registered.is_eligible_for_inbound_transfer, Some(true));
+        assert_eq!(registered.is_whois_editable, Some(true));
+        assert_eq!(registered.owner.as_deref(), Some("user@fake-example.com"));
+        assert_eq!(registered.registrar.as_deref(), Some("OPENSRS"));
+        assert_eq!(
+            registered.product_slug,
+            Some(ProductSlug("domain_reg".to_string()))
+        );
+        assert_eq!(registered.subscription_id, Some(SubscriptionId(67890)));
+        assert_eq!(registered.points_to_wpcom, Some(true));
+        assert_eq!(registered.has_wpcom_nameservers, Some(true));
+        assert_eq!(registered.has_zone, Some(true));
+        assert_eq!(registered.can_set_as_primary, Some(true));
+        assert_eq!(registered.domain_locking_available, Some(true));
+        assert_eq!(registered.privacy_available, Some(true));
+        assert_eq!(registered.contact_info_disclosure_available, Some(true));
+        assert_eq!(
+            registered.auto_renewal_date,
+            Some(WpDateString("2027-03-15".to_string()))
+        );
+        assert_eq!(
+            registered.renewable_until,
+            Some(WpDateString("2027-04-15".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_site_domains_google_apps_subscription() {
+        let file = File::open("tests/wpcom/domains/site_domains/with-email-subscriptions.json")
+            .expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let domain = &response.domains[0];
+        assert_eq!(domain.email_forwards_count, Some(2));
+
+        let google = domain
+            .google_apps_subscription
+            .as_ref()
+            .expect("expected google_apps_subscription");
+        assert_eq!(google.status, GoogleAppsSubscriptionStatus::Active);
+        assert_eq!(google.is_eligible_for_introductory_offer, Some(false));
+        assert_eq!(
+            google.subscribed_date,
+            Some(WpDateString("2024-07-15T10:00:00+00:00".to_string()))
+        );
+        assert_eq!(google.subscription_id, Some(SubscriptionId(55001)));
+        assert_eq!(google.owned_by_user_id, Some(WpComUserId(33001)));
+        assert_eq!(google.pending_tos_acceptance, Some(false));
+        assert_eq!(google.has_expected_dns_records, Some(true));
+        assert_eq!(google.total_user_count, Some(3));
+        assert_eq!(
+            google.product_slug,
+            Some(ProductSlug(
+                "wp_google_workspace_business_starter_monthly".to_string()
+            ))
+        );
+
+        let purchase_cost = google
+            .purchase_cost_per_mailbox
+            .as_ref()
+            .expect("expected purchase_cost_per_mailbox");
+        assert_eq!(purchase_cost.amount, Decimal2::from_hundredths(600));
+        assert_eq!(purchase_cost.currency, CurrencyCode("USD".to_string()));
+        assert_eq!(purchase_cost.text, "$6.00");
+    }
+
+    #[test]
+    fn test_site_domains_titan_mail_no_subscription() {
+        let file = File::open("tests/wpcom/domains/site_domains/with-email-subscriptions.json")
+            .expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let domain = &response.domains[0];
+        let titan = domain
+            .titan_mail_subscription
+            .as_ref()
+            .expect("expected titan_mail_subscription");
+        assert_eq!(titan.status, TitanMailSubscriptionStatus::NoSubscription);
+        assert_eq!(titan.is_eligible_for_introductory_offer, Some(true));
+        assert_eq!(titan.maximum_mailbox_count, Some(0));
+        assert_eq!(titan.owned_by_user_id, Some(WpComUserId(33001)));
+    }
+
+    #[test]
+    fn test_site_domains_mapped_domain() {
+        let file = File::open("tests/wpcom/domains/site_domains/with-email-subscriptions.json")
+            .expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let mapped = &response.domains[1];
+        assert_eq!(mapped.domain.0, "fake-mapped-site.org");
+        assert_eq!(mapped.domain_type, SiteDomainType::Mapping);
+        assert_eq!(mapped.primary_domain, Some(false));
+        assert_eq!(mapped.ssl_status.as_ref(), Some(&DomainSslStatus::Pending));
+        assert_eq!(
+            mapped.connection_mode.as_ref(),
+            Some(&DomainConnectionMode::Advanced)
+        );
+        assert_eq!(
+            mapped
+                .a_records_required_for_mapping
+                .as_ref()
+                .map(|v| v.iter().map(String::as_str).collect::<Vec<_>>()),
+            Some(vec!["192.0.78.24", "192.0.78.25"])
+        );
+        assert_eq!(mapped.supports_domain_connect, Some(true));
+        assert_eq!(mapped.has_wpcom_nameservers, Some(false));
+    }
+
+    #[test]
+    fn test_site_domains_transfer_domain() {
+        let file = File::open("tests/wpcom/domains/site_domains/with-email-subscriptions.json")
+            .expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        let transfer = &response.domains[2];
+        assert_eq!(transfer.domain.0, "fake-transfer-pending.net");
+        assert_eq!(transfer.domain_type, SiteDomainType::Transfer);
+        assert_eq!(transfer.pending_transfer, Some(true));
+        assert_eq!(transfer.can_set_as_primary, Some(false));
+        assert_eq!(
+            transfer.transfer_status.as_ref(),
+            Some(&DomainTransferStatus::PendingRegistry)
+        );
+        assert!(transfer.ssl_status.is_none());
     }
 }

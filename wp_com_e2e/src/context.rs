@@ -14,6 +14,7 @@ use wp_mobile_cache::WpApiCache;
 pub struct TestContext {
     pub client: WpComApiClient,
     pub service: WpService,
+    pub site_id: WpComSiteId,
     pub token: String,
     pub runtime: Runtime,
 }
@@ -65,6 +66,7 @@ impl TestContext {
         Self {
             client,
             service,
+            site_id: WpComSiteId(site_id),
             token,
             runtime,
         }

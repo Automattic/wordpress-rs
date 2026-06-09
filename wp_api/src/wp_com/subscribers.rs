@@ -435,8 +435,22 @@ impl AppendUrlQueryPairs for SubscriberImportJobsListParams {
 
 impl_as_query_value_for_new_type!(SubscriptionId);
 uniffi::custom_newtype!(SubscriptionId, u64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// WordPress.com billing subscription identifier.
+///
+/// Deserializes from both numeric (`67890`) and string (`"67890"`)
+/// representations, since some endpoints return it as a string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
 pub struct SubscriptionId(pub u64);
+
+impl<'de> serde::Deserialize<'de> for SubscriptionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        wp_serde_helper::deserialize_u64_or_string(deserializer).map(Self)
+    }
+}
 
 impl std::str::FromStr for SubscriptionId {
     type Err = std::num::ParseIntError;

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - WordPress.com `POST /me/shopping-cart` endpoint for creating shopping carts with domain and plan products
+- WordPress.com `GET /sites/<site_id>/domains` endpoint for fetching all domains associated with a site
 
 ### Changed
 
