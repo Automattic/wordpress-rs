@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WordPress.com `GET /sites/<site_id>/domains` endpoint for fetching all domains associated with a site
 - WordPress.com REST API implementation checklist (`WPCOM_REST_API_CHECKLIST.md`)
 - WordPress.com `GET /me/transactions/supported-countries` endpoint for listing countries supported in payment transactions
+- WordPress.com `GET /me/domain-contact-information` endpoint for fetching WHOIS/domain contact details
 
 ### Changed
 
