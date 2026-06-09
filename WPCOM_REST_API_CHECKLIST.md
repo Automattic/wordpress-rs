@@ -1,53 +1,16 @@
 # WordPress.com REST API Checklist
 
-Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
+Tracks which WordPress.com REST API endpoints have been (or should be) ported to
+`wordpress-rs`. Endpoints are split into two sections:
 
-<!-- Format: - [ ] `METHOD /path` -->
+1. **Active** — Candidates for porting. Checked items are already implemented.
+2. **Deferred** — Endpoints unlikely to be ported, grouped by reason.
 
-## Posts
+**Caveat:** This is a planning aid, not a specification. All categorizations — especially
+in the Deferred section — reflect current priorities and may change. For anything critical,
+investigate the relevant code before making decisions based on this document.
 
-- [ ] `GET /rest/v1.1/sites/$site/posts` — list/search posts
-- [ ] `GET /rest/v1.1/sites/$site/posts/$post_id` — fetch single post
-- [ ] `GET /rest/v1.1/sites/$site/posts/$post_id` — fetch post status (fields=status)
-- [ ] `GET /rest/v1.2/sites/$site/posts/$post_id/likes` — fetch post likes
-- [ ] `POST /rest/v1.2/sites/$site/posts/new` — create new post
-- [ ] `POST /rest/v1.2/sites/$site/posts/$post_id` — update existing post
-- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/autosave` — autosave post revision
-- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/delete` — delete/trash post
-- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/restore` — restore trashed post
-- [ ] `GET /rest/v1.1/sites/$site/posts/$post_id/autosave` — retrieve autosave
-- [ ] `GET /rest/v1.1/sites/$site/post-types` — list post types
-
-## Revisions
-
-- [ ] `GET /rest/v1.1/sites/$site/post/$post_id/diffs` — fetch post revision diffs
-- [ ] `GET /rest/v1.1/sites/$site/page/$post_id/diffs` — fetch page revision diffs
-
-## Comments
-
-- [ ] `GET /rest/v1.1/sites/$site/comments` — list comments
-- [ ] `GET /rest/v1.1/sites/$site/comments/$comment_id` — fetch single comment
-- [ ] `GET /rest/v1.2/sites/$site/comments/$comment_id/likes` — fetch comment likes
-- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id` — update comment
-- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/delete` — delete comment
-- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/replies/new` — reply to comment
-- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/replies/new` — new top-level comment
-- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/likes/new` — like comment
-- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/likes/mine/delete` — unlike comment
-
-## Taxonomies
-
-- [ ] `GET /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms` — list terms
-- [ ] `GET /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/$slug` — fetch single term
-- [ ] `POST /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/new` — create term
-- [ ] `POST /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/$slug` — update term
-- [ ] `POST /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/$slug/delete` — delete term
-- [ ] `GET /rest/v1.1/sites/$site/categories` — list categories (iOS path)
-- [ ] `POST /rest/v1.1/sites/$site/categories/new` — create category (iOS path)
-- [ ] `GET /rest/v1.1/sites/$site/tags` — list tags (iOS path)
-- [ ] `POST /rest/v1.1/sites/$site/tags/new` — create tag (iOS path)
-- [ ] `POST /rest/v1.1/sites/$site/tags/slug:$slug` — update tag (iOS path)
-- [ ] `POST /rest/v1.1/sites/$site/tags/slug:$slug/delete` — delete tag (iOS path)
+---
 
 ## Blogging Prompts
 
@@ -260,13 +223,6 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `GET /rest/v1.1/domains/$domain/price/` — domain price
 - [ ] `POST /rest/v1.1/sites/$site/domains/primary/` — set primary domain
 
-## Menus
-
-- [ ] `GET /rest/v1.1/sites/$site/menus` — list menus and locations
-- [ ] `POST /rest/v1.1/sites/$site/menus/new` — create menu
-- [ ] `POST /rest/v1.1/sites/$site/menus/$menu` — update menu
-- [ ] `POST /rest/v1.1/sites/$site/menus/$menu/delete` — delete menu
-
 ## Dashboard
 
 - [ ] `GET /wpcom/v2/sites/$site/dashboard/cards-data/` — fetch dashboard cards
@@ -407,30 +363,6 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `GET /rest/v1/users/suggest` — fetch username suggestions
 - [ ] `GET /rest/v1/sites/$site/tags` — fetch site tags for suggestions
 
-## Media
-
-- [ ] `GET /rest/v1.1/sites/$site/media` — list media items
-- [ ] `GET /rest/v1.1/sites/$site/media/$media_id` — fetch single media item
-- [ ] `POST /rest/v1.1/sites/$site/media/$media_id` — update media metadata
-- [ ] `POST /rest/v1.1/sites/$site/media/new` — upload media file
-- [ ] `POST /rest/v1.1/sites/$site/media/$media_id/delete` — delete media item
-- [ ] `POST /rest/v1.1/sites/$site/external-media-upload` — upload stock media by URL
-- [ ] `GET /rest/v1.1/videos/$videopress_id` — VideoPress metadata
-- [ ] `POST /rest/v2.0/sites/$site/media/videopress-playback-jwt/$videopress_id` — VideoPress JWT
-
-## Stock Media
-
-- [ ] `GET /rest/v1.1/meta/external-media/pexels` — search Pexels stock media
-
-## Plugins
-
-- [ ] `GET /rest/v1.2/sites/$site/plugins` — list installed plugins
-- [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin` — configure plugin (active/auto-update)
-- [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin/delete` — delete plugin
-- [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin/install` — install plugin
-- [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin/update` — update plugin
-- [ ] `GET /wpcom/v2/plugins/featured` — featured plugins list
-
 ## Plans & Products
 
 - [ ] `GET /rest/v1.5/plans` — list all WPCom plans
@@ -447,19 +379,6 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 ## Mobile Pay
 
 - [ ] `POST /wpcom/v2/iap/orders` — create in-app purchase order
-
-## Themes
-
-- [ ] `GET /rest/v1.2/themes` — list WPCom themes
-- [ ] `GET /rest/v1/sites/$site/themes` — list installed themes (Jetpack)
-- [ ] `GET /rest/v1.1/sites/$site/themes/mine` — fetch current theme
-- [ ] `POST /rest/v1.1/sites/$site/themes/mine` — activate theme
-- [ ] `POST /rest/v1.1/sites/$site/themes/$theme/install` — install theme
-- [ ] `POST /rest/v1.1/sites/$site/themes/$theme/delete` — delete theme
-- [ ] `GET /wpcom/v2/common-starter-site-designs` — fetch starter designs
-- [ ] `GET /rest/v1.1/themes/$theme` — fetch single theme by ID
-- [ ] `GET /wpcom/v2/themes` — list WPCom themes (v2)
-- [ ] `GET /rest/v1.1/sites/$site/themes/purchased` — purchased themes
 
 ## Activity Log
 
@@ -481,3 +400,101 @@ Tracks which WordPress.com REST API endpoints have been ported to wordpress-rs.
 - [ ] `GET /rest/v1.1/read/feed/` — search reader sites/feeds
 - [ ] `GET /rest/v1.2/freshly-pressed` — freshly pressed posts
 
+---
+
+# Deferred Endpoints
+
+The endpoints below are unlikely to be ported to `wordpress-rs`. They remain documented for
+reference and may be reconsidered if specific needs arise.
+
+## WordPress REST API equivalents already implemented
+
+The WordPress REST API (`/wp/v2/...`) counterparts of these endpoints are already
+implemented in `wordpress-rs` and will be used instead. See `WP_REST_API_CHECKLIST.md` for
+the full list of implemented WP REST API endpoints.
+
+### Posts
+
+- [ ] `GET /rest/v1.1/sites/$site/posts` — list/search posts
+- [ ] `GET /rest/v1.1/sites/$site/posts/$post_id` — fetch single post
+- [ ] `GET /rest/v1.1/sites/$site/posts/$post_id` — fetch post status (fields=status)
+- [ ] `GET /rest/v1.2/sites/$site/posts/$post_id/likes` — fetch post likes
+- [ ] `POST /rest/v1.2/sites/$site/posts/new` — create new post
+- [ ] `POST /rest/v1.2/sites/$site/posts/$post_id` — update existing post
+- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/autosave` — autosave post revision
+- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/delete` — delete/trash post
+- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/restore` — restore trashed post
+- [ ] `GET /rest/v1.1/sites/$site/posts/$post_id/autosave` — retrieve autosave
+- [ ] `GET /rest/v1.1/sites/$site/post-types` — list post types
+
+### Revisions
+
+- [ ] `GET /rest/v1.1/sites/$site/post/$post_id/diffs` — fetch post revision diffs
+- [ ] `GET /rest/v1.1/sites/$site/page/$post_id/diffs` — fetch page revision diffs
+
+### Comments
+
+- [ ] `GET /rest/v1.1/sites/$site/comments` — list comments
+- [ ] `GET /rest/v1.1/sites/$site/comments/$comment_id` — fetch single comment
+- [ ] `GET /rest/v1.2/sites/$site/comments/$comment_id/likes` — fetch comment likes
+- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id` — update comment
+- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/delete` — delete comment
+- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/replies/new` — reply to comment
+- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/replies/new` — new top-level comment
+- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/likes/new` — like comment
+- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/likes/mine/delete` — unlike comment
+
+### Taxonomies
+
+- [ ] `GET /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms` — list terms
+- [ ] `GET /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/$slug` — fetch single term
+- [ ] `POST /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/new` — create term
+- [ ] `POST /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/$slug` — update term
+- [ ] `POST /rest/v1.1/sites/$site/taxonomies/$taxonomy/terms/$slug/delete` — delete term
+- [ ] `GET /rest/v1.1/sites/$site/categories` — list categories (iOS path)
+- [ ] `POST /rest/v1.1/sites/$site/categories/new` — create category (iOS path)
+- [ ] `GET /rest/v1.1/sites/$site/tags` — list tags (iOS path)
+- [ ] `POST /rest/v1.1/sites/$site/tags/new` — create tag (iOS path)
+- [ ] `POST /rest/v1.1/sites/$site/tags/slug:$slug` — update tag (iOS path)
+- [ ] `POST /rest/v1.1/sites/$site/tags/slug:$slug/delete` — delete tag (iOS path)
+
+### Media
+
+- [ ] `GET /rest/v1.1/sites/$site/media` — list media items
+- [ ] `GET /rest/v1.1/sites/$site/media/$media_id` — fetch single media item
+- [ ] `POST /rest/v1.1/sites/$site/media/$media_id` — update media metadata
+- [ ] `POST /rest/v1.1/sites/$site/media/new` — upload media file
+- [ ] `POST /rest/v1.1/sites/$site/media/$media_id/delete` — delete media item
+- [ ] `POST /rest/v1.1/sites/$site/external-media-upload` — upload stock media by URL
+- [ ] `GET /rest/v1.1/videos/$videopress_id` — VideoPress metadata
+- [ ] `POST /rest/v2.0/sites/$site/media/videopress-playback-jwt/$videopress_id` — VideoPress JWT
+- [ ] `GET /rest/v1.1/meta/external-media/pexels` — search Pexels stock media
+
+### Plugins
+
+- [ ] `GET /rest/v1.2/sites/$site/plugins` — list installed plugins
+- [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin` — configure plugin (active/auto-update)
+- [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin/delete` — delete plugin
+- [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin/install` — install plugin
+- [ ] `POST /rest/v1.2/sites/$site/plugins/$plugin/update` — update plugin
+- [ ] `GET /wpcom/v2/plugins/featured` — featured plugins list
+
+### Themes
+
+- [ ] `GET /rest/v1.2/themes` — list WPCom themes
+- [ ] `GET /rest/v1/sites/$site/themes` — list installed themes (Jetpack)
+- [ ] `GET /rest/v1.1/sites/$site/themes/mine` — fetch current theme
+- [ ] `POST /rest/v1.1/sites/$site/themes/mine` — activate theme
+- [ ] `POST /rest/v1.1/sites/$site/themes/$theme/install` — install theme
+- [ ] `POST /rest/v1.1/sites/$site/themes/$theme/delete` — delete theme
+- [ ] `GET /wpcom/v2/common-starter-site-designs` — fetch starter designs
+- [ ] `GET /rest/v1.1/themes/$theme` — fetch single theme by ID
+- [ ] `GET /wpcom/v2/themes` — list WPCom themes (v2)
+- [ ] `GET /rest/v1.1/sites/$site/themes/purchased` — purchased themes
+
+### Menus
+
+- [ ] `GET /rest/v1.1/sites/$site/menus` — list menus and locations
+- [ ] `POST /rest/v1.1/sites/$site/menus/new` — create menu
+- [ ] `POST /rest/v1.1/sites/$site/menus/$menu` — update menu
+- [ ] `POST /rest/v1.1/sites/$site/menus/$menu/delete` — delete menu
