@@ -129,4 +129,69 @@ mod tests {
         assert_eq!(reply.author_role, "user");
         assert!(reply.attachments.is_empty());
     }
+
+    #[test]
+    fn test_reply_params_multipart_form_files() {
+        // Each attachment file path is uploaded as a `attachment_{i}` file part,
+        // verbatim (no MIME / filename overrides).
+        let params = ReplyToUnifiedConversationParams {
+            message: "Thanks!".to_string(),
+            encrypted_log_ids: vec![],
+            attachments: vec![
+                "/tmp/screenshot-1.png".to_string(),
+                "/tmp/screenshot-2.png".to_string(),
+            ],
+        };
+
+        let files = params.multipart_form_files();
+        assert_eq!(files.len(), 2);
+        assert_eq!(files["attachment_0"].file_path, "/tmp/screenshot-1.png");
+        assert_eq!(files["attachment_1"].file_path, "/tmp/screenshot-2.png");
+        assert!(files["attachment_0"].mime_type.is_none());
+        assert!(files["attachment_0"].file_name.is_none());
+    }
+
+    #[test]
+    fn test_reply_params_multipart_text_fields() {
+        use crate::request::WpMultipartFormField;
+
+        let params = ReplyToUnifiedConversationParams {
+            message: "Thanks!".to_string(),
+            encrypted_log_ids: vec!["log-a".to_string(), "log-b".to_string()],
+            attachments: vec!["/tmp/screenshot.png".to_string()],
+        };
+
+        // Mirror `request.rs::post_multipart`: serialize the params to JSON, then
+        // expand each key into multipart text fields.
+        let value = serde_json::to_value(&params).expect("params serialize");
+        let object = value
+            .as_object()
+            .expect("params serialize to a JSON object");
+
+        // `attachments` is `#[serde(skip)]` — it must NOT appear as a text field;
+        // it is uploaded as a file part instead (see the test above).
+        assert!(!object.contains_key("attachments"));
+
+        let mut text_fields: Vec<(String, String)> = object
+            .iter()
+            .flat_map(|(key, value)| WpMultipartFormField::from_json(key.clone(), value.clone()))
+            .map(|field| match field {
+                WpMultipartFormField::Text { name, value } => (name, value),
+                WpMultipartFormField::File { name, .. } => {
+                    panic!("unexpected file field from serialized params: {name}")
+                }
+            })
+            .collect();
+        text_fields.sort();
+
+        // `encrypted_log_ids` is sent as indexed form fields, one per id.
+        assert_eq!(
+            text_fields,
+            vec![
+                ("encrypted_log_ids[0]".to_string(), "log-a".to_string()),
+                ("encrypted_log_ids[1]".to_string(), "log-b".to_string()),
+                ("message".to_string(), "Thanks!".to_string()),
+            ]
+        );
+    }
 }
