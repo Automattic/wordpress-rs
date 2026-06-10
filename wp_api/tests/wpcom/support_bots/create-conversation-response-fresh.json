@@ -1,0 +1,23 @@
+{
+  "chat_id": 5365939,
+  "wpcom_user_id": 3907979,
+  "external_id": null,
+  "external_id_provider": null,
+  "session_id": "05f5f858-9c07-4026-92d2-820ea33dea6e",
+  "bot_slug": "jetpack-workflow-chat_mobile_support",
+  "bot_version": "1.0.0",
+  "created_at": "2026-06-10 10:17:55",
+  "zendesk_ticket_id": null,
+  "messages": [
+    {
+      "message_id": 25543355,
+      "content": "Hi there! I'm here to help you with the Jetpack Mobile app. What can I assist you with today?",
+      "role": "bot",
+      "created_at": "2026-06-10 10:17:59",
+      "context": {
+        "flags": null
+      },
+      "ts": 1781086679
+    }
+  ]
+}
