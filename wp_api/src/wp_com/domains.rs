@@ -1801,4 +1801,13 @@ mod tests {
         );
         assert!(transfer.ssl_status.is_none());
     }
+
+    #[test]
+    fn test_set_primary_domain_response_deserialization() {
+        let file = File::open("tests/wpcom/domains/set_primary/success.json")
+            .expect("Failed to open file");
+        let response: SetPrimaryDomainResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert!(response.success);
+    }
 }
