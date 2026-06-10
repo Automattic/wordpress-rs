@@ -1,0 +1,45 @@
+{
+  "cart_generated_at_timestamp": 1700000001,
+  "blog_id": 12345678,
+  "cart_key": 12345678,
+  "coupon": "",
+  "is_coupon_applied": false,
+  "has_auto_renew_coupon_been_automatically_applied": false,
+  "next_domain_is_free": false,
+  "next_domain_condition": "",
+  "products": [],
+  "unmerged_products": [],
+  "total_cost": 0,
+  "currency": "USD",
+  "total_cost_integer": 0,
+  "temporary": true,
+  "tax": {
+    "location": {},
+    "display_taxes": false
+  },
+  "coupon_savings_total_integer": 0,
+  "sub_total_with_taxes_integer": 0,
+  "sub_total_integer": 0,
+  "total_tax": 0,
+  "total_tax_integer": 0,
+  "total_tax_breakdown": [],
+  "credits": 0,
+  "credits_integer": 0,
+  "allowed_payment_methods": [
+    "WPCOM_Billing_WPCOM"
+  ],
+  "terms_of_service": [],
+  "did_use_cached_taxes": true,
+  "is_gift_purchase": false,
+  "gift_details": null,
+  "messages": {
+    "errors": [
+      {
+        "code": "invalid-product-id",
+        "message": "We encountered a problem while adding this product to your shopping cart."
+      }
+    ],
+    "success": [],
+    "persistent_errors": []
+  }
+}

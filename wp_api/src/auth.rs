@@ -86,6 +86,13 @@ impl ModifiableAuthenticationProvider {
             .expect("If the lock is poisoned, there isn't much we can do")
             .insert_header(headers)
     }
+
+    fn current_auth(&self) -> WpAuthentication {
+        self.auth
+            .read()
+            .expect("If the lock is poisoned, there isn't much we can do")
+            .clone()
+    }
 }
 
 #[derive(uniffi::Object)]
@@ -286,6 +293,17 @@ impl WpAuthenticationProvider {
 }
 
 impl WpAuthenticationProvider {
+    /// The credential currently in use, so callers can tell which authentication
+    /// scheme a request was made with (e.g. an application password versus a
+    /// bearer token).
+    pub(crate) fn current_auth(&self) -> WpAuthentication {
+        match self {
+            WpAuthenticationProvider::StaticAuthenticationProvider { auth } => auth.clone(),
+            WpAuthenticationProvider::DynamicAuthenticationProvider { inner } => inner.auth(),
+            WpAuthenticationProvider::Modifiable { inner } => inner.current_auth(),
+        }
+    }
+
     pub fn insert_header(&self, headers: &mut HeaderMap) {
         match self {
             WpAuthenticationProvider::StaticAuthenticationProvider { auth } => {

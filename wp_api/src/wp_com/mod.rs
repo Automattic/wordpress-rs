@@ -15,6 +15,7 @@ pub mod oauth2;
 pub mod products;
 pub mod publicize;
 pub mod segments;
+pub mod shopping_cart;
 pub mod sites;
 pub mod stats_city_views;
 pub mod stats_clicks;

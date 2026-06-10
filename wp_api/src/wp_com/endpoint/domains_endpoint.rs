@@ -1,11 +1,11 @@
 use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
     wp_com::{
-        WpComNamespace,
+        WpComNamespace, WpComSiteId,
         domains::{
             AllDomainsParams, AllDomainsResponse, CountryCode, DomainAvailability,
             DomainAvailabilityParams, DomainName, DomainSuggestion, DomainSuggestionsParams,
-            SupportedCountries, SupportedState,
+            SiteDomainsResponse, SupportedCountries, SupportedState,
         },
     },
 };
@@ -23,6 +23,8 @@ enum DomainsRequest {
     IsAvailable,
     #[get(url = "/all-domains", params = &AllDomainsParams, output = AllDomainsResponse)]
     AllDomains,
+    #[get(url = "/sites/<wp_com_site_id>/domains", output = SiteDomainsResponse)]
+    SiteDomains,
 }
 
 impl DerivedRequest for DomainsRequest {
@@ -162,6 +164,17 @@ mod tests {
             }),
             "/all-domains?garden=starter",
         );
+    }
+
+    #[rstest]
+    #[case::numeric_id(WpComSiteId(12345), "/sites/12345/domains")]
+    #[case::large_id(WpComSiteId(229889220), "/sites/229889220/domains")]
+    fn site_domains(
+        endpoint: DomainsRequestEndpoint,
+        #[case] site_id: WpComSiteId,
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_com_rest_v1_1_endpoint(endpoint.site_domains(&site_id), expected_path);
     }
 
     fn base_domain_suggestions_params() -> DomainSuggestionsParams {

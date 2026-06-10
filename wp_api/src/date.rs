@@ -33,6 +33,35 @@ uniffi::custom_type!(WpGmtDateTime, i64, {
     try_lift: |seconds| Ok(WpGmtDateTime::from_timestamp(seconds)),
 });
 
+uniffi::custom_newtype!(WpDateString, String);
+/// A date string in `"YYYY-MM-DD"` format as returned by some WordPress.com
+/// API fields (e.g. domain expiry, registration date).
+///
+/// Some PHP endpoints return `false` instead of `null` when a date is not
+/// applicable. Use [`deserialize_optional_date_string`] on fields that
+/// exhibit this pattern.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct WpDateString(pub String);
+
+impl Display for WpDateString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Deserialize an `Option<WpDateString>` that may be a string, `null`, or
+/// boolean `false` (a common PHP pattern for "not applicable").
+pub fn deserialize_optional_date_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<WpDateString>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    wp_serde_helper::deserialize_false_or_string_or_null(deserializer)
+        .map(|opt| opt.map(WpDateString))
+}
+
 // Assertion functions that should only be used by the native test suite
 // These are hidden from the Rust public API, but will be visible/usable in the generated bindings
 mod native_test_helper {

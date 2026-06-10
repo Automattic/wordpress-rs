@@ -4,7 +4,7 @@ use crate::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
     users::UserCapabilitiesMap,
-    wp_com::{WpComSiteId, me::WpComUserId},
+    wp_com::{WpComSiteId, me::WpComUserId, products::ProductSlug},
     wp_content_string_id,
 };
 
@@ -282,7 +282,7 @@ pub struct WPComLogoSize {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WPComPlan {
     pub product_id: u64,
-    pub product_slug: String,
+    pub product_slug: ProductSlug,
     pub product_name_short: String,
     pub expired: bool,
     pub user_is_owner: bool,
@@ -299,7 +299,7 @@ pub struct WPComPlanFeatures {
 pub struct WPComProduct {
     #[serde(deserialize_with = "deserialize_u64_or_string")]
     pub product_id: u64,
-    pub product_slug: String,
+    pub product_slug: ProductSlug,
     pub product_name: String,
     pub product_name_short: String,
     pub product_type: String,
