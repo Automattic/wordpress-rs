@@ -106,7 +106,7 @@ investigate the relevant code before making decisions based on this document.
 - [x] `GET /rest/v1.1/domains/supported-countries/` — supported countries
 - [x] `GET /rest/v1.1/domains/supported-states/$country/` — states for country
 - [x] `GET /rest/v1.1/sites/$site/domains/` — site domains
-- [ ] `POST /rest/v1.1/sites/$site/domains/primary/` — set primary domain
+- [x] `POST /rest/v1.1/sites/$site/domains/primary/` — set primary domain
 - [x] `GET /rest/v1.3/domains/$domain/is-available/` — check domain availability
 
 ## Geo

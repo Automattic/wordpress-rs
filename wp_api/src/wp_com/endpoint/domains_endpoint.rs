@@ -5,7 +5,8 @@ use crate::{
         domains::{
             AllDomainsParams, AllDomainsResponse, CountryCode, DomainAvailability,
             DomainAvailabilityParams, DomainName, DomainSuggestion, DomainSuggestionsParams,
-            SiteDomainsResponse, SupportedCountries, SupportedState,
+            SetPrimaryDomainParams, SetPrimaryDomainResponse, SiteDomainsResponse,
+            SupportedCountries, SupportedState,
         },
     },
 };
@@ -25,6 +26,8 @@ enum DomainsRequest {
     AllDomains,
     #[get(url = "/sites/<wp_com_site_id>/domains", output = SiteDomainsResponse)]
     SiteDomains,
+    #[post(url = "/sites/<wp_com_site_id>/domains/primary", params = &SetPrimaryDomainParams, output = SetPrimaryDomainResponse)]
+    SetPrimary,
 }
 
 impl DerivedRequest for DomainsRequest {
@@ -175,6 +178,17 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_wp_com_rest_v1_1_endpoint(endpoint.site_domains(&site_id), expected_path);
+    }
+
+    #[rstest]
+    #[case::numeric_id(WpComSiteId(12345), "/sites/12345/domains/primary")]
+    #[case::large_id(WpComSiteId(229889220), "/sites/229889220/domains/primary")]
+    fn set_primary(
+        endpoint: DomainsRequestEndpoint,
+        #[case] site_id: WpComSiteId,
+        #[case] expected_path: &str,
+    ) {
+        validate_wp_com_rest_v1_1_endpoint(endpoint.set_primary(&site_id), expected_path);
     }
 
     fn base_domain_suggestions_params() -> DomainSuggestionsParams {

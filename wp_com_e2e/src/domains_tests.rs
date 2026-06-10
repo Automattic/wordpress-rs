@@ -3,7 +3,7 @@ use libtest_mimic::Trial;
 use std::sync::Arc;
 use wp_api::wp_com::domains::{
     AllDomainsParams, CountryCode, DomainAvailabilityParams, DomainAvailabilityStatus,
-    DomainListItemStatusType, DomainName, DomainSubtypeId, SiteDomainType,
+    DomainListItemStatusType, DomainName, DomainSubtypeId, SetPrimaryDomainParams, SiteDomainType,
 };
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
@@ -276,6 +276,51 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                             .into());
                         }
                     }
+                }
+
+                Ok(())
+            })
+        }
+    }));
+
+    // POST /sites/{siteId}/domains/primary/
+    //
+    // This endpoint mutates the site's primary domain, so the test reads the
+    // current primary and sets it again. This exercises the endpoint
+    // idempotently without changing the test site's effective primary domain.
+    trials.push(Trial::test("domains::set_primary", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                let domains = ctx
+                    .client
+                    .domains()
+                    .site_domains(&site_id)
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .data
+                    .domains;
+
+                let primary = match domains.iter().find(|d| d.primary_domain == Some(true)) {
+                    Some(domain) => domain,
+                    None => return Err("expected the test site to have a primary domain".into()),
+                };
+
+                let response = ctx
+                    .client
+                    .domains()
+                    .set_primary(
+                        &site_id,
+                        &SetPrimaryDomainParams {
+                            domain: primary.domain.clone(),
+                        },
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .data;
+
+                if !response.success {
+                    return Err("expected set_primary to report success".into());
                 }
 
                 Ok(())
