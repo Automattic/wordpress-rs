@@ -42,5 +42,36 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         }));
     }
 
+    trials.push(Trial::test("me::transactions_supported_countries", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                let response = ctx
+                    .client
+                    .me()
+                    .transactions_supported_countries()
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .data;
+
+                if response.all.is_empty() {
+                    return Err("expected non-empty countries list".into());
+                }
+
+                // No separator entries should leak through.
+                let has_separator = response
+                    .featured
+                    .iter()
+                    .chain(response.all.iter())
+                    .any(|c| c.code.0.is_empty());
+                if has_separator {
+                    return Err("separator entry should be filtered out".into());
+                }
+
+                Ok(())
+            })
+        }
+    }));
+
     trials
 }
