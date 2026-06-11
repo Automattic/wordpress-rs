@@ -528,9 +528,27 @@ impl std::fmt::Display for DomainName {
 impl_as_query_value_for_new_type!(CountryCode);
 uniffi::custom_newtype!(CountryCode, String);
 /// ISO 3166-1 alpha-2 country code (e.g. `"US"`, `"CA"`, `"GB"`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
+///
+/// Rejects empty strings during deserialization — an empty code is not
+/// a valid country.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CountryCode(pub String);
+
+impl<'de> serde::Deserialize<'de> for CountryCode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s.is_empty() {
+            return Err(serde::de::Error::invalid_value(
+                serde::de::Unexpected::Str(&s),
+                &"a non-empty country code",
+            ));
+        }
+        Ok(Self(s))
+    }
+}
 
 impl std::fmt::Display for CountryCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
