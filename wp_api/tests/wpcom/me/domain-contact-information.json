@@ -1,0 +1,15 @@
+{
+  "first_name": "Jane",
+  "last_name": "Smith",
+  "organization": "Fake Corp",
+  "address_1": "742 Evergreen Terrace",
+  "address_2": "Suite 200",
+  "postal_code": "90210",
+  "city": "Springfield",
+  "state": "IL",
+  "country_code": "US",
+  "email": "jane@fakecorp.example",
+  "phone": "+1.5559876543",
+  "fax": null,
+  "extra": null
+}

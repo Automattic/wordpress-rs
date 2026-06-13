@@ -73,5 +73,27 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         }
     }));
 
+    trials.push(Trial::test("me::domain_contact_information", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                let contact = ctx
+                    .client
+                    .me()
+                    .domain_contact_information()
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .data;
+
+                // The test account should have at least an email.
+                if contact.email.is_none() {
+                    return Err("expected non-null email in domain contact info".into());
+                }
+
+                Ok(())
+            })
+        }
+    }));
+
     trials
 }
