@@ -86,7 +86,7 @@
       "auto_renewing": false,
       "current_user_is_owner": true,
       "is_domain_only_site": false,
-      "expiry": "2027-01-01 00:00:00",
+      "expiry": "2027-01-01",
       "expired": false,
       "primary_domain": false,
       "can_set_as_primary": false,
@@ -95,7 +95,7 @@
         "label": "Active",
         "type": "success"
       },
-      "subscription_id": 55555,
+      "subscription_id": "55555",
       "tags": []
     }
   ]
