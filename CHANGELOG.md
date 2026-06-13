@@ -14,9 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WordPress.com REST API implementation checklist (`WPCOM_REST_API_CHECKLIST.md`)
 - WordPress.com `GET /me/transactions/supported-countries` endpoint for listing countries supported in payment transactions
 - WordPress.com `GET /me/domain-contact-information` endpoint for fetching WHOIS/domain contact details
+- Kotlin: `WpRequestResult.toLogErrorString()` returns a concise, log-only description of a failed request (or `null` on success) for diagnostics
 
 ### Changed
 
+- Kotlin: `WpComApiClient`, `WpApiClient`, and `JetpackApiClient` `request(...)` now log failed requests via `System.err` (which surfaces in logcat) by default; pass `logErrors = false` to opt out
 - **BREAKING:** `AllDomainItem.expiry` changed from `Option<WpGmtDateTime>` to `Option<WpDateString>`. The `/all-domains` endpoint returns date-only values (`"YYYY-MM-DD"`), which failed to deserialize as a datetime; callers now receive the raw `"YYYY-MM-DD"` string instead of a timestamp.
 - **BREAKING:** `product_slug` and `billing_product_slug` fields on `Product`, `PaidDomainSuggestion`, `DomainPricing`, `WPComPlan`, and `WPComProduct` changed from `String` to `ProductSlug`. Callers that match on or construct these values will need to wrap/unwrap with `ProductSlug(...)`.
 - Publish releases automatically on version-bump in the changelog file

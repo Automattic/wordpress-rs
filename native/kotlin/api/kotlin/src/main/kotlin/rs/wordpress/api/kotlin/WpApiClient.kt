@@ -78,12 +78,15 @@ class WpApiClient @JvmOverloads constructor(
     //
     // It'll also help make sure any breaking changes to the API will end up as a compiler error.
     suspend fun <T> request(
+        logErrors: Boolean = true,
         executeRequest: suspend (UniffiWpApiClient) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
-        try {
+        val result = try {
             WpRequestResult.Success(response = executeRequest(requestBuilder))
         } catch (exception: WpApiException) {
-            mapWpApiExceptionToWpRequestResult(exception)
+            mapWpApiExceptionToWpRequestResult<T>(exception)
         }
+        result.logErrorIfNeeded(logErrors)
+        result
     }
 }
