@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING:** `AllDomainItem.expiry` changed from `Option<WpGmtDateTime>` to `Option<WpDateString>`. The `/all-domains` endpoint returns date-only values (`"YYYY-MM-DD"`), which failed to deserialize as a datetime; callers now receive the raw `"YYYY-MM-DD"` string instead of a timestamp.
 - **BREAKING:** `product_slug` and `billing_product_slug` fields on `Product`, `PaidDomainSuggestion`, `DomainPricing`, `WPComPlan`, and `WPComProduct` changed from `String` to `ProductSlug`. Callers that match on or construct these values will need to wrap/unwrap with `ProductSlug(...)`.
 - Publish releases automatically on version-bump in the changelog file
 - **Internal:** Route Dependabot Ruby dependency reviews through `CODEOWNERS` instead of the retired `reviewers` key.
