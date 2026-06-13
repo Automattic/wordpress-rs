@@ -44,6 +44,8 @@ class JetpackApiClient(
      * Convenience constructor that accepts a list of OkHttp interceptors.
      * Uses [WpRequestExecutor] internally with the provided interceptors.
      */
+    // Trailing params are all optional config with defaults; the count is benign here.
+    @Suppress("LongParameterList")
     constructor(
         wpOrgSiteApiRootUrl: URL,
         authProvider: WpAuthenticationProvider,
