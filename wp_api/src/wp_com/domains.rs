@@ -1,5 +1,5 @@
 use crate::{
-    date::{WpDateString, WpGmtDateTime, deserialize_optional_date_string},
+    date::{WpDateString, deserialize_optional_date_string},
     decimal2::Decimal2,
     impl_as_query_value_for_new_type,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
@@ -384,8 +384,10 @@ pub struct AllDomainItem {
     pub current_user_is_owner: bool,
     /// Whether the site only has a domain (no content).
     pub is_domain_only_site: bool,
-    /// Expiry date of the domain, or `None` if it has no expiry.
-    pub expiry: Option<WpGmtDateTime>,
+    /// Expiry date of the domain in `"YYYY-MM-DD"` format, or `None` if it has
+    /// no expiry.
+    #[serde(default, deserialize_with = "deserialize_optional_date_string")]
+    pub expiry: Option<WpDateString>,
     /// Whether the domain has expired.
     pub expired: bool,
     /// Whether this is the primary domain for the site.
@@ -1050,6 +1052,13 @@ mod tests {
         let redirect = &response.domains[3];
         assert_eq!(redirect.subtype.id, DomainSubtypeId::SiteRedirect);
         assert_eq!(redirect.subtype.label, "Site redirect");
+        // Date-only `"YYYY-MM-DD"` expiry, the real-world format from the API.
+        assert_eq!(
+            redirect.expiry,
+            Some(WpDateString("2027-01-01".to_string()))
+        );
+        // The API returns `subscription_id` as a string, not a number.
+        assert_eq!(redirect.subscription_id, Some(SubscriptionId(55555)));
     }
 
     #[test]
