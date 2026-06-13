@@ -21,20 +21,23 @@ class JetpackApiClient(
     authProvider: WpAuthenticationProvider,
     private val requestExecutor: RequestExecutor,
     private val appNotifier: WpAppNotifier = EmptyAppNotifier(),
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val errorLogger: RequestErrorLogger? = null
 ) {
     constructor(
         wpOrgSiteApiRootUrl: URL,
         authProvider: WpAuthenticationProvider,
         requestExecutor: RequestExecutor,
         appNotifier: WpAppNotifier = EmptyAppNotifier(),
-        dispatcher: CoroutineDispatcher = Dispatchers.IO
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        errorLogger: RequestErrorLogger? = null
     ) : this(
         apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(wpOrgSiteApiRootUrl.toString())),
         authProvider,
         requestExecutor,
         appNotifier,
-        dispatcher
+        dispatcher,
+        errorLogger
     )
 
     /**
@@ -47,13 +50,15 @@ class JetpackApiClient(
         interceptors: List<Interceptor>,
         networkAvailabilityProvider: NetworkAvailabilityProvider,
         appNotifier: WpAppNotifier = EmptyAppNotifier(),
-        dispatcher: CoroutineDispatcher = Dispatchers.IO
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        errorLogger: RequestErrorLogger? = null
     ) : this(
         wpOrgSiteApiRootUrl,
         authProvider,
         requestExecutor = WpRequestExecutor(interceptors, networkAvailabilityProvider),
         appNotifier,
-        dispatcher
+        dispatcher,
+        errorLogger
     )
 
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
@@ -76,7 +81,6 @@ class JetpackApiClient(
     //
     // It'll also help make sure any breaking changes to the API will end up as a compiler error.
     suspend fun <T> request(
-        logErrors: Boolean = true,
         executeRequest: suspend (UniffiJetpackApiClient) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
         val result = try {
@@ -84,7 +88,7 @@ class JetpackApiClient(
         } catch (exception: WpApiException) {
             mapWpApiExceptionToWpRequestResult<T>(exception)
         }
-        result.logErrorIfNeeded(logErrors)
+        errorLogger?.let { logger -> result.toLogErrorString()?.let(logger::logError) }
         result
     }
 }

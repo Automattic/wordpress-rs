@@ -2,18 +2,6 @@ package rs.wordpress.api.kotlin
 
 import uniffi.wp_api.WpApiException
 
-private const val REQUEST_ERROR_LOG_TAG = "WpRequestError"
-
-/**
- * Logs a failed request via `System.err`, which is redirected to logcat on
- * Android (the same mechanism [DebugMiddleware] relies on). No-op on success
- * or when [enabled] is `false`.
- */
-internal fun WpRequestResult<*>.logErrorIfNeeded(enabled: Boolean) {
-    if (!enabled) return
-    toLogErrorString()?.let { System.err.println("$REQUEST_ERROR_LOG_TAG: $it") }
-}
-
 fun <T> mapWpApiExceptionToWpRequestResult(apiException: WpApiException): WpRequestResult<T> =
     when (apiException) {
         is WpApiException.InvalidHttpStatusCode -> WpRequestResult.InvalidHttpStatusCode<T>(
