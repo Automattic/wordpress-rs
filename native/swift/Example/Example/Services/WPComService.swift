@@ -27,6 +27,19 @@ final class WPComService: ObservableObject {
                     }
             },
 
+            RootListData(name: "Unified Conversations", category: .system) {
+                let client = try await WPComApiClient.instance(loginManager: self.loginManager)
+                return try await client.unifiedConversations.getUnifiedConversationList().data
+                    .map {
+                        ListViewData(
+                            id: String($0.id),
+                            title: $0.title,
+                            subtitle: "\($0.status) · \($0.createdAt.formatted())",
+                            fields: [:]
+                        )
+                    }
+            },
+
             RootListData(
                 name: "Bot Conversations",
                 category: .system,

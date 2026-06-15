@@ -52,6 +52,9 @@ use super::endpoint::{
         SupportEligibilityRequestBuilder, SupportEligibilityRequestExecutor,
     },
     support_tickets_endpoint::{SupportTicketsRequestBuilder, SupportTicketsRequestExecutor},
+    unified_conversations_endpoint::{
+        UnifiedConversationsRequestBuilder, UnifiedConversationsRequestExecutor,
+    },
 };
 use crate::{
     api_client::WpApiClientDelegate,
@@ -105,6 +108,7 @@ pub struct WpComApiRequestBuilder {
     support_bots: Arc<SupportBotsRequestBuilder>,
     support_eligibility: Arc<SupportEligibilityRequestBuilder>,
     support_tickets: Arc<SupportTicketsRequestBuilder>,
+    unified_conversations: Arc<UnifiedConversationsRequestBuilder>,
 }
 
 impl WpComApiRequestBuilder {
@@ -149,7 +153,8 @@ impl WpComApiRequestBuilder {
             subscribers,
             support_bots,
             support_eligibility,
-            support_tickets
+            support_tickets,
+            unified_conversations
         )
     }
 }
@@ -206,6 +211,7 @@ pub struct WpComApiClient {
     support_bots: Arc<SupportBotsRequestExecutor>,
     support_eligibility: Arc<SupportEligibilityRequestExecutor>,
     support_tickets: Arc<SupportTicketsRequestExecutor>,
+    unified_conversations: Arc<UnifiedConversationsRequestExecutor>,
 }
 
 impl WpComApiClient {
@@ -251,7 +257,8 @@ impl WpComApiClient {
             subscribers,
             support_bots,
             support_eligibility,
-            support_tickets
+            support_tickets,
+            unified_conversations
         )
     }
 }
@@ -291,3 +298,4 @@ api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);
 api_client_generate_endpoint_impl!(WpComApi, support_eligibility);
 api_client_generate_endpoint_impl!(WpComApi, support_tickets);
+api_client_generate_endpoint_impl!(WpComApi, unified_conversations);

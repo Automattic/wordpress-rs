@@ -24,6 +24,7 @@ mod subscribers_by_user_type_tests;
 mod support_bot_tests;
 mod support_eligibility_test;
 mod support_tickets_test;
+mod unified_conversations_tests;
 mod wp_service_tests;
 
 use context::TestContext;
@@ -64,6 +65,7 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(support_bot_tests::tests(Arc::clone(&ctx)));
     tests.extend(support_eligibility_test::tests(Arc::clone(&ctx)));
     tests.extend(support_tickets_test::tests(Arc::clone(&ctx)));
+    tests.extend(unified_conversations_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_emails_summary_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_subscribers_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_top_posts_tests::tests(Arc::clone(&ctx)));
