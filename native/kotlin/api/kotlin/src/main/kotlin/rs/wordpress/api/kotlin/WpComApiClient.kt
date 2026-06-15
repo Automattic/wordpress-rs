@@ -16,7 +16,8 @@ class WpComApiClient(
     authProvider: WpAuthenticationProvider,
     private val requestExecutor: RequestExecutor,
     private val appNotifier: WpAppNotifier = EmptyAppNotifier(),
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val errorLogger: RequestErrorLogger? = null
 ) {
 
     /**
@@ -28,12 +29,14 @@ class WpComApiClient(
         interceptors: List<Interceptor>,
         networkAvailabilityProvider: NetworkAvailabilityProvider,
         appNotifier: WpAppNotifier = EmptyAppNotifier(),
-        dispatcher: CoroutineDispatcher = Dispatchers.IO
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        errorLogger: RequestErrorLogger? = null
     ) : this(
         authProvider,
         requestExecutor = WpRequestExecutor(interceptors, networkAvailabilityProvider),
         appNotifier,
-        dispatcher
+        dispatcher,
+        errorLogger
     )
 
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
@@ -57,10 +60,12 @@ class WpComApiClient(
     suspend fun <T> request(
         executeRequest: suspend (UniffiWpComApiClient) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
-        try {
+        val result = try {
             WpRequestResult.Success(response = executeRequest(requestBuilder))
         } catch (exception: WpApiException) {
-            mapWpApiExceptionToWpRequestResult(exception)
+            mapWpApiExceptionToWpRequestResult<T>(exception)
         }
+        errorLogger?.let { logger -> result.toLogErrorString()?.let(logger::logError) }
+        result
     }
 }

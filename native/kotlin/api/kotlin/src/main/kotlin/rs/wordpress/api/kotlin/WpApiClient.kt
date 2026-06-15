@@ -21,7 +21,8 @@ class WpApiClient @JvmOverloads constructor(
     authProvider: WpAuthenticationProvider,
     private val requestExecutor: RequestExecutor,
     private val appNotifier: WpAppNotifier = EmptyAppNotifier(),
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val errorLogger: RequestErrorLogger? = null
 ) {
     @JvmOverloads
     constructor(
@@ -29,19 +30,23 @@ class WpApiClient @JvmOverloads constructor(
         authProvider: WpAuthenticationProvider,
         requestExecutor: RequestExecutor,
         appNotifier: WpAppNotifier = EmptyAppNotifier(),
-        dispatcher: CoroutineDispatcher = Dispatchers.IO
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        errorLogger: RequestErrorLogger? = null
     ) : this(
         apiUrlResolver = WpOrgSiteApiUrlResolver(apiRootUrl = ParsedUrl.parse(wpOrgSiteApiRootUrl.toString())),
         authProvider,
         requestExecutor,
         appNotifier,
-        dispatcher
+        dispatcher,
+        errorLogger
     )
 
     /**
      * Convenience constructor that accepts a list of OkHttp interceptors.
      * Uses [WpRequestExecutor] internally with the provided interceptors.
      */
+    // Trailing params are all optional config with defaults; the count is benign here.
+    @Suppress("LongParameterList")
     @JvmOverloads
     constructor(
         wpOrgSiteApiRootUrl: URL,
@@ -49,13 +54,15 @@ class WpApiClient @JvmOverloads constructor(
         interceptors: List<Interceptor>,
         networkAvailabilityProvider: NetworkAvailabilityProvider,
         appNotifier: WpAppNotifier = EmptyAppNotifier(),
-        dispatcher: CoroutineDispatcher = Dispatchers.IO
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        errorLogger: RequestErrorLogger? = null
     ) : this(
         wpOrgSiteApiRootUrl,
         authProvider,
         requestExecutor = WpRequestExecutor(interceptors, networkAvailabilityProvider),
         appNotifier,
-        dispatcher
+        dispatcher,
+        errorLogger
     )
 
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
@@ -80,10 +87,12 @@ class WpApiClient @JvmOverloads constructor(
     suspend fun <T> request(
         executeRequest: suspend (UniffiWpApiClient) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
-        try {
+        val result = try {
             WpRequestResult.Success(response = executeRequest(requestBuilder))
         } catch (exception: WpApiException) {
-            mapWpApiExceptionToWpRequestResult(exception)
+            mapWpApiExceptionToWpRequestResult<T>(exception)
         }
+        errorLogger?.let { logger -> result.toLogErrorString()?.let(logger::logError) }
+        result
     }
 }
