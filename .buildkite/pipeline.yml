@@ -201,7 +201,7 @@ steps:
           cd ./native/kotlin
           ./gradlew detektMain detektTest
         agents:
-          queue: android
+          queue: android-staging
       - label: ":rust: Build host library"
         key: "rust-build-host"
         artifact_paths:
@@ -218,7 +218,7 @@ steps:
           echo "--- :rust: Building host library"
           cargo build --package wp_mobile --release
         agents:
-          queue: android
+          queue: android-staging
       - label: ":rust: Build Android {{matrix}}"
         key: "rust-build-android"
         plugins: [$CI_TOOLKIT]
@@ -231,7 +231,7 @@ steps:
           - "x86"
           - "x86_64"
         agents:
-          queue: android
+          queue: android-staging
       - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
         key: "publish-wp-api-kotlin"
         plugins: [$CI_TOOLKIT]
@@ -249,7 +249,7 @@ steps:
           echo "--- :kotlin: Publishing `rs.wordpress.api:kotlin`"
           .buildkite/publish-wp-api-kotlin.sh
         agents:
-          queue: android
+          queue: android-staging
       - label: ":kotlin: Publish `rs.wordpress.api:android`"
         key: "publish-wp-api-android"
         plugins: [$CI_TOOLKIT]
@@ -268,7 +268,7 @@ steps:
           echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
           .buildkite/publish-wp-api-android.sh
         agents:
-          queue: android
+          queue: android-staging
 
       - label: ":android: Build Example App"
         plugins: [$CI_TOOLKIT]
@@ -284,7 +284,7 @@ steps:
             -PwpApiAndroidVersion="$$PUBLISHED_WP_API_ANDROID_VERSION" \
             :example:composeApp:assembleDebug
         agents:
-          queue: android
+          queue: android-staging
 
   # Docker Group
   - group: ":wordpress: End-to-end Tests"
@@ -340,7 +340,7 @@ steps:
           echo "--- 🧪 Run e2e Tests"
           cargo run --bin wp_com_e2e
         agents:
-          queue: android
+          queue: android-staging
 
   - label: ":wastebasket: Clean up `pr-build/*` branches for closed PRs"
     command: .buildkite/cleanup-pr-build-branches.sh
