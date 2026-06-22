@@ -135,6 +135,22 @@ tasks.named("sourcesJar").configure {
     dependsOn(generateUniFFIBindingsTask)
 }
 
+// Generated AI reference docs are a build output (not committed). Single source of truth for the path.
+val aiDocsDir = layout.buildDirectory.dir("ai-docs/ai-reference")
+
+val generateAiDocs = tasks.register<GenerateAiDocsTask>("generateAiDocs") {
+    dependsOn(generateUniFFIBindingsTask)
+    generatedBindingsFile.set(
+        layout.buildDirectory.file("generated/source/uniffi/java/uniffi/wp_api/wp_api.kt")
+    )
+    outputDirectory.set(aiDocsDir)
+}
+
+// Derive the publisher's source from the generator's output so zipAiDocs implicitly depends on generateAiDocs.
+aiDocs {
+    from(generateAiDocs.flatMap { it.outputDirectory })
+}
+
 project.afterEvaluate {
     publishing {
         publications {
