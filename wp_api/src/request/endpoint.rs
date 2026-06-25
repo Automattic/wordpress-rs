@@ -163,6 +163,42 @@ impl WpOrgSiteApiUrlResolver {
 #[uniffi::export]
 impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
+        // When the API root URL uses the `?rest_route=/` query-parameter form
+        // (plain-permalink sites), we must build endpoint URLs by setting the
+        // `rest_route` query value rather than path-extending, because
+        // path-extending produces URLs that WordPress ignores.
+        //
+        // Example:
+        //   api_root = https://example.com/index.php?rest_route=/
+        //   resolve("wp/v2", ["users", "me"])
+        //     → https://example.com/index.php?rest_route=/wp/v2/users/me
+        if let Some(_rest_route) = self
+            .api_root_url
+            .inner
+            .query_pairs()
+            .find(|(key, _)| key == "rest_route")
+            .map(|(_, value)| value.to_string())
+        {
+            let route_path = Self::build_route_path(&namespace, &endpoint_segments);
+            let mut url = self.api_root_url.inner.clone();
+
+            // Rebuild query string without the old `rest_route`, then add the new one
+            let new_query: String = url
+                .query_pairs()
+                .filter(|(key, _)| key != "rest_route")
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&");
+
+            url.set_query(None);
+            if !new_query.is_empty() {
+                url.set_query(Some(&new_query));
+            }
+            url.query_pairs_mut()
+                .append_pair("rest_route", &route_path);
+            return Arc::new(ParsedUrl::new(url));
+        }
+
         Arc::new(
             self.api_root_url
                 .by_extending_and_splitting_by_forward_slash(
@@ -178,6 +214,26 @@ impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
             namespace.trim_end_matches('/'),
             endpoint_path.trim_start_matches('/')
         )
+    }
+}
+
+impl WpOrgSiteApiUrlResolver {
+    /// Build a route path for the `rest_route` query parameter form.
+    /// Unlike `route_path`, this normalizes the leading slash to avoid
+    /// double slashes when the namespace already starts with `/`.
+    fn build_route_path(namespace: &str, segments: &[String]) -> String {
+        let mut parts: Vec<&str> = Vec::new();
+        let ns = namespace.trim_start_matches('/').trim_end_matches('/');
+        if !ns.is_empty() {
+            parts.push(ns);
+        }
+        for seg in segments {
+            let trimmed = seg.trim_start_matches('/');
+            if !trimmed.is_empty() {
+                parts.push(trimmed);
+            }
+        }
+        format!("/{}", parts.join("/"))
     }
 }
 
@@ -216,6 +272,72 @@ mod tests {
                 namespace.namespace_value(),
                 path
             )
+        );
+    }
+
+    #[test]
+    fn test_resolve_with_rest_route_query_param() {
+        let api_root =
+            ParsedUrl::parse("https://example.com/index.php?rest_route=/").unwrap();
+        let resolver = WpOrgSiteApiUrlResolver::new(Arc::new(api_root));
+
+        let result = resolver.resolve(
+            "/wp/v2".to_string(),
+            vec!["users".to_string(), "me".to_string()],
+        );
+
+        assert_eq!(
+            result.url(),
+            "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fusers%2Fme"
+        );
+    }
+
+    #[test]
+    fn test_resolve_with_rest_route_trailing_slash() {
+        let api_root =
+            ParsedUrl::parse("https://example.com/index.php?rest_route=/").unwrap();
+        let resolver = WpOrgSiteApiUrlResolver::new(Arc::new(api_root));
+
+        let result = resolver.resolve(
+            "/wp/v2".to_string(),
+            vec!["posts".to_string()],
+        );
+
+        assert_eq!(
+            result.url(),
+            "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fposts"
+        );
+    }
+
+    #[test]
+    fn test_resolve_without_rest_route() {
+        let api_root = ParsedUrl::parse("https://example.com/wp-json").unwrap();
+        let resolver = WpOrgSiteApiUrlResolver::new(Arc::new(api_root));
+
+        let result = resolver.resolve(
+            "/wp/v2".to_string(),
+            vec!["users".to_string(), "me".to_string()],
+        );
+
+        assert_eq!(
+            result.url(),
+            "https://example.com/wp-json/wp/v2/users/me"
+        );
+    }
+
+    #[test]
+    fn test_build_route_path() {
+        let api_root = ParsedUrl::parse("https://example.com").unwrap();
+        let resolver = WpOrgSiteApiUrlResolver::new(Arc::new(api_root));
+
+        assert_eq!(
+            resolver.route_path("/wp/v2".to_string(), "users/me".to_string()),
+            "/wp/v2/users/me"
+        );
+
+        assert_eq!(
+            resolver.route_path("/wp/v2".to_string(), "/posts".to_string()),
+            "/wp/v2/posts"
         );
     }
 }
