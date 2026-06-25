@@ -1,11 +1,12 @@
-//! End-to-end regression test for [#1366]: self-hosted sites with plain
-//! permalinks advertise the REST API root as `…/index.php?rest_route=/` rather
-//! than `…/wp-json`. Before the fix, every endpoint URL was built by
-//! path-extending the discovered root and silently collapsed to the API index.
+//! Regression test for [#1366]: self-hosted sites with *plain* permalinks
+//! advertise the REST API root as `…/index.php?rest_route=/` rather than
+//! `…/wp-json/`. Before the fix, every endpoint URL was built by path-extending
+//! the discovered root and silently collapsed to the API index.
 //!
-//! Requires a dedicated WordPress instance (see `make
-//! start-plain-permalinks-test-server`); the test self-skips when its
-//! credentials file is absent so it doesn't break the default suite.
+//! This flips the shared integration-test server to plain permalinks for the
+//! duration of the test, then restores the original structure as its last step
+//! (the same pattern the other `_mut` tests use with `RestoreServer::db()`).
+//! It is `#[serial]` because it mutates a *global* server setting.
 //!
 //! [#1366]: https://github.com/Automattic/wordpress-rs/issues/1366
 
@@ -19,38 +20,17 @@ use wp_api::{
     request::endpoint::WpOrgSiteApiUrlResolver,
     reqwest_request_executor::ReqwestRequestExecutor,
 };
-use wp_api_integration_tests::prelude::AssertResponse;
-
-const CREDENTIALS_PATH: &str = "../test_credentials_plain_permalinks.json";
-
-struct PlainPermalinksCredentials {
-    site_url: String,
-    admin_username: String,
-    admin_password: String,
-}
-
-impl PlainPermalinksCredentials {
-    fn load() -> Option<Self> {
-        let raw = std::fs::read_to_string(CREDENTIALS_PATH).ok()?;
-        let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
-        Some(Self {
-            site_url: v.get("site_url")?.as_str()?.to_string(),
-            admin_username: v.get("admin_username")?.as_str()?.to_string(),
-            admin_password: v.get("admin_password")?.as_str()?.to_string(),
-        })
-    }
-}
+use wp_api_integration_tests::prelude::{AssertResponse, TestCredentials, serial};
 
 #[tokio::test]
+#[serial]
 async fn login_and_fetch_users_me_on_plain_permalinks_site() {
-    let Some(creds) = PlainPermalinksCredentials::load() else {
-        eprintln!(
-            "Skipping: {CREDENTIALS_PATH} not found. Run \
-             `make start-plain-permalinks-test-server` to bring up the \
-             dedicated WordPress instance for this test."
-        );
-        return;
-    };
+    let creds = TestCredentials::instance();
+
+    // Capture the server's current (date-based) permalink structure so we can put
+    // it back at the end, then switch the site to "Plain".
+    let original_permalink_structure = wp_cli::get_permalink_structure();
+    wp_cli::set_permalink_structure("");
 
     let executor = Arc::new(ReqwestRequestExecutor::default());
     let login_client = WpLoginClient::new(
@@ -59,7 +39,7 @@ async fn login_and_fetch_users_me_on_plain_permalinks_site() {
     );
 
     let discovery = login_client
-        .api_discovery(creds.site_url.clone(), None)
+        .api_discovery(creds.site_url.to_string(), None)
         .await;
     let success = discovery
         .combined_result()
@@ -78,8 +58,8 @@ async fn login_and_fetch_users_me_on_plain_permalinks_site() {
         WpApiClientDelegate {
             auth_provider: Arc::new(WpAuthenticationProvider::static_with_auth(
                 WpAuthentication::from_username_and_password(
-                    creds.admin_username,
-                    creds.admin_password,
+                    creds.admin_username.to_string(),
+                    creds.admin_password.to_string(),
                 ),
             )),
             request_executor: executor,
@@ -95,4 +75,7 @@ async fn login_and_fetch_users_me_on_plain_permalinks_site() {
         .assert_response()
         .data;
     assert_eq!(user.id.0, 1, "admin user should have id 1");
+
+    // Restore the original permalink structure for subsequent tests.
+    wp_cli::set_permalink_structure(&original_permalink_structure);
 }

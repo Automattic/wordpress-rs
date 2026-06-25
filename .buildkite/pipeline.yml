@@ -309,17 +309,6 @@ steps:
           echo "--- :rust: Testing"
           make test-rust-integration-wordpress-org-api
 
-      - label: ":wordpress: :rust: Plain Permalinks Login (#1366)"
-        command: |
-          # Give read/write permissions to `./` for all users
-          chmod -R a+rw ./
-
-          echo "--- :docker: Setting up plain-permalinks WordPress server"
-          make start-plain-permalinks-test-server
-
-          echo "--- 🧪 Running plain-permalinks integration test"
-          make test-rust-integration-plain-permalinks
-
       - label: ":wordpress: :kotlin: WordPress {{matrix}}"
         command: ".buildkite/commands/run-kotlin-integration-tests.sh"
         env:
