@@ -214,13 +214,6 @@ test-rust-integration:
 test-rust-integration-wordpress-org-api:
 	$(rust_docker_run) cargo test --package wp_api_integration_tests --test test_plugin_directory -- --nocapture
 
-test-rust-integration-plain-permalinks:
-	@# Help: Run the plain-permalinks integration test inside the dedicated WordPress server.
-	# Runs cargo *inside* the container (which has the Rust toolchain + libssl-dev),
-	# matching the main `test-rust-integration` flow. The site is reachable there at
-	# `http://localhost`, so the test connects on the container's own Apache port.
-	$(plain-permalinks-compose) exec -T wordpress /bin/bash -c "cd /app && cargo test -p wp_api_integration_tests --test test_login_plain_permalinks -- --nocapture"
-
 test-kotlin-integration:
 	@# Help: Run Kotlin integration tests in test server.
 	docker exec -i wordpress /bin/bash < ./scripts/run-kotlin-integration-tests.sh
@@ -252,17 +245,6 @@ print-log-integration-test-server:
 stop-server:
 	@# Help: Stop the running server.
 	docker-compose down
-
-plain-permalinks-compose := docker-compose -f docker-compose.plain-permalinks.yml -p wordpress-rs-plain-permalinks
-
-start-plain-permalinks-test-server: stop-plain-permalinks-test-server
-	@# Help: Start the dedicated WordPress instance used by the plain-permalinks integration test (on :8081).
-	$(plain-permalinks-compose) up -d --build
-	$(plain-permalinks-compose) exec -T wordpress /bin/bash < ./scripts/setup-plain-permalinks-test-site.sh
-
-stop-plain-permalinks-test-server:
-	@# Help: Stop the plain-permalinks WordPress instance.
-	$(plain-permalinks-compose) down
 
 lint: lint-rust lint-swift
 	@# Help: Run the linter for all languages.

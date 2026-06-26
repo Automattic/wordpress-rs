@@ -47,19 +47,55 @@ pub fn restore_db() -> std::process::Output {
         .expect("Failed to restore db")
 }
 
+/// Reads the site's current `permalink_structure` option. An empty string means
+/// "Plain" permalinks, the case where WordPress advertises the REST API root in
+/// the `…/index.php?rest_route=/` form rather than `…/wp-json/`.
+pub fn get_permalink_structure() -> String {
+    // Read the raw value (no `--format`): empty output for "Plain", otherwise the
+    // structure string. `rewrite`/`option` writes below reject `--format`, so this
+    // can't share `run_wp_cli_command`.
+    let output = run_wp_cli_command_raw(["option", "get", "permalink_structure"]);
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+/// Sets the permalink structure and flushes the rewrite rules in one step.
+/// Passing an empty string selects "Plain" permalinks. Use this (not a bare
+/// `option update`) so the cached `rewrite_rules` option stays consistent with
+/// the new structure.
+pub fn set_permalink_structure(structure: &str) -> std::process::Output {
+    run_wp_cli_command_raw(["rewrite", "structure", structure])
+}
+
 fn run_wp_cli_command<I, S>(args: I) -> std::process::Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
+    let mut c = wp_cli_command();
+    c.arg("--format=json").args(args);
+    println!("Running wp_cli command: {c:#?}");
+    c.output().expect("Failed to run wp-cli command")
+}
+
+/// Like [`run_wp_cli_command`] but without `--format=json`, for commands such as
+/// `rewrite structure` that reject the `--format` parameter.
+fn run_wp_cli_command_raw<I, S>(args: I) -> std::process::Output
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let mut c = wp_cli_command();
+    c.args(args);
+    println!("Running wp_cli command: {c:#?}");
+    c.output().expect("Failed to run wp-cli command")
+}
+
+fn wp_cli_command() -> Command {
     let mut c = Command::new("wp");
     c.arg("--allow-root")
         .arg("--http=http://localhost")
-        .arg("--path=/var/www/html")
-        .arg("--format=json")
-        .args(args);
-    println!("Running wp_cli command: {c:#?}");
-    c.output().expect("Failed to run wp-cli command")
+        .arg("--path=/var/www/html");
+    c
 }
 
 pub(crate) trait AsWpCliArguments {
