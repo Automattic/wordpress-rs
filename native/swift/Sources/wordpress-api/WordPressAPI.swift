@@ -255,7 +255,8 @@ public final class WordPressAPI: Sendable {
         params: MediaCreateParams,
         fulfilling progress: Progress
     ) async throws -> MediaRequestCreateResponse {
-        try await fulfill(progress: progress) { [media] in
+        try progress.setTotalUnitCountToFileSizeIfUnset(filePath: params.filePath)
+        return try await fulfill(progress: progress) { [media] in
             try await media.createCancellation(params: params, context: $0)
         }
     }
@@ -268,6 +269,22 @@ public final class WordPressAPI: Sendable {
 }
 
 #if PROGRESS_REPORTING_ENABLED
+
+extension Progress {
+    /// Defaults an unset total (0) to the byte size of the file at `filePath`.
+    ///
+    /// Media upload callers otherwise have to stat the file themselves just to satisfy
+    /// `fulfill`'s requirement that the total be greater than zero. A missing or unreadable
+    /// file throws rather than leaving the total unset, so the failure surfaces here instead
+    /// of as a confusing zero-total upload.
+    func setTotalUnitCountToFileSizeIfUnset(filePath: String) throws {
+        guard totalUnitCount == 0 else { return }
+        let attributes = try FileManager.default.attributesOfItem(atPath: filePath)
+        if let size = attributes[.size] as? NSNumber {
+            totalUnitCount = size.int64Value
+        }
+    }
+}
 
 extension SafeRequestExecutor {
     func fulfill<R: Sendable>(

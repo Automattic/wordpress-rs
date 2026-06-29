@@ -10,6 +10,7 @@ extension WpService {
         params: MediaCreateParams,
         fulfilling progress: Progress
     ) async throws -> MediaWithEditContext {
+        try progress.setTotalUnitCountToFileSizeIfUnset(filePath: params.filePath)
         if let executor = requestExecutor() as? SafeRequestExecutor {
             return try await executor.fulfill(progress: progress) { [service = media()] context in
                 try await service.createMedia(params: params, context: context)
