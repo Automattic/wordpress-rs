@@ -50,7 +50,7 @@ class BindingsParser(private val lines: List<String>) {
             val line = lines[i]
             if (line.startsWith("data class ") && line.contains("(")) {
                 val name = line.removePrefix("data class ").substringBefore(" (").trim()
-                val fields = mutableListOf<Triple<String, String, String?>>()
+                val fields = mutableListOf<Field>()
                 i++
 
                 while (i < lines.size) {
@@ -58,7 +58,7 @@ class BindingsParser(private val lines: List<String>) {
                     if (fieldLine.startsWith("val ")) {
                         val parsed = parseField(fieldLine)
                         if (parsed != null) fields.add(parsed)
-                    } else if (fieldLine.startsWith(")") || fieldLine == "): Disposable{") {
+                    } else if (fieldLine.startsWith(")")) {
                         break
                     }
                     i++
@@ -162,9 +162,7 @@ class BindingsParser(private val lines: List<String>) {
             paramsStr.split(", ").mapNotNull { param ->
                 val parts = param.split(": ", limit = 2)
                 if (parts.size == 2) {
-                    val pName = parts[0].removeSurrounding("`").trim()
-                    val pType = parts[1].trim()
-                    pName to pType
+                    Param(parts[0].removeSurrounding("`").trim(), parts[1].trim())
                 } else null
             }
         }
@@ -172,19 +170,18 @@ class BindingsParser(private val lines: List<String>) {
         return MethodSignature(name, params, returnType, isSuspend)
     }
 
-    private fun parseField(line: String): Triple<String, String, String?>? {
+    private fun parseField(line: String): Field? {
         val withoutVal = line.removePrefix("val ").trim()
         val nameRaw = withoutVal.substringBefore(":").removeSurrounding("`").trim()
         val rest = withoutVal.substringAfter(": ", "")
         if (rest.isEmpty()) return null
 
-        val type = rest.substringBefore(" =").substringBefore(" \n").trim()
-            .removeSuffix(",").trim()
+        val type = rest.substringBefore(" =").trim().removeSuffix(",").trim()
         val default = if (rest.contains(" = ")) {
-            rest.substringAfter(" = ").substringBefore(" \n").removeSuffix(",").trim()
+            rest.substringAfter(" = ").removeSuffix(",").trim()
         } else null
 
-        return Triple(nameRaw, cleanType(type), default)
+        return Field(nameRaw, cleanType(type), default)
     }
 
     private fun cleanType(type: String): String = type

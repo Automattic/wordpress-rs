@@ -32,9 +32,9 @@ class BindingsParserTest {
         // The parser keeps every method; filtering `cancel`/`fetchAuthenticationState` is the generator's job.
         assertEquals(
             listOf(
-                MethodSignature("cancel", listOf("context" to "RequestContext"), "Unit", isSuspend = false),
+                MethodSignature("cancel", listOf(Param("context", "RequestContext")), "Unit", isSuspend = false),
                 MethodSignature("fetchAuthenticationState", emptyList(), "AuthenticationState?", isSuspend = true),
-                MethodSignature("list", listOf("params" to "PostListParams"), "PostListResponse", isSuspend = true)
+                MethodSignature("list", listOf(Param("params", "PostListParams")), "PostListResponse", isSuspend = true)
             ),
             executor.methods
         )
@@ -56,8 +56,8 @@ class BindingsParserTest {
         val params = dataClasses["PostListParams"]
         assertEquals(
             listOf(
-                Triple("search", "String?", "null"),
-                Triple("page", "UInt", null)
+                Field("search", "String?", "null"),
+                Field("page", "UInt", null)
             ),
             params?.fields
         )
