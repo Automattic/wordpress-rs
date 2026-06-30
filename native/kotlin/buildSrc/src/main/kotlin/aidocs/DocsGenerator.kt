@@ -12,59 +12,34 @@ class DocsGenerator(parsed: ParsedBindings) {
     private val enumClasses = parsed.enumClasses
 
     fun generate(): List<GeneratedDoc> {
-        val docs = mutableListOf<GeneratedDoc>()
-
-        // WordPress.com stats endpoints are numerous and individually tiny, so we
-        // collect them into a single grouped file instead of one file each.
-        val (statsExecutors, regularExecutors) = executorInterfaces
-            .partition { it.domain.startsWith("stats") }
-
-        val indexEntries = mutableListOf<Pair<String, String>>()
-
-        for (executor in regularExecutors) {
-            val fileName = "${executor.domain}.md"
-            indexEntries.add(executor.domain to "- [${executor.domain}]($fileName)")
-            docs.add(GeneratedDoc(fileName, generateEndpointDoc(executor, level = 1).toString()))
+        val endpoints = executorInterfaces.map { executor ->
+            GeneratedDoc("${executor.domain}.md", generateEndpointDoc(executor))
         }
+        return endpoints + GeneratedDoc("index.md", buildIndex())
+    }
 
-        if (statsExecutors.isNotEmpty()) {
-            indexEntries.add("stats" to "- [stats](stats.md)")
-            val statsDoc = StringBuilder()
-            statsDoc.appendLine("# stats")
-            statsDoc.appendLine()
-            statsDoc.appendLine("WordPress.com stats endpoints.")
-            for (executor in statsExecutors.sortedBy { it.domain }) {
-                statsDoc.appendLine()
-                statsDoc.append(generateEndpointDoc(executor, level = 2))
-            }
-            docs.add(GeneratedDoc("stats.md", statsDoc.toString()))
-        }
-
+    private fun buildIndex(): String {
         val index = StringBuilder()
         index.appendLine("# WordPress REST API - Kotlin Bindings Reference")
         index.appendLine()
         index.appendLine("## Endpoints")
         index.appendLine()
-        indexEntries.sortedBy { it.first }.forEach { index.appendLine(it.second) }
-        docs.add(GeneratedDoc("index.md", index.toString()))
-
-        return docs
+        executorInterfaces.map { it.domain }.sorted().forEach { domain ->
+            index.appendLine("- [$domain]($domain.md)")
+        }
+        return index.toString()
     }
 
-    private fun generateEndpointDoc(executor: ExecutorInterface, level: Int): StringBuilder {
-        val h1 = "#".repeat(level)
-        val h2 = "#".repeat(level + 1)
-        val h3 = "#".repeat(level + 2)
-
+    private fun generateEndpointDoc(executor: ExecutorInterface): String {
         val doc = StringBuilder()
-        doc.appendLine("$h1 ${executor.domain}")
+        doc.appendLine("# ${executor.domain}")
         doc.appendLine()
 
         val apiMethods = executor.methods.filter {
             it.name != "cancel" && it.name != "fetchAuthenticationState"
         }
 
-        doc.appendLine("$h2 Methods")
+        doc.appendLine("## Methods")
         doc.appendLine()
         for (method in apiMethods) {
             val params = method.params.joinToString(", ") { "${it.name}: ${it.type}" }
@@ -81,19 +56,19 @@ class DocsGenerator(parsed: ParsedBindings) {
 
         if (paramsClasses.isNotEmpty()) {
             doc.appendLine()
-            doc.appendLine("$h2 Parameters")
+            doc.appendLine("## Parameters")
             for (cls in paramsClasses) {
                 doc.appendLine()
-                writeDataClass(doc, cls, h3)
+                writeDataClass(doc, cls, "###")
             }
         }
 
         if (entityClasses.isNotEmpty()) {
             doc.appendLine()
-            doc.appendLine("$h2 Types")
+            doc.appendLine("## Types")
             for (cls in entityClasses) {
                 doc.appendLine()
-                writeDataClass(doc, cls, h3)
+                writeDataClass(doc, cls, "###")
             }
         }
 
@@ -102,20 +77,20 @@ class DocsGenerator(parsed: ParsedBindings) {
 
         if (relevantEnums.isNotEmpty() || relevantSealed.isNotEmpty()) {
             doc.appendLine()
-            doc.appendLine("$h2 Enums")
+            doc.appendLine("## Enums")
             for (enum in relevantEnums) {
                 doc.appendLine()
-                doc.appendLine("$h3 ${enum.name}")
+                doc.appendLine("### ${enum.name}")
                 doc.appendLine("Variants: ${enum.variants.joinToString(", ") { "`$it`" }}")
             }
             for (sealed in relevantSealed) {
                 doc.appendLine()
-                doc.appendLine("$h3 ${sealed.name}")
+                doc.appendLine("### ${sealed.name}")
                 doc.appendLine("Variants: ${sealed.variants.joinToString(", ") { "`$it`" }}")
             }
         }
 
-        return doc
+        return doc.toString()
     }
 
     private fun writeDataClass(doc: StringBuilder, cls: DataClassInfo, heading: String) {
