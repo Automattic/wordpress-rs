@@ -19,38 +19,38 @@ class BindingsParser(private val lines: List<String>) {
     )
 
     fun parseExecutorInterfaces(): List<ExecutorInterface> =
-        blocks { it.startsWith("public interface ") && it.endsWith("RequestExecutorInterface {") }
+        blocks { it.startsWith(INTERFACE_PREFIX) && it.endsWith("$EXECUTOR_SUFFIX {") }
             .map { (header, body) ->
-                val name = header.removePrefix("public interface ").removeSuffix(" {")
-                val domain = name.removeSuffix("RequestExecutorInterface").replaceFirstChar { c -> c.lowercase() }
+                val name = header.removePrefix(INTERFACE_PREFIX).removeSuffix(" {")
+                val domain = name.removeSuffix(EXECUTOR_SUFFIX).replaceFirstChar { c -> c.lowercase() }
                 val methods = body.takeWhile { it != "}" }.mapNotNull { parseMethodSignature(it.trim()) }
                 ExecutorInterface(name, domain, methods)
             }
 
     fun parseDataClasses(): Map<String, DataClassInfo> =
-        blocks { it.startsWith("data class ") && it.contains("(") }
+        blocks { it.startsWith(DATA_CLASS_PREFIX) && it.contains("(") }
             .mapNotNull { (header, body) ->
-                val name = header.removePrefix("data class ").substringBefore(" (").trim()
+                val name = header.removePrefix(DATA_CLASS_PREFIX).substringBefore(" (").trim()
                 val fields = body.takeWhile { !it.trim().startsWith(")") }
-                    .filter { it.trim().startsWith("val ") }
+                    .filter { it.trim().startsWith(VAL_PREFIX) }
                     .mapNotNull { parseField(it.trim()) }
                 if (fields.isEmpty()) null else DataClassInfo(name, fields)
             }
             .associateBy { it.name }
 
     fun parseSealedClasses(): Map<String, SealedClassInfo> =
-        blocks { it.startsWith("sealed class ") && it.endsWith("{") }
+        blocks { it.startsWith(SEALED_CLASS_PREFIX) && it.endsWith("{") }
             .mapNotNull { (header, body) ->
-                val name = header.removePrefix("sealed class ").substringBefore(" ").trim()
+                val name = header.removePrefix(SEALED_CLASS_PREFIX).substringBefore(" ").trim()
                 val variants = body.takeWhile { it != "}" }.mapNotNull { sealedVariantName(it.trim()) }
                 if (variants.isEmpty()) null else SealedClassInfo(name, variants)
             }
             .associateBy { it.name }
 
     fun parseEnumClasses(): Map<String, EnumClassInfo> =
-        blocks { it.startsWith("enum class ") && it.contains("{") }
+        blocks { it.startsWith(ENUM_CLASS_PREFIX) && it.contains("{") }
             .mapNotNull { (header, body) ->
-                val name = header.removePrefix("enum class ").substringBefore("(").substringBefore(" {").trim()
+                val name = header.removePrefix(ENUM_CLASS_PREFIX).substringBefore("(").substringBefore(" {").trim()
                 val variants = enumVariants(body)
                 if (variants.isEmpty()) null else EnumClassInfo(name, variants)
             }
@@ -64,8 +64,8 @@ class BindingsParser(private val lines: List<String>) {
             .map { (index, line) -> Decl(line, lines.subList(index + 1, lines.size)) }
 
     private fun sealedVariantName(line: String): String? = when {
-        line.startsWith("data class ") -> line.removePrefix("data class ").substringBefore("(").trim()
-        line.startsWith("object ") -> line.removePrefix("object ").substringBefore(" ").substringBefore(":").trim()
+        line.startsWith(DATA_CLASS_PREFIX) -> line.removePrefix(DATA_CLASS_PREFIX).substringBefore("(").trim()
+        line.startsWith(OBJECT_PREFIX) -> line.removePrefix(OBJECT_PREFIX).substringBefore(" ").substringBefore(":").trim()
         else -> null
     }
 
@@ -86,11 +86,11 @@ class BindingsParser(private val lines: List<String>) {
     }
 
     private fun parseMethodSignature(line: String): MethodSignature? {
-        if (!line.startsWith("fun ") && !line.startsWith("suspend fun ")) return null
-        if (line.contains("companion object")) return null
+        if (!line.startsWith(FUN_PREFIX) && !line.startsWith(SUSPEND_FUN_PREFIX)) return null
+        if (line.contains(COMPANION_OBJECT)) return null
 
-        val isSuspend = line.startsWith("suspend ")
-        val withoutPrefix = if (isSuspend) line.removePrefix("suspend fun ") else line.removePrefix("fun ")
+        val isSuspend = line.startsWith(SUSPEND_FUN_PREFIX)
+        val withoutPrefix = if (isSuspend) line.removePrefix(SUSPEND_FUN_PREFIX) else line.removePrefix(FUN_PREFIX)
 
         val name = withoutPrefix.substringBefore("(").removeSurrounding("`")
         val paramsStr = withoutPrefix.substringAfter("(").substringBefore(")")
@@ -126,7 +126,7 @@ class BindingsParser(private val lines: List<String>) {
     }
 
     private fun parseField(line: String): Field? {
-        val withoutVal = line.removePrefix("val ").trim()
+        val withoutVal = line.removePrefix(VAL_PREFIX).trim()
         val nameRaw = withoutVal.substringBefore(":").removeSurrounding("`").trim()
         val rest = withoutVal.substringAfter(": ", "")
         if (rest.isEmpty()) return null
@@ -142,4 +142,18 @@ class BindingsParser(private val lines: List<String>) {
     // Strip the `kotlin.` package prefix from built-in types, e.g. `kotlin.String` -> `String` and
     // `Map<kotlin.String, kotlin.UInt>` -> `Map<String, UInt>`.
     private fun cleanType(type: String): String = type.replace(kotlinPackagePrefix, "")
+
+    // The UniFFI-generated declaration markers this parser keys off of.
+    private companion object {
+        const val INTERFACE_PREFIX = "public interface "
+        const val EXECUTOR_SUFFIX = "RequestExecutorInterface"
+        const val DATA_CLASS_PREFIX = "data class "
+        const val SEALED_CLASS_PREFIX = "sealed class "
+        const val ENUM_CLASS_PREFIX = "enum class "
+        const val OBJECT_PREFIX = "object "
+        const val VAL_PREFIX = "val "
+        const val FUN_PREFIX = "fun "
+        const val SUSPEND_FUN_PREFIX = "suspend fun "
+        const val COMPANION_OBJECT = "companion object"
+    }
 }
