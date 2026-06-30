@@ -18,30 +18,27 @@ class DocsGenerator(parsed: ParsedBindings) {
         return endpoints + GeneratedDoc("index.md", buildIndex())
     }
 
-    private fun buildIndex(): String {
-        val index = StringBuilder()
-        index.appendLine("# WordPress REST API - Kotlin Bindings Reference")
-        index.appendLine()
-        index.appendLine("## Endpoints")
-        index.appendLine()
+    private fun buildIndex(): String = buildString {
+        appendLine("# WordPress REST API - Kotlin Bindings Reference")
+        appendLine()
+        appendLine("## Endpoints")
+        appendLine()
         executorInterfaces.map { it.domain }.sorted().forEach { domain ->
-            index.appendLine("- [$domain]($domain.md)")
+            appendLine("- [$domain]($domain.md)")
         }
-        return index.toString()
     }
 
-    private fun generateEndpointDoc(executor: ExecutorInterface): String {
-        val doc = StringBuilder()
-        doc.appendLine("# ${executor.domain}")
-        doc.appendLine()
+    private fun generateEndpointDoc(executor: ExecutorInterface): String = buildString {
+        appendLine("# ${executor.domain}")
+        appendLine()
 
         val apiMethods = executor.methods.filterNot { it.name in EXCLUDED_METHODS }
 
-        doc.appendLine("## Methods")
-        doc.appendLine()
-        for (method in apiMethods) {
+        appendLine("## Methods")
+        appendLine()
+        apiMethods.forEach { method ->
             val params = method.params.joinToString(", ") { "${it.name}: ${it.type}" }
-            doc.appendLine("- `${method.name}($params): ${method.returnType}`")
+            appendLine("- `${method.name}($params): ${method.returnType}`")
         }
 
         val referencedTypes = collectReferencedTypes(apiMethods)
@@ -53,20 +50,20 @@ class DocsGenerator(parsed: ParsedBindings) {
         val entityClasses = relevantDataClasses.filter { !it.name.endsWith(PARAMS_SUFFIX) && !it.name.endsWith(RESPONSE_SUFFIX) }
 
         if (paramsClasses.isNotEmpty()) {
-            doc.appendLine()
-            doc.appendLine("## Parameters")
-            for (cls in paramsClasses) {
-                doc.appendLine()
-                doc.append(dataClassTable(cls, "###"))
+            appendLine()
+            appendLine("## Parameters")
+            paramsClasses.forEach { cls ->
+                appendLine()
+                append(dataClassTable(cls, "###"))
             }
         }
 
         if (entityClasses.isNotEmpty()) {
-            doc.appendLine()
-            doc.appendLine("## Types")
-            for (cls in entityClasses) {
-                doc.appendLine()
-                doc.append(dataClassTable(cls, "###"))
+            appendLine()
+            appendLine("## Types")
+            entityClasses.forEach { cls ->
+                appendLine()
+                append(dataClassTable(cls, "###"))
             }
         }
 
@@ -74,21 +71,19 @@ class DocsGenerator(parsed: ParsedBindings) {
         val relevantSealed = referencedTypes.mapNotNull { sealedClasses[it] }
 
         if (relevantEnums.isNotEmpty() || relevantSealed.isNotEmpty()) {
-            doc.appendLine()
-            doc.appendLine("## Enums")
-            for (enum in relevantEnums) {
-                doc.appendLine()
-                doc.appendLine("### ${enum.name}")
-                doc.appendLine("Variants: ${enum.variants.joinToString(", ") { "`$it`" }}")
+            appendLine()
+            appendLine("## Enums")
+            relevantEnums.forEach { enum ->
+                appendLine()
+                appendLine("### ${enum.name}")
+                appendLine("Variants: ${enum.variants.joinToString(", ") { "`$it`" }}")
             }
-            for (sealed in relevantSealed) {
-                doc.appendLine()
-                doc.appendLine("### ${sealed.name}")
-                doc.appendLine("Variants: ${sealed.variants.joinToString(", ") { "`$it`" }}")
+            relevantSealed.forEach { sealed ->
+                appendLine()
+                appendLine("### ${sealed.name}")
+                appendLine("Variants: ${sealed.variants.joinToString(", ") { "`$it`" }}")
             }
         }
-
-        return doc.toString()
     }
 
     private fun dataClassTable(cls: DataClassInfo, heading: String): String = buildString {
