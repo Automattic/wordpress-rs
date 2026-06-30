@@ -67,14 +67,14 @@ class DocsGenerator(parsed: ParsedBindings) {
         doc.appendLine("$h2 Methods")
         doc.appendLine()
         for (method in apiMethods) {
-            val params = method.params.joinToString(", ") { "${it.first}: ${it.second}" }
+            val params = method.params.joinToString(", ") { "${it.name}: ${it.type}" }
             doc.appendLine("- `${method.name}($params): ${method.returnType}`")
         }
 
         val referencedTypes = collectReferencedTypes(apiMethods)
         val relevantDataClasses = referencedTypes
             .mapNotNull { dataClasses[it] }
-            .filter { !it.name.endsWith("Response") || it.fields.any { f -> f.first != "data" && f.first != "headerMap" } }
+            .filter { !it.name.endsWith("Response") || it.fields.any { f -> f.name != "data" && f.name != "headerMap" } }
 
         val paramsClasses = relevantDataClasses.filter { it.name.endsWith("Params") }
         val entityClasses = relevantDataClasses.filter { !it.name.endsWith("Params") && !it.name.endsWith("Response") }

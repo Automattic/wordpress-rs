@@ -3,9 +3,13 @@ package aidocs
 // Structured model of the UniFFI-generated Kotlin bindings. Produced by [BindingsParser] and consumed
 // by [DocsGenerator]; pure data, no I/O.
 
+data class Param(val name: String, val type: String)
+
+data class Field(val name: String, val type: String, val default: String?)
+
 data class MethodSignature(
     val name: String,
-    val params: List<Pair<String, String>>,
+    val params: List<Param>,
     val returnType: String,
     val isSuspend: Boolean
 )
@@ -18,7 +22,7 @@ data class ExecutorInterface(
 
 data class DataClassInfo(
     val name: String,
-    val fields: List<Triple<String, String, String?>>
+    val fields: List<Field>
 )
 
 data class SealedClassInfo(
