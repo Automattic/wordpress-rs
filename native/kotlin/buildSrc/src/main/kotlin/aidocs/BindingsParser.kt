@@ -1,5 +1,9 @@
 package aidocs
 
+// A matched top-level declaration: its header line plus every line that follows it. Callers slice the
+// body down to the lines they care about.
+private data class Decl(val header: String, val body: List<String>)
+
 // Parses the UniFFI-generated `wp_api.kt` text into a [ParsedBindings] model. Pure: it operates only
 // on the lines it is given and performs no I/O.
 class BindingsParser(private val lines: List<String>) {
@@ -52,13 +56,12 @@ class BindingsParser(private val lines: List<String>) {
             }
             .associateBy { it.name }
 
-    // Each top-level declaration whose header line matches [isHeader], paired with every line that
-    // follows it. Callers slice the body down to the lines they need with takeWhile. This replaces the
-    // four hand-threaded index loops the parsers used to share.
-    private fun blocks(isHeader: (String) -> Boolean): List<Pair<String, List<String>>> =
+    // Every top-level declaration whose header line matches [isHeader]. This replaces the four
+    // hand-threaded index loops the parsers used to share.
+    private fun blocks(isHeader: (String) -> Boolean): List<Decl> =
         lines.withIndex()
             .filter { (_, line) -> isHeader(line) }
-            .map { (index, line) -> line to lines.subList(index + 1, lines.size) }
+            .map { (index, line) -> Decl(line, lines.subList(index + 1, lines.size)) }
 
     private fun sealedVariantName(line: String): String? = when {
         line.startsWith("data class ") -> line.removePrefix("data class ").substringBefore("(").trim()
