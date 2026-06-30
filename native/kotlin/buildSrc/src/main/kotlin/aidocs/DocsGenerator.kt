@@ -28,60 +28,61 @@ class DocsGenerator(parsed: ParsedBindings) {
         }
     }
 
-    private fun generateEndpointDoc(executor: ExecutorInterface): String = buildString {
-        appendLine("# ${executor.domain}")
-        appendLine()
+    private fun generateEndpointDoc(executor: ExecutorInterface): String {
+        val methods = executor.methods.filterNot { it.name in EXCLUDED_METHODS }
+        val referencedTypes = collectReferencedTypes(methods)
 
-        val apiMethods = executor.methods.filterNot { it.name in EXCLUDED_METHODS }
+        val documentedClasses = referencedTypes.mapNotNull { dataClasses[it] }.filter { isDocumentedType(it) }
+        val paramsClasses = documentedClasses.filter { it.name.endsWith(PARAMS_SUFFIX) }
+        val entityClasses = documentedClasses.filter { !it.name.endsWith(PARAMS_SUFFIX) && !it.name.endsWith(RESPONSE_SUFFIX) }
+        val enums = referencedTypes.mapNotNull { enumClasses[it] }
+        val sealedTypes = referencedTypes.mapNotNull { sealedClasses[it] }
 
+        return buildString {
+            appendLine("# ${executor.domain}")
+            appendLine()
+            append(methodsSection(methods))
+            append(classesSection("Parameters", paramsClasses))
+            append(classesSection("Types", entityClasses))
+            append(enumsSection(enums, sealedTypes))
+        }
+    }
+
+    private fun methodsSection(methods: List<MethodSignature>): String = buildString {
         appendLine("## Methods")
         appendLine()
-        apiMethods.forEach { method ->
+        methods.forEach { method ->
             val params = method.params.joinToString(", ") { "${it.name}: ${it.type}" }
             appendLine("- `${method.name}($params): ${method.returnType}`")
         }
+    }
 
-        val referencedTypes = collectReferencedTypes(apiMethods)
-        val relevantDataClasses = referencedTypes
-            .mapNotNull { dataClasses[it] }
-            .filter { isDocumentedType(it) }
-
-        val paramsClasses = relevantDataClasses.filter { it.name.endsWith(PARAMS_SUFFIX) }
-        val entityClasses = relevantDataClasses.filter { !it.name.endsWith(PARAMS_SUFFIX) && !it.name.endsWith(RESPONSE_SUFFIX) }
-
-        if (paramsClasses.isNotEmpty()) {
+    private fun classesSection(title: String, classes: List<DataClassInfo>): String {
+        if (classes.isEmpty()) return ""
+        return buildString {
             appendLine()
-            appendLine("## Parameters")
-            paramsClasses.forEach { cls ->
+            appendLine("## $title")
+            classes.forEach { cls ->
                 appendLine()
                 append(dataClassTable(cls, "###"))
             }
         }
+    }
 
-        if (entityClasses.isNotEmpty()) {
-            appendLine()
-            appendLine("## Types")
-            entityClasses.forEach { cls ->
-                appendLine()
-                append(dataClassTable(cls, "###"))
-            }
-        }
-
-        val relevantEnums = referencedTypes.mapNotNull { enumClasses[it] }
-        val relevantSealed = referencedTypes.mapNotNull { sealedClasses[it] }
-
-        if (relevantEnums.isNotEmpty() || relevantSealed.isNotEmpty()) {
+    private fun enumsSection(enums: List<EnumClassInfo>, sealedTypes: List<SealedClassInfo>): String {
+        if (enums.isEmpty() && sealedTypes.isEmpty()) return ""
+        return buildString {
             appendLine()
             appendLine("## Enums")
-            relevantEnums.forEach { enum ->
+            enums.forEach { enum ->
                 appendLine()
                 appendLine("### ${enum.name}")
                 appendLine("Variants: ${enum.variants.joinToString(", ") { "`$it`" }}")
             }
-            relevantSealed.forEach { sealed ->
+            sealedTypes.forEach { sealedType ->
                 appendLine()
-                appendLine("### ${sealed.name}")
-                appendLine("Variants: ${sealed.variants.joinToString(", ") { "`$it`" }}")
+                appendLine("### ${sealedType.name}")
+                appendLine("Variants: ${sealedType.variants.joinToString(", ") { "`$it`" }}")
             }
         }
     }
