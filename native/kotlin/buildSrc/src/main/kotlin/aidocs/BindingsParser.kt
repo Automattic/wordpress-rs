@@ -99,7 +99,7 @@ class BindingsParser(private val lines: List<String>) {
         val params = if (paramsStr.isBlank()) {
             emptyList()
         } else {
-            paramsStr.split(", ").mapNotNull { param ->
+            splitParams(paramsStr).mapNotNull { param ->
                 val parts = param.split(": ", limit = 2)
                 if (parts.size == 2) {
                     Param(parts[0].removeSurrounding("`").trim(), parts[1].trim())
@@ -108,6 +108,21 @@ class BindingsParser(private val lines: List<String>) {
         }
 
         return MethodSignature(name, params, returnType, isSuspend)
+    }
+
+    // Split a parameter list on its top-level commas, keeping commas inside generic `<...>` brackets
+    // attached to their parameter (e.g. `filter: Map<String, Int>` stays a single parameter).
+    private fun splitParams(params: String): List<String> {
+        val parts = mutableListOf(StringBuilder())
+        var depth = 0
+        for (char in params) {
+            when (char) {
+                '<' -> depth++
+                '>' -> depth--
+            }
+            if (char == ',' && depth == 0) parts.add(StringBuilder()) else parts.last().append(char)
+        }
+        return parts.map { it.toString().trim() }.filter { it.isNotEmpty() }
     }
 
     private fun parseField(line: String): Field? {

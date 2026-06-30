@@ -153,4 +153,17 @@ class BindingsParserTest {
         // The indented `object` variant inside the sealed class is not double-counted as a data class.
         assertNull(parsed.dataClasses["MeError"])
     }
+
+    @Test
+    fun `keeps a comma'd generic param as a single parameter`() {
+        val lines = listOf(
+            "public interface FilterRequestExecutorInterface {",
+            "    suspend fun `query`(`filter`: Map<kotlin.String, kotlin.Int>): FilterResponse",
+            "}"
+        )
+
+        val method = BindingsParser(lines).parseExecutorInterfaces().single().methods.single()
+
+        assertEquals(listOf(Param("filter", "Map<kotlin.String, kotlin.Int>")), method.params)
+    }
 }
