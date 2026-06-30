@@ -5,6 +5,7 @@ package aidocs
 class BindingsParser(private val lines: List<String>) {
 
     private val identifierRegex = Regex("^[A-Za-z][A-Za-z0-9_]*$")
+    private val kotlinPackagePrefix = Regex("\\bkotlin\\.")
 
     fun parse(): ParsedBindings = ParsedBindings(
         executors = parseExecutorInterfaces(),
@@ -120,13 +121,7 @@ class BindingsParser(private val lines: List<String>) {
         return Field(nameRaw, cleanType(type), default)
     }
 
-    private fun cleanType(type: String): String = type
-        .replace("kotlin.String", "String")
-        .replace("kotlin.Boolean", "Boolean")
-        .replace("kotlin.UInt", "UInt")
-        .replace("kotlin.Int", "Int")
-        .replace("kotlin.Long", "Long")
-        .replace("kotlin.ULong", "ULong")
-        .replace("kotlin.UByte", "UByte")
-        .replace("kotlin.Double", "Double")
+    // Strip the `kotlin.` package prefix from built-in types, e.g. `kotlin.String` -> `String` and
+    // `Map<kotlin.String, kotlin.UInt>` -> `Map<String, UInt>`.
+    private fun cleanType(type: String): String = type.replace(kotlinPackagePrefix, "")
 }
