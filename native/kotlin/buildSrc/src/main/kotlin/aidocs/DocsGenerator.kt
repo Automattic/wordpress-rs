@@ -59,7 +59,7 @@ class DocsGenerator(parsed: ParsedBindings) {
             doc.appendLine("## Parameters")
             for (cls in paramsClasses) {
                 doc.appendLine()
-                writeDataClass(doc, cls, "###")
+                doc.append(dataClassTable(cls, "###"))
             }
         }
 
@@ -68,7 +68,7 @@ class DocsGenerator(parsed: ParsedBindings) {
             doc.appendLine("## Types")
             for (cls in entityClasses) {
                 doc.appendLine()
-                writeDataClass(doc, cls, "###")
+                doc.append(dataClassTable(cls, "###"))
             }
         }
 
@@ -93,12 +93,12 @@ class DocsGenerator(parsed: ParsedBindings) {
         return doc.toString()
     }
 
-    private fun writeDataClass(doc: StringBuilder, cls: DataClassInfo, heading: String) {
-        doc.appendLine("$heading ${cls.name}")
-        doc.appendLine("| Field | Type | Default |")
-        doc.appendLine("|-------|------|---------|")
-        for ((name, type, default) in cls.fields) {
-            doc.appendLine("| `$name` | `$type` | ${default ?: ""} |")
+    private fun dataClassTable(cls: DataClassInfo, heading: String): String = buildString {
+        appendLine("$heading ${cls.name}")
+        appendLine("| Field | Type | Default |")
+        appendLine("|-------|------|---------|")
+        cls.fields.forEach { (name, type, default) ->
+            appendLine("| `$name` | `$type` | ${default ?: ""} |")
         }
     }
 
