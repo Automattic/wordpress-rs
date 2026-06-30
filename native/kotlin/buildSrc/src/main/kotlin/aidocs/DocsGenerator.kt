@@ -103,26 +103,13 @@ class DocsGenerator(parsed: ParsedBindings) {
     }
 
     private fun collectReferencedTypes(methods: List<MethodSignature>): Set<String> {
-        val types = mutableSetOf<String>()
-        for (method in methods) {
-            for ((_, type) in method.params) {
-                types.add(extractTypeName(type))
-            }
-            types.add(extractTypeName(method.returnType))
+        val direct = methods.flatMap { method ->
+            method.params.map { extractTypeName(it.type) } + extractTypeName(method.returnType)
+        }.toSet()
+        val nested = direct.flatMap { type ->
+            dataClasses[type]?.fields.orEmpty().map { extractTypeName(it.type) }
         }
-
-        val expanded = mutableSetOf<String>()
-        expanded.addAll(types)
-        for (type in types) {
-            val dc = dataClasses[type]
-            if (dc != null) {
-                for ((_, fieldType, _) in dc.fields) {
-                    expanded.add(extractTypeName(fieldType))
-                }
-            }
-        }
-
-        return expanded
+        return direct + nested
     }
 
     private fun extractTypeName(type: String): String = type
