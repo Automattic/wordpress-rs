@@ -56,8 +56,7 @@ class BindingsParser(private val lines: List<String>) {
             }
             .associateBy { it.name }
 
-    // Every top-level declaration whose header line matches [isHeader]. This replaces the four
-    // hand-threaded index loops the parsers used to share.
+    // Every top-level declaration whose header line matches [isHeader], paired with the lines after it.
     private fun blocks(isHeader: (String) -> Boolean): List<Decl> =
         lines.withIndex()
             .filter { (_, line) -> isHeader(line) }
