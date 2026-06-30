@@ -109,6 +109,24 @@ class BindingsParserTest {
     }
 
     @Test
+    fun `parses enum terminated by a brace with no trailing semicolon`() {
+        val lines = listOf(
+            "enum class SimpleKind {",
+            "    FIRST,",
+            "    SECOND",
+            "}"
+        )
+
+        val enums = BindingsParser(lines).parseEnumClasses()
+
+        // No `;`: the entry list runs until the closing `}` instead.
+        assertEquals(
+            listOf("FIRST", "SECOND"),
+            enums["SimpleKind"]?.variants
+        )
+    }
+
+    @Test
     fun `parse bundles all four model kinds`() {
         val lines = listOf(
             "public interface MeRequestExecutorInterface {",
