@@ -13,136 +13,72 @@ class BindingsParser(private val lines: List<String>) {
         enumClasses = parseEnumClasses()
     )
 
-    fun parseExecutorInterfaces(): List<ExecutorInterface> {
-        val interfaces = mutableListOf<ExecutorInterface>()
-        var i = 0
-
-        while (i < lines.size) {
-            val line = lines[i]
-            if (line.startsWith("public interface ") && line.endsWith("RequestExecutorInterface {")) {
-                val name = line.removePrefix("public interface ").removeSuffix(" {")
-                val domain = name.removeSuffix("RequestExecutorInterface")
-                    .replaceFirstChar { it.lowercase() }
-
-                val methods = mutableListOf<MethodSignature>()
-                i++
-
-                while (i < lines.size && lines[i] != "}") {
-                    val methodLine = lines[i].trim()
-                    val parsed = parseMethodSignature(methodLine)
-                    if (parsed != null) methods.add(parsed)
-                    i++
-                }
-
-                interfaces.add(ExecutorInterface(name, domain, methods))
+    fun parseExecutorInterfaces(): List<ExecutorInterface> =
+        blocks { it.startsWith("public interface ") && it.endsWith("RequestExecutorInterface {") }
+            .map { (header, body) ->
+                val name = header.removePrefix("public interface ").removeSuffix(" {")
+                val domain = name.removeSuffix("RequestExecutorInterface").replaceFirstChar { c -> c.lowercase() }
+                val methods = body.takeWhile { it != "}" }.mapNotNull { parseMethodSignature(it.trim()) }
+                ExecutorInterface(name, domain, methods)
             }
-            i++
-        }
 
-        return interfaces
+    fun parseDataClasses(): Map<String, DataClassInfo> =
+        blocks { it.startsWith("data class ") && it.contains("(") }
+            .mapNotNull { (header, body) ->
+                val name = header.removePrefix("data class ").substringBefore(" (").trim()
+                val fields = body.takeWhile { !it.trim().startsWith(")") }
+                    .filter { it.trim().startsWith("val ") }
+                    .mapNotNull { parseField(it.trim()) }
+                if (fields.isEmpty()) null else DataClassInfo(name, fields)
+            }
+            .associateBy { it.name }
+
+    fun parseSealedClasses(): Map<String, SealedClassInfo> =
+        blocks { it.startsWith("sealed class ") && it.endsWith("{") }
+            .mapNotNull { (header, body) ->
+                val name = header.removePrefix("sealed class ").substringBefore(" ").trim()
+                val variants = body.takeWhile { it != "}" }.mapNotNull { sealedVariantName(it.trim()) }
+                if (variants.isEmpty()) null else SealedClassInfo(name, variants)
+            }
+            .associateBy { it.name }
+
+    fun parseEnumClasses(): Map<String, EnumClassInfo> =
+        blocks { it.startsWith("enum class ") && it.contains("{") }
+            .mapNotNull { (header, body) ->
+                val name = header.removePrefix("enum class ").substringBefore("(").substringBefore(" {").trim()
+                val variants = enumVariants(body)
+                if (variants.isEmpty()) null else EnumClassInfo(name, variants)
+            }
+            .associateBy { it.name }
+
+    // Each top-level declaration whose header line matches [isHeader], paired with every line that
+    // follows it. Callers slice the body down to the lines they need with takeWhile. This replaces the
+    // four hand-threaded index loops the parsers used to share.
+    private fun blocks(isHeader: (String) -> Boolean): List<Pair<String, List<String>>> =
+        lines.withIndex()
+            .filter { (_, line) -> isHeader(line) }
+            .map { (index, line) -> line to lines.subList(index + 1, lines.size) }
+
+    private fun sealedVariantName(line: String): String? = when {
+        line.startsWith("data class ") -> line.removePrefix("data class ").substringBefore("(").trim()
+        line.startsWith("object ") -> line.removePrefix("object ").substringBefore(" ").substringBefore(":").trim()
+        else -> null
     }
 
-    fun parseDataClasses(): Map<String, DataClassInfo> {
-        val classes = mutableMapOf<String, DataClassInfo>()
-        var i = 0
-
-        while (i < lines.size) {
-            val line = lines[i]
-            if (line.startsWith("data class ") && line.contains("(")) {
-                val name = line.removePrefix("data class ").substringBefore(" (").trim()
-                val fields = mutableListOf<Field>()
-                i++
-
-                while (i < lines.size) {
-                    val fieldLine = lines[i].trim()
-                    if (fieldLine.startsWith("val ")) {
-                        val parsed = parseField(fieldLine)
-                        if (parsed != null) fields.add(parsed)
-                    } else if (fieldLine.startsWith(")")) {
-                        break
-                    }
-                    i++
-                }
-
-                if (fields.isNotEmpty()) {
-                    classes[name] = DataClassInfo(name, fields)
-                }
-            }
-            i++
+    // Enum entries run from the body start until the first line ending in ';' (inclusive — that line
+    // still holds an entry) or the closing '}' (exclusive), whichever comes first; everything after is
+    // companion/methods.
+    private fun enumVariants(body: List<String>): List<String> {
+        val end = body.indexOfFirst { val trimmed = it.trim(); trimmed == "}" || trimmed.endsWith(";") }
+        val entries = when {
+            end < 0 -> body
+            body[end].trim().endsWith(";") -> body.subList(0, end + 1)
+            else -> body.subList(0, end)
         }
-
-        return classes
-    }
-
-    fun parseSealedClasses(): Map<String, SealedClassInfo> {
-        val classes = mutableMapOf<String, SealedClassInfo>()
-        var i = 0
-
-        while (i < lines.size) {
-            val line = lines[i]
-            if (line.startsWith("sealed class ") && line.endsWith("{")) {
-                val name = line.removePrefix("sealed class ").substringBefore(" ").trim()
-                val variants = mutableListOf<String>()
-                i++
-
-                while (i < lines.size && lines[i] != "}") {
-                    val variantLine = lines[i].trim()
-                    if (variantLine.startsWith("data class ") || variantLine.startsWith("object ")) {
-                        val variantName = if (variantLine.startsWith("data class ")) {
-                            variantLine.removePrefix("data class ").substringBefore("(").trim()
-                        } else {
-                            variantLine.removePrefix("object ").substringBefore(" ").substringBefore(":").trim()
-                        }
-                        variants.add(variantName)
-                    }
-                    i++
-                }
-
-                if (variants.isNotEmpty()) {
-                    classes[name] = SealedClassInfo(name, variants)
-                }
-            }
-            i++
-        }
-
-        return classes
-    }
-
-    fun parseEnumClasses(): Map<String, EnumClassInfo> {
-        val classes = mutableMapOf<String, EnumClassInfo>()
-        var i = 0
-
-        while (i < lines.size) {
-            val line = lines[i]
-            if (line.startsWith("enum class ") && line.contains("{")) {
-                val name = line.removePrefix("enum class ").substringBefore("(").substringBefore(" {").trim()
-                val variants = mutableListOf<String>()
-                i++
-
-                while (i < lines.size && lines[i].trim() != "}") {
-                    val variantLine = lines[i].trim()
-                    // Enum entries are terminated by ';' when the enum also has methods.
-                    // Capture the final entry on that line, then stop before the methods.
-                    val entryListEnd = variantLine.endsWith(";")
-                    if (variantLine.isNotEmpty() && !variantLine.startsWith("//")) {
-                        val variantName = variantLine.removeSuffix(",").removeSuffix(";").trim()
-                            .substringBefore("(").trim()
-                        if (variantName.matches(identifierRegex)) {
-                            variants.add(variantName)
-                        }
-                    }
-                    if (entryListEnd) break
-                    i++
-                }
-
-                if (variants.isNotEmpty()) {
-                    classes[name] = EnumClassInfo(name, variants)
-                }
-            }
-            i++
-        }
-
-        return classes
+        return entries.map { it.trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("//") }
+            .map { it.removeSuffix(",").removeSuffix(";").trim().substringBefore("(").trim() }
+            .filter { it.matches(identifierRegex) }
     }
 
     private fun parseMethodSignature(line: String): MethodSignature? {
