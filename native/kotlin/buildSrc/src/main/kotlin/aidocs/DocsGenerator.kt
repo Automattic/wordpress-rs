@@ -35,9 +35,7 @@ class DocsGenerator(parsed: ParsedBindings) {
         doc.appendLine("# ${executor.domain}")
         doc.appendLine()
 
-        val apiMethods = executor.methods.filter {
-            it.name != "cancel" && it.name != "fetchAuthenticationState"
-        }
+        val apiMethods = executor.methods.filterNot { it.name in EXCLUDED_METHODS }
 
         doc.appendLine("## Methods")
         doc.appendLine()
@@ -49,10 +47,10 @@ class DocsGenerator(parsed: ParsedBindings) {
         val referencedTypes = collectReferencedTypes(apiMethods)
         val relevantDataClasses = referencedTypes
             .mapNotNull { dataClasses[it] }
-            .filter { !it.name.endsWith("Response") || it.fields.any { f -> f.name != "data" && f.name != "headerMap" } }
+            .filter { isDocumentedType(it) }
 
-        val paramsClasses = relevantDataClasses.filter { it.name.endsWith("Params") }
-        val entityClasses = relevantDataClasses.filter { !it.name.endsWith("Params") && !it.name.endsWith("Response") }
+        val paramsClasses = relevantDataClasses.filter { it.name.endsWith(PARAMS_SUFFIX) }
+        val entityClasses = relevantDataClasses.filter { !it.name.endsWith(PARAMS_SUFFIX) && !it.name.endsWith(RESPONSE_SUFFIX) }
 
         if (paramsClasses.isNotEmpty()) {
             doc.appendLine()
@@ -116,4 +114,15 @@ class DocsGenerator(parsed: ParsedBindings) {
         .removePrefix("List<").removeSuffix(">")
         .removeSuffix("?")
         .trim()
+
+    // A `*Response` wrapper whose only fields are the data/headerMap envelope adds nothing to the docs.
+    private fun isDocumentedType(cls: DataClassInfo): Boolean =
+        !cls.name.endsWith(RESPONSE_SUFFIX) || cls.fields.any { it.name !in RESPONSE_ENVELOPE_FIELDS }
+
+    private companion object {
+        val EXCLUDED_METHODS = setOf("cancel", "fetchAuthenticationState")
+        val RESPONSE_ENVELOPE_FIELDS = setOf("data", "headerMap")
+        const val RESPONSE_SUFFIX = "Response"
+        const val PARAMS_SUFFIX = "Params"
+    }
 }
