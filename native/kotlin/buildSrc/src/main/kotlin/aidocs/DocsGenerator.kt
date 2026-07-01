@@ -43,18 +43,21 @@ class DocsGenerator(parsed: ParsedBindings) {
         freeFunctions.sortedBy { it.name }.forEach { appendLine(signatureLine(it)) }
     }
 
-    // Flat structure: the method list, then one block per referenced type, all separated by `---` so a
-    // consumer can split the file into blocks. Every type named in a signature or field has its own
-    // block, so the doc is self-contained.
+    // Flat structure: the interface's method list, then one block per referenced type, all separated by
+    // `---` so a consumer can split the file into blocks. The methods live under a `## interface <Name>`
+    // header so they're owned by their declaring type, matching the `## <kind> <Name>` type blocks below.
+    // Every type named in a signature or field has its own block, so the doc is self-contained.
     private fun generateEndpointDoc(executor: ExecutorInterface): String {
         val methods = executor.methods.filterNot { it.name in EXCLUDED_METHODS }
-        val methodsBlock = buildString {
+        val interfaceBlock = buildString {
             appendLine("# ${executor.domain}")
+            appendLine()
+            appendLine("## interface ${executor.name}")
             appendLine()
             methods.forEach { appendLine(signatureLine(it)) }
         }.trimEnd()
         val typeBlocks = collectReferencedTypes(methods).mapNotNull { typeBlock(it)?.trimEnd() }
-        return (listOf(methodsBlock) + typeBlocks).joinToString("\n\n---\n\n") + "\n"
+        return (listOf(interfaceBlock) + typeBlocks).joinToString("\n\n---\n\n") + "\n"
     }
 
     private fun signatureLine(function: MethodSignature): String {
