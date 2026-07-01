@@ -186,7 +186,6 @@ class BindingsParser(private val lines: List<String>) {
         const val DATA_CLASS_PREFIX = "data class "
         const val SEALED_CLASS_PREFIX = "sealed class "
         const val ENUM_CLASS_PREFIX = "enum class "
-        const val OBJECT_PREFIX = "object "
         const val VAL_PREFIX = "val "
         const val FUN_PREFIX = "fun "
         const val SUSPEND_FUN_PREFIX = "suspend fun "
