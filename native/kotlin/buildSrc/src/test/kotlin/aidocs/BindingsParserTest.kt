@@ -64,25 +64,44 @@ class BindingsParserTest {
     }
 
     @Test
-    fun `parses sealed class data-class and object variants`() {
+    fun `parses sealed variants with their fields across data-class, class and object shapes`() {
         val lines = listOf(
-            "sealed class ApplicationPasswordsNotSupportedReason {",
-            "    ",
-            "    data class ApplicationPasswordBlockedByPlugin(",
-            "        val `plugin`: uniffi.wp_api.KnownAuthenticationBlockingPlugin) : ApplicationPasswordsNotSupportedReason()",
+            // Exception-style header carries a `: Super()` that must be stripped from the name.
+            "sealed class SslErrorReason: kotlin.Exception() {",
+            "    data class CertificateNotValidForName(",
+            "        val `hostname`: kotlin.String, ",
+            "        val `presentedHostnames`: List<kotlin.String>, ",
+            "        val `plugin`: uniffi.wp_api.KnownAuthenticationBlockingPlugin) : SslErrorReason()",
             "    {",
             "        companion object",
             "    }",
-            "    ",
-            "    object ApplicationPasswordBlockedByMultiplePlugins : ApplicationPasswordsNotSupportedReason()",
+            "    class InvalidJson(",
+            "        val `reason`: kotlin.String",
+            "        ) : SslErrorReason() {",
+            "        override val message",
+            "    }",
+            "    object GenericSslError : SslErrorReason()",
             "}"
         )
 
-        val sealedClasses = BindingsParser(lines).parseSealedClasses()
+        val sealed = BindingsParser(lines).parseSealedClasses()["SslErrorReason"]
 
+        // `class`/`data class` variants keep their constructor fields; `object` variants have none; the
+        // `override val message` in a variant body is not mistaken for a field.
         assertEquals(
-            listOf("ApplicationPasswordBlockedByPlugin", "ApplicationPasswordBlockedByMultiplePlugins"),
-            sealedClasses["ApplicationPasswordsNotSupportedReason"]?.variants
+            listOf(
+                SealedVariant(
+                    "CertificateNotValidForName",
+                    listOf(
+                        Field("hostname", "String", null),
+                        Field("presentedHostnames", "List<String>", null),
+                        Field("plugin", "KnownAuthenticationBlockingPlugin", null)
+                    )
+                ),
+                SealedVariant("InvalidJson", listOf(Field("reason", "String", null))),
+                SealedVariant("GenericSslError", emptyList())
+            ),
+            sealed?.variants
         )
     }
 
@@ -148,7 +167,7 @@ class BindingsParserTest {
 
         assertEquals(listOf("me"), parsed.executors.map { it.domain })
         assertTrue(parsed.dataClasses.containsKey("MeParams"))
-        assertEquals(listOf("NotFound"), parsed.sealedClasses["MeError"]?.variants)
+        assertEquals(listOf(SealedVariant("NotFound", emptyList())), parsed.sealedClasses["MeError"]?.variants)
         assertEquals(listOf("A", "B"), parsed.enumClasses["MeKind"]?.variants)
         // The indented `object` variant inside the sealed class is not double-counted as a data class.
         assertNull(parsed.dataClasses["MeError"])
