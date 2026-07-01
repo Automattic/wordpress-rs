@@ -48,7 +48,7 @@ GEM
     emoji_regex (3.2.3)
     erubi (1.13.1)
     excon (0.112.0)
-    faraday (1.10.5)
+    faraday (1.10.6)
       faraday-em_http (~> 1.0)
       faraday-em_synchrony (~> 1.0)
       faraday-excon (~> 1.1)
@@ -319,7 +319,7 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  faraday (~> 1.10, >= 1.10.5)
+  faraday (~> 1.10)
   fastlane (~> 2.236)
   fastlane-plugin-wpmreleasetoolkit (~> 14.8)
   fluent-tools (~> 0.3)
