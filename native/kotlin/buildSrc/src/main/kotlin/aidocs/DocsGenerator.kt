@@ -48,9 +48,9 @@ class DocsGenerator(parsed: ParsedBindings) {
         val methods = executor.methods.filterNot { it.name in EXCLUDED_METHODS }
         val referencedTypes = collectReferencedTypes(methods)
 
-        val documentedClasses = referencedTypes.mapNotNull { dataClasses[it] }.filter { isDocumentedType(it) }
+        val documentedClasses = referencedTypes.mapNotNull { dataClasses[it] }
         val paramsClasses = documentedClasses.filter { it.name.endsWith(PARAMS_SUFFIX) }
-        val entityClasses = documentedClasses.filter { !it.name.endsWith(PARAMS_SUFFIX) && !it.name.endsWith(RESPONSE_SUFFIX) }
+        val typeClasses = documentedClasses.filter { !it.name.endsWith(PARAMS_SUFFIX) }
         val enums = referencedTypes.mapNotNull { enumClasses[it] }
         val sealedTypes = referencedTypes.mapNotNull { sealedClasses[it] }
 
@@ -59,7 +59,7 @@ class DocsGenerator(parsed: ParsedBindings) {
             appendLine()
             append(methodsSection(methods))
             append(classesSection("Parameters", paramsClasses))
-            append(classesSection("Types", entityClasses))
+            append(classesSection("Types", typeClasses))
             append(enumsSection(enums, sealedTypes))
         }
     }
@@ -132,14 +132,8 @@ class DocsGenerator(parsed: ParsedBindings) {
         .removeSuffix("?")
         .trim()
 
-    // A `*Response` wrapper whose only fields are the data/headerMap envelope adds nothing to the docs.
-    private fun isDocumentedType(cls: DataClassInfo): Boolean =
-        !cls.name.endsWith(RESPONSE_SUFFIX) || cls.fields.any { it.name !in RESPONSE_ENVELOPE_FIELDS }
-
     private companion object {
         val EXCLUDED_METHODS = setOf("cancel", "fetchAuthenticationState")
-        val RESPONSE_ENVELOPE_FIELDS = setOf("data", "headerMap")
-        const val RESPONSE_SUFFIX = "Response"
         const val PARAMS_SUFFIX = "Params"
     }
 }
