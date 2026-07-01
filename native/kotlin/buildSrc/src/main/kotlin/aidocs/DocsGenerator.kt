@@ -48,9 +48,9 @@ class DocsGenerator(parsed: ParsedBindings) {
         val methods = executor.methods.filterNot { it.name in EXCLUDED_METHODS }
         val referencedTypes = collectReferencedTypes(methods)
 
-        val documentedClasses = referencedTypes.mapNotNull { dataClasses[it] }
-        val paramsClasses = documentedClasses.filter { it.name.endsWith(PARAMS_SUFFIX) }
-        val typeClasses = documentedClasses.filter { !it.name.endsWith(PARAMS_SUFFIX) }
+        val referencedClasses = referencedTypes.mapNotNull { dataClasses[it] }
+        val paramsClasses = referencedClasses.filter { it.name.endsWith(PARAMS_SUFFIX) }
+        val typeClasses = referencedClasses.filter { !it.name.endsWith(PARAMS_SUFFIX) }
         val enums = referencedTypes.mapNotNull { enumClasses[it] }
         val sealedTypes = referencedTypes.mapNotNull { sealedClasses[it] }
 
@@ -114,14 +114,24 @@ class DocsGenerator(parsed: ParsedBindings) {
         }
     }
 
+    // All data-class types reachable from these methods: their parameter/return types, then those
+    // types' field types, transitively. Keeping the closure complete makes each endpoint doc
+    // self-contained — every type it names has its own table, so a consuming session never has to fall
+    // back to the bindings source to resolve one.
     private fun collectReferencedTypes(methods: List<MethodSignature>): Set<String> {
-        val direct = methods.flatMap { method ->
+        val seeds = methods.flatMap { method ->
             method.params.map { extractTypeName(it.type) } + extractTypeName(method.returnType)
         }.toSet()
-        val nested = direct.flatMap { type ->
-            dataClasses[type]?.fields.orEmpty().map { extractTypeName(it.type) }
-        }
-        return direct + nested
+        return reachableTypes(seeds)
+    }
+
+    private tailrec fun reachableTypes(frontier: Set<String>, seen: Set<String> = emptySet()): Set<String> {
+        if (frontier.isEmpty()) return seen
+        val nextSeen = seen + frontier
+        val discovered = frontier
+            .flatMap { type -> dataClasses[type]?.fields.orEmpty().map { extractTypeName(it.type) } }
+            .toSet()
+        return reachableTypes(discovered - nextSeen, nextSeen)
     }
 
     // Strip nullability first so `List<Foo>?` yields `Foo`, not `Foo>`; the inner element can itself be
