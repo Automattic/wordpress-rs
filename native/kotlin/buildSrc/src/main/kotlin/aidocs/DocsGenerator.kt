@@ -11,6 +11,7 @@ class DocsGenerator(parsed: ParsedBindings) {
     private val sealedClasses = parsed.sealedClasses
     private val enumClasses = parsed.enumClasses
     private val freeFunctions = parsed.freeFunctions
+    private val typeNameRegex = Regex("[A-Za-z_][A-Za-z0-9_]*")
 
     fun generate(): List<GeneratedDoc> {
         val endpoints = executorInterfaces.map { executor ->
@@ -39,35 +40,21 @@ class DocsGenerator(parsed: ParsedBindings) {
     private fun functionsDoc(): String = buildString {
         appendLine("# functions")
         appendLine()
-        appendLine("Top-level functions exported by the library.")
-        appendLine()
         freeFunctions.sortedBy { it.name }.forEach { appendLine(signatureLine(it)) }
     }
 
+    // Flat structure: the method list, then one block per referenced type, all separated by `---` so a
+    // consumer can split the file into blocks. Every type named in a signature or field has its own
+    // block, so the doc is self-contained.
     private fun generateEndpointDoc(executor: ExecutorInterface): String {
         val methods = executor.methods.filterNot { it.name in EXCLUDED_METHODS }
-        val referencedTypes = collectReferencedTypes(methods)
-
-        val referencedClasses = referencedTypes.mapNotNull { dataClasses[it] }
-        val paramsClasses = referencedClasses.filter { it.name.endsWith(PARAMS_SUFFIX) }
-        val typeClasses = referencedClasses.filter { !it.name.endsWith(PARAMS_SUFFIX) }
-        val enums = referencedTypes.mapNotNull { enumClasses[it] }
-        val sealedTypes = referencedTypes.mapNotNull { sealedClasses[it] }
-
-        return buildString {
+        val methodsBlock = buildString {
             appendLine("# ${executor.domain}")
             appendLine()
-            append(methodsSection(methods))
-            append(classesSection("Parameters", paramsClasses))
-            append(classesSection("Types", typeClasses))
-            append(variantTypesSection(enums, sealedTypes))
-        }
-    }
-
-    private fun methodsSection(methods: List<MethodSignature>): String = buildString {
-        appendLine("## Methods")
-        appendLine()
-        methods.forEach { appendLine(signatureLine(it)) }
+            methods.forEach { appendLine(signatureLine(it)) }
+        }.trimEnd()
+        val typeBlocks = collectReferencedTypes(methods).mapNotNull { typeBlock(it)?.trimEnd() }
+        return (listOf(methodsBlock) + typeBlocks).joinToString("\n\n---\n\n") + "\n"
     }
 
     private fun signatureLine(function: MethodSignature): String {
@@ -75,34 +62,31 @@ class DocsGenerator(parsed: ParsedBindings) {
         return "- `${function.name}($params): ${function.returnType}`"
     }
 
-    private fun classesSection(title: String, classes: List<DataClassInfo>): String {
-        if (classes.isEmpty()) return ""
-        return buildString {
-            appendLine()
-            appendLine("## $title")
-            classes.forEach { cls ->
-                appendLine()
-                append(dataClassTable(cls, "###"))
-            }
+    private fun typeBlock(typeName: String): String? =
+        dataClasses[typeName]?.let { dataClassBlock(it) }
+            ?: enumClasses[typeName]?.let { enumBlock(it) }
+            ?: sealedClasses[typeName]?.let { sealedBlock(it) }
+
+    private fun dataClassBlock(cls: DataClassInfo): String = buildString {
+        appendLine("## data class ${cls.name}")
+        appendLine()
+        appendLine("| Field | Type | Default |")
+        appendLine("|-------|------|---------|")
+        cls.fields.forEach { (name, type, default) ->
+            appendLine("| `$name` | `$type` | ${default ?: ""} |")
         }
     }
 
-    private fun variantTypesSection(enums: List<EnumClassInfo>, sealedTypes: List<SealedClassInfo>): String {
-        if (enums.isEmpty() && sealedTypes.isEmpty()) return ""
-        return buildString {
-            appendLine()
-            appendLine("## Enums & Sealed Types")
-            enums.forEach { enum ->
-                appendLine()
-                appendLine("### ${enum.name}")
-                appendLine("Variants: ${enum.variants.joinToString(", ") { "`$it`" }}")
-            }
-            sealedTypes.forEach { sealedType ->
-                appendLine()
-                appendLine("### ${sealedType.name}")
-                sealedType.variants.forEach { appendLine(variantLine(it)) }
-            }
-        }
+    private fun enumBlock(enum: EnumClassInfo): String = buildString {
+        appendLine("## enum class ${enum.name}")
+        appendLine()
+        appendLine("Variants: ${enum.variants.joinToString(", ") { "`$it`" }}")
+    }
+
+    private fun sealedBlock(sealed: SealedClassInfo): String = buildString {
+        appendLine("## sealed class ${sealed.name}")
+        appendLine()
+        sealed.variants.forEach { appendLine(variantLine(it)) }
     }
 
     private fun variantLine(variant: SealedVariant): String =
@@ -112,22 +96,9 @@ class DocsGenerator(parsed: ParsedBindings) {
             "- `${variant.name}(${variant.fields.joinToString(", ") { "${it.name}: ${it.type}" }})`"
         }
 
-    private fun dataClassTable(cls: DataClassInfo, heading: String): String = buildString {
-        appendLine("$heading ${cls.name}")
-        appendLine("| Field | Type | Default |")
-        appendLine("|-------|------|---------|")
-        cls.fields.forEach { (name, type, default) ->
-            appendLine("| `$name` | `$type` | ${default ?: ""} |")
-        }
-    }
-
-    // All data-class types reachable from these methods: their parameter/return types, then those
-    // types' field types, transitively. Keeping the closure complete makes each endpoint doc
-    // self-contained — every type it names has its own table, so a consuming session never has to fall
-    // back to the bindings source to resolve one.
     private fun collectReferencedTypes(methods: List<MethodSignature>): Set<String> {
         val seeds = methods.flatMap { method ->
-            method.params.map { extractTypeName(it.type) } + extractTypeName(method.returnType)
+            method.params.flatMap { extractTypeNames(it.type) } + extractTypeNames(method.returnType)
         }.toSet()
         return reachableTypes(seeds)
     }
@@ -142,21 +113,16 @@ class DocsGenerator(parsed: ParsedBindings) {
     // The types a given type points at: a data class's field types, or a sealed type's variant field
     // types. Following both keeps the closure complete through sealed hierarchies too.
     private fun fieldTypesOf(type: String): List<String> =
-        dataClasses[type]?.fields.orEmpty().map { extractTypeName(it.type) } +
+        dataClasses[type]?.fields.orEmpty().flatMap { extractTypeNames(it.type) } +
             sealedClasses[type]?.variants.orEmpty().flatMap { variant ->
-                variant.fields.map { extractTypeName(it.type) }
+                variant.fields.flatMap { extractTypeNames(it.type) }
             }
 
-    // Strip nullability first so `List<Foo>?` yields `Foo`, not `Foo>`; the inner element can itself be
-    // nullable (`List<Foo?>`), hence the trailing `removeSuffix("?")`.
-    private fun extractTypeName(type: String): String = type
-        .removeSuffix("?")
-        .removePrefix("List<").removeSuffix(">")
-        .removeSuffix("?")
-        .trim()
+    // Every identifier in a type expression, e.g. `Map<String, List<JsonValue>>?` -> [Map, String,
+    // List, JsonValue]. Built-ins and generics simply don't resolve to a documented type.
+    private fun extractTypeNames(type: String): List<String> = typeNameRegex.findAll(type).map { it.value }.toList()
 
     private companion object {
         val EXCLUDED_METHODS = setOf("cancel", "fetchAuthenticationState")
-        const val PARAMS_SUFFIX = "Params"
     }
 }
