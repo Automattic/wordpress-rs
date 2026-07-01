@@ -124,7 +124,10 @@ class DocsGenerator(parsed: ParsedBindings) {
         return direct + nested
     }
 
+    // Strip nullability first so `List<Foo>?` yields `Foo`, not `Foo>`; the inner element can itself be
+    // nullable (`List<Foo?>`), hence the trailing `removeSuffix("?")`.
     private fun extractTypeName(type: String): String = type
+        .removeSuffix("?")
         .removePrefix("List<").removeSuffix(">")
         .removeSuffix("?")
         .trim()
