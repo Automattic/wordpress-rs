@@ -164,6 +164,48 @@ class BindingsParserTest {
 
         val method = BindingsParser(lines).parseExecutorInterfaces().single().methods.single()
 
-        assertEquals(listOf(Param("filter", "Map<kotlin.String, kotlin.Int>")), method.params)
+        assertEquals(listOf(Param("filter", "Map<String, Int>")), method.params)
+    }
+
+    @Test
+    fun `parses top-level free functions and ignores interface methods`() {
+        val lines = listOf(
+            "public interface PostsRequestExecutorInterface {",
+            "    suspend fun `list`(`params`: PostListParams): PostListResponse",
+            "}",
+            " fun `setupLogger`(`appId`: kotlin.String)",
+            "        =",
+            "    uniffiRustCall() { _status -> }",
+            "    @Throws(OAuthResponseUrlException::class) fun `extractLoginDetailsFromUrl`(`url`: kotlin.String): WpApiApplicationPasswordDetails {",
+            "        return foo",
+            "    }",
+            " suspend fun `fetchAuthenticationState`(): AuthenticationState? {",
+            "        return bar",
+            "    }",
+            "    /**",
+            "     * A documented function.",
+            "     */ fun `buildTokenRequestUrl`(`state`: kotlin.String): ParsedUrl {",
+            "        return baz",
+            "    }"
+        )
+
+        val functions = BindingsParser(lines).parseFreeFunctions()
+
+        // `list` is a method (brace-depth 1) and is excluded; the top-level functions are kept regardless
+        // of leading `@Throws`/KDoc prefixes or the `suspend` modifier.
+        assertEquals(
+            listOf(
+                MethodSignature("setupLogger", listOf(Param("appId", "String")), "Unit", isSuspend = false),
+                MethodSignature(
+                    "extractLoginDetailsFromUrl",
+                    listOf(Param("url", "String")),
+                    "WpApiApplicationPasswordDetails",
+                    isSuspend = false
+                ),
+                MethodSignature("fetchAuthenticationState", emptyList(), "AuthenticationState?", isSuspend = true),
+                MethodSignature("buildTokenRequestUrl", listOf(Param("state", "String")), "ParsedUrl", isSuspend = false)
+            ),
+            functions
+        )
     }
 }

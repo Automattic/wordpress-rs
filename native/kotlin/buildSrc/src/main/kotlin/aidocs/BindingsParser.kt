@@ -10,12 +10,14 @@ class BindingsParser(private val lines: List<String>) {
 
     private val identifierRegex = Regex("^[A-Za-z][A-Za-z0-9_]*$")
     private val kotlinPackagePrefix = Regex("\\bkotlin\\.")
+    private val freeFunctionRegex = Regex("(suspend )?fun `\\w+`\\(")
 
     fun parse(): ParsedBindings = ParsedBindings(
         executors = parseExecutorInterfaces(),
         dataClasses = parseDataClasses(),
         sealedClasses = parseSealedClasses(),
-        enumClasses = parseEnumClasses()
+        enumClasses = parseEnumClasses(),
+        freeFunctions = parseFreeFunctions()
     )
 
     fun parseExecutorInterfaces(): List<ExecutorInterface> =
@@ -56,6 +58,18 @@ class BindingsParser(private val lines: List<String>) {
             }
             .associateBy { it.name }
 
+    // Top-level functions (the UniFFI namespace functions): every `fun` declared at brace-depth 0, i.e.
+    // not inside an interface/class/object. The generated source is brace-balanced, so counting `{`/`}`
+    // gives the depth before each line reliably.
+    fun parseFreeFunctions(): List<MethodSignature> {
+        val depthBeforeLine = lines.runningFold(0) { depth, line ->
+            depth + line.count { it == '{' } - line.count { it == '}' }
+        }
+        return lines.mapIndexedNotNull { index, line ->
+            if (depthBeforeLine[index] == 0) freeFunctionSignature(line) else null
+        }
+    }
+
     // Every top-level declaration whose header line matches [isHeader], paired with the lines after it.
     private fun blocks(isHeader: (String) -> Boolean): List<Decl> =
         lines.withIndex()
@@ -84,6 +98,14 @@ class BindingsParser(private val lines: List<String>) {
             .filter { it.matches(identifierRegex) }
     }
 
+    // Slice a free-function declaration down to the `fun ...`/`suspend fun ...` form
+    // [parseMethodSignature] understands, dropping any leading prefix (KDoc `*/`, `@Throws(...)`, etc.)
+    // and the trailing ` {` body brace.
+    private fun freeFunctionSignature(line: String): MethodSignature? {
+        val start = freeFunctionRegex.find(line)?.range?.first ?: return null
+        return parseMethodSignature(line.substring(start).substringBefore(" {"))
+    }
+
     private fun parseMethodSignature(line: String): MethodSignature? {
         if (!line.startsWith(FUN_PREFIX) && !line.startsWith(SUSPEND_FUN_PREFIX)) return null
         if (line.contains(COMPANION_OBJECT)) return null
@@ -93,7 +115,7 @@ class BindingsParser(private val lines: List<String>) {
 
         val name = withoutPrefix.substringBefore("(").removeSurrounding("`")
         val paramsStr = withoutPrefix.substringAfter("(").substringBefore(")")
-        val returnType = withoutPrefix.substringAfter("): ", "Unit")
+        val returnType = cleanType(withoutPrefix.substringAfter("): ", "Unit"))
 
         val params = if (paramsStr.isBlank()) {
             emptyList()
@@ -101,7 +123,7 @@ class BindingsParser(private val lines: List<String>) {
             splitParams(paramsStr).mapNotNull { param ->
                 val parts = param.split(": ", limit = 2)
                 if (parts.size == 2) {
-                    Param(parts[0].removeSurrounding("`").trim(), parts[1].trim())
+                    Param(parts[0].removeSurrounding("`").trim(), cleanType(parts[1].trim()))
                 } else null
             }
         }
