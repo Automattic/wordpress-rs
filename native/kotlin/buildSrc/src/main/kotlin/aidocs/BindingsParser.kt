@@ -9,8 +9,13 @@ private data class Decl(val header: String, val body: List<String>)
 class BindingsParser(private val lines: List<String>) {
 
     private val identifierRegex = Regex("^[A-Za-z][A-Za-z0-9_]*$")
-    private val kotlinPackagePrefix = Regex("\\bkotlin\\.")
+    // A dotted lowercase package prefix (e.g. `kotlin.`, `uniffi.wp_api.`) ahead of a type name.
+    private val packagePrefix = Regex("\\b[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*\\.")
     private val freeFunctionRegex = Regex("(suspend )?fun `\\w+`\\(")
+    // Sealed variants: `object Name`, `class Name(...)`, or `data class Name(...)`. Anchored to a line
+    // start (after indentation) so a `class`/`object` inside a variant body or a string can't match.
+    private val sealedVariantRegex =
+        Regex("^[ \\t]*object (\\w+)|^[ \\t]*(?:data )?class (\\w+)(?:\\(([^)]*)\\))?", RegexOption.MULTILINE)
 
     fun parse(): ParsedBindings = ParsedBindings(
         executors = parseExecutorInterfaces(),
@@ -43,8 +48,9 @@ class BindingsParser(private val lines: List<String>) {
     fun parseSealedClasses(): Map<String, SealedClassInfo> =
         blocks { it.startsWith(SEALED_CLASS_PREFIX) && it.endsWith("{") }
             .mapNotNull { (header, body) ->
-                val name = header.removePrefix(SEALED_CLASS_PREFIX).substringBefore(" ").trim()
-                val variants = body.takeWhile { it != "}" }.mapNotNull { sealedVariantName(it.trim()) }
+                // Strip any `: Super()` before the name (exception-style sealed classes carry one).
+                val name = header.removePrefix(SEALED_CLASS_PREFIX).substringBefore(" ").substringBefore(":").trim()
+                val variants = parseSealedVariants(body.takeWhile { it != "}" })
                 if (variants.isEmpty()) null else SealedClassInfo(name, variants)
             }
             .associateBy { it.name }
@@ -76,11 +82,20 @@ class BindingsParser(private val lines: List<String>) {
             .filter { (_, line) -> isHeader(line) }
             .map { (index, line) -> Decl(line, lines.subList(index + 1, lines.size)) }
 
-    private fun sealedVariantName(line: String): String? = when {
-        line.startsWith(DATA_CLASS_PREFIX) -> line.removePrefix(DATA_CLASS_PREFIX).substringBefore("(").trim()
-        line.startsWith(OBJECT_PREFIX) -> line.removePrefix(OBJECT_PREFIX).substringBefore(" ").substringBefore(":").trim()
-        else -> null
-    }
+    // `object` variants carry no data; `class`/`data class` variants carry their constructor params as
+    // fields. The constructor runs to its first `)`, which precedes the ` : Super()` supertype call.
+    private fun parseSealedVariants(body: List<String>): List<SealedVariant> =
+        sealedVariantRegex.findAll(body.joinToString("\n")).map { match ->
+            val (objectName, className, constructor) = match.destructured
+            if (objectName.isNotEmpty()) SealedVariant(objectName, emptyList())
+            else SealedVariant(className, parseVariantFields(constructor))
+        }.toList()
+
+    private fun parseVariantFields(constructor: String): List<Field> =
+        splitParams(constructor)
+            .map { it.trim() }
+            .filter { it.startsWith(VAL_PREFIX) }
+            .mapNotNull { parseField(it) }
 
     // Enum entries run from the body start until the first line ending in ';' (inclusive — that line
     // still holds an entry) or the closing '}' (exclusive), whichever comes first; everything after is
@@ -160,9 +175,9 @@ class BindingsParser(private val lines: List<String>) {
         return Field(nameRaw, cleanType(type), default)
     }
 
-    // Strip the `kotlin.` package prefix from built-in types, e.g. `kotlin.String` -> `String` and
-    // `Map<kotlin.String, kotlin.UInt>` -> `Map<String, UInt>`.
-    private fun cleanType(type: String): String = type.replace(kotlinPackagePrefix, "")
+    // Strip package prefixes so types read as bare names, e.g. `kotlin.String` -> `String`,
+    // `uniffi.wp_api.WpUuid` -> `WpUuid`, `Map<kotlin.String, uniffi.wp_api.Foo>` -> `Map<String, Foo>`.
+    private fun cleanType(type: String): String = type.replace(packagePrefix, "")
 
     // The UniFFI-generated declaration markers this parser keys off of.
     private companion object {

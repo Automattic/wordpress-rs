@@ -60,7 +60,7 @@ class DocsGenerator(parsed: ParsedBindings) {
             append(methodsSection(methods))
             append(classesSection("Parameters", paramsClasses))
             append(classesSection("Types", typeClasses))
-            append(enumsSection(enums, sealedTypes))
+            append(variantTypesSection(enums, sealedTypes))
         }
     }
 
@@ -87,11 +87,11 @@ class DocsGenerator(parsed: ParsedBindings) {
         }
     }
 
-    private fun enumsSection(enums: List<EnumClassInfo>, sealedTypes: List<SealedClassInfo>): String {
+    private fun variantTypesSection(enums: List<EnumClassInfo>, sealedTypes: List<SealedClassInfo>): String {
         if (enums.isEmpty() && sealedTypes.isEmpty()) return ""
         return buildString {
             appendLine()
-            appendLine("## Enums")
+            appendLine("## Enums & Sealed Types")
             enums.forEach { enum ->
                 appendLine()
                 appendLine("### ${enum.name}")
@@ -100,10 +100,17 @@ class DocsGenerator(parsed: ParsedBindings) {
             sealedTypes.forEach { sealedType ->
                 appendLine()
                 appendLine("### ${sealedType.name}")
-                appendLine("Variants: ${sealedType.variants.joinToString(", ") { "`$it`" }}")
+                sealedType.variants.forEach { appendLine(variantLine(it)) }
             }
         }
     }
+
+    private fun variantLine(variant: SealedVariant): String =
+        if (variant.fields.isEmpty()) {
+            "- `${variant.name}`"
+        } else {
+            "- `${variant.name}(${variant.fields.joinToString(", ") { "${it.name}: ${it.type}" }})`"
+        }
 
     private fun dataClassTable(cls: DataClassInfo, heading: String): String = buildString {
         appendLine("$heading ${cls.name}")
@@ -128,11 +135,17 @@ class DocsGenerator(parsed: ParsedBindings) {
     private tailrec fun reachableTypes(frontier: Set<String>, seen: Set<String> = emptySet()): Set<String> {
         if (frontier.isEmpty()) return seen
         val nextSeen = seen + frontier
-        val discovered = frontier
-            .flatMap { type -> dataClasses[type]?.fields.orEmpty().map { extractTypeName(it.type) } }
-            .toSet()
+        val discovered = frontier.flatMap { fieldTypesOf(it) }.toSet()
         return reachableTypes(discovered - nextSeen, nextSeen)
     }
+
+    // The types a given type points at: a data class's field types, or a sealed type's variant field
+    // types. Following both keeps the closure complete through sealed hierarchies too.
+    private fun fieldTypesOf(type: String): List<String> =
+        dataClasses[type]?.fields.orEmpty().map { extractTypeName(it.type) } +
+            sealedClasses[type]?.variants.orEmpty().flatMap { variant ->
+                variant.fields.map { extractTypeName(it.type) }
+            }
 
     // Strip nullability first so `List<Foo>?` yields `Foo`, not `Foo>`; the inner element can itself be
     // nullable (`List<Foo?>`), hence the trailing `removeSuffix("?")`.

@@ -25,9 +25,11 @@ data class DataClassInfo(
     val fields: List<Field>
 )
 
+data class SealedVariant(val name: String, val fields: List<Field>)
+
 data class SealedClassInfo(
     val name: String,
-    val variants: List<String>
+    val variants: List<SealedVariant>
 )
 
 data class EnumClassInfo(
