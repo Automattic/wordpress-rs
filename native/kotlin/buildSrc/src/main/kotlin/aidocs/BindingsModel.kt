@@ -40,5 +40,7 @@ data class ParsedBindings(
     val executors: List<ExecutorInterface>,
     val dataClasses: Map<String, DataClassInfo>,
     val sealedClasses: Map<String, SealedClassInfo>,
-    val enumClasses: Map<String, EnumClassInfo>
+    val enumClasses: Map<String, EnumClassInfo>,
+    // Top-level functions exported in the namespace, not methods on any type.
+    val freeFunctions: List<MethodSignature>
 )

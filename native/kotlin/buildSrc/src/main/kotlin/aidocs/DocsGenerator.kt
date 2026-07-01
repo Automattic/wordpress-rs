@@ -10,12 +10,14 @@ class DocsGenerator(parsed: ParsedBindings) {
     private val dataClasses = parsed.dataClasses
     private val sealedClasses = parsed.sealedClasses
     private val enumClasses = parsed.enumClasses
+    private val freeFunctions = parsed.freeFunctions
 
     fun generate(): List<GeneratedDoc> {
         val endpoints = executorInterfaces.map { executor ->
             GeneratedDoc("${executor.domain}.md", generateEndpointDoc(executor))
         }
-        return endpoints + GeneratedDoc("index.md", buildIndex())
+        val functions = if (freeFunctions.isEmpty()) emptyList() else listOf(GeneratedDoc("functions.md", functionsDoc()))
+        return endpoints + functions + GeneratedDoc("index.md", buildIndex())
     }
 
     private fun buildIndex(): String = buildString {
@@ -26,6 +28,20 @@ class DocsGenerator(parsed: ParsedBindings) {
         executorInterfaces.map { it.domain }.sorted().forEach { domain ->
             appendLine("- [$domain]($domain.md)")
         }
+        if (freeFunctions.isNotEmpty()) {
+            appendLine()
+            appendLine("## Functions")
+            appendLine()
+            appendLine("- [functions](functions.md)")
+        }
+    }
+
+    private fun functionsDoc(): String = buildString {
+        appendLine("# functions")
+        appendLine()
+        appendLine("Top-level functions exported by the library.")
+        appendLine()
+        freeFunctions.sortedBy { it.name }.forEach { appendLine(signatureLine(it)) }
     }
 
     private fun generateEndpointDoc(executor: ExecutorInterface): String {
@@ -51,10 +67,12 @@ class DocsGenerator(parsed: ParsedBindings) {
     private fun methodsSection(methods: List<MethodSignature>): String = buildString {
         appendLine("## Methods")
         appendLine()
-        methods.forEach { method ->
-            val params = method.params.joinToString(", ") { "${it.name}: ${it.type}" }
-            appendLine("- `${method.name}($params): ${method.returnType}`")
-        }
+        methods.forEach { appendLine(signatureLine(it)) }
+    }
+
+    private fun signatureLine(function: MethodSignature): String {
+        val params = function.params.joinToString(", ") { "${it.name}: ${it.type}" }
+        return "- `${function.name}($params): ${function.returnType}`"
     }
 
     private fun classesSection(title: String, classes: List<DataClassInfo>): String {
