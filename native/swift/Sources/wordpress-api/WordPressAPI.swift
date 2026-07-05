@@ -280,9 +280,11 @@ extension Progress {
     func setTotalUnitCountToFileSizeIfUnset(filePath: String) throws {
         guard totalUnitCount == 0 else { return }
         let attributes = try FileManager.default.attributesOfItem(atPath: filePath)
-        if let size = attributes[.size] as? NSNumber {
-            totalUnitCount = size.int64Value
-        }
+        let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        // A zero-byte file (or an unreadable size) would leave the total at 0 and trip
+        // `fulfill`'s precondition. Use 1 as a placeholder so the request proceeds and the
+        // caller gets the server's "file is empty" error instead of a crash.
+        totalUnitCount = max(size, 1)
     }
 }
 
