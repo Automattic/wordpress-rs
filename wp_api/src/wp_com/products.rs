@@ -31,6 +31,18 @@ impl std::fmt::Display for ProductId {
     }
 }
 
+uniffi::custom_newtype!(ProductSlug, String);
+/// WordPress.com product slug (e.g. `"domain_reg"`, `"personal-bundle"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ProductSlug(pub String);
+
+impl std::fmt::Display for ProductSlug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Filter for the `type` query parameter on `GET /products`.
 ///
 /// The API supports `"domains"` and `"jetpack"` as built-in filters.
@@ -102,11 +114,11 @@ pub type ProductMap = HashMap<String, Product>;
 pub struct Product {
     pub product_id: ProductId,
     pub product_name: String,
-    pub product_slug: String,
+    pub product_slug: ProductSlug,
     pub description: String,
     pub product_type: String,
     pub available: bool,
-    pub billing_product_slug: String,
+    pub billing_product_slug: ProductSlug,
     pub is_domain_registration: bool,
     /// Formatted display cost (e.g. `"$18.00"`), localized to the account's
     /// currency.

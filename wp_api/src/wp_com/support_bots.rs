@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::collections::HashMap;
 use wp_derive::WpDeriveParamsField;
-use wp_serde_helper::deserialize_empty_vec_as_none;
+use wp_serde_helper::{
+    deserialize_empty_vec_as_none, deserialize_null_as_empty_vec,
+    deserialize_null_or_empty_array_as_hashmap,
+};
 
 use super::WpComSiteId;
 
@@ -90,7 +93,14 @@ pub enum MessageContext {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct BotMessageContext {
+    // A fresh conversation's bot greeting omits `sources` and returns `flags: null`,
+    // so both fields tolerate missing/null and fall back to empty collections.
+    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
     pub sources: Vec<BotMessageContextSource>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_null_or_empty_array_as_hashmap"
+    )]
     pub flags: HashMap<String, bool>,
 }
 
@@ -277,6 +287,25 @@ mod tests {
         let conversation: BotConversation =
             serde_json::from_str(json).expect("Failed to deserialize bot conversation");
         assert_eq!(conversation.chat_id, 1965886);
+    }
+
+    #[test]
+    fn test_bot_create_conversation_fresh_response_deserialization() {
+        // A freshly created conversation's bot greeting omits `sources` and
+        // returns `context: { "flags": null }`. Both should fall back to empty
+        // collections rather than failing the untagged `MessageContext` match.
+        let json =
+            include_str!("../../tests/wpcom/support_bots/create-conversation-response-fresh.json");
+        let conversation: BotConversation =
+            serde_json::from_str(json).expect("Failed to deserialize fresh bot conversation");
+        assert_eq!(conversation.chat_id, 5365939);
+        assert_eq!(conversation.messages.len(), 1);
+        let context = match &conversation.messages[0].context {
+            MessageContext::Bot(context) => context,
+            MessageContext::User(_) => panic!("expected a bot message context"),
+        };
+        assert!(context.sources.is_empty());
+        assert!(context.flags.is_empty());
     }
 
     #[rstest]

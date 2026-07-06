@@ -1,4 +1,5 @@
-use crate::{date::WpGmtDateTime, wp_content_u64_id};
+use crate::wp_com::domains::CountryCode;
+use crate::{JsonValue, date::WpGmtDateTime, wp_content_u64_id};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use wp_serde_helper::{
@@ -131,6 +132,41 @@ pub struct WpComSocialLoginConnection {
     pub service_user_id: String,
 }
 
+/// WHOIS/domain contact information for the authenticated user.
+///
+/// Returned by `GET /rest/v1.1/me/domain-contact-information/` and also
+/// used as the request body for `POST /me/domain-contact-information/`
+/// and as part of `POST /me/transactions/`.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct DomainContactInformation {
+    /// First name.
+    pub first_name: Option<String>,
+    /// Last name.
+    pub last_name: Option<String>,
+    /// Organization or company name.
+    pub organization: Option<String>,
+    /// Address line 1.
+    pub address_1: Option<String>,
+    /// Address line 2.
+    pub address_2: Option<String>,
+    /// Postal or ZIP code.
+    pub postal_code: Option<String>,
+    /// City.
+    pub city: Option<String>,
+    /// State or province (code like `"MA"` or full name, depending on country).
+    pub state: Option<String>,
+    /// ISO 3166-1 alpha-2 country code.
+    pub country_code: Option<CountryCode>,
+    /// Contact email address.
+    pub email: Option<String>,
+    /// Phone number in RFC 5733 format (e.g. `"+1.5551234567"`).
+    pub phone: Option<String>,
+    /// Fax number in RFC 5733 format (legacy, usually `null`).
+    pub fax: Option<String>,
+    /// TLD-specific additional contact information (e.g. `.de` requirements).
+    pub extra: Option<HashMap<String, JsonValue>>,
+}
+
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
@@ -152,6 +188,78 @@ mod tests {
         assert_eq!(user_info.id, expected_id);
         assert!(user_info.avatar_url.is_some());
         assert!(user_info.profile_url.is_some());
+    }
+
+    #[rstest]
+    #[case("domain-contact-information.json")]
+    #[case("domain-contact-information-minimal.json")]
+    #[case("domain-contact-information-with-extra.json")]
+    fn test_domain_contact_information_deserialization(#[case] json_file_path: &str) {
+        let json = test_json(json_file_path).expect("Failed to read JSON file");
+        let _contact: DomainContactInformation =
+            serde_json::from_slice(json.as_slice()).expect("Failed to deserialize");
+    }
+
+    #[test]
+    fn test_domain_contact_information_full() {
+        let json = test_json("domain-contact-information.json").expect("Failed to read JSON file");
+        let contact: DomainContactInformation =
+            serde_json::from_slice(json.as_slice()).expect("Failed to deserialize");
+
+        assert_eq!(contact.first_name.as_deref(), Some("Jane"));
+        assert_eq!(contact.last_name.as_deref(), Some("Smith"));
+        assert_eq!(contact.organization.as_deref(), Some("Fake Corp"));
+        assert_eq!(contact.address_1.as_deref(), Some("742 Evergreen Terrace"));
+        assert_eq!(contact.address_2.as_deref(), Some("Suite 200"));
+        assert_eq!(contact.postal_code.as_deref(), Some("90210"));
+        assert_eq!(contact.city.as_deref(), Some("Springfield"));
+        assert_eq!(contact.state.as_deref(), Some("IL"));
+        assert_eq!(contact.country_code, Some(CountryCode("US".to_string())));
+        assert_eq!(contact.email.as_deref(), Some("jane@fakecorp.example"));
+        assert_eq!(contact.phone.as_deref(), Some("+1.5559876543"));
+        assert!(contact.fax.is_none());
+        assert!(contact.extra.is_none());
+    }
+
+    #[test]
+    fn test_domain_contact_information_minimal() {
+        let json =
+            test_json("domain-contact-information-minimal.json").expect("Failed to read JSON file");
+        let contact: DomainContactInformation =
+            serde_json::from_slice(json.as_slice()).expect("Failed to deserialize");
+
+        assert_eq!(contact.first_name.as_deref(), Some("John"));
+        assert_eq!(contact.last_name.as_deref(), Some("Doe"));
+        assert!(contact.organization.is_none());
+        assert!(contact.address_1.is_none());
+        assert!(contact.country_code.is_none());
+        assert_eq!(contact.email.as_deref(), Some("john@example.com"));
+        assert!(contact.phone.is_none());
+    }
+
+    #[test]
+    fn test_domain_contact_information_with_extra() {
+        let json = test_json("domain-contact-information-with-extra.json")
+            .expect("Failed to read JSON file");
+        let contact: DomainContactInformation =
+            serde_json::from_slice(json.as_slice()).expect("Failed to deserialize");
+
+        assert_eq!(contact.country_code, Some(CountryCode("DE".to_string())));
+        let extra = contact.extra.expect("expected extra");
+        assert!(extra.contains_key("de"));
+    }
+
+    #[test]
+    fn test_domain_contact_information_serialization_roundtrip() {
+        let json = test_json("domain-contact-information.json").expect("Failed to read JSON file");
+        let contact: DomainContactInformation =
+            serde_json::from_slice(json.as_slice()).expect("Failed to deserialize");
+        let serialized = serde_json::to_string(&contact).expect("Failed to serialize");
+        let deserialized: DomainContactInformation =
+            serde_json::from_str(&serialized).expect("Failed to re-deserialize");
+        assert_eq!(contact.first_name, deserialized.first_name);
+        assert_eq!(contact.country_code, deserialized.country_code);
+        assert_eq!(contact.phone, deserialized.phone);
     }
 
     fn test_json(input: &str) -> Result<Vec<u8>, std::io::Error> {

@@ -95,7 +95,7 @@ fn generate_async_request_executor(
                         let response = #perform_call;
                         let response_status_code = response.status_code;
                         let parsed_response = response.parse();
-                        let unauthorized = parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.fetch_authentication_state().await.map(|auth_state| auth_state.is_unauthorized()).unwrap_or_default());
+                        let unauthorized = parsed_response.is_unauthorized_error().unwrap_or_default() || (response_status_code == 401 && self.fetch_authentication_state().await.map(|auth_state| auth_state.map_or(true, |auth_state| auth_state.is_unauthorized())).unwrap_or_default());
 
                         Ok((parsed_response, unauthorized, request_url))
                     };
@@ -240,7 +240,7 @@ fn generate_async_request_executor(
         impl #generated_request_executor_ident {
             #(#exported_functions)*
 
-            pub async fn fetch_authentication_state(&self) -> Result<#crate_ident::request::AuthenticationState, #error_type> {
+            pub async fn fetch_authentication_state(&self) -> Result<Option<#crate_ident::request::AuthenticationState>, #error_type> {
                 #crate_ident::request::fetch_authentication_state(self.delegate.request_executor.clone(), self.api_url_resolver.clone(), self.delegate.auth_provider.clone()).await
             }
 

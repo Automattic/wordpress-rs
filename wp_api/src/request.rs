@@ -1,7 +1,7 @@
 use self::endpoint::WpEndpointUrl;
 use crate::{
     api_error::{ParsedRequestError, RequestExecutionError, WpApiError, WpErrorCode},
-    auth::WpAuthenticationProvider,
+    auth::{WpAuthentication, WpAuthenticationProvider},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
 use base64::Engine;
@@ -944,7 +944,21 @@ pub async fn fetch_authentication_state(
     request_executor: Arc<dyn RequestExecutor>,
     api_url_resolver: Arc<dyn ApiUrlResolver>,
     authentication_provider: Arc<WpAuthenticationProvider>,
-) -> Result<AuthenticationState, WpApiError> {
+) -> Result<Option<AuthenticationState>, WpApiError> {
+    // The introspection request below validates the application password used on
+    // the current request, so it is only meaningful when the request actually
+    // authenticates with one (HTTP Basic). For any other scheme (e.g. a bearer
+    // token on WordPress.com) there is no application password to introspect, so
+    // there is no authentication state to report (`Ok(None)`). This also avoids
+    // resolving the `/wp/v2` namespace on resolvers that don't serve it (e.g.
+    // `WpComApiClientInternalUrlResolver`), which would panic.
+    if !matches!(
+        authentication_provider.current_auth(),
+        WpAuthentication::AuthorizationHeader { .. }
+    ) {
+        return Ok(None);
+    }
+
     let request =
         ApplicationPasswordsRequestBuilder::new(api_url_resolver, authentication_provider)
             .retrieve_current_with_edit_context()
@@ -955,14 +969,14 @@ pub async fn fetch_authentication_state(
         WpApiError,
     > = response.parse();
     match parsed_res {
-        Ok(_) => Ok(AuthenticationState::Authenticated),
+        Ok(_) => Ok(Some(AuthenticationState::Authenticated)),
         Err(wp_api_error) => {
             if let WpApiError::WpError {
                 error_code: WpErrorCode::Unauthorized,
                 ..
             } = wp_api_error
             {
-                Ok(AuthenticationState::Unauthorized)
+                Ok(Some(AuthenticationState::Unauthorized))
             } else {
                 Err(wp_api_error)
             }

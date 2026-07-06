@@ -7,10 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Swift: `WordPressAPI.uploadMedia` and `WpService.uploadMedia` now accept a `Progress` whose total is zero, defaulting the total to the upload file's byte size.
+- Self-hosted login and endpoint requests now work against sites with plain permalinks. Previously, the client path-extended the discovered `?rest_route=/` API root, producing URLs like `…/index.php/wp/v2/users/me?rest_route=/` that WordPress collapsed to the API index ([#1366](https://github.com/Automattic/wordpress-rs/issues/1366)).
+
+## [0.5.0] - 2026-06-18
+
+### Added
+
+- WordPress.com `POST /me/shopping-cart` endpoint for creating shopping carts with domain and plan products
+- WordPress.com `GET /sites/<site_id>/domains` endpoint for fetching all domains associated with a site
+- WordPress.com REST API implementation checklist (`WPCOM_REST_API_CHECKLIST.md`)
+- WordPress.com `GET /me/transactions/supported-countries` endpoint for listing countries supported in payment transactions
+- WordPress.com `GET /me/domain-contact-information` endpoint for fetching WHOIS/domain contact details
+- Kotlin: `WpRequestResult.toLogErrorString()` returns a concise, log-only description of a failed request (or `null` on success) for diagnostics
+- Kotlin: `WpComApiClient`, `WpApiClient`, and `JetpackApiClient` accept an optional `errorLogger: RequestErrorLogger` constructor parameter. When provided, failed requests are reported to it via `toLogErrorString()`, letting callers route errors to their own logger or crash reporter. No logging happens when no logger is configured.
+
+### Changed
+- **BREAKING:** `AllDomainItem.expiry` changed from `Option<WpGmtDateTime>` to `Option<WpDateString>`. The `/all-domains` endpoint returns date-only values (`"YYYY-MM-DD"`), which failed to deserialize as a datetime; callers now receive the raw `"YYYY-MM-DD"` string instead of a timestamp.
+- **BREAKING:** `product_slug` and `billing_product_slug` fields on `Product`, `PaidDomainSuggestion`, `DomainPricing`, `WPComPlan`, and `WPComProduct` changed from `String` to `ProductSlug`. Callers that match on or construct these values will need to wrap/unwrap with `ProductSlug(...)`.
+- Publish releases automatically on version-bump in the changelog file
+- **Internal:** Route Dependabot Ruby dependency reviews through `CODEOWNERS` instead of the retired `reviewers` key.
+- **Internal:** Extend CODEOWNERS Ruby/Apps-Infra review routing to CI config and toolchain pins.
+- Pinned third-party GitHub Actions to commit SHA to mitigate supply-chain vulnerabilities
+
 ### Fixed
 
 - Fixed a typo in a public doc comment (`maintainance` → `maintenance`)
-- Self-hosted login and endpoint requests now work against sites with plain permalinks. Previously, the client path-extended the discovered `?rest_route=/` API root, producing URLs like `…/index.php/wp/v2/users/me?rest_route=/` that WordPress collapsed to the API index ([#1366](https://github.com/Automattic/wordpress-rs/issues/1366)).
+- Fixed a crash when using an invalid token in `WpComApiClient`
 
 ## [0.4.0] - 2026-05-29
 
@@ -22,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live membership updates on `MediaMetadataCollectionWithEditContext`, so cached media lists reflect items moving in or out of the filter without a full refresh
 - WordPress.com `/domains/{name}/is-available` endpoint for checking domain availability, pricing, and transfer status
 - WordPress.com `/all-domains` endpoint for listing all domains across a user's sites
+- WordPress.com `/mobile-support/unified-conversations` endpoints for listing, fetching, and replying to unified support conversations, with attachment uploads and encrypted log IDs supported when replying
 
 ### Changed
 

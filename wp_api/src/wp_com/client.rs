@@ -9,6 +9,7 @@ use super::endpoint::{
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
     products_endpoint::{ProductsRequestBuilder, ProductsRequestExecutor},
     publicize_endpoint::{PublicizeRequestBuilder, PublicizeRequestExecutor},
+    shopping_cart_endpoint::{ShoppingCartRequestBuilder, ShoppingCartRequestExecutor},
     stats_city_views_endpoint::{StatsCityViewsRequestBuilder, StatsCityViewsRequestExecutor},
     stats_clicks_endpoint::{StatsClicksRequestBuilder, StatsClicksRequestExecutor},
     stats_country_views_endpoint::{
@@ -51,6 +52,9 @@ use super::endpoint::{
         SupportEligibilityRequestBuilder, SupportEligibilityRequestExecutor,
     },
     support_tickets_endpoint::{SupportTicketsRequestBuilder, SupportTicketsRequestExecutor},
+    unified_conversations_endpoint::{
+        UnifiedConversationsRequestBuilder, UnifiedConversationsRequestExecutor,
+    },
 };
 use crate::{
     api_client::WpApiClientDelegate,
@@ -77,6 +81,7 @@ pub struct WpComApiRequestBuilder {
     oauth2: Arc<Oauth2RequestBuilder>,
     products: Arc<ProductsRequestBuilder>,
     publicize: Arc<PublicizeRequestBuilder>,
+    shopping_cart: Arc<ShoppingCartRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
     stats_clicks: Arc<StatsClicksRequestBuilder>,
@@ -103,6 +108,7 @@ pub struct WpComApiRequestBuilder {
     support_bots: Arc<SupportBotsRequestBuilder>,
     support_eligibility: Arc<SupportEligibilityRequestBuilder>,
     support_tickets: Arc<SupportTicketsRequestBuilder>,
+    unified_conversations: Arc<UnifiedConversationsRequestBuilder>,
 }
 
 impl WpComApiRequestBuilder {
@@ -121,6 +127,7 @@ impl WpComApiRequestBuilder {
             oauth2,
             products,
             publicize,
+            shopping_cart,
             sites,
             stats_city_views,
             stats_clicks,
@@ -146,7 +153,8 @@ impl WpComApiRequestBuilder {
             subscribers,
             support_bots,
             support_eligibility,
-            support_tickets
+            support_tickets,
+            unified_conversations
         )
     }
 }
@@ -176,6 +184,7 @@ pub struct WpComApiClient {
     oauth2: Arc<Oauth2RequestExecutor>,
     products: Arc<ProductsRequestExecutor>,
     publicize: Arc<PublicizeRequestExecutor>,
+    shopping_cart: Arc<ShoppingCartRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
     stats_clicks: Arc<StatsClicksRequestExecutor>,
@@ -202,6 +211,7 @@ pub struct WpComApiClient {
     support_bots: Arc<SupportBotsRequestExecutor>,
     support_eligibility: Arc<SupportEligibilityRequestExecutor>,
     support_tickets: Arc<SupportTicketsRequestExecutor>,
+    unified_conversations: Arc<UnifiedConversationsRequestExecutor>,
 }
 
 impl WpComApiClient {
@@ -221,6 +231,7 @@ impl WpComApiClient {
             oauth2,
             products,
             publicize,
+            shopping_cart,
             sites,
             stats_city_views,
             stats_clicks,
@@ -246,7 +257,8 @@ impl WpComApiClient {
             subscribers,
             support_bots,
             support_eligibility,
-            support_tickets
+            support_tickets,
+            unified_conversations
         )
     }
 }
@@ -259,6 +271,7 @@ api_client_generate_endpoint_impl!(WpComApi, me_connections);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, products);
 api_client_generate_endpoint_impl!(WpComApi, publicize);
+api_client_generate_endpoint_impl!(WpComApi, shopping_cart);
 api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_clicks);
@@ -285,3 +298,4 @@ api_client_generate_endpoint_impl!(WpComApi, subscribers);
 api_client_generate_endpoint_impl!(WpComApi, support_bots);
 api_client_generate_endpoint_impl!(WpComApi, support_eligibility);
 api_client_generate_endpoint_impl!(WpComApi, support_tickets);
+api_client_generate_endpoint_impl!(WpComApi, unified_conversations);
