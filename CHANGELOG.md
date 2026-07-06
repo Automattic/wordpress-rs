@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+<<<<<<< iangmaia/secure-claude-workflows
 - **Internal:** Hardened the Claude review GitHub Actions workflow with scoped permissions and gated triggers.
+=======
+- Swift: `WordPressAPI.uploadMedia` and `WpService.uploadMedia` now accept a `Progress` whose total is zero, defaulting the total to the upload file's byte size.
+>>>>>>> trunk
 
 ## [0.5.0] - 2026-06-18
 
