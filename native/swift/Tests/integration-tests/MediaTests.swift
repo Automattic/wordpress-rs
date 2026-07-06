@@ -38,7 +38,9 @@ struct MediaTests {
     #if os(macOS)
     @Test
     func uploadProgress() async throws {
-        let progress = Progress.discreteProgress(totalUnitCount: 100)
+        // Use a bare `Progress` (total of 0) to verify `uploadMedia` defaults the total
+        // to the upload file's size; otherwise `fractionCompleted` could never reach 1.
+        let progress = Progress()
         #expect(progress.fractionCompleted == 0)
 
         let file = try #require(Bundle.module.url(forResource: "test-data/test_media.jpg", withExtension: nil))
