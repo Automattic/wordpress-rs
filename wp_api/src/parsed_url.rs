@@ -37,6 +37,60 @@ impl ParsedUrl {
             }))
             .expect("ParsedUrl is already parsed, so this can't result in an error")
     }
+
+    /// Extend an API-root URL with REST API path segments, preserving the form
+    /// the site advertises. On plain-permalink sites WordPress advertises the
+    /// query-parameter form (`…/index.php?rest_route=/`); for those we append
+    /// into the `rest_route` value rather than the path. Otherwise we extend
+    /// the path as before.
+    pub fn by_extending_rest_api_path<I>(&self, segments: I) -> Url
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        let appended_path = segments
+            .into_iter()
+            .flat_map(|s| {
+                s.as_ref()
+                    .split('/')
+                    .filter_map(|x| match x.trim() {
+                        "" => None,
+                        y => Some(y.to_string()),
+                    })
+                    .collect::<Vec<String>>()
+            })
+            .collect::<Vec<_>>()
+            .join("/");
+
+        if self.inner.query_pairs().any(|(k, _)| k == "rest_route") {
+            let pairs: Vec<(String, String)> = self
+                .inner
+                .query_pairs()
+                .map(|(k, v)| {
+                    if k == "rest_route" {
+                        let base = v.trim_end_matches('/');
+                        let new_value = if appended_path.is_empty() {
+                            v.into_owned()
+                        } else {
+                            format!("{base}/{appended_path}")
+                        };
+                        (k.into_owned(), new_value)
+                    } else {
+                        (k.into_owned(), v.into_owned())
+                    }
+                })
+                .collect();
+
+            let mut url = self.inner.clone();
+            url.query_pairs_mut().clear();
+            for (k, v) in pairs {
+                url.query_pairs_mut().append_pair(&k, &v);
+            }
+            return url;
+        }
+
+        self.by_extending_and_splitting_by_forward_slash([appended_path])
+    }
 }
 
 impl Display for ParsedUrl {
@@ -211,6 +265,49 @@ mod tests {
         assert_eq!(
             url.extend(["bar", "baz"]).unwrap().as_str(),
             "https://example.com/bar/baz"
+        );
+    }
+
+    #[rstest]
+    #[case::pretty_permalinks(
+        "https://example.com/wp-json",
+        vec!["/wp/v2", "users", "me"],
+        "https://example.com/wp-json/wp/v2/users/me"
+    )]
+    #[case::pretty_permalinks_trailing_slash(
+        "https://example.com/wp-json/",
+        vec!["/wp/v2", "users", "me"],
+        "https://example.com/wp-json/wp/v2/users/me"
+    )]
+    #[case::rest_route_query_form(
+        "https://example.com/index.php?rest_route=/",
+        vec!["/wp/v2", "users", "me"],
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fusers%2Fme"
+    )]
+    #[case::rest_route_query_form_no_trailing_slash(
+        "https://example.com/index.php?rest_route=",
+        vec!["/wp/v2", "users", "me"],
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fusers%2Fme"
+    )]
+    #[case::rest_route_with_other_query_params(
+        "https://example.com/index.php?rest_route=/&debug=1",
+        vec!["/wp/v2", "users", "me"],
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fusers%2Fme&debug=1"
+    )]
+    #[case::rest_route_empty_segments_preserves_value(
+        "https://example.com/index.php?rest_route=/",
+        Vec::<&str>::new(),
+        "https://example.com/index.php?rest_route=%2F"
+    )]
+    fn by_extending_rest_api_path(
+        #[case] api_root: &str,
+        #[case] segments: Vec<&str>,
+        #[case] expected: &str,
+    ) {
+        let parsed = ParsedUrl::parse(api_root).unwrap();
+        assert_eq!(
+            parsed.by_extending_rest_api_path(segments).as_str(),
+            expected
         );
     }
 }

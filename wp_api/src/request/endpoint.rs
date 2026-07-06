@@ -165,9 +165,7 @@ impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
     fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
         Arc::new(
             self.api_root_url
-                .by_extending_and_splitting_by_forward_slash(
-                    [namespace].into_iter().chain(endpoint_segments),
-                )
+                .by_extending_rest_api_path([namespace].into_iter().chain(endpoint_segments))
                 .into(),
         )
     }
@@ -216,6 +214,35 @@ mod tests {
                 namespace.namespace_value(),
                 path
             )
+        );
+    }
+
+    #[rstest]
+    #[case::pretty_permalinks(
+        "https://example.com/wp-json",
+        "/wp/v2",
+        vec!["users".to_string(), "me".to_string()],
+        "https://example.com/wp-json/wp/v2/users/me"
+    )]
+    #[case::plain_permalinks_rest_route_form(
+        "https://example.com/index.php?rest_route=/",
+        "/wp/v2",
+        vec!["users".to_string(), "me".to_string()],
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fusers%2Fme"
+    )]
+    fn wp_org_resolver_handles_both_api_root_forms(
+        #[case] api_root: &str,
+        #[case] namespace: &str,
+        #[case] endpoint_segments: Vec<String>,
+        #[case] expected: &str,
+    ) {
+        let resolver =
+            WpOrgSiteApiUrlResolver::new(ParsedUrl::parse(api_root).expect("valid url").into());
+        assert_eq!(
+            resolver
+                .resolve(namespace.to_string(), endpoint_segments)
+                .url(),
+            expected
         );
     }
 }
