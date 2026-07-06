@@ -48,7 +48,9 @@ struct AuthArgs {
     #[arg(long)]
     wpcom_site: Option<String>,
 
-    /// WordPress.org/Jetpack API root (must end with /wp-json)
+    /// WordPress.org/Jetpack API root URL. Examples:
+    /// `https://example.com/wp-json` (pretty permalinks) or
+    /// `https://example.com/index.php?rest_route=/` (plain permalinks).
     #[arg(long)]
     api_root: Option<String>,
 
@@ -317,9 +319,8 @@ impl SiteApiType {
         }
         if let Some(api_root) = &args.api_root {
             // Explicit api_root takes priority for wp.org/Jetpack
-            let parsed = ParsedUrl::try_from(api_root.as_str()).map_err(|_| {
-                anyhow!("Invalid api_root URL: must be a valid URL ending with /wp-json")
-            })?;
+            let parsed = ParsedUrl::try_from(api_root.as_str())
+                .map_err(|_| anyhow!("Invalid api_root URL: {api_root}"))?;
             return Ok(SiteApiType::WpOrg {
                 api_root: Arc::new(parsed),
             });
