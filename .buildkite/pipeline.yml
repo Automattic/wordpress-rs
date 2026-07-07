@@ -328,6 +328,11 @@ steps:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix: *wordpress_version_matrix
 
+      - label: ":wordpress: :rust: wp-env Tests"
+        command: ".buildkite/commands/run-wp-env-tests.sh"
+        agents:
+          queue: android
+
       - label: ":wordpress: WordPress.com e2e Tests"
         command: |
           echo "--- :rust: Installing Rust"

@@ -120,28 +120,8 @@ async fn login_spec_7_aggressively_cached_site_with_no_link_header() {
     );
 }
 
-#[tokio::test]
-#[parallel]
-async fn login_spec_8_site_with_application_passwords_disabled_by_wordfence() {
-    // Spec Example 8
-    let error = login_err("https://wordfence.wpmt.co")
-        .await
-        .to_fetch_and_parse_api_root_failure();
-    if let FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported {
-        reason:
-            Some(ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin {
-                ref plugin,
-            }),
-        ..
-    } = error
-    {
-        assert_eq!(plugin.name, "Wordfence");
-    } else {
-        panic!(
-            "Expected ApplicationPasswordsNotSupportedReason::ApplicationPasswordBlockedByPlugin, got: {error:?}"
-        );
-    }
-}
+// Spec Example 8 has been moved to test_login_wp_env.rs – it now uses a local wp-env
+// instance running WordFence instead of hitting the remote wordfence.wpmt.co server.
 
 #[tokio::test]
 #[parallel]
