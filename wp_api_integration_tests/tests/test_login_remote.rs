@@ -18,6 +18,7 @@ use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_1_valid_site_works_correctly() {
     // Spec Example 1
     assert_eq!(
@@ -59,6 +60,7 @@ async fn login_spec_2_local_development_environment() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_3_admin_url_provided() {
     // Spec Example 3
     assert_eq!(
@@ -73,6 +75,7 @@ async fn login_spec_3_admin_url_provided() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_4_auth_https_support() {
     // Spec Example 4
     assert_eq!(
@@ -83,6 +86,7 @@ async fn login_spec_4_auth_https_support() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_5_http_only_site() {
     // Spec Example 5
     let error = login_err("http://no-https.wpmt.co")
@@ -102,6 +106,7 @@ async fn login_spec_5_http_only_site() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_6_http_only_site_with_application_passwords_enabled() {
     // Spec Example 6
     assert_eq!(
@@ -112,6 +117,7 @@ async fn login_spec_6_http_only_site_with_application_passwords_enabled() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_7_aggressively_cached_site_with_no_link_header() {
     // Spec Example 7
     assert_eq!(
@@ -122,6 +128,7 @@ async fn login_spec_7_aggressively_cached_site_with_no_link_header() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_8_site_with_application_passwords_disabled_by_wordfence() {
     // Spec Example 8
     let error = login_err("https://wordfence.wpmt.co")
@@ -145,6 +152,7 @@ async fn login_spec_8_site_with_application_passwords_disabled_by_wordfence() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_9_not_a_wordpress_site() {
     // Spec Example 9
     assert_eq!(
@@ -155,6 +163,7 @@ async fn login_spec_9_not_a_wordpress_site() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_10_wordpress_subdirectory_with_link_header() {
     // Spec Example 10
     assert_eq!(
@@ -165,6 +174,7 @@ async fn login_spec_10_wordpress_subdirectory_with_link_header() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_11_wordpress_subdirectory_with_link_tag() {
     // Spec Example 11
     assert_eq!(
@@ -175,6 +185,7 @@ async fn login_spec_11_wordpress_subdirectory_with_link_tag() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_12_wordpress_subdirectory_with_redirect() {
     // Spec Example 12
     assert_eq!(
@@ -185,6 +196,7 @@ async fn login_spec_12_wordpress_subdirectory_with_redirect() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_13_wordpress_http_basic_with_missing_credentials() {
     // Spec Example 13 (with missing credentials)
     let expected_hostname = "https://basic-auth.wpmt.co/";
@@ -202,6 +214,7 @@ async fn login_spec_13_wordpress_http_basic_with_missing_credentials() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_13_wordpress_http_basic_with_invalid_credentials() {
     // Spec Example 13 (with invalid credentials)
     let expected_hostname = "https://basic-auth.wpmt.co/";
@@ -227,6 +240,7 @@ async fn login_spec_13_wordpress_http_basic_with_invalid_credentials() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_13_wordpress_http_basic_with_valid_credentials() {
     // Spec Example 13 (with valid credentials)
     let login_url = discovery_helper(
@@ -247,6 +261,7 @@ async fn login_spec_13_wordpress_http_basic_with_valid_credentials() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_14_wordpress_custom_rest_api_prefix() {
     // Spec Example 14
     assert_eq!(
@@ -257,6 +272,7 @@ async fn login_spec_14_wordpress_custom_rest_api_prefix() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_15_wordpress_heavy_rate_limiting() {
     // Spec Example 15
     assert_eq!(
@@ -293,6 +309,7 @@ async fn login_spec_15_wordpress_heavy_rate_limiting_that_never_succeeds() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_16_invalid_url() {
     // Spec Example 16
 
@@ -312,6 +329,7 @@ async fn login_spec_16_invalid_url() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_17_invalid_https_fails() {
     // Spec Example 17
     let request_execution_error_reason =
@@ -331,6 +349,7 @@ async fn login_spec_17_invalid_https_fails() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_17_invalid_https_with_exception_works() {
     // Spec Example 17 (with exception)
     assert_eq!(
@@ -345,6 +364,7 @@ async fn login_spec_17_invalid_https_with_exception_works() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_18_xmlrpc_disabled_by_host() {
     // The xmlrpc endpoint does not return a valid HTTP response:
     // $ curl https://xmlrpc-disabled.wpmt.co/xmlrpc.php
@@ -361,6 +381,7 @@ async fn login_spec_18_xmlrpc_disabled_by_host() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_18_xmlrpc_disabled_by_plugin() {
     let result = xmlrpc_url("https://xmlrpc-disabled-by-plugin.wpmt.co").await;
     assert!(result.is_err());
@@ -374,6 +395,7 @@ async fn login_spec_18_xmlrpc_disabled_by_plugin() {
 
 #[tokio::test]
 #[parallel]
+#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_18_xmlrpc_found() {
     let result = xmlrpc_url("https://vanilla.wpmt.co").await;
     assert!(result.is_ok());

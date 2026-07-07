@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Self-hosted login and endpoint requests now work against sites with plain permalinks. Previously, the client path-extended the discovered `?rest_route=/` API root, producing URLs like `…/index.php/wp/v2/users/me?rest_route=/` that WordPress collapsed to the API index ([#1366](https://github.com/Automattic/wordpress-rs/issues/1366)).
 - **Internal:** Hardened the Claude review GitHub Actions workflow with scoped permissions and gated triggers.
 - **Internal:** Added a `buildkite-triage` Claude skill for pulling failing tests from a Buildkite build via the Buildkite MCP.
+- **Internal:** Quarantined the external login-discovery integration tests (`test_login_remote`) behind `#[ignore]`; they now run in a dedicated soft-fail Buildkite step so intermittent `*.wpmt.co` timeouts no longer fail the build.
 
 ## [0.5.0] - 2026-06-18
 
