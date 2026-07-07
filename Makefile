@@ -214,6 +214,10 @@ test-rust-integration:
 test-rust-integration-wordpress-org-api:
 	$(rust_docker_run) cargo test --package wp_api_integration_tests --test test_plugin_directory -- --nocapture
 
+test-rust-integration-remote-login:
+	@# Help: Run the flaky external login-discovery tests (ignored in the main suite; hit real *.wpmt.co sites).
+	$(rust_docker_run) cargo test --package wp_api_integration_tests --test test_login_remote -- --ignored --nocapture
+
 test-kotlin-integration:
 	@# Help: Run Kotlin integration tests in test server.
 	docker exec -i wordpress /bin/bash < ./scripts/run-kotlin-integration-tests.sh

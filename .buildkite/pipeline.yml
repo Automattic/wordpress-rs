@@ -309,6 +309,14 @@ steps:
           echo "--- :rust: Testing"
           make test-rust-integration-wordpress-org-api
 
+      - label: ":wordpress: :rust: Remote Login Discovery (flaky)"
+        command: |
+          echo "--- :rust: Running external login-discovery tests (ignored in the main suite)"
+          make test-rust-integration-remote-login
+        # These tests hit real external *.wpmt.co sites and time out intermittently,
+        # so a failure must not fail the build — they run here only for visibility.
+        soft_fail: true
+
       - label: ":wordpress: :kotlin: WordPress {{matrix}}"
         command: ".buildkite/commands/run-kotlin-integration-tests.sh"
         env:
