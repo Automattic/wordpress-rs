@@ -29,7 +29,6 @@ async fn login_spec_1_valid_site_works_correctly() {
 
 #[tokio::test]
 #[parallel]
-#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_2_local_development_environment() {
     // Spec Example 2
     let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
@@ -284,7 +283,6 @@ async fn login_spec_15_wordpress_heavy_rate_limiting() {
 
 #[tokio::test]
 #[parallel]
-#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_15_wordpress_heavy_rate_limiting_that_never_succeeds() {
     // Spec Example 15
     let executor = MockExecutor::with_execute_fn(|request| match request.url().0.as_str() {
