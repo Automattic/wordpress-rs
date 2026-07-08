@@ -218,6 +218,10 @@ test-rust-integration-remote-login:
 	@# Help: Run the flaky external login-discovery tests (ignored in the main suite; hit real *.wpmt.co sites).
 	$(rust_docker_run) cargo test --package wp_api_integration_tests --test test_login_remote -- --ignored --nocapture
 
+report-remote-login-integration-test-suite-health:
+	@# Help: Post the remote login integration-test-suite health digest to Slack (needs BUILDKITE_TOKEN + SLACK_WEBHOOK).
+	bundle exec fastlane report_remote_login_integration_test_suite_health
+
 test-kotlin-integration:
 	@# Help: Run Kotlin integration tests in test server.
 	docker exec -i wordpress /bin/bash < ./scripts/run-kotlin-integration-tests.sh
