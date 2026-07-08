@@ -510,6 +510,90 @@ lane :set_up_signing_release do |readonly: true|
   set_up_certificate_in_keychain(type: 'appstore', readonly: readonly)
 end
 
+desc 'Post a Slack health digest for the quarantined remote login-discovery integration tests'
+lane :report_remote_login_integration_test_suite_health do
+  require 'buildkit'
+  require 'net/http'
+  require 'json'
+
+  api_token = get_required_env!('BUILDKITE_TOKEN')
+  slack_webhook = get_required_env!('SLACK_WEBHOOK')
+  days = Integer(ENV.fetch('REPORT_DAYS', '7'))
+
+  org = 'automattic'
+  pipeline = PROJECT_NAME
+  slack_channel = '#wordpress-rs'
+  step_label = 'Remote Login Discovery' # substring of the soft-fail step's label
+  investigate_cap = 3
+  timeout_signature = /HttpTimeoutError|timed out/
+  created_from = (Time.now.utc - (days * 86_400)).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+  # Read each run's real exit_status from the Buildkite API for accuracy.
+  # Builds come back newest-first.
+  client = Buildkit.new(token: api_token)
+  client.auto_paginate = true
+  runs = client.pipeline_builds(org, pipeline, created_from: created_from, per_page: 100).flat_map do |build|
+    Array(build.jobs).filter_map do |job|
+      next unless job.respond_to?(:name) && job.name.to_s.include?(step_label)
+      next if job.respond_to?(:retried) && job.retried
+      next if !job.respond_to?(:exit_status) || job.exit_status.nil?
+
+      { build: build.number, url: build.web_url, job_id: job.id, exit_status: job.exit_status }
+    end
+  end
+
+  # Bucket each failed run: timeouts are expected/flaky; anything else is worth investigating.
+  timeouts = 0
+  other = []
+  runs.reject { |run| run[:exit_status].zero? }.each do |run|
+    log = client.job_log(org, pipeline, run[:build], run[:job_id])
+    content = log.respond_to?(:content) ? log.content.to_s : ''
+    if content.match?(timeout_signature)
+      timeouts += 1
+    else
+      failed = content.scan(/(login_spec_[a-z0-9_]+) \.\.\. FAILED/).flatten.uniq
+      other << { build: run[:build], url: run[:url], test: failed.empty? ? 'unknown' : failed.join(', ') }
+    end
+  end
+
+  total = runs.size
+  passed = runs.count { |run| run[:exit_status].zero? }
+
+  # Compose the Slack digest.
+  section = ->(text) { { type: 'section', text: { type: 'mrkdwn', text: text } } }
+  header = "*Remote Login Discovery — Integration Test Suite Health*  ·  last #{days} days"
+
+  blocks =
+    if total.zero?
+      [section.call("#{header}\nThe step did not run in this window.")]
+    else
+      pct = ->(count) { (count * 100.0 / total).round }
+      table = [
+        format('%-13s %3d%%  (%d/%d)', 'Pass rate', pct.call(passed), passed, total),
+        format('%-13s %3d%%  (%d/%d)', 'Timeout Error', pct.call(timeouts), timeouts, total),
+        format('%-13s %3d%%  (%d/%d)', 'Other Errors', pct.call(other.size), other.size, total)
+      ].join("\n")
+      digest = [section.call("#{header}\n```\n#{table}\n```")]
+      if other.any?
+        capped = other.size > investigate_cap ? " (showing #{investigate_cap})" : ''
+        listed = other.first(investigate_cap).map { |o| "• <#{o[:url]}|#{o[:build]}> · `#{o[:test]}`" }
+        digest << section.call(":warning: *#{other.size} failures need investigating#{capped}:*\n#{listed.join("\n")}")
+      end
+      digest
+    end
+
+  payload = {
+    channel: slack_channel,
+    username: 'wordpress-rs CI',
+    icon_emoji: ':mag:',
+    attachments: [{ color: other.empty? ? 'good' : 'danger', blocks: blocks }]
+  }
+  response = Net::HTTP.post(URI.parse(slack_webhook), payload.to_json, 'Content-Type' => 'application/json')
+  UI.user_error!("Slack returned #{response.code}: #{response.body}") unless response.is_a?(Net::HTTPSuccess)
+
+  UI.success("Posted digest: #{total} runs, #{timeouts} timeout, #{other.size} other.")
+end
+
 # Utils
 
 XCFRAMEWORK_COMMENT_MARKER = '<!-- wordpress-rs-xcframework-build -->'
