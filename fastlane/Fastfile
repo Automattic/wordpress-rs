@@ -516,21 +516,20 @@ lane :report_remote_login_integration_test_suite_health do
   require 'net/http'
   require 'json'
 
-  api_token = ENV['BUILDKITE_TOKEN'] || ENV['BUILDKITE_API_TOKEN'] ||
-              UI.user_error!('Set BUILDKITE_TOKEN (with the read_builds scope) to run this lane.')
+  api_token = get_required_env!('BUILDKITE_TOKEN')
   slack_webhook = get_required_env!('SLACK_WEBHOOK')
   days = Integer(ENV.fetch('REPORT_DAYS', '7'))
 
   org = 'automattic'
-  pipeline = 'wordpress-rs'
+  pipeline = PROJECT_NAME
   slack_channel = '#wordpress-rs'
   step_label = 'Remote Login Discovery' # substring of the soft-fail step's label
   investigate_cap = 3
   timeout_signature = /HttpTimeoutError|timed out/
   created_from = (Time.now.utc - (days * 86_400)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-  # The step is soft-fail, so its failures never reach GitHub. Read each run's real
-  # exit_status from the Buildkite API instead. Builds come back newest-first.
+  # Read each run's real exit_status from the Buildkite API for accuracy.
+  # Builds come back newest-first.
   client = Buildkit.new(token: api_token)
   client.auto_paginate = true
   runs = client.pipeline_builds(org, pipeline, created_from: created_from, per_page: 100).flat_map do |build|
@@ -560,7 +559,7 @@ lane :report_remote_login_integration_test_suite_health do
   total = runs.size
   passed = runs.count { |run| run[:exit_status].zero? }
 
-  # --- Compose the Slack digest ---
+  # Compose the Slack digest.
   section = ->(text) { { type: 'section', text: { type: 'mrkdwn', text: text } } }
   header = "*Remote Login Discovery — Integration Test Suite Health*  ·  last #{days} days"
 

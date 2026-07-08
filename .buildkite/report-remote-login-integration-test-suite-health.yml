@@ -1,11 +1,8 @@
-# Scheduled health digest for the quarantined remote login-discovery integration tests.
-#
-# The schedule that runs this pipeline is managed externally (Terraform), not from
-# this repo.
-#
-# The report itself is the `report_remote_login_integration_test_suite_health`
-# Fastlane lane (see `fastlane/Fastfile`). It is pure Ruby (Buildkite API + Slack
-# webhook), so it runs on the Linux `android` queue — no Xcode/mac VM needed.
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+---
+
+# Runs the health digest for the quarantined remote login-discovery integration tests.
+# Meant to run on a schedule configured on the Buildkite end.
 steps:
   - label: ":rust: :mag: Remote Login Integration Test Suite Health"
     command: |
