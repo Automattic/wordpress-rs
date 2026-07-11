@@ -1,6 +1,5 @@
-use aes_gcm::aead::rand_core::RngCore;
-use aes_gcm::aead::{Aead, KeyInit, OsRng};
-use aes_gcm::{AeadCore, Aes256Gcm, Key, Nonce};
+use aes_gcm::aead::{Aead, Generate, KeyInit};
+use aes_gcm::{Aes256Gcm, Key, Nonce};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use hkdf::Hkdf;
@@ -114,12 +113,11 @@ impl PasswordTransformer for AesGcmPasswordTransformer {
         &self,
         password: DecryptedPassword,
     ) -> Result<EncryptedPassword, PasswordTransformerError> {
-        let mut salt = [0u8; SALT_SIZE];
-        OsRng.fill_bytes(&mut salt);
+        let salt: [u8; SALT_SIZE] = Generate::generate();
 
         let mut key = self.derive_key(&salt);
         let cipher = Aes256Gcm::new(&key);
-        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+        let nonce = Nonce::generate();
 
         let result = cipher.encrypt(&nonce, password.0.as_bytes()).map_err(|e| {
             PasswordTransformerError::EncryptionFailed {
@@ -179,7 +177,8 @@ impl PasswordTransformer for AesGcmPasswordTransformer {
                 ),
             });
         }
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce =
+            Nonce::try_from(nonce_bytes.as_slice()).map_err(|_| parse_err("invalid nonce"))?;
         let ciphertext = BASE64.decode(ciphertext_b64).map_err(|e| {
             PasswordTransformerError::DecryptionFailed {
                 reason: e.to_string(),
@@ -189,7 +188,7 @@ impl PasswordTransformer for AesGcmPasswordTransformer {
         let mut key = self.derive_key(&salt);
         let cipher = Aes256Gcm::new(&key);
 
-        let result = cipher.decrypt(nonce, ciphertext.as_ref()).map_err(|e| {
+        let result = cipher.decrypt(&nonce, ciphertext.as_ref()).map_err(|e| {
             PasswordTransformerError::DecryptionFailed {
                 reason: e.to_string(),
             }

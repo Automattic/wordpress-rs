@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Added a `buildkite-triage` Claude skill for pulling failing tests from a Buildkite build via the Buildkite MCP.
 - **Internal:** Quarantined the external login-discovery integration tests (`test_login_remote`) behind `#[ignore]`; they now run in a dedicated soft-fail Buildkite step so intermittent `*.wpmt.co` timeouts no longer fail the build.
 - **Internal:** Added a scheduled Buildkite health digest for the quarantined `test_login_remote` tests that reads the soft-fail step's real pass/fail from the Buildkite API, separates external `*.wpmt.co` timeouts from genuine failures, and posts a summary to Slack.
+- **Internal:** Updated `aes-gcm` from `0.10` to `0.11`, migrating the password encryption transformer to the `aead` 0.6 API. The AES-256-GCM scheme and stored `salt:nonce:ciphertext` format are unchanged.
 
 ## [0.5.0] - 2026-06-18
 
