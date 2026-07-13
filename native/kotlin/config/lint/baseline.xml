@@ -1,35 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<issues format="6" by="lint 8.1.0" type="baseline" client="gradle" dependencies="false" name="AGP (8.1.0)" variant="all" version="8.1.0">
+<issues format="6" by="lint 9.2.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.1)" variant="all" version="9.2.1">
+
     <issue
         id="NewApi"
-        message="Call requires API level 33 (current min is 24): `android.system.SystemCleaner#cleaner`"
-        errorLine1="    val cleaner = android.system.SystemCleaner.cleaner()"
-        errorLine2="                                               ~~~~~~~">
+        message="Exception requires API level 28 (current min is 26): `android.security.keystore.StrongBoxUnavailableException`"
+        errorLine1="            } catch (_: StrongBoxUnavailableException) {"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="build/generated/source/uniffi/debug/java/uniffi/wp_api/wp_api.kt"
-            line="924"
-            column="48"/>
+            file="src/main/kotlin/rs/wordpress/api/android/KeystorePasswordTransformer.kt"
+            line="177"
+            column="25"/>
     </issue>
 
     <issue
         id="NewApi"
-        message="Call requires API level 33 (current min is 24): `java.lang.ref.Cleaner#register`"
-        errorLine1="    ): UniffiCleaner.Cleanable = AndroidSystemCleanable(cleaner.register(value, cleanUpTask))"
-        errorLine2="                                                                ~~~~~~~~">
+        message="Call requires API level 28 (current min is 26): `android.security.keystore.KeyGenParameterSpec.Builder#setIsStrongBoxBacked`"
+        errorLine1="                builder.setIsStrongBoxBacked(false)"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="build/generated/source/uniffi/debug/java/uniffi/wp_api/wp_api.kt"
-            line="929"
-            column="65"/>
+            file="src/main/kotlin/rs/wordpress/api/android/KeystorePasswordTransformer.kt"
+            line="180"
+            column="25"/>
     </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 33 (current min is 24): `java.lang.ref.Cleaner.Cleanable#clean`"
-        errorLine1="    override fun clean() = cleanable.clean()"
-        errorLine2="                                     ~~~~~">
-        <location
-            file="build/generated/source/uniffi/debug/java/uniffi/wp_api/wp_api.kt"
-            line="935"
-            column="38"/>
-    </issue>
 </issues>

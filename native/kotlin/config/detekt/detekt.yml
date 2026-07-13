@@ -4,3 +4,8 @@
 
 config:
   warningsAsErrors: true
+
+# Compose: `@Composable` functions are PascalCase by convention.
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']

@@ -27,7 +27,7 @@ fun main() {
                 modules(commonModules(accountRepository))
             }) {
                 // Authentication is not supported on Desktop
-                App(authenticationEnabled = false, authenticateSite = {}, authenticateWpCom = null)
+                App(authenticationEnabled = false, authenticateSite = { _, _, _ -> }, authenticateWpCom = null)
             }
         }
     }

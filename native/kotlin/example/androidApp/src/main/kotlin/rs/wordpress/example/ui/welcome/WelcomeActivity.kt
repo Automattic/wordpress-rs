@@ -56,6 +56,7 @@ class WelcomeActivity : ComponentActivity() {
         }
     }
 
+    @Suppress("LongMethod", "TooGenericExceptionCaught")
     private fun authenticateSite(url: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         lifecycleScope.launch {
             try {
@@ -168,7 +169,7 @@ class WelcomeActivity : ComponentActivity() {
 
         if (siteUrl != null && username != null && password != null) {
             val discoverySuccess = apiDiscoverySuccess
-                ?: throw IllegalStateException("Api discovery has to be successful before authentication")
+                ?: error("Api discovery has to be successful before authentication")
             accountRepository.store(
                 Account.SelfHostedSite(
                     id = 0uL,
@@ -182,6 +183,7 @@ class WelcomeActivity : ComponentActivity() {
         }
     }
 
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
     private fun handleWpComCallback(uri: android.net.Uri) {
         lifecycleScope.launch {
             try {
@@ -210,7 +212,7 @@ class WelcomeActivity : ComponentActivity() {
                         is WpRequestResult.Success -> {
                             val tokenResponse = tokenResult.response.data
                             val blogId = tokenResponse.blogId
-                                ?: throw IllegalStateException("Expected blog_id in site-specific token response")
+                                ?: error("Expected blog_id in site-specific token response")
                             accountRepository.store(
                                 Account.WpCom(
                                     id = 0uL,
