@@ -1,7 +1,6 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    id("org.mozilla.rust-android-gradle.rust-android")
     id("com.automattic.android.publish-to-s3")
 }
 
@@ -47,7 +46,10 @@ android {
     // file - at least for now.
     lint.baseline = file("${project.rootDir}/config/lint/baseline.xml")
 
-    sourceSets["androidTest"].jniLibs.srcDirs.plus("${layout.buildDirectory.get()}/rustJniLibs/android")
+    // The Rust `.so` files produced by the `cargoBuild` task (below) are written here; registering
+    // the directory as a jniLibs source set makes AGP package them into the AAR and the test APK.
+    sourceSets["main"].jniLibs.srcDir("${layout.buildDirectory.get()}/rustJniLibs/android")
+    sourceSets["androidTest"].jniLibs.srcDir("${layout.buildDirectory.get()}/rustJniLibs/android")
 }
 
 dependencies {
@@ -83,27 +85,69 @@ dependencies {
     testImplementation(libs.jna)
 }
 
-val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot")!!
-val moduleName = rootProject.ext.get("rustPrimaryModule").toString()
-cargo {
-    cargoCommand = rootProject.ext.get("cargoBinaryPath").toString()
-    rustcCommand = rootProject.ext.get("rustcBinaryPath").toString()
-    module = "$cargoProjectRoot/$moduleName/"
-    libname = moduleName
-    profile = "release"
-    targets = if (project.hasProperty("cargoTarget")) {
-        listOf(project.property("cargoTarget").toString())
-    } else {
-        listOf("arm", "arm64", "x86", "x86_64")
-    }
-    targetDirectory = "$cargoProjectRoot/target"
-    exec = { spec: ExecSpec, _: com.nishtahir.Toolchain ->
-        // https://doc.rust-lang.org/rustc/command-line-arguments.html#-g-include-debug-information
-        spec.environment("RUSTFLAGS", "-g")
+// --- Rust native library build ---
+//
+// Cross-compiles the Rust crate for each Android ABI with `cargo ndk`, writing the resulting `.so`
+// files to `build/rustJniLibs/android/<abi>/` — registered as a jniLibs source directory above so
+// AGP packages them into the AAR.
+//
+// Requires the `cargo-ndk` cargo subcommand (`cargo install cargo-ndk`) and the NDK named by
+// `ndkVersion` above to be installed.
+val cargoProjectRoot = rootProject.ext.get("cargoProjectRoot").toString()
+val rustModule = rootProject.ext.get("rustPrimaryModule").toString()
+val rustJniLibsDir = layout.buildDirectory.dir("rustJniLibs/android")
+
+// Map the `-PcargoTarget` name passed for single-ABI builds (e.g. `arm64`) to the Android ABI
+// understood by `cargo ndk`. With no property set, all four ABIs are built.
+val gradleTargetToAbi = mapOf(
+    "arm" to "armeabi-v7a",
+    "arm64" to "arm64-v8a",
+    "x86" to "x86",
+    "x86_64" to "x86_64",
+)
+val cargoAbis: List<String> = project.findProperty("cargoTarget")?.let { property ->
+    val target = property.toString()
+    listOf(gradleTargetToAbi[target] ?: error("Unknown cargoTarget '$target'"))
+} ?: gradleTargetToAbi.values.toList()
+
+tasks.register<Exec>("cargoBuild") {
+    group = "rust"
+    description = "Cross-compiles the Rust native library for Android via cargo-ndk"
+
+    workingDir(cargoProjectRoot)
+
+    // Point cargo-ndk at the same NDK that AGP is configured to use.
+    environment("ANDROID_NDK_HOME", android.sdkDirectory.resolve("ndk/${android.ndkVersion}").absolutePath)
+    // Include debug information in the release build.
+    environment("RUSTFLAGS", "-g")
+
+    commandLine(
+        buildList {
+            add(rootProject.ext.get("cargoBinaryPath").toString())
+            add("ndk")
+            add("--output-dir"); add(rustJniLibsDir.get().asFile.absolutePath)
+            add("--platform"); add(libs.versions.android.minSdk.get())
+            cargoAbis.forEach { abi -> add("-t"); add(abi) }
+            add("build"); add("--release"); add("--package"); add(rustModule)
+        }
+    )
+
+    outputs.dir(rustJniLibsDir)
+
+    doLast {
+        // cargo-ndk copies every cdylib the build produces; keep only the primary library. `wp_api`
+        // also declares a `cdylib` crate type, but its code is statically linked into
+        // `libwp_mobile.so` — the single library the generated UniFFI bindings load — so its
+        // standalone `.so` is redundant weight in the AAR.
+        val keep = "lib$rustModule.so"
+        rustJniLibsDir.get().asFile.walkTopDown()
+            .filter { it.isFile && it.extension == "so" && it.name != keep }
+            .forEach { it.delete() }
     }
 }
+
 tasks.matching { it.name.matches("merge.*JniLibFolders".toRegex()) }.configureEach {
-    inputs.dir(File("${layout.buildDirectory.get()}/rustJniLibs/android"))
+    inputs.dir(rustJniLibsDir)
     dependsOn("cargoBuild")
 }
 
