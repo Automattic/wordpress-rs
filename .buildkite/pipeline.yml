@@ -299,7 +299,7 @@ steps:
           ./native/kotlin/gradlew -p native/kotlin \
             -PwpApiKotlinVersion="$$PUBLISHED_WP_API_KOTLIN_VERSION" \
             -PwpApiAndroidVersion="$$PUBLISHED_WP_API_ANDROID_VERSION" \
-            :example:composeApp:assembleDebug
+            :example:androidApp:assembleDebug
         agents:
           queue: android
 
