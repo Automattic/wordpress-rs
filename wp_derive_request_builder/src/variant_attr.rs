@@ -43,13 +43,7 @@ impl ParsedVariantAttribute {
     ) -> Result<Self, ItemVariantAttributeParseError> {
         let non_empty_token_tree_or_none =
             |tokens: Option<Vec<TokenTree>>| -> Option<Vec<TokenTree>> {
-                tokens.and_then(|tokens| {
-                    if tokens.is_empty() {
-                        None
-                    } else {
-                        Some(tokens)
-                    }
-                })
+                tokens.filter(|tokens| !tokens.is_empty())
             };
         let params_type = non_empty_token_tree_or_none(params).map(|tokens| ParamsType {
             tokens: TokenStream::from_iter(tokens),

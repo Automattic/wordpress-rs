@@ -123,7 +123,7 @@ mod tests {
     #[rstest]
     #[case(CommentListParams::default(), &[], "/comments?context=edit&_fields=")]
     #[case(generate!(CommentListParams, (orderby, Some(WpApiParamCommentsOrderBy::Id))), &[SparseCommentFieldWithEditContext::Author], "/comments?context=edit&orderby=id&_fields=author")]
-    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_EDIT_CONTEXT, &format!("/comments?context=edit&{}&{}", &expected_query_pairs_for_comment_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EDIT_CONTEXT))]
+    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_EDIT_CONTEXT, &format!("/comments?context=edit&{}&{}", expected_query_pairs_for_comment_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EDIT_CONTEXT))]
     fn filter_list_comments_with_edit_context(
         endpoint: CommentsRequestEndpoint,
         #[case] params: CommentListParams,
@@ -139,7 +139,7 @@ mod tests {
     #[rstest]
     #[case(CommentListParams::default(), &[], "/comments?context=embed&_fields=")]
     #[case(generate!(CommentListParams, (orderby, Some(WpApiParamCommentsOrderBy::DateGmt))), &[SparseCommentFieldWithEmbedContext::Author], "/comments?context=embed&orderby=date_gmt&_fields=author")]
-    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT, &format!("/comments?context=embed&{}&{}", &expected_query_pairs_for_comment_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT))]
+    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT, &format!("/comments?context=embed&{}&{}", expected_query_pairs_for_comment_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_EMBED_CONTEXT))]
     fn filter_list_comments_with_embed_context(
         endpoint: CommentsRequestEndpoint,
         #[case] params: CommentListParams,
@@ -155,7 +155,7 @@ mod tests {
     #[rstest]
     #[case(CommentListParams::default(), &[], "/comments?context=view&_fields=")]
     #[case(generate!(CommentListParams, (orderby, Some(WpApiParamCommentsOrderBy::Include))), &[SparseCommentFieldWithViewContext::Author], "/comments?context=view&orderby=include&_fields=author")]
-    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT, &format!("/comments?context=view&{}&{}", &expected_query_pairs_for_comment_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(comment_list_params_with_all_fields(), ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT, &format!("/comments?context=view&{}&{}", expected_query_pairs_for_comment_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_COMMENT_FIELDS_WITH_VIEW_CONTEXT))]
     fn filter_list_comments_with_view_context(
         endpoint: CommentsRequestEndpoint,
         #[case] params: CommentListParams,

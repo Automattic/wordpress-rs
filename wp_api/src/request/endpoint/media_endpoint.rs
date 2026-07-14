@@ -137,7 +137,7 @@ mod tests {
     #[rstest]
     #[case(MediaListParams::default(), &[], "/media?context=edit&_fields=")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparseMediaFieldWithEditContext::Author], "/media?context=edit&orderby=author&_fields=author")]
-    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_EDIT_CONTEXT, &format!("/media?context=edit&{}&{}", &expected_query_pairs_for_media_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_EDIT_CONTEXT))]
+    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_EDIT_CONTEXT, &format!("/media?context=edit&{}&{}", expected_query_pairs_for_media_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_EDIT_CONTEXT))]
     fn filter_list_media_with_edit_context(
         endpoint: MediaRequestEndpoint,
         #[case] params: MediaListParams,
@@ -153,7 +153,7 @@ mod tests {
     #[rstest]
     #[case(MediaListParams::default(), &[], "/media?context=embed&_fields=")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparseMediaFieldWithEmbedContext::Author], "/media?context=embed&orderby=author&_fields=author")]
-    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT, &format!("/media?context=embed&{}&{}", &expected_query_pairs_for_media_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT))]
+    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT, &format!("/media?context=embed&{}&{}", expected_query_pairs_for_media_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_EMBED_CONTEXT))]
     fn filter_list_media_with_embed_context(
         endpoint: MediaRequestEndpoint,
         #[case] params: MediaListParams,
@@ -169,7 +169,7 @@ mod tests {
     #[rstest]
     #[case(MediaListParams::default(), &[], "/media?context=view&_fields=")]
     #[case(generate!(MediaListParams, (orderby, Some(WpApiParamPostsOrderBy::Author))), &[SparseMediaFieldWithViewContext::Author], "/media?context=view&orderby=author&_fields=author")]
-    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_VIEW_CONTEXT, &format!("/media?context=view&{}&{}", &expected_query_pairs_for_media_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_VIEW_CONTEXT))]
+    #[case(media_list_params_with_all_fields(), ALL_SPARSE_MEDIA_FIELDS_WITH_VIEW_CONTEXT, &format!("/media?context=view&{}&{}", expected_query_pairs_for_media_list_params_with_all_fields(), EXPECTED_QUERY_PAIRS_FOR_ALL_SPARSE_MEDIA_FIELDS_WITH_VIEW_CONTEXT))]
     fn filter_list_media_with_view_context(
         endpoint: MediaRequestEndpoint,
         #[case] params: MediaListParams,
