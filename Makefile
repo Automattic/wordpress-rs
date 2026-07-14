@@ -283,6 +283,10 @@ fmt-rust:
 fmt-check-rust:
 	$(rust_docker_run) /bin/bash -c "rustup component add rustfmt && cargo fmt --all -- --check"
 
+check-rust-toolchain:
+	@# Help: Check whether the pinned Rust toolchain has fallen behind the latest stable release.
+	./.buildkite/commands/check-rust-toolchain-current.sh
+
 setup-rust:
 	@# Help: Install the necessary Rust toolchains on your development computer (for macOS).
 	RUST_TOOLCHAIN=$(rust_stable_toolchain) $(MAKE) setup-rust-toolchain

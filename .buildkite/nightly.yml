@@ -25,3 +25,16 @@ steps:
       IMAGE_ID: $IMAGE_ID
     agents:
       queue: mac
+
+  - label: ":rust: :arrow_up: Check Rust toolchain is current"
+    command: |
+      echo "--- :rust: Checking whether the pinned Rust toolchain is behind stable"
+      .buildkite/commands/check-rust-toolchain-current.sh --notify-slack
+    plugins: [$CI_TOOLKIT]
+    # A stale pin is a nudge, not a breakage. `soft_fail` keeps the nightly green
+    # (so this doesn't trip the other steps' "build failed" notifications) while
+    # still surfacing an orange step, and the script posts the Slack reminder
+    # itself. See https://github.com/Automattic/wordpress-rs/issues/1436.
+    soft_fail: true
+    agents:
+      queue: android
