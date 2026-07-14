@@ -1,0 +1,12 @@
+# Pins the Rust toolchain so local `cargo` and CI use the exact same compiler.
+# Without this, local dev floats to whatever stable is installed while CI stays
+# frozen, so `clippy` can silently fall behind and stop flagging real findings.
+# See https://github.com/Automattic/wordpress-rs/issues/1436.
+#
+# Keep this version in lockstep with:
+#   - `rust_stable_toolchain` in `Makefile`
+#   - `FROM rust:<version>` in `wp_rs_web/Dockerfile`
+[toolchain]
+channel = "1.97.0"
+components = ["clippy", "rustfmt"]
+profile = "minimal"
