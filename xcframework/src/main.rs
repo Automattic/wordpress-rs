@@ -97,7 +97,7 @@ impl XCFramework {
         recreate_directory(&dest)?;
         std::fs::rename(temp_dest, &dest).with_context(|| "Failed to move xcframework")?;
 
-        println!("xcframework created at {}", &dest.display());
+        println!("xcframework created at {}", dest.display());
         Ok(dest)
     }
 

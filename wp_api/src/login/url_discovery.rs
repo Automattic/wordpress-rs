@@ -120,8 +120,8 @@ impl AutoDiscoveryResult {
         } else {
             Err(self
                 .attempts
-                .iter()
-                .flat_map(|(_, a)| a.api_discovery_result.as_ref().err())
+                .values()
+                .flat_map(|a| a.api_discovery_result.as_ref().err())
                 // Sort in descending order so the most important error is returned
                 .sorted_by(|a, b| b.compare_importance(a))
                 .next()

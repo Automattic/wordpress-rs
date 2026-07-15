@@ -4,7 +4,12 @@
 docker_container_repo_dir=/app
 
 # Common docker options
-rust_docker_container := public.ecr.aws/docker/library/rust:1.90.0
+#
+# Pinned Rust toolchain version. Keep in lockstep with `rust-toolchain.toml` and
+# `wp_rs_web/Dockerfile` so local `cargo`, the CI Docker image, and the pinned
+# toolchain never drift. See https://github.com/Automattic/wordpress-rs/issues/1436.
+rust_stable_toolchain := 1.97.0
+rust_docker_container := public.ecr.aws/docker/library/rust:$(rust_stable_toolchain)
 
 docker_opts_shared := --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e TEST_ALL_PLUGINS -e CARGO_HOME=/app/.cargo $(rust_docker_container)
@@ -278,9 +283,13 @@ fmt-rust:
 fmt-check-rust:
 	$(rust_docker_run) /bin/bash -c "rustup component add rustfmt && cargo fmt --all -- --check"
 
+check-rust-toolchain:
+	@# Help: Check whether the pinned Rust toolchain has fallen behind the latest stable release.
+	./.buildkite/commands/check-rust-toolchain-current.sh
+
 setup-rust:
 	@# Help: Install the necessary Rust toolchains on your development computer (for macOS).
-	RUST_TOOLCHAIN=stable $(MAKE) setup-rust-toolchain
+	RUST_TOOLCHAIN=$(rust_stable_toolchain) $(MAKE) setup-rust-toolchain
 	RUST_TOOLCHAIN=$(rust_nightly_toolchain) $(MAKE) setup-rust-toolchain
 
 setup-rust-toolchain:
@@ -295,15 +304,15 @@ setup-rust-toolchain:
 
 # Platform-specific Rust setup (only installs what each platform needs in CI)
 setup-rust-macOS:
-	rustup toolchain install stable
-	rustup target add --toolchain stable x86_64-apple-darwin aarch64-apple-darwin
+	rustup toolchain install $(rust_stable_toolchain)
+	rustup target add --toolchain $(rust_stable_toolchain) x86_64-apple-darwin aarch64-apple-darwin
 
 setup-rust-iOS:
-	rustup toolchain install stable
-	rustup target add --toolchain stable aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+	rustup toolchain install $(rust_stable_toolchain)
+	rustup target add --toolchain $(rust_stable_toolchain) aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
 
 setup-rust-tvOS setup-rust-watchOS:
-	rustup toolchain install stable
+	rustup toolchain install $(rust_stable_toolchain)
 	rustup toolchain install $(rust_nightly_toolchain)
 	rustup component add rust-src --toolchain $(rust_nightly_toolchain)
 

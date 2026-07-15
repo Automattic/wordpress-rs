@@ -1,4 +1,6 @@
-FROM rust:1.90.0 AS builder
+# Keep this version in lockstep with `rust-toolchain.toml` and `rust_stable_toolchain`
+# in the `Makefile`. See https://github.com/Automattic/wordpress-rs/issues/1436.
+FROM rust:1.97.0 AS builder
 
 WORKDIR /app
 
