@@ -340,6 +340,30 @@ mod tests {
     }
 
     #[test]
+    fn test_stats_visits_params_serialization_with_empty_stat_fields() {
+        let mut url =
+            url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/visits")
+                .expect("Failed to parse url");
+
+        let params = StatsVisitsParams {
+            unit: Some(StatsVisitsUnit::Day),
+            quantity: Some(7),
+            end_date: None,
+            start_date: None,
+            stat_fields: Some(StatsVisitsFields(vec![])),
+            locale: None,
+        };
+
+        let mut query_pairs = url.query_pairs_mut();
+        params.append_query_pairs(&mut query_pairs);
+
+        assert_eq!(
+            query_pairs.finish().as_str(),
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/visits?unit=day&quantity=7"
+        );
+    }
+
+    #[test]
     fn test_stats_visits_fields_display() {
         assert_eq!(
             StatsVisitsFields(vec![
