@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- WordPress.com `GET /sites/<site_id>/stats/visits` now supports the `start_date` and `stat_fields` query parameters. `StatsVisitsParams` gained a `start_date: Option<String>` field and a `stat_fields: Option<StatsVisitsFields>` field (a type-safe comma-separated list of the new `StatsVisitsField` enum: `Views`, `Visitors`, `Likes`, `Reblogs`, `Comments`, `Posts`).
+- WordPress.com `GET /sites/<site_id>/stats/visits` now supports the `start_date` and `stat_fields` query parameters. `StatsVisitsParams` gained a `start_date: Option<String>` field and a `stat_fields: Vec<StatsVisitsField>` field, where `StatsVisitsField` is a new enum (`Views`, `Visitors`, `Likes`, `Reblogs`, `Comments`, `Posts`). An empty `stat_fields` omits the parameter, letting the API return its default set of fields.
 
 ### Changed
 

@@ -60,20 +60,7 @@ pub enum StatsVisitsField {
     Posts,
 }
 
-uniffi::custom_newtype!(StatsVisitsFields, Vec<StatsVisitsField>);
-/// The stat fields to include in the stats visits response.
-/// An empty vec results in the API returning its default set of fields.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StatsVisitsFields(pub Vec<StatsVisitsField>);
-
-impl std::fmt::Display for StatsVisitsFields {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let joined: Vec<_> = self.0.iter().map(|field| field.to_string()).collect();
-        write!(f, "{}", joined.join(","))
-    }
-}
-
-impl_as_query_value_from_to_string!(StatsVisitsFields);
+impl_as_query_value_from_to_string!(StatsVisitsField);
 
 /// Parameters for the stats visits endpoint.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
@@ -91,9 +78,9 @@ pub struct StatsVisitsParams {
     #[uniffi(default = None)]
     pub start_date: Option<String>,
     /// The specific stat fields to include in the response.
-    /// When `None`, the API returns its default set of fields.
-    #[uniffi(default = None)]
-    pub stat_fields: Option<StatsVisitsFields>,
+    /// When empty, the API returns its default set of fields.
+    #[uniffi(default = [])]
+    pub stat_fields: Vec<StatsVisitsField>,
     /// The locale for the response.
     #[uniffi(default = None)]
     pub locale: Option<WPComLanguage>,
@@ -106,12 +93,7 @@ impl AppendUrlQueryPairs for StatsVisitsParams {
             .append_option_query_value_pair("quantity", self.quantity.as_ref())
             .append_option_query_value_pair("date", self.end_date.as_ref())
             .append_option_query_value_pair("start_date", self.start_date.as_ref())
-            .append_option_query_value_pair(
-                "stat_fields",
-                self.stat_fields
-                    .as_ref()
-                    .filter(|fields| !fields.0.is_empty()),
-            )
+            .append_vec_query_value_pair("stat_fields", self.stat_fields.as_ref())
             .append_option_query_value_pair("locale", self.locale.as_ref());
     }
 }
@@ -280,7 +262,7 @@ mod tests {
             quantity: Some(24),
             end_date: Some("2025-01-15".to_string()),
             start_date: None,
-            stat_fields: None,
+            stat_fields: vec![],
             locale: Some(WPComLanguage::English),
         };
 
@@ -304,7 +286,7 @@ mod tests {
             quantity: Some(7),
             end_date: None,
             start_date: None,
-            stat_fields: None,
+            stat_fields: vec![],
             locale: None,
         };
 
@@ -328,10 +310,7 @@ mod tests {
             quantity: Some(12),
             end_date: Some("2026-07-13".to_string()),
             start_date: Some("2025-08-01".to_string()),
-            stat_fields: Some(StatsVisitsFields(vec![
-                StatsVisitsField::Views,
-                StatsVisitsField::Visitors,
-            ])),
+            stat_fields: vec![StatsVisitsField::Views, StatsVisitsField::Visitors],
             locale: None,
         };
 
@@ -355,7 +334,7 @@ mod tests {
             quantity: Some(7),
             end_date: None,
             start_date: None,
-            stat_fields: Some(StatsVisitsFields(vec![])),
+            stat_fields: vec![],
             locale: None,
         };
 
@@ -366,25 +345,6 @@ mod tests {
             query_pairs.finish().as_str(),
             "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/visits?unit=day&quantity=7"
         );
-    }
-
-    #[test]
-    fn test_stats_visits_fields_display() {
-        assert_eq!(
-            StatsVisitsFields(vec![
-                StatsVisitsField::Views,
-                StatsVisitsField::Visitors,
-                StatsVisitsField::Likes,
-                StatsVisitsField::Comments,
-            ])
-            .to_string(),
-            "views,visitors,likes,comments"
-        );
-        assert_eq!(
-            StatsVisitsFields(vec![StatsVisitsField::Views]).to_string(),
-            "views"
-        );
-        assert_eq!(StatsVisitsFields(vec![]).to_string(), "");
     }
 
     #[rstest]
