@@ -106,7 +106,12 @@ impl AppendUrlQueryPairs for StatsVisitsParams {
             .append_option_query_value_pair("quantity", self.quantity.as_ref())
             .append_option_query_value_pair("date", self.end_date.as_ref())
             .append_option_query_value_pair("start_date", self.start_date.as_ref())
-            .append_option_query_value_pair("stat_fields", self.stat_fields.as_ref())
+            .append_option_query_value_pair(
+                "stat_fields",
+                self.stat_fields
+                    .as_ref()
+                    .filter(|fields| !fields.0.is_empty()),
+            )
             .append_option_query_value_pair("locale", self.locale.as_ref());
     }
 }
