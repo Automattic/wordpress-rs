@@ -36,17 +36,6 @@ android {
         buildConfig = true
     }
 
-    // There is an incorrect lint error in generated wp_api.kt about the usage of NewApi
-    // that's related to the usage of `android.system.SystemCleaner`.
-    //
-    // At the time of this comment, generated bindings only use this `SystemCleaner` for
-    // API's above 33 and fallback to Jna cleaner `UniffiJnaCleaner` that's available for
-    // earlier APIs.
-    //
-    // Instead of completely ignoring this issue, we are tracking it through the baseline lint
-    // file - at least for now.
-    lint.baseline = file("${project.rootDir}/config/lint/baseline.xml")
-
     // Declare the release variant as a publishable component (the `release` component consumed below).
     publishing {
         singleVariant("release")
@@ -100,9 +89,7 @@ val rustJniLibsDir = layout.buildDirectory.dir("rustJniLibs/android")
 
 // NDK directory AGP resolves for the configured `ndkVersion`, passed to cargo-ndk so it builds
 // against the same NDK.
-val ndkDirectory = extensions
-    .getByType(com.android.build.api.variant.LibraryAndroidComponentsExtension::class.java)
-    .sdkComponents.ndkDirectory
+val ndkDirectory = androidComponents.sdkComponents.ndkDirectory
 
 // Map the `-PcargoTarget` name passed for single-ABI builds (e.g. `arm64`) to the Android ABI
 // understood by `cargo ndk`. With no property set, all four ABIs are built.

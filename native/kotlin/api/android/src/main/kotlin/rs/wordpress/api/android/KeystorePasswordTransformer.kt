@@ -162,25 +162,26 @@ class KeystorePasswordTransformer(applicationName: String) : PasswordTransformer
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(AES_KEY_SIZE)
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                builder.setIsStrongBoxBacked(true)
-            }
-
             val keyGenerator = KeyGenerator.getInstance(
                 KeyProperties.KEY_ALGORITHM_AES,
                 KEYSTORE_PROVIDER
             )
 
-            try {
-                keyGenerator.init(builder.build())
-                return keyGenerator.generateKey()
-            } catch (_: StrongBoxUnavailableException) {
-                // StrongBox not available — fall back to TEE/software-backed key.
-                Log.w(TAG, "StrongBox unavailable, falling back to software-backed key")
-                builder.setIsStrongBoxBacked(false)
-                keyGenerator.init(builder.build())
-                return keyGenerator.generateKey()
+            // StrongBox is only available on API 28+; keep its enable/fallback fully inside the guard.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                builder.setIsStrongBoxBacked(true)
+                try {
+                    keyGenerator.init(builder.build())
+                    return keyGenerator.generateKey()
+                } catch (_: StrongBoxUnavailableException) {
+                    // StrongBox not available — fall back to TEE/software-backed key.
+                    Log.w(TAG, "StrongBox unavailable, falling back to software-backed key")
+                    builder.setIsStrongBoxBacked(false)
+                }
             }
+
+            keyGenerator.init(builder.build())
+            return keyGenerator.generateKey()
         }
     }
 }
