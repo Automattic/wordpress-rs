@@ -1,4 +1,4 @@
-use wp_api::prelude::WpApiError;
+use wp_api::prelude::{RequestExecutionErrorReason, WpApiError};
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 use wp_mobile_cache::SqliteDbError;
@@ -18,6 +18,19 @@ pub enum FetchError {
     /// A list refresh occurred while a load-more fetch was in-flight,
     /// making the paginated results stale.
     StaleLoadMore,
+}
+
+impl FetchError {
+    /// Whether this error is a request timeout, as opposed to any other failure.
+    pub fn is_timeout(&self) -> bool {
+        matches!(
+            self,
+            FetchError::Api(WpApiError::RequestExecutionFailed {
+                reason: RequestExecutionErrorReason::HttpTimeoutError,
+                ..
+            })
+        )
+    }
 }
 
 impl From<WpApiError> for FetchError {

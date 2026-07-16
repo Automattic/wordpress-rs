@@ -34,8 +34,12 @@ use wp_mobile_cache::{
     repository::{entity_state::EntityType, posts::PostRepository},
 };
 
-/// Maximum number of posts to fetch in a single batch request
-const BATCH_FETCH_SIZE: u32 = 100;
+/// Batch sizes to try when fetching posts by ID, largest first. When a batch
+/// request times out, the failing batch is retried with the next (smaller)
+/// size; posts still timing out at the smallest size are marked as failed. This
+/// lets sites that can't render a large batch within the request timeout still
+/// sync in smaller pieces.
+const BATCH_FETCH_SIZES: &[usize] = &[100, 20, 5];
 
 // Internal types
 
@@ -425,31 +429,64 @@ impl PostService {
         let mut failed_count: u32 = 0;
 
         if !ids_to_fetch.is_empty() {
-            // Batch into chunks
-            for chunk in ids_to_fetch.chunks(BATCH_FETCH_SIZE as usize) {
-                match self.load_posts_by_ids(endpoint_type, chunk.to_vec()).await {
-                    Ok(result) => {
-                        // Accumulate failures reported by load_posts_by_ids
-                        failed_count += result.failed_count;
-                    }
-                    Err(e) => {
-                        log::warn!(
-                            "Failed to load {} posts (IDs: {:?}): {}",
-                            chunk.len(),
-                            chunk,
-                            e
-                        );
-                        // Network/DB error - all items in this chunk failed
-                        failed_count += chunk.len() as u32;
-                    }
-                }
-            }
+            failed_count = self
+                .load_posts_with_adaptive_batching(endpoint_type, &ids_to_fetch)
+                .await;
         }
 
         FetchStats {
             fetched_count,
             failed_count,
         }
+    }
+
+    /// Load posts by ID, degrading the batch size on request timeouts.
+    ///
+    /// Starts with the largest size in [`BATCH_FETCH_SIZES`]. When a batch
+    /// request times out, that batch is split into smaller sub-batches (the next
+    /// size down) and retried. Posts that still time out at the smallest size —
+    /// or fail for any non-timeout reason — are counted as failed (their
+    /// `Failed` state is set by [`Self::load_posts_by_ids`]).
+    ///
+    /// Returns the number of posts that failed to load.
+    async fn load_posts_with_adaptive_batching(
+        &self,
+        endpoint_type: &PostEndpointType,
+        ids: &[PostId],
+    ) -> u32 {
+        let mut failed_count: u32 = 0;
+        // Work items: a set of IDs plus the index into `BATCH_FETCH_SIZES`
+        // of the batch size to use for them.
+        let mut pending: Vec<(Vec<PostId>, usize)> = vec![(ids.to_vec(), 0)];
+
+        while let Some((batch_ids, size_index)) = pending.pop() {
+            let batch_size = BATCH_FETCH_SIZES[size_index];
+            for chunk in batch_ids.chunks(batch_size) {
+                match self.load_posts_by_ids(endpoint_type, chunk.to_vec()).await {
+                    Ok(result) => failed_count += result.failed_count,
+                    Err(e) => {
+                        if e.is_timeout() && size_index + 1 < BATCH_FETCH_SIZES.len() {
+                            log::debug!(
+                                "Fetching {} posts by ID timed out; retrying with batch size {}",
+                                chunk.len(),
+                                BATCH_FETCH_SIZES[size_index + 1]
+                            );
+                            pending.push((chunk.to_vec(), size_index + 1));
+                        } else {
+                            log::warn!(
+                                "Failed to load {} posts (IDs: {:?}): {}",
+                                chunk.len(),
+                                chunk,
+                                e
+                            );
+                            failed_count += chunk.len() as u32;
+                        }
+                    }
+                }
+            }
+        }
+
+        failed_count
     }
 
     /// Load posts by IDs from network to cache with state tracking.
@@ -517,8 +554,9 @@ impl PostService {
 
         let params = PostListParams {
             include: post_ids,
-            // Ensure we get all requested posts regardless of default per_page
-            per_page: Some(BATCH_FETCH_SIZE),
+            // Ensure we get all requested posts regardless of default per_page.
+            // Every chunk is at most the largest fetch batch size.
+            per_page: Some(BATCH_FETCH_SIZES[0] as u32),
             // Request all available post statuses as defined in the WordPress REST API.
             // Use "any" to match all post statuses (including custom ones), plus
             // "trash" which WordPress excludes from "any" because it has
@@ -1426,6 +1464,115 @@ mod tests {
         let cache = Arc::new(WpApiCache::try_from(conn).expect("Cache creation should succeed"));
         let db_site_arc = Arc::new(db_site);
         PostService::new(api_client, db_site_arc, cache)
+    }
+
+    /// Parse the `include=<ids>` post IDs from a fetch request URL.
+    fn included_ids(url: &str) -> Vec<i64> {
+        url.split("include=")
+            .nth(1)
+            .and_then(|s| s.split('&').next())
+            .map(|s| {
+                s.replace("%2C", ",")
+                    .split(',')
+                    .filter_map(|p| p.parse::<i64>().ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Builds a `PostService` whose network times out for fetch requests of
+    /// more than 5 IDs and returns posts for 5 or fewer — simulating a site that
+    /// can only render a small batch within the request timeout.
+    fn service_with_small_batch_limit() -> PostService {
+        let mock_executor = Arc::new(MockExecutor::with_execute_fn(|request| {
+            let ids = included_ids(&request.url().0);
+            if ids.len() > 5 {
+                return Err(RequestExecutionError::RequestExecutionFailed {
+                    status_code: None,
+                    redirects: None,
+                    reason: RequestExecutionErrorReason::HttpTimeoutError,
+                    request_url: request.url().0,
+                    request_method: request.method(),
+                });
+            }
+            let posts: Vec<AnyPostWithEditContext> = ids
+                .iter()
+                .map(|&id| {
+                    PostBuilder::minimal()
+                        .with_id(id)
+                        .with_slug(&format!("post-{id}"))
+                        .build()
+                })
+                .collect();
+            Ok(WpNetworkResponse {
+                body: serde_json::to_vec(&posts).expect("serialize posts"),
+                status_code: 200,
+                response_header_map: Arc::new(WpNetworkHeaderMap::default()),
+                request_url: request.url(),
+                request_method: request.method(),
+                request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+            })
+        }));
+
+        let api_root_url =
+            Arc::new(ParsedUrl::parse("https://test.local/wp-json").expect("Parse URL"));
+        let api_client = Arc::new(WpApiClient::new(
+            Arc::new(WpOrgSiteApiUrlResolver::new(api_root_url)),
+            WpApiClientDelegate {
+                auth_provider: Arc::new(WpAuthenticationProvider::none()),
+                request_executor: mock_executor,
+                middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+                app_notifier: Arc::new(EmptyAppNotifier),
+            },
+        ));
+
+        let mut conn = Connection::open_in_memory().expect("Create in-memory database");
+        let mut migration_manager = MigrationManager::new(&conn).expect("Create migration manager");
+        migration_manager
+            .perform_migrations()
+            .expect("Migrations succeed");
+
+        let site_repo = SiteRepository;
+        let self_hosted_site = SelfHostedSite {
+            url: "https://test.local".to_string(),
+            api_root: "https://test.local/wp-json".to_string(),
+        };
+        let db_site = site_repo
+            .upsert_self_hosted_site(&mut conn, &self_hosted_site)
+            .expect("Site creation")
+            .db_site;
+
+        let cache = Arc::new(WpApiCache::try_from(conn).expect("Cache creation should succeed"));
+        let db_site_arc = Arc::new(db_site);
+        PostService::new(api_client, db_site_arc, cache)
+    }
+
+    /// When a large fetch batch times out, the service retries with
+    /// progressively smaller batches. The mock times out for any request of more
+    /// than 5 IDs, so the 100- and 20-post batches fail but the 5-post batches
+    /// succeed — every post still loads, with no failures.
+    #[tokio::test]
+    async fn test_batch_size_degrades_on_timeout() {
+        let service = service_with_small_batch_limit();
+        let metadata: Vec<EntityMetadata> = (1i64..=12)
+            .map(|id| EntityMetadata::new(id, None, None, None))
+            .collect();
+
+        let stats = service
+            .fetch_missing_and_stale_posts(&PostEndpointType::Posts, &metadata)
+            .await;
+
+        assert_eq!(stats.fetched_count, 12);
+        assert_eq!(
+            stats.failed_count, 0,
+            "all posts should load once the batch is small enough"
+        );
+
+        let ids: Vec<i64> = (1..=12).collect();
+        let loaded = service
+            .read_posts_by_ids_from_db(&ids)
+            .expect("re-reading fetched posts should succeed");
+        assert_eq!(loaded.len(), 12);
     }
 
     // State transition tests
