@@ -61,7 +61,9 @@ class WpRequestExecutor @JvmOverloads constructor(
 
     /**
      * Convenience constructor that accepts a list of OkHttp interceptors.
-     * Uses [WpHttpClient.DefaultHttpClient] internally with the provided interceptors.
+     * Uses [WpHttpClient.DefaultHttpClient] internally with the provided interceptors and
+     * [timeouts] (defaulting to [HttpClientTimeouts]'s more forgiving values), so callers can
+     * tune timeouts without building an [okhttp3.OkHttpClient] by hand.
      */
     @JvmOverloads
     constructor(
@@ -69,9 +71,10 @@ class WpRequestExecutor @JvmOverloads constructor(
         networkAvailabilityProvider: NetworkAvailabilityProvider,
         dispatcher: CoroutineDispatcher = Dispatchers.IO,
         fileResolver: FileResolver = DefaultFileResolver(),
-        uploadListener: UploadListener? = null
+        uploadListener: UploadListener? = null,
+        timeouts: HttpClientTimeouts = HttpClientTimeouts(),
     ) : this(
-        httpClient = WpHttpClient.DefaultHttpClient(interceptors),
+        httpClient = WpHttpClient.DefaultHttpClient(interceptors, timeouts),
         networkAvailabilityProvider = networkAvailabilityProvider,
         dispatcher = dispatcher,
         fileResolver = fileResolver,

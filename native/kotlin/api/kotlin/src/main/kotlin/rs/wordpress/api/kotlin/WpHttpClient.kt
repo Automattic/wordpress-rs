@@ -3,14 +3,35 @@ package rs.wordpress.api.kotlin
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.internal.tls.OkHostnameVerifier
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLSession
+
+/**
+ * Client-wide OkHttp timeouts applied by [WpHttpClient.DefaultHttpClient].
+ *
+ * OkHttp's built-in per-operation defaults are 10s, which is too short for slow sites or large
+ * responses. These defaults are more forgiving; override any of them by passing a custom instance
+ * to [WpHttpClient.DefaultHttpClient] or the [WpRequestExecutor] convenience constructor.
+ */
+data class HttpClientTimeouts(
+    val connectTimeoutSeconds: Long = DEFAULT_CONNECT_TIMEOUT_SECONDS,
+    val readTimeoutSeconds: Long = DEFAULT_READ_TIMEOUT_SECONDS,
+    val writeTimeoutSeconds: Long = DEFAULT_WRITE_TIMEOUT_SECONDS,
+) {
+    companion object {
+        const val DEFAULT_CONNECT_TIMEOUT_SECONDS = 15L
+        const val DEFAULT_READ_TIMEOUT_SECONDS = 60L
+        const val DEFAULT_WRITE_TIMEOUT_SECONDS = 60L
+    }
+}
 
 sealed class WpHttpClient {
     abstract fun getClient(): OkHttpClient
 
     class DefaultHttpClient(
-        private val interceptors: List<Interceptor>
+        private val interceptors: List<Interceptor>,
+        private val timeouts: HttpClientTimeouts = HttpClientTimeouts(),
     ) : WpHttpClient() {
         private var allowedHostnames: Map<String, List<String>> = emptyMap()
 
@@ -27,6 +48,9 @@ sealed class WpHttpClient {
             return OkHttpClient.Builder().apply {
                 this@DefaultHttpClient.interceptors.forEach { addInterceptor(it) }
                 hostnameVerifier(WpRequestExecutorHostnameVerifier(allowedHostnames))
+                connectTimeout(timeouts.connectTimeoutSeconds, TimeUnit.SECONDS)
+                readTimeout(timeouts.readTimeoutSeconds, TimeUnit.SECONDS)
+                writeTimeout(timeouts.writeTimeoutSeconds, TimeUnit.SECONDS)
             }.build()
         }
 

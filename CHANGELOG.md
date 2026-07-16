@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- WordPress.com `GET /sites/<site_id>/stats/visits` now supports the `start_date` and `stat_fields` query parameters. `StatsVisitsParams` gained a `start_date: Option<String>` field and a `stat_fields: Vec<StatsVisitsField>` field, where `StatsVisitsField` is a new enum (`Views`, `Visitors`, `Likes`, `Reblogs`, `Comments`, `Posts`). An empty `stat_fields` omits the parameter, letting the API return its default set of fields.
+
 ### Changed
 
 - Updated uniffi-rs to 0.32.0.
+- Kotlin: `WpHttpClient.DefaultHttpClient` now applies more forgiving default OkHttp timeouts (connect 15s, read 60s, write 60s) instead of relying on OkHttp's 10s per-operation defaults, preventing premature timeouts when fetching large or slow-to-render responses. The values are configurable via a new `HttpClientTimeouts` type, accepted by both `DefaultHttpClient` and the `WpRequestExecutor` convenience constructor so callers can override them without building an `OkHttpClient` by hand.
 - Swift: `WordPressAPI.uploadMedia` and `WpService.uploadMedia` now accept a `Progress` whose total is zero, defaulting the total to the upload file's byte size.
 - Self-hosted login and endpoint requests now work against sites with plain permalinks. Previously, the client path-extended the discovered `?rest_route=/` API root, producing URLs like `…/index.php/wp/v2/users/me?rest_route=/` that WordPress collapsed to the API index ([#1366](https://github.com/Automattic/wordpress-rs/issues/1366)).
 - **Internal:** Hardened the Claude review GitHub Actions workflow with scoped permissions and gated triggers.

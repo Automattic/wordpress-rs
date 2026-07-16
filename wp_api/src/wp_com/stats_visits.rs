@@ -34,6 +34,34 @@ pub enum StatsVisitsUnit {
 
 impl_as_query_value_from_to_string!(StatsVisitsUnit);
 
+/// A stat field that can be requested from the stats visits endpoint.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum StatsVisitsField {
+    Views,
+    Visitors,
+    Likes,
+    Reblogs,
+    Comments,
+    Posts,
+}
+
+impl_as_query_value_from_to_string!(StatsVisitsField);
+
 /// Parameters for the stats visits endpoint.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct StatsVisitsParams {
@@ -46,6 +74,13 @@ pub struct StatsVisitsParams {
     /// The end date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
     pub end_date: Option<String>,
+    /// The start date to query stats for (format: YYYY-MM-DD).
+    #[uniffi(default = None)]
+    pub start_date: Option<String>,
+    /// The specific stat fields to include in the response.
+    /// When empty, the API returns its default set of fields.
+    #[uniffi(default = [])]
+    pub stat_fields: Vec<StatsVisitsField>,
     /// The locale for the response.
     #[uniffi(default = None)]
     pub locale: Option<WPComLanguage>,
@@ -57,6 +92,8 @@ impl AppendUrlQueryPairs for StatsVisitsParams {
             .append_option_query_value_pair("unit", self.unit.as_ref())
             .append_option_query_value_pair("quantity", self.quantity.as_ref())
             .append_option_query_value_pair("date", self.end_date.as_ref())
+            .append_option_query_value_pair("start_date", self.start_date.as_ref())
+            .append_vec_query_value_pair("stat_fields", self.stat_fields.as_ref())
             .append_option_query_value_pair("locale", self.locale.as_ref());
     }
 }
@@ -224,6 +261,8 @@ mod tests {
             unit: Some(StatsVisitsUnit::Hour),
             quantity: Some(24),
             end_date: Some("2025-01-15".to_string()),
+            start_date: None,
+            stat_fields: vec![],
             locale: Some(WPComLanguage::English),
         };
 
@@ -246,6 +285,56 @@ mod tests {
             unit: Some(StatsVisitsUnit::Day),
             quantity: Some(7),
             end_date: None,
+            start_date: None,
+            stat_fields: vec![],
+            locale: None,
+        };
+
+        let mut query_pairs = url.query_pairs_mut();
+        params.append_query_pairs(&mut query_pairs);
+
+        assert_eq!(
+            query_pairs.finish().as_str(),
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/visits?unit=day&quantity=7"
+        );
+    }
+
+    #[test]
+    fn test_stats_visits_params_serialization_with_start_date_and_stat_fields() {
+        let mut url =
+            url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/visits")
+                .expect("Failed to parse url");
+
+        let params = StatsVisitsParams {
+            unit: Some(StatsVisitsUnit::Month),
+            quantity: Some(12),
+            end_date: Some("2026-07-13".to_string()),
+            start_date: Some("2025-08-01".to_string()),
+            stat_fields: vec![StatsVisitsField::Views, StatsVisitsField::Visitors],
+            locale: None,
+        };
+
+        let mut query_pairs = url.query_pairs_mut();
+        params.append_query_pairs(&mut query_pairs);
+
+        assert_eq!(
+            query_pairs.finish().as_str(),
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/visits?unit=month&quantity=12&date=2026-07-13&start_date=2025-08-01&stat_fields=views%2Cvisitors"
+        );
+    }
+
+    #[test]
+    fn test_stats_visits_params_serialization_with_empty_stat_fields() {
+        let mut url =
+            url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/visits")
+                .expect("Failed to parse url");
+
+        let params = StatsVisitsParams {
+            unit: Some(StatsVisitsUnit::Day),
+            quantity: Some(7),
+            end_date: None,
+            start_date: None,
+            stat_fields: vec![],
             locale: None,
         };
 
