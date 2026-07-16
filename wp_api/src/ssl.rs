@@ -12,8 +12,8 @@ use crate::date::WpGmtDateTime;
 //
 // If this returns `None`, we weren't able to parse the certificate
 #[uniffi::export]
-pub fn parse_certificate(data: &[u8]) -> Option<Arc<SslCertificateInfo>> {
-    let certificate = Certificate::from_der(data).ok()?;
+pub fn parse_certificate(data: Vec<u8>) -> Option<Arc<SslCertificateInfo>> {
+    let certificate = Certificate::from_der(&data).ok()?;
     let certificate: &x509_cert::certificate::TbsCertificateInner = certificate.tbs_certificate();
 
     Some(

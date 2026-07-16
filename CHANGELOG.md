@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updated uniffi-rs to 0.32.0.
 - Kotlin: `WpHttpClient.DefaultHttpClient` now applies more forgiving default OkHttp timeouts (connect 15s, read 60s, write 60s) instead of relying on OkHttp's 10s per-operation defaults, preventing premature timeouts when fetching large or slow-to-render responses. The values are configurable via a new `HttpClientTimeouts` type, accepted by both `DefaultHttpClient` and the `WpRequestExecutor` convenience constructor so callers can override them without building an `OkHttpClient` by hand.
 - Posts and media are now fetched by ID in batches of `5` instead of `100`, so sites that can't render a large batch within the request timeout can still sync (at the cost of more, smaller requests).
 - Swift: `WordPressAPI.uploadMedia` and `WpService.uploadMedia` now accept a `Progress` whose total is zero, defaulting the total to the upload file's byte size.

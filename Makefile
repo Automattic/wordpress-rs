@@ -24,7 +24,7 @@ swift_package_platform_tvos = $(call swift_package_platform_version,tvos)
 certificate_name_release = Apple Distribution: Automattic, Inc. (PZYM8XX95Q)
 
 # Required for supporting tvOS and watchOS. We can update the nightly toolchain version if needed.
-rust_nightly_toolchain := nightly-2025-07-29
+rust_nightly_toolchain := nightly-2026-07-16
 
 clean:
 	@# Help: Remove untracked files from the project via Git.
