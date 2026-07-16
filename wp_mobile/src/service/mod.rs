@@ -7,6 +7,7 @@ use wp_api::prelude::{ApiUrlResolver, WpApiClient, WpApiClientDelegate};
 use wp_api::request::RequestExecutor;
 use wp_mobile_cache::{WpApiCache, db_types::db_site::DbSite};
 
+mod adaptive_batch;
 pub mod entity_state_service;
 pub mod media;
 pub mod metadata;

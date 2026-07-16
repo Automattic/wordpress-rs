@@ -8,6 +8,7 @@ use crate::{
     },
     filters::{AnyPostFilter, PostListFilter},
     service::{
+        adaptive_batch::load_with_adaptive_batching,
         entity_state_service::{EntityStateReader, EntityStateReaderImpl, EntityStateService},
         metadata::MetadataService,
     },
@@ -429,64 +430,23 @@ impl PostService {
         let mut failed_count: u32 = 0;
 
         if !ids_to_fetch.is_empty() {
-            failed_count = self
-                .load_posts_with_adaptive_batching(endpoint_type, &ids_to_fetch)
-                .await;
+            failed_count = load_with_adaptive_batching(
+                &ids_to_fetch,
+                BATCH_FETCH_SIZES,
+                "posts",
+                |chunk| async move {
+                    self.load_posts_by_ids(endpoint_type, chunk)
+                        .await
+                        .map(|result| result.failed_count)
+                },
+            )
+            .await;
         }
 
         FetchStats {
             fetched_count,
             failed_count,
         }
-    }
-
-    /// Load posts by ID, degrading the batch size on request timeouts.
-    ///
-    /// Starts with the largest size in [`BATCH_FETCH_SIZES`]. When a batch
-    /// request times out, that batch is split into smaller sub-batches (the next
-    /// size down) and retried. Posts that still time out at the smallest size —
-    /// or fail for any non-timeout reason — are counted as failed (their
-    /// `Failed` state is set by [`Self::load_posts_by_ids`]).
-    ///
-    /// Returns the number of posts that failed to load.
-    async fn load_posts_with_adaptive_batching(
-        &self,
-        endpoint_type: &PostEndpointType,
-        ids: &[PostId],
-    ) -> u32 {
-        let mut failed_count: u32 = 0;
-        // Work items: a set of IDs plus the index into `BATCH_FETCH_SIZES`
-        // of the batch size to use for them.
-        let mut pending: Vec<(Vec<PostId>, usize)> = vec![(ids.to_vec(), 0)];
-
-        while let Some((batch_ids, size_index)) = pending.pop() {
-            let batch_size = BATCH_FETCH_SIZES[size_index];
-            for chunk in batch_ids.chunks(batch_size) {
-                match self.load_posts_by_ids(endpoint_type, chunk.to_vec()).await {
-                    Ok(result) => failed_count += result.failed_count,
-                    Err(e) => {
-                        if e.is_timeout() && size_index + 1 < BATCH_FETCH_SIZES.len() {
-                            log::debug!(
-                                "Fetching {} posts by ID timed out; retrying with batch size {}",
-                                chunk.len(),
-                                BATCH_FETCH_SIZES[size_index + 1]
-                            );
-                            pending.push((chunk.to_vec(), size_index + 1));
-                        } else {
-                            log::warn!(
-                                "Failed to load {} posts (IDs: {:?}): {}",
-                                chunk.len(),
-                                chunk,
-                                e
-                            );
-                            failed_count += chunk.len() as u32;
-                        }
-                    }
-                }
-            }
-        }
-
-        failed_count
     }
 
     /// Load posts by IDs from network to cache with state tracking.

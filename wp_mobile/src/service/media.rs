@@ -6,6 +6,7 @@ use crate::{
     },
     filters::MediaListFilter,
     service::{
+        adaptive_batch::load_with_adaptive_batching,
         entity_state_service::{EntityStateReader, EntityStateReaderImpl, EntityStateService},
         metadata::MetadataService,
     },
@@ -32,8 +33,12 @@ use wp_mobile_cache::{
     repository::{entity_state::EntityType, media::MediaRepository},
 };
 
-/// Maximum number of media items to fetch in a single batch request
-const BATCH_FETCH_SIZE: u32 = 100;
+/// Batch sizes to try when fetching media by ID, largest first. When a batch
+/// request times out, the failing batch is retried with the next (smaller)
+/// size; media still timing out at the smallest size are marked as failed. This
+/// lets sites that can't render a large batch within the request timeout still
+/// sync in smaller pieces.
+const BATCH_FETCH_SIZES: &[usize] = &[100, 20, 5];
 
 /// Core WordPress attachment statuses. Used by `load_media_by_ids` as the
 /// baseline for hydration requests; the caller's filter statuses are unioned
@@ -367,22 +372,17 @@ impl MediaService {
         let mut failed_count: u32 = 0;
 
         if !ids_to_fetch.is_empty() {
-            for chunk in ids_to_fetch.chunks(BATCH_FETCH_SIZE as usize) {
-                match self.load_media_by_ids(chunk.to_vec(), &filter.status).await {
-                    Ok(result) => {
-                        failed_count += result.failed_count;
-                    }
-                    Err(e) => {
-                        log::warn!(
-                            "Failed to load {} media item(s) (IDs: {:?}): {}",
-                            chunk.len(),
-                            chunk,
-                            e
-                        );
-                        failed_count += chunk.len() as u32;
-                    }
-                }
-            }
+            failed_count = load_with_adaptive_batching(
+                &ids_to_fetch,
+                BATCH_FETCH_SIZES,
+                "media items",
+                |chunk| async move {
+                    self.load_media_by_ids(chunk, &filter.status)
+                        .await
+                        .map(|result| result.failed_count)
+                },
+            )
+            .await;
         }
 
         FetchStats {
@@ -444,7 +444,9 @@ impl MediaService {
 
         let params = MediaListParams {
             include: media_ids,
-            per_page: Some(BATCH_FETCH_SIZE),
+            // Ensure we get all requested media regardless of default per_page.
+            // Every chunk is at most the largest fetch batch size.
+            per_page: Some(BATCH_FETCH_SIZES[0] as u32),
             status: statuses,
             ..Default::default()
         };
