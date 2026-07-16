@@ -32,8 +32,9 @@ use wp_mobile_cache::{
     repository::{entity_state::EntityType, media::MediaRepository},
 };
 
-/// Maximum number of media items to fetch in a single batch request
-const BATCH_FETCH_SIZE: u32 = 100;
+/// Number of media items to fetch in a single batch request. Kept small so sites
+/// that can't render a large batch within the request timeout can still sync.
+const BATCH_FETCH_SIZE: u32 = 5;
 
 /// Core WordPress attachment statuses. Used by `load_media_by_ids` as the
 /// baseline for hydration requests; the caller's filter statuses are unioned
