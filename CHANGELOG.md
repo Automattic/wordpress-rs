@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updated uniffi-rs to 0.32.0.
 - Swift: `WordPressAPI.uploadMedia` and `WpService.uploadMedia` now accept a `Progress` whose total is zero, defaulting the total to the upload file's byte size.
 - Self-hosted login and endpoint requests now work against sites with plain permalinks. Previously, the client path-extended the discovered `?rest_route=/` API root, producing URLs like `…/index.php/wp/v2/users/me?rest_route=/` that WordPress collapsed to the API index ([#1366](https://github.com/Automattic/wordpress-rs/issues/1366)).
 - **Internal:** Hardened the Claude review GitHub Actions workflow with scoped permissions and gated triggers.
