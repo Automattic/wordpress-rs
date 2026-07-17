@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Added a scheduled Buildkite health digest for the quarantined `test_login_remote` tests that reads the soft-fail step's real pass/fail from the Buildkite API, separates external `*.wpmt.co` timeouts from genuine failures, and posts a summary to Slack.
 - **Internal:** Updated `aes-gcm` from `0.10` to `0.11`, migrating the password encryption transformer to the `aead` 0.6 API. The AES-256-GCM scheme and stored `salt:nonce:ciphertext` format are unchanged.
 - **Internal:** Bumped the CI Rust toolchain from `1.90.0` to `1.97.0` and added a pinned `rust-toolchain.toml` so local and CI compilers can't drift, fixed the clippy lints the newer toolchain surfaced (`iter_kv_map`, `manual_filter`, `useless_borrows_in_formatting`), and added a nightly Buildkite check that nudges Slack when the pin falls behind stable ([#1436](https://github.com/Automattic/wordpress-rs/issues/1436)).
+- **Internal:** Bumped the pinned CI Rust toolchain from `1.97.0` to `1.97.1` (latest stable) in lockstep across `rust-toolchain.toml`, the `Makefile`, and `wp_rs_web/Dockerfile`. No new clippy lints surfaced ([#1436](https://github.com/Automattic/wordpress-rs/issues/1436)).
 
 ## [0.5.0] - 2026-06-18
 
