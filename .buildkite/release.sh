@@ -28,6 +28,13 @@ echo "--- :rust: Building XCFramework"
 make xcframework-package-sign
 make xcframework-package-checksum
 
+echo "--- :wastebasket: Removing XCFramework build intermediates"
+rm -rf \
+  target/*-apple-* \
+  target/debug \
+  target/release \
+  target/libwordpressFFI.xcframework
+
 release_version="$1"
 echo "--- :rocket: Publish release $release_version"
 bundle exec fastlane release "version:$release_version"
