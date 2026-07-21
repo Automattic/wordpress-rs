@@ -1,5 +1,4 @@
 plugins {
-    alias(libs.plugins.rustAndroid)
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.publishToS3)

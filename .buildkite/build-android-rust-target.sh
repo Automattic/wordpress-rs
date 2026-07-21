@@ -23,6 +23,9 @@ esac
 # Only install the single target needed — no Apple targets or nightly toolchain
 rustup target add "$RUST_TARGET"
 
+echo "--- :package: Installing cargo-ndk"
+cargo install cargo-ndk --locked
+
 # This is a temporary step until we implement a more graceful way to handle missing credentials
 printf "site_url\nadmin_username\nadmin_password\nadmin_password_uuid\nsubscriber_username\nsubscriber_password\nsubscriber_password_uuid\n" > test_credentials
 

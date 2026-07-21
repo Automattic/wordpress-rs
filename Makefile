@@ -322,6 +322,7 @@ setup-rust-android-targets:
 		i686-linux-android \
 		armv7-linux-androideabi \
 		aarch64-linux-android
+	cargo install cargo-ndk --locked
 
 run-wp-cli-command:
 	@docker exec wordpress /bin/bash -c "wp --allow-root $(ARGS)"

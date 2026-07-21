@@ -6,7 +6,6 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform) apply false
     alias(libs.plugins.kotlinJvm) apply false
     alias(libs.plugins.kotlinSerialization) apply false
-    alias(libs.plugins.rustAndroid) apply false
     alias(libs.plugins.publishToS3) apply false
 
     alias(libs.plugins.detekt)
