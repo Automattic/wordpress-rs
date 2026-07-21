@@ -202,6 +202,23 @@ steps:
           ./gradlew detektMain detektTest
         agents:
           queue: android
+      - label: ":kotlin: buildSrc Unit Tests"
+        key: "kotlin-buildsrc-tests"
+        plugins:
+          - $CI_TOOLKIT
+          - $TEST_COLLECTOR:
+              files: "native/kotlin/buildSrc/build/test-results/test/*.xml"
+              format: "junit"
+        artifact_paths:
+          - "native/kotlin/buildSrc/build/test-results/test/*.xml"
+        command: |
+          # buildSrc holds the AI-docs generator; its tests are pure JVM (no Rust/test server needed)
+          # and aren't part of the main build's task graph, so they run as a dedicated step.
+          echo "--- :kotlin: Running buildSrc unit tests"
+          cd ./native/kotlin
+          ./gradlew -p buildSrc test
+        agents:
+          queue: android
       - label: ":rust: Build host library"
         key: "rust-build-host"
         artifact_paths:

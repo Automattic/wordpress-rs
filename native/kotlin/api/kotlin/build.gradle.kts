@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.publishToS3)
     id("java-library")
     id("jvm-test-suite")
+    id("ai-docs")
 }
 
 java {
