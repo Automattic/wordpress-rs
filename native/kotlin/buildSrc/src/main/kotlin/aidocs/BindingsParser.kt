@@ -154,7 +154,7 @@ class BindingsParser(private val lines: List<String>) {
         for (char in params) {
             when (char) {
                 '<' -> depth++
-                '>' -> depth--
+                '>' -> depth = maxOf(0, depth - 1)
             }
             if (char == ',' && depth == 0) parts.add(StringBuilder()) else parts.last().append(char)
         }
