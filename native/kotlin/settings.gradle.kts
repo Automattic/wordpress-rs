@@ -31,3 +31,4 @@ dependencyResolutionManagement {
 include(":api:kotlin")
 include(":api:android")
 include(":example:composeApp")
+include(":example:androidApp")

@@ -13,7 +13,7 @@ import rs.wordpress.example.shared.di.commonModules
 import uniffi.wp_mobile.AccountRepository
 import uniffi.wp_mobile.AccountRepositoryException
 
-class ExampleApplication: Application() {
+class ExampleApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 

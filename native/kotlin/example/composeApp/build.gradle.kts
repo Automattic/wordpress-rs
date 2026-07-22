@@ -1,11 +1,10 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidApplication)
+    alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.jetbrainsCompose)
     alias(libs.plugins.compose.compiler)
 }
@@ -33,7 +32,11 @@ val copyDesktopAppResources = tasks.register<Copy>("copyDesktopAppResources") {
 }
 
 kotlin {
-    androidTarget()
+    androidLibrary {
+        namespace = "rs.wordpress.example.shared"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+    }
     jvm("desktop")
 
     sourceSets {
@@ -41,20 +44,6 @@ kotlin {
             resources.srcDirs(desktopResourcesPath)
         }
 
-        androidMain.dependencies {
-            implementation(compose.preview)
-            implementation(libs.androidx.activity.compose)
-            implementation(libs.koin.android)
-            implementation(libs.lifecycle.viewmodel.compose)
-            implementation(libs.navigation.compose)
-            implementation(libs.navigation.fragment.ktx)
-            implementation(libs.navigation.ui.ktx)
-            if (project.hasProperty("wpApiAndroidVersion")) {
-                implementation("rs.wordpress.api:android:${project.properties["wpApiAndroidVersion"]}")
-            } else {
-                implementation(project(":api:android"))
-            }
-        }
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -83,43 +72,6 @@ kotlin {
                 implementation(project(":api:kotlin"))
             }
         }
-    }
-}
-
-android {
-    namespace = "rs.wordpress.example"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    sourceSets["main"].res.srcDirs("src/androidMain/res")
-
-    defaultConfig {
-        applicationId = "rs.wordpress.example"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
-    }
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
-        }
-    }
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-    buildFeatures {
-        compose = true
-    }
-    dependencies {
-        debugImplementation(compose.uiTooling)
     }
 }
 
@@ -250,16 +202,15 @@ val generateWpComCredentials = tasks.register("generateWpComCredentials") {
     }
 }
 
-tasks.named("compileKotlinDesktop").configure {
-    dependsOn(generateBuildConfig)
+// `TestCredentials`/`WpComCredentials` live in `commonMain`, so every target's Kotlin compilation
+// (Android and desktop) must wait on their generators. `BuildConfig` is `desktopMain`-only.
+tasks.withType<KotlinJvmCompile>().configureEach {
     dependsOn(generateTestCredentials)
     dependsOn(generateWpComCredentials)
 }
 
-// Ensure generated sources are available before any Android compilation
-tasks.named("preBuild").configure {
-    dependsOn(generateTestCredentials)
-    dependsOn(generateWpComCredentials)
+tasks.named("compileKotlinDesktop").configure {
+    dependsOn(generateBuildConfig)
 }
 
 tasks.named("desktopProcessResources").configure {

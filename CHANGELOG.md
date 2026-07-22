@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Internal:** Build the Android JNI libraries with `cargo-ndk` instead of the `rust-android-gradle` Gradle plugin.
+- **Internal:** Upgraded the Android/Kotlin build to Android Gradle Plugin `9.3.0` / Gradle `9.5.0` (Kotlin `2.3.21`, `compileSdk` 36), migrating `api/android` to the AGP 9 variant APIs and splitting the example app into a `com.android.kotlin.multiplatform.library` shared module and a standalone `com.android.application` module.
 
 ## [0.6.0] - 2026-07-16
 
