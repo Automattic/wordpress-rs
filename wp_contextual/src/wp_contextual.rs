@@ -505,10 +505,11 @@ impl GeneratedContextualField {
                         })
                         .collect(),
                     vis: f.vis.clone(),
-                    mutability: syn::FieldMutability::None,
+                    modifiers: syn::FieldModifiers::default(),
                     ident: f.ident.clone(),
                     colon_token: f.colon_token,
                     ty: new_type,
+                    default: None,
                 };
                 Ok(Self {
                     field: new_field,
