@@ -34,7 +34,7 @@ val copyDesktopAppResources = tasks.register<Copy>("copyDesktopAppResources") {
 kotlin {
     androidLibrary {
         namespace = "rs.wordpress.example.shared"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        compileSdk = libs.versions.example.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
     }
     jvm("desktop")

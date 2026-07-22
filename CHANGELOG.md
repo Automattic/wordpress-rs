@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Internal:** Build the Android JNI libraries with `cargo-ndk` instead of the `rust-android-gradle` Gradle plugin.
 - **Internal:** Upgraded the Android/Kotlin build to Android Gradle Plugin `9.3.0` / Gradle `9.5.0` (Kotlin `2.3.21`, `compileSdk` 36), migrating `api/android` to the AGP 9 variant APIs and splitting the example app into a `com.android.kotlin.multiplatform.library` shared module and a standalone `com.android.application` module.
+- **Internal:** Bumped `androidx.lifecycle` `2.10.0` → `2.11.0`. Because 2.11.0 requires `compileSdk 37` (via the transitive `lifecycle-runtime-compose`), the sample app now compiles against a dedicated `example-compileSdk` (37); the published `api/android` library stays on `compileSdk 36` to remain aligned with WPAndroid.
 
 ## [0.6.0] - 2026-07-16
 

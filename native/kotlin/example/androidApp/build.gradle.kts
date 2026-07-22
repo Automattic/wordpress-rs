@@ -16,7 +16,7 @@ tasks.withType<KotlinJvmCompile>().configureEach {
 
 android {
     namespace = "rs.wordpress.example"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    compileSdk = libs.versions.example.compileSdk.get().toInt()
 
     defaultConfig {
         applicationId = "rs.wordpress.example"
