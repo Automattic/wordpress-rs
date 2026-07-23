@@ -29,7 +29,7 @@ pub enum PurchaseSubscriptionStatus {
 
 /// How a purchase renews or expires.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
-pub enum ExpiryStatus {
+pub enum PurchaseExpiryStatus {
     #[serde(rename = "auto-renew")]
     AutoRenew,
     #[serde(rename = "manual-renew")]
@@ -104,7 +104,7 @@ pub struct SitePurchase {
 
     // Status & dates
     pub subscription_status: PurchaseSubscriptionStatus,
-    pub expiry_status: ExpiryStatus,
+    pub expiry_status: PurchaseExpiryStatus,
     #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
     #[uniffi(default = None)]
     pub expiry_date: Option<WpGmtDateTime>,
@@ -208,7 +208,7 @@ mod tests {
             purchase.subscription_status,
             PurchaseSubscriptionStatus::Active
         );
-        assert_eq!(purchase.expiry_status, ExpiryStatus::ManualRenew);
+        assert_eq!(purchase.expiry_status, PurchaseExpiryStatus::ManualRenew);
         assert!(purchase.blocks_site_deletion);
         assert!(purchase.is_plan);
         assert_eq!(purchase.amount, Decimal2::from_hundredths(4800));

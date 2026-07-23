@@ -1,7 +1,7 @@
 use crate::context::TestContext;
 use libtest_mimic::Trial;
 use std::sync::Arc;
-use wp_api::wp_com::purchases::{ExpiryStatus, PaymentType, PurchaseSubscriptionStatus};
+use wp_api::wp_com::purchases::{PaymentType, PurchaseExpiryStatus, PurchaseSubscriptionStatus};
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut trials = vec![];
@@ -29,7 +29,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     if let PurchaseSubscriptionStatus::Other(s) = &purchase.subscription_status {
                         return Err(format!("unexpected subscription_status '{s}'").into());
                     }
-                    if let ExpiryStatus::Other(s) = &purchase.expiry_status {
+                    if let PurchaseExpiryStatus::Other(s) = &purchase.expiry_status {
                         return Err(format!("unexpected expiry_status '{s}'").into());
                     }
                     if let Some(PaymentType::Other(s)) = &purchase.payment_type {
