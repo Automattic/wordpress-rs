@@ -14,6 +14,7 @@ pub mod me_connections;
 pub mod oauth2;
 pub mod products;
 pub mod publicize;
+pub mod purchases;
 pub mod segments;
 pub mod shopping_cart;
 pub mod sites;

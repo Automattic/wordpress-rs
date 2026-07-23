@@ -9,6 +9,7 @@ use super::endpoint::{
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
     products_endpoint::{ProductsRequestBuilder, ProductsRequestExecutor},
     publicize_endpoint::{PublicizeRequestBuilder, PublicizeRequestExecutor},
+    purchases_endpoint::{PurchasesRequestBuilder, PurchasesRequestExecutor},
     shopping_cart_endpoint::{ShoppingCartRequestBuilder, ShoppingCartRequestExecutor},
     stats_city_views_endpoint::{StatsCityViewsRequestBuilder, StatsCityViewsRequestExecutor},
     stats_clicks_endpoint::{StatsClicksRequestBuilder, StatsClicksRequestExecutor},
@@ -81,6 +82,7 @@ pub struct WpComApiRequestBuilder {
     oauth2: Arc<Oauth2RequestBuilder>,
     products: Arc<ProductsRequestBuilder>,
     publicize: Arc<PublicizeRequestBuilder>,
+    purchases: Arc<PurchasesRequestBuilder>,
     shopping_cart: Arc<ShoppingCartRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
@@ -127,6 +129,7 @@ impl WpComApiRequestBuilder {
             oauth2,
             products,
             publicize,
+            purchases,
             shopping_cart,
             sites,
             stats_city_views,
@@ -184,6 +187,7 @@ pub struct WpComApiClient {
     oauth2: Arc<Oauth2RequestExecutor>,
     products: Arc<ProductsRequestExecutor>,
     publicize: Arc<PublicizeRequestExecutor>,
+    purchases: Arc<PurchasesRequestExecutor>,
     shopping_cart: Arc<ShoppingCartRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
@@ -231,6 +235,7 @@ impl WpComApiClient {
             oauth2,
             products,
             publicize,
+            purchases,
             shopping_cart,
             sites,
             stats_city_views,
@@ -271,6 +276,7 @@ api_client_generate_endpoint_impl!(WpComApi, me_connections);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, products);
 api_client_generate_endpoint_impl!(WpComApi, publicize);
+api_client_generate_endpoint_impl!(WpComApi, purchases);
 api_client_generate_endpoint_impl!(WpComApi, shopping_cart);
 api_client_generate_endpoint_impl!(WpComApi, sites);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);

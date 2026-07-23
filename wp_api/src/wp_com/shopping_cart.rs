@@ -5,6 +5,7 @@ use crate::{
         CurrencyCode, WpComSiteId,
         domains::{CountryCode, DomainName},
         products::{ProductId, ProductSlug},
+        purchases::PurchaseId,
         subscribers::SubscriptionId,
     },
 };
@@ -21,12 +22,6 @@ uniffi::custom_newtype!(BillingPlanId, String);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct BillingPlanId(pub String);
-
-uniffi::custom_newtype!(PurchaseId, u64);
-/// Identifies an existing purchase/subscription for renewals.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct PurchaseId(pub u64);
 
 /// Whether a cart product is a new purchase or a renewal.
 ///
