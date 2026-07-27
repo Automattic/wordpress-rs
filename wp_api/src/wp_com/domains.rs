@@ -1000,6 +1000,20 @@ pub struct SiteDomain {
     pub whois_update_unmodifiable_fields: Option<Vec<String>>,
 }
 
+/// Request body for `POST /rest/v1.1/sites/{siteId}/domains/primary/`.
+#[derive(Debug, Clone, Serialize, uniffi::Record)]
+pub struct SetPrimaryDomainParams {
+    /// The domain name to set as the site's primary domain.
+    pub domain: DomainName,
+}
+
+/// Response from `POST /rest/v1.1/sites/{siteId}/domains/primary/`.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct SetPrimaryDomainResponse {
+    /// Whether the primary domain was set successfully.
+    pub success: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;
@@ -1786,5 +1800,14 @@ mod tests {
             Some(&DomainTransferStatus::PendingRegistry)
         );
         assert!(transfer.ssl_status.is_none());
+    }
+
+    #[test]
+    fn test_set_primary_domain_response_deserialization() {
+        let file = File::open("tests/wpcom/domains/set_primary/success.json")
+            .expect("Failed to open file");
+        let response: SetPrimaryDomainResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert!(response.success);
     }
 }
