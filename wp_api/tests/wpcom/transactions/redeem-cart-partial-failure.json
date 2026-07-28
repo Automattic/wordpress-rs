@@ -1,0 +1,98 @@
+{
+  "receipt_id": 22334455,
+  "purchases": {
+    "12345678": [
+      {
+        "is_gift_purchase": false,
+        "will_auto_renew": false,
+        "expiry": "2130-03-01",
+        "user_email": "buyer@example.com",
+        "product_id": 601,
+        "product_slug": "domain_transfer",
+        "product_name": "Domain Transfer",
+        "product_name_short": "Transfer",
+        "product_type": "domain_transfer",
+        "free_trial": false,
+        "is_domain_registration": false,
+        "meta": "fake-transfer-domain.com",
+        "ownership_id": 88001,
+        "is_renewal": false,
+        "blog_id": 12345678,
+        "price_integer": 900,
+        "delayed_provisioning": true,
+        "is_hundred_year_domain": true,
+        "is_root_domain_with_us": true
+      },
+      {
+        "is_gift_purchase": true,
+        "will_auto_renew": true,
+        "expiry": "2027-02-01",
+        "user_email": "buyer@example.com",
+        "product_id": 602,
+        "product_slug": "fake_marketplace_saas_monthly",
+        "product_name": "Fake Marketplace Add-on",
+        "product_name_short": "Add-on",
+        "product_type": "saas_plugin",
+        "free_trial": false,
+        "is_domain_registration": false,
+        "meta": null,
+        "ownership_id": 88002,
+        "is_renewal": true,
+        "blog_id": 12345678,
+        "price_integer": 1200,
+        "new_quantity": 25,
+        "saas_redirect_url": "https://example.com/setup?intent-id=fake-intent",
+        "tax_vendor_info": {
+          "country_code": "IE",
+          "address": [
+            "Fake Payments Ltd.",
+            "1 Example Street",
+            "Faketown, FK1 2AB",
+            "Fakeland"
+          ],
+          "tax_name_and_vendor_id_array": {
+            "VAT": "FAKE-VAT-000456"
+          }
+        }
+      },
+      {
+        "is_gift_purchase": false,
+        "will_auto_renew": false,
+        "user_email": "buyer@example.com",
+        "product_id": 604,
+        "product_slug": "fake_one_time_theme",
+        "product_name": "Fake Premium Theme",
+        "product_name_short": null,
+        "product_type": "theme",
+        "free_trial": false,
+        "is_domain_registration": false,
+        "meta": null,
+        "ownership_id": null,
+        "is_renewal": false,
+        "blog_id": 12345678,
+        "price_integer": 0
+      }
+    ]
+  },
+  "display_price": "$21.00",
+  "price_integer": 2100,
+  "price_float": 21,
+  "currency": "USD",
+  "is_gift_purchase": true,
+  "is_gravatar_domain": false,
+  "success": false,
+  "error_code": "",
+  "error_message": "",
+  "order_id": 66778899,
+  "failed_purchases": {
+    "12345678": [
+      {
+        "product_id": 603,
+        "product_name": ".example Domain Registration",
+        "product_slug": "dotexample_domain",
+        "product_meta": "fake-failed-domain.example",
+        "product_cost": 18
+      }
+    ]
+  }
+}

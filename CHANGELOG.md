@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- WordPress.com `POST /me/transactions` endpoint for redeeming a shopping cart with the account's WordPress.com credits, completing a domain purchase
 - Publish the Kotlin bindings' per-endpoint Markdown API reference as an `ai-docs` Maven classifier zip on `rs.wordpress.api:kotlin`, generated from the UniFFI bindings for agent/tooling consumption
 - WordPress.com `POST /sites/<site_id>/domains/primary` endpoint for setting a site's primary domain
 
 ### Changed
 
+- **BREAKING:** `product_type` fields on `Product` and `WPComProduct` changed from `String` to `ProductType`. Callers that match on or construct these values will need to wrap/unwrap with `ProductType(...)`.
 - **Internal:** Build the Android JNI libraries with `cargo-ndk` instead of the `rust-android-gradle` Gradle plugin.
 - **Internal:** Upgraded the Android/Kotlin build to Android Gradle Plugin `9.3.0` / Gradle `9.5.0` (Kotlin `2.3.21`, `compileSdk` 36), migrating `api/android` to the AGP 9 variant APIs and splitting the example app into a `com.android.kotlin.multiplatform.library` shared module and a standalone `com.android.application` module.
 - **Internal:** Bumped `syn` from `2.0` to `3.0`, updating the proc-macro crates for its breaking changes.

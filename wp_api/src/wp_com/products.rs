@@ -3,6 +3,7 @@ use crate::{
     decimal2::Decimal2,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
     wp_com::{CurrencyCode, TimeSpanUnit, language::WPComLanguage},
+    wp_content_string_id,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -30,6 +31,11 @@ impl std::fmt::Display for ProductId {
         write!(f, "{}", self.0)
     }
 }
+
+// Product category as classified by the billing system (e.g. `"domain_reg"`,
+// `"bundle"`, `"jetpack"`, `"theme"`). The set is open-ended — products define
+// their own type — so this is a newtype rather than an enum.
+wp_content_string_id!(ProductType);
 
 uniffi::custom_newtype!(ProductSlug, String);
 /// WordPress.com product slug (e.g. `"domain_reg"`, `"personal-bundle"`).
@@ -116,7 +122,7 @@ pub struct Product {
     pub product_name: String,
     pub product_slug: ProductSlug,
     pub description: String,
-    pub product_type: String,
+    pub product_type: ProductType,
     pub available: bool,
     pub billing_product_slug: ProductSlug,
     pub is_domain_registration: bool,
@@ -391,7 +397,7 @@ mod tests {
         let backup = products
             .get("fake_jetpack_backup_daily")
             .expect("fake_jetpack_backup_daily missing");
-        assert_eq!(backup.product_type, "jetpack");
+        assert_eq!(backup.product_type, ProductType("jetpack".to_string()));
         assert!(!backup.is_domain_registration);
         assert!(backup.introductory_offer.is_none());
 
@@ -399,7 +405,7 @@ mod tests {
         let security = products
             .get("fake_jetpack_security_yearly")
             .expect("fake_jetpack_security_yearly missing");
-        assert_eq!(security.product_type, "jetpack");
+        assert_eq!(security.product_type, ProductType("jetpack".to_string()));
         let offer = security
             .introductory_offer
             .as_ref()
@@ -411,6 +417,6 @@ mod tests {
         let complete = products
             .get("fake_jetpack_complete")
             .expect("fake_jetpack_complete missing");
-        assert_eq!(complete.product_type, "bundle");
+        assert_eq!(complete.product_type, ProductType("bundle".to_string()));
     }
 }

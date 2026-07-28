@@ -51,7 +51,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
                 // All returned products should be domain-related.
                 for (slug, product) in &products {
-                    if !product.product_type.contains("domain") {
+                    if !product.product_type.0.contains("domain") {
                         return Err(format!(
                             "expected domain product type for {slug}, got {}",
                             product.product_type
