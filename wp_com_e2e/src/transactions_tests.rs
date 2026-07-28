@@ -6,7 +6,9 @@ use wp_api::{
     decimal2::Decimal2,
     wp_com::{
         CurrencyCode, WpComSiteId,
-        shopping_cart::{CartKey, ShoppingCart, ShoppingCartMessages, ShoppingCartTax},
+        shopping_cart::{
+            CartKey, ShoppingCart, ShoppingCartMessages, ShoppingCartTax, ShoppingCartTaxLocation,
+        },
         transactions::{RedeemCartParams, TransactionPayment, TransactionPaymentMethod},
     },
 };
@@ -35,6 +37,17 @@ fn empty_cart(site_id: WpComSiteId) -> ShoppingCart {
         temporary: true,
         tax: ShoppingCartTax {
             display_taxes: false,
+            location: ShoppingCartTaxLocation {
+                country_code: None,
+                postal_code: None,
+                subdivision_code: None,
+                ip_address: None,
+                vat_id: None,
+                organization: None,
+                address: None,
+                city: None,
+                is_for_business: None,
+            },
         },
         coupon_savings_total_integer: 0,
         sub_total_with_taxes_integer: 0,

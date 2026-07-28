@@ -3,7 +3,7 @@ use crate::{
     decimal2::Decimal2,
     wp_com::{
         CurrencyCode, WpComSiteId,
-        domains::DomainName,
+        domains::{CountryCode, DomainName},
         products::{ProductId, ProductSlug},
         subscribers::SubscriptionId,
     },
@@ -312,6 +312,48 @@ pub struct ShoppingCartCostOverride {
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct ShoppingCartTax {
     pub display_taxes: bool,
+    /// Where the cart is taxed. Empty when the server has no location for it.
+    pub location: ShoppingCartTaxLocation,
+}
+
+/// The location a cart's tax is calculated from.
+///
+/// Every field is individually optional — the server omits the ones it has no
+/// value for. This must round-trip: a cart submitted to
+/// `POST /me/transactions` carries its tax location back to the server, which
+/// reads it from here and has no fallback, so dropping a field changes the tax
+/// charged.
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+pub struct ShoppingCartTaxLocation {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub country_code: Option<CountryCode>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub postal_code: Option<String>,
+    /// State, province or other subdivision code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub subdivision_code: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub ip_address: Option<String>,
+    /// The customer's VAT registration ID, for business purchases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub vat_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub organization: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub address: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub city: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub is_for_business: Option<bool>,
 }
 
 /// Messages returned with the shopping cart response.
@@ -480,6 +522,45 @@ mod tests {
             "12345"
         );
         assert_eq!(CartKey::NoSite.to_string(), "no-site");
+    }
+
+    #[test]
+    fn test_tax_location_round_trips() {
+        // A cart is sent back to the server verbatim when it's redeemed, and
+        // the server reads the tax location from it with no fallback, so every
+        // field has to survive being deserialized and serialized again.
+        let json = r#"{
+            "display_taxes": true,
+            "location": {
+                "country_code": "CA",
+                "postal_code": "V6B 1A1",
+                "subdivision_code": "BC",
+                "ip_address": "198.51.100.7",
+                "vat_id": "FAKE-VAT-000789",
+                "organization": "Fake Corp",
+                "address": "1 Example Street",
+                "city": "Faketown",
+                "is_for_business": true
+            }
+        }"#;
+
+        let tax: ShoppingCartTax = serde_json::from_str(json).expect("should deserialize");
+        let expected: serde_json::Value = serde_json::from_str(json).expect("should parse");
+        let actual = serde_json::to_value(&tax).expect("should serialize");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_empty_tax_location_serializes_as_empty_object() {
+        // The server sends `{}` when it has no location; it must not come back
+        // as a set of nulls.
+        let file = File::open("tests/wpcom/shopping_cart/cart-with-site.json")
+            .expect("Failed to open file");
+        let cart: ShoppingCart = serde_json::from_reader(file).expect("Unable to parse JSON");
+        assert!(cart.tax.location.country_code.is_none());
+
+        let json = serde_json::to_value(&cart.tax).expect("should serialize");
+        assert_eq!(json["location"], serde_json::json!({}));
     }
 
     #[test]
