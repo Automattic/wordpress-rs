@@ -108,6 +108,47 @@ where
     deserialize_u64_or_string(deserializer).map(|v| if v == 0 { None } else { Some(v) })
 }
 
+/// Deserialize an optional `u64` from a number or a string, treating an empty
+/// string and `null` as `None`.
+///
+/// Some WordPress.com fields are documented as integers but fall back to an
+/// empty string when the underlying value is unavailable.
+///
+/// Accepts:
+/// - `123` or `"123"` → `Some(123)`
+/// - `""` → `None`
+/// - `null` → `None`
+///
+/// # Errors
+///
+/// Returns an error for non-numeric strings, negative numbers, booleans,
+/// arrays, or objects.
+pub fn deserialize_u64_or_none_from_number_or_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NumberOrString {
+        Number(u64),
+        String(String),
+    }
+
+    match Option::<NumberOrString>::deserialize(deserializer)? {
+        None => Ok(None),
+        Some(NumberOrString::Number(number)) => Ok(Some(number)),
+        Some(NumberOrString::String(string)) => {
+            if string.is_empty() {
+                Ok(None)
+            } else {
+                string.parse().map(Some).map_err(de::Error::custom)
+            }
+        }
+    }
+}
+
 /// Deserialize an optional `u64`, treating `false`, `null`, and negative numbers as `None`.
 ///
 /// Accepts:

@@ -59,11 +59,27 @@ pub struct RedeemCartParams {
     pub domain_details: Option<DomainContactInformation>,
 }
 
+/// Deserialize an [`OrderId`] that the server may report as an empty string.
+fn deserialize_optional_order_id<'de, D>(deserializer: D) -> Result<Option<OrderId>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    wp_serde_helper::deserialize_u64_or_none_from_number_or_string(deserializer)
+        .map(|order_id| order_id.map(OrderId))
+}
+
 /// Response from `POST /me/transactions` — a receipt for the redeemed cart.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct TransactionReceipt {
     pub receipt_id: ReceiptId,
-    pub order_id: OrderId,
+    /// The billing order behind this receipt.
+    ///
+    /// `None` when the payment processor didn't return one — the server sends
+    /// an empty string in that case, after the transaction has already been
+    /// charged.
+    #[serde(default, deserialize_with = "deserialize_optional_order_id")]
+    #[uniffi(default = None)]
+    pub order_id: Option<OrderId>,
     /// Whether every product in the cart was purchased.
     ///
     /// `false` does not mean nothing happened. Receiving this type at all means
@@ -192,7 +208,7 @@ mod tests {
         let receipt = receipt("tests/wpcom/transactions/redeem-cart-success.json");
 
         assert_eq!(receipt.receipt_id, ReceiptId(11223344));
-        assert_eq!(receipt.order_id, OrderId(55667788));
+        assert_eq!(receipt.order_id, Some(OrderId(55667788)));
         assert!(receipt.success);
         assert!(receipt.failed_purchases.is_empty());
         assert_eq!(receipt.price_integer, 2825);
@@ -306,6 +322,25 @@ mod tests {
             .expect("expected tax_vendor_info");
         assert_eq!(tax.vat_id, Some(TaxVendorId("FAKE-VAT-000456".to_string())));
         assert_eq!(tax.tax_name, Some(TaxName("VAT".to_string())));
+    }
+
+    #[test]
+    fn test_receipt_with_empty_order_id() {
+        // The server defaults `order_id` to an empty string and only fills it
+        // in when the payment processor returned one. The receipt still has to
+        // deserialize — by this point the transaction has been charged.
+        let mut json: serde_json::Value = serde_json::from_reader(
+            File::open("tests/wpcom/transactions/redeem-cart-success.json")
+                .expect("Failed to open file"),
+        )
+        .expect("Unable to parse JSON");
+        json["order_id"] = serde_json::json!("");
+
+        let receipt: TransactionReceipt =
+            serde_json::from_value(json).expect("a receipt without an order id should deserialize");
+
+        assert!(receipt.order_id.is_none());
+        assert_eq!(receipt.receipt_id, ReceiptId(11223344));
     }
 
     fn fixture_cart() -> ShoppingCart {
