@@ -387,7 +387,7 @@ investigate the relevant code before making decisions based on this document.
 
 - [x] `POST /rest/v1.1/me/shopping-cart/$site` — create shopping cart (with site)
 - [x] `POST /rest/v1.1/me/shopping-cart/no-site` — create shopping cart (no site)
-- [ ] `POST /rest/v1.1/me/transactions` — redeem cart using credits
+- [x] `POST /rest/v1.1/me/transactions` — redeem cart using credits
 - [x] `GET /rest/v1.1/me/transactions/supported-countries` — supported countries
 
 ## Verticals

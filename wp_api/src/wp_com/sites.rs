@@ -4,7 +4,11 @@ use crate::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
     users::UserCapabilitiesMap,
-    wp_com::{WpComSiteId, me::WpComUserId, products::ProductSlug},
+    wp_com::{
+        WpComSiteId,
+        me::WpComUserId,
+        products::{ProductSlug, ProductType},
+    },
     wp_content_string_id,
 };
 
@@ -302,7 +306,7 @@ pub struct WPComProduct {
     pub product_slug: ProductSlug,
     pub product_name: String,
     pub product_name_short: String,
-    pub product_type: String,
+    pub product_type: ProductType,
     pub expired: bool,
     pub user_is_owner: bool,
 }

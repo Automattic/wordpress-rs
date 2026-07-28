@@ -1,0 +1,78 @@
+{
+  "receipt_id": 11223344,
+  "purchases": {
+    "98765432": [
+      {
+        "is_gift_purchase": false,
+        "will_auto_renew": true,
+        "expiry": "2030-01-15",
+        "user_email": "buyer@example.com",
+        "product_id": 501,
+        "product_slug": "dotblog_domain",
+        "product_name": ".blog Domain Registration",
+        "product_name_short": null,
+        "product_type": "domain_reg",
+        "free_trial": false,
+        "is_domain_registration": true,
+        "meta": "fake-test-domain.blog",
+        "ownership_id": 77001,
+        "is_renewal": false,
+        "blog_id": 98765432,
+        "price_integer": 2500,
+        "tax_vendor_info": {
+          "country_code": "CA",
+          "address": [
+            "Fake Payments Ltd.",
+            "1 Example Street",
+            "Faketown, FK1 2AB",
+            "Fakeland"
+          ],
+          "tax_name_and_vendor_id_array": {
+            "GST": "FAKE-GST-000123"
+          }
+        }
+      },
+      {
+        "is_gift_purchase": false,
+        "will_auto_renew": true,
+        "expiry": "2030-01-15",
+        "user_email": "buyer@example.com",
+        "product_id": 502,
+        "product_slug": "domain_map",
+        "product_name": "Domain Connection",
+        "product_name_short": null,
+        "product_type": "domain_map",
+        "free_trial": false,
+        "is_domain_registration": false,
+        "meta": "fake-test-domain.blog",
+        "ownership_id": 77002,
+        "is_renewal": false,
+        "blog_id": 98765432,
+        "price_integer": 0,
+        "tax_vendor_info": {
+          "country_code": "CA",
+          "address": [
+            "Fake Payments Ltd.",
+            "1 Example Street",
+            "Faketown, FK1 2AB",
+            "Fakeland"
+          ],
+          "tax_name_and_vendor_id_array": {
+            "GST": "FAKE-GST-000123"
+          }
+        }
+      }
+    ]
+  },
+  "display_price": "$28.25",
+  "price_integer": 2825,
+  "price_float": 28.25,
+  "currency": "USD",
+  "is_gift_purchase": false,
+  "is_gravatar_domain": false,
+  "success": true,
+  "error_code": "",
+  "error_message": "",
+  "order_id": 55667788,
+  "failed_purchases": {}
+}

@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use crate::{impl_as_query_value_for_new_type, request::endpoint::AsNamespace};
+use crate::{request::endpoint::AsNamespace, wp_content_u64_id};
 use serde::{Deserialize, Serialize};
-use std::{num::ParseIntError, str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 pub mod client;
 pub mod domains;
@@ -39,26 +39,10 @@ pub mod subscribers;
 pub mod support_bots;
 pub mod support_eligibility;
 pub mod support_tickets;
+pub mod transactions;
 pub mod unified_conversations;
 
-impl_as_query_value_for_new_type!(WpComSiteId);
-uniffi::custom_newtype!(WpComSiteId, u64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WpComSiteId(pub u64);
-
-impl FromStr for WpComSiteId {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
-    }
-}
-
-impl std::fmt::Display for WpComSiteId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+wp_content_u64_id!(WpComSiteId);
 
 uniffi::custom_newtype!(CurrencyCode, String);
 /// ISO 4217 currency code (e.g. `"USD"`, `"TRY"`, `"EUR"`).

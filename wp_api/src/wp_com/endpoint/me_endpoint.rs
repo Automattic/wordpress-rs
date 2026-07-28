@@ -1,5 +1,6 @@
 use crate::wp_com::domains::SupportedCountries;
 use crate::wp_com::me::{DomainContactInformation, WPComUserInfo};
+use crate::wp_com::transactions::{RedeemCartParams, TransactionReceipt};
 use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
     wp_com::WpComNamespace,
@@ -14,6 +15,8 @@ enum MeRequest {
     TransactionsSupportedCountries,
     #[get(url = "/me/domain-contact-information", output = DomainContactInformation)]
     DomainContactInformation,
+    #[post(url = "/me/transactions", params = &RedeemCartParams, output = TransactionReceipt)]
+    RedeemCart,
 }
 
 impl DerivedRequest for MeRequest {
@@ -58,5 +61,10 @@ mod tests {
             endpoint.domain_contact_information(),
             "/me/domain-contact-information",
         );
+    }
+
+    #[rstest]
+    fn redeem_cart(endpoint: MeRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(endpoint.redeem_cart(), "/me/transactions");
     }
 }
