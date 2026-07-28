@@ -26,6 +26,7 @@
       {
         "is_gift_purchase": true,
         "will_auto_renew": true,
+        "expiry": "2027-02-01",
         "user_email": "buyer@example.com",
         "product_id": 602,
         "product_slug": "fake_marketplace_saas_monthly",
@@ -35,7 +36,7 @@
         "free_trial": false,
         "is_domain_registration": false,
         "meta": null,
-        "ownership_id": null,
+        "ownership_id": 88002,
         "is_renewal": true,
         "blog_id": 12345678,
         "price_integer": 1200,
@@ -55,6 +56,23 @@
           "vat_id": "FAKE-VAT-000456",
           "tax_name": "VAT"
         }
+      },
+      {
+        "is_gift_purchase": false,
+        "will_auto_renew": false,
+        "user_email": "buyer@example.com",
+        "product_id": 604,
+        "product_slug": "fake_one_time_theme",
+        "product_name": "Fake Premium Theme",
+        "product_name_short": null,
+        "product_type": "theme",
+        "free_trial": false,
+        "is_domain_registration": false,
+        "meta": null,
+        "ownership_id": null,
+        "is_renewal": false,
+        "blog_id": 12345678,
+        "price_integer": 0
       }
     ]
   },
@@ -62,7 +80,7 @@
   "price_integer": 2100,
   "price_float": 21,
   "currency": "USD",
-  "is_gift_purchase": false,
+  "is_gift_purchase": true,
   "is_gravatar_domain": false,
   "success": false,
   "error_code": "",

@@ -272,11 +272,14 @@ mod tests {
         assert!(tax.tax_name.is_none());
     }
 
-    /// The server has no reachable code path that populates `failed_purchases`
-    /// safely enough to capture, so this fixture is hand-written from the
-    /// `WPCOM_Store_API::checkout()` assembly logic rather than a real
-    /// response. It also exercises the purchase fields that only appear for
-    /// transfers, marketplace products and quantity upgrades.
+    /// There is no way to capture a real partial failure without paying for
+    /// one, so this fixture is hand-written from the
+    /// `WPCOM_Store_API::checkout()` assembly logic. Its purchases follow that
+    /// logic's constraints — the fields gated on a subscription
+    /// (`expiry`, `ownership_id`, `is_renewal`, `will_auto_renew`,
+    /// `new_quantity`, `saas_redirect_url`) only appear together — and it
+    /// covers the fields that show up solely for transfers, marketplace
+    /// products and quantity upgrades.
     #[test]
     fn test_redeem_cart_partial_failure_deserialization() {
         let receipt = receipt("tests/wpcom/transactions/redeem-cart-partial-failure.json");
@@ -315,12 +318,16 @@ mod tests {
             saas.saas_redirect_url.as_deref(),
             Some("https://example.com/setup?intent-id=fake-intent")
         );
-        assert!(
-            saas.expiry.is_none(),
-            "a purchase without a subscription has no expiry"
-        );
-        assert!(saas.ownership_id.is_none());
         assert!(saas.meta.is_none());
+
+        // A product that creates no subscription: no expiry, no ownership, and
+        // nothing to renew.
+        let one_time = &purchases[2];
+        assert!(one_time.expiry.is_none());
+        assert!(one_time.ownership_id.is_none());
+        assert!(!one_time.will_auto_renew);
+        assert!(!one_time.is_renewal);
+        assert!(one_time.product_name_short.is_none());
 
         let tax = saas
             .tax_vendor_info
