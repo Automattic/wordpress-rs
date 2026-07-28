@@ -113,7 +113,8 @@ pub struct TransactionPurchase {
     pub product_name_short: Option<String>,
     pub product_type: ProductType,
     pub is_domain_registration: bool,
-    /// Product-specific detail — the domain name for domain products.
+    /// The domain name, for domain products. Products of other types either
+    /// store their own identifier here or leave it unset.
     pub meta: Option<String>,
     /// The site this purchase belongs to.
     pub blog_id: Option<WpComSiteId>,
@@ -166,7 +167,8 @@ pub struct TransactionFailedPurchase {
     pub product_id: ProductId,
     pub product_name: String,
     pub product_slug: ProductSlug,
-    /// Product-specific detail — the domain name for domain products.
+    /// The domain name, for domain products. Products of other types either
+    /// store their own identifier here or leave it unset.
     pub product_meta: Option<String>,
     pub product_cost: Decimal2,
 }
