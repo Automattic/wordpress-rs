@@ -27,12 +27,12 @@ wp_content_string_id!(TaxVendorId);
 
 /// How a transaction is paid for.
 ///
-/// Only credit redemption is offered. The server accepts several other payment
-/// methods (stored cards, Stripe, PayPal, and various redirect processors), but
-/// those answer with a redirect/pending body — `redirect_url`, `qr_code` and
-/// friends — rather than a receipt. Adding a variant here therefore means
-/// giving the endpoint a response type that can represent both shapes; it is
-/// not just a matter of another string.
+/// Only credit redemption is offered, which is all this client needs. The
+/// server accepts several other methods (stored cards, Stripe, PayPal and
+/// various redirect processors); adding one here is not just another string,
+/// because a payment that needs the user to be sent elsewhere answers with a
+/// `redirect_url`/`qr_code` body instead of a receipt, and
+/// [`TransactionReceipt`] cannot represent that.
 #[derive(Debug, Clone, Serialize, uniffi::Enum)]
 pub enum TransactionPaymentMethod {
     /// Charge the account's WordPress.com credits.
@@ -53,7 +53,8 @@ pub struct RedeemCartParams {
     pub cart: ShoppingCart,
     pub payment: TransactionPayment,
     /// WHOIS contact information. Required when the cart contains a domain
-    /// registration or transfer, ignored otherwise.
+    /// registration or transfer and isn't made up purely of renewals; ignored
+    /// otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[uniffi(default = None)]
     pub domain_details: Option<DomainContactInformation>,
@@ -69,6 +70,10 @@ where
 }
 
 /// Response from `POST /me/transactions` — a receipt for the redeemed cart.
+///
+/// The API also declares `error_code` and `error_message`, which are omitted
+/// here: the backend hardcodes both to an empty string on this path and
+/// reports real failures as HTTP errors.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct TransactionReceipt {
     pub receipt_id: ReceiptId,
