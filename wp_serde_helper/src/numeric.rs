@@ -108,8 +108,8 @@ where
     deserialize_u64_or_string(deserializer).map(|v| if v == 0 { None } else { Some(v) })
 }
 
-/// Deserialize an optional `u64` from a number or a string, treating an empty
-/// string and `null` as `None`.
+/// Deserialize an optional `u64` from either a number or a string, treating an
+/// empty string and `null` as `None`.
 ///
 /// Some WordPress.com fields are documented as integers but fall back to an
 /// empty string when the underlying value is unavailable.
@@ -123,9 +123,7 @@ where
 ///
 /// Returns an error for non-numeric strings, negative numbers, booleans,
 /// arrays, or objects.
-pub fn deserialize_u64_or_none_from_number_or_string<'de, D>(
-    deserializer: D,
-) -> Result<Option<u64>, D::Error>
+pub fn deserialize_u64_or_string_or_none<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -147,6 +145,26 @@ where
             }
         }
     }
+}
+
+/// Deserialize an optional `u64` from either a number or a string and convert
+/// it to a type that implements `From<u64>`, treating an empty string and
+/// `null` as `None`.
+///
+/// This is useful for newtype wrappers around `u64`.
+///
+/// # Errors
+///
+/// Returns an error for non-numeric strings, negative numbers, booleans,
+/// arrays, or objects.
+pub fn deserialize_u64_or_string_or_none_as_t<'de, D, T>(
+    deserializer: D,
+) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: From<u64>,
+{
+    deserialize_u64_or_string_or_none(deserializer).map(|value| value.map(Into::into))
 }
 
 /// Deserialize an optional `u64`, treating `false`, `null`, and negative numbers as `None`.

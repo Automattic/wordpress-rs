@@ -12,6 +12,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use wp_serde_helper::deserialize_u64_or_string_or_none_as_t;
 
 wp_content_u64_id!(ReceiptId);
 wp_content_u64_id!(OrderId);
@@ -60,15 +61,6 @@ pub struct RedeemCartParams {
     pub domain_details: Option<DomainContactInformation>,
 }
 
-/// Deserialize an [`OrderId`] that the server may report as an empty string.
-fn deserialize_optional_order_id<'de, D>(deserializer: D) -> Result<Option<OrderId>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    wp_serde_helper::deserialize_u64_or_none_from_number_or_string(deserializer)
-        .map(|order_id| order_id.map(OrderId))
-}
-
 /// Response from `POST /me/transactions` — a receipt for the redeemed cart.
 ///
 /// The API also declares `error_code` and `error_message`, which are omitted
@@ -82,7 +74,7 @@ pub struct TransactionReceipt {
     /// `None` when the payment processor didn't return one — the server sends
     /// an empty string in that case, after the transaction has already been
     /// charged.
-    #[serde(default, deserialize_with = "deserialize_optional_order_id")]
+    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none_as_t")]
     #[uniffi(default = None)]
     pub order_id: Option<OrderId>,
     /// Whether every product in the cart was purchased.
