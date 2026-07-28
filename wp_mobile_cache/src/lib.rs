@@ -662,6 +662,24 @@ mod tests {
     }
 
     #[test]
+    fn test_try_from_preserves_foreign_key_setting() {
+        let connection = Connection::open_in_memory().expect("in-memory connection should open");
+        connection
+            .pragma_update(None, "foreign_keys", "OFF")
+            .expect("foreign keys should be disabled before cache creation");
+
+        let cache = WpApiCache::try_from(connection).expect("cache should be created");
+
+        cache.execute(|connection| {
+            assert!(
+                !connection
+                    .pragma_query_value(None, "foreign_keys", |row| row.get::<_, bool>(0))
+                    .expect("foreign key setting should be readable")
+            );
+        });
+    }
+
+    #[test]
     fn test_migration_numbering_should_be_sequential() {
         let connection = Connection::open_in_memory().unwrap();
         let mut migration_manager = MigrationManager::new(&connection).unwrap();

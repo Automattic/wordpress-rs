@@ -64,6 +64,11 @@ fn test_duplicate_post_id_in_same_site_updates_on_upsert(mut test_ctx: TestConte
 
 #[rstest]
 fn test_invalid_site_id_fails_foreign_key_constraint(mut test_ctx: TestContext) {
+    test_ctx
+        .conn
+        .pragma_update(None, "foreign_keys", "ON")
+        .expect("foreign keys should be enabled for the test");
+
     // Site doesn't exist in database - intentionally invalid for testing error handling
     let non_existent_site = DbSite {
         row_id: RowId(999),

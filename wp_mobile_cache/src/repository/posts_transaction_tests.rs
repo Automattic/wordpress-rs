@@ -79,6 +79,11 @@ fn test_upsert_batch_handles_duplicate_ids_by_updating(mut test_ctx: TestContext
 
 #[rstest]
 fn test_upsert_batch_fails_on_foreign_key_violation(mut test_ctx: TestContext) {
+    test_ctx
+        .conn
+        .pragma_update(None, "foreign_keys", "ON")
+        .expect("foreign keys should be enabled for the test");
+
     // Site doesn't exist in database - intentionally invalid for testing error handling
     let invalid_site = DbSite {
         row_id: RowId(999),
