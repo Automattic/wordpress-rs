@@ -112,6 +112,25 @@ impl SiteService {
             Ok(entity_id.db_site)
         })
     }
+
+    pub(crate) fn remove_cached_data(&self) -> Result<bool, WpServiceError> {
+        self.cache
+            .execute(|conn| -> Result<bool, SqliteDbError> {
+                let foreign_keys_were_enabled =
+                    conn.pragma_query_value(None, "foreign_keys", |row| row.get::<_, bool>(0))?;
+                if !foreign_keys_were_enabled {
+                    conn.pragma_update(None, "foreign_keys", "ON")?;
+                }
+
+                let deletion_result = SiteRepository.delete_site(conn, &self.db_site);
+
+                if !foreign_keys_were_enabled {
+                    conn.pragma_update(None, "foreign_keys", "OFF")?;
+                }
+                deletion_result
+            })
+            .map_err(Into::into)
+    }
 }
 
 #[uniffi::export]

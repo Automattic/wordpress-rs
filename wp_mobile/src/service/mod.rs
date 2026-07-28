@@ -135,8 +135,234 @@ impl WpService {
         self.sites.clone()
     }
 
+    /// Remove this site's cached data.
+    ///
+    /// Returns `true` if the site existed in the cache and `false` if it had
+    /// already been removed. After successful removal, this service should be
+    /// discarded rather than reused.
+    pub fn remove_cached_data(&self) -> Result<bool, WpServiceError> {
+        self.sites.remove_cached_data()
+    }
+
     /// Get the request executor used by this service.
     pub fn request_executor(&self) -> Arc<dyn RequestExecutor> {
         self.request_executor.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{WpService, sites::SiteInfo};
+    use crate::testing::{EmptyAppNotifier, MockExecutor};
+    use rusqlite::params;
+    use std::sync::Arc;
+    use wp_api::prelude::{
+        ParsedUrl, WpApiClientDelegate, WpApiMiddlewarePipeline, WpAuthenticationProvider,
+    };
+    use wp_api::wp_com::WpComSiteId;
+    use wp_mobile_cache::{
+        WpApiCache,
+        db_types::db_site::DbSite,
+        repository::{
+            entity_state::{DbEntityState, EntityStateRepository, EntityType},
+            sites::SiteRepository,
+        },
+    };
+
+    fn test_delegate() -> WpApiClientDelegate {
+        WpApiClientDelegate {
+            auth_provider: Arc::new(WpAuthenticationProvider::none()),
+            request_executor: Arc::new(MockExecutor::with_execute_fn(|_| {
+                panic!("Network request should not be made while deleting cached data")
+            })),
+            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+            app_notifier: Arc::new(EmptyAppNotifier),
+        }
+    }
+
+    fn test_cache() -> Arc<WpApiCache> {
+        let connection =
+            rusqlite::Connection::open_in_memory().expect("in-memory connection should be created");
+        connection
+            .pragma_update(None, "foreign_keys", "OFF")
+            .expect("foreign keys should be disabled before cache creation");
+        wp_mobile_cache::MigrationManager::new(&connection)
+            .expect("migration manager should be created")
+            .perform_migrations()
+            .expect("cache migrations should succeed");
+
+        let cache =
+            Arc::new(WpApiCache::try_from(connection).expect("in-memory cache should be created"));
+        cache.execute(|connection| {
+            connection
+                .pragma_update(None, "foreign_keys", "OFF")
+                .expect("foreign keys should be disabled for the test");
+        });
+        cache
+    }
+
+    fn foreign_key_enforcement_is_enabled(cache: &WpApiCache) -> bool {
+        cache.execute(|connection| {
+            connection
+                .pragma_query_value(None, "foreign_keys", |row| row.get::<_, bool>(0))
+                .expect("foreign key setting should be readable")
+        })
+    }
+
+    fn self_hosted_service(cache: Arc<WpApiCache>, site_url: &str) -> WpService {
+        WpService::new(
+            SiteInfo::SelfHosted {
+                site_url: Arc::new(ParsedUrl::parse(site_url).expect("site URL should parse")),
+                api_root: Arc::new(
+                    ParsedUrl::parse(&format!("{site_url}/wp-json"))
+                        .expect("API root URL should parse"),
+                ),
+            },
+            test_delegate(),
+            cache,
+        )
+        .expect("self-hosted service should be created")
+    }
+
+    fn wordpress_com_service(cache: Arc<WpApiCache>, site_id: WpComSiteId) -> WpService {
+        WpService::new(SiteInfo::WordPressCom { site_id }, test_delegate(), cache)
+            .expect("WordPress.com service should be created")
+    }
+
+    fn seed_cached_records(cache: &WpApiCache, db_site: &DbSite) {
+        cache.execute(|conn| {
+            conn.execute(
+                "INSERT INTO list_metadata (db_site_id, key) VALUES (?1, ?2)",
+                params![db_site.row_id, "edit:posts:publish"],
+            )
+            .expect("list metadata should be inserted");
+            EntityStateRepository::set_state(
+                conn,
+                42,
+                db_site,
+                EntityType::PostsEditContext,
+                &DbEntityState::Fresh,
+            )
+            .expect("entity state should be inserted");
+        });
+    }
+
+    fn count_rows_for_site(cache: &WpApiCache, table: &str, db_site: &DbSite) -> usize {
+        cache.execute(|conn| {
+            let sql = format!("SELECT COUNT(*) FROM {table} WHERE db_site_id = ?");
+            conn.query_row(&sql, [db_site.row_id], |row| row.get::<_, i64>(0))
+                .expect("site rows should be counted") as usize
+        })
+    }
+
+    #[test]
+    fn remove_cached_data_deletes_self_hosted_site_and_preserves_other_site() {
+        let cache = test_cache();
+        let service = self_hosted_service(cache.clone(), "https://removed.example.com");
+        let _other_service = self_hosted_service(cache.clone(), "https://preserved.example.com");
+
+        let (removed_site, preserved_site) = cache.execute(|conn| {
+            let removed_site = SiteRepository
+                .select_self_hosted_site_by_url(conn, "https://removed.example.com")
+                .expect("removed site lookup should succeed")
+                .expect("removed site should exist")
+                .data
+                .0;
+            let preserved_site = SiteRepository
+                .select_self_hosted_site_by_url(conn, "https://preserved.example.com")
+                .expect("preserved site lookup should succeed")
+                .expect("preserved site should exist")
+                .data
+                .0;
+            (removed_site, preserved_site)
+        });
+        seed_cached_records(&cache, &removed_site);
+        seed_cached_records(&cache, &preserved_site);
+
+        assert!(
+            service
+                .remove_cached_data()
+                .expect("cleanup should succeed")
+        );
+        assert_eq!(
+            count_rows_for_site(&cache, "list_metadata", &removed_site),
+            0
+        );
+        assert_eq!(
+            count_rows_for_site(&cache, "entity_state", &removed_site),
+            0
+        );
+        assert_eq!(
+            count_rows_for_site(&cache, "list_metadata", &preserved_site),
+            1
+        );
+        assert_eq!(
+            count_rows_for_site(&cache, "entity_state", &preserved_site),
+            1
+        );
+        cache.execute(|conn| {
+            assert!(
+                SiteRepository
+                    .select_self_hosted_site_by_url(conn, "https://removed.example.com")
+                    .expect("removed site lookup should succeed")
+                    .is_none()
+            );
+            assert!(
+                SiteRepository
+                    .select_self_hosted_site_by_url(conn, "https://preserved.example.com")
+                    .expect("preserved site lookup should succeed")
+                    .is_some()
+            );
+        });
+
+        assert!(
+            !service
+                .remove_cached_data()
+                .expect("repeated cleanup should succeed")
+        );
+        assert!(!foreign_key_enforcement_is_enabled(&cache));
+    }
+
+    #[test]
+    fn remove_cached_data_deletes_wordpress_com_site() {
+        let cache = test_cache();
+        cache.execute(|connection| {
+            connection
+                .pragma_update(None, "foreign_keys", "ON")
+                .expect("foreign keys should be enabled for the test");
+        });
+        let site_id = WpComSiteId(123456);
+        let service = wordpress_com_service(cache.clone(), site_id);
+        let db_site = cache.execute(|conn| {
+            SiteRepository
+                .select_wordpress_com_site_by_site_id(conn, site_id)
+                .expect("WordPress.com site lookup should succeed")
+                .expect("WordPress.com site should exist")
+                .data
+                .0
+        });
+        seed_cached_records(&cache, &db_site);
+
+        assert!(
+            service
+                .remove_cached_data()
+                .expect("cleanup should succeed")
+        );
+        assert_eq!(count_rows_for_site(&cache, "list_metadata", &db_site), 0);
+        assert_eq!(count_rows_for_site(&cache, "entity_state", &db_site), 0);
+        cache.execute(|conn| {
+            assert!(
+                SiteRepository
+                    .select_wordpress_com_site_by_site_id(conn, site_id)
+                    .expect("WordPress.com site lookup should succeed")
+                    .is_none()
+            );
+        });
+        assert!(
+            !service
+                .remove_cached_data()
+                .expect("repeated cleanup should succeed")
+        );
+        assert!(foreign_key_enforcement_is_enabled(&cache));
     }
 }
