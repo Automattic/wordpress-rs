@@ -179,20 +179,6 @@ pub struct TransactionTaxVendorInfo {
     pub address: Vec<String>,
     /// Each tax charged, mapped to the vendor's registration ID for it.
     pub tax_name_and_vendor_id_array: HashMap<TaxName, TaxVendorId>,
-    /// Every vendor ID in
-    /// [`tax_name_and_vendor_id_array`](Self::tax_name_and_vendor_id_array)
-    /// joined with `" / "` — e.g. `"790004303 / PST-1464-5919"` where two taxes
-    /// apply. Kept by the backend for backwards compatibility and not observed
-    /// on this endpoint's responses; prefer the map.
-    #[serde(default)]
-    #[uniffi(default = None)]
-    pub vat_id: Option<String>,
-    /// The tax names from
-    /// [`tax_name_and_vendor_id_array`](Self::tax_name_and_vendor_id_array)
-    /// joined the same way — e.g. `"GST / PST"`. See [`vat_id`](Self::vat_id).
-    #[serde(default)]
-    #[uniffi(default = None)]
-    pub tax_name: Option<String>,
 }
 
 #[cfg(test)]
@@ -263,10 +249,6 @@ mod tests {
                 .get(&TaxName("GST".to_string())),
             Some(&TaxVendorId("FAKE-GST-000123".to_string()))
         );
-        // Not present on the captured response this fixture came from; the
-        // fields are modelled defensively rather than because they were seen.
-        assert!(tax.vat_id.is_none());
-        assert!(tax.tax_name.is_none());
     }
 
     /// There is no way to capture a real partial failure without paying for
@@ -330,8 +312,12 @@ mod tests {
             .tax_vendor_info
             .as_ref()
             .expect("expected tax_vendor_info");
-        assert_eq!(tax.vat_id.as_deref(), Some("FAKE-VAT-000456"));
-        assert_eq!(tax.tax_name.as_deref(), Some("VAT"));
+        assert_eq!(tax.country_code, CountryCode("IE".to_string()));
+        assert_eq!(
+            tax.tax_name_and_vendor_id_array
+                .get(&TaxName("VAT".to_string())),
+            Some(&TaxVendorId("FAKE-VAT-000456".to_string()))
+        );
     }
 
     #[test]

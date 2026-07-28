@@ -52,9 +52,7 @@
           ],
           "tax_name_and_vendor_id_array": {
             "VAT": "FAKE-VAT-000456"
-          },
-          "vat_id": "FAKE-VAT-000456",
-          "tax_name": "VAT"
+          }
         }
       },
       {
