@@ -218,12 +218,16 @@ GEM
     logger (1.7.0)
     mini_magick (4.13.2)
     mini_mime (1.1.5)
+    mini_portile2 (2.8.9)
     multi_json (1.21.1)
     multipart-post (2.4.1)
     mutex_m (0.3.0)
     nanaimo (0.4.0)
     naturally (2.3.0)
     nkf (0.3.0)
+    nokogiri (1.19.4)
+      mini_portile2 (~> 2.8.2)
+      racc (~> 1.4)
     nokogiri (1.19.4-aarch64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.19.4-aarch64-linux-musl)
@@ -317,6 +321,7 @@ PLATFORMS
   arm-linux-gnu
   arm-linux-musl
   arm64-darwin
+  ruby
   x86_64-darwin
   x86_64-linux-gnu
   x86_64-linux-musl
@@ -330,4 +335,4 @@ DEPENDENCIES
   openssl (~> 4.0.2)
 
 BUNDLED WITH
-   4.0.17
+  4.0.17
