@@ -178,7 +178,7 @@ swift-example-app-mac:
 
 swift-example-app-ios:
 	xcrun simctl create "iPhone 17 Pro Test Device" "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
-	bundle exec fastlane run run_tests project:native/swift/Example/Example.xcodeproj scheme:Example build_for_testing:true ensure_devices_found:true device:"iPhone 17 Pro Test Device (26.1)" xcargs:"-skipPackagePluginValidation"
+	bundle exec fastlane run run_tests project:native/swift/Example/Example.xcodeproj scheme:Example build_for_testing:true ensure_devices_found:true device:"iPhone 17 Pro Test Device (26.5)" xcargs:"-skipPackagePluginValidation"
 
 test-swift:
 	$(MAKE) test-swift-$(uname)
