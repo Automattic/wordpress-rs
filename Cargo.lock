@@ -442,7 +442,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -1128,7 +1128,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54f0d287c53ffd184d04d8677f590f4ac5379785529e5e08b1c8083acdd5c198"
 dependencies = [
  "memchr",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -1159,7 +1159,7 @@ dependencies = [
  "ignore",
  "intl-memoizer",
  "log",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "unic-langid",
 ]
 
@@ -1595,7 +1595,7 @@ dependencies = [
  "once_cell",
  "rand 0.9.2",
  "ring",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tinyvec",
  "tokio",
  "tracing",
@@ -1639,7 +1639,7 @@ dependencies = [
  "rand 0.9.2",
  "resolv-conf",
  "smallvec",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tokio",
  "tracing",
 ]
@@ -2735,7 +2735,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "198db74531d58c70a361c42201efde7e2591e976d518caf7662a47dc5720e7b6"
 dependencies = [
  "memchr",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "ucd-trie",
 ]
 
@@ -2965,7 +2965,7 @@ dependencies = [
  "rustc-hash 2.1.1",
  "rustls",
  "socket2 0.5.9",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tokio",
  "tracing",
  "web-time",
@@ -2987,7 +2987,7 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "slab",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tinyvec",
  "tracing",
  "web-time",
@@ -4052,11 +4052,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.18"
+version = "2.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
+checksum = "09a43598840e33d5b0331f38c5e30d13bb11c11210a4b58f0d9b18a5a5eefcd9"
 dependencies = [
- "thiserror-impl 2.0.18",
+ "thiserror-impl 2.0.19",
 ]
 
 [[package]]
@@ -4072,13 +4072,13 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.18"
+version = "2.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
+checksum = "43cbfe0cf76104d42a574802844187e84a305e531ed54455f11fbde0f10541cd"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -5524,7 +5524,7 @@ dependencies = [
  "serde_urlencoded",
  "strum",
  "strum_macros",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tokio",
  "uniffi",
  "url",
@@ -5609,7 +5609,7 @@ dependencies = [
  "quote",
  "serde",
  "syn 3.0.3",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "trybuild",
  "uniffi",
  "wp_derive",
@@ -5630,7 +5630,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "syn 3.0.3",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "trybuild",
  "wp_serde_helper",
 ]
@@ -5648,7 +5648,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "syn 3.0.3",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "toml 1.1.4+spec-1.1.0",
  "trybuild",
  "uniffi",
@@ -5666,7 +5666,7 @@ dependencies = [
  "rstest",
  "strum",
  "strum_macros",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "unic-langid",
  "uniffi",
  "wp_localization_macro",
@@ -5694,7 +5694,7 @@ name = "wp_localization_parser"
 version = "0.1.0"
 dependencies = [
  "fluent-syntax",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
@@ -5704,7 +5704,7 @@ dependencies = [
  "clap",
  "fluent-syntax",
  "itertools",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "wp_localization_parser",
 ]
 
@@ -5726,7 +5726,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "tempfile",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tokio",
  "uniffi",
  "url",
@@ -5749,7 +5749,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
- "thiserror 2.0.18",
+ "thiserror 2.0.19",
  "tokio",
  "uniffi",
  "wp_api",
