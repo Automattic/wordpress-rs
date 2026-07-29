@@ -195,13 +195,13 @@ test-swift-darwin: xcframework
 test-swift-macOS: test-swift-darwin
 
 test-swift-iOS: xcframework
-	scripts/xcodebuild-test.sh iOS-26-1
+	scripts/xcodebuild-test.sh iOS-26-5
 
 test-swift-tvOS: xcframework
-	scripts/xcodebuild-test.sh tvOS-26-1
+	scripts/xcodebuild-test.sh tvOS-26-5
 
 test-swift-watchOS: xcframework
-	scripts/xcodebuild-test.sh watchOS-26-1
+	scripts/xcodebuild-test.sh watchOS-26-5
 
 test-rust-lib:
 	$(rust_docker_run) cargo test --lib -- --nocapture
