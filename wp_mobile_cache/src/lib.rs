@@ -367,6 +367,7 @@ impl WpApiCache {
             else {
                 return Ok(false);
             };
+
             SiteRepository.delete_site(connection, &full_entity.data.0)
         })
     }
@@ -439,7 +440,7 @@ impl TryFrom<Connection> for WpApiCache {
     /// This is typically used in tests to create a cache from an already-migrated
     /// in-memory database connection.
     fn try_from(connection: Connection) -> Result<Self, Self::Error> {
-        register_url_functions(&connection)?;
+        configure_connection(&connection)?;
         Ok(Self {
             inner: DBManager {
                 connection: Mutex::new(connection),
@@ -610,7 +611,7 @@ impl DBManager {
             Connection::open_in_memory()?
         };
 
-        register_url_functions(&connection)?;
+        configure_connection(&connection)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -648,17 +649,231 @@ pub(crate) fn register_url_functions(conn: &Connection) -> SqliteResult<()> {
     )
 }
 
+fn configure_connection(connection: &Connection) -> Result<(), SqliteDbError> {
+    register_url_functions(connection)?;
+    connection.pragma_update(None, "foreign_keys", "ON")?;
+    Ok(())
+}
+
 uniffi::setup_scaffolding!();
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        db_types::{
+            db_site::DbSite, self_hosted_site::SelfHostedSite, wordpress_com_site::WordPressComSite,
+        },
+        repository::entity_state::{DbEntityState, EntityType},
+    };
+
+    #[derive(Debug, Default, PartialEq, Eq)]
+    struct SiteRowCounts {
+        db_sites: i64,
+        list_metadata: i64,
+        list_metadata_items: i64,
+        list_metadata_state: i64,
+        entity_state: i64,
+    }
+
+    impl SiteRowCounts {
+        fn one_of_each() -> Self {
+            Self {
+                db_sites: 1,
+                list_metadata: 1,
+                list_metadata_items: 1,
+                list_metadata_state: 1,
+                entity_state: 1,
+            }
+        }
+    }
+
+    fn cache_from_connection_with_foreign_keys_disabled() -> WpApiCache {
+        let connection = Connection::open_in_memory().expect("in-memory connection should open");
+        connection
+            .pragma_update(None, "foreign_keys", "OFF")
+            .expect("foreign keys should be disabled before cache creation");
+        MigrationManager::new(&connection)
+            .expect("migration manager should be created")
+            .perform_migrations()
+            .expect("cache migrations should succeed");
+        WpApiCache::try_from(connection).expect("cache should be created")
+    }
+
+    fn foreign_keys_are_enabled(cache: &WpApiCache) -> bool {
+        cache.execute(|connection| {
+            connection
+                .pragma_query_value(None, "foreign_keys", |row| row.get::<_, bool>(0))
+                .expect("foreign key setting should be readable")
+        })
+    }
+
+    fn seed_site_records(cache: &WpApiCache, db_site: &DbSite, key: &str, entity_id: i64) -> i64 {
+        cache.execute(|connection| {
+            connection
+                .execute(
+                    "INSERT INTO list_metadata (db_site_id, key) VALUES (?1, ?2)",
+                    params![db_site.row_id, key],
+                )
+                .expect("list metadata should be inserted");
+            let list_metadata_id = connection.last_insert_rowid();
+            connection
+                .execute(
+                    "INSERT INTO list_metadata_items (list_metadata_id, entity_id) VALUES (?1, ?2)",
+                    params![list_metadata_id, entity_id],
+                )
+                .expect("list metadata item should be inserted");
+            connection
+                .execute(
+                    "INSERT INTO list_metadata_state (list_metadata_id, state) VALUES (?1, 0)",
+                    [list_metadata_id],
+                )
+                .expect("list metadata state should be inserted");
+            EntityStateRepository::set_state(
+                connection,
+                entity_id,
+                db_site,
+                EntityType::PostsEditContext,
+                &DbEntityState::Fresh,
+            )
+            .expect("entity state should be inserted");
+            list_metadata_id
+        })
+    }
+
+    fn row_counts(cache: &WpApiCache, db_site: &DbSite, list_metadata_id: i64) -> SiteRowCounts {
+        cache.execute(|connection| {
+            connection
+                .query_row(
+                    "SELECT
+                        (SELECT COUNT(*) FROM db_sites WHERE rowid = ?1),
+                        (SELECT COUNT(*) FROM list_metadata WHERE db_site_id = ?1),
+                        (SELECT COUNT(*) FROM list_metadata_items
+                         WHERE list_metadata_id = ?2),
+                        (SELECT COUNT(*) FROM list_metadata_state
+                         WHERE list_metadata_id = ?2),
+                        (SELECT COUNT(*) FROM entity_state WHERE db_site_id = ?1)",
+                    params![db_site.row_id, list_metadata_id],
+                    |row| {
+                        Ok(SiteRowCounts {
+                            db_sites: row.get(0)?,
+                            list_metadata: row.get(1)?,
+                            list_metadata_items: row.get(2)?,
+                            list_metadata_state: row.get(3)?,
+                            entity_state: row.get(4)?,
+                        })
+                    },
+                )
+                .expect("site-scoped rows should be counted")
+        })
+    }
+
+    fn assert_site_removal_cascades(
+        cache: &WpApiCache,
+        removed_site: &DbSite,
+        preserved_site: &DbSite,
+        remove_site: impl FnOnce() -> Result<bool, SqliteDbError>,
+    ) {
+        let removed_list_metadata_id = seed_site_records(cache, removed_site, "removed-list", 41);
+        let preserved_list_metadata_id =
+            seed_site_records(cache, preserved_site, "preserved-list", 42);
+
+        assert!(remove_site().expect("site cleanup should succeed"));
+
+        assert_eq!(
+            row_counts(cache, removed_site, removed_list_metadata_id),
+            SiteRowCounts::default()
+        );
+        assert_eq!(
+            row_counts(cache, preserved_site, preserved_list_metadata_id),
+            SiteRowCounts::one_of_each()
+        );
+    }
+
+    #[test]
+    fn direct_api_remove_self_hosted_site_cascades_with_foreign_keys_enabled() {
+        let cache = cache_from_connection_with_foreign_keys_disabled();
+        let removed_url =
+            ParsedUrl::parse("https://removed.example.com").expect("removed site URL should parse");
+        let (removed_site, preserved_site) = cache.execute(|connection| {
+            let removed_site = SiteRepository
+                .upsert_self_hosted_site(
+                    connection,
+                    &SelfHostedSite {
+                        url: removed_url.url(),
+                        api_root: "https://removed.example.com/wp-json".to_string(),
+                    },
+                )
+                .expect("removed site should be inserted")
+                .db_site;
+            let preserved_site = SiteRepository
+                .upsert_self_hosted_site(
+                    connection,
+                    &SelfHostedSite {
+                        url: "https://preserved.example.com".to_string(),
+                        api_root: "https://preserved.example.com/wp-json".to_string(),
+                    },
+                )
+                .expect("preserved site should be inserted")
+                .db_site;
+            (removed_site, preserved_site)
+        });
+
+        assert_site_removal_cascades(&cache, &removed_site, &preserved_site, || {
+            cache.remove_self_hosted_site(Arc::new(removed_url))
+        });
+    }
+
+    #[test]
+    fn direct_api_remove_wordpress_com_site_cascades_with_foreign_keys_enabled() {
+        let cache = cache_from_connection_with_foreign_keys_disabled();
+        let removed_site_id = WpComSiteId(123456);
+        let (removed_site, preserved_site) = cache.execute(|connection| {
+            let removed_site = SiteRepository
+                .upsert_wordpress_com_site(
+                    connection,
+                    &WordPressComSite {
+                        site_id: removed_site_id,
+                    },
+                )
+                .expect("WordPress.com site should be inserted")
+                .db_site;
+            let preserved_site = SiteRepository
+                .upsert_self_hosted_site(
+                    connection,
+                    &SelfHostedSite {
+                        url: "https://preserved.example.com".to_string(),
+                        api_root: "https://preserved.example.com/wp-json".to_string(),
+                    },
+                )
+                .expect("preserved site should be inserted")
+                .db_site;
+            (removed_site, preserved_site)
+        });
+
+        assert_site_removal_cascades(&cache, &removed_site, &preserved_site, || {
+            cache.remove_wordpress_com_site(removed_site_id)
+        });
+    }
 
     #[test]
     fn test_migration_works() {
         let cache = WpApiCache::new(None).unwrap();
+        assert!(foreign_keys_are_enabled(&cache));
         let migrations_run = cache.perform_migrations().unwrap();
         assert_eq!(migrations_run, MIGRATION_QUERIES.len() as i64);
+    }
+
+    #[test]
+    fn test_try_from_enables_foreign_keys() {
+        let connection = Connection::open_in_memory().expect("in-memory connection should open");
+        connection
+            .pragma_update(None, "foreign_keys", "OFF")
+            .expect("foreign keys should be disabled before cache creation");
+
+        let cache = WpApiCache::try_from(connection).expect("cache should be created");
+
+        assert!(foreign_keys_are_enabled(&cache));
     }
 
     #[test]
