@@ -1,0 +1,120 @@
+{
+  "9005": {
+    "formatted_original_price": "$0",
+    "original_price": {},
+    "raw_price": 180,
+    "raw_price_integer": 18000,
+    "formatted_price": "$180",
+    "raw_discount": 0,
+    "raw_discount_integer": 0,
+    "formatted_discount": "$0",
+    "product_id": 9005,
+    "product_slug": "fake-premium-bundle-2y",
+    "product_name": "Fake Premium",
+    "discount_reason": null,
+    "cost_overrides": [],
+    "is_domain_upgrade": null,
+    "currency_code": "USD",
+    "plan_card_order": 2,
+    "tagline": "Step up your fake site with premium design features.",
+    "plan_card_name": "Premium",
+    "product_tier_id": 7002,
+    "product_tier_product_ids": [9005, 9006],
+    "current_plan": true,
+    "user_is_owner": false,
+    "id": 55501234,
+    "has_domain_credit": false,
+    "has_redeemed_domain_credit": false,
+    "expiry": "2029-03-15T00:00:00+00:00",
+    "is_expired": false,
+    "free_trial": false,
+    "subscribed_date": "2027-03-15T12:00:00+00:00",
+    "auto_renew": false,
+    "auto_renew_date": "2029-02-14T00:00:00+00:00",
+    "partner_name": "",
+    "user_facing_expiry": "2029-03-15T00:00:00+00:00",
+    "is_delayed_downgrade_pending": false,
+    "delayed_downgrade_to_product_slug": null,
+    "interval": 730,
+    "badges": ["Fake popular"],
+    "plan_card_features": [
+      { "text": "13 GB fake storage", "available": true },
+      { "text": "Fake premium themes", "available": true }
+    ],
+    "features_comparison": [
+      {
+        "group": "Fake essential features",
+        "features": [
+          {
+            "key": "fake_unlimited_pages",
+            "title": "Unlimited fake pages",
+            "tiers": [7001, 7002]
+          }
+        ]
+      }
+    ]
+  },
+  "9006": {
+    "formatted_original_price": "$270",
+    "original_price": {},
+    "raw_price": 255,
+    "raw_price_integer": 25500,
+    "formatted_price": "$255",
+    "raw_discount": 15,
+    "raw_discount_integer": 1500,
+    "formatted_discount": "$15",
+    "product_id": 9006,
+    "product_slug": "fake-premium-bundle-3y",
+    "product_name": "Fake Premium",
+    "discount_reason": "Your fake recent plan purchase is deducted from the price ($15).",
+    "cost_overrides": [
+      {
+        "old_price": 270,
+        "new_price": 255,
+        "override_code": "fake-plan-proration",
+        "does_override_original_cost": false,
+        "human_readable_reason": "Fake prorated balance from previous plan",
+        "percentage": 0,
+        "first_unit_only": false
+      }
+    ],
+    "is_domain_upgrade": null,
+    "currency_code": "USD",
+    "plan_card_order": 2,
+    "tagline": "Step up your fake site with premium design features.",
+    "plan_card_name": "Premium",
+    "product_tier_id": 7002,
+    "product_tier_product_ids": [9005, 9006],
+    "can_start_trial": false,
+    "available_for_upgrade": true,
+    "available_for_downgrade": false,
+    "interval": 1095,
+    "badges": ["Fake popular"]
+  },
+  "9001": {
+    "formatted_original_price": "$0",
+    "original_price": {},
+    "raw_price": 0,
+    "raw_price_integer": 0,
+    "formatted_price": "$0",
+    "raw_discount": 0,
+    "raw_discount_integer": 0,
+    "formatted_discount": "$0",
+    "product_id": 9001,
+    "product_slug": "fake_free_plan",
+    "product_name": "Fake Free",
+    "discount_reason": null,
+    "cost_overrides": [],
+    "is_domain_upgrade": null,
+    "currency_code": "USD",
+    "plan_card_order": 1,
+    "tagline": "Start out with all the fake basics.",
+    "plan_card_name": "Free",
+    "product_tier_id": 7001,
+    "product_tier_product_ids": [9001],
+    "available_for_upgrade": false,
+    "available_for_downgrade": true,
+    "interval": -1,
+    "plan_card_features": [{ "text": "1 GB fake storage", "available": true }]
+  }
+}

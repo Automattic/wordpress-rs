@@ -19,6 +19,7 @@ pub mod publicize_endpoint;
 pub mod purchases_endpoint;
 pub mod segments_endpoint;
 pub mod shopping_cart_endpoint;
+pub mod site_plans_endpoint;
 pub mod sites_endpoint;
 pub mod stats_city_views_endpoint;
 pub mod stats_clicks_endpoint;

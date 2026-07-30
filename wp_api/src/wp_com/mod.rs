@@ -17,6 +17,7 @@ pub mod publicize;
 pub mod purchases;
 pub mod segments;
 pub mod shopping_cart;
+pub mod site_plans;
 pub mod sites;
 pub mod stats_city_views;
 pub mod stats_clicks;
@@ -52,6 +53,36 @@ uniffi::custom_newtype!(CurrencyCode, String);
 pub struct CurrencyCode(pub String);
 
 impl std::fmt::Display for CurrencyCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+crate::impl_as_query_value_from_to_string!(CouponCode);
+uniffi::custom_newtype!(CouponCode, String);
+/// A promotional coupon code (e.g. `"SPRING25"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct CouponCode(pub String);
+
+impl std::fmt::Display for CouponCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+uniffi::custom_newtype!(CostOverrideCode, String);
+/// Identifies why a product's cost was overridden (e.g.
+/// `"recent-plan-proration"`, `"bundled-domain-credit"`).
+///
+/// The billing backend keeps a registry of these codes and never removes one,
+/// so receipts for past purchases keep rendering the right reason. The
+/// localized text for a code is returned alongside it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct CostOverrideCode(pub String);
+
+impl std::fmt::Display for CostOverrideCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
