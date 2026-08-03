@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Bumped `syn` from `2.0` to `3.0`, updating the proc-macro crates for its breaking changes.
 - **Internal:** Use Xcode 26.6 on CI.
 - **Internal:** Use Ruby 3.4.9 for automation tooling.
+- **Internal:** Update translations.
 
 ## [0.6.0] - 2026-07-16
 
