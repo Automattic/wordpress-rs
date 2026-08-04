@@ -60,10 +60,13 @@ RUN mkdir gradle-cache-tmp \
 
 # Setup Swift using Swiftly
 ENV PATH="/root/.local/share/swiftly/bin:$PATH"
+# The WordPress beta image is based on Debian 13 (trixie), which swiftly 1.1.3 doesn't
+# recognize. swift.org publishes no Debian 13 toolchain for 6.2 either, so pin the platform
+# to Debian 12 — its toolchain runs on trixie via glibc forward compatibility.
 RUN curl -s -o swiftly.tar.gz "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" \
     && tar zxf swiftly.tar.gz \
     && rm swiftly.tar.gz \
-    && ./swiftly init --assume-yes --skip-install
+    && ./swiftly init --assume-yes --skip-install --platform debian12
 RUN apt-get update \
   && apt-get -y -qq install libicu-dev libcurl4-openssl-dev libedit-dev libsqlite3-dev \
     libncurses-dev libpython3-dev libxml2-dev uuid-dev git libstdc++-12-dev
