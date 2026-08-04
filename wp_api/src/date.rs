@@ -62,6 +62,27 @@ where
         .map(|opt| opt.map(WpDateString))
 }
 
+/// Deserialize an `Option<WpGmtDateTime>` where the API may send an ISO-8601
+/// datetime string, `null`, or an empty string `""`.
+///
+/// Some WordPress.com endpoints return `""` (or omit the field) instead of
+/// `null` when a datetime is not set; both map to `None`. Populated values are
+/// parsed by [`WpGmtDateTime`]'s ISO-8601 handling (which accepts a timezone
+/// offset such as `+00:00`).
+pub fn deserialize_optional_wp_gmt_date_time<'de, D>(
+    deserializer: D,
+) -> Result<Option<WpGmtDateTime>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    match Option::<String>::deserialize(deserializer)? {
+        Some(s) if !s.trim().is_empty() => WpGmtDateTime::from_str(&s)
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+        _ => Ok(None),
+    }
+}
+
 // Assertion functions that should only be used by the native test suite
 // These are hidden from the Rust public API, but will be visible/usable in the generated bindings
 mod native_test_helper {

@@ -16,6 +16,7 @@ pub mod me_endpoint;
 pub mod oauth2;
 pub mod products_endpoint;
 pub mod publicize_endpoint;
+pub mod purchases_endpoint;
 pub mod segments_endpoint;
 pub mod shopping_cart_endpoint;
 pub mod sites_endpoint;

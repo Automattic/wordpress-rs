@@ -279,7 +279,7 @@ investigate the relevant code before making decisions based on this document.
 - [ ] `POST /rest/v1.1/sites/$site/homepage/` — update homepage settings
 - [ ] `POST /rest/v1.1/sites/$site/mobile-quick-start/` — complete Quick Start
 - [ ] `GET /rest/v1.1/sites/$site/post-formats/` — fetch post formats
-- [ ] `GET /rest/v1.1/sites/$site/purchases` — get site purchases
+- [x] `GET /rest/v1.2/sites/$site/purchases` — get site purchases
 - [ ] `GET /rest/v1.1/sites/$site/roles/` — fetch user roles
 - [ ] `GET /rest/v1.1/sites/$site/settings` — fetch general site settings
 - [ ] `POST /rest/v1.1/sites/$site/settings` — update general site settings
