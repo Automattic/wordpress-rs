@@ -12,7 +12,14 @@ import Combine
 // because the Combine observer is synchronous, which is much easier to work with in
 // unit tests. Unlike the `AsyncSequence` API, the order of execution is much more
 // predictable.
-@Suite(.timeLimit(.minutes(5)))
+//
+// `.serialized` is required because every test observes updates through the shared
+// `NotificationCenter.default`. Notifications are filtered by the per-cache broadcaster
+// object, but once a cache (and its broadcaster) is deallocated (see
+// `afterCacheDeallocated`), that object filter goes stale and the observer starts
+// matching every update notification. Running in parallel then lets one test's updates
+// leak into another test's observer, which made `afterCacheDeallocated` flaky.
+@Suite(.timeLimit(.minutes(5)), .serialized)
 struct WordPressApiCacheTests {
     @Test func addDatabaseUpdatesObserver() async throws {
         let (cache, mockService) = try testContext()
@@ -76,17 +83,25 @@ struct WordPressApiCacheTests {
     @Test func afterCacheDeallocated() async throws {
         var (cache, mockService): (WordPressApiCache?, MockPostService) = try testContext()
 
-        try await confirmation(expectedCount: 5) { confirmation in
-            _ = cache?
-                .addDatabaseUpdatesObserver { _ in
-                    confirmation()
-                }
+        // Remove the observer at the end (via the returned token): once the cache is
+        // deallocated below, its broadcaster is gone and this observer would otherwise
+        // linger on the shared `NotificationCenter.default` with a stale object filter,
+        // matching unrelated caches' update notifications.
+        var token: NSObjectProtocol?
+        defer {
+            if let token {
+                NotificationCenter.default.removeObserver(token)
+            }
+        }
+
+        await confirmation(expectedCount: 5) { confirmation in
+            token = cache?.addDatabaseUpdatesObserver { _ in confirmation() }
 
             _ = mockService.generateAndInsertPosts(count: 5)
 
-            // The changes below should not be sent to the observer.
+            // The changes below happen after the cache is deallocated and must not be
+            // sent to the observer.
             cache = nil
-            try await Task.sleep(for: .seconds(1))
             _ = mockService.generateAndInsertPosts(count: 10)
         }
     }
