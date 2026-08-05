@@ -14,6 +14,7 @@ rust_docker_container := public.ecr.aws/docker/library/rust:$(rust_stable_toolch
 docker_opts_shared := --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
 rust_docker_run := docker run -v $(PWD):/$(docker_container_repo_dir) -w $(docker_container_repo_dir) -it -e TEST_ALL_PLUGINS -e CARGO_HOME=/app/.cargo $(rust_docker_container)
 docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared) -it foo
+gradle_mirror_init_script ?= /var/lib/buildkite-agent/.gradle/init.d/mirror.gradle.kts
 
 swift_package_platform_version = $(shell swift package dump-package | jq -r '.platforms[] | select(.platformName=="$1") | .version')
 swift_package_platform_macos = $(call swift_package_platform_version,macos)
@@ -229,6 +230,7 @@ report-remote-login-integration-test-suite-health:
 
 test-kotlin-integration:
 	@# Help: Run Kotlin integration tests in test server.
+	@if [ -f "$(gradle_mirror_init_script)" ]; then docker exec -i wordpress mkdir -p /root/.gradle/init.d && docker cp "$(gradle_mirror_init_script)" wordpress:/root/.gradle/init.d/mirror.gradle.kts; fi
 	docker exec -i wordpress /bin/bash < ./scripts/run-kotlin-integration-tests.sh
 
 runComposeDesktopApp:
