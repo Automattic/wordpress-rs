@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Use Ruby 3.4.9 for automation tooling.
 - **Internal:** Update translations.
 - **Internal:** Fix a flaky unit test.
+- **Internal:** Route the Kotlin integration tests through the in-VPC Reposilite dependency mirror
 
 ## [0.6.0] - 2026-07-16
 
