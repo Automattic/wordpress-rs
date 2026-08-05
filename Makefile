@@ -229,7 +229,7 @@ report-remote-login-integration-test-suite-health:
 
 test-kotlin-integration:
 	@# Help: Run Kotlin integration tests in test server.
-	docker exec -i wordpress /bin/bash < ./scripts/run-kotlin-integration-tests.sh
+	docker exec -i -e REPOSILITE_MIRROR_ENABLED -e REPOSILITE_MIRROR_URL wordpress /bin/bash < ./scripts/run-kotlin-integration-tests.sh
 
 runComposeDesktopApp:
 	@# Help: Run the Compose Multiplatform desktop application.
