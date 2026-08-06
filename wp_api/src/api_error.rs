@@ -910,6 +910,11 @@ mod tests {
             method: None,
         }
     )]
+    #[case::misconfigured_http_authentication(
+        RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
+            issue: HttpAuthMethodParsingError::Unknown,
+        }
+    )]
     #[case::http_error(RequestExecutionErrorReason::HttpError {
         reason: "connection failed".to_string(),
     })]
