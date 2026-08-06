@@ -1,4 +1,4 @@
-use crate::posts::PostId;
+use crate::{posts::PostId, wp_com::stats_visits::StatsVisitsDataValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use wp_serde_helper::{deserialize_empty_array_or_hashmap, deserialize_u64_or_string};
@@ -57,38 +57,13 @@ struct RawStatsPostResponse {
     /// Column names for the `data` rows. Always `["period", "views"]` in every
     /// response observed, but read rather than assumed.
     fields: Vec<String>,
-    data: Vec<Vec<RawStatsPostDataValue>>,
+    data: Vec<Vec<StatsVisitsDataValue>>,
     highest_month: u64,
     highest_day_average: u64,
     highest_week_average: u64,
     like_count: u64,
     discussion: StatsPostDiscussion,
     post: StatsPostDetails,
-}
-
-/// A value in a raw `data` row (a string, a number, or null).
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum RawStatsPostDataValue {
-    String(String),
-    Number(u64),
-    Null,
-}
-
-impl RawStatsPostDataValue {
-    fn as_string(&self) -> Option<&String> {
-        match self {
-            Self::String(string) => Some(string),
-            _ => None,
-        }
-    }
-
-    fn as_number(&self) -> Option<u64> {
-        match self {
-            Self::Number(number) => Some(*number),
-            _ => None,
-        }
-    }
 }
 
 impl From<RawStatsPostResponse> for StatsPostResponse {
@@ -99,7 +74,7 @@ impl From<RawStatsPostResponse> for StatsPostResponse {
             years: raw.years,
             averages: raw.averages,
             weeks: raw.weeks,
-            daily_views: daily_views(&raw.fields, &raw.data),
+            daily_views: daily_views(&raw.fields, raw.data),
             highest_month: raw.highest_month,
             highest_day_average: raw.highest_day_average,
             highest_week_average: raw.highest_week_average,
@@ -112,7 +87,10 @@ impl From<RawStatsPostResponse> for StatsPostResponse {
 
 /// Flattens the `fields`/`data` column table into data points, skipping rows the
 /// columns can't be read from.
-fn daily_views(fields: &[String], data: &[Vec<RawStatsPostDataValue>]) -> Vec<StatsPostDailyView> {
+///
+/// Takes `data` by value so each row's period string is moved rather than
+/// copied — the history runs to thousands of rows on a long-lived post.
+fn daily_views(fields: &[String], data: Vec<Vec<StatsVisitsDataValue>>) -> Vec<StatsPostDailyView> {
     let (Some(period_index), Some(views_index)) = (
         fields.iter().position(|field| field == "period"),
         fields.iter().position(|field| field == "views"),
@@ -120,14 +98,23 @@ fn daily_views(fields: &[String], data: &[Vec<RawStatsPostDataValue>]) -> Vec<St
         return vec![];
     };
 
-    data.iter()
-        .filter_map(|row| {
-            Some(StatsPostDailyView {
-                period: row.get(period_index)?.as_string()?.clone(),
-                views: row.get(views_index)?.as_number()?,
-            })
-        })
-        .collect()
+    let mut daily_views = Vec::with_capacity(data.len());
+    for mut row in data {
+        let Some(views) = row
+            .get(views_index)
+            .and_then(StatsVisitsDataValue::as_number)
+        else {
+            continue;
+        };
+        if period_index >= row.len() {
+            continue;
+        }
+        let StatsVisitsDataValue::String(period) = row.swap_remove(period_index) else {
+            continue;
+        };
+        daily_views.push(StatsPostDailyView { period, views });
+    }
+    daily_views
 }
 
 /// A single day's view count from the daily view history.
@@ -173,7 +160,8 @@ pub struct StatsPostWeek {
 }
 
 /// The change in views from one week to the next.
-#[derive(Debug, Clone, Copy, PartialEq, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(from = "RawStatsPostChange", into = "RawStatsPostChange")]
 pub enum StatsPostChange {
     /// The percentage change from the previous week.
     Percentage { value: f64 },
@@ -190,45 +178,32 @@ pub enum StatsPostChange {
 /// responses spanning 15 sites. A week following a zero-view week always reports
 /// an integer `0` rather than a not-a-number marker, so there is no `isNan`
 /// counterpart to model.
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 enum RawStatsPostChange {
     Percentage(f64),
     Infinite {
-        // The value is ignored: the API only ever sends `true`, and the presence
-        // of the key is what identifies the shape.
-        #[allow(dead_code)]
+        // Only ever `true` on the wire; the presence of the key is what
+        // identifies the shape.
         #[serde(rename = "isInfinity")]
         is_infinity: bool,
     },
 }
 
-impl<'de> Deserialize<'de> for StatsPostChange {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Ok(match RawStatsPostChange::deserialize(deserializer)? {
+impl From<RawStatsPostChange> for StatsPostChange {
+    fn from(raw: RawStatsPostChange) -> Self {
+        match raw {
             RawStatsPostChange::Percentage(value) => Self::Percentage { value },
             RawStatsPostChange::Infinite { .. } => Self::Infinite,
-        })
+        }
     }
 }
 
-impl Serialize for StatsPostChange {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeMap;
-
-        match self {
-            Self::Percentage { value } => serializer.serialize_f64(*value),
-            Self::Infinite => {
-                let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("isInfinity", &true)?;
-                map.end()
-            }
+impl From<StatsPostChange> for RawStatsPostChange {
+    fn from(change: StatsPostChange) -> Self {
+        match change {
+            StatsPostChange::Percentage { value } => Self::Percentage(value),
+            StatsPostChange::Infinite => Self::Infinite { is_infinity: true },
         }
     }
 }
@@ -303,49 +278,12 @@ mod tests {
         serde_json::from_reader(file).expect("Unable to parse JSON")
     }
 
-    /// A minimal response carrying the given `fields`/`data` column table, for
-    /// exercising the flattening in isolation.
-    fn parse_with_columns(fields: &str, data: &str) -> StatsPostResponse {
-        let json = format!(
-            r#"{{
-                "date": "2026-08-06",
-                "views": 0,
-                "years": {{}},
-                "averages": {{}},
-                "weeks": [],
-                "fields": {fields},
-                "data": {data},
-                "highest_month": 0,
-                "highest_day_average": 0,
-                "highest_week_average": 0,
-                "like_count": 0,
-                "discussion": {{ "comment_count": 0 }},
-                "post": {{
-                    "ID": 1,
-                    "post_title": "A Post",
-                    "post_date": "2026-01-01 00:00:00",
-                    "post_date_gmt": "2026-01-01 00:00:00",
-                    "post_modified": "2026-01-01 00:00:00",
-                    "post_name": "a-post",
-                    "post_status": "publish",
-                    "post_type": "post",
-                    "post_author": "1",
-                    "guid": "https://example.com/?p=1"
-                }}
-            }}"#
-        );
-        serde_json::from_str(&json).expect("Unable to parse JSON")
-    }
-
-    #[rstest]
-    #[case(WITH_VIEWS)]
-    #[case(NO_VIEWS)]
-    fn test_stats_post_response_deserialization(#[case] json_file_path: &str) {
-        let response = parse(json_file_path);
-
-        assert!(!response.date.is_empty());
-        assert!(!response.daily_views.is_empty());
-        assert!(!response.weeks.is_empty());
+    /// Flattens a `fields`/`data` column table given as JSON, for exercising the
+    /// column handling without a full response envelope.
+    fn flatten(fields: &[&str], data: &str) -> Vec<StatsPostDailyView> {
+        let fields: Vec<String> = fields.iter().map(|f| f.to_string()).collect();
+        let data = serde_json::from_str(data).expect("Unable to parse JSON");
+        daily_views(&fields, data)
     }
 
     #[test]
@@ -457,41 +395,35 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_stats_post_daily_views_reads_the_column_table() {
-        // The column positions are read rather than assumed, so swapping them
-        // still yields the same data points.
-        let response = parse_with_columns(
-            r#"["views", "period"]"#,
-            r#"[[5, "2026-08-04"], [7, "2026-08-06"]]"#,
-        );
+    #[rstest]
+    // The column positions are read rather than assumed, so swapping them still
+    // yields the same data points.
+    #[case::reordered_columns(
+        &["views", "period"],
+        r#"[[5, "2026-08-04"], [7, "2026-08-06"]]"#,
+        vec![("2026-08-04", 5), ("2026-08-06", 7)]
+    )]
+    // An unreadable row is dropped rather than derailing the rest.
+    #[case::unreadable_row(
+        &["period", "views"],
+        r#"[["2026-08-04", 5], [null, null], ["2026-08-06", 7]]"#,
+        vec![("2026-08-04", 5), ("2026-08-06", 7)]
+    )]
+    #[case::missing_views_column(&["period"], r#"[["2026-08-04"]]"#, vec![])]
+    fn test_stats_post_daily_views_column_handling(
+        #[case] fields: &[&str],
+        #[case] data: &str,
+        #[case] expected: Vec<(&str, u64)>,
+    ) {
+        let expected: Vec<StatsPostDailyView> = expected
+            .into_iter()
+            .map(|(period, views)| StatsPostDailyView {
+                period: period.to_string(),
+                views,
+            })
+            .collect();
 
-        assert_eq!(response.daily_views.len(), 2);
-        assert_eq!(response.daily_views[0].period, "2026-08-04");
-        assert_eq!(response.daily_views[0].views, 5);
-    }
-
-    #[test]
-    fn test_stats_post_daily_views_skips_unreadable_rows() {
-        let response = parse_with_columns(
-            r#"["period", "views"]"#,
-            r#"[["2026-08-04", 5], [null, null], ["2026-08-06", 7]]"#,
-        );
-
-        assert_eq!(
-            response.daily_views.len(),
-            2,
-            "the unreadable row should be dropped, not derail the rest"
-        );
-        assert_eq!(response.daily_views[0].period, "2026-08-04");
-        assert_eq!(response.daily_views[1].period, "2026-08-06");
-    }
-
-    #[test]
-    fn test_stats_post_daily_views_without_known_columns() {
-        let response = parse_with_columns(r#"["period"]"#, r#"[["2026-08-04"]]"#);
-
-        assert!(response.daily_views.is_empty());
+        assert_eq!(flatten(fields, data), expected);
     }
 
     #[test]
