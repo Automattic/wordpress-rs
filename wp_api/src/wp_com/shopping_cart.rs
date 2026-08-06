@@ -2,7 +2,7 @@ use crate::{
     date::WpGmtDateTime,
     decimal2::Decimal2,
     wp_com::{
-        CurrencyCode, WpComSiteId,
+        CostOverrideCode, CouponCode, CurrencyCode, WpComSiteId,
         domains::{CountryCode, DomainName},
         products::{ProductId, ProductSlug},
         purchases::PurchaseId,
@@ -139,7 +139,8 @@ pub struct ShoppingCart {
     pub cart_generated_at_timestamp: u64,
     pub blog_id: WpComSiteId,
     pub cart_key: CartKey,
-    pub coupon: String,
+    /// The coupon applied to the cart. Empty when there isn't one.
+    pub coupon: CouponCode,
     pub is_coupon_applied: bool,
     pub has_auto_renew_coupon_been_automatically_applied: bool,
     pub next_domain_is_free: bool,
@@ -296,7 +297,7 @@ pub struct ShoppingCartCostOverride {
     pub old_subtotal_integer: u64,
     pub new_subtotal: Decimal2,
     pub new_subtotal_integer: u64,
-    pub override_code: String,
+    pub override_code: CostOverrideCode,
     pub does_override_original_cost: bool,
     pub percentage: u32,
     pub first_unit_only: bool,
@@ -471,7 +472,7 @@ mod tests {
         assert!(!domain.cost_overrides.is_empty());
         assert_eq!(
             domain.cost_overrides[0].override_code,
-            "bundled-domain-credit"
+            CostOverrideCode("bundled-domain-credit".to_string())
         );
         assert_eq!(
             domain.cost_overrides[0].human_readable_reason,
