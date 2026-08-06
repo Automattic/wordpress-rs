@@ -1,7 +1,9 @@
 use crate::{posts::PostId, wp_com::stats_visits::StatsVisitsDataValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use wp_serde_helper::{deserialize_empty_array_or_hashmap, deserialize_u64_or_string};
+use wp_serde_helper::{
+    deserialize_empty_array_or_hashmap, deserialize_false_as_none, deserialize_u64_or_string,
+};
 
 /// Response from the per-post stats endpoint.
 ///
@@ -10,6 +12,13 @@ use wp_serde_helper::{deserialize_empty_array_or_hashmap, deserialize_u64_or_str
 /// Callers that only need a trailing window (such as the "Latest Post Summary"
 /// card) should slice the tail of it — `daily_views.suffix(7)` in Swift,
 /// `dailyViews.takeLast(7)` in Kotlin.
+///
+/// # The site's home page
+///
+/// Requesting `PostId(0)` returns view stats for the site's home page, which
+/// `/stats/top-posts` reports as a pseudo-entry with that id. The home page
+/// isn't a post, so [`Self::post`], [`Self::discussion`] and [`Self::like_count`]
+/// are all `None` for it; every view field is populated as usual.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 #[serde(from = "RawStatsPostResponse")]
 pub struct StatsPostResponse {
@@ -35,12 +44,12 @@ pub struct StatsPostResponse {
     pub highest_day_average: u64,
     /// The highest weekly view average the post reached.
     pub highest_week_average: u64,
-    /// The post's like count.
-    pub like_count: u64,
-    /// The post's comment counts.
-    pub discussion: StatsPostDiscussion,
-    /// The post the stats belong to.
-    pub post: StatsPostDetails,
+    /// The post's like count. `None` for the site's home page.
+    pub like_count: Option<u64>,
+    /// The post's comment counts. `None` for the site's home page.
+    pub discussion: Option<StatsPostDiscussion>,
+    /// The post the stats belong to. `None` for the site's home page.
+    pub post: Option<StatsPostDetails>,
 }
 
 /// The response as the API sends it, before the `fields`/`data` column table is
@@ -61,9 +70,12 @@ struct RawStatsPostResponse {
     highest_month: u64,
     highest_day_average: u64,
     highest_week_average: u64,
-    like_count: u64,
-    discussion: StatsPostDiscussion,
-    post: StatsPostDetails,
+    // The home page (`PostId(0)`) has no post behind it, so the API sends these
+    // as `null` — and `post` as boolean `false` rather than `null`.
+    like_count: Option<u64>,
+    discussion: Option<StatsPostDiscussion>,
+    #[serde(deserialize_with = "deserialize_false_as_none")]
+    post: Option<StatsPostDetails>,
 }
 
 impl From<RawStatsPostResponse> for StatsPostResponse {
@@ -272,6 +284,7 @@ mod tests {
 
     const WITH_VIEWS: &str = "tests/wpcom/stats_post/post-with-views.json";
     const NO_VIEWS: &str = "tests/wpcom/stats_post/post-no-views.json";
+    const HOMEPAGE: &str = "tests/wpcom/stats_post/homepage.json";
 
     fn parse(json_file_path: &str) -> StatsPostResponse {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
@@ -295,8 +308,8 @@ mod tests {
         assert_eq!(response.highest_month, 3224);
         assert_eq!(response.highest_day_average, 293);
         assert_eq!(response.highest_week_average, 3);
-        assert_eq!(response.like_count, 9);
-        assert_eq!(response.discussion.comment_count, 48);
+        assert_eq!(response.like_count, Some(9));
+        assert_eq!(response.discussion.expect("present").comment_count, 48);
 
         let year = response.years.get("2013").expect("2013 should exist");
         assert_eq!(year.total, 6146);
@@ -309,7 +322,7 @@ mod tests {
 
     #[test]
     fn test_stats_post_details() {
-        let post = parse(WITH_VIEWS).post;
+        let post = parse(WITH_VIEWS).post.expect("a real post has details");
 
         assert_eq!(post.id, PostId(2729));
         assert_eq!(
@@ -427,13 +440,36 @@ mod tests {
     }
 
     #[test]
+    fn test_stats_post_homepage() {
+        // `PostId(0)` is the site's home page. It isn't a post, so the API sends
+        // `like_count` and `discussion` as null and `post` as boolean `false`,
+        // while every view field is populated as usual.
+        let response = parse(HOMEPAGE);
+
+        assert!(response.post.is_none());
+        assert!(response.discussion.is_none());
+        assert!(response.like_count.is_none());
+
+        assert_eq!(response.views, 74286);
+        assert_eq!(response.highest_month, 3822);
+        assert_eq!(response.daily_views.len(), 3);
+        assert_eq!(response.daily_views[0].period, "2013-05-19");
+        assert_eq!(response.daily_views[0].views, 73);
+        assert_eq!(
+            response.years.get("2013").expect("2013 should exist").total,
+            14276
+        );
+        assert!(!response.weeks.is_empty());
+    }
+
+    #[test]
     fn test_stats_post_without_views() {
         let response = parse(NO_VIEWS);
 
         assert_eq!(response.views, 0);
         assert_eq!(response.highest_month, 0);
-        assert_eq!(response.like_count, 0);
-        assert_eq!(response.discussion.comment_count, 0);
+        assert_eq!(response.like_count, Some(0));
+        assert_eq!(response.discussion.expect("present").comment_count, 0);
 
         // The API sends `months` as an empty array rather than an empty object.
         let year = response.years.get("2026").expect("2026 should exist");

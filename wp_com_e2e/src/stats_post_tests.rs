@@ -1,6 +1,7 @@
 use libtest_mimic::Trial;
 use std::sync::Arc;
 use wp_api::{
+    api_error::WpApiError,
     posts::PostId,
     wp_com::{
         WpComSiteId,
@@ -44,6 +45,44 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                                 .await
                                 .map_err(|e| e.to_string())?;
                             Ok(())
+                        })
+                    }
+                },
+            ));
+
+            // `PostId(0)` is the site's home page rather than a post, so the API
+            // omits the post, discussion, and like fields. Every site has one,
+            // so this needs no lookup.
+            trials.push(Trial::test(
+                format!("post_stats::get_stats_post_homepage::{}", site_id),
+                {
+                    let ctx = Arc::clone(&ctx);
+                    move || {
+                        ctx.runtime.block_on(async {
+                            let result = ctx
+                                .client
+                                .stats_post()
+                                .get_stats_post(&site_id, &PostId(0))
+                                .await;
+
+                            match result {
+                                Ok(response) => {
+                                    if response.data.post.is_some() {
+                                        return Err(
+                                            "the home page should have no post details".into()
+                                        );
+                                    }
+                                    Ok(())
+                                }
+                                // Test sites without Jetpack Stats have nothing to
+                                // report; that isn't a failure of this endpoint.
+                                Err(WpApiError::UnknownError { response, .. })
+                                    if response.contains("invalid_blog") =>
+                                {
+                                    Ok(())
+                                }
+                                Err(e) => Err(format!("{e:?}").into()),
+                            }
                         })
                     }
                 },
