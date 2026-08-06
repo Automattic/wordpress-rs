@@ -47,7 +47,6 @@ extension WpApiError {
         }
         return false
     }
-
 }
 
 extension RequestExecutionErrorReason {
