@@ -48,35 +48,63 @@ impl StatsPostViewsResponse {
     /// Returns an empty list if the response is missing the `period` or `views`
     /// column.
     pub fn daily_views(&self) -> Vec<StatsPostViewsDataPoint> {
-        self.daily_views_iter().collect()
+        let Some(columns) = self.data_columns() else {
+            return vec![];
+        };
+
+        self.data
+            .iter()
+            .filter_map(|row| columns.data_point(row))
+            .collect()
     }
 
     /// The most recent `days` entries of the daily view history, oldest first.
     ///
     /// Returns fewer entries if the post has a shorter history.
+    ///
+    /// Prefer this over [`Self::daily_views`] when only a trailing window is
+    /// needed. It walks the history backwards and allocates just the entries it
+    /// returns, rather than materializing the post's full history first.
     pub fn recent_daily_views(&self, days: u32) -> Vec<StatsPostViewsDataPoint> {
-        let days = days as usize;
-        let all = self.daily_views();
-        all[all.len().saturating_sub(days)..].to_vec()
+        let Some(columns) = self.data_columns() else {
+            return vec![];
+        };
+
+        let mut recent: Vec<StatsPostViewsDataPoint> = self
+            .data
+            .iter()
+            .rev()
+            .filter_map(|row| columns.data_point(row))
+            .take(days as usize)
+            .collect();
+        recent.reverse();
+        recent
     }
 }
 
 impl StatsPostViewsResponse {
-    fn daily_views_iter(&self) -> impl Iterator<Item = StatsPostViewsDataPoint> + '_ {
-        let period_index = self.fields.iter().position(|f| f == "period");
-        let views_index = self.fields.iter().position(|f| f == "views");
+    /// Resolves the positions of the columns the daily view history is read
+    /// from, or `None` if [`Self::fields`] doesn't name both of them.
+    fn data_columns(&self) -> Option<StatsPostViewsDataColumns> {
+        Some(StatsPostViewsDataColumns {
+            period: self.fields.iter().position(|field| field == "period")?,
+            views: self.fields.iter().position(|field| field == "views")?,
+        })
+    }
+}
 
-        self.data.iter().filter_map(move |row| {
-            if let (Some(period_index), Some(views_index)) = (period_index, views_index)
-                && let Some(period) = row.get(period_index).and_then(|v| v.as_string())
-                && let Some(views) = row.get(views_index).and_then(|v| v.as_number())
-            {
-                return Some(StatsPostViewsDataPoint {
-                    period: period.clone(),
-                    views,
-                });
-            }
-            None
+/// Positions of the columns within a [`StatsPostViewsResponse::data`] row.
+#[derive(Clone, Copy)]
+struct StatsPostViewsDataColumns {
+    period: usize,
+    views: usize,
+}
+
+impl StatsPostViewsDataColumns {
+    fn data_point(&self, row: &[StatsPostViewsDataValue]) -> Option<StatsPostViewsDataPoint> {
+        Some(StatsPostViewsDataPoint {
+            period: row.get(self.period)?.as_string()?.clone(),
+            views: row.get(self.views)?.as_number()?,
         })
     }
 }
@@ -160,11 +188,19 @@ pub enum StatsPostViewsChange {
 }
 
 /// The wire representations the API uses for a week's `change`.
+///
+/// These three shapes — a number, `{"isInfinity": true}`, and `null` (handled by
+/// the surrounding `Option`) — are the only ones observed across 60 real
+/// responses spanning 15 sites. A week following a zero-view week always reports
+/// an integer `0` rather than a not-a-number marker, so there is no `isNan`
+/// counterpart to model.
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum RawStatsPostViewsChange {
     Percentage(f64),
     Infinite {
+        // The value is ignored: the API only ever sends `true`, and the presence
+        // of the key is what identifies the shape.
         #[allow(dead_code)]
         #[serde(rename = "isInfinity")]
         is_infinity: bool,
@@ -222,6 +258,10 @@ pub struct StatsPostViewsDiscussion {
 /// This mirrors WordPress' raw post row, so it carries the post's editorial
 /// metadata but not a permalink. Fields the API sends that aren't modelled here
 /// (post content, ping status, and similar) are ignored.
+///
+/// The row's `comment_count` is deliberately omitted: the API sends it as a
+/// string here, and [`StatsPostViewsDiscussion::comment_count`] carries the same
+/// value as a number.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostViewsPost {
     /// The post's ID.
@@ -400,6 +440,22 @@ mod tests {
         // Asking for more days than the post has returns the whole history.
         assert_eq!(response.recent_daily_views(100).len(), 5);
         assert!(response.recent_daily_views(0).is_empty());
+    }
+
+    #[test]
+    fn test_stats_post_views_recent_daily_views_skips_unreadable_rows() {
+        let mut response = parse(WITH_VIEWS);
+
+        // Drop a row the column reader can't make sense of into the middle of the
+        // history. It should be skipped rather than counted against `days`.
+        response
+            .data
+            .insert(3, vec![StatsPostViewsDataValue::Null; 2]);
+
+        let recent = response.recent_daily_views(3);
+        assert_eq!(recent.len(), 3);
+        assert_eq!(recent[0].period, "2013-06-22");
+        assert_eq!(recent[2].period, "2026-08-06");
     }
 
     #[test]
