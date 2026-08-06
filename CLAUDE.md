@@ -29,9 +29,24 @@ swift package plugin swiftlint --strict
 # Generate API documentation
 cargo doc --no-deps --all-features
 
-# Generate Swift bindings (use this to verify UniFFI changes work correctly)
-make xcframework
+# Generate Swift bindings and an xcframework `swift build` can link.
+# Use this to verify UniFFI changes locally — it builds 2 targets (~18GB).
+make xcframework-only-macos
+swift build --target WordPressAPI
+
+# Compile the generated Kotlin bindings and lint them. Builds for the host, so
+# no Android NDK is required.
+cd native/kotlin && ./gradlew :api:kotlin:compileKotlin :api:kotlin:detekt
 ```
+
+**Do not run `make xcframework` to verify a local change.** It builds all 11
+Apple targets, consumes ~100GB in `target/`, and takes tens of minutes. It is
+what CI and releases need, not what a code change needs. Note also that
+`xcframework-only-<platform>` *replaces* the xcframework rather than adding a
+slice, so running the `ios` variant will break a subsequent `swift build`.
+
+See `Documentation/local-development.md` for the full rationale, the Java 21
+toolchain requirement for Kotlin builds, and how to reclaim disk space.
 
 ## Architecture
 
