@@ -5,28 +5,30 @@ use wp_serde_helper::{deserialize_empty_array_or_hashmap, deserialize_u64_or_str
 
 /// Response from the per-post stats endpoint.
 ///
-/// The endpoint returns the post's complete view history, so [`Self::data`] can
-/// contain thousands of rows for a long-lived post. Callers that only need a
-/// short trailing window (such as the "Latest Post Summary" card) should use
-/// [`Self::recent_daily_views`] rather than materializing the whole series.
+/// The endpoint returns the post's complete view history, so
+/// [`Self::daily_views`] can hold thousands of entries for a long-lived post.
+/// Callers that only need a trailing window (such as the "Latest Post Summary"
+/// card) should slice the tail of it — `daily_views.suffix(7)` in Swift,
+/// `dailyViews.takeLast(7)` in Kotlin.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawStatsPostViewsResponse")]
 pub struct StatsPostViewsResponse {
     /// The date the stats were generated for (format: YYYY-MM-DD).
     pub date: String,
     /// The post's all-time view count.
     pub views: u64,
     /// Yearly view totals, keyed by year (e.g. `"2026"`).
-    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     pub years: HashMap<String, StatsPostViewsYear>,
     /// Yearly view averages, keyed by year (e.g. `"2026"`).
-    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     pub averages: HashMap<String, StatsPostViewsAverage>,
     /// The most recent weeks of daily views, oldest first.
     pub weeks: Vec<StatsPostViewsWeek>,
-    /// Field names for the [`Self::data`] rows, e.g. `["period", "views"]`.
-    pub fields: Vec<String>,
-    /// The full daily view history as rows of values corresponding to [`Self::fields`].
-    pub data: Vec<Vec<StatsPostViewsDataValue>>,
+    /// The post's complete daily view history, oldest first.
+    ///
+    /// The API sends this as a `fields`/`data` column table; it is flattened
+    /// while deserializing so callers never handle the column indirection.
+    /// Empty if the response doesn't name both the `period` and `views` columns.
+    pub daily_views: Vec<StatsPostViewsDataPoint>,
     /// The highest view count the post reached in a single month.
     pub highest_month: u64,
     /// The highest daily view average the post reached.
@@ -41,72 +43,94 @@ pub struct StatsPostViewsResponse {
     pub post: StatsPostViewsPost,
 }
 
-#[uniffi::export]
-impl StatsPostViewsResponse {
-    /// The post's complete daily view history, oldest first.
-    ///
-    /// Returns an empty list if the response is missing the `period` or `views`
-    /// column.
-    pub fn daily_views(&self) -> Vec<StatsPostViewsDataPoint> {
-        let Some(columns) = self.data_columns() else {
-            return vec![];
-        };
+/// The response as the API sends it, before the `fields`/`data` column table is
+/// flattened into [`StatsPostViewsResponse::daily_views`].
+#[derive(Deserialize)]
+struct RawStatsPostViewsResponse {
+    date: String,
+    views: u64,
+    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    years: HashMap<String, StatsPostViewsYear>,
+    #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
+    averages: HashMap<String, StatsPostViewsAverage>,
+    weeks: Vec<StatsPostViewsWeek>,
+    /// Column names for the `data` rows. Always `["period", "views"]` in every
+    /// response observed, but read rather than assumed.
+    fields: Vec<String>,
+    data: Vec<Vec<RawStatsPostViewsDataValue>>,
+    highest_month: u64,
+    highest_day_average: u64,
+    highest_week_average: u64,
+    like_count: u64,
+    discussion: StatsPostViewsDiscussion,
+    post: StatsPostViewsPost,
+}
 
-        self.data
-            .iter()
-            .filter_map(|row| columns.data_point(row))
-            .collect()
+/// A value in a raw `data` row (a string, a number, or null).
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum RawStatsPostViewsDataValue {
+    String(String),
+    Number(u64),
+    Null,
+}
+
+impl RawStatsPostViewsDataValue {
+    fn as_string(&self) -> Option<&String> {
+        match self {
+            Self::String(string) => Some(string),
+            _ => None,
+        }
     }
 
-    /// The most recent `days` entries of the daily view history, oldest first.
-    ///
-    /// Returns fewer entries if the post has a shorter history.
-    ///
-    /// Prefer this over [`Self::daily_views`] when only a trailing window is
-    /// needed. It walks the history backwards and allocates just the entries it
-    /// returns, rather than materializing the post's full history first.
-    pub fn recent_daily_views(&self, days: u32) -> Vec<StatsPostViewsDataPoint> {
-        let Some(columns) = self.data_columns() else {
-            return vec![];
-        };
-
-        let mut recent: Vec<StatsPostViewsDataPoint> = self
-            .data
-            .iter()
-            .rev()
-            .filter_map(|row| columns.data_point(row))
-            .take(days as usize)
-            .collect();
-        recent.reverse();
-        recent
+    fn as_number(&self) -> Option<u64> {
+        match self {
+            Self::Number(number) => Some(*number),
+            _ => None,
+        }
     }
 }
 
-impl StatsPostViewsResponse {
-    /// Resolves the positions of the columns the daily view history is read
-    /// from, or `None` if [`Self::fields`] doesn't name both of them.
-    fn data_columns(&self) -> Option<StatsPostViewsDataColumns> {
-        Some(StatsPostViewsDataColumns {
-            period: self.fields.iter().position(|field| field == "period")?,
-            views: self.fields.iter().position(|field| field == "views")?,
+impl From<RawStatsPostViewsResponse> for StatsPostViewsResponse {
+    fn from(raw: RawStatsPostViewsResponse) -> Self {
+        Self {
+            date: raw.date,
+            views: raw.views,
+            years: raw.years,
+            averages: raw.averages,
+            weeks: raw.weeks,
+            daily_views: daily_views(&raw.fields, &raw.data),
+            highest_month: raw.highest_month,
+            highest_day_average: raw.highest_day_average,
+            highest_week_average: raw.highest_week_average,
+            like_count: raw.like_count,
+            discussion: raw.discussion,
+            post: raw.post,
+        }
+    }
+}
+
+/// Flattens the `fields`/`data` column table into data points, skipping rows the
+/// columns can't be read from.
+fn daily_views(
+    fields: &[String],
+    data: &[Vec<RawStatsPostViewsDataValue>],
+) -> Vec<StatsPostViewsDataPoint> {
+    let (Some(period_index), Some(views_index)) = (
+        fields.iter().position(|field| field == "period"),
+        fields.iter().position(|field| field == "views"),
+    ) else {
+        return vec![];
+    };
+
+    data.iter()
+        .filter_map(|row| {
+            Some(StatsPostViewsDataPoint {
+                period: row.get(period_index)?.as_string()?.clone(),
+                views: row.get(views_index)?.as_number()?,
+            })
         })
-    }
-}
-
-/// Positions of the columns within a [`StatsPostViewsResponse::data`] row.
-#[derive(Clone, Copy)]
-struct StatsPostViewsDataColumns {
-    period: usize,
-    views: usize,
-}
-
-impl StatsPostViewsDataColumns {
-    fn data_point(&self, row: &[StatsPostViewsDataValue]) -> Option<StatsPostViewsDataPoint> {
-        Some(StatsPostViewsDataPoint {
-            period: row.get(self.period)?.as_string()?.clone(),
-            views: row.get(self.views)?.as_number()?,
-        })
-    }
+        .collect()
 }
 
 /// A single day's view count from the daily view history.
@@ -116,31 +140,6 @@ pub struct StatsPostViewsDataPoint {
     pub period: String,
     /// The number of views on that day.
     pub views: u64,
-}
-
-/// A value in the daily view history rows (can be a string, a number, or null).
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Enum)]
-#[serde(untagged)]
-pub enum StatsPostViewsDataValue {
-    String(String),
-    Number(u64),
-    Null,
-}
-
-impl StatsPostViewsDataValue {
-    pub fn as_string(&self) -> Option<&String> {
-        match self {
-            StatsPostViewsDataValue::String(s) => Some(s),
-            _ => None,
-        }
-    }
-
-    pub fn as_number(&self) -> Option<u64> {
-        match self {
-            StatsPostViewsDataValue::Number(n) => Some(*n),
-            _ => None,
-        }
-    }
 }
 
 /// A year's view totals.
@@ -307,6 +306,40 @@ mod tests {
         serde_json::from_reader(file).expect("Unable to parse JSON")
     }
 
+    /// A minimal response carrying the given `fields`/`data` column table, for
+    /// exercising the flattening in isolation.
+    fn parse_with_columns(fields: &str, data: &str) -> StatsPostViewsResponse {
+        let json = format!(
+            r#"{{
+                "date": "2026-08-06",
+                "views": 0,
+                "years": {{}},
+                "averages": {{}},
+                "weeks": [],
+                "fields": {fields},
+                "data": {data},
+                "highest_month": 0,
+                "highest_day_average": 0,
+                "highest_week_average": 0,
+                "like_count": 0,
+                "discussion": {{ "comment_count": 0 }},
+                "post": {{
+                    "ID": 1,
+                    "post_title": "A Post",
+                    "post_date": "2026-01-01 00:00:00",
+                    "post_date_gmt": "2026-01-01 00:00:00",
+                    "post_modified": "2026-01-01 00:00:00",
+                    "post_name": "a-post",
+                    "post_status": "publish",
+                    "post_type": "post",
+                    "post_author": "1",
+                    "guid": "https://example.com/?p=1"
+                }}
+            }}"#
+        );
+        serde_json::from_str(&json).expect("Unable to parse JSON")
+    }
+
     #[rstest]
     #[case(WITH_VIEWS)]
     #[case(NO_VIEWS)]
@@ -314,7 +347,7 @@ mod tests {
         let response = parse(json_file_path);
 
         assert!(!response.date.is_empty());
-        assert_eq!(response.fields, vec!["period", "views"]);
+        assert!(!response.daily_views.is_empty());
         assert!(!response.weeks.is_empty());
     }
 
@@ -408,9 +441,8 @@ mod tests {
 
     #[test]
     fn test_stats_post_views_daily_views() {
-        let response = parse(WITH_VIEWS);
+        let daily_views = parse(WITH_VIEWS).daily_views;
 
-        let daily_views = response.daily_views();
         assert_eq!(daily_views.len(), 5);
         assert_eq!(
             daily_views[0],
@@ -429,42 +461,40 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_post_views_recent_daily_views() {
-        let response = parse(WITH_VIEWS);
+    fn test_stats_post_views_daily_views_reads_the_column_table() {
+        // The column positions are read rather than assumed, so swapping them
+        // still yields the same data points.
+        let response = parse_with_columns(
+            r#"["views", "period"]"#,
+            r#"[[5, "2026-08-04"], [7, "2026-08-06"]]"#,
+        );
 
-        let recent = response.recent_daily_views(3);
-        assert_eq!(recent.len(), 3);
-        assert_eq!(recent[0].period, "2013-06-22");
-        assert_eq!(recent[2].period, "2026-08-06");
-
-        // Asking for more days than the post has returns the whole history.
-        assert_eq!(response.recent_daily_views(100).len(), 5);
-        assert!(response.recent_daily_views(0).is_empty());
+        assert_eq!(response.daily_views.len(), 2);
+        assert_eq!(response.daily_views[0].period, "2026-08-04");
+        assert_eq!(response.daily_views[0].views, 5);
     }
 
     #[test]
-    fn test_stats_post_views_recent_daily_views_skips_unreadable_rows() {
-        let mut response = parse(WITH_VIEWS);
+    fn test_stats_post_views_daily_views_skips_unreadable_rows() {
+        let response = parse_with_columns(
+            r#"["period", "views"]"#,
+            r#"[["2026-08-04", 5], [null, null], ["2026-08-06", 7]]"#,
+        );
 
-        // Drop a row the column reader can't make sense of into the middle of the
-        // history. It should be skipped rather than counted against `days`.
-        response
-            .data
-            .insert(3, vec![StatsPostViewsDataValue::Null; 2]);
-
-        let recent = response.recent_daily_views(3);
-        assert_eq!(recent.len(), 3);
-        assert_eq!(recent[0].period, "2013-06-22");
-        assert_eq!(recent[2].period, "2026-08-06");
+        assert_eq!(
+            response.daily_views.len(),
+            2,
+            "the unreadable row should be dropped, not derail the rest"
+        );
+        assert_eq!(response.daily_views[0].period, "2026-08-04");
+        assert_eq!(response.daily_views[1].period, "2026-08-06");
     }
 
     #[test]
-    fn test_stats_post_views_daily_views_without_known_fields() {
-        let mut response = parse(WITH_VIEWS);
-        response.fields = vec!["period".to_string()];
+    fn test_stats_post_views_daily_views_without_known_columns() {
+        let response = parse_with_columns(r#"["period"]"#, r#"[["2026-08-04"]]"#);
 
-        assert!(response.daily_views().is_empty());
-        assert!(response.recent_daily_views(7).is_empty());
+        assert!(response.daily_views.is_empty());
     }
 
     #[test]
@@ -485,8 +515,7 @@ mod tests {
         assert_eq!(average.overall, 0.0);
         assert!(average.months.is_empty());
 
-        let daily_views = response.daily_views();
-        assert_eq!(daily_views.len(), 3);
-        assert!(daily_views.iter().all(|d| d.views == 0));
+        assert_eq!(response.daily_views.len(), 3);
+        assert!(response.daily_views.iter().all(|d| d.views == 0));
     }
 }
