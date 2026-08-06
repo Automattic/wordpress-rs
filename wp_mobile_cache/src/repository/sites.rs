@@ -444,8 +444,12 @@ impl SiteRepository {
 mod tests {
     use super::*;
     use crate::{
-        MigrationManager, db_types::row_ext::ColumnIndex,
-        db_types::wordpress_com_site::DbWordPressComSiteColumn, entity::EntityId,
+        MigrationManager,
+        db_types::row_ext::ColumnIndex,
+        db_types::wordpress_com_site::DbWordPressComSiteColumn,
+        entity::EntityId,
+        list_metadata::{ListKey, ListState},
+        repository::list_metadata::{ListMetadataItemInput, ListMetadataRepository},
         test_fixtures::get_table_column_names,
     };
     use rstest::*;
@@ -741,6 +745,75 @@ mod tests {
         assert_eq!(
             count_self_hosted_after, 0,
             "Site should be deleted from self_hosted_sites table"
+        );
+    }
+
+    /// `list_metadata` cascades from `db_sites`, and its items and state rows
+    /// cascade again from `list_metadata`. The second hop only fires because
+    /// SQLite applies cascades recursively, so it is worth asserting directly.
+    #[rstest]
+    fn test_delete_site_cascades_through_list_metadata_to_items_and_state(
+        mut test_conn: Connection,
+    ) {
+        let repo = SiteRepository;
+        let site = SelfHostedSite {
+            url: "https://example.com".to_string(),
+            api_root: "https://example.com/wp-json".to_string(),
+        };
+        let entity_id = repo
+            .upsert_self_hosted_site(&mut test_conn, &site)
+            .expect("Failed to upsert site");
+
+        let key = ListKey::from("edit:posts:publish");
+        let list_metadata_id =
+            ListMetadataRepository::get_or_create(&test_conn, &entity_id.db_site, &key, 20)
+                .expect("Failed to create list metadata");
+        ListMetadataRepository::set_items_by_list_metadata_id(
+            &test_conn,
+            list_metadata_id,
+            &[ListMetadataItemInput {
+                entity_id: 1,
+                modified_gmt: None,
+                parent: None,
+                menu_order: None,
+            }],
+        )
+        .expect("Failed to set list items");
+        ListMetadataRepository::update_state_by_list_metadata_id(
+            &test_conn,
+            list_metadata_id,
+            ListState::Idle,
+            None,
+        )
+        .expect("Failed to set list state");
+
+        assert_eq!(
+            ListMetadataRepository::get_items_by_list_metadata_id(&test_conn, list_metadata_id)
+                .expect("Failed to read list items")
+                .len(),
+            1
+        );
+
+        repo.delete_site(&mut test_conn, &entity_id.db_site)
+            .expect("Failed to delete site");
+
+        assert!(
+            ListMetadataRepository::get_header(&test_conn, &entity_id.db_site, &key)
+                .expect("Failed to read list header")
+                .is_none(),
+            "list_metadata should cascade from db_sites"
+        );
+        assert!(
+            ListMetadataRepository::get_items_by_list_metadata_id(&test_conn, list_metadata_id)
+                .expect("Failed to read list items")
+                .is_empty(),
+            "list_metadata_items should cascade from list_metadata"
+        );
+        assert!(
+            ListMetadataRepository::get_state_by_list_metadata_id(&test_conn, list_metadata_id)
+                .expect("Failed to read list state")
+                .is_none(),
+            "list_metadata_state should cascade from list_metadata"
         );
     }
 
