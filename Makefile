@@ -125,18 +125,29 @@ build-apple-tvOS: $(build-apple-platform-tvos)
 build-apple-watchOS: $(build-apple-platform-watchos)
 
 # Creating xcframework for one single platform, including real device and simulator.
+# NOTE: these REPLACE the xcframework rather than adding a slice to it. Use
+# `xcframework-only-macos` for local `swift build`, which links the macOS slice.
 xcframework-only-macos: $(build-apple-platform-macos)
+	@# Help: Build an xcframework containing only macOS (~18GB). Use this to verify UniFFI changes locally.
 xcframework-only-ios: $(build-apple-platform-ios)
+	@# Help: Build an xcframework containing only iOS (~24GB). Replaces any existing xcframework.
 xcframework-only-tvos: $(build-apple-platform-tvos)
+	@# Help: Build an xcframework containing only tvOS. Replaces any existing xcframework.
 xcframework-only-watchos: $(build-apple-platform-watchos)
+	@# Help: Build an xcframework containing only watchOS. Replaces any existing xcframework.
 xcframework-only-%:
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-$*)
 
 # Assemble pre-built targets into an xcframework (without building targets).
 xcframework-assemble:
+	@# Help: Assemble already-built targets into an xcframework, without building anything.
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
 
 # Creating xcframework for all platforms.
+#
+# This builds all 11 Apple targets and consumes ~100GB in `target/`. For local
+# verification of a UniFFI change, prefer `xcframework-only-macos` — see
+# Documentation/local-development.md.
 xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
 
