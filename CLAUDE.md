@@ -45,8 +45,8 @@ what CI and releases need, not what a code change needs. Note also that
 `xcframework-only-<platform>` *replaces* the xcframework rather than adding a
 slice, so running the `ios` variant will break a subsequent `swift build`.
 
-See `Documentation/local-development.md` for the full rationale, the Java 21
-toolchain requirement for Kotlin builds, and how to reclaim disk space.
+See `Documentation/local-development.md` for the full rationale and the fast
+path for verifying a UniFFI change.
 
 ## Architecture
 

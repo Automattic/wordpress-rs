@@ -15,12 +15,9 @@ Given the multi-platform nature of this project, the development environment wil
 | Dependency                                                | Platform         |
 | --------------------------------------------------------- | ---------------- |
 | [Gradle](https://gradle.org/install/)                     | Core             |
-| JDK 21 ([see notes](Documentation/local-development.md#java-toolchain-kotlin-builds)) | Core |
+| JDK 21                                                    | Core             |
 | [Android SDK](https://developer.android.com/tools)        | Android          |
 | [Docker](https://www.docker.com/) (for integration tests) | Core + Android   |
-
-The Kotlin bindings pin a **Java 21** toolchain. Android Studio's bundled JDK is
-not a substitute — see [Local Development](Documentation/local-development.md#java-toolchain-kotlin-builds).
 
 See [Android Studio Configuration](#android-studio-configuration) for required IDE setup.
 
@@ -46,8 +43,7 @@ make help
 ```
 
 See [Local Development](Documentation/local-development.md) for guidance on
-choosing an xcframework build, verifying UniFFI changes, and reclaiming the disk
-space these builds consume.
+choosing an xcframework build and verifying UniFFI changes.
 
 See [this documentation](Documentation/debugging-from-xcode.md) if you want to debug Rust code from Xcode.
 
