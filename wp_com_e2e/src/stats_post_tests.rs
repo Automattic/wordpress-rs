@@ -32,14 +32,14 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             };
 
             trials.push(Trial::test(
-                format!("post_views::get_stats_post_views::{}", site_id),
+                format!("post_stats::get_stats_post::{}", site_id),
                 {
                     let ctx = Arc::clone(&ctx);
                     move || {
                         ctx.runtime.block_on(async {
                             ctx.client
-                                .stats_post_views()
-                                .get_stats_post_views(&site_id, &post_id)
+                                .stats_post()
+                                .get_stats_post(&site_id, &post_id)
                                 .await
                                 .map_err(|e| e.to_string())?;
                             Ok(())

@@ -1,17 +1,17 @@
 use crate::{
     posts::PostId,
     request::endpoint::{AsNamespace, DerivedRequest},
-    wp_com::{WpComNamespace, WpComSiteId, stats_post_views::StatsPostViewsResponse},
+    wp_com::{WpComNamespace, WpComSiteId, stats_post::StatsPostResponse},
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
-enum StatsPostViewsRequest {
-    #[get(url = "/sites/<wp_com_site_id>/stats/post/<post_id>", output = StatsPostViewsResponse)]
-    GetStatsPostViews,
+enum StatsPostRequest {
+    #[get(url = "/sites/<wp_com_site_id>/stats/post/<post_id>", output = StatsPostResponse)]
+    GetStatsPost,
 }
 
-impl DerivedRequest for StatsPostViewsRequest {
+impl DerivedRequest for StatsPostRequest {
     fn namespace(&self) -> impl AsNamespace {
         WpComNamespace::RestV1_1
     }
@@ -36,14 +36,14 @@ mod tests {
         PostId(9007199254740991),
         "/sites/229889220/stats/post/9007199254740991"
     )]
-    fn get_stats_post_views(
-        endpoint: StatsPostViewsRequestEndpoint,
+    fn get_stats_post(
+        endpoint: StatsPostRequestEndpoint,
         #[case] site_id: WpComSiteId,
         #[case] post_id: PostId,
         #[case] expected_path: &str,
     ) {
         validate_wp_com_rest_v1_1_endpoint(
-            endpoint.get_stats_post_views(&site_id, &post_id),
+            endpoint.get_stats_post(&site_id, &post_id),
             expected_path,
         );
     }
@@ -51,7 +51,7 @@ mod tests {
     #[fixture]
     fn endpoint(
         fixture_wp_com_api_url_resolver: Arc<dyn ApiUrlResolver>,
-    ) -> StatsPostViewsRequestEndpoint {
-        StatsPostViewsRequestEndpoint::new(fixture_wp_com_api_url_resolver)
+    ) -> StatsPostRequestEndpoint {
+        StatsPostRequestEndpoint::new(fixture_wp_com_api_url_resolver)
     }
 }

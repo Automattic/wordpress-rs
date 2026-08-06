@@ -11,24 +11,24 @@ use wp_serde_helper::{deserialize_empty_array_or_hashmap, deserialize_u64_or_str
 /// card) should slice the tail of it — `daily_views.suffix(7)` in Swift,
 /// `dailyViews.takeLast(7)` in Kotlin.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
-#[serde(from = "RawStatsPostViewsResponse")]
-pub struct StatsPostViewsResponse {
+#[serde(from = "RawStatsPostResponse")]
+pub struct StatsPostResponse {
     /// The date the stats were generated for (format: YYYY-MM-DD).
     pub date: String,
     /// The post's all-time view count.
     pub views: u64,
     /// Yearly view totals, keyed by year (e.g. `"2026"`).
-    pub years: HashMap<String, StatsPostViewsYear>,
+    pub years: HashMap<String, StatsPostYear>,
     /// Yearly view averages, keyed by year (e.g. `"2026"`).
-    pub averages: HashMap<String, StatsPostViewsAverage>,
+    pub averages: HashMap<String, StatsPostAverage>,
     /// The most recent weeks of daily views, oldest first.
-    pub weeks: Vec<StatsPostViewsWeek>,
+    pub weeks: Vec<StatsPostWeek>,
     /// The post's complete daily view history, oldest first.
     ///
     /// The API sends this as a `fields`/`data` column table; it is flattened
     /// while deserializing so callers never handle the column indirection.
     /// Empty if the response doesn't name both the `period` and `views` columns.
-    pub daily_views: Vec<StatsPostViewsDataPoint>,
+    pub daily_views: Vec<StatsPostDailyView>,
     /// The highest view count the post reached in a single month.
     pub highest_month: u64,
     /// The highest daily view average the post reached.
@@ -38,44 +38,44 @@ pub struct StatsPostViewsResponse {
     /// The post's like count.
     pub like_count: u64,
     /// The post's comment counts.
-    pub discussion: StatsPostViewsDiscussion,
+    pub discussion: StatsPostDiscussion,
     /// The post the stats belong to.
-    pub post: StatsPostViewsPost,
+    pub post: StatsPostDetails,
 }
 
 /// The response as the API sends it, before the `fields`/`data` column table is
-/// flattened into [`StatsPostViewsResponse::daily_views`].
+/// flattened into [`StatsPostResponse::daily_views`].
 #[derive(Deserialize)]
-struct RawStatsPostViewsResponse {
+struct RawStatsPostResponse {
     date: String,
     views: u64,
     #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
-    years: HashMap<String, StatsPostViewsYear>,
+    years: HashMap<String, StatsPostYear>,
     #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
-    averages: HashMap<String, StatsPostViewsAverage>,
-    weeks: Vec<StatsPostViewsWeek>,
+    averages: HashMap<String, StatsPostAverage>,
+    weeks: Vec<StatsPostWeek>,
     /// Column names for the `data` rows. Always `["period", "views"]` in every
     /// response observed, but read rather than assumed.
     fields: Vec<String>,
-    data: Vec<Vec<RawStatsPostViewsDataValue>>,
+    data: Vec<Vec<RawStatsPostDataValue>>,
     highest_month: u64,
     highest_day_average: u64,
     highest_week_average: u64,
     like_count: u64,
-    discussion: StatsPostViewsDiscussion,
-    post: StatsPostViewsPost,
+    discussion: StatsPostDiscussion,
+    post: StatsPostDetails,
 }
 
 /// A value in a raw `data` row (a string, a number, or null).
 #[derive(Deserialize)]
 #[serde(untagged)]
-enum RawStatsPostViewsDataValue {
+enum RawStatsPostDataValue {
     String(String),
     Number(u64),
     Null,
 }
 
-impl RawStatsPostViewsDataValue {
+impl RawStatsPostDataValue {
     fn as_string(&self) -> Option<&String> {
         match self {
             Self::String(string) => Some(string),
@@ -91,8 +91,8 @@ impl RawStatsPostViewsDataValue {
     }
 }
 
-impl From<RawStatsPostViewsResponse> for StatsPostViewsResponse {
-    fn from(raw: RawStatsPostViewsResponse) -> Self {
+impl From<RawStatsPostResponse> for StatsPostResponse {
+    fn from(raw: RawStatsPostResponse) -> Self {
         Self {
             date: raw.date,
             views: raw.views,
@@ -112,10 +112,7 @@ impl From<RawStatsPostViewsResponse> for StatsPostViewsResponse {
 
 /// Flattens the `fields`/`data` column table into data points, skipping rows the
 /// columns can't be read from.
-fn daily_views(
-    fields: &[String],
-    data: &[Vec<RawStatsPostViewsDataValue>],
-) -> Vec<StatsPostViewsDataPoint> {
+fn daily_views(fields: &[String], data: &[Vec<RawStatsPostDataValue>]) -> Vec<StatsPostDailyView> {
     let (Some(period_index), Some(views_index)) = (
         fields.iter().position(|field| field == "period"),
         fields.iter().position(|field| field == "views"),
@@ -125,7 +122,7 @@ fn daily_views(
 
     data.iter()
         .filter_map(|row| {
-            Some(StatsPostViewsDataPoint {
+            Some(StatsPostDailyView {
                 period: row.get(period_index)?.as_string()?.clone(),
                 views: row.get(views_index)?.as_number()?,
             })
@@ -135,7 +132,7 @@ fn daily_views(
 
 /// A single day's view count from the daily view history.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
-pub struct StatsPostViewsDataPoint {
+pub struct StatsPostDailyView {
     /// The day the views were recorded on (format: YYYY-MM-DD).
     pub period: String,
     /// The number of views on that day.
@@ -144,7 +141,7 @@ pub struct StatsPostViewsDataPoint {
 
 /// A year's view totals.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
-pub struct StatsPostViewsYear {
+pub struct StatsPostYear {
     /// View totals keyed by month number (`"1"` through `"12"`).
     #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     pub months: HashMap<String, u64>,
@@ -154,7 +151,7 @@ pub struct StatsPostViewsYear {
 
 /// A year's view averages.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
-pub struct StatsPostViewsAverage {
+pub struct StatsPostAverage {
     /// View averages keyed by month number (`"1"` through `"12"`).
     #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     pub months: HashMap<String, f64>,
@@ -164,20 +161,20 @@ pub struct StatsPostViewsAverage {
 
 /// A week of daily views.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
-pub struct StatsPostViewsWeek {
+pub struct StatsPostWeek {
     /// The days in the week, oldest first. The final week may be partial.
-    pub days: Vec<StatsPostViewsDay>,
+    pub days: Vec<StatsPostDay>,
     /// The total views for the week.
     pub total: u64,
     /// The average daily views for the week.
     pub average: f64,
     /// The change from the previous week, or `None` for the first week.
-    pub change: Option<StatsPostViewsChange>,
+    pub change: Option<StatsPostChange>,
 }
 
 /// The change in views from one week to the next.
 #[derive(Debug, Clone, Copy, PartialEq, uniffi::Enum)]
-pub enum StatsPostViewsChange {
+pub enum StatsPostChange {
     /// The percentage change from the previous week.
     Percentage { value: f64 },
     /// The previous week had no views, so the change is unbounded. The API
@@ -195,7 +192,7 @@ pub enum StatsPostViewsChange {
 /// counterpart to model.
 #[derive(Deserialize)]
 #[serde(untagged)]
-enum RawStatsPostViewsChange {
+enum RawStatsPostChange {
     Percentage(f64),
     Infinite {
         // The value is ignored: the API only ever sends `true`, and the presence
@@ -206,19 +203,19 @@ enum RawStatsPostViewsChange {
     },
 }
 
-impl<'de> Deserialize<'de> for StatsPostViewsChange {
+impl<'de> Deserialize<'de> for StatsPostChange {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        Ok(match RawStatsPostViewsChange::deserialize(deserializer)? {
-            RawStatsPostViewsChange::Percentage(value) => Self::Percentage { value },
-            RawStatsPostViewsChange::Infinite { .. } => Self::Infinite,
+        Ok(match RawStatsPostChange::deserialize(deserializer)? {
+            RawStatsPostChange::Percentage(value) => Self::Percentage { value },
+            RawStatsPostChange::Infinite { .. } => Self::Infinite,
         })
     }
 }
 
-impl Serialize for StatsPostViewsChange {
+impl Serialize for StatsPostChange {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -236,9 +233,9 @@ impl Serialize for StatsPostViewsChange {
     }
 }
 
-/// A single day within a [`StatsPostViewsWeek`].
+/// A single day within a [`StatsPostWeek`].
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
-pub struct StatsPostViewsDay {
+pub struct StatsPostDay {
     /// The day (format: YYYY-MM-DD).
     pub day: String,
     /// The number of views on that day.
@@ -247,7 +244,7 @@ pub struct StatsPostViewsDay {
 
 /// A post's comment counts.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
-pub struct StatsPostViewsDiscussion {
+pub struct StatsPostDiscussion {
     /// The number of comments on the post.
     pub comment_count: u64,
 }
@@ -259,10 +256,10 @@ pub struct StatsPostViewsDiscussion {
 /// (post content, ping status, and similar) are ignored.
 ///
 /// The row's `comment_count` is deliberately omitted: the API sends it as a
-/// string here, and [`StatsPostViewsDiscussion::comment_count`] carries the same
+/// string here, and [`StatsPostDiscussion::comment_count`] carries the same
 /// value as a number.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
-pub struct StatsPostViewsPost {
+pub struct StatsPostDetails {
     /// The post's ID.
     #[serde(rename = "ID")]
     pub id: PostId,
@@ -298,17 +295,17 @@ mod tests {
     use super::*;
     use rstest::*;
 
-    const WITH_VIEWS: &str = "tests/wpcom/stats_post_views/post-with-views.json";
-    const NO_VIEWS: &str = "tests/wpcom/stats_post_views/post-no-views.json";
+    const WITH_VIEWS: &str = "tests/wpcom/stats_post/post-with-views.json";
+    const NO_VIEWS: &str = "tests/wpcom/stats_post/post-no-views.json";
 
-    fn parse(json_file_path: &str) -> StatsPostViewsResponse {
+    fn parse(json_file_path: &str) -> StatsPostResponse {
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
         serde_json::from_reader(file).expect("Unable to parse JSON")
     }
 
     /// A minimal response carrying the given `fields`/`data` column table, for
     /// exercising the flattening in isolation.
-    fn parse_with_columns(fields: &str, data: &str) -> StatsPostViewsResponse {
+    fn parse_with_columns(fields: &str, data: &str) -> StatsPostResponse {
         let json = format!(
             r#"{{
                 "date": "2026-08-06",
@@ -343,7 +340,7 @@ mod tests {
     #[rstest]
     #[case(WITH_VIEWS)]
     #[case(NO_VIEWS)]
-    fn test_stats_post_views_response_deserialization(#[case] json_file_path: &str) {
+    fn test_stats_post_response_deserialization(#[case] json_file_path: &str) {
         let response = parse(json_file_path);
 
         assert!(!response.date.is_empty());
@@ -352,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_post_views_response_details() {
+    fn test_stats_post_response_details() {
         let response = parse(WITH_VIEWS);
 
         assert_eq!(response.date, "2026-08-06");
@@ -373,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_post_views_post() {
+    fn test_stats_post_details() {
         let post = parse(WITH_VIEWS).post;
 
         assert_eq!(post.id, PostId(2729));
@@ -396,7 +393,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_post_views_weeks() {
+    fn test_stats_post_weeks() {
         let weeks = parse(WITH_VIEWS).weeks;
 
         assert_eq!(weeks.len(), 3);
@@ -414,18 +411,18 @@ mod tests {
         assert_eq!(second.total, 6);
         assert_eq!(
             second.change,
-            Some(StatsPostViewsChange::Percentage {
+            Some(StatsPostChange::Percentage {
                 value: 133.33333333333334
             })
         );
 
         // The API sends `{"isInfinity": true}` when the previous week had no views.
         let last = &weeks[2];
-        assert_eq!(last.change, Some(StatsPostViewsChange::Infinite));
+        assert_eq!(last.change, Some(StatsPostChange::Infinite));
     }
 
     #[test]
-    fn test_stats_post_views_change_round_trips() {
+    fn test_stats_post_change_round_trips() {
         let weeks = parse(WITH_VIEWS).weeks;
 
         assert_eq!(serde_json::to_string(&weeks[0].change).unwrap(), "null");
@@ -440,20 +437,20 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_post_views_daily_views() {
+    fn test_stats_post_daily_views() {
         let daily_views = parse(WITH_VIEWS).daily_views;
 
         assert_eq!(daily_views.len(), 5);
         assert_eq!(
             daily_views[0],
-            StatsPostViewsDataPoint {
+            StatsPostDailyView {
                 period: "2013-06-20".to_string(),
                 views: 1194,
             }
         );
         assert_eq!(
             daily_views[4],
-            StatsPostViewsDataPoint {
+            StatsPostDailyView {
                 period: "2026-08-06".to_string(),
                 views: 0,
             }
@@ -461,7 +458,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_post_views_daily_views_reads_the_column_table() {
+    fn test_stats_post_daily_views_reads_the_column_table() {
         // The column positions are read rather than assumed, so swapping them
         // still yields the same data points.
         let response = parse_with_columns(
@@ -475,7 +472,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_post_views_daily_views_skips_unreadable_rows() {
+    fn test_stats_post_daily_views_skips_unreadable_rows() {
         let response = parse_with_columns(
             r#"["period", "views"]"#,
             r#"[["2026-08-04", 5], [null, null], ["2026-08-06", 7]]"#,
@@ -491,14 +488,14 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_post_views_daily_views_without_known_columns() {
+    fn test_stats_post_daily_views_without_known_columns() {
         let response = parse_with_columns(r#"["period"]"#, r#"[["2026-08-04"]]"#);
 
         assert!(response.daily_views.is_empty());
     }
 
     #[test]
-    fn test_stats_post_views_post_without_views() {
+    fn test_stats_post_without_views() {
         let response = parse(NO_VIEWS);
 
         assert_eq!(response.views, 0);
