@@ -3,55 +3,21 @@
     "views": 19096,
     "years": {
         "2013": {
-            "months": {
-                "6": 3224,
-                "7": 1250,
-                "8": 562,
-                "9": 321,
-                "10": 315,
-                "11": 258,
-                "12": 216
-            },
+            "months": { "6": 3224, "7": 1250 },
             "total": 6146
         },
         "2026": {
-            "months": {
-                "1": 23,
-                "2": 18,
-                "3": 13,
-                "4": 16,
-                "5": 27,
-                "6": 29,
-                "7": 12,
-                "8": 9
-            },
+            "months": { "8": 9 },
             "total": 147
         }
     },
     "averages": {
         "2013": {
-            "months": {
-                "6": 293,
-                "7": 40,
-                "8": 18,
-                "9": 10,
-                "10": 10,
-                "11": 8,
-                "12": 6
-            },
+            "months": { "6": 293, "7": 40 },
             "overall": 31
         },
         "2026": {
-            "months": {
-                "1": 0,
-                "2": 0,
-                "3": 0,
-                "4": 0,
-                "5": 0,
-                "6": 0,
-                "7": 0,
-                "8": 1
-            },
+            "months": { "8": 1 },
             "overall": 0
         }
     },
@@ -91,10 +57,7 @@
             "change": { "isInfinity": true }
         }
     ],
-    "fields": [
-        "period",
-        "views"
-    ],
+    "fields": ["period", "views"],
     "data": [
         ["2013-06-20", 1194],
         ["2013-06-21", 504],
@@ -106,32 +69,21 @@
     "highest_day_average": 293,
     "highest_week_average": 3,
     "like_count": 9,
-    "discussion": {
-        "comment_count": 48
-    },
+    "discussion": { "comment_count": 48 },
     "post": {
         "ID": 2729,
         "post_author": "5399133",
         "post_date": "2013-06-20 09:15:49",
         "post_date_gmt": "2013-06-20 13:15:49",
-        "post_content": "The wait is over.",
         "post_title": "The Last Version of FeedDemon is Here, and it's Free",
-        "post_excerpt": "",
         "post_status": "publish",
-        "comment_status": "closed",
-        "ping_status": "closed",
-        "post_password": "",
         "post_name": "the-last-version-of-feeddemon-is-here-and-its-free",
-        "to_ping": "",
-        "pinged": "",
         "post_modified": "2013-06-23 21:57:23",
-        "post_modified_gmt": "2013-06-24 01:57:23",
-        "post_content_filtered": "",
-        "post_parent": 0,
         "guid": "https://example.com/?p=2729",
-        "menu_order": 0,
         "post_type": "post",
-        "post_mime_type": "",
+
+        "_comment": "Fields below are sent by the API but deliberately not modelled; they must be ignored rather than break parsing.",
+        "post_content": "The wait is over.",
         "comment_count": "48",
         "filter": "raw"
     }
