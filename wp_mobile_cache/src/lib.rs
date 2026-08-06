@@ -24,6 +24,7 @@ pub mod test_fixtures;
 pub enum SqliteDbError {
     SqliteError(String),
     ConstraintViolation(String),
+    ForeignKeysUnavailable,
     TableNameMismatch { expected: DbTable, actual: DbTable },
     PerPageMismatch { expected: i64, actual: i64 },
 }
@@ -34,6 +35,12 @@ impl std::fmt::Display for SqliteDbError {
             SqliteDbError::SqliteError(message) => write!(f, "SqliteDbError: message={}", message),
             SqliteDbError::ConstraintViolation(message) => {
                 write!(f, "Constraint violation: {}", message)
+            }
+            SqliteDbError::ForeignKeysUnavailable => {
+                write!(
+                    f,
+                    "Foreign key enforcement could not be enabled on the connection"
+                )
             }
             SqliteDbError::TableNameMismatch { expected, actual } => {
                 write!(
@@ -439,6 +446,7 @@ impl TryFrom<Connection> for WpApiCache {
     /// This is typically used in tests to create a cache from an already-migrated
     /// in-memory database connection.
     fn try_from(connection: Connection) -> Result<Self, Self::Error> {
+        enable_foreign_keys(&connection)?;
         register_url_functions(&connection)?;
         Ok(Self {
             inner: DBManager {
@@ -473,8 +481,9 @@ impl<'a> MigrationManager<'a> {
     pub fn new(connection: &'a Connection) -> Result<Self, SqliteDbError> {
         // Cover raw-connection paths that bypass WpApiCache construction
         // (test fixtures that hand a Connection straight to the repository
-        // layer). The registration is idempotent, so connections that were
-        // already prepared by DBManager / From<Connection> are unaffected.
+        // layer). Both calls are idempotent, so connections that were already
+        // prepared by DBManager / TryFrom<Connection> are unaffected.
+        enable_foreign_keys(connection)?;
         register_url_functions(connection)?;
         Ok(Self { connection })
     }
@@ -610,11 +619,32 @@ impl DBManager {
             Connection::open_in_memory()?
         };
 
+        enable_foreign_keys(&connection)?;
         register_url_functions(&connection)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
         })
+    }
+}
+
+/// Turn on foreign key enforcement for `conn` and confirm it took effect.
+///
+/// The schema relies on `ON DELETE CASCADE` to clear the rows belonging to a
+/// deleted parent. SQLite honours those clauses only while `foreign_keys` is
+/// on — a per-connection setting whose default is not guaranteed — and when it
+/// is off the delete still succeeds and silently leaves the children behind.
+///
+/// The value is read back rather than assumed because `PRAGMA foreign_keys` is
+/// a no-op inside an open transaction and reports no error when it is ignored.
+pub(crate) fn enable_foreign_keys(conn: &Connection) -> Result<(), SqliteDbError> {
+    conn.pragma_update(None, "foreign_keys", true)?;
+
+    let enabled: bool = conn.query_row("PRAGMA foreign_keys", [], |row| row.get(0))?;
+    if enabled {
+        Ok(())
+    } else {
+        Err(SqliteDbError::ForeignKeysUnavailable)
     }
 }
 
@@ -653,6 +683,123 @@ uniffi::setup_scaffolding!();
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_fixtures::get_table_column_names;
+
+    fn foreign_keys_enabled(conn: &Connection) -> bool {
+        conn.query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+            .expect("Failed to read foreign_keys pragma")
+    }
+
+    /// A connection with enforcement explicitly turned off, standing in for a
+    /// SQLite build whose default leaves it off.
+    fn connection_without_foreign_keys() -> Connection {
+        let conn = Connection::open_in_memory().expect("Failed to open in-memory database");
+        conn.pragma_update(None, "foreign_keys", false)
+            .expect("Failed to disable foreign_keys");
+        assert!(!foreign_keys_enabled(&conn));
+        conn
+    }
+
+    #[test]
+    fn test_cache_constructor_enables_foreign_keys() {
+        let cache = WpApiCache::new(None).expect("Cache creation should succeed");
+        assert!(
+            cache.execute(|conn| foreign_keys_enabled(conn)),
+            "WpApiCache::new must enable foreign key enforcement"
+        );
+    }
+
+    #[test]
+    fn test_try_from_enables_foreign_keys_on_a_connection_that_had_them_off() {
+        let cache = WpApiCache::try_from(connection_without_foreign_keys())
+            .expect("Cache creation should succeed");
+        assert!(
+            cache.execute(|conn| foreign_keys_enabled(conn)),
+            "WpApiCache::try_from must enable foreign key enforcement rather than \
+             inherit whatever the incoming connection had"
+        );
+    }
+
+    #[test]
+    fn test_migration_manager_enables_foreign_keys_on_a_connection_that_had_them_off() {
+        let conn = connection_without_foreign_keys();
+        MigrationManager::new(&conn).expect("MigrationManager creation should succeed");
+        assert!(
+            foreign_keys_enabled(&conn),
+            "MigrationManager::new must enable foreign key enforcement so that raw \
+             connections handed straight to the repository layer are also covered"
+        );
+    }
+
+    /// `SiteRepository::delete_site` deletes only the `db_sites` row and relies on
+    /// `ON DELETE CASCADE` for everything else, so a child table that reaches
+    /// `db_sites` without that clause leaks its rows on every site removal.
+    ///
+    /// `entity_state` is the deliberate exception: it carries no constraint and is
+    /// cleared by an explicit `DELETE` in `delete_site`.
+    #[test]
+    fn test_every_table_referencing_db_sites_cascades_on_delete() {
+        const NO_CASCADE_CONSTRAINT: [DbTable; 1] = [DbTable::EntityState];
+
+        let conn = Connection::open_in_memory().expect("Failed to open in-memory database");
+        let mut migration_manager =
+            MigrationManager::new(&conn).expect("Failed to create MigrationManager");
+        migration_manager
+            .perform_migrations()
+            .expect("All migrations should succeed");
+
+        // Read the table list from the schema rather than from `DbTable`, so a
+        // table added by a future migration is covered whether or not it is
+        // also exposed as a `DbTable` variant.
+        let exempt: Vec<&str> = NO_CASCADE_CONSTRAINT
+            .iter()
+            .map(|table| table.table_name())
+            .collect();
+        let tables: Vec<String> = conn
+            .prepare(
+                "SELECT name FROM sqlite_master \
+                 WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != '_migrations'",
+            )
+            .expect("Failed to prepare sqlite_master query")
+            .query_map([], |row| row.get::<_, String>(0))
+            .expect("Failed to execute sqlite_master query")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("Failed to collect table names");
+
+        let mut checked = 0;
+        for table in tables {
+            let has_db_site_id = get_table_column_names(&conn, &table)
+                .iter()
+                .any(|column| column == "db_site_id");
+            if !has_db_site_id || exempt.contains(&table.as_str()) {
+                continue;
+            }
+
+            // (referenced table, on_delete) for each outgoing foreign key
+            let foreign_keys: Vec<(String, String)> = conn
+                .prepare(&format!("PRAGMA foreign_key_list({})", table))
+                .expect("Failed to prepare PRAGMA query")
+                .query_map([], |row| Ok((row.get(2)?, row.get(6)?)))
+                .expect("Failed to execute PRAGMA query")
+                .collect::<Result<Vec<_>, _>>()
+                .expect("Failed to collect foreign keys");
+
+            assert!(
+                foreign_keys.contains(&(
+                    DbTable::DbSites.table_name().to_string(),
+                    "CASCADE".to_string()
+                )),
+                "{} has a db_site_id column but no ON DELETE CASCADE foreign key to {}; \
+                 its rows would survive delete_site. Foreign keys found: {:?}",
+                table,
+                DbTable::DbSites,
+                foreign_keys
+            );
+            checked += 1;
+        }
+
+        assert!(checked > 0, "No tables were checked");
+    }
 
     #[test]
     fn test_migration_works() {
