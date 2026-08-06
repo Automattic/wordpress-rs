@@ -1,0 +1,93 @@
+{
+    "date": "2026-08-06",
+    "views": 0,
+    "years": {
+        "2025": {
+            "months": [],
+            "total": 0
+        },
+        "2026": {
+            "months": [],
+            "total": 0
+        }
+    },
+    "averages": {
+        "2025": {
+            "months": [],
+            "overall": 0
+        },
+        "2026": {
+            "months": [],
+            "overall": 0
+        }
+    },
+    "weeks": [
+        {
+            "days": [
+                { "day": "2026-07-27", "count": 0 },
+                { "day": "2026-07-28", "count": 0 },
+                { "day": "2026-07-29", "count": 0 },
+                { "day": "2026-07-30", "count": 0 },
+                { "day": "2026-07-31", "count": 0 },
+                { "day": "2026-08-01", "count": 0 },
+                { "day": "2026-08-02", "count": 0 }
+            ],
+            "total": 0,
+            "average": 0,
+            "change": null
+        },
+        {
+            "days": [
+                { "day": "2026-08-03", "count": 0 },
+                { "day": "2026-08-04", "count": 0 },
+                { "day": "2026-08-05", "count": 0 },
+                { "day": "2026-08-06", "count": 0 }
+            ],
+            "total": 0,
+            "average": 0,
+            "change": 0
+        }
+    ],
+    "fields": [
+        "period",
+        "views"
+    ],
+    "data": [
+        ["2026-08-04", 0],
+        ["2026-08-05", 0],
+        ["2026-08-06", 0]
+    ],
+    "highest_month": 0,
+    "highest_day_average": 0,
+    "highest_week_average": 0,
+    "like_count": 0,
+    "discussion": {
+        "comment_count": 0
+    },
+    "post": {
+        "ID": 169,
+        "post_author": "1",
+        "post_date": "2026-06-11 14:22:01",
+        "post_date_gmt": "2026-06-11 14:22:01",
+        "post_content": "",
+        "post_title": "A Quiet Post",
+        "post_excerpt": "",
+        "post_status": "publish",
+        "comment_status": "open",
+        "ping_status": "open",
+        "post_password": "",
+        "post_name": "a-quiet-post",
+        "to_ping": "",
+        "pinged": "",
+        "post_modified": "2026-06-11 14:22:01",
+        "post_modified_gmt": "2026-06-11 14:22:01",
+        "post_content_filtered": "",
+        "post_parent": 0,
+        "guid": "https://example.com/?p=169",
+        "menu_order": 0,
+        "post_type": "post",
+        "post_mime_type": "",
+        "comment_count": "0",
+        "filter": "raw"
+    }
+}

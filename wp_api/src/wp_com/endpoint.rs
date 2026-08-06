@@ -29,6 +29,7 @@ pub mod stats_devices_screensize_endpoint;
 pub mod stats_emails_summary_endpoint;
 pub mod stats_file_downloads_endpoint;
 pub mod stats_insights_endpoint;
+pub mod stats_post_views_endpoint;
 pub mod stats_referrers_endpoint;
 pub mod stats_region_views_endpoint;
 pub mod stats_search_terms_endpoint;

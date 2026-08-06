@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- WordPress.com `GET /sites/<site_id>/stats/post/<post_id>` endpoint for per-post stats. Returns the post's view history, like and comment counts, and post metadata — everything the "Latest Post Summary" card needs. Use `recent_daily_views(days)` for the trailing window rather than the full history, which can run to thousands of entries.
 - WordPress.com `POST /me/transactions` endpoint for redeeming a shopping cart with the account's WordPress.com credits, completing a domain purchase
 - WordPress.com `GET /sites/<site_id>/purchases` endpoint for listing a site's purchases (plans, domains, and other subscriptions)
 - Publish the Kotlin bindings' per-endpoint Markdown API reference as an `ai-docs` Maven classifier zip on `rs.wordpress.api:kotlin`, generated from the UniFFI bindings for agent/tooling consumption
