@@ -47,6 +47,83 @@ extension WpApiError {
         }
         return false
     }
+
+    /// Whether the site could not be reached at all — the host did not resolve,
+    /// refused the connection, or the URL was malformed.
+    ///
+    /// Distinct from ``isDeviceOffline``: this indicates a problem reaching
+    /// *this particular site*, not a loss of device connectivity.
+    public var isSiteUnreachable: Bool {
+        executionErrorReason?.isSiteUnreachable ?? false
+    }
+
+    /// Whether the request failed because the device has no network connection.
+    ///
+    /// Distinct from ``isSiteUnreachable``: the site itself may be perfectly
+    /// healthy.
+    public var isDeviceOffline: Bool {
+        executionErrorReason?.isDeviceOffline ?? false
+    }
+
+    /// The underlying reason when this is a request execution failure, otherwise `nil`.
+    private var executionErrorReason: RequestExecutionErrorReason? {
+        if case .RequestExecutionFailed(
+            statusCode: _,
+            redirects: _,
+            reason: let reason,
+            requestUrl: _,
+            requestMethod: _
+        ) = self {
+            return reason
+        }
+        return nil
+    }
+}
+
+extension RequestExecutionError {
+    /// Whether the site could not be reached at all — the host did not resolve,
+    /// refused the connection, or the URL was malformed.
+    public var isSiteUnreachable: Bool {
+        executionErrorReason?.isSiteUnreachable ?? false
+    }
+
+    /// Whether the request failed because the device has no network connection.
+    public var isDeviceOffline: Bool {
+        executionErrorReason?.isDeviceOffline ?? false
+    }
+
+    /// The underlying reason when this is a request execution failure, otherwise `nil`.
+    private var executionErrorReason: RequestExecutionErrorReason? {
+        if case .RequestExecutionFailed(
+            statusCode: _,
+            redirects: _,
+            reason: let reason,
+            requestUrl: _,
+            requestMethod: _
+        ) = self {
+            return reason
+        }
+        return nil
+    }
+}
+
+extension RequestExecutionErrorReason {
+    /// Whether the site could not be reached at all — the host did not resolve,
+    /// refused the connection, or the URL was malformed.
+    ///
+    /// Distinct from ``isDeviceOffline``: this indicates a problem reaching
+    /// *this particular site*, not a loss of device connectivity.
+    public var isSiteUnreachable: Bool {
+        requestExecutionErrorReasonIsSiteUnreachable(reason: self)
+    }
+
+    /// Whether the request failed because the device has no network connection.
+    ///
+    /// Distinct from ``isSiteUnreachable``: the site itself may be perfectly
+    /// healthy.
+    public var isDeviceOffline: Bool {
+        requestExecutionErrorReasonIsDeviceOffline(reason: self)
+    }
 }
 
 // MARK: - Enum initialization and unpacking
