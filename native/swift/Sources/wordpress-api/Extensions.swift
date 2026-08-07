@@ -59,8 +59,10 @@ extension RequestExecutionErrorReason {
     /// - Note: A refused connection (the host resolves, but nothing is
     ///   listening) is classified differently per platform — Swift reports it
     ///   here, Kotlin reports it as an HTTP error. Only a DNS failure is treated
-    ///   as an unreachable site by every executor. A malformed site URL never
-    ///   reaches this predicate; it surfaces as `WpApiError.SiteUrlParsingError`.
+    ///   as an unreachable site by every executor. A site URL rejected while
+    ///   parsing surfaces as `WpApiError.SiteUrlParsingError` and never reaches
+    ///   this predicate; a URL that only `URLSession` rejects at request time
+    ///   (`.badURL`) does map here.
     public var isSiteUnreachable: Bool {
         requestExecutionErrorReasonIsSiteUnreachable(reason: self)
     }

@@ -694,17 +694,19 @@ impl RequestExecutionErrorReason {
     /// A refused connection (the host resolves, but nothing is listening) is
     /// **not** classified consistently:
     ///
-    /// - Swift and the `reqwest` executor map it to `NonExistentSiteError`, so
-    ///   this returns `true`.
-    /// - Kotlin maps it to `HttpError`, so this returns `false`.
+    /// - Swift maps it to `NonExistentSiteError`, so this returns `true`.
+    /// - Kotlin and the `reqwest` executor map it to `HttpError`, so this
+    ///   returns `false`.
     ///
     /// Only a DNS failure is treated as an unreachable site by every executor.
     /// Callers that must behave identically across platforms should rely on that
     /// case alone until the mappings are aligned.
     ///
-    /// Note also that a malformed site URL never reaches this predicate: it
+    /// A site URL rejected while parsing never reaches this predicate: it
     /// surfaces as [`WpApiError::SiteUrlParsingError`], which carries no
-    /// `RequestExecutionErrorReason`.
+    /// `RequestExecutionErrorReason`. On Swift, however, a URL that only
+    /// `URLSession` rejects at request time (`badURL`) maps to
+    /// `NonExistentSiteError`, so it *does* reach here.
     pub fn is_site_unreachable(&self) -> bool {
         matches!(self, Self::NonExistentSiteError { .. })
     }
@@ -716,13 +718,14 @@ impl RequestExecutionErrorReason {
     ///
     /// # Platform differences
     ///
-    /// Offline detection requires an executor that can consult a
-    /// `NetworkAvailabilityProvider` — currently only the Swift and Kotlin
-    /// executors. The `reqwest` executor never constructs `DeviceIsOfflineError`,
-    /// so this always returns `false` there, and an offline failure is reported
-    /// as `NonExistentSiteError` (the DNS lookup fails) — meaning
-    /// [`RequestExecutionErrorReason::is_site_unreachable`] returns `true`
-    /// instead.
+    /// Offline detection depends on a platform signal, so it is not uniform.
+    /// Swift derives it from the OS-reported `URLError` codes
+    /// (`notConnectedToInternet`, `networkConnectionLost`); Kotlin consults a
+    /// caller-supplied `NetworkAvailabilityProvider` when a DNS lookup fails. The
+    /// `reqwest` executor has neither and never constructs `DeviceIsOfflineError`,
+    /// so this always returns `false` there — an offline request typically
+    /// surfaces as a DNS failure (`NonExistentSiteError`) or a connect error
+    /// (`HttpError`) instead.
     pub fn is_device_offline(&self) -> bool {
         matches!(self, Self::DeviceIsOfflineError { .. })
     }
@@ -776,8 +779,11 @@ impl RequestExecutionErrorReason {
     }
 }
 
-/// Whether the site could not be reached at all — the host did not resolve,
-/// refused the connection, or the URL was malformed.
+/// Whether the site could not be reached — most reliably, the host did not
+/// resolve.
+///
+/// See [`RequestExecutionErrorReason::is_site_unreachable`] for the per-platform
+/// differences in how connectivity failures are classified.
 #[uniffi::export]
 pub fn request_execution_error_reason_is_site_unreachable(
     reason: &RequestExecutionErrorReason,
