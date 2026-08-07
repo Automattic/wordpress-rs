@@ -178,10 +178,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         for request: NetworkRequestContent
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
 
-        guard
-            var peerCertificateChain = getPeerCertificateChain(error),
-            !peerCertificateChain.isEmpty
-        else {
+        guard let siteCertificate = leafCertificate(from: error) else {
             return .failure(
                 .RequestExecutionFailed(
                     statusCode: nil,
@@ -193,8 +190,6 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             )
         }
 
-        let siteCertificate = peerCertificateChain.remove(at: 0)
-
         return .failure(
             .RequestExecutionFailed(
                 statusCode: nil,
@@ -202,7 +197,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 reason: RequestExecutionErrorReason.invalidSslError(
                     reason: .certificateNotValidForName(
                         hostname: URL(string: request.url())?.host ?? "unknown host",
-                        presentedHostnames: [siteCertificate.commonName()]
+                        presentedHostnames: siteCertificate.presentedHostnames()
                     )
                 ),
                 requestUrl: request.url(),
@@ -327,19 +322,28 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         )
     }
 
-    private func getPeerCertificateChain(_ error: Error) -> [SslCertificateInfo]? {
+    /// Parse the site (leaf) certificate out of a failed TLS handshake.
+    ///
+    /// The peer certificate chain is leaf-first, so the site's certificate is
+    /// element 0 of the *raw* chain. We parse that element directly rather than
+    /// parsing the whole chain and taking element 0 of whatever survived: a leaf
+    /// we can't parse must degrade to `genericSslError`, never silently promote an
+    /// intermediate CA's certificate into the site's position and report the CA's
+    /// name (e.g. `R10`) as the presented hostname.
+    private func leafCertificate(from error: Error) -> SslCertificateInfo? {
         #if os(Linux) // Linux doesn't support `SecCertificate`
-        return []
+        return nil
         #else
         // The certificate chain the server presented during the failed TLS handshake.
         guard
             let trust = (error as? URLError)?.failureURLPeerTrust,
-            let certChainArray = SecTrustCopyCertificateChain(trust) as? [SecCertificate]
+            let certChainArray = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
+            let leaf = certChainArray.first
         else {
             return nil
         }
 
-        return certChainArray.compactMap { parseCertificate(data: SecCertificateCopyData($0) as Data) }
+        return parseCertificate(data: SecCertificateCopyData(leaf) as Data)
         #endif
     }
 }
@@ -377,8 +381,12 @@ private final class RequestExecutorDelegate:
     }
 
     private func alternateNames(forCertificate cert: SslCertificateInfo) -> Set<String> {
-        lock.withLock {
-            additionalAlternativeNames[cert.commonName()] ?? []
+        // The allowlist is keyed on the certificate's Common Name, so a SAN-only
+        // certificate that omits its CN can't be matched here — there's no key to
+        // look it up under. Fall through to default handling in that case.
+        guard let commonName = cert.commonName() else { return [] }
+        return lock.withLock {
+            additionalAlternativeNames[commonName] ?? []
         }
     }
 
