@@ -127,16 +127,26 @@ build-apple-watchOS: $(build-apple-platform-watchos)
 # Creating xcframework for one single platform, including real device and simulator.
 # NOTE: these REPLACE the xcframework rather than adding a slice to it. Use
 # `xcframework-only-macos` for local `swift build`, which links the macOS slice.
+#
+# Each rule builds its platform's targets (prerequisites), then assembles them
+# into the xcframework (recipe). The assemble command is inlined per rule on
+# purpose: these rules previously shared a single `xcframework-only-%` pattern
+# rule for the assemble recipe, but adding a `@# Help:` comment to the
+# otherwise-recipe-less explicit rules silently shadowed that pattern recipe,
+# so the assemble step stopped running (#1490). Keep each rule's recipe
+# self-contained so `make help` and the actual build never drift again.
 xcframework-only-macos: $(build-apple-platform-macos)
 	@# Help: Build an xcframework containing only macOS (~18GB). Use this to verify UniFFI changes locally.
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-macos)
 xcframework-only-ios: $(build-apple-platform-ios)
 	@# Help: Build an xcframework containing only iOS (~24GB). Replaces any existing xcframework.
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-ios)
 xcframework-only-tvos: $(build-apple-platform-tvos)
 	@# Help: Build an xcframework containing only tvOS. Replaces any existing xcframework.
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-tvos)
 xcframework-only-watchos: $(build-apple-platform-watchos)
 	@# Help: Build an xcframework containing only watchOS. Replaces any existing xcframework.
-xcframework-only-%:
-	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-$*)
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-watchos)
 
 # Assemble pre-built targets into an xcframework (without building targets).
 xcframework-assemble:
