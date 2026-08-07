@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Merge `CHANGELOG.md` with git's built-in `union` driver (via `.gitattributes`), so the frequent conflicts on the `## [Unreleased]` section resolve by keeping both sides instead of emitting conflict markers.
 - **Internal:** Documented how to pick an xcframework build for local work, and added `make help` descriptions for the `xcframework-only-*` targets. Verifying a UniFFI change needs only `make xcframework-only-macos`, not the full 11-target `make xcframework`.
 
+### Security
+
+- **Internal:** Bumped the transitive `rand` dependency to `0.9.3` and `0.8.6` to clear [RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097.html) (`GHSA-cq8v-f236-94qc`), a low-severity unsoundness in `rand` 0.9.2 / 0.8.5. Lockfile-only; the affected code path (a custom `log` logger calling `rand::rng()` during reseed) is not exercised here.
+
 ## [0.6.0] - 2026-07-16
 
 ### Added
