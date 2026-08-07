@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publish the Kotlin bindings' per-endpoint Markdown API reference as an `ai-docs` Maven classifier zip on `rs.wordpress.api:kotlin`, generated from the UniFFI bindings for agent/tooling consumption
 - WordPress.com `POST /sites/<site_id>/domains/primary` endpoint for setting a site's primary domain
 - WordPress.com `GET /sites/<site_id>/plans` endpoint for listing the plans a site can buy, priced for that site, with the plan it's currently on flagged.
-- `RequestExecutionErrorReason` gained `isSiteUnreachable` and `isDeviceOffline` for distinguishing a site that could not be reached (host did not resolve, connection refused) from a device with no network connection. Previously consumers had to match the `NonExistentSiteError` / `DeviceIsOfflineError` variants themselves. Available on both platforms as properties on the reason, which is reachable from `WpRequestResult.RequestExecutionFailed` and `WpApiException.RequestExecutionFailed` on Kotlin. Swift additionally exposes both as convenience properties on `WpApiError` and `RequestExecutionError`.
+- `RequestExecutionErrorReason` gained `isSiteUnreachable` and `isDeviceOffline` for distinguishing a site that could not be reached (most reliably, a DNS failure) from a device with no network connection. Previously consumers had to match the `NonExistentSiteError` / `DeviceIsOfflineError` variants themselves. Available on both platforms as properties on the reason, which is reachable from `WpRequestResult.RequestExecutionFailed` and `WpApiException.RequestExecutionFailed` on Kotlin. Swift additionally exposes both as convenience properties on `WpApiError` and `RequestExecutionError`.
 
 ### Changed
 
