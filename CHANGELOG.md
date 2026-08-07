@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING:** `ShoppingCart.coupon` changed from `String` to `CouponCode`, and `ShoppingCartCostOverride.override_code` from `String` to `CostOverrideCode`, so the shopping cart and site plans describe these values with the same types. Callers will need to wrap/unwrap with `CouponCode(...)` / `CostOverrideCode(...)`.
 - Documented `GET /all-domains/` subtypes and parameters. `DomainSubtypeId::DefaultAddress` covers staging and garden subdomains as well as the free WordPress.com address, and is the set v1.1's `no_wpcom=true` excluded; v1.2 has no equivalent parameter, so clients filter this subtype out instead.
 - **Internal:** Corrected `GET /all-domains/` fixtures that claimed subtypes the endpoint never returns (`site_redirect`, `domain_mapping`).
+- **Internal:** Run clippy's `--tests` lint pass with `--jobs 1` to cap the Rust lint step's peak memory at ~4.7 GiB (down from ~9 GiB) on CI.
 - **Internal:** Build the Android JNI libraries with `cargo-ndk` instead of the `rust-android-gradle` Gradle plugin.
 - **Internal:** Upgraded the Android/Kotlin build to Android Gradle Plugin `9.3.0` / Gradle `9.5.0` (Kotlin `2.3.21`, `compileSdk` 36), migrating `api/android` to the AGP 9 variant APIs and splitting the example app into a `com.android.kotlin.multiplatform.library` shared module and a standalone `com.android.application` module.
 - **Internal:** Bumped `syn` from `2.0` to `3.0`, updating the proc-macro crates for its breaking changes.

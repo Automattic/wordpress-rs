@@ -283,9 +283,16 @@ stop-server:
 lint: lint-rust lint-swift
 	@# Help: Run the linter for all languages.
 
+# `--jobs 1` on the --tests pass caps clippy's peak RAM. Each crate in the wp_api
+# family (wp_api, wp_mobile, the integration-test crates, the CLIs) costs ~4.5GB
+# to lint because of the wp_contextual/UniFFI macro-generated code. The first
+# pass's heavy libs form a dependency chain and can't overlap (peak ~4.7GB even
+# at the default -j), so it stays parallel. But the --tests pass builds their
+# independent test targets all at once, spiking to ~9GB — serializing just that
+# pass caps it back at one crate (~4.7GB) without paying serial-dep time twice.
 lint-rust:
 	@# Help: Run the linter for Rust.
-	$(rust_docker_run) /bin/bash -c "rustup component add clippy && cargo clippy --all -- -D warnings && cargo clippy --tests --all -- -D warnings"
+	$(rust_docker_run) /bin/bash -c "rustup component add clippy && cargo clippy --all -- -D warnings && cargo clippy --tests --all --jobs 1 -- -D warnings"
 
 lint-swift:
 	@# Help: Run the linter for Swift.
