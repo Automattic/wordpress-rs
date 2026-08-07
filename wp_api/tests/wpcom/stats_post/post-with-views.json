@@ -24,37 +24,42 @@
     "weeks": [
         {
             "days": [
-                { "day": "2026-06-29", "count": 2 },
-                { "day": "2026-06-30", "count": 1 },
-                { "day": "2026-07-01", "count": 1 },
-                { "day": "2026-07-02", "count": 1 },
-                { "day": "2026-07-03", "count": 1 },
-                { "day": "2026-07-04", "count": 1 },
-                { "day": "2026-07-05", "count": 0 }
+                { "day": "2026-07-20", "count": 0 },
+                { "day": "2026-07-21", "count": 0 },
+                { "day": "2026-07-22", "count": 0 },
+                { "day": "2026-07-23", "count": 0 },
+                { "day": "2026-07-24", "count": 0 },
+                { "day": "2026-07-25", "count": 0 },
+                { "day": "2026-07-26", "count": 0 }
             ],
-            "total": 7,
-            "average": 1,
+            "total": 0,
+            "average": 0,
             "change": null
+        },
+        {
+            "days": [
+                { "day": "2026-07-27", "count": 2 },
+                { "day": "2026-07-28", "count": 2 },
+                { "day": "2026-07-29", "count": 2 },
+                { "day": "2026-07-30", "count": 2 },
+                { "day": "2026-07-31", "count": 2 },
+                { "day": "2026-08-01", "count": 2 },
+                { "day": "2026-08-02", "count": 2 }
+            ],
+            "total": 14,
+            "average": 2,
+            "change": { "isInfinity": true }
         },
         {
             "days": [
                 { "day": "2026-08-03", "count": 3 },
                 { "day": "2026-08-04", "count": 3 },
-                { "day": "2026-08-05", "count": 0 },
-                { "day": "2026-08-06", "count": 0 }
+                { "day": "2026-08-05", "count": 3 },
+                { "day": "2026-08-06", "count": 1 }
             ],
-            "total": 6,
-            "average": 2,
-            "change": 133.33333333333334
-        },
-        {
-            "days": [
-                { "day": "2026-08-10", "count": 4 },
-                { "day": "2026-08-11", "count": 1 }
-            ],
-            "total": 5,
+            "total": 10,
             "average": 3,
-            "change": { "isInfinity": true }
+            "change": 50
         }
     ],
     "fields": ["period", "views"],
@@ -76,14 +81,16 @@
         "post_date": "2013-06-20 09:15:49",
         "post_date_gmt": "2013-06-20 13:15:49",
         "post_title": "The Last Version of FeedDemon is Here, and it's Free",
+        "post_excerpt": "The wait is over.",
         "post_status": "publish",
         "post_name": "the-last-version-of-feeddemon-is-here-and-its-free",
         "post_modified": "2013-06-23 21:57:23",
+        "post_modified_gmt": "2013-06-24 01:57:23",
         "guid": "https://example.com/?p=2729",
         "post_type": "post",
 
         "_comment": "Fields below are sent by the API but deliberately not modelled; they must be ignored rather than break parsing.",
-        "post_content": "The wait is over.",
+        "post_content": "The wait is over, and the last version of FeedDemon is now free.",
         "comment_count": "48",
         "filter": "raw"
     }

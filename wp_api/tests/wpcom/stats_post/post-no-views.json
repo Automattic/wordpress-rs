@@ -16,6 +16,11 @@
     "weeks": [
         {
             "days": [
+                { "day": "2026-07-27", "count": 0 },
+                { "day": "2026-07-28", "count": 0 },
+                { "day": "2026-07-29", "count": 0 },
+                { "day": "2026-07-30", "count": 0 },
+                { "day": "2026-07-31", "count": 0 },
                 { "day": "2026-08-01", "count": 0 },
                 { "day": "2026-08-02", "count": 0 }
             ],
@@ -25,6 +30,8 @@
         },
         {
             "days": [
+                { "day": "2026-08-03", "count": 0 },
+                { "day": "2026-08-04", "count": 0 },
                 { "day": "2026-08-05", "count": 0 },
                 { "day": "2026-08-06", "count": 0 }
             ],
@@ -50,9 +57,11 @@
         "post_date": "2026-06-11 14:22:01",
         "post_date_gmt": "2026-06-11 14:22:01",
         "post_title": "A Quiet Post",
+        "post_excerpt": "",
         "post_status": "publish",
         "post_name": "a-quiet-post",
         "post_modified": "2026-06-11 14:22:01",
+        "post_modified_gmt": "2026-06-11 14:22:01",
         "guid": "https://example.com/?p=169",
         "post_type": "post",
         "comment_count": "0"
