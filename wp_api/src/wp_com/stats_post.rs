@@ -63,7 +63,8 @@ pub struct StatsPostResponse {
     /// Yearly view totals, keyed by year (e.g. `"2026"`).
     ///
     /// A target with no recorded views gets an entry for every year from 1970
-    /// to the present rather than an empty map.
+    /// to the present, each with an empty `months` map, rather than a map
+    /// covering only the years the target existed for.
     pub years: HashMap<String, StatsPostYear>,
     /// Yearly view averages, keyed by year (e.g. `"2026"`). Populated on the
     /// same basis as [`Self::years`].
@@ -75,11 +76,11 @@ pub struct StatsPostResponse {
     /// The API sends this as a `fields`/`data` column table; it is flattened
     /// while deserializing so callers never handle the column indirection.
     ///
-    /// Empty when the response doesn't name both the `period` and `views`
-    /// columns, and also when the target has never been viewed — the API then
-    /// sends one placeholder row carrying a year-less date and a string-typed
-    /// count, which is discarded. [`Self::weeks`] still reports zero-filled
-    /// days in that case, so prefer it for a freshly published post.
+    /// The history is padded rather than sparse: a target with no views still
+    /// gets one zero-count entry per day since it was published.
+    ///
+    /// Empty if the response doesn't name both the `period` and `views`
+    /// columns.
     pub daily_views: Vec<StatsPostDailyView>,
     /// The highest view count the target reached in a single month.
     pub highest_month: u64,
@@ -316,9 +317,11 @@ pub struct StatsPostDiscussion {
 
 /// The post the stats belong to.
 ///
-/// This mirrors WordPress' raw post row, so it carries the post's editorial
-/// metadata. Fields the API sends that aren't modelled here (ping status, menu
-/// order, and similar) are ignored.
+/// This is WordPress' raw post row plus the [`Self::permalink`] the stats
+/// service computes for it, so it carries the post's editorial metadata but
+/// none of its rendered representation — there is no featured image here.
+/// Fields the API sends that aren't modelled (ping status, menu order, and
+/// similar) are ignored.
 ///
 /// The row's `comment_count` is deliberately omitted: the API sends it as a
 /// string here, and [`StatsPostDiscussion::comment_count`] carries the same
@@ -363,7 +366,13 @@ pub struct StatsPostDetails {
         deserialize_with = "deserialize_i64_or_string_as_t"
     )]
     pub author_id: UserId,
-    /// The post's globally unique identifier. Not a permalink.
+    /// The post's public URL.
+    ///
+    /// The stats service computes this and attaches it to the row; it is not
+    /// one of the post's stored columns.
+    pub permalink: String,
+    /// The post's globally unique identifier. Use [`Self::permalink`] for a
+    /// URL that resolves.
     pub guid: String,
 }
 
@@ -435,6 +444,11 @@ mod tests {
         assert_eq!(post.status, "publish");
         assert_eq!(post.post_type, "post");
         assert_eq!(post.guid, "https://example.com/?p=2729");
+        // The stats service attaches this; it isn't one of the post's columns.
+        assert_eq!(
+            post.permalink,
+            "https://example.com/2013/06/20/the-last-version-of-feeddemon-is-here-and-its-free/"
+        );
         // The API sends `post_author` as a string.
         assert_eq!(post.author_id, UserId(5399133));
     }
@@ -541,10 +555,10 @@ mod tests {
         vec![("2026-08-04", 5), ("2026-08-06", 7)]
     )]
     #[case::missing_views_column(&["period"], r#"[["2026-08-04"]]"#, vec![])]
-    // A target with no recorded views gets one placeholder row instead of a
-    // history: a year-less date and a string-typed count. Neither is a usable
-    // data point, so the row is dropped and `daily_views` comes back empty.
-    #[case::placeholder_row(&["period", "views"], r#"[["8-06", "0"]]"#, vec![])]
+    // The API has a no-history fallback row carrying a year-less date and a
+    // string-typed count. Neither is a usable data point, so the row is
+    // dropped rather than parsed into a bogus one.
+    #[case::no_history_fallback_row(&["period", "views"], r#"[["8-06", "0"]]"#, vec![])]
     fn test_stats_post_daily_views_column_handling(
         #[case] fields: &[&str],
         #[case] data: &str,
@@ -585,7 +599,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_post_without_recent_views() {
+    fn test_stats_post_never_viewed() {
         let response = parse(NO_VIEWS);
 
         assert_eq!(response.views, 0);
@@ -593,15 +607,18 @@ mod tests {
         assert_eq!(response.like_count, Some(0));
         assert_eq!(response.discussion.expect("present").comment_count, 0);
 
-        // The API sends `months` as an empty array rather than an empty object.
-        let year = response.years.get("2026").expect("2026 should exist");
+        // Without a view to anchor on, the API reports every year from 1970
+        // instead of the years the post existed for.
+        let year = response.years.get("1970").expect("1970 should exist");
         assert_eq!(year.total, 0);
+        // Each one sends `months` as an empty array rather than an empty object.
         assert!(year.months.is_empty());
 
-        let average = response.averages.get("2026").expect("2026 should exist");
+        let average = response.averages.get("1970").expect("1970 should exist");
         assert_eq!(average.overall, 0);
         assert!(average.months.is_empty());
 
+        // The daily history is still padded, so it stays readable.
         assert_eq!(response.daily_views.len(), 3);
         assert!(response.daily_views.iter().all(|d| d.views == 0));
     }

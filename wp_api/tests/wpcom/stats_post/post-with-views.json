@@ -88,6 +88,7 @@
         "post_modified_gmt": "2013-06-24 01:57:23",
         "guid": "https://example.com/?p=2729",
         "post_type": "post",
+        "permalink": "https://example.com/2013/06/20/the-last-version-of-feeddemon-is-here-and-its-free/",
 
         "_comment": "Fields below are sent by the API but deliberately not modelled; they must be ignored rather than break parsing.",
         "post_content": "The wait is over, and the last version of FeedDemon is now free.",
