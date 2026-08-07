@@ -27,31 +27,34 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         for site in &sites {
             let site_id = site.id;
 
-            trials.push(Trial::test(format!("post::get_stats_post::{}", site_id), {
-                let ctx = Arc::clone(&ctx);
-                move || {
-                    // The endpoint needs a real post, so borrow one from the
-                    // site's top posts. Resolving it here rather than during
-                    // collection keeps the lookup off unrelated test runs.
-                    let Some(target) = most_viewed_post(&ctx, &site_id) else {
-                        return Ok(());
-                    };
+            trials.push(Trial::test(
+                format!("post_stats::get_stats_post::{}", site_id),
+                {
+                    let ctx = Arc::clone(&ctx);
+                    move || {
+                        // The endpoint needs a real post, so borrow one from the
+                        // site's top posts. Resolving it here rather than during
+                        // collection keeps the lookup off unrelated test runs.
+                        let Some(target) = most_viewed_post(&ctx, &site_id) else {
+                            return Ok(());
+                        };
 
-                    ctx.runtime.block_on(async {
-                        ctx.client
-                            .stats_post()
-                            .get_stats_post(&site_id, &target)
-                            .await
-                            .map_err(|e| e.to_string())?;
-                        Ok(())
-                    })
-                }
-            }));
+                        ctx.runtime.block_on(async {
+                            ctx.client
+                                .stats_post()
+                                .get_stats_post(&site_id, &target)
+                                .await
+                                .map_err(|e| e.to_string())?;
+                            Ok(())
+                        })
+                    }
+                },
+            ));
 
             // The home page isn't a post, so the API omits the post, discussion,
             // and like fields. Every site has one, so this needs no lookup.
             trials.push(Trial::test(
-                format!("post::get_stats_post_homepage::{}", site_id),
+                format!("post_stats::get_stats_post_homepage::{}", site_id),
                 {
                     let ctx = Arc::clone(&ctx);
                     move || {
@@ -114,6 +117,7 @@ fn most_viewed_post(ctx: &TestContext, site_id: &WpComSiteId) -> Option<StatsPos
         .iter()
         // Id 0 is the homepage pseudo-entry, which isn't a real post.
         .find(|post_view| post_view.id != 0)
-        .and_then(|post_view| i64::try_from(post_view.id).ok())
-        .map(|id| StatsPostTarget::Post { id: PostId(id) })
+        .map(|post_view| StatsPostTarget::Post {
+            id: PostId(post_view.id as i64),
+        })
 }
