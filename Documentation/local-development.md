@@ -44,7 +44,7 @@ targets fail with `can't find crate for 'core'`.
 
 When adding or changing an exported function, the fast path is:
 
-1. **`cargo test -p wp_api --lib`** — the Rust side compiles and behaves.
+1. **`cargo test --lib`** — the Rust side compiles and behaves.
 2. **`make xcframework-only-macos`** — regenerates the bindings and builds a
    framework `swift build` can link.
 3. **`swift build --target WordPressAPI`** — the generated Swift compiles and
