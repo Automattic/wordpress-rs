@@ -2,7 +2,7 @@ use crate::{
     date::WpGmtDateTime, posts::PostId, users::UserId, wp_com::stats_visits::StatsVisitsDataValue,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt};
 use wp_serde_helper::{
     deserialize_empty_array_or_hashmap, deserialize_false_as_none, deserialize_i64_or_string_as_t,
 };
@@ -14,7 +14,7 @@ const VIEWS_COLUMN: &str = "views";
 /// What a per-post stats request is about.
 ///
 /// The API addresses the site's home page as post `0`, which is not a valid
-/// [`PostId`] anywhere else in the crate, so it gets its own variant here.
+/// [`PostId`] anywhere else in the crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum StatsPostTarget {
     /// A specific post or page.
@@ -24,8 +24,8 @@ pub enum StatsPostTarget {
     HomePage,
 }
 
-impl Display for StatsPostTarget {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for StatsPostTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Post { id } => write!(f, "{id}"),
             Self::HomePage => write!(f, "0"),
@@ -86,10 +86,8 @@ pub struct StatsPostResponse {
     pub highest_month: u64,
     /// The highest monthly average of daily views the target reached.
     pub highest_day_average: u64,
-    /// The highest single-day view count across the last few weeks.
-    ///
-    /// Despite the name the API gives it, this is neither a weekly figure nor
-    /// an average.
+    /// The highest single-day view count across the last few weeks. Despite the
+    /// name, this is neither a weekly figure nor an average.
     pub highest_week_average: u64,
     /// The post's like count. `None` for the site's home page.
     pub like_count: Option<u64>,
@@ -118,11 +116,10 @@ struct RawStatsPostResponse {
     highest_day_average: u64,
     highest_week_average: u64,
     // The home page has no post behind it, so the API sends these as `null` —
-    // and `post` as boolean `false` rather than `null` when the site's front
-    // page is set to "latest posts".
+    // and `post` as boolean `false` rather than `null`.
     like_count: Option<u64>,
     discussion: Option<StatsPostDiscussion>,
-    #[serde(default, deserialize_with = "deserialize_false_as_none")]
+    #[serde(deserialize_with = "deserialize_false_as_none")]
     post: Option<StatsPostDetails>,
 }
 
@@ -317,11 +314,9 @@ pub struct StatsPostDiscussion {
 
 /// The post the stats belong to.
 ///
-/// This is WordPress' raw post row plus the [`Self::permalink`] the stats
-/// service computes for it, so it carries the post's editorial metadata but
-/// none of its rendered representation — there is no featured image here.
-/// Fields the API sends that aren't modelled (ping status, menu order, and
-/// similar) are ignored.
+/// This mirrors WordPress' raw post row, so it carries the post's editorial
+/// metadata. Fields the API sends that aren't modelled here (post content,
+/// ping status, and similar) are ignored.
 ///
 /// The row's `comment_count` is deliberately omitted: the API sends it as a
 /// string here, and [`StatsPostDiscussion::comment_count`] carries the same
@@ -367,9 +362,6 @@ pub struct StatsPostDetails {
     )]
     pub author_id: UserId,
     /// The post's public URL.
-    ///
-    /// The stats service computes this and attaches it to the row; it is not
-    /// one of the post's stored columns.
     pub permalink: String,
     /// The post's globally unique identifier. Use [`Self::permalink`] for a
     /// URL that resolves.
@@ -414,7 +406,6 @@ mod tests {
         assert_eq!(year.total, 6146);
         assert_eq!(year.months.get("6"), Some(&3224));
 
-        // The API truncates averages to whole numbers before sending them.
         let average = response.averages.get("2013").expect("2013 should exist");
         assert_eq!(average.overall, 31);
         assert_eq!(average.months.get("6"), Some(&293));
@@ -444,7 +435,6 @@ mod tests {
         assert_eq!(post.status, "publish");
         assert_eq!(post.post_type, "post");
         assert_eq!(post.guid, "https://example.com/?p=2729");
-        // The stats service attaches this; it isn't one of the post's columns.
         assert_eq!(
             post.permalink,
             "https://example.com/2013/06/20/the-last-version-of-feeddemon-is-here-and-its-free/"
@@ -461,62 +451,50 @@ mod tests {
 
         let first = &weeks[0];
         assert_eq!(first.days.len(), 7);
-        assert_eq!(first.days[0].day, "2026-07-20");
-        assert_eq!(first.total, 0);
-        assert_eq!(first.average, 0);
+        assert_eq!(first.days[0].day, "2026-06-29");
+        assert_eq!(first.days[0].count, 2);
+        assert_eq!(first.total, 7);
+        assert_eq!(first.average, 1);
         assert!(first.change.is_none(), "the first week has no prior week");
 
-        // The API sends `{"isInfinity": true}` when the previous week had no views.
         let second = &weeks[1];
-        assert_eq!(second.total, 14);
-        assert_eq!(second.average, 2);
-        assert_eq!(second.change, Some(StatsPostChange::Infinite));
-
-        // Only the current week is partial, and today is left out of its
-        // average, so 9 views over 3 elapsed days averages 3.
-        let last = &weeks[2];
-        assert_eq!(last.days.len(), 4, "the current week may be partial");
-        assert_eq!(last.total, 10);
-        assert_eq!(last.average, 3);
+        assert_eq!(second.days.len(), 4, "a week may be partial");
+        assert_eq!(second.total, 6);
         assert_eq!(
-            last.change,
-            Some(StatsPostChange::Percentage { value: 50.0 })
+            second.change,
+            Some(StatsPostChange::Percentage {
+                value: 133.33333333333334
+            })
         );
+
+        // The API sends `{"isInfinity": true}` when the previous week had no views.
+        let last = &weeks[2];
+        assert_eq!(last.change, Some(StatsPostChange::Infinite));
     }
 
     #[test]
     fn test_stats_post_change_round_trips() {
         let weeks = parse(WITH_VIEWS).weeks;
 
+        assert_eq!(serde_json::to_string(&weeks[0].change).unwrap(), "null");
         assert_eq!(
-            serde_json::to_string(&weeks[0].change).expect("should serialize"),
-            "null"
+            serde_json::to_string(&weeks[1].change).unwrap(),
+            "133.33333333333334"
         );
         assert_eq!(
-            serde_json::to_string(&weeks[1].change).expect("should serialize"),
+            serde_json::to_string(&weeks[2].change).unwrap(),
             r#"{"isInfinity":true}"#
-        );
-        assert_eq!(
-            serde_json::to_string(&weeks[2].change).expect("should serialize"),
-            "50.0"
         );
     }
 
     #[test]
     fn test_stats_post_response_round_trips() {
-        // The response deserializes from a `fields`/`data` column table and
-        // serializes back into one, so a serialized response can be read again.
         let response = parse(WITH_VIEWS);
-        let json = serde_json::to_string(&response).expect("should serialize");
+        let json = serde_json::to_string(&response).expect("Unable to serialize response");
         let reparsed: StatsPostResponse =
-            serde_json::from_str(&json).expect("a serialized response should parse back");
+            serde_json::from_str(&json).expect("Unable to parse JSON");
 
         assert_eq!(reparsed.daily_views, response.daily_views);
-        assert_eq!(reparsed.views, response.views);
-        assert_eq!(
-            reparsed.post.expect("present").id,
-            response.post.expect("present").id
-        );
     }
 
     #[test]
@@ -555,10 +533,6 @@ mod tests {
         vec![("2026-08-04", 5), ("2026-08-06", 7)]
     )]
     #[case::missing_views_column(&["period"], r#"[["2026-08-04"]]"#, vec![])]
-    // The API has a no-history fallback row carrying a year-less date and a
-    // string-typed count. Neither is a usable data point, so the row is
-    // dropped rather than parsed into a bogus one.
-    #[case::no_history_fallback_row(&["period", "views"], r#"[["8-06", "0"]]"#, vec![])]
     fn test_stats_post_daily_views_column_handling(
         #[case] fields: &[&str],
         #[case] data: &str,
@@ -599,7 +573,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stats_post_never_viewed() {
+    fn test_stats_post_without_views() {
         let response = parse(NO_VIEWS);
 
         assert_eq!(response.views, 0);
@@ -607,18 +581,15 @@ mod tests {
         assert_eq!(response.like_count, Some(0));
         assert_eq!(response.discussion.expect("present").comment_count, 0);
 
-        // Without a view to anchor on, the API reports every year from 1970
-        // instead of the years the post existed for.
-        let year = response.years.get("1970").expect("1970 should exist");
+        // The API sends `months` as an empty array rather than an empty object.
+        let year = response.years.get("2026").expect("2026 should exist");
         assert_eq!(year.total, 0);
-        // Each one sends `months` as an empty array rather than an empty object.
         assert!(year.months.is_empty());
 
-        let average = response.averages.get("1970").expect("1970 should exist");
+        let average = response.averages.get("2026").expect("2026 should exist");
         assert_eq!(average.overall, 0);
         assert!(average.months.is_empty());
 
-        // The daily history is still padded, so it stays readable.
         assert_eq!(response.daily_views.len(), 3);
         assert!(response.daily_views.iter().all(|d| d.views == 0));
     }

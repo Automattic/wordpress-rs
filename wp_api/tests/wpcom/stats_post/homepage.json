@@ -16,28 +16,12 @@
     "weeks": [
         {
             "days": [
-                { "day": "2026-07-27", "count": 6 },
-                { "day": "2026-07-28", "count": 6 },
-                { "day": "2026-07-29", "count": 6 },
-                { "day": "2026-07-30", "count": 6 },
-                { "day": "2026-07-31", "count": 6 },
-                { "day": "2026-08-01", "count": 6 },
-                { "day": "2026-08-02", "count": 6 }
-            ],
-            "total": 42,
-            "average": 6,
-            "change": null
-        },
-        {
-            "days": [
-                { "day": "2026-08-03", "count": 12 },
-                { "day": "2026-08-04", "count": 12 },
-                { "day": "2026-08-05", "count": 12 },
+                { "day": "2026-08-05", "count": 8 },
                 { "day": "2026-08-06", "count": 6 }
             ],
-            "total": 42,
-            "average": 12,
-            "change": 100
+            "total": 40,
+            "average": 11,
+            "change": 1.7094017094017318
         }
     ],
     "fields": ["period", "views"],
@@ -48,9 +32,9 @@
     ],
     "highest_month": 3822,
     "highest_day_average": 127,
-    "highest_week_average": 12,
+    "highest_week_average": 89,
 
-    "_comment": "The home page has no post behind it: the API sends `like_count` and `discussion` as null. `post` is boolean false when the site's front page is set to \"latest posts\", and null when it has a static front page — in which case these figures cover the whole site rather than one page.",
+    "_comment": "The home page has no post behind it: the API sends `like_count` and `discussion` as null, and `post` as boolean false rather than null.",
     "like_count": null,
     "discussion": null,
     "post": false

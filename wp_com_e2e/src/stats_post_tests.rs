@@ -48,11 +48,10 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 }
             }));
 
-            // The home page is addressable on every site and has no post behind
-            // it, so the post, discussion, and like fields come back empty. It
-            // needs no lookup.
+            // The home page isn't a post, so the API omits the post, discussion,
+            // and like fields. Every site has one, so this needs no lookup.
             trials.push(Trial::test(
-                format!("post::get_stats_post_home_page::{}", site_id),
+                format!("post::get_stats_post_homepage::{}", site_id),
                 {
                     let ctx = Arc::clone(&ctx);
                     move || {
@@ -113,7 +112,7 @@ fn most_viewed_post(ctx: &TestContext, site_id: &WpComSiteId) -> Option<StatsPos
         .summary?
         .postviews
         .iter()
-        // Id 0 is the home page pseudo-entry, which the other trial covers.
+        // Id 0 is the homepage pseudo-entry, which isn't a real post.
         .find(|post_view| post_view.id != 0)
         .and_then(|post_view| i64::try_from(post_view.id).ok())
         .map(|id| StatsPostTarget::Post { id: PostId(id) })

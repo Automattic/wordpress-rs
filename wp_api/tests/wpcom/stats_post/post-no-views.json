@@ -1,6 +1,5 @@
 {
-    "_comment": "A post that has never been viewed. The API can't derive a start year, so `years` and `averages` run from 1970 to the present with every month map empty — trimmed here to the first two and the last of the 57 entries a real response carries. `data` is padded from the post's publication date to today.",
-    "date": "2026-08-07",
+    "date": "2026-08-06",
     "views": 0,
     "years": {
         "1970": { "months": [], "total": 0 },
@@ -15,11 +14,6 @@
     "weeks": [
         {
             "days": [
-                { "day": "2026-07-27", "count": 0 },
-                { "day": "2026-07-28", "count": 0 },
-                { "day": "2026-07-29", "count": 0 },
-                { "day": "2026-07-30", "count": 0 },
-                { "day": "2026-07-31", "count": 0 },
                 { "day": "2026-08-01", "count": 0 },
                 { "day": "2026-08-02", "count": 0 }
             ],
@@ -29,11 +23,8 @@
         },
         {
             "days": [
-                { "day": "2026-08-03", "count": 0 },
-                { "day": "2026-08-04", "count": 0 },
                 { "day": "2026-08-05", "count": 0 },
-                { "day": "2026-08-06", "count": 0 },
-                { "day": "2026-08-07", "count": 0 }
+                { "day": "2026-08-06", "count": 0 }
             ],
             "total": 0,
             "average": 0,
@@ -42,9 +33,9 @@
     ],
     "fields": ["period", "views"],
     "data": [
-        ["2026-06-11", 0],
-        ["2026-06-12", 0],
-        ["2026-06-13", 0]
+        ["2026-08-04", 0],
+        ["2026-08-05", 0],
+        ["2026-08-06", 0]
     ],
     "highest_month": 0,
     "highest_day_average": 0,
@@ -63,8 +54,8 @@
         "post_modified": "2026-06-11 14:22:01",
         "post_modified_gmt": "2026-06-11 14:22:01",
         "guid": "https://example.com/?p=169",
+        "permalink": "https://example.com/2026/06/11/a-quiet-post/",
         "post_type": "post",
-        "comment_count": "0",
-        "permalink": "https://example.com/2026/06/11/a-quiet-post/"
+        "comment_count": "0"
     }
 }

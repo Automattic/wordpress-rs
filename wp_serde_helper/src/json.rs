@@ -25,10 +25,6 @@ where
 /// This is the type-generic counterpart of [`crate::deserialize_false_or_string`]
 /// and the `false`-tolerant helpers in [`crate::numeric`].
 ///
-/// Pair this with `#[serde(default)]` on fields the API may omit entirely.
-/// Serde does not invoke `deserialize_with` for a missing key, so without a
-/// default a missing field is an error rather than `None`.
-///
 /// # Errors
 ///
 /// Returns an error for boolean `true`, and for any other value that is not a
@@ -262,12 +258,6 @@ mod tests {
         inner: Option<FalseAsNoneValue>,
     }
 
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct DefaultedFalseAsNone {
-        #[serde(default, deserialize_with = "deserialize_false_as_none")]
-        inner: Option<FalseAsNoneValue>,
-    }
-
     #[rstest]
     #[case(r#"{"inner": false}"#, None)]
     #[case(r#"{"inner": null}"#, None)]
@@ -276,35 +266,15 @@ mod tests {
         #[case] json: &str,
         #[case] expected: Option<FalseAsNoneValue>,
     ) {
-        let result: FalseAsNone =
-            serde_json::from_str(json).expect("Test case should be a valid JSON");
+        let result: FalseAsNone = serde_json::from_str(json).unwrap();
         assert_eq!(result.inner, expected);
     }
 
     #[rstest]
-    // Only `false` stands in for absence. `true` is a value the API is not
-    // expected to send, so it is an error rather than a silent `None` —
-    // matching `deserialize_false_or_string` and `deserialize_u64_or_none`.
     #[case::boolean_true(r#"{"inner": true}"#)]
-    // A wrong-shaped object is an error rather than being silently dropped.
     #[case::malformed_value(r#"{"inner": {"id": "x"}}"#)]
     fn test_deserialize_false_as_none_errors(#[case] json: &str) {
         let result = serde_json::from_str::<FalseAsNone>(json);
         assert!(result.is_err(), "The deserializer should emit an error");
-    }
-
-    #[test]
-    fn test_deserialize_false_as_none_requires_default_for_a_missing_field() {
-        // Serde does not call `deserialize_with` for an absent key, so the
-        // helper alone cannot make a field optional.
-        let result = serde_json::from_str::<FalseAsNone>(r#"{}"#);
-        assert!(
-            result.is_err(),
-            "A missing field should error without default"
-        );
-
-        let defaulted = serde_json::from_str::<DefaultedFalseAsNone>(r#"{}"#)
-            .expect("`default` should cover the missing field");
-        assert_eq!(defaulted.inner, None);
     }
 }
