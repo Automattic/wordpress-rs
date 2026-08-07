@@ -1,5 +1,6 @@
 package rs.wordpress.api.kotlin
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -26,6 +27,7 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.parseCertificate
 import java.io.File
+import java.io.IOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
@@ -181,7 +183,7 @@ class WpRequestExecutor @JvmOverloads constructor(
 
     // We intentionally catch all exceptions to prevent UniFFI callback crashes.
     // All exceptions are converted to proper Rust error types rather than being swallowed.
-    @Suppress("ThrowsCount", "TooGenericExceptionCaught", "SwallowedException")
+    @Suppress("ThrowsCount", "TooGenericExceptionCaught", "SwallowedException", "RethrowCaughtException")
     private fun executeRequestSafely(
         urlRequest: Request,
         requestUrl: String,
@@ -189,9 +191,10 @@ class WpRequestExecutor @JvmOverloads constructor(
         requestHeaderMap: WpNetworkHeaderMap,
         notifyUploadListener: Boolean = false
     ): WpNetworkResponse {
-        try {
-            val call = httpClient.getClient().newCall(urlRequest)
-
+        // Hoisted above the `try` so the `IOException` handler can distinguish a cancelled
+        // request (`call.isCanceled()`) from other I/O failures.
+        val call = httpClient.getClient().newCall(urlRequest)
+        val reason: RequestExecutionErrorReason = try {
             // Notify upload listener if this is an upload request
             if (notifyUploadListener) {
                 uploadListener?.onUploadStarted(CancellableCall(call))
@@ -207,47 +210,37 @@ class WpRequestExecutor @JvmOverloads constructor(
                     requestHeaderMap = requestHeaderMap
                 )
             }
+        } catch (e: CancellationException) {
+            // Structured concurrency requires coroutine cancellation to propagate, never to be
+            // flattened into a returned error value. Rethrow before it can be classified below.
+            throw e
         } catch (e: SSLPeerUnverifiedException) {
-            throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url),
-                requestUrl,
-                requestMethod,
-            )
+            RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
         } catch (e: UnknownHostException) {
-            throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.unknownHost(e, networkAvailabilityProvider),
-                requestUrl,
-                requestMethod,
-            )
+            RequestExecutionErrorReason.unknownHost(e, networkAvailabilityProvider)
         } catch (e: NoRouteToHostException) {
-            throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.noRouteToHost(e),
-                requestUrl,
-                requestMethod,
-            )
+            RequestExecutionErrorReason.noRouteToHost(e)
         } catch (e: ConnectException) {
-            throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.HttpError(
-                    reason = "Connection failed: ${e.localizedMessage}"
-                ),
-                requestUrl,
-                requestMethod,
-            )
+            RequestExecutionErrorReason.HttpError(reason = "Connection failed: ${e.localizedMessage}")
         } catch (e: SocketTimeoutException) {
-            throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.HttpTimeoutError,
-                requestUrl,
-                requestMethod,
-            )
-        } catch (e: Exception) {
-            throw requestExecutionFailedWith(
+            RequestExecutionErrorReason.HttpTimeoutError
+        } catch (e: IOException) {
+            // Cancelling via `CancellableCall.cancel()` makes the blocking `call.execute()` throw a
+            // base `IOException("Canceled")`. Classify it as `CancellationError` to match Swift's
+            // `URLError.cancelled` handling; everything else remains a `GenericError`.
+            if (call.isCanceled()) {
+                RequestExecutionErrorReason.CancellationError
+            } else {
                 RequestExecutionErrorReason.GenericError(
                     errorMessage = e.localizedMessage ?: e.toString()
-                ),
-                requestUrl,
-                requestMethod,
+                )
+            }
+        } catch (e: Exception) {
+            RequestExecutionErrorReason.GenericError(
+                errorMessage = e.localizedMessage ?: e.toString()
             )
         }
+        throw requestExecutionFailedWith(reason, requestUrl, requestMethod)
     }
 
     override suspend fun sleep(millis: ULong) {
