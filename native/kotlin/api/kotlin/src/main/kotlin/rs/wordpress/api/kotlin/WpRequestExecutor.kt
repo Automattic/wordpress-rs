@@ -227,7 +227,7 @@ class WpRequestExecutor @JvmOverloads constructor(
             )
         } catch (e: ConnectException) {
             throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.HttpError(
+                RequestExecutionErrorReason.ConnectionError(
                     reason = "Connection failed: ${e.localizedMessage}"
                 ),
                 requestUrl,
@@ -321,7 +321,7 @@ private fun RequestExecutionErrorReason.Companion.unknownHost(
 }
 
 private fun RequestExecutionErrorReason.Companion.noRouteToHost(e: NoRouteToHostException) =
-    RequestExecutionErrorReason.HttpError(
+    RequestExecutionErrorReason.ConnectionError(
         reason = e.localizedMessage
     )
 

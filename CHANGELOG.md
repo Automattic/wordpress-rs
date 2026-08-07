@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WordPress.com `POST /sites/<site_id>/domains/primary` endpoint for setting a site's primary domain
 - WordPress.com `GET /sites/<site_id>/plans` endpoint for listing the plans a site can buy, priced for that site, with the plan it's currently on flagged.
 - `RequestExecutionErrorReason` gained `isSiteUnreachable` and `isDeviceOffline` for distinguishing a site that could not be reached (the host did not resolve) from a device with no network connection. Previously consumers had to match the `NonExistentSiteError` / `DeviceIsOfflineError` variants themselves. Available on both platforms as properties on the reason, which is reachable from `WpRequestResult.RequestExecutionFailed` and `WpApiException.RequestExecutionFailed` on Kotlin. Swift additionally exposes both as convenience properties on `WpApiError` and `RequestExecutionError`.
+- `RequestExecutionErrorReason` gained a `ConnectionError` variant — the host resolved, but no connection to the server could be established (the connection was refused, there was no route, or the host was unreachable) — and an `isConnectivityFailure` predicate (the union of `isSiteUnreachable` and `ConnectionError`) for a single portable "we couldn't reach the site's server" signal, distinct from `isDeviceOffline`. Refused and unreachable connections now classify as `ConnectionError` on every executor (previously the generic `HttpError` on Kotlin and reqwest). A connect timeout is not included; it remains `HttpTimeoutError`.
 
 ### Changed
 
@@ -32,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Swift now classifies a refused connection — the host resolves, but nothing is listening (server down, wrong port) — as `RequestExecutionErrorReason.HttpError`, matching the Kotlin and reqwest executors. iOS previously reported it as `NonExistentSiteError`, which now uniformly means a DNS-resolution failure across all three executors.
+- Swift no longer classifies a refused connection — the host resolves, but nothing is listening (server down, wrong port) — as `NonExistentSiteError`, so `isSiteUnreachable` no longer fires for it. `NonExistentSiteError` now uniformly means a DNS-resolution failure across all three executors (refused connections are a `ConnectionError`; see Added).
 
 ## [0.6.0] - 2026-07-16
 

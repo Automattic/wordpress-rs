@@ -98,8 +98,8 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 return handleNonExistentSiteError(error, for: request)
             }
 
-            if errorIsHttpError(error) {
-                return handleHttpError(error, for: request)
+            if errorIsConnectionError(error) {
+                return handleConnectionError(error, for: request)
             }
 
             if errorIsDeviceIsOffline(error) {
@@ -229,7 +229,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         )
     }
 
-    func handleHttpError(
+    func handleConnectionError(
         _ error: Error,
         for request: NetworkRequestContent
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
@@ -237,7 +237,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             .RequestExecutionFailed(
                 statusCode: nil,
                 redirects: executorDelegate.redirects(for: request.requestId()),
-                reason: .httpError(reason: error.localizedDescription),
+                reason: .connectionError(reason: error.localizedDescription),
                 requestUrl: request.url(),
                 requestMethod: request.method()
             )
@@ -266,9 +266,9 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 
     private func errorIsNonExistentSiteError(_ error: Error) -> Bool {
         // A refused connection (`.cannotConnectToHost` — the host resolves, but
-        // nothing is listening) is deliberately *not* here: it is a transport
-        // failure handled by `errorIsHttpError`, matching the Kotlin and reqwest
-        // executors. This keeps `NonExistentSiteError` — and the
+        // nothing is listening) is deliberately *not* here: it is a failed
+        // connection handled by `errorIsConnectionError`, matching the Kotlin and
+        // reqwest executors. This keeps `NonExistentSiteError` — and the
         // `isSiteUnreachable` predicate built on it — a portable "the host does
         // not resolve" signal across platforms. See #1495.
         //
@@ -289,11 +289,12 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         .contains((error as? URLError)?.code)
     }
 
-    private func errorIsHttpError(_ error: Error) -> Bool {
-        // A refused connection: the host resolves, but nothing accepts the
-        // connection (server down, wrong port, service not listening). It is a
-        // transport failure, so it maps to `HttpError` — the same classification
-        // the Kotlin (`ConnectException`) and reqwest (io-error) executors use.
+    private func errorIsConnectionError(_ error: Error) -> Bool {
+        // A failed connection: the host resolves, but nothing accepts the
+        // connection (server down, wrong port, not listening, or no route). It
+        // maps to `ConnectionError` — the same classification the Kotlin
+        // (`ConnectException` / `NoRouteToHostException`) and reqwest (io-error)
+        // executors use, and it backs `isConnectivityFailure`.
         [
             .cannotConnectToHost
         ]

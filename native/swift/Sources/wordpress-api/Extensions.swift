@@ -57,15 +57,28 @@ extension RequestExecutionErrorReason {
     /// *this particular site*, not a loss of device connectivity.
     ///
     /// - Note: A refused connection (the host resolves, but nothing is
-    ///   listening) is classified differently per platform — Swift reports it
-    ///   here, Kotlin reports it as an HTTP error. Only a DNS failure is treated
-    ///   as an unreachable site by every executor. A site URL rejected while
-    ///   parsing surfaces as `WpApiError.SiteUrlParsingError` and never reaches
-    ///   this predicate; a `.badURL` that only `URLSession` rejects at send time
-    ///   is classified here for lack of a dedicated invalid-URL case, though no
-    ///   known URL actually reaches that branch.
+    ///   listening) is classified as a `ConnectionError` on every executor, so it
+    ///   does *not* satisfy this predicate — use ``isConnectivityFailure`` to
+    ///   cover both. A site URL rejected while parsing surfaces as
+    ///   `WpApiError.SiteUrlParsingError` and never reaches this predicate; a
+    ///   `.badURL` that only `URLSession` rejects at send time is classified here
+    ///   for lack of a dedicated invalid-URL case, though no known URL actually
+    ///   reaches that branch.
     public var isSiteUnreachable: Bool {
         requestExecutionErrorReasonIsSiteUnreachable(reason: self)
+    }
+
+    /// Whether the site's server could not be reached at all — either its host
+    /// did not resolve (`NonExistentSiteError`) or the host resolved but no
+    /// connection could be established (`ConnectionError`).
+    ///
+    /// The broad counterpart to ``isSiteUnreachable`` (which is strictly the DNS
+    /// case): use this for a single "we couldn't reach your site" signal, and
+    /// ``isSiteUnreachable`` to tell a bad domain apart from a server that's down.
+    /// Distinct from ``isDeviceOffline``, the device's own loss of connectivity. A
+    /// connect timeout is not included (it stays `HttpTimeoutError`).
+    public var isConnectivityFailure: Bool {
+        requestExecutionErrorReasonIsConnectivityFailure(reason: self)
     }
 
     /// Whether the request failed because the device has no network connection.
@@ -95,6 +108,14 @@ public extension CarriesRequestExecutionErrorReason {
     /// differences that apply.
     var isSiteUnreachable: Bool {
         executionErrorReason?.isSiteUnreachable ?? false
+    }
+
+    /// Whether the site's server could not be reached at all — the host did not
+    /// resolve, or the connection could not be established.
+    ///
+    /// See ``RequestExecutionErrorReason/isConnectivityFailure``.
+    var isConnectivityFailure: Bool {
+        executionErrorReason?.isConnectivityFailure ?? false
     }
 
     /// Whether the request failed because the device has no network connection.

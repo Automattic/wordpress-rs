@@ -1,6 +1,7 @@
 package rs.wordpress.api.kotlin
 
 import uniffi.wp_api.RequestExecutionErrorReason
+import uniffi.wp_api.requestExecutionErrorReasonIsConnectivityFailure
 import uniffi.wp_api.requestExecutionErrorReasonIsDeviceOffline
 import uniffi.wp_api.requestExecutionErrorReasonIsSiteUnreachable
 
@@ -8,9 +9,10 @@ import uniffi.wp_api.requestExecutionErrorReasonIsSiteUnreachable
  * Extension properties for classifying connectivity failures.
  *
  * The request executor maps the underlying platform errors onto
- * [RequestExecutionErrorReason.NonExistentSiteError] and
+ * [RequestExecutionErrorReason.NonExistentSiteError],
+ * [RequestExecutionErrorReason.ConnectionError], and
  * [RequestExecutionErrorReason.DeviceIsOfflineError]. These properties expose
- * that distinction without requiring callers to match the variants themselves.
+ * those distinctions without requiring callers to match the variants themselves.
  *
  * The reason is available as `reason` on `WpRequestResult.RequestExecutionFailed`
  * and on `WpApiException.RequestExecutionFailed`.
@@ -24,12 +26,27 @@ import uniffi.wp_api.requestExecutionErrorReasonIsSiteUnreachable
  * particular site*, not a loss of device connectivity.
  *
  * Note that a refused connection (the host resolves, but nothing is listening)
- * is a transport failure reported as an HTTP error on every executor, so it does
- * not satisfy this predicate. A malformed site URL never reaches this predicate
- * either; it surfaces as `WpApiException.SiteUrlParsingException`.
+ * is classified as a [RequestExecutionErrorReason.ConnectionError] on every
+ * executor, so it does not satisfy this predicate — use [isConnectivityFailure]
+ * to cover both. A malformed site URL never reaches this predicate either; it
+ * surfaces as `WpApiException.SiteUrlParsingException`.
  */
 val RequestExecutionErrorReason.isSiteUnreachable: Boolean
     get() = requestExecutionErrorReasonIsSiteUnreachable(this)
+
+/**
+ * Whether the site's server could not be reached at all — either its host did
+ * not resolve ([RequestExecutionErrorReason.NonExistentSiteError]) or the host
+ * resolved but no connection could be established
+ * ([RequestExecutionErrorReason.ConnectionError]).
+ *
+ * The broad counterpart to [isSiteUnreachable] (which is strictly the DNS case):
+ * use this for a single "we couldn't reach your site" signal. Distinct from
+ * [isDeviceOffline], the device's own loss of connectivity. A connect timeout is
+ * not included (it stays [RequestExecutionErrorReason.HttpTimeoutError]).
+ */
+val RequestExecutionErrorReason.isConnectivityFailure: Boolean
+    get() = requestExecutionErrorReasonIsConnectivityFailure(this)
 
 /**
  * Whether the request failed because the device has no network connection.
