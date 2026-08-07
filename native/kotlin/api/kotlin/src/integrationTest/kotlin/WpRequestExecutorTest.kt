@@ -1,5 +1,6 @@
 package rs.wordpress.api.kotlin
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -154,6 +155,50 @@ class WpRequestExecutorTest {
             (result as WpRequestResult.RequestExecutionFailed<*>).reason
         )
     }
+
+    @Test
+    fun `a CancellationException thrown synchronously by an upload callback is mapped to CancellationError`() =
+        runTest {
+            // The executor runs inside UniFFI's callback scope. A `CancellationException` thrown
+            // synchronously by a client callback must NOT be rethrown — UniFFI would treat it as an
+            // unexpected error and panic, surfacing as an uncaught `InternalException` out of
+            // `WpApiClient.request`. It must instead be classified as `CancellationError` so `request`
+            // still returns a result. This guards against "fixing" the executor's catch back to a
+            // `throw` (the usual Kotlin idiom), which would reintroduce that crash path.
+            val throwingUploadListener = object : WpRequestExecutor.UploadListener {
+                override fun onProgressUpdate(uploadedBytes: Long, totalBytes: Long) {
+                    // Not relevant to this test.
+                }
+
+                override fun onUploadStarted(cancellableUpload: WpRequestExecutor.CancellableUpload) {
+                    throw CancellationException("cancelled synchronously from callback")
+                }
+            }
+
+            val executor = WpRequestExecutor(
+                httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+                networkAvailabilityProvider = NetworkAvailabilityProvider { true },
+                fileResolver = ClasspathFileResolver(),
+                uploadListener = throwingUploadListener
+            )
+
+            val apiClient = WpApiClient(
+                wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+                authProvider = WpAuthenticationProvider.none(),
+                requestExecutor = executor
+            )
+
+            val result = apiClient.request { requestBuilder ->
+                requestBuilder.media().create(
+                    params = MediaCreateParams(title = "Cancelled upload", filePath = "test_media.jpg")
+                )
+            }
+
+            assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+            assertIs<RequestExecutionErrorReason.CancellationError>(
+                (result as WpRequestResult.RequestExecutionFailed<*>).reason
+            )
+        }
 
     @Test
     fun `cancelling the enclosing coroutine propagates cancellation instead of a RequestExecutionFailed`() =

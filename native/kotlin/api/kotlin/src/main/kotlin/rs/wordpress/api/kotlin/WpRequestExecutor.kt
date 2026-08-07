@@ -188,7 +188,6 @@ class WpRequestExecutor @JvmOverloads constructor(
         "ThrowsCount",
         "TooGenericExceptionCaught",
         "SwallowedException",
-        "RethrowCaughtException",
         "CyclomaticComplexMethod",
     )
     private fun executeRequestSafely(
@@ -218,11 +217,18 @@ class WpRequestExecutor @JvmOverloads constructor(
                 )
             }
         } catch (e: CancellationException) {
-            // Rethrow so a `CancellationException` is never flattened into a `GenericError`. Coroutine
-            // cancellation of the blocking `call.execute()` isn't delivered here (it surfaces at the
-            // `withContext` boundary and propagates via `WpApiClient.request`'s `WpApiException` catch);
-            // this only guards one thrown synchronously inside the `try`, e.g. from an upload callback.
-            throw e
+            // This is NOT coroutine cancellation: `executeRequestSafely` is non-suspending, so a
+            // cancellation signal is never injected into this `try`. The only `CancellationException`
+            // that can reach here is one thrown synchronously by a client callback (e.g. `onUploadStarted`).
+            //
+            // Deliberately NOT rethrown (the usual Kotlin idiom): this runs inside UniFFI's
+            // `GlobalScope.launch` callback, where a throwable that isn't the declared
+            // `RequestExecutionException` is treated as *unexpected* — UniFFI panics and it surfaces as an
+            // uncaught `InternalException` out of `WpApiClient.request` (which only catches `WpApiException`).
+            // Classifying it as a cancellation keeps the executor's no-throw contract and reports an honest
+            // cause. Real coroutine cancellation still propagates caller-side via `suspendCancellableCoroutine`
+            // in the generated await.
+            RequestExecutionErrorReason.CancellationError
         } catch (e: SSLPeerUnverifiedException) {
             RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
         } catch (e: UnknownHostException) {
