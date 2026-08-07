@@ -286,7 +286,7 @@ investigate the relevant code before making decisions based on this document.
 - [x] `GET /rest/v1.1/sites/$site_url/` — fetch site by URL (unauthenticated)
 - [ ] `POST /rest/v1.1/sites/new/` — create new site
 - [x] `GET /rest/v1.2/me/sites/` — list user's sites (with filters)
-- [ ] `GET /rest/v1.3/sites/$site/plans/` — fetch site plans
+- [x] `GET /rest/v1.3/sites/$site/plans/` — fetch site plans
 - [ ] `POST /wpcom/v2/sites/$site/launch/` — launch site
 
 ## Sites — Automated Transfers
