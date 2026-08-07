@@ -1,0 +1,6 @@
+# Resolve CHANGELOG conflicts by keeping both sides instead of writing
+# conflict markers. Every PR appends to the same "## [Unreleased]" section,
+# so independent entries collide constantly; git's built-in `union` merge
+# driver takes both. Note it does not deduplicate, so a reworded line can
+# leave a duplicate to tidy by hand.
+CHANGELOG.md merge=union

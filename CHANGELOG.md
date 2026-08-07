@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Update translations.
 - **Internal:** Fix a flaky unit test.
 - **Internal:** Route the Kotlin integration tests through the in-VPC Reposilite dependency mirror
+- **Internal:** Merge `CHANGELOG.md` with git's built-in `union` driver (via `.gitattributes`), so the frequent conflicts on the `## [Unreleased]` section resolve by keeping both sides instead of emitting conflict markers.
 
 ## [0.6.0] - 2026-07-16
 
