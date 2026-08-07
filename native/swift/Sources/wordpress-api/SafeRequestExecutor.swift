@@ -246,6 +246,15 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     private func errorIsNonExistentSiteError(_ error: Error) -> Bool {
+        // `.badURL` is grouped with the non-existent-site errors deliberately.
+        // A malformed URL has no dedicated classification at the executor layer:
+        // `RequestExecutionError` can't produce `WpApiError.SiteUrlParsingError`
+        // (that's a parse-time error, one layer up) and `RequestExecutionErrorReason`
+        // has no invalid-URL case, so `NonExistentSiteError` is the nearest fit.
+        // In practice we could not construct a URL that reaches this branch:
+        // request URLs are normalized by the Rust `url` crate before they arrive,
+        // and modern Foundation repairs the leftovers (e.g. an invalid `%zz`
+        // becomes `%25zz`) rather than raising `.badURL`. It's kept for completeness.
         [
             .badURL,
             .cannotConnectToHost,

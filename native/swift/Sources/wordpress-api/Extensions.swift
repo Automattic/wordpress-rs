@@ -61,8 +61,9 @@ extension RequestExecutionErrorReason {
     ///   here, Kotlin reports it as an HTTP error. Only a DNS failure is treated
     ///   as an unreachable site by every executor. A site URL rejected while
     ///   parsing surfaces as `WpApiError.SiteUrlParsingError` and never reaches
-    ///   this predicate; a URL that only `URLSession` rejects at request time
-    ///   (`.badURL`) does map here.
+    ///   this predicate; a `.badURL` that only `URLSession` rejects at send time
+    ///   is classified here for lack of a dedicated invalid-URL case, though no
+    ///   known URL actually reaches that branch.
     public var isSiteUnreachable: Bool {
         requestExecutionErrorReasonIsSiteUnreachable(reason: self)
     }

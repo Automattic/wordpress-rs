@@ -704,9 +704,12 @@ impl RequestExecutionErrorReason {
     ///
     /// A site URL rejected while parsing never reaches this predicate: it
     /// surfaces as [`WpApiError::SiteUrlParsingError`], which carries no
-    /// `RequestExecutionErrorReason`. On Swift, however, a URL that only
-    /// `URLSession` rejects at request time (`badURL`) maps to
-    /// `NonExistentSiteError`, so it *does* reach here.
+    /// `RequestExecutionErrorReason`. On Swift a URL that only `URLSession`
+    /// rejects at request time (`badURL`) is classified as `NonExistentSiteError`
+    /// — the executor has no dedicated invalid-URL reason, so it's the nearest
+    /// fit. That branch appears unreachable in practice (request URLs are
+    /// normalized before they reach the platform, which repairs the rest); it is
+    /// covered for completeness.
     pub fn is_site_unreachable(&self) -> bool {
         matches!(self, Self::NonExistentSiteError { .. })
     }
