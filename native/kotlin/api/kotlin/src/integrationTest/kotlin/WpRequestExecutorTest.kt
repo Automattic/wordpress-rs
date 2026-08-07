@@ -77,6 +77,43 @@ class WpRequestExecutorTest {
     }
 
     @Test
+    fun `whole-call callTimeout is mapped to HttpTimeoutError, not CancellationError`() = runTest {
+        // OkHttp's `callTimeout` bounds the entire call and, on expiry, cancels the call internally
+        // and throws `InterruptedIOException`. Because that cancel flips `call.isCanceled()` to true,
+        // the executor must classify it as a timeout *before* the `isCanceled()` cancellation check —
+        // otherwise a genuine timeout would be mislabeled as a user `CancellationError`.
+        mockWebServer.enqueue(
+            MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
+        )
+
+        // Only `callTimeout` is short; leave connect/read/write at their defaults so the whole-call
+        // deadline (not a socket read timeout) is what fires.
+        val client = OkHttpClient.Builder()
+            .callTimeout(300, TimeUnit.MILLISECONDS)
+            .build()
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(client),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+        assertIs<RequestExecutionErrorReason.HttpTimeoutError>(
+            (result as WpRequestResult.RequestExecutionFailed<*>).reason
+        )
+    }
+
+    @Test
     fun `cancelling an in-flight request via CancellableCall is mapped to CancellationError`() = runTest {
         // `CancellableCall` is only surfaced through the upload path's `onUploadStarted` callback,
         // so cancellation is exercised via a media upload. Cancelling here — before `call.execute()`
@@ -121,9 +158,13 @@ class WpRequestExecutorTest {
     @Test
     fun `cancelling the enclosing coroutine propagates cancellation instead of a RequestExecutionFailed`() =
         runBlocking {
-            // Stall the response body so the executor is parked mid-request when we cancel. Kotlin
-            // coroutine cancellation must propagate out of `execute()`, never be flattened into a
-            // returned `RequestExecutionFailed` (e.g. `GenericError`) by the executor's catch-all.
+            // Stall the response body so the request is in-flight when we cancel. Cancelling the
+            // enclosing coroutine must surface as cancellation out of `WpApiClient.request`, not a
+            // returned `RequestExecutionFailed`. That guarantee is caller-side: `request` catches only
+            // `WpApiException`, so a `CancellationException` propagates instead of being mapped to a
+            // result. (The blocking `call.execute()` isn't interruptible, so the executor's own
+            // `catch (CancellationException)` is never reached by coroutine cancellation — this test
+            // covers the caller-side half of the contract.)
             mockWebServer.enqueue(
                 MockResponse()
                     .setBody("[]")

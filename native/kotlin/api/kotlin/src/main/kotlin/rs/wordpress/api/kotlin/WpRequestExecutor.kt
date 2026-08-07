@@ -28,6 +28,7 @@ import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.parseCertificate
 import java.io.File
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
@@ -183,7 +184,13 @@ class WpRequestExecutor @JvmOverloads constructor(
 
     // We intentionally catch all exceptions to prevent UniFFI callback crashes.
     // All exceptions are converted to proper Rust error types rather than being swallowed.
-    @Suppress("ThrowsCount", "TooGenericExceptionCaught", "SwallowedException", "RethrowCaughtException")
+    @Suppress(
+        "ThrowsCount",
+        "TooGenericExceptionCaught",
+        "SwallowedException",
+        "RethrowCaughtException",
+        "CyclomaticComplexMethod",
+    )
     private fun executeRequestSafely(
         urlRequest: Request,
         requestUrl: String,
@@ -211,8 +218,10 @@ class WpRequestExecutor @JvmOverloads constructor(
                 )
             }
         } catch (e: CancellationException) {
-            // Structured concurrency requires coroutine cancellation to propagate, never to be
-            // flattened into a returned error value. Rethrow before it can be classified below.
+            // Rethrow so a `CancellationException` is never flattened into a `GenericError`. Coroutine
+            // cancellation of the blocking `call.execute()` isn't delivered here (it surfaces at the
+            // `withContext` boundary and propagates via `WpApiClient.request`'s `WpApiException` catch);
+            // this only guards one thrown synchronously inside the `try`, e.g. from an upload callback.
             throw e
         } catch (e: SSLPeerUnverifiedException) {
             RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
@@ -224,10 +233,15 @@ class WpRequestExecutor @JvmOverloads constructor(
             RequestExecutionErrorReason.HttpError(reason = "Connection failed: ${e.localizedMessage}")
         } catch (e: SocketTimeoutException) {
             RequestExecutionErrorReason.HttpTimeoutError
+        } catch (e: InterruptedIOException) {
+            // OkHttp's whole-call `callTimeout` cancels the call and throws a bare `InterruptedIOException`
+            // (the superclass of `SocketTimeoutException` above); classify it as a timeout so it isn't
+            // mislabeled a `CancellationError` by the `isCanceled()` check below.
+            RequestExecutionErrorReason.HttpTimeoutError
         } catch (e: IOException) {
-            // Cancelling via `CancellableCall.cancel()` makes the blocking `call.execute()` throw a
-            // base `IOException("Canceled")`. Classify it as `CancellationError` to match Swift's
-            // `URLError.cancelled` handling; everything else remains a `GenericError`.
+            // An explicit `CancellableCall.cancel()` throws a base `IOException("Canceled")` with
+            // `isCanceled() == true` — classify only that as `CancellationError` (matching Swift's
+            // `URLError.cancelled`); other I/O failures stay `GenericError`.
             if (call.isCanceled()) {
                 RequestExecutionErrorReason.CancellationError
             } else {
