@@ -50,20 +50,24 @@ extension WpApiError {
 }
 
 extension RequestExecutionErrorReason {
-    /// Whether the site could not be reached — most reliably, the host did not
-    /// resolve.
+    /// Whether the site could not be reached at all — either its host did not
+    /// resolve (`NonExistentSiteError`) or the host resolved but no connection
+    /// could be established (`ConnectionError`).
+    ///
+    /// This is a portable signal: every executor classifies both failure modes
+    /// the same way. To tell them apart — a domain that doesn't resolve vs. a
+    /// server that's down — match `.nonExistentSiteError` and `.connectionError`
+    /// directly.
     ///
     /// Distinct from ``isDeviceOffline``: this indicates a problem reaching
     /// *this particular site*, not a loss of device connectivity.
     ///
-    /// - Note: A refused connection (the host resolves, but nothing is
-    ///   listening) is classified differently per platform — Swift reports it
-    ///   here, Kotlin reports it as an HTTP error. Only a DNS failure is treated
-    ///   as an unreachable site by every executor. A site URL rejected while
-    ///   parsing surfaces as `WpApiError.SiteUrlParsingError` and never reaches
-    ///   this predicate; a `.badURL` that only `URLSession` rejects at send time
-    ///   is classified here for lack of a dedicated invalid-URL case, though no
-    ///   known URL actually reaches that branch.
+    /// - Note: A connect timeout is not included (it stays `HttpTimeoutError`). A
+    ///   site URL rejected while parsing surfaces as
+    ///   `WpApiError.SiteUrlParsingError` and never reaches this predicate; a
+    ///   `.badURL` that only `URLSession` rejects at send time is classified as
+    ///   `NonExistentSiteError` for lack of a dedicated invalid-URL case, though
+    ///   no known URL actually reaches that branch.
     public var isSiteUnreachable: Bool {
         requestExecutionErrorReasonIsSiteUnreachable(reason: self)
     }
@@ -88,11 +92,10 @@ public protocol CarriesRequestExecutionErrorReason {
 }
 
 public extension CarriesRequestExecutionErrorReason {
-    /// Whether the site could not be reached — most reliably, the host did not
-    /// resolve.
+    /// Whether the site could not be reached at all — the host did not resolve,
+    /// or the connection could not be established.
     ///
-    /// See ``RequestExecutionErrorReason/isSiteUnreachable`` for the platform
-    /// differences that apply.
+    /// See ``RequestExecutionErrorReason/isSiteUnreachable``.
     var isSiteUnreachable: Bool {
         executionErrorReason?.isSiteUnreachable ?? false
     }

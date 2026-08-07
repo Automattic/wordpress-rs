@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WordPress.com `POST /sites/<site_id>/domains/primary` endpoint for setting a site's primary domain
 - WordPress.com `GET /sites/<site_id>/stats/post/<post_id>` endpoint for a post's view history, like count, comment count, and metadata
 - WordPress.com `GET /sites/<site_id>/plans` endpoint for listing the plans a site can buy, priced for that site, with the plan it's currently on flagged.
-- `RequestExecutionErrorReason` gained `isSiteUnreachable` and `isDeviceOffline` for distinguishing a site that could not be reached (the host did not resolve) from a device with no network connection. Previously consumers had to match the `NonExistentSiteError` / `DeviceIsOfflineError` variants themselves. Available on both platforms as properties on the reason, which is reachable from `WpRequestResult.RequestExecutionFailed` and `WpApiException.RequestExecutionFailed` on Kotlin. Swift additionally exposes both as convenience properties on `WpApiError` and `RequestExecutionError`.
+- `RequestExecutionErrorReason` gained `isSiteUnreachable` and `isDeviceOffline` for distinguishing a site that could not be reached (the host did not resolve, or a connection to it could not be established) from a device with no network connection. Previously consumers had to match the `NonExistentSiteError` / `DeviceIsOfflineError` variants themselves. Available on both platforms as properties on the reason, which is reachable from `WpRequestResult.RequestExecutionFailed` and `WpApiException.RequestExecutionFailed` on Kotlin. Swift additionally exposes both as convenience properties on `WpApiError` and `RequestExecutionError`.
+- **BREAKING:** `RequestExecutionErrorReason` gained a `ConnectionError` variant — the host resolved, but no connection to the server could be established (the connection was refused, there was no route, or the host was unreachable). Exhaustive matches over `RequestExecutionErrorReason` (Swift `switch`, Kotlin `when`, Rust `match`) must now handle the new case. `isSiteUnreachable` covers it alongside DNS failures, so it's a single portable "we couldn't reach the site" signal that returns the same answer on every executor; match `NonExistentSiteError` / `ConnectionError` directly to tell a bad domain apart from a server that's down. Refused and unreachable connections previously classified as the generic `HttpError` on Kotlin and reqwest. A connect timeout is not included; it remains `HttpTimeoutError`.
 
 ### Changed
 
@@ -42,14 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Swift: `WpRequestExecutor.sleep(millis:)` converted milliseconds to nanoseconds with the wrong factor (`* 1_000` instead of `* 1_000_000`), so it slept 1000× too short — a `Retry-After: 30` waited 30 ms instead of 30 s. `RetryAfterMiddleware` then re-sent immediately, the server kept returning 429, and after `max_retries` the caller observed `MisconfiguredRateLimitError` where honoring the backoff would usually have succeeded. The executor now waits the full interval, and no longer risks a `fatalError` if the sleep's task is cancelled.
 - Swift: Classify invalid-SSL failures from the failed handshake's `SecTrust` (`URLError.failureURLPeerTrust`), via `SecTrustCopyCertificateChain`, instead of reading the undocumented `NSErrorPeerCertificateChainKey` `userInfo` string that has no public constant. Behavior is unchanged on every platform: iOS/macOS/tvOS still surface the presented certificate as `certificateNotValidForName`, and watchOS — which exposes no peer trust — still degrades to `genericSslError`. ([#1510](https://github.com/Automattic/wordpress-rs/issues/1510))
+- `isSiteUnreachable` now returns the same answer for a refused connection — the host resolves, but nothing is listening (server down, wrong port) — on every executor. Previously it was `NonExistentSiteError` on Swift (so `isSiteUnreachable` was `true`) but the generic `HttpError` on Kotlin and reqwest (so it was `false`); a refused connection is now a `ConnectionError` everywhere, which `isSiteUnreachable` covers. `NonExistentSiteError` is reserved for a DNS-resolution failure.
 
 ### Security
 
 - **Internal:** Bumped the transitive `rand` dependency to `0.9.3` and `0.8.6` to clear [RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097.html) (`GHSA-cq8v-f236-94qc`), a low-severity unsoundness in `rand` 0.9.2 / 0.8.5. Lockfile-only; the affected code path (a custom `log` logger calling `rand::rng()` during reseed) is not exercised here.
-
-### Fixed
-
-- Swift now classifies a refused connection — the host resolves, but nothing is listening (server down, wrong port) — as `RequestExecutionErrorReason.HttpError`, matching the Kotlin and reqwest executors. iOS previously reported it as `NonExistentSiteError`, which now uniformly means a DNS-resolution failure across all three executors.
 
 ## [0.6.0] - 2026-07-16
 

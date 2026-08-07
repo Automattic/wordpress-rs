@@ -195,6 +195,17 @@ fn request_execution_error_from_reqwest(
         tls_error.into()
     } else if let Some(io_error) = error.as_io_error() {
         match io_error.kind() {
+            // The host resolved, but the connection couldn't be established. This
+            // is caught here (before `is_connect()` below, which is the DNS
+            // `NXDOMAIN` fallback) because a refused/unreachable connection
+            // carries an inner `io::Error`.
+            std::io::ErrorKind::ConnectionRefused
+            | std::io::ErrorKind::HostUnreachable
+            | std::io::ErrorKind::NetworkUnreachable => {
+                RequestExecutionErrorReason::ConnectionError {
+                    reason: io_error.to_string(),
+                }
+            }
             std::io::ErrorKind::UnexpectedEof => RequestExecutionErrorReason::HttpError {
                 reason: "The server terminated the connection unexpectedly".to_string(),
             },
@@ -376,10 +387,12 @@ mod tests {
     use crate::request::endpoint::WpEndpointUrl;
 
     // A refused connection — the host resolves (here, loopback), but nothing is
-    // listening on the port — must classify as `HttpError`, not
-    // `NonExistentSiteError`. `NonExistentSiteError` is reserved for DNS
-    // failures, which keeps `is_site_unreachable` a portable "the host does not
-    // resolve" signal across the Swift, Kotlin, and reqwest executors (#1495).
+    // listening on the port — must classify as `ConnectionError`, not
+    // `NonExistentSiteError` (which is reserved for DNS failures) and not the
+    // generic `HttpError` (which is a failure *after* a connection is
+    // established). Keeping the two apart lets `is_site_unreachable` cover both
+    // consistently while callers can still tell a bad domain from a down server
+    // across the Swift, Kotlin, and reqwest executors (#1495).
     //
     // The branch ordering in `request_execution_error_from_reqwest` is
     // load-bearing: `ECONNREFUSED` carries an inner `io::Error`, so it is caught
@@ -388,7 +401,7 @@ mod tests {
     // ordering so a refactor can't silently reclassify a refused connection as
     // an unreachable site.
     #[tokio::test]
-    async fn refused_connection_is_http_error() {
+    async fn refused_connection_is_connection_error() {
         // Port 1 on loopback is privileged, so nothing is bound in any test
         // environment, and the OS refuses the connection immediately.
         let request = WpNetworkRequest::get(WpEndpointUrl("http://127.0.0.1:1".to_string()));
@@ -403,8 +416,8 @@ mod tests {
             panic!("expected RequestExecutionFailed, got: {error:?}");
         };
         assert!(
-            matches!(reason, RequestExecutionErrorReason::HttpError { .. }),
-            "a refused connection must be HttpError, got: {reason:?}"
+            matches!(reason, RequestExecutionErrorReason::ConnectionError { .. }),
+            "a refused connection must be ConnectionError, got: {reason:?}"
         );
     }
 }

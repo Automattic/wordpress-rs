@@ -92,12 +92,12 @@ struct WordPressAPITests {
     }
 
     // A refused connection — the host resolves (loopback), but nothing is
-    // listening on the port — must be classified as `.httpError`, matching the
-    // Kotlin and reqwest executors. It must *not* be `.nonExistentSiteError`,
+    // listening on the port — must be classified as `.connectionError`, matching
+    // the Kotlin and reqwest executors. It must *not* be `.nonExistentSiteError`,
     // which is reserved for DNS failures so `isSiteUnreachable` stays a portable
     // "the host does not resolve" signal across platforms. See #1495.
     @Test(.enabled(if: !isLinux()))
-    func testRefusedConnectionIsHttpError() async throws {
+    func testRefusedConnectionIsConnectionError() async throws {
         // Port 1 on loopback is privileged, so nothing is bound in any test
         // environment, and the OS refuses the connection immediately
         // (`URLError.cannotConnectToHost`).
@@ -131,8 +131,8 @@ struct WordPressAPITests {
                     return false
                 }
 
-                guard case .httpError = reason else {
-                    Issue.record("A refused connection must be `.httpError`, got: \(reason)")
+                guard case .connectionError = reason else {
+                    Issue.record("A refused connection must be `.connectionError`, got: \(reason)")
                     return false
                 }
 

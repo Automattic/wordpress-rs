@@ -249,6 +249,38 @@ class WpRequestExecutorTest {
             assertTrue(loggedErrors.isEmpty(), "cancellation should not be logged as an error: $loggedErrors")
         }
 
+    @Test
+    fun `refused connection is mapped to ConnectionError`() = runTest {
+        // Reserve a port with a throwaway server, then shut it down so nothing is
+        // listening — a connection to it is refused (ConnectException). That must
+        // classify as ConnectionError, not the generic HttpError and not
+        // NonExistentSiteError (which is reserved for DNS failures).
+        val closedServer = MockWebServer()
+        closedServer.start()
+        val refusedUrl = closedServer.url("/wp-json")
+        closedServer.shutdown()
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(refusedUrl.toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+        assertIs<RequestExecutionErrorReason.ConnectionError>(
+            (result as WpRequestResult.RequestExecutionFailed<*>).reason
+        )
+    }
+
     /**
      * Resolves media fixtures (e.g. `test_media.jpg`) from the test classpath so uploads can be
      * built without touching the real filesystem layout.

@@ -26,6 +26,8 @@ http_cancellation_error = The request was cancelled.
 
 http_authentication_rejected_error = The server at {$url} rejected your credentials. Please provide a valid username and password.
 
+connection_error = Couldn't connect to the server: {$reason}. The site may be down or unreachable.
+
 http_server_error = Unable to connect to server: {$reason}. Please contact your server provider.
 
 misconfigured_http_authentication_error = The server is sending invalid HTTP authentication information. Please check your site's HTTP authentication configuration.

@@ -236,7 +236,7 @@ class WpRequestExecutor @JvmOverloads constructor(
         } catch (e: NoRouteToHostException) {
             RequestExecutionErrorReason.noRouteToHost(e)
         } catch (e: ConnectException) {
-            RequestExecutionErrorReason.HttpError(reason = "Connection failed: ${e.localizedMessage}")
+            RequestExecutionErrorReason.ConnectionError(reason = "Connection failed: ${e.localizedMessage}")
         } catch (e: SocketTimeoutException) {
             RequestExecutionErrorReason.HttpTimeoutError
         } catch (e: InterruptedIOException) {

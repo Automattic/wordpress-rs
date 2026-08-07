@@ -39,6 +39,7 @@ private fun RequestExecutionErrorReason.description(): String = when (this) {
     is RequestExecutionErrorReason.HttpTimeoutError -> "Request timed out"
     is RequestExecutionErrorReason.InvalidSslError -> "SSL error: $reason"
     is RequestExecutionErrorReason.NonExistentSiteError -> errorMessage ?: "Site not found"
+    is RequestExecutionErrorReason.ConnectionError -> "Could not connect to the server: $reason"
     is RequestExecutionErrorReason.HttpAuthenticationRequiredError -> "Authentication required for $hostname"
     is RequestExecutionErrorReason.HttpAuthenticationRejectedError -> "Authentication rejected for $hostname"
     is RequestExecutionErrorReason.HttpForbiddenError -> "Access forbidden for $hostname"
