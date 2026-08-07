@@ -17,7 +17,7 @@ Pick the smallest build that verifies your change:
 
 | Command                       | Targets | Approx. `target/` cost | Use when                                           |
 | ----------------------------- | ------- | ---------------------- | -------------------------------------------------- |
-| `cargo check -p wp_api`       | 0       | ~0                     | Verifying Rust compiles                            |
+| `cargo check`       | 0       | ~0                     | Verifying Rust compiles                            |
 | `cargo test -p wp_api --lib`  | 0       | ~1 GB                  | Running unit tests                                 |
 | `make xcframework-only-macos` | 2       | ~18 GB                 | Verifying `swift build` and generated bindings     |
 | `make xcframework-only-ios`   | 3       | ~24 GB                 | Building an iOS consumer app against a local build |
