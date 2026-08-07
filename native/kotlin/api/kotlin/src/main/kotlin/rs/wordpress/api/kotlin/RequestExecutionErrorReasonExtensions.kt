@@ -17,17 +17,16 @@ import uniffi.wp_api.requestExecutionErrorReasonIsSiteUnreachable
  */
 
 /**
- * Whether the site could not be reached — most reliably, the host did not
- * resolve.
+ * Whether the site could not be reached because its host did not resolve — a
+ * DNS-resolution failure ([RequestExecutionErrorReason.NonExistentSiteError]).
  *
  * Distinct from [isDeviceOffline]: this indicates a problem reaching *this
  * particular site*, not a loss of device connectivity.
  *
  * Note that a refused connection (the host resolves, but nothing is listening)
- * is reported here as an HTTP error rather than an unreachable site, whereas
- * the Swift executor reports it as unreachable. Only a DNS failure is treated
- * as an unreachable site by every executor. A malformed site URL never reaches
- * this predicate; it surfaces as `WpApiException.SiteUrlParsingException`.
+ * is a transport failure reported as an HTTP error on every executor, so it does
+ * not satisfy this predicate. A malformed site URL never reaches this predicate
+ * either; it surfaces as `WpApiException.SiteUrlParsingException`.
  */
 val RequestExecutionErrorReason.isSiteUnreachable: Boolean
     get() = requestExecutionErrorReasonIsSiteUnreachable(this)

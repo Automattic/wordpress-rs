@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WordPress.com `POST /sites/<site_id>/domains/primary` endpoint for setting a site's primary domain
 - WordPress.com `GET /sites/<site_id>/stats/post/<post_id>` endpoint for a post's view history, like count, comment count, and metadata
 - WordPress.com `GET /sites/<site_id>/plans` endpoint for listing the plans a site can buy, priced for that site, with the plan it's currently on flagged.
-- `RequestExecutionErrorReason` gained `isSiteUnreachable` and `isDeviceOffline` for distinguishing a site that could not be reached (most reliably, a DNS failure) from a device with no network connection. Previously consumers had to match the `NonExistentSiteError` / `DeviceIsOfflineError` variants themselves. Available on both platforms as properties on the reason, which is reachable from `WpRequestResult.RequestExecutionFailed` and `WpApiException.RequestExecutionFailed` on Kotlin. Swift additionally exposes both as convenience properties on `WpApiError` and `RequestExecutionError`.
+- `RequestExecutionErrorReason` gained `isSiteUnreachable` and `isDeviceOffline` for distinguishing a site that could not be reached (the host did not resolve) from a device with no network connection. Previously consumers had to match the `NonExistentSiteError` / `DeviceIsOfflineError` variants themselves. Available on both platforms as properties on the reason, which is reachable from `WpRequestResult.RequestExecutionFailed` and `WpApiException.RequestExecutionFailed` on Kotlin. Swift additionally exposes both as convenience properties on `WpApiError` and `RequestExecutionError`.
 
 ### Changed
 
@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - **Internal:** Bumped the transitive `rand` dependency to `0.9.3` and `0.8.6` to clear [RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097.html) (`GHSA-cq8v-f236-94qc`), a low-severity unsoundness in `rand` 0.9.2 / 0.8.5. Lockfile-only; the affected code path (a custom `log` logger calling `rand::rng()` during reseed) is not exercised here.
+
+### Fixed
+
+- Swift now classifies a refused connection — the host resolves, but nothing is listening (server down, wrong port) — as `RequestExecutionErrorReason.HttpError`, matching the Kotlin and reqwest executors. iOS previously reported it as `NonExistentSiteError`, which now uniformly means a DNS-resolution failure across all three executors.
 
 ## [0.6.0] - 2026-07-16
 
