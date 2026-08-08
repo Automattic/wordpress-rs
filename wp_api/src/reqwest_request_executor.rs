@@ -59,6 +59,23 @@ impl ReqwestRequestExecutor {
     }
 }
 
+/// Constructs the pure-Rust [`ReqwestRequestExecutor`] and hands it back as a
+/// [`RequestExecutor`] trait object the bindings can pass straight to a client.
+///
+/// This exists chiefly for Swift-on-Linux. There the default executor is
+/// `WpRequestExecutor`, which runs on swift-corelibs-foundation's libcurl bridge
+/// — a bridge that maps every curl SSL failure to `NSURLErrorUnknown`, so TLS
+/// errors degrade to `GenericError` (Automattic/wordpress-rs#1509) and the
+/// `allowSSL` exception path is compiled out entirely. `ReqwestRequestExecutor`
+/// classifies errors from rustls directly, so its behaviour is identical on every
+/// platform. It is not exported to the Apple xcframework, where `URLSession` is
+/// the first-class executor and pulling in reqwest/rustls would only add binary
+/// weight.
+#[uniffi::export]
+pub fn new_reqwest_request_executor() -> Arc<dyn RequestExecutor> {
+    Arc::new(ReqwestRequestExecutor::default())
+}
+
 impl ReqwestRequestExecutor {
     pub async fn async_request(
         &self,
