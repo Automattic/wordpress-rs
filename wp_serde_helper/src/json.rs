@@ -36,8 +36,9 @@ where
 {
     match serde_json::Value::deserialize(deserializer)? {
         serde_json::Value::Bool(false) | serde_json::Value::Null => Ok(None),
-        serde_json::Value::Bool(true) => Err(de::Error::custom(
-            "expected a value, `null`, or `false`, got `true`",
+        serde_json::Value::Bool(true) => Err(de::Error::invalid_value(
+            de::Unexpected::Bool(true),
+            &"boolean `false`, `null`, or a value",
         )),
         value => serde_json::from_value(value)
             .map(Some)

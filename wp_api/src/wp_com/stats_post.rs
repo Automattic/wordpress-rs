@@ -7,7 +7,7 @@ use wp_serde_helper::{
     deserialize_empty_array_or_hashmap, deserialize_false_as_none, deserialize_i64_or_string_as_t,
 };
 
-/// The column names the API uses for the daily view history.
+// The column names the API uses for the daily view history.
 const PERIOD_COLUMN: &str = "period";
 const VIEWS_COLUMN: &str = "views";
 
