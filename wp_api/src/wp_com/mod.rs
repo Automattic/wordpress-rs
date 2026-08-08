@@ -26,6 +26,7 @@ pub mod stats_devices;
 pub mod stats_emails_summary;
 pub mod stats_file_downloads;
 pub mod stats_insights;
+pub mod stats_post;
 pub mod stats_referrers;
 pub mod stats_region_views;
 pub mod stats_search_terms;

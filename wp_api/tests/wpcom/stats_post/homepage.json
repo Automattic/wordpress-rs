@@ -1,0 +1,41 @@
+{
+    "date": "2026-08-06",
+    "views": 74286,
+    "years": {
+        "2013": {
+            "months": { "5": 866, "6": 3822 },
+            "total": 14276
+        }
+    },
+    "averages": {
+        "2013": {
+            "months": { "5": 66, "6": 127 },
+            "overall": 62
+        }
+    },
+    "weeks": [
+        {
+            "days": [
+                { "day": "2026-08-05", "count": 8 },
+                { "day": "2026-08-06", "count": 6 }
+            ],
+            "total": 40,
+            "average": 11,
+            "change": 1.7094017094017318
+        }
+    ],
+    "fields": ["period", "views"],
+    "data": [
+        ["2013-05-19", 73],
+        ["2013-05-20", 144],
+        ["2013-05-21", 14]
+    ],
+    "highest_month": 3822,
+    "highest_day_average": 127,
+    "highest_week_average": 89,
+
+    "_comment": "The home page has no post behind it: the API sends `like_count` and `discussion` as null, and `post` as boolean false rather than null.",
+    "like_count": null,
+    "discussion": null,
+    "post": false
+}

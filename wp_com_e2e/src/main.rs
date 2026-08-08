@@ -16,6 +16,7 @@ mod stats_city_views_tests;
 mod stats_country_views_tests;
 mod stats_emails_summary_tests;
 mod stats_insights_tests;
+mod stats_post_tests;
 mod stats_referrers_tests;
 mod stats_region_views_tests;
 mod stats_subscribers_tests;
@@ -60,6 +61,7 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(stats_city_views_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_country_views_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_insights_tests::tests(Arc::clone(&ctx)));
+    tests.extend(stats_post_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_referrers_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_region_views_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_summary_tests::tests(Arc::clone(&ctx)));

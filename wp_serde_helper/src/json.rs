@@ -14,6 +14,38 @@ where
     Ok(serde_json::from_value(value).ok())
 }
 
+/// Deserialize an optional value the API may send as boolean `false` when it is
+/// absent, which PHP endpoints do in place of `null`.
+///
+/// Accepts:
+/// - Boolean `false` → `None`
+/// - `null` → `None`
+/// - Anything else → deserialized as `T`
+///
+/// This is the type-generic counterpart of [`crate::deserialize_false_or_string`]
+/// and the `false`-tolerant helpers in [`crate::numeric`].
+///
+/// # Errors
+///
+/// Returns an error for boolean `true`, and for any other value that is not a
+/// valid `T`.
+pub fn deserialize_false_as_none<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: DeserializeOwned,
+    D: de::Deserializer<'de>,
+{
+    match serde_json::Value::deserialize(deserializer)? {
+        serde_json::Value::Bool(false) | serde_json::Value::Null => Ok(None),
+        serde_json::Value::Bool(true) => Err(de::Error::invalid_value(
+            de::Unexpected::Bool(true),
+            &"boolean `false`, `null`, or a value",
+        )),
+        value => serde_json::from_value(value)
+            .map(Some)
+            .map_err(de::Error::custom),
+    }
+}
+
 /// Serialize a value as a JSON string embedded within the parent JSON structure.
 ///
 /// This function serializes the value to a JSON string, then embeds that string
@@ -214,5 +246,36 @@ mod tests {
         let json = r#"{"inner": {}}"#;
         let result: TreatErrorAsNone = serde_json::from_str(json).unwrap();
         assert_eq!(result.inner, None);
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct FalseAsNoneValue {
+        id: u64,
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct FalseAsNone {
+        #[serde(deserialize_with = "deserialize_false_as_none")]
+        inner: Option<FalseAsNoneValue>,
+    }
+
+    #[rstest]
+    #[case(r#"{"inner": false}"#, None)]
+    #[case(r#"{"inner": null}"#, None)]
+    #[case(r#"{"inner": {"id": 7}}"#, Some(FalseAsNoneValue { id: 7 }))]
+    fn test_deserialize_false_as_none(
+        #[case] json: &str,
+        #[case] expected: Option<FalseAsNoneValue>,
+    ) {
+        let result: FalseAsNone = serde_json::from_str(json).unwrap();
+        assert_eq!(result.inner, expected);
+    }
+
+    #[rstest]
+    #[case::boolean_true(r#"{"inner": true}"#)]
+    #[case::malformed_value(r#"{"inner": {"id": "x"}}"#)]
+    fn test_deserialize_false_as_none_errors(#[case] json: &str) {
+        let result = serde_json::from_str::<FalseAsNone>(json);
+        assert!(result.is_err(), "The deserializer should emit an error");
     }
 }

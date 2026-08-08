@@ -33,6 +33,7 @@ use super::endpoint::{
         StatsFileDownloadsRequestBuilder, StatsFileDownloadsRequestExecutor,
     },
     stats_insights_endpoint::{StatsInsightsRequestBuilder, StatsInsightsRequestExecutor},
+    stats_post_endpoint::{StatsPostRequestBuilder, StatsPostRequestExecutor},
     stats_referrers_endpoint::{StatsReferrersRequestBuilder, StatsReferrersRequestExecutor},
     stats_region_views_endpoint::{
         StatsRegionViewsRequestBuilder, StatsRegionViewsRequestExecutor,
@@ -96,6 +97,7 @@ pub struct WpComApiRequestBuilder {
     stats_emails_summary: Arc<StatsEmailsSummaryRequestBuilder>,
     stats_devices_platform: Arc<StatsDevicesPlatformRequestBuilder>,
     stats_devices_screensize: Arc<StatsDevicesScreensizeRequestBuilder>,
+    stats_post: Arc<StatsPostRequestBuilder>,
     stats_referrers: Arc<StatsReferrersRequestBuilder>,
     stats_subscribers: Arc<StatsSubscribersRequestBuilder>,
     stats_region_views: Arc<StatsRegionViewsRequestBuilder>,
@@ -144,6 +146,7 @@ impl WpComApiRequestBuilder {
             stats_emails_summary,
             stats_devices_platform,
             stats_devices_screensize,
+            stats_post,
             stats_referrers,
             stats_subscribers,
             stats_region_views,
@@ -203,6 +206,7 @@ pub struct WpComApiClient {
     stats_emails_summary: Arc<StatsEmailsSummaryRequestExecutor>,
     stats_devices_platform: Arc<StatsDevicesPlatformRequestExecutor>,
     stats_devices_screensize: Arc<StatsDevicesScreensizeRequestExecutor>,
+    stats_post: Arc<StatsPostRequestExecutor>,
     stats_referrers: Arc<StatsReferrersRequestExecutor>,
     stats_subscribers: Arc<StatsSubscribersRequestExecutor>,
     stats_region_views: Arc<StatsRegionViewsRequestExecutor>,
@@ -252,6 +256,7 @@ impl WpComApiClient {
             stats_emails_summary,
             stats_devices_platform,
             stats_devices_screensize,
+            stats_post,
             stats_referrers,
             stats_subscribers,
             stats_region_views,
@@ -294,6 +299,7 @@ api_client_generate_endpoint_impl!(WpComApi, stats_devices_browser);
 api_client_generate_endpoint_impl!(WpComApi, stats_emails_summary);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_platform);
 api_client_generate_endpoint_impl!(WpComApi, stats_devices_screensize);
+api_client_generate_endpoint_impl!(WpComApi, stats_post);
 api_client_generate_endpoint_impl!(WpComApi, stats_referrers);
 api_client_generate_endpoint_impl!(WpComApi, stats_subscribers);
 api_client_generate_endpoint_impl!(WpComApi, stats_region_views);

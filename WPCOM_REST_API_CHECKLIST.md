@@ -329,7 +329,7 @@ investigate the relevant code before making decisions based on this document.
 - [ ] `GET /rest/v1.1/sites/$site/stats/comments` — top commenters and most-commented posts
 - [ ] `GET /rest/v1.1/sites/$site/stats/followers` — site followers (filterable by type)
 - [x] `GET /rest/v1.1/sites/$site/stats/insights` — most popular day/hour, yearly aggregates
-- [ ] `GET /rest/v1.1/sites/$site/stats/post/$post_id` — per-post view stats
+- [x] `GET /rest/v1.1/sites/$site/stats/post/$post_id` — per-post view stats
 - [ ] `GET /rest/v1.1/sites/$site/stats/publicize` — social media follower counts
 - [ ] `GET /rest/v1.1/sites/$site/stats/streak` — posting activity/streak data
 - [ ] `GET /rest/v1.1/sites/$site/stats/summary` — total likes, comments, followers
