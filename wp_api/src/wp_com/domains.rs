@@ -350,8 +350,9 @@ pub struct DomainTransferInfo {
 /// particular there is no equivalent of the `no_wpcom` parameter that
 /// `GET /all-domains/` (v1.1) took, and the API discards undeclared query
 /// parameters before the endpoint sees them, so sending one has no effect.
-/// To list only the domains added to a site, filter the response on
-/// [`DomainSubtypeId::DefaultAddress`].
+/// To list only the domains added to a site, exclude the items whose
+/// subtype is [`DomainSubtypeId::DefaultAddress`] (this reproduces
+/// v1.1's `no_wpcom=true`).
 #[derive(Debug, Default, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct AllDomainsParams {
     /// Restrict the response to a single garden, by name.
@@ -454,8 +455,8 @@ pub enum DomainSubtypeId {
     DomainTransfer,
     /// Site redirect to another URL.
     ///
-    /// `GET /all-domains/` does not currently return these: it lists only
-    /// mapped and parked domains, and site redirects are neither.
+    /// `GET /all-domains/` does not emit this subtype — its
+    /// `Domain_List_Item` has no site-redirect branch.
     SiteRedirect,
     /// A subtype not covered by the known variants.
     #[serde(untagged)]
