@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A pure-Rust `RequestExecutor` reachable from Swift-on-Linux via `newReqwestRequestExecutor()`. The default `WpRequestExecutor` runs on swift-corelibs-foundation's libcurl bridge on Linux, which maps every curl SSL failure to `NSURLErrorUnknown` — so TLS errors degrade to `GenericError` and the `allowSSL` exception path is compiled out. The reqwest executor classifies SSL/DNS/timeout errors from rustls directly, identically on every platform. It is not exported to the Apple xcframework, where `URLSession` remains the first-class executor and reqwest/rustls would only add binary weight.
+- A pure-Rust executor for Swift-on-Linux, exposed as `ReqwestRequestExecutor` with a `WordPressLoginClient(executor:)` convenience init. On Linux the default `WpRequestExecutor` runs on swift-corelibs-foundation's libcurl bridge, which maps every curl SSL failure to `NSURLErrorUnknown` — so TLS errors degrade to `GenericError` and the `allowSSL` exception path is compiled out. The reqwest executor classifies SSL/DNS/timeout errors from rustls directly, matching Darwin. It is Linux-only; the Apple xcframework keeps `URLSession` as the first-class executor and gains no reqwest/rustls weight.
 - WordPress.com `POST /me/transactions` endpoint for redeeming a shopping cart with the account's WordPress.com credits, completing a domain purchase
 - WordPress.com `GET /sites/<site_id>/purchases` endpoint for listing a site's purchases (plans, domains, and other subscriptions)
 - Publish the Kotlin bindings' per-endpoint Markdown API reference as an `ai-docs` Maven classifier zip on `rs.wordpress.api:kotlin`, generated from the UniFFI bindings for agent/tooling consumption
