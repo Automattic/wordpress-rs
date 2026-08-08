@@ -487,14 +487,20 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_stats_post_response_round_trips() {
-        let response = parse(WITH_VIEWS);
-        let json = serde_json::to_string(&response).expect("Unable to serialize response");
+    #[rstest]
+    #[case::with_views(WITH_VIEWS)]
+    #[case::no_views(NO_VIEWS)]
+    #[case::homepage(HOMEPAGE)]
+    fn test_stats_post_response_round_trips(#[case] json_file_path: &str) {
+        let serialized =
+            serde_json::to_value(parse(json_file_path)).expect("Unable to serialize response");
         let reparsed: StatsPostResponse =
-            serde_json::from_str(&json).expect("Unable to parse JSON");
+            serde_json::from_value(serialized.clone()).expect("Unable to parse JSON");
 
-        assert_eq!(reparsed.daily_views, response.daily_views);
+        assert_eq!(
+            serde_json::to_value(reparsed).expect("Unable to serialize response"),
+            serialized
+        );
     }
 
     #[test]
