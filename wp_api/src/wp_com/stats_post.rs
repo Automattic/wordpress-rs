@@ -11,6 +11,9 @@ use wp_serde_helper::{
 const PERIOD_COLUMN: &str = "period";
 const VIEWS_COLUMN: &str = "views";
 
+/// The id the API addresses the site's home page by.
+const HOME_PAGE_POST_ID: PostId = PostId(0);
+
 /// What a per-post stats request is about.
 ///
 /// The API addresses the site's home page as post `0`, which is not a valid
@@ -29,6 +32,19 @@ impl fmt::Display for StatsPostTarget {
         match self {
             Self::Post { id } => write!(f, "{id}"),
             Self::HomePage => write!(f, "0"),
+        }
+    }
+}
+
+impl From<PostId> for StatsPostTarget {
+    /// Resolves the API's home page id, so callers working from a list that
+    /// includes it — `/stats/top-posts` reports one — don't each repeat the
+    /// check.
+    fn from(id: PostId) -> Self {
+        if id == HOME_PAGE_POST_ID {
+            Self::HomePage
+        } else {
+            Self::Post { id }
         }
     }
 }
@@ -392,6 +408,13 @@ mod tests {
         let fields: Vec<String> = fields.iter().map(|f| f.to_string()).collect();
         let data = serde_json::from_str(data).expect("Unable to parse JSON");
         daily_views(&fields, data)
+    }
+
+    #[rstest]
+    #[case::home_page(PostId(0), StatsPostTarget::HomePage)]
+    #[case::post(PostId(2729), StatsPostTarget::Post { id: PostId(2729) })]
+    fn test_stats_post_target_from_post_id(#[case] id: PostId, #[case] expected: StatsPostTarget) {
+        assert_eq!(StatsPostTarget::from(id), expected);
     }
 
     #[test]
