@@ -97,8 +97,8 @@ final class HTTPStubs: SafeRequestExecutor {
     }
 
     func sleep(millis: UInt64) async {
-        // swiftlint:disable:next force_try
-        try! await Task.sleep(nanoseconds: millis * 1000)
+        // No-op: the stub doesn't wait, so Retry-After/backoff tests run instantly.
+        // Mirrors the no-op `sleep` in the Rust middleware unit tests.
     }
 
     func cancel(context: RequestContext) {

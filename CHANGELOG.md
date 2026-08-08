@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Documented how to pick an xcframework build for local work, and added `make help` descriptions for the `xcframework-only-*` targets. Verifying a UniFFI change needs only `make xcframework-only-macos`, not the full 11-target `make xcframework`.
 - **Internal:** Fixed `make xcframework-only-<platform>` building the per-target libraries but never assembling them into the xcframework. The `@# Help:` comments added for those `make help` descriptions became each rule's recipe and silently shadowed the shared `xcframework-only-%` pattern rule that ran the assemble step; each rule now runs the assemble step directly.
 
+### Fixed
+
+- Swift: `WpRequestExecutor.sleep(millis:)` converted milliseconds to nanoseconds with the wrong factor (`* 1_000` instead of `* 1_000_000`), so it slept 1000× too short — a `Retry-After: 30` waited 30 ms instead of 30 s. `RetryAfterMiddleware` then re-sent immediately, the server kept returning 429, and after `max_retries` the caller observed `MisconfiguredRateLimitError` where honoring the backoff would usually have succeeded. The executor now waits the full interval, and no longer risks a `fatalError` if the sleep's task is cancelled.
+
 ### Security
 
 - **Internal:** Bumped the transitive `rand` dependency to `0.9.3` and `0.8.6` to clear [RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097.html) (`GHSA-cq8v-f236-94qc`), a low-severity unsoundness in `rand` 0.9.2 / 0.8.5. Lockfile-only; the affected code path (a custom `log` logger calling `rand::rng()` during reseed) is not exercised here.
