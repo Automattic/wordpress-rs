@@ -587,6 +587,10 @@ mod tests {
         assert_eq!(response.like_count, Some(0));
         assert_eq!(response.discussion.expect("present").comment_count, 0);
 
+        // With no view to anchor on, the API reports every year from 1970.
+        assert!(response.years.contains_key("1970"));
+        assert!(response.averages.contains_key("1970"));
+
         // The API sends `months` as an empty array rather than an empty object.
         let year = response.years.get("2026").expect("2026 should exist");
         assert_eq!(year.total, 0);
