@@ -102,8 +102,8 @@
     {
       "domain": "mapped-wrong.example.com",
       "subtype": {
-        "id": "domain_mapping",
-        "label": "Domain mapping"
+        "id": "domain_connection",
+        "label": "Domain name connection"
       },
       "blog_id": 99999,
       "blog_name": "Mapped Site",

@@ -29,7 +29,10 @@ aes-gcm = "0.11"
 android_logger = "0.15"
 anyhow = "1.0"
 async-trait = "0.1"
-base64 = "0.22"
+# `default-features = false` drops the default-on `simd-unsafe` feature: we only
+# use the scalar `STANDARD` engine, and with `simd-unsafe` off base64 is
+# `#![forbid(unsafe_code)]`. `std` keeps the scalar encode/decode API.
+base64 = { version = "0.23", default-features = false, features = ["std"] }
 chrono = "0.4"
 clap = "4.6"
 colored = "3.1"

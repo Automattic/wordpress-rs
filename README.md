@@ -15,6 +15,7 @@ Given the multi-platform nature of this project, the development environment wil
 | Dependency                                                | Platform         |
 | --------------------------------------------------------- | ---------------- |
 | [Gradle](https://gradle.org/install/)                     | Core             |
+| JDK 21                                                    | Core             |
 | [Android SDK](https://developer.android.com/tools)        | Android          |
 | [Docker](https://www.docker.com/) (for integration tests) | Core + Android   |
 
@@ -40,6 +41,9 @@ Many of the project scripts are managed in a Makefile found in the root of the p
 ```sh
 make help
 ```
+
+See [Local Development](Documentation/local-development.md) for guidance on
+choosing an xcframework build and verifying UniFFI changes.
 
 See [this documentation](Documentation/debugging-from-xcode.md) if you want to debug Rust code from Xcode.
 

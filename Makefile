@@ -125,18 +125,39 @@ build-apple-tvOS: $(build-apple-platform-tvos)
 build-apple-watchOS: $(build-apple-platform-watchos)
 
 # Creating xcframework for one single platform, including real device and simulator.
+# NOTE: these REPLACE the xcframework rather than adding a slice to it. Use
+# `xcframework-only-macos` for local `swift build`, which links the macOS slice.
+#
+# Each rule builds its platform's targets (prerequisites), then assembles them
+# into the xcframework (recipe). The assemble command is inlined per rule on
+# purpose: these rules previously shared a single `xcframework-only-%` pattern
+# rule for the assemble recipe, but adding a `@# Help:` comment to the
+# otherwise-recipe-less explicit rules silently shadowed that pattern recipe,
+# so the assemble step stopped running (#1490). Keep each rule's recipe
+# self-contained so `make help` and the actual build never drift again.
 xcframework-only-macos: $(build-apple-platform-macos)
+	@# Help: Build an xcframework containing only macOS (~18GB). Use this to verify UniFFI changes locally.
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-macos)
 xcframework-only-ios: $(build-apple-platform-ios)
+	@# Help: Build an xcframework containing only iOS (~24GB). Replaces any existing xcframework.
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-ios)
 xcframework-only-tvos: $(build-apple-platform-tvos)
+	@# Help: Build an xcframework containing only tvOS. Replaces any existing xcframework.
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-tvos)
 xcframework-only-watchos: $(build-apple-platform-watchos)
-xcframework-only-%:
-	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-$*)
+	@# Help: Build an xcframework containing only watchOS. Replaces any existing xcframework.
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-watchos)
 
 # Assemble pre-built targets into an xcframework (without building targets).
 xcframework-assemble:
+	@# Help: Assemble already-built targets into an xcframework, without building anything.
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
 
 # Creating xcframework for all platforms.
+#
+# This builds all 11 Apple targets and consumes ~100GB in `target/`. For local
+# verification of a UniFFI change, prefer `xcframework-only-macos` — see
+# Documentation/local-development.md.
 xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
 

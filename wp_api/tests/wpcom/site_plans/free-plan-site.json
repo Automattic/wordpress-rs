@@ -1,0 +1,186 @@
+{
+  "9001": {
+    "formatted_original_price": "$0",
+    "original_price": {},
+    "raw_price": 0,
+    "raw_price_integer": 0,
+    "formatted_price": "$0",
+    "raw_discount": 0,
+    "raw_discount_integer": 0,
+    "formatted_discount": "$0",
+    "product_id": 9001,
+    "product_slug": "fake_free_plan",
+    "product_name": "Fake Free",
+    "discount_reason": null,
+    "cost_overrides": [],
+    "is_domain_upgrade": null,
+    "currency_code": "USD",
+    "plan_card_order": 1,
+    "tagline": "Start out with all the fake basics.",
+    "plan_card_name": "Free",
+    "product_tier_id": 7001,
+    "product_tier_product_ids": [9001],
+    "current_plan": true,
+    "user_is_owner": null,
+    "id": null,
+    "has_domain_credit": false,
+    "interval": -1,
+    "plan_card_features": [
+      { "text": "1 GB fake storage", "available": true },
+      { "text": "Unlimited fake pages and posts", "available": true },
+      { "text": "Fake custom domain", "available": false }
+    ],
+    "features_comparison": [
+      {
+        "group": "Fake essential features",
+        "features": [
+          {
+            "key": "fake_unlimited_pages",
+            "title": "Unlimited fake pages",
+            "tiers": [7001, 7002, 7003, 7004]
+          },
+          {
+            "key": "fake_custom_domain",
+            "title": "Fake free domain for one year",
+            "tiers": [7002, 7003, 7004],
+            "billing_periods": [365]
+          },
+          {
+            "key": "fake_visitor_stats",
+            "title": "Fake visitor stats",
+            "tiers": [7001, 7002, 7003, 7004],
+            "tier_values": {
+              "7001": "Last 7 fake days of basic stats",
+              "7002": "Fake full history and filters",
+              "7003": "Fake advanced insights",
+              "7004": "Fake advanced insights"
+            }
+          }
+        ]
+      },
+      {
+        "group": "Fake support",
+        "features": [
+          {
+            "key": "fake_support",
+            "title": "Fake support",
+            "tiers": [7002, 7003, 7004],
+            "tier_values": {
+              "7002": "Fake support from our team",
+              "7003": "Fake fast support from our team",
+              "7004": "Fake priority support from our team"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "9002": {
+    "formatted_original_price": "$0",
+    "original_price": {},
+    "raw_price": 90,
+    "raw_price_integer": 9000,
+    "formatted_price": "$90",
+    "raw_discount": 0,
+    "raw_discount_integer": 0,
+    "formatted_discount": "$0",
+    "product_id": 9002,
+    "product_slug": "fake-premium-bundle",
+    "product_name": "Fake Premium",
+    "discount_reason": null,
+    "cost_overrides": [],
+    "is_domain_upgrade": null,
+    "currency_code": "USD",
+    "plan_card_order": 2,
+    "tagline": "Step up your fake site with premium design features.",
+    "plan_card_name": "Premium",
+    "product_tier_id": 7002,
+    "product_tier_product_ids": [9002],
+    "can_start_trial": false,
+    "available_for_upgrade": true,
+    "available_for_downgrade": false,
+    "interval": 365,
+    "badges": ["Fake popular"],
+    "plan_card_features": [
+      { "text": "13 GB fake storage", "available": true },
+      { "text": "Fake premium themes", "available": true },
+      { "text": "Fake advanced form features", "available": true }
+    ],
+    "features_comparison": [
+      {
+        "group": "Fake essential features",
+        "features": [
+          {
+            "key": "fake_unlimited_pages",
+            "title": "Unlimited fake pages",
+            "tiers": [7001, 7002, 7003, 7004]
+          }
+        ]
+      }
+    ]
+  },
+  "9003": {
+    "formatted_original_price": "$0",
+    "original_price": {},
+    "raw_price": 45,
+    "raw_price_integer": 4500,
+    "formatted_price": "$45",
+    "raw_discount": 0,
+    "raw_discount_integer": 0,
+    "formatted_discount": "$0",
+    "product_id": 9003,
+    "product_slug": "fake-basic-bundle",
+    "product_name": "Fake Basic",
+    "discount_reason": null,
+    "cost_overrides": [],
+    "is_domain_upgrade": null,
+    "currency_code": "USD",
+    "plan_card_order": null,
+    "tagline": null,
+    "plan_card_name": null,
+    "product_tier_id": 7003,
+    "product_tier_product_ids": [9003],
+    "can_start_trial": false,
+    "available_for_upgrade": true,
+    "available_for_downgrade": false,
+    "interval": 365,
+    "features_comparison": [
+      {
+        "group": "Fake essential features",
+        "features": [
+          {
+            "key": "fake_unlimited_pages",
+            "title": "Unlimited fake pages",
+            "tiers": [7001, 7002, 7003, 7004]
+          }
+        ]
+      }
+    ]
+  },
+  "9004": {
+    "formatted_original_price": "$0",
+    "original_price": {},
+    "raw_price": 39,
+    "raw_price_integer": 3900,
+    "formatted_price": "$39",
+    "raw_discount": 0,
+    "raw_discount_integer": 0,
+    "formatted_discount": "$0",
+    "product_id": 9004,
+    "product_slug": "fake-commerce-bundle-monthly",
+    "product_name": "Fake Commerce Medium",
+    "discount_reason": null,
+    "cost_overrides": [],
+    "is_domain_upgrade": null,
+    "currency_code": "USD",
+    "plan_card_order": null,
+    "tagline": "Accelerate your fake growth with advanced features.",
+    "plan_card_name": null,
+    "product_tier_id": 7004,
+    "product_tier_product_ids": [9004],
+    "can_start_trial": false,
+    "available_for_upgrade": true,
+    "available_for_downgrade": false,
+    "interval": 31
+  }
+}

@@ -49,6 +49,46 @@ impl std::fmt::Display for ProductSlug {
     }
 }
 
+uniffi::custom_newtype!(ProductTierId, u64);
+/// Identifies a tier in the product catalog — the group that ties a plan's
+/// monthly, yearly and multi-year variants together.
+///
+/// Deserializes from both numeric (`625`) and string (`"625"`) representations,
+/// because the API also uses it as a JSON object key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(transparent)]
+pub struct ProductTierId(pub u64);
+
+impl<'de> Deserialize<'de> for ProductTierId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        wp_serde_helper::deserialize_u64_or_string(deserializer).map(Self)
+    }
+}
+
+impl std::fmt::Display for ProductTierId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+uniffi::custom_newtype!(BillPeriodDays, i32);
+/// Length of a billing period, in days.
+///
+/// `-1` marks a product that is never billed, such as the free plan. Monthly
+/// products use `31`, and multi-year products use `730`, `1095` or `36500`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct BillPeriodDays(pub i32);
+
+impl std::fmt::Display for BillPeriodDays {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Filter for the `type` query parameter on `GET /products`.
 ///
 /// The API supports `"domains"` and `"jetpack"` as built-in filters.

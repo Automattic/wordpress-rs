@@ -49,6 +49,93 @@ extension WpApiError {
     }
 }
 
+extension RequestExecutionErrorReason {
+    /// Whether the site could not be reached — most reliably, the host did not
+    /// resolve.
+    ///
+    /// Distinct from ``isDeviceOffline``: this indicates a problem reaching
+    /// *this particular site*, not a loss of device connectivity.
+    ///
+    /// - Note: A refused connection (the host resolves, but nothing is
+    ///   listening) is classified differently per platform — Swift reports it
+    ///   here, Kotlin reports it as an HTTP error. Only a DNS failure is treated
+    ///   as an unreachable site by every executor. A site URL rejected while
+    ///   parsing surfaces as `WpApiError.SiteUrlParsingError` and never reaches
+    ///   this predicate; a `.badURL` that only `URLSession` rejects at send time
+    ///   is classified here for lack of a dedicated invalid-URL case, though no
+    ///   known URL actually reaches that branch.
+    public var isSiteUnreachable: Bool {
+        requestExecutionErrorReasonIsSiteUnreachable(reason: self)
+    }
+
+    /// Whether the request failed because the device has no network connection.
+    ///
+    /// Distinct from ``isSiteUnreachable``: the site itself may be perfectly
+    /// healthy.
+    public var isDeviceOffline: Bool {
+        requestExecutionErrorReasonIsDeviceOffline(reason: self)
+    }
+}
+
+/// An error that may carry a ``RequestExecutionErrorReason``.
+///
+/// Implemented by both `WpApiError` and `RequestExecutionError`, which share the
+/// same `RequestExecutionFailed` payload, so the connectivity predicates only
+/// need to be written once.
+public protocol CarriesRequestExecutionErrorReason {
+    /// The underlying reason when this is a request execution failure, otherwise `nil`.
+    var executionErrorReason: RequestExecutionErrorReason? { get }
+}
+
+public extension CarriesRequestExecutionErrorReason {
+    /// Whether the site could not be reached — most reliably, the host did not
+    /// resolve.
+    ///
+    /// See ``RequestExecutionErrorReason/isSiteUnreachable`` for the platform
+    /// differences that apply.
+    var isSiteUnreachable: Bool {
+        executionErrorReason?.isSiteUnreachable ?? false
+    }
+
+    /// Whether the request failed because the device has no network connection.
+    ///
+    /// See ``RequestExecutionErrorReason/isDeviceOffline`` for the platform
+    /// differences that apply.
+    var isDeviceOffline: Bool {
+        executionErrorReason?.isDeviceOffline ?? false
+    }
+}
+
+extension WpApiError: CarriesRequestExecutionErrorReason {
+    public var executionErrorReason: RequestExecutionErrorReason? {
+        if case .RequestExecutionFailed(
+            statusCode: _,
+            redirects: _,
+            reason: let reason,
+            requestUrl: _,
+            requestMethod: _
+        ) = self {
+            return reason
+        }
+        return nil
+    }
+}
+
+extension RequestExecutionError: CarriesRequestExecutionErrorReason {
+    public var executionErrorReason: RequestExecutionErrorReason? {
+        if case .RequestExecutionFailed(
+            statusCode: _,
+            redirects: _,
+            reason: let reason,
+            requestUrl: _,
+            requestMethod: _
+        ) = self {
+            return reason
+        }
+        return nil
+    }
+}
+
 // MARK: - Enum initialization and unpacking
 public extension CommentStatus {
     init(_ status: String) {

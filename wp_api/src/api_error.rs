@@ -682,6 +682,57 @@ pub enum RequestExecutionErrorReason {
 }
 
 impl RequestExecutionErrorReason {
+    /// Whether the site could not be reached — most reliably, the host did not
+    /// resolve.
+    ///
+    /// Distinct from [`RequestExecutionErrorReason::is_device_offline`]: this
+    /// indicates a problem reaching *this particular site*, not a loss of device
+    /// connectivity.
+    ///
+    /// # Platform differences
+    ///
+    /// A refused connection (the host resolves, but nothing is listening) is
+    /// **not** classified consistently:
+    ///
+    /// - Swift maps it to `NonExistentSiteError`, so this returns `true`.
+    /// - Kotlin and the `reqwest` executor map it to `HttpError`, so this
+    ///   returns `false`.
+    ///
+    /// Only a DNS failure is treated as an unreachable site by every executor.
+    /// Callers that must behave identically across platforms should rely on that
+    /// case alone until the mappings are aligned.
+    ///
+    /// A site URL rejected while parsing never reaches this predicate: it
+    /// surfaces as [`WpApiError::SiteUrlParsingError`], which carries no
+    /// `RequestExecutionErrorReason`. On Swift a URL that only `URLSession`
+    /// rejects at request time (`badURL`) is classified as `NonExistentSiteError`
+    /// — the executor has no dedicated invalid-URL reason, so it's the nearest
+    /// fit. That branch appears unreachable in practice (request URLs are
+    /// normalized before they reach the platform, which repairs the rest); it is
+    /// covered for completeness.
+    pub fn is_site_unreachable(&self) -> bool {
+        matches!(self, Self::NonExistentSiteError { .. })
+    }
+
+    /// Whether the request failed because the device has no network connection.
+    ///
+    /// Distinct from [`RequestExecutionErrorReason::is_site_unreachable`]: the
+    /// site itself may be perfectly healthy.
+    ///
+    /// # Platform differences
+    ///
+    /// Offline detection depends on a platform signal, so it is not uniform.
+    /// Swift derives it from the OS-reported `URLError` codes
+    /// (`notConnectedToInternet`, `networkConnectionLost`); Kotlin consults a
+    /// caller-supplied `NetworkAvailabilityProvider` when a DNS lookup fails. The
+    /// `reqwest` executor has neither and never constructs `DeviceIsOfflineError`,
+    /// so this always returns `false` there — an offline request typically
+    /// surfaces as a DNS failure (`NonExistentSiteError`) or a connect error
+    /// (`HttpError`) instead.
+    pub fn is_device_offline(&self) -> bool {
+        matches!(self, Self::DeviceIsOfflineError { .. })
+    }
+
     pub fn try_from_response(response: &WpNetworkResponse) -> Option<Self> {
         if response.status_code != 401 && response.status_code != 403 {
             return None;
@@ -729,6 +780,26 @@ impl RequestExecutionErrorReason {
         };
         Some(reason)
     }
+}
+
+/// Whether the site could not be reached — most reliably, the host did not
+/// resolve.
+///
+/// See [`RequestExecutionErrorReason::is_site_unreachable`] for the per-platform
+/// differences in how connectivity failures are classified.
+#[uniffi::export]
+pub fn request_execution_error_reason_is_site_unreachable(
+    reason: &RequestExecutionErrorReason,
+) -> bool {
+    reason.is_site_unreachable()
+}
+
+/// Whether the request failed because the device has no network connection.
+#[uniffi::export]
+pub fn request_execution_error_reason_is_device_offline(
+    reason: &RequestExecutionErrorReason,
+) -> bool {
+    reason.is_device_offline()
 }
 
 impl WpSupportsLocalization for RequestExecutionErrorReason {
@@ -788,5 +859,97 @@ impl From<RequestExecutionError> for WpApiError {
                 Self::MediaFileNotFound { file_path }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    fn non_existent_site() -> RequestExecutionErrorReason {
+        RequestExecutionErrorReason::NonExistentSiteError {
+            error_message: None,
+            suggested_action: None,
+        }
+    }
+
+    fn device_is_offline() -> RequestExecutionErrorReason {
+        RequestExecutionErrorReason::DeviceIsOfflineError {
+            error_message: "offline".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_is_site_unreachable_matches_non_existent_site_error() {
+        let reason = non_existent_site();
+        assert!(reason.is_site_unreachable());
+        assert!(!reason.is_device_offline());
+    }
+
+    #[test]
+    fn test_is_device_offline_matches_device_is_offline_error() {
+        let reason = device_is_offline();
+        assert!(reason.is_device_offline());
+        assert!(!reason.is_site_unreachable());
+    }
+
+    /// Neither predicate should fire for the other reasons, which represent a
+    /// site that *was* reached but responded unusably, or a failure unrelated to
+    /// connectivity.
+    #[rstest]
+    #[case::http_timeout(RequestExecutionErrorReason::HttpTimeoutError)]
+    #[case::cancellation(RequestExecutionErrorReason::CancellationError)]
+    #[case::misconfigured_rate_limit(RequestExecutionErrorReason::MisconfiguredRateLimitError)]
+    #[case::invalid_ssl(RequestExecutionErrorReason::InvalidSslError {
+        reason: InvalidSslErrorReason::GenericSslError,
+    })]
+    #[case::http_forbidden(RequestExecutionErrorReason::HttpForbiddenError {
+        hostname: "example.com".to_string(),
+    })]
+    #[case::http_authentication_required(
+        RequestExecutionErrorReason::HttpAuthenticationRequiredError {
+            hostname: "example.com".to_string(),
+            method: None,
+        }
+    )]
+    #[case::http_authentication_rejected(
+        RequestExecutionErrorReason::HttpAuthenticationRejectedError {
+            hostname: "example.com".to_string(),
+            method: None,
+        }
+    )]
+    #[case::misconfigured_http_authentication(
+        RequestExecutionErrorReason::MisconfiguredHttpAuthenticationError {
+            issue: HttpAuthMethodParsingError::Unknown,
+        }
+    )]
+    #[case::http_error(RequestExecutionErrorReason::HttpError {
+        reason: "connection failed".to_string(),
+    })]
+    #[case::generic(RequestExecutionErrorReason::GenericError {
+        error_message: "boom".to_string(),
+    })]
+    fn test_neither_predicate_matches_other_reasons(#[case] reason: RequestExecutionErrorReason) {
+        assert!(!reason.is_site_unreachable());
+        assert!(!reason.is_device_offline());
+    }
+
+    #[test]
+    fn test_exported_functions_delegate_to_inherent_methods() {
+        let unreachable = non_existent_site();
+        let offline = device_is_offline();
+
+        assert!(request_execution_error_reason_is_site_unreachable(
+            &unreachable
+        ));
+        assert!(!request_execution_error_reason_is_device_offline(
+            &unreachable
+        ));
+
+        assert!(request_execution_error_reason_is_device_offline(&offline));
+        assert!(!request_execution_error_reason_is_site_unreachable(
+            &offline
+        ));
     }
 }

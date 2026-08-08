@@ -14,11 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publish the Kotlin bindings' per-endpoint Markdown API reference as an `ai-docs` Maven classifier zip on `rs.wordpress.api:kotlin`, generated from the UniFFI bindings for agent/tooling consumption
 - WordPress.com `POST /sites/<site_id>/domains/primary` endpoint for setting a site's primary domain
 - WordPress.com `GET /sites/<site_id>/stats/post/<post_id>` endpoint for a post's view history, like count, comment count, and metadata
+- WordPress.com `GET /sites/<site_id>/plans` endpoint for listing the plans a site can buy, priced for that site, with the plan it's currently on flagged.
+- `RequestExecutionErrorReason` gained `isSiteUnreachable` and `isDeviceOffline` for distinguishing a site that could not be reached (most reliably, a DNS failure) from a device with no network connection. Previously consumers had to match the `NonExistentSiteError` / `DeviceIsOfflineError` variants themselves. Available on both platforms as properties on the reason, which is reachable from `WpRequestResult.RequestExecutionFailed` and `WpApiException.RequestExecutionFailed` on Kotlin. Swift additionally exposes both as convenience properties on `WpApiError` and `RequestExecutionError`.
 
 ### Changed
 
 - **BREAKING:** `product_type` fields on `Product` and `WPComProduct` changed from `String` to `ProductType`. Callers that match on or construct these values will need to wrap/unwrap with `ProductType(...)`.
 - **BREAKING:** The cache now enables SQLite foreign key enforcement on every connection it prepares, and fails with `SqliteDbError::ForeignKeysUnavailable` if the setting doesn't take effect. Removing a site relies on `ON DELETE CASCADE` to clear its cached rows, so on builds where enforcement defaulted to off those rows were silently left behind.
+- **BREAKING:** `ShoppingCart.coupon` changed from `String` to `CouponCode`, and `ShoppingCartCostOverride.override_code` from `String` to `CostOverrideCode`, so the shopping cart and site plans describe these values with the same types. Callers will need to wrap/unwrap with `CouponCode(...)` / `CostOverrideCode(...)`.
+- Documented `GET /all-domains/` subtypes and parameters. `DomainSubtypeId::DefaultAddress` covers staging and garden subdomains as well as the free WordPress.com address, and is the set v1.1's `no_wpcom=true` excluded; v1.2 has no equivalent parameter, so clients filter this subtype out instead.
+- **Internal:** Corrected `GET /all-domains/` fixtures that claimed subtypes the endpoint never returns (`site_redirect`, `domain_mapping`).
 - **Internal:** Build the Android JNI libraries with `cargo-ndk` instead of the `rust-android-gradle` Gradle plugin.
 - **Internal:** Upgraded the Android/Kotlin build to Android Gradle Plugin `9.3.0` / Gradle `9.5.0` (Kotlin `2.3.21`, `compileSdk` 36), migrating `api/android` to the AGP 9 variant APIs and splitting the example app into a `com.android.kotlin.multiplatform.library` shared module and a standalone `com.android.application` module.
 - **Internal:** Bumped `syn` from `2.0` to `3.0`, updating the proc-macro crates for its breaking changes.
@@ -27,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Update translations.
 - **Internal:** Fix a flaky unit test.
 - **Internal:** Route the Kotlin integration tests through the in-VPC Reposilite dependency mirror
+- **Internal:** Merge `CHANGELOG.md` with git's built-in `union` driver (via `.gitattributes`), so the frequent conflicts on the `## [Unreleased]` section resolve by keeping both sides instead of emitting conflict markers.
+- **Internal:** Documented how to pick an xcframework build for local work, and added `make help` descriptions for the `xcframework-only-*` targets. Verifying a UniFFI change needs only `make xcframework-only-macos`, not the full 11-target `make xcframework`.
+- **Internal:** Fixed `make xcframework-only-<platform>` building the per-target libraries but never assembling them into the xcframework. The `@# Help:` comments added for those `make help` descriptions became each rule's recipe and silently shadowed the shared `xcframework-only-%` pattern rule that ran the assemble step; each rule now runs the assemble step directly.
 
 ## [0.6.0] - 2026-07-16
 

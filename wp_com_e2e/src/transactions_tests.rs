@@ -5,7 +5,7 @@ use wp_api::{
     api_error::WpApiError,
     decimal2::Decimal2,
     wp_com::{
-        CurrencyCode, WpComSiteId,
+        CouponCode, CurrencyCode, WpComSiteId,
         shopping_cart::{
             CartKey, ShoppingCart, ShoppingCartMessages, ShoppingCartTax, ShoppingCartTaxLocation,
         },
@@ -24,7 +24,7 @@ fn empty_cart(site_id: WpComSiteId) -> ShoppingCart {
         cart_generated_at_timestamp: 0,
         blog_id: site_id,
         cart_key: CartKey::Site { id: site_id },
-        coupon: String::new(),
+        coupon: CouponCode(String::new()),
         is_coupon_applied: false,
         has_auto_renew_coupon_been_automatically_applied: false,
         next_domain_is_free: false,
