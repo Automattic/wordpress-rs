@@ -1,10 +1,12 @@
 use crate::{
-    date::WpGmtDateTime, posts::PostId, users::UserId, wp_com::stats_visits::StatsVisitsDataValue,
+    date::WpGmtDateTime,
+    posts::PostId,
+    wp_com::{me::WpComUserId, stats_visits::StatsVisitsDataValue},
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt};
 use wp_serde_helper::{
-    deserialize_empty_array_or_hashmap, deserialize_false_as_none, deserialize_i64_or_string_as_t,
+    deserialize_empty_array_or_hashmap, deserialize_false_as_none, deserialize_u64_or_string_as_t,
 };
 
 // The column names the API uses for the daily view history.
@@ -374,9 +376,9 @@ pub struct StatsPostDetails {
     /// The ID of the post's author.
     #[serde(
         rename = "post_author",
-        deserialize_with = "deserialize_i64_or_string_as_t"
+        deserialize_with = "deserialize_u64_or_string_as_t"
     )]
-    pub author_id: UserId,
+    pub author_id: WpComUserId,
     /// The post's public URL. `None` if the API doesn't supply one.
     ///
     /// Unlike the fields around it this isn't a stored column — the stats
@@ -469,7 +471,7 @@ mod tests {
             )
         );
         // The API sends `post_author` as a string.
-        assert_eq!(post.author_id, UserId(5399133));
+        assert_eq!(post.author_id, WpComUserId(5399133));
     }
 
     #[test]

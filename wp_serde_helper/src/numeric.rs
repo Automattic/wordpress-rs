@@ -51,6 +51,22 @@ where
     deserialize_i64_or_string(deserializer).map(Into::into)
 }
 
+/// Deserialize a `u64` and convert it to a type that implements `From<u64>`.
+///
+/// This is useful for deserializing into newtype wrappers around `u64`.
+///
+/// # Errors
+///
+/// Returns an error for negative numbers, non-numeric strings, booleans, null,
+/// arrays, or objects.
+pub fn deserialize_u64_or_string_as_t<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: From<u64>,
+{
+    deserialize_u64_or_string(deserializer).map(Into::into)
+}
+
 /// Deserialize an optional `u64`, treating `false` and `null` as `None`.
 ///
 /// Accepts:
