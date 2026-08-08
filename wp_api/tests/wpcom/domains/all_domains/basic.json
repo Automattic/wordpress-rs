@@ -75,14 +75,14 @@
       ]
     },
     {
-      "domain": "old-domain.com",
+      "domain": "registered-domain.com",
       "subtype": {
-        "id": "site_redirect",
-        "label": "Site redirect"
+        "id": "domain_registration",
+        "label": "Domain name registration"
       },
       "blog_id": 44444,
-      "blog_name": "Redirect Target",
-      "site_slug": "redirect-target.wordpress.com",
+      "blog_name": "Registered Domain Site",
+      "site_slug": "registered-domain-site.wordpress.com",
       "auto_renewing": false,
       "current_user_is_owner": true,
       "is_domain_only_site": false,

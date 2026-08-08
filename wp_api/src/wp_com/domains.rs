@@ -345,9 +345,24 @@ pub struct DomainTransferInfo {
 }
 
 /// Optional query parameters for `GET /all-domains/` (v1.2).
+///
+/// `garden` is the only parameter this endpoint version accepts. In
+/// particular there is no equivalent of the `no_wpcom` parameter that
+/// `GET /all-domains/` (v1.1) took, and the API discards undeclared query
+/// parameters before the endpoint sees them, so sending one has no effect.
+/// To list only the domains added to a site, filter the response on
+/// [`DomainSubtypeId::DefaultAddress`].
 #[derive(Debug, Default, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct AllDomainsParams {
-    /// Filter domains by garden name.
+    /// Restrict the response to a single garden, by name.
+    ///
+    /// A garden is a WordPress.com hosting vertical: a class of sites
+    /// provisioned with their own infrastructure, default software, plans,
+    /// and subdomain — for example `"commerce"`, whose sites sit under
+    /// `"*.commerce-garden.com"`.
+    ///
+    /// When set, the response omits site addresses entirely rather than
+    /// restricting them to that garden.
     #[uniffi(default = None)]
     pub garden: Option<String>,
 }
@@ -418,7 +433,18 @@ pub struct DomainSubtype {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
 #[serde(rename_all = "snake_case")]
 pub enum DomainSubtypeId {
-    /// Free WordPress.com address (e.g. `"mysite.wordpress.com"`).
+    /// The site's own address, rather than a domain added to it.
+    ///
+    /// Usually the free WordPress.com address (e.g. `"mysite.wordpress.com"`),
+    /// but the server also files staging (`"*.wpcomstaging.com"`) and garden
+    /// subdomains under this subtype, because it surfaces those as the site
+    /// address too.
+    ///
+    /// In `GET /all-domains/` (v1.2) every site the user has contributes
+    /// exactly one of these, alongside any domains registered, connected, or
+    /// transferred to it. This is the set `no_wpcom=true` excluded from
+    /// `GET /all-domains/` (v1.1); see [`AllDomainsParams`] for why that
+    /// parameter is unavailable on v1.2.
     DefaultAddress,
     /// External domain connected/mapped to the site.
     DomainConnection,
@@ -427,6 +453,9 @@ pub enum DomainSubtypeId {
     /// Domain transfer in progress.
     DomainTransfer,
     /// Site redirect to another URL.
+    ///
+    /// `GET /all-domains/` does not currently return these: it lists only
+    /// mapped and parked domains, and site redirects are neither.
     SiteRedirect,
     /// A subtype not covered by the known variants.
     #[serde(untagged)]
@@ -1063,16 +1092,16 @@ mod tests {
         let staging = &response.domains[2];
         assert_eq!(staging.tags, vec!["wpcom_staging"]);
 
-        let redirect = &response.domains[3];
-        assert_eq!(redirect.subtype.id, DomainSubtypeId::SiteRedirect);
-        assert_eq!(redirect.subtype.label, "Site redirect");
+        let registration = &response.domains[3];
+        assert_eq!(registration.subtype.id, DomainSubtypeId::DomainRegistration);
+        assert_eq!(registration.subtype.label, "Domain name registration");
         // Date-only `"YYYY-MM-DD"` expiry, the real-world format from the API.
         assert_eq!(
-            redirect.expiry,
+            registration.expiry,
             Some(WpDateString("2027-01-01".to_string()))
         );
         // The API returns `subscription_id` as a string, not a number.
-        assert_eq!(redirect.subscription_id, Some(SubscriptionId(55555)));
+        assert_eq!(registration.subscription_id, Some(SubscriptionId(55555)));
     }
 
     #[test]
@@ -1123,6 +1152,7 @@ mod tests {
         assert!(century.auto_renewing);
 
         let mapped = &response.domains[4];
+        assert_eq!(mapped.subtype.id, DomainSubtypeId::DomainConnection);
         assert_eq!(
             mapped.domain_status.status_type,
             DomainListItemStatusType::Alert
