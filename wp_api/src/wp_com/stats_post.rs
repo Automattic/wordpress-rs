@@ -361,8 +361,12 @@ pub struct StatsPostDetails {
         deserialize_with = "deserialize_i64_or_string_as_t"
     )]
     pub author_id: UserId,
-    /// The post's public URL.
-    pub permalink: String,
+    /// The post's public URL. `None` if the API doesn't supply one.
+    ///
+    /// Unlike the fields around it this isn't a stored column — the stats
+    /// service derives it per request.
+    #[serde(default, deserialize_with = "deserialize_false_as_none")]
+    pub permalink: Option<String>,
     /// The post's globally unique identifier. Use [`Self::permalink`] for a
     /// URL that resolves.
     pub guid: String,
@@ -436,8 +440,10 @@ mod tests {
         assert_eq!(post.post_type, "post");
         assert_eq!(post.guid, "https://example.com/?p=2729");
         assert_eq!(
-            post.permalink,
-            "https://example.com/2013/06/20/the-last-version-of-feeddemon-is-here-and-its-free/"
+            post.permalink.as_deref(),
+            Some(
+                "https://example.com/2013/06/20/the-last-version-of-feeddemon-is-here-and-its-free/"
+            )
         );
         // The API sends `post_author` as a string.
         assert_eq!(post.author_id, UserId(5399133));
