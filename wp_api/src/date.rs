@@ -1,3 +1,4 @@
+use crate::impl_as_query_value_from_to_string;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, str::FromStr};
@@ -34,8 +35,14 @@ uniffi::custom_type!(WpGmtDateTime, i64, {
 });
 
 uniffi::custom_newtype!(WpDateString, String);
-/// A date string in `"YYYY-MM-DD"` format as returned by some WordPress.com
-/// API fields (e.g. domain expiry, registration date).
+/// A date the API sends as a string that can't be resolved to an instant —
+/// either because it carries no time (`"2026-08-06"`, e.g. domain expiry) or
+/// because its time is in the site's timezone rather than GMT
+/// (`"2026-08-06 09:15:49"`).
+///
+/// Use [`WpGmtDateTime`] instead wherever the API gives a GMT or offset-bearing
+/// value; every date field should be one or the other rather than a bare
+/// `String`.
 ///
 /// Some PHP endpoints return `false` instead of `null` when a date is not
 /// applicable. Use [`deserialize_optional_date_string`] on fields that
@@ -49,6 +56,8 @@ impl Display for WpDateString {
         write!(f, "{}", self.0)
     }
 }
+
+impl_as_query_value_from_to_string!(WpDateString);
 
 /// Deserialize an `Option<WpDateString>` that may be a string, `null`, or
 /// boolean `false` (a common PHP pattern for "not applicable").
