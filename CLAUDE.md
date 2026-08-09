@@ -76,6 +76,7 @@ Test credentials are configured in:
 
 ## Important Files
 
+- `CONVENTIONS.md` - Rules for modelling API responses; read before adding types
 - `Makefile` - Build automation and platform-specific targets
 - `wp_api/src/lib.rs` - Main library entry point
 - `wp_api/src/request.rs` - Core request/response handling
