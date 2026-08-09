@@ -1,4 +1,5 @@
 use crate::{
+    date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::stats_visits::StatsVisitsDataValue,
@@ -72,7 +73,7 @@ pub struct StatsSubscribersParams {
     pub quantity: Option<u32>,
     /// The date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The stat fields to include in the response (comma-separated in the URL).
     #[uniffi(default = [])]
     pub stat_fields: Vec<StatsSubscribersStatField>,
@@ -101,7 +102,7 @@ impl AppendUrlQueryPairs for StatsSubscribersParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsSubscribersResponse {
     /// The date for the stats query.
-    pub date: String,
+    pub date: WpDateString,
     /// The time unit used for grouping.
     pub unit: String,
     /// Field names for the data arrays.
@@ -192,7 +193,7 @@ mod tests {
         let params = StatsSubscribersParams {
             unit: Some(StatsSubscribersUnit::Day),
             quantity: Some(30),
-            date: Some("2026-02-26".to_string()),
+            date: Some(WpDateString("2026-02-26".to_string())),
             stat_fields: vec![
                 StatsSubscribersStatField::Subscribers,
                 StatsSubscribersStatField::SubscribersPaid,
@@ -268,7 +269,7 @@ mod tests {
         let response: StatsSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-01-27");
+        assert_eq!(response.date.0, "2026-01-27");
         assert_eq!(response.unit, "day");
         assert_eq!(
             response.fields,
@@ -304,7 +305,7 @@ mod tests {
         let response: StatsSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-02-26");
+        assert_eq!(response.date.0, "2026-02-26");
         assert_eq!(response.unit, "week");
         assert_eq!(response.data.len(), 12);
 
@@ -326,7 +327,7 @@ mod tests {
         let response: StatsSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-02-26");
+        assert_eq!(response.date.0, "2026-02-26");
         assert_eq!(response.unit, "month");
         assert_eq!(response.data.len(), 6);
 
@@ -348,7 +349,7 @@ mod tests {
         let response: StatsSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-02-26");
+        assert_eq!(response.date.0, "2026-02-26");
         assert_eq!(response.unit, "year");
         assert_eq!(response.data.len(), 3);
 

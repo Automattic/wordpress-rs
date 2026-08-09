@@ -1,5 +1,5 @@
 use crate::{
-    date::WpGmtDateTime,
+    date::{WpDateString, WpGmtDateTime},
     posts::PostId,
     wp_com::{me::WpComUserId, stats_visits::StatsVisitsDataValue},
 };
@@ -74,8 +74,8 @@ impl From<PostId> for StatsPostTarget {
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 #[serde(from = "RawStatsPostResponse", into = "RawStatsPostResponse")]
 pub struct StatsPostResponse {
-    /// The date the stats were generated for (format: YYYY-MM-DD).
-    pub date: String,
+    /// The date the stats were generated for, in the site's timezone.
+    pub date: WpDateString,
     /// The target's all-time view count.
     pub views: u64,
     /// Yearly view totals, keyed by year (e.g. `"2026"`).
@@ -119,7 +119,7 @@ pub struct StatsPostResponse {
 /// flattened into [`StatsPostResponse::daily_views`].
 #[derive(Serialize, Deserialize)]
 struct RawStatsPostResponse {
-    date: String,
+    date: WpDateString,
     views: u64,
     #[serde(deserialize_with = "deserialize_empty_array_or_hashmap")]
     years: HashMap<String, StatsPostYear>,
@@ -174,7 +174,7 @@ impl From<StatsPostResponse> for RawStatsPostResponse {
                 .into_iter()
                 .map(|daily_view| {
                     vec![
-                        StatsVisitsDataValue::String(daily_view.period),
+                        StatsVisitsDataValue::String(daily_view.period.0),
                         StatsVisitsDataValue::Number(daily_view.views),
                     ]
                 })
@@ -216,7 +216,10 @@ fn daily_views(fields: &[String], data: Vec<Vec<StatsVisitsDataValue>>) -> Vec<S
         let StatsVisitsDataValue::String(period) = row.swap_remove(period_index) else {
             continue;
         };
-        daily_views.push(StatsPostDailyView { period, views });
+        daily_views.push(StatsPostDailyView {
+            period: WpDateString(period),
+            views,
+        });
     }
     daily_views
 }
@@ -224,8 +227,8 @@ fn daily_views(fields: &[String], data: Vec<Vec<StatsVisitsDataValue>>) -> Vec<S
 /// A single day's view count from the daily view history.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostDailyView {
-    /// The day the views were recorded on (format: YYYY-MM-DD).
-    pub period: String,
+    /// The day the views were recorded on, in the site's timezone.
+    pub period: WpDateString,
     /// The number of views on that day.
     pub views: u64,
 }
@@ -317,8 +320,8 @@ impl From<StatsPostChange> for RawStatsPostChange {
 /// A single day within a [`StatsPostWeek`].
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostDay {
-    /// The day (format: YYYY-MM-DD).
-    pub day: String,
+    /// The day, in the site's timezone.
+    pub day: WpDateString,
     /// The number of views on that day.
     pub count: u64,
 }
@@ -353,15 +356,15 @@ pub struct StatsPostDetails {
     /// The post's excerpt. Empty when the post has none.
     #[serde(rename = "post_excerpt")]
     pub excerpt: String,
-    /// The post's publication date in the site's timezone (format: YYYY-MM-DD HH:MM:SS).
+    /// The post's publication date in the site's timezone.
     #[serde(rename = "post_date")]
-    pub date: String,
+    pub date: WpDateString,
     /// The post's publication date in GMT.
     #[serde(rename = "post_date_gmt")]
     pub date_gmt: WpGmtDateTime,
-    /// The date the post was last modified, in the site's timezone (format: YYYY-MM-DD HH:MM:SS).
+    /// The date the post was last modified, in the site's timezone.
     #[serde(rename = "post_modified")]
-    pub modified: String,
+    pub modified: WpDateString,
     /// The date the post was last modified, in GMT.
     #[serde(rename = "post_modified_gmt")]
     pub modified_gmt: WpGmtDateTime,
@@ -423,7 +426,7 @@ mod tests {
     fn test_stats_post_response_details() {
         let response = parse(WITH_VIEWS);
 
-        assert_eq!(response.date, "2026-08-06");
+        assert_eq!(response.date, WpDateString("2026-08-06".to_string()));
         assert_eq!(response.views, 19096);
         assert_eq!(response.highest_month, 3224);
         assert_eq!(response.highest_day_average, 293);
@@ -450,9 +453,12 @@ mod tests {
             "The Last Version of FeedDemon is Here, and it's Free"
         );
         assert_eq!(post.excerpt, "The wait is over.");
-        assert_eq!(post.date, "2013-06-20 09:15:49");
+        assert_eq!(post.date, WpDateString("2013-06-20 09:15:49".to_string()));
         assert_eq!(post.date_gmt.0.to_rfc3339(), "2013-06-20T13:15:49+00:00");
-        assert_eq!(post.modified, "2013-06-23 21:57:23");
+        assert_eq!(
+            post.modified,
+            WpDateString("2013-06-23 21:57:23".to_string())
+        );
         assert_eq!(
             post.modified_gmt.0.to_rfc3339(),
             "2013-06-24T01:57:23+00:00"
@@ -482,7 +488,7 @@ mod tests {
 
         let first = &weeks[0];
         assert_eq!(first.days.len(), 7);
-        assert_eq!(first.days[0].day, "2026-06-29");
+        assert_eq!(first.days[0].day, WpDateString("2026-06-29".to_string()));
         assert_eq!(first.days[0].count, 2);
         assert_eq!(first.total, 7);
         assert_eq!(first.average, 1);
@@ -542,14 +548,14 @@ mod tests {
         assert_eq!(
             daily_views[0],
             StatsPostDailyView {
-                period: "2013-06-20".to_string(),
+                period: WpDateString("2013-06-20".to_string()),
                 views: 1194,
             }
         );
         assert_eq!(
             daily_views[4],
             StatsPostDailyView {
-                period: "2026-08-06".to_string(),
+                period: WpDateString("2026-08-06".to_string()),
                 views: 0,
             }
         );
@@ -578,7 +584,7 @@ mod tests {
         let expected: Vec<StatsPostDailyView> = expected
             .into_iter()
             .map(|(period, views)| StatsPostDailyView {
-                period: period.to_string(),
+                period: WpDateString(period.to_string()),
                 views,
             })
             .collect();
@@ -600,7 +606,10 @@ mod tests {
         assert_eq!(response.views, 74286);
         assert_eq!(response.highest_month, 3822);
         assert_eq!(response.daily_views.len(), 3);
-        assert_eq!(response.daily_views[0].period, "2013-05-19");
+        assert_eq!(
+            response.daily_views[0].period,
+            WpDateString("2013-05-19".to_string())
+        );
         assert_eq!(response.daily_views[0].views, 73);
         assert_eq!(
             response.years.get("2013").expect("2013 should exist").total,

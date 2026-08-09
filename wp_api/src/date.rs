@@ -47,7 +47,7 @@ uniffi::custom_newtype!(WpDateString, String);
 /// Some PHP endpoints return `false` instead of `null` when a date is not
 /// applicable. Use [`deserialize_optional_date_string`] on fields that
 /// exhibit this pattern.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct WpDateString(pub String);
 

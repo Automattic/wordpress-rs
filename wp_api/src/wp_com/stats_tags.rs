@@ -1,4 +1,5 @@
 use crate::{
+    date::WpDateString,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::language::WPComLanguage,
 };
@@ -27,7 +28,7 @@ impl AppendUrlQueryPairs for StatsTagsParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsTagsResponse {
     /// The date for the stats query.
-    pub date: String,
+    pub date: WpDateString,
     /// The list of tag groups with their view counts.
     pub tags: Vec<StatsTagGroup>,
 }
@@ -101,7 +102,7 @@ mod tests {
         let response: StatsTagsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-03-12");
+        assert_eq!(response.date.0, "2026-03-12");
         assert_eq!(response.tags.len(), 3);
 
         let first = &response.tags[0];
@@ -123,7 +124,7 @@ mod tests {
         let response: StatsTagsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-03-12");
+        assert_eq!(response.date.0, "2026-03-12");
         assert!(response.tags.is_empty());
     }
 }

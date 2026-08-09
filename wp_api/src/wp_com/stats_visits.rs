@@ -1,4 +1,5 @@
 use crate::{
+    date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::language::WPComLanguage,
@@ -73,10 +74,10 @@ pub struct StatsVisitsParams {
     pub quantity: Option<u32>,
     /// The end date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub end_date: Option<String>,
+    pub end_date: Option<WpDateString>,
     /// The start date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub start_date: Option<String>,
+    pub start_date: Option<WpDateString>,
     /// The specific stat fields to include in the response.
     /// When empty, the API returns its default set of fields.
     #[uniffi(default = [])]
@@ -102,7 +103,7 @@ impl AppendUrlQueryPairs for StatsVisitsParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitsResponse {
     /// The date for the stats query.
-    pub date: String,
+    pub date: WpDateString,
     /// The time unit used for grouping.
     pub unit: String,
     /// Field names for the data arrays.
@@ -260,7 +261,7 @@ mod tests {
         let params = StatsVisitsParams {
             unit: Some(StatsVisitsUnit::Hour),
             quantity: Some(24),
-            end_date: Some("2025-01-15".to_string()),
+            end_date: Some(WpDateString("2025-01-15".to_string())),
             start_date: None,
             stat_fields: vec![],
             locale: Some(WPComLanguage::English),
@@ -308,8 +309,8 @@ mod tests {
         let params = StatsVisitsParams {
             unit: Some(StatsVisitsUnit::Month),
             quantity: Some(12),
-            end_date: Some("2026-07-13".to_string()),
-            start_date: Some("2025-08-01".to_string()),
+            end_date: Some(WpDateString("2026-07-13".to_string())),
+            start_date: Some(WpDateString("2025-08-01".to_string())),
             stat_fields: vec![StatsVisitsField::Views, StatsVisitsField::Visitors],
             locale: None,
         };
@@ -355,7 +356,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.date.is_empty());
+        assert!(!response.date.0.is_empty());
         assert!(!response.unit.is_empty());
         assert!(!response.fields.is_empty());
     }
@@ -367,7 +368,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-01-18 00:00:00");
+        assert_eq!(response.date.0, "2026-01-18 00:00:00");
         assert_eq!(response.unit, "hour");
         assert_eq!(
             response.fields,
@@ -457,7 +458,7 @@ mod tests {
     #[test]
     fn test_get_stats_visits_data_empty_response() {
         let response = StatsVisitsResponse {
-            date: "2026-01-19".to_string(),
+            date: WpDateString("2026-01-19".to_string()),
             unit: "day".to_string(),
             fields: vec![
                 "period".to_string(),
