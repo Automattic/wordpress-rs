@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+use wp_api::date::WpDateString;
 use wp_api::posts::{
     AnyPostWithEditContext, PostContentWithEditContext, PostGuidWithEditContext, PostId,
     PostStatus, PostTitleWithEditContext,
@@ -132,14 +133,14 @@ fn create_test_post(
 ) -> AnyPostWithEditContext {
     AnyPostWithEditContext {
         id,
-        date: "2025-01-01T00:00:00".to_string(),
+        date: WpDateString("2025-01-01T00:00:00".to_string()),
         date_gmt: "2025-01-01T00:00:00Z".parse().unwrap(),
         guid: PostGuidWithEditContext {
             raw: None,
             rendered: format!("https://example.com/?p={}", id.0),
         },
         link: link.to_string(),
-        modified: "2025-01-01T00:00:00".to_string(),
+        modified: WpDateString("2025-01-01T00:00:00".to_string()),
         modified_gmt: "2025-01-01T00:00:00Z".parse().unwrap(),
         slug: slug.to_string(),
         status: PostStatus::Publish,

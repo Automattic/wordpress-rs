@@ -4,8 +4,9 @@ use crate::{
     db_types::{
         db_site::DbSite,
         helpers::{
-            bool_to_integer, deserialize_json_value, get_id, get_optional_id, integer_to_bool,
-            parse_datetime, parse_enum, parse_optional_enum, serialize_value_to_json,
+            bool_to_integer, deserialize_json_value, get_date_string, get_id, get_optional_id,
+            integer_to_bool, parse_datetime, parse_enum, parse_optional_enum,
+            serialize_value_to_json,
         },
         posts::{
             DbAnyPostWithEditContext, DbAnyPostWithEmbedContext, DbAnyPostWithViewContext,
@@ -462,14 +463,14 @@ impl PostContext for EditContext {
 
         let post = AnyPostWithEditContext {
             id: get_id(row, Id)?,
-            date: row.get_column(Date)?,
+            date: get_date_string(row, Date)?,
             date_gmt: parse_datetime(row, DateGmt)?,
             guid: PostGuidWithEditContext {
                 raw: row.get_column(GuidRaw)?,
                 rendered: row.get_column(GuidRendered)?,
             },
             link: row.get_column(Link)?,
-            modified: row.get_column(Modified)?,
+            modified: get_date_string(row, Modified)?,
             modified_gmt: parse_datetime(row, ModifiedGmt)?,
             slug: row.get_column(Slug)?,
             status: parse_enum(row, Status)?,
@@ -560,13 +561,13 @@ impl PostContext for ViewContext {
 
         let post = AnyPostWithViewContext {
             id: get_id(row, Id)?,
-            date: row.get_column(Date)?,
+            date: get_date_string(row, Date)?,
             date_gmt: parse_datetime(row, DateGmt)?,
             guid: PostGuidWithViewContext {
                 rendered: row.get_column(GuidRendered)?,
             },
             link: row.get_column(Link)?,
-            modified: row.get_column(Modified)?,
+            modified: get_date_string(row, Modified)?,
             modified_gmt: parse_datetime(row, ModifiedGmt)?,
             slug: row.get_column(Slug)?,
             status: parse_enum(row, Status)?,
@@ -648,7 +649,7 @@ impl PostContext for EmbedContext {
 
         let post = AnyPostWithEmbedContext {
             id: get_id(row, Id)?,
-            date: row.get_column(Date)?,
+            date: get_date_string(row, Date)?,
             link: row.get_column(Link)?,
             slug: row.get_column(Slug)?,
             post_type: row.get_column(PostType)?,
@@ -765,10 +766,10 @@ impl PostRepository<EditContext> {
                 rusqlite::named_params! {
                     ":db_site_id": site.row_id,
                     ":id": post.id.0,
-                    ":date": post.date,
+                    ":date": post.date.0,
                     ":date_gmt": post.date_gmt.to_string(),
                     ":link": post.link,
-                    ":modified": post.modified,
+                    ":modified": post.modified.0,
                     ":modified_gmt": post.modified_gmt.to_string(),
                     ":slug": post.slug,
                     ":status": post.status.to_string(),
@@ -909,10 +910,10 @@ impl PostRepository<ViewContext> {
                 rusqlite::named_params! {
                     ":db_site_id": site.row_id,
                     ":id": post.id.0,
-                    ":date": post.date,
+                    ":date": post.date.0,
                     ":date_gmt": post.date_gmt.to_string(),
                     ":link": post.link,
-                    ":modified": post.modified,
+                    ":modified": post.modified.0,
                     ":modified_gmt": post.modified_gmt.to_string(),
                     ":slug": post.slug,
                     ":status": post.status.to_string(),
@@ -1029,7 +1030,7 @@ impl PostRepository<EmbedContext> {
                 rusqlite::named_params! {
                     ":db_site_id": site.row_id,
                     ":id": post.id.0,
-                    ":date": post.date,
+                    ":date": post.date.0,
                     ":link": post.link,
                     ":slug": post.slug,
                     ":post_type": post.post_type,

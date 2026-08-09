@@ -5,6 +5,7 @@ use crate::{
 use rusqlite::Row;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use wp_api::date::WpDateString;
 
 /// Helper to get a required ID wrapper type (e.g., PostId, UserId) from a row.
 pub fn get_id<T, C>(row: &Row, column: C) -> Result<T, SqliteDbError>
@@ -14,6 +15,14 @@ where
 {
     let id: i64 = row.get_column(column)?;
     Ok(id.into())
+}
+
+/// Helper to get a required [`WpDateString`] from a string column.
+pub fn get_date_string<C>(row: &Row, column: C) -> Result<WpDateString, SqliteDbError>
+where
+    C: ColumnIndex,
+{
+    Ok(WpDateString(row.get_column(column)?))
 }
 
 /// Helper to get an optional ID wrapper type from a row.

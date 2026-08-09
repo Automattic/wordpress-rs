@@ -1,5 +1,6 @@
 use crate::{
     EnumFromStrParsingError, JsonValue, OptionFromStr, WpApiParamOrder, WpResponseString,
+    date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
@@ -503,7 +504,7 @@ pub struct SparseUser {
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
     #[WpContext(edit)]
-    pub registered_date: Option<String>,
+    pub registered_date: Option<WpGmtDateTime>,
     #[WpContext(edit)]
     pub roles: Option<Vec<UserRole>>,
     #[WpContext(edit)]

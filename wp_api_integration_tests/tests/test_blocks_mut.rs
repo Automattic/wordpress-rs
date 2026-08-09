@@ -81,7 +81,7 @@ generate_update_test!(
     date,
     unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
     |updated_block| {
-        assert_eq!(updated_block.date, "2024-09-09T12:00:00");
+        assert_eq!(updated_block.date.0, "2024-09-09T12:00:00");
     }
 );
 

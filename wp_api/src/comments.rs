@@ -1,6 +1,6 @@
 use crate::{
     UserAvatarSize, UserId, WpAdditionalFields, WpApiParamOrder, WpResponseString,
-    date::WpGmtDateTime,
+    date::{WpDateString, WpGmtDateTime},
     impl_as_query_value_from_to_string,
     posts::PostId,
     url_query::{
@@ -215,7 +215,7 @@ pub struct CommentCreateParams {
     /// The date the comment was published, in the site's timezone.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The date the comment was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -290,7 +290,7 @@ impl CommentCreateParamsBuilder {
         self.params.author_user_agent = author_user_agent;
         self
     }
-    pub fn date(mut self, date: Option<String>) -> Self {
+    pub fn date(mut self, date: Option<WpDateString>) -> Self {
         self.params.date = date;
         self
     }
@@ -348,7 +348,7 @@ pub struct CommentUpdateParams {
     /// The date the comment was published, in the site's timezone.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The date the comment was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -388,7 +388,7 @@ pub struct SparseComment {
     #[WpContextualField]
     pub content: Option<SparseCommentContent>,
     #[WpContext(edit, embed, view)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     #[WpContext(edit, view)]
     pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]

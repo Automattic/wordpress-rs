@@ -4,8 +4,8 @@ use crate::{
     db_types::{
         db_site::DbSite,
         helpers::{
-            deserialize_json_value, get_id, get_optional_id, parse_datetime, parse_enum,
-            serialize_value_to_json,
+            deserialize_json_value, get_date_string, get_id, get_optional_id, parse_datetime,
+            parse_enum, serialize_value_to_json,
         },
         media::{DbMediaWithEditContext, MediaEditContextColumn},
         row_ext::RowExt,
@@ -285,14 +285,14 @@ impl MediaContext for EditContext {
 
         let media = MediaWithEditContext {
             id: get_id(row, Id)?,
-            date: row.get_column(Date)?,
+            date: get_date_string(row, Date)?,
             date_gmt: parse_datetime(row, DateGmt)?,
             guid: PostGuidWithEditContext {
                 raw: row.get_column(GuidRaw)?,
                 rendered: row.get_column(GuidRendered)?,
             },
             link: row.get_column(Link)?,
-            modified: row.get_column(Modified)?,
+            modified: get_date_string(row, Modified)?,
             modified_gmt: parse_datetime(row, ModifiedGmt)?,
             slug: row.get_column(Slug)?,
             status: parse_enum(row, Status)?,
@@ -429,10 +429,10 @@ impl MediaRepository<EditContext> {
                 rusqlite::named_params! {
                     ":db_site_id": site.row_id,
                     ":id": media.id.0,
-                    ":date": media.date,
+                    ":date": media.date.0,
                     ":date_gmt": media.date_gmt.to_string(),
                     ":link": media.link,
-                    ":modified": media.modified,
+                    ":modified": media.modified.0,
                     ":modified_gmt": media.modified_gmt.to_string(),
                     ":slug": media.slug,
                     ":status": media.status.to_string(),

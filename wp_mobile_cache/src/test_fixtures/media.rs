@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 use wp_api::{
+    date::WpDateString,
     media::{
         MediaCaptionWithEditContext, MediaDescriptionWithEditContext, MediaDetails, MediaId,
         MediaStatus, MediaType, MediaWithEditContext,
@@ -129,14 +130,14 @@ impl Default for MediaBuilder {
 fn create_minimal_media() -> MediaWithEditContext {
     MediaWithEditContext {
         id: MediaId(0),
-        date: "2026-01-01T00:00:00".into(),
+        date: WpDateString("2026-01-01T00:00:00".to_string()),
         date_gmt: "2026-01-01T00:00:00Z".parse().unwrap(),
         guid: PostGuidWithEditContext {
             raw: None,
             rendered: "https://example.com/?p=0".into(),
         },
         link: "https://example.com/0".into(),
-        modified: "2026-01-01T00:00:00".into(),
+        modified: WpDateString("2026-01-01T00:00:00".to_string()),
         modified_gmt: "2026-01-01T00:00:00Z".parse().unwrap(),
         slug: "media-0".into(),
         status: MediaStatus::Inherit,
