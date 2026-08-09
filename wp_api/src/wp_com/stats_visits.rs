@@ -184,36 +184,48 @@ fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(String, 
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitsDataPoint {
+    /// The span this point covers, labelled to match the requested
+    /// [`StatsVisitsUnit`]: `"2026-01-27"` for a day, `"2026W02W23"` for a
+    /// week, `"2025-11-01"` for a month, `"2024"` for a year, and
+    /// `"2026-01-17 01:00:00"` for an hour.
+    ///
+    /// This is a label rather than a date — the week form isn't one at all —
+    /// so it stays a `String` where a date would be a `WpDateString`.
     pub period: String,
     pub visits: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitorsDataPoint {
+    /// Labelled as [`StatsVisitsDataPoint::period`].
     pub period: String,
     pub visitors: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsLikesDataPoint {
+    /// Labelled as [`StatsVisitsDataPoint::period`].
     pub period: String,
     pub likes: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsReblogsDataPoint {
+    /// Labelled as [`StatsVisitsDataPoint::period`].
     pub period: String,
     pub reblogs: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsCommentsDataPoint {
+    /// Labelled as [`StatsVisitsDataPoint::period`].
     pub period: String,
     pub comments: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostsDataPoint {
+    /// Labelled as [`StatsVisitsDataPoint::period`].
     pub period: String,
     pub posts: u64,
 }

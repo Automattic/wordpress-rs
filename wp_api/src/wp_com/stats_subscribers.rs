@@ -167,6 +167,12 @@ fn get_stats_subscribers_data(
 /// A subscriber count data point.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsSubscribersDataPoint {
+    /// The span this point covers, labelled to match the requested
+    /// [`StatsSubscribersUnit`]: `"2026-01-27"` for a day, `"2026W02W23"` for
+    /// a week, `"2025-11-01"` for a month, `"2024"` for a year.
+    ///
+    /// This is a label rather than a date — the week form isn't one at all —
+    /// so it stays a `String` where a date would be a `WpDateString`.
     pub period: String,
     pub subscribers: u64,
 }
@@ -174,6 +180,7 @@ pub struct StatsSubscribersDataPoint {
 /// A paid subscriber count data point.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsSubscribersPaidDataPoint {
+    /// Labelled as [`StatsSubscribersDataPoint::period`].
     pub period: String,
     pub subscribers_paid: u64,
 }
