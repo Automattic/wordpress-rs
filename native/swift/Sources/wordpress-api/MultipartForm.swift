@@ -27,6 +27,19 @@ enum MultipartFormContent {
             return InputStream(fileAtPath: url.path)!
         }
     }
+
+    /// Deletes the temporary file backing an `.onDisk` body, if there is one.
+    ///
+    /// Large (or `forceWriteToFile`) uploads serialize the form to a UUID-named temp file under
+    /// `FileManager.default.temporaryDirectory`. `URLSession`'s `uploadTask(fromFile:)` treats that
+    /// file as caller-owned — it reads it for the duration of the transfer but never deletes it — so
+    /// the caller must remove it once the upload finishes, or every large upload leaks a temp file
+    /// until the OS eventually reclaims it (#1540). `.inMemory` bodies own no file, so this is a
+    /// no-op for them. Best-effort: a failure to delete leaves a file the OS will still purge.
+    func removeTemporaryFileIfNeeded() {
+        guard case let .onDisk(url) = self else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
 }
 
 struct MultipartFormField {
