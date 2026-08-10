@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Internal:** Upgraded `reqwest` from `0.12` to `0.13` and removed the direct `hickory-resolver` dependency, moving `hickory-proto` to `0.26.1` to clear [RUSTSEC-2026-0119](https://rustsec.org/advisories/RUSTSEC-2026-0119.html) ([`GHSA-q2qq-hmj6-3wpp`](https://github.com/hickory-dns/hickory-dns/security/advisories/GHSA-q2qq-hmj6-3wpp)), a medium-severity O(n²) CPU-exhaustion DoS in DNS message encoding. Only the Rust `reqwest` request executor — used by the CLI, web tool, and integration tests — pulls in `hickory`; the shipping iOS/Android bindings don't compile `reqwest`, so they were never affected. `reqwest` 0.13 also drops the `native-tls`/`openssl` stack in favor of rustls-only, so the executor no longer links OpenSSL.
 - **Internal:** Bumped the transitive `rand` dependency to `0.9.3` and `0.8.6` to clear [RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097.html) (`GHSA-cq8v-f236-94qc`), a low-severity unsoundness in `rand` 0.9.2 / 0.8.5. Lockfile-only; the affected code path (a custom `log` logger calling `rand::rng()` during reseed) is not exercised here.
 
 ## [0.6.0] - 2026-07-16
