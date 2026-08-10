@@ -673,6 +673,12 @@ pub enum RequestExecutionErrorReason {
         error_message: String,
     },
     CancellationError,
+    // The host resolved, but a connection to the server could not be
+    // established — refused, no route, or the host was unreachable. Distinct
+    // from `HttpError`, which is a failure *after* a connection was established.
+    ConnectionError {
+        reason: String,
+    },
     HttpError {
         reason: String,
     },
@@ -682,25 +688,24 @@ pub enum RequestExecutionErrorReason {
 }
 
 impl RequestExecutionErrorReason {
-    /// Whether the site could not be reached — most reliably, the host did not
-    /// resolve.
+    /// Whether the site could not be reached at all — either its host did not
+    /// resolve (`NonExistentSiteError`) or the host resolved but no connection
+    /// could be established (`ConnectionError`: the connection was refused, there
+    /// was no route, or the host was unreachable).
+    ///
+    /// This is a portable signal: every executor (Swift, Kotlin, and `reqwest`)
+    /// classifies both failure modes the same way, so it returns the same answer
+    /// on every platform. To tell the two apart — a domain that doesn't resolve
+    /// vs. a server that's down — match `NonExistentSiteError` and
+    /// `ConnectionError` directly.
     ///
     /// Distinct from [`RequestExecutionErrorReason::is_device_offline`]: this
     /// indicates a problem reaching *this particular site*, not a loss of device
     /// connectivity.
     ///
-    /// # Platform differences
-    ///
-    /// A refused connection (the host resolves, but nothing is listening) is
-    /// **not** classified consistently:
-    ///
-    /// - Swift maps it to `NonExistentSiteError`, so this returns `true`.
-    /// - Kotlin and the `reqwest` executor map it to `HttpError`, so this
-    ///   returns `false`.
-    ///
-    /// Only a DNS failure is treated as an unreachable site by every executor.
-    /// Callers that must behave identically across platforms should rely on that
-    /// case alone until the mappings are aligned.
+    /// A connect *timeout* is **not** included: neither the `reqwest` nor the
+    /// Kotlin executor can reliably separate a connect timeout from a read
+    /// timeout, so those remain `HttpTimeoutError`. See #1495.
     ///
     /// A site URL rejected while parsing never reaches this predicate: it
     /// surfaces as [`WpApiError::SiteUrlParsingError`], which carries no
@@ -711,7 +716,10 @@ impl RequestExecutionErrorReason {
     /// normalized before they reach the platform, which repairs the rest); it is
     /// covered for completeness.
     pub fn is_site_unreachable(&self) -> bool {
-        matches!(self, Self::NonExistentSiteError { .. })
+        matches!(
+            self,
+            Self::NonExistentSiteError { .. } | Self::ConnectionError { .. }
+        )
     }
 
     /// Whether the request failed because the device has no network connection.
@@ -728,7 +736,7 @@ impl RequestExecutionErrorReason {
     /// `reqwest` executor has neither and never constructs `DeviceIsOfflineError`,
     /// so this always returns `false` there — an offline request typically
     /// surfaces as a DNS failure (`NonExistentSiteError`) or a connect error
-    /// (`HttpError`) instead.
+    /// (`ConnectionError`) instead.
     pub fn is_device_offline(&self) -> bool {
         matches!(self, Self::DeviceIsOfflineError { .. })
     }
@@ -782,11 +790,12 @@ impl RequestExecutionErrorReason {
     }
 }
 
-/// Whether the site could not be reached — most reliably, the host did not
-/// resolve.
+/// Whether the site could not be reached at all — the host did not resolve, or
+/// the host resolved but no connection could be established.
 ///
-/// See [`RequestExecutionErrorReason::is_site_unreachable`] for the per-platform
-/// differences in how connectivity failures are classified.
+/// See [`RequestExecutionErrorReason::is_site_unreachable`] for what does and
+/// does not count, and match `NonExistentSiteError` / `ConnectionError` directly
+/// to tell a DNS failure apart from a failed connection.
 #[uniffi::export]
 pub fn request_execution_error_reason_is_site_unreachable(
     reason: &RequestExecutionErrorReason,
@@ -826,6 +835,9 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
             }
             RequestExecutionErrorReason::DeviceIsOfflineError { error_message } => {
                 WpMessages::just(error_message)
+            }
+            RequestExecutionErrorReason::ConnectionError { reason } => {
+                WpMessages::connection_error(reason)
             }
             RequestExecutionErrorReason::HttpError { reason } => {
                 WpMessages::http_server_error(reason)
@@ -880,11 +892,22 @@ mod tests {
         }
     }
 
+    fn connection_error() -> RequestExecutionErrorReason {
+        RequestExecutionErrorReason::ConnectionError {
+            reason: "connection refused".to_string(),
+        }
+    }
+
     #[test]
-    fn test_is_site_unreachable_matches_non_existent_site_error() {
-        let reason = non_existent_site();
-        assert!(reason.is_site_unreachable());
-        assert!(!reason.is_device_offline());
+    fn test_is_site_unreachable_matches_dns_and_connection_failures() {
+        // The site is unreachable whether its host didn't resolve (DNS) or the
+        // host resolved but the connection couldn't be established.
+        assert!(non_existent_site().is_site_unreachable());
+        assert!(connection_error().is_site_unreachable());
+
+        // Neither is the device being offline.
+        assert!(!non_existent_site().is_device_offline());
+        assert!(!connection_error().is_device_offline());
     }
 
     #[test]
@@ -950,6 +973,15 @@ mod tests {
         assert!(request_execution_error_reason_is_device_offline(&offline));
         assert!(!request_execution_error_reason_is_site_unreachable(
             &offline
+        ));
+
+        // A failed connection is also site-unreachable (the exported fn delegates
+        // to the broadened inherent method), but not device-offline.
+        assert!(request_execution_error_reason_is_site_unreachable(
+            &connection_error()
+        ));
+        assert!(!request_execution_error_reason_is_device_offline(
+            &connection_error()
         ));
     }
 }

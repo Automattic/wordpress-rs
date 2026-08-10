@@ -98,6 +98,10 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 return handleNonExistentSiteError(error, for: request)
             }
 
+            if errorIsConnectionError(error) {
+                return handleConnectionError(error, for: request)
+            }
+
             if errorIsDeviceIsOffline(error) {
                 return handleDeviceIsOfflineError(error, for: request)
             }
@@ -225,6 +229,21 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         )
     }
 
+    func handleConnectionError(
+        _ error: Error,
+        for request: NetworkRequestContent
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        .failure(
+            .RequestExecutionFailed(
+                statusCode: nil,
+                redirects: executorDelegate.redirects(for: request.requestId()),
+                reason: .connectionError(reason: error.localizedDescription),
+                requestUrl: request.url(),
+                requestMethod: request.method()
+            )
+        )
+    }
+
     public func sleep(millis: UInt64) async {
         // `try?`: `Task.sleep` only throws on cancellation, which this non-throwing `sleep`
         // leaves to the request machinery to handle.
@@ -247,20 +266,38 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     private func errorIsNonExistentSiteError(_ error: Error) -> Bool {
-        // `.badURL` is grouped with the non-existent-site errors deliberately.
-        // A malformed URL has no dedicated classification at the executor layer:
-        // `RequestExecutionError` can't produce `WpApiError.SiteUrlParsingError`
-        // (that's a parse-time error, one layer up) and `RequestExecutionErrorReason`
-        // has no invalid-URL case, so `NonExistentSiteError` is the nearest fit.
-        // In practice we could not construct a URL that reaches this branch:
-        // request URLs are normalized by the Rust `url` crate before they arrive,
-        // and modern Foundation repairs the leftovers (e.g. an invalid `%zz`
-        // becomes `%25zz`) rather than raising `.badURL`. It's kept for completeness.
+        // A refused connection (`.cannotConnectToHost` — the host resolves, but
+        // nothing is listening) is deliberately *not* here: it is a failed
+        // connection handled by `errorIsConnectionError`, matching the Kotlin and
+        // reqwest executors. This keeps `NonExistentSiteError` — and the
+        // `isSiteUnreachable` predicate built on it — a portable "the host does
+        // not resolve" signal across platforms. See #1495.
+        //
+        // `.badURL` is grouped here deliberately. A malformed URL has no dedicated
+        // classification at the executor layer: `RequestExecutionError` can't
+        // produce `WpApiError.SiteUrlParsingError` (that's a parse-time error, one
+        // layer up) and `RequestExecutionErrorReason` has no invalid-URL case, so
+        // `NonExistentSiteError` is the nearest fit. In practice we could not
+        // construct a URL that reaches this branch: request URLs are normalized by
+        // the Rust `url` crate before they arrive, and modern Foundation repairs
+        // the leftovers (e.g. an invalid `%zz` becomes `%25zz`) rather than raising
+        // `.badURL`. It's kept for completeness.
         [
             .badURL,
-            .cannotConnectToHost,
             .cannotFindHost,
             .dnsLookupFailed
+        ]
+        .contains((error as? URLError)?.code)
+    }
+
+    private func errorIsConnectionError(_ error: Error) -> Bool {
+        // A failed connection: the host resolves, but nothing accepts the
+        // connection (server down, wrong port, not listening, or no route). It
+        // maps to `ConnectionError` — the same classification the Kotlin
+        // (`ConnectException` / `NoRouteToHostException`) and reqwest (io-error)
+        // executors use. `isSiteUnreachable` covers it alongside a DNS failure.
+        [
+            .cannotConnectToHost
         ]
         .contains((error as? URLError)?.code)
     }
