@@ -194,6 +194,24 @@ extension Array where Element == MultipartFormField {
                 dest.write(data: Data(bytesNoCopy: &buffer, count: bytesRead, deallocator: .none))
             }
 
+            // The loop above is gated on `hasBytesAvailable`, which is already false when
+            // `open()` failed — e.g. the file was deleted between the field's construction
+            // and here, leaving the stream in `.error`. The body then never runs, no `read`
+            // ever returns -1, and the mid-read guard above can't fire. Without this check
+            // we'd emit the closing CRLF below and serialize a well-formed-but-empty part;
+            // multipart/form-data carries no per-part length, so the server couldn't detect
+            // the truncation and a should-fail upload would become a silently-wrong one. A
+            // legitimately empty field leaves the stream `.open` (empty in-memory data) or
+            // `.atEnd` (empty file), never `.error`, so this doesn't false-fail zero-byte
+            // parts. It intentionally does not cover a file that *shrinks* between the size
+            // read and serialization — that surfaces as a clean `read() == 0`/`.atEnd`, and
+            // catching it would need the bytes-written reconciliation the issue rejected.
+            if field.inputStream.streamStatus == .error {
+                throw MultipartFormError.inaccessibleFile(
+                    underlyingError: field.inputStream.streamError ?? POSIXError(.EIO)
+                )
+            }
+
             dest.writeMultipartFormLineBreak()
         }
 
