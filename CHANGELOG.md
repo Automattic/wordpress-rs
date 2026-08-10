@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Documented how to pick an xcframework build for local work, and added `make help` descriptions for the `xcframework-only-*` targets. Verifying a UniFFI change needs only `make xcframework-only-macos`, not the full 11-target `make xcframework`.
 - **Internal:** Fixed `make xcframework-only-<platform>` building the per-target libraries but never assembling them into the xcframework. The `@# Help:` comments added for those `make help` descriptions became each rule's recipe and silently shadowed the shared `xcframework-only-%` pattern rule that ran the assemble step; each rule now runs the assemble step directly.
 
+### Fixed
+
+- Swift: Classify invalid-SSL failures from the failed handshake's `SecTrust` (`URLError.failureURLPeerTrust`), via `SecTrustCopyCertificateChain`, instead of reading the undocumented `NSErrorPeerCertificateChainKey` `userInfo` string that has no public constant. Behavior is unchanged on every platform: iOS/macOS/tvOS still surface the presented certificate as `certificateNotValidForName`, and watchOS — which exposes no peer trust — still degrades to `genericSslError`. ([#1510](https://github.com/Automattic/wordpress-rs/issues/1510))
+
 ### Security
 
 - **Internal:** Bumped the transitive `rand` dependency to `0.9.3` and `0.8.6` to clear [RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097.html) (`GHSA-cq8v-f236-94qc`), a low-severity unsoundness in `rand` 0.9.2 / 0.8.5. Lockfile-only; the affected code path (a custom `log` logger calling `rand::rng()` during reseed) is not exercised here.
