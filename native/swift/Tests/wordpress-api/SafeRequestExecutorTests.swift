@@ -19,9 +19,11 @@ struct SafeRequestExecutorTests {
         await executor.sleep(millis: requestedMillis)
         let elapsed = start.duration(to: clock.now)
 
-        // The old bug slept ~0.2 ms for a 200 ms request. `Task.sleep` waits *at least* the
-        // requested duration, so a 150 ms lower bound sits comfortably above the buggy value and
-        // below the target — catching the regression without flaking on scheduling jitter.
+        // `Task.sleep` waits *at least* the requested duration, so bound both sides. The 150 ms
+        // floor catches the old 1000×-too-short bug (~0.2 ms for a 200 ms request); the 2 s
+        // ceiling catches the symmetric slip (e.g. `.seconds` in place of `.milliseconds`, ~200 s)
+        // while staying well clear of scheduling jitter, which is milliseconds, not seconds.
         #expect(elapsed >= .milliseconds(150))
+        #expect(elapsed < .seconds(2))
     }
 }
