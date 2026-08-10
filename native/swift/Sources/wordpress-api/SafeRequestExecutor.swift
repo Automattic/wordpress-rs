@@ -226,8 +226,9 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     public func sleep(millis: UInt64) async {
-        // swiftlint:disable:next force_try
-        try! await Task.sleep(nanoseconds: millis * 1000)
+        // `try?`: `Task.sleep` only throws on cancellation, which this non-throwing `sleep`
+        // leaves to the request machinery to handle.
+        try? await Task.sleep(for: .milliseconds(millis))
     }
 
     private func errorIsHttpsError(_ error: Error) -> Bool {
