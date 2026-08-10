@@ -8,7 +8,6 @@ use crate::{
 };
 use async_trait::async_trait;
 use h2::Error as Http2Error;
-use hickory_resolver::error::ResolveError;
 use http::{HeaderMap, HeaderValue};
 use hyper::Error as HyperError;
 use reqwest::multipart::Part;
@@ -34,7 +33,7 @@ impl ReqwestRequestExecutor {
             client: reqwest::Client::builder()
                 .danger_accept_invalid_certs(danger_accept_invalid_certs)
                 .timeout(timeout)
-                .use_rustls_tls()
+                .tls_backend_rustls()
                 .build()
                 .expect("We should be able to build the reqwest client with this configuration"),
         }
@@ -51,7 +50,7 @@ impl ReqwestRequestExecutor {
         Self {
             client: reqwest::Client::builder()
                 .timeout(Duration::from_secs(DEFAULT_TIMEOUT))
-                .use_rustls_tls()
+                .tls_backend_rustls()
                 .cookie_store(true)
                 .build()
                 .expect("We should be able to build the reqwest client with this configuration"),
@@ -204,9 +203,9 @@ fn request_execution_error_from_reqwest(
         }
     } else if let Some(hyper_error) = error.as_hyper_error() {
         hyper_error.into()
-    } else if let Some(dns_error) = error.as_dns_error() {
-        dns_error.into()
     } else if error.is_connect() {
+        // DNS resolution failures surface here: reqwest performs name resolution as
+        // part of establishing the connection, so a failed lookup is a connect error.
         RequestExecutionErrorReason::NonExistentSiteError {
             error_message: Some(error.to_string()),
             suggested_action: None,
@@ -242,19 +241,6 @@ impl From<&TlsError> for RequestExecutionErrorReason {
             _ => RequestExecutionErrorReason::GenericError {
                 error_message: error.to_string(),
             },
-        }
-    }
-}
-
-/// Converts all DNS errors to a RequestExecutionErrorReason
-impl From<&ResolveError> for RequestExecutionErrorReason {
-    fn from(error: &ResolveError) -> Self {
-        // Future improvement: We could probably detect when the domain is valid, but
-        // there's no DNS record for the provided hostname
-
-        RequestExecutionErrorReason::NonExistentSiteError {
-            error_message: Some(error.to_string()),
-            suggested_action: None,
         }
     }
 }
@@ -295,7 +281,6 @@ impl From<&HyperError> for RequestExecutionErrorReason {
 
 trait ExaminableError {
     fn as_io_error(&self) -> Option<&std::io::Error>;
-    fn as_dns_error(&self) -> Option<&ResolveError>;
     fn as_tls_error(&self) -> Option<&TlsError>;
     fn as_hyper_error(&self) -> Option<&HyperError>;
 }
@@ -303,10 +288,6 @@ trait ExaminableError {
 impl ExaminableError for reqwest::Error {
     fn as_io_error(&self) -> Option<&std::io::Error> {
         self.find::<std::io::Error>()
-    }
-
-    fn as_dns_error(&self) -> Option<&ResolveError> {
-        self.find::<ResolveError>()
     }
 
     fn as_tls_error(&self) -> Option<&TlsError> {
