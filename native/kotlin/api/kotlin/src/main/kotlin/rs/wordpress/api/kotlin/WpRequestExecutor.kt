@@ -1,5 +1,6 @@
 package rs.wordpress.api.kotlin
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -26,6 +27,8 @@ import uniffi.wp_api.WpNetworkRequest
 import uniffi.wp_api.WpNetworkResponse
 import uniffi.wp_api.parseCertificate
 import java.io.File
+import java.io.IOException
+import java.io.InterruptedIOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
@@ -181,7 +184,12 @@ class WpRequestExecutor @JvmOverloads constructor(
 
     // We intentionally catch all exceptions to prevent UniFFI callback crashes.
     // All exceptions are converted to proper Rust error types rather than being swallowed.
-    @Suppress("ThrowsCount", "TooGenericExceptionCaught", "SwallowedException")
+    @Suppress(
+        "ThrowsCount",
+        "TooGenericExceptionCaught",
+        "SwallowedException",
+        "CyclomaticComplexMethod",
+    )
     private fun executeRequestSafely(
         urlRequest: Request,
         requestUrl: String,
@@ -189,9 +197,10 @@ class WpRequestExecutor @JvmOverloads constructor(
         requestHeaderMap: WpNetworkHeaderMap,
         notifyUploadListener: Boolean = false
     ): WpNetworkResponse {
-        try {
-            val call = httpClient.getClient().newCall(urlRequest)
-
+        // Hoisted above the `try` so the `IOException` handler can distinguish a cancelled
+        // request (`call.isCanceled()`) from other I/O failures.
+        val call = httpClient.getClient().newCall(urlRequest)
+        val reason: RequestExecutionErrorReason = try {
             // Notify upload listener if this is an upload request
             if (notifyUploadListener) {
                 uploadListener?.onUploadStarted(CancellableCall(call))
@@ -207,47 +216,51 @@ class WpRequestExecutor @JvmOverloads constructor(
                     requestHeaderMap = requestHeaderMap
                 )
             }
+        } catch (e: CancellationException) {
+            // This is NOT coroutine cancellation: `executeRequestSafely` is non-suspending, so a
+            // cancellation signal is never injected into this `try`. The only `CancellationException`
+            // that can reach here is one thrown synchronously by a client callback (e.g. `onUploadStarted`).
+            //
+            // Deliberately NOT rethrown (the usual Kotlin idiom): this runs inside UniFFI's
+            // `GlobalScope.launch` callback, where a throwable that isn't the declared
+            // `RequestExecutionException` is treated as *unexpected* — UniFFI panics and it surfaces as an
+            // uncaught `InternalException` out of `WpApiClient.request` (which only catches `WpApiException`).
+            // Classifying it as a cancellation keeps the executor's no-throw contract and reports an honest
+            // cause. Real coroutine cancellation still propagates caller-side via `suspendCancellableCoroutine`
+            // in the generated await.
+            RequestExecutionErrorReason.CancellationError
         } catch (e: SSLPeerUnverifiedException) {
-            throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url),
-                requestUrl,
-                requestMethod,
-            )
+            RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
         } catch (e: UnknownHostException) {
-            throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.unknownHost(e, networkAvailabilityProvider),
-                requestUrl,
-                requestMethod,
-            )
+            RequestExecutionErrorReason.unknownHost(e, networkAvailabilityProvider)
         } catch (e: NoRouteToHostException) {
-            throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.noRouteToHost(e),
-                requestUrl,
-                requestMethod,
-            )
+            RequestExecutionErrorReason.noRouteToHost(e)
         } catch (e: ConnectException) {
-            throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.HttpError(
-                    reason = "Connection failed: ${e.localizedMessage}"
-                ),
-                requestUrl,
-                requestMethod,
-            )
+            RequestExecutionErrorReason.HttpError(reason = "Connection failed: ${e.localizedMessage}")
         } catch (e: SocketTimeoutException) {
-            throw requestExecutionFailedWith(
-                RequestExecutionErrorReason.HttpTimeoutError,
-                requestUrl,
-                requestMethod,
-            )
-        } catch (e: Exception) {
-            throw requestExecutionFailedWith(
+            RequestExecutionErrorReason.HttpTimeoutError
+        } catch (e: InterruptedIOException) {
+            // OkHttp's whole-call `callTimeout` cancels the call and throws a bare `InterruptedIOException`
+            // (the superclass of `SocketTimeoutException` above); classify it as a timeout so it isn't
+            // mislabeled a `CancellationError` by the `isCanceled()` check below.
+            RequestExecutionErrorReason.HttpTimeoutError
+        } catch (e: IOException) {
+            // An explicit `CancellableCall.cancel()` throws a base `IOException("Canceled")` with
+            // `isCanceled() == true` — classify only that as `CancellationError` (matching Swift's
+            // `URLError.cancelled`); other I/O failures stay `GenericError`.
+            if (call.isCanceled()) {
+                RequestExecutionErrorReason.CancellationError
+            } else {
                 RequestExecutionErrorReason.GenericError(
                     errorMessage = e.localizedMessage ?: e.toString()
-                ),
-                requestUrl,
-                requestMethod,
+                )
+            }
+        } catch (e: Exception) {
+            RequestExecutionErrorReason.GenericError(
+                errorMessage = e.localizedMessage ?: e.toString()
             )
         }
+        throw requestExecutionFailedWith(reason, requestUrl, requestMethod)
     }
 
     override suspend fun sleep(millis: ULong) {
