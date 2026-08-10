@@ -59,6 +59,103 @@ impl ReqwestRequestExecutor {
     }
 }
 
+/// Wraps [`ReqwestRequestExecutor`] with an owned multi-threaded Tokio runtime so
+/// it can be driven by UniFFI's async bridge.
+///
+/// reqwest/hyper require a running Tokio reactor; direct Rust callers already have
+/// one (`#[tokio::main]`, `#[tokio::test]`). UniFFI, however, drives exported async
+/// methods on its own executor, so a request made through the bindings fails with
+/// "there is no reactor running". Each call hops onto this runtime and the result
+/// is returned over a `oneshot` channel, whose receiver is pollable from any
+/// executor — so the reqwest work runs on Tokio while UniFFI drives the wrapper.
+struct UniffiReqwestExecutor {
+    inner: Arc<ReqwestRequestExecutor>,
+    runtime: tokio::runtime::Runtime,
+}
+
+impl UniffiReqwestExecutor {
+    fn new() -> Self {
+        Self {
+            inner: Arc::new(ReqwestRequestExecutor::default()),
+            runtime: tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("the reqwest executor's Tokio runtime should build"),
+        }
+    }
+}
+
+// The runtime hangs up only if it is torn down mid-request, so this is defensive.
+fn reqwest_runtime_unavailable() -> RequestExecutionError {
+    RequestExecutionError::RequestExecutionFailed {
+        status_code: None,
+        redirects: None,
+        reason: RequestExecutionErrorReason::CancellationError,
+        request_url: String::new(),
+        request_method: RequestMethod::GET,
+    }
+}
+
+#[async_trait]
+impl RequestExecutor for UniffiReqwestExecutor {
+    async fn execute(
+        &self,
+        request: Arc<WpNetworkRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        let inner = Arc::clone(&self.inner);
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.runtime.spawn(async move {
+            let _ = tx.send(inner.execute(request).await);
+        });
+        rx.await.unwrap_or_else(|_| Err(reqwest_runtime_unavailable()))
+    }
+
+    async fn upload(
+        &self,
+        request: Arc<WpMultipartFormRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        let inner = Arc::clone(&self.inner);
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.runtime.spawn(async move {
+            let _ = tx.send(inner.upload(request).await);
+        });
+        rx.await.unwrap_or_else(|_| Err(reqwest_runtime_unavailable()))
+    }
+
+    async fn sleep(&self, millis: u64) {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        self.runtime.spawn(async move {
+            tokio::time::sleep(Duration::from_millis(millis)).await;
+            let _ = tx.send(());
+        });
+        let _ = rx.await;
+    }
+
+    fn cancel(&self, context: Arc<RequestContext>) {
+        self.inner.cancel(context);
+    }
+}
+
+/// Constructs the pure-Rust reqwest executor and hands it back as a
+/// [`RequestExecutor`] trait object the bindings can pass straight to a client.
+///
+/// This exists chiefly for Swift-on-Linux. There the default executor is
+/// `WpRequestExecutor`, which runs on swift-corelibs-foundation's libcurl bridge
+/// — a bridge that maps every curl SSL failure to `NSURLErrorUnknown`, so TLS
+/// errors degrade to `GenericError` (Automattic/wordpress-rs#1509) and the
+/// `allowSSL` exception path is compiled out entirely. The reqwest executor
+/// classifies errors from rustls directly, so its behaviour is identical on every
+/// platform. It is not exported to the Apple xcframework, where `URLSession` is
+/// the first-class executor and pulling in reqwest/rustls would only add binary
+/// weight.
+///
+/// The returned executor owns a Tokio runtime (see [`UniffiReqwestExecutor`]);
+/// reqwest needs one and UniFFI's async bridge does not provide it.
+#[uniffi::export]
+pub fn new_reqwest_request_executor() -> Arc<dyn RequestExecutor> {
+    Arc::new(UniffiReqwestExecutor::new())
+}
+
 impl ReqwestRequestExecutor {
     pub async fn async_request(
         &self,

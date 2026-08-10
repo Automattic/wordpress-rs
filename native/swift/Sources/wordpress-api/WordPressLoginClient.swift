@@ -84,6 +84,19 @@ public final class WordPressLoginClient: @unchecked Sendable {
     }
 }
 
+#if os(Linux)
+extension WordPressLoginClient {
+    /// Creates a login client backed by a custom executor.
+    ///
+    /// On Linux, prefer this with a `ReqwestRequestExecutor` over `init(urlSession:)`:
+    /// the URLSession-backed `WpRequestExecutor` runs on libcurl and can't classify
+    /// TLS failures (Automattic/wordpress-rs#1509).
+    public convenience init(executor: SafeRequestExecutor, middleware: MiddlewarePipeline = .default) {
+        self.init(requestExecutor: executor, middleware: middleware)
+    }
+}
+#endif
+
 extension DiscoveredAuthenticationMechanism {
 
     public func loginURL(for application: Application) -> URL? {

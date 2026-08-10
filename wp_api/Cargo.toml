@@ -29,7 +29,14 @@ url = { workspace = true }
 parse_link_header = { workspace = true }
 paste = { workspace = true }
 regex = { workspace = true }
-reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate", "rustls-tls", "hickory-dns", "cookies" ], optional = true }
+# Declared directly (not `workspace = true`) so we can set `default-features = false`,
+# which Cargo forbids when inheriting a workspace dependency. That drops reqwest's
+# `default-tls` (native-tls/OpenSSL), which the executor never uses — it always selects
+# rustls via `.use_rustls_tls()`. Beyond being dead weight, native-tls's OpenSSL symbols
+# break the Swift-on-Linux link: `wp_mobile` ships as a staticlib linked without cargo's
+# `openssl-sys` link directives. `http2`, `charset`, and `system-proxy` are the non-TLS
+# reqwest defaults, re-added. Keep the version in sync with the workspace `reqwest`.
+reqwest = { version = "0.12.28", default-features = false, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate", "rustls-tls", "hickory-dns", "cookies", "http2", "charset", "system-proxy" ], optional = true }
 roxmltree = { workspace = true }
 rustls = { workspace = true, optional = true }
 scraper = { workspace = true }

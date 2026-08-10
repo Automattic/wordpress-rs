@@ -34,6 +34,14 @@ extension SafeRequestExecutor {
     }
 }
 
+/// A `SafeRequestExecutor` backed by `URLSession`.
+///
+/// On Apple platforms this is the first-class executor. On Linux, `URLSession`
+/// runs on swift-corelibs-foundation's libcurl bridge, which maps every curl SSL
+/// failure to `NSURLErrorUnknown` — so a TLS failure can't be classified and
+/// degrades to `.genericError` (Automattic/wordpress-rs#1509), and the `allowSSL`
+/// exception path is compiled out. Linux consumers who need SSL/DNS/offline
+/// classification should use `ReqwestRequestExecutor` instead.
 public final class WpRequestExecutor: SafeRequestExecutor {
     private let session: URLSession
     private let executorDelegate: RequestExecutorDelegate

@@ -186,7 +186,7 @@ docker-image-web:
 	docker build -t wordpress-rs-web -f wp_rs_web/Dockerfile . --progress=plain
 
 swift-linux-library:
-	cargo build --release --features export-uncancellable-endpoints --package wp_mobile
+	cargo build --release --features export-uncancellable-endpoints,reqwest-request-executor --package wp_mobile
 	./scripts/swift-bindings.sh target/release/libwp_mobile.a
 	mkdir -p target/release/libwordpressFFI-linux
 	cp target/release/swift-bindings/Headers/* target/release/libwordpressFFI-linux/
