@@ -114,6 +114,25 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 )
             }
 
+            if let urlError = error as? URLError, urlError.code == .timedOut {
+                // `.timedOut` conflates connect- and read-timeouts, matching reqwest's
+                // `is_timeout()` and Kotlin's `SocketTimeoutException`, so classifying it as
+                // `httpTimeoutError` brings Apple platforms to parity with the other executors.
+                // Caveat: with `URLSessionConfiguration.waitsForConnectivity == true` (the default is
+                // `false`), an offline device surfaces here as `.timedOut` rather than
+                // `.notConnectedToInternet`, so it classifies as `httpTimeoutError` rather than
+                // `deviceIsOfflineError`.
+                return .failure(
+                    .RequestExecutionFailed(
+                        statusCode: nil,
+                        redirects: nil,
+                        reason: .httpTimeoutError,
+                        requestUrl: request.url(),
+                        requestMethod: request.method()
+                    )
+                )
+            }
+
             return .failure(
                 .RequestExecutionFailed(
                     statusCode: nil,
