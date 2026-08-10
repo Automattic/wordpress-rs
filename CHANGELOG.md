@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BREAKING:** `ShoppingCart.coupon` changed from `String` to `CouponCode`, and `ShoppingCartCostOverride.override_code` from `String` to `CostOverrideCode`, so the shopping cart and site plans describe these values with the same types. Callers will need to wrap/unwrap with `CouponCode(...)` / `CostOverrideCode(...)`.
 - Documented `GET /all-domains/` subtypes and parameters. `DomainSubtypeId::DefaultAddress` covers staging and garden subdomains as well as the free WordPress.com address, and is the set v1.1's `no_wpcom=true` excluded; v1.2 has no equivalent parameter, so clients filter this subtype out instead.
 - **Internal:** Corrected `GET /all-domains/` fixtures that claimed subtypes the endpoint never returns (`site_redirect`, `domain_mapping`).
+- Kotlin: The request executor now classifies cancelling an in-flight request via `CancellableCall.cancel()` as `CancellationError` instead of `GenericError`, matching Swift's handling of `URLError.cancelled`. Whole-call `callTimeout` expiry is classified as `HttpTimeoutError` rather than being mistaken for a cancellation, and a `CancellationException` surfacing synchronously inside the executor (e.g. from an upload callback) is classified as `CancellationError` rather than flattened into a `GenericError` ([#1492](https://github.com/Automattic/wordpress-rs/issues/1492)).
+- **Internal:** Run clippy's `--tests` lint pass with `--jobs 1` to cap the Rust lint step's peak memory at ~4.7 GiB (down from ~9 GiB) on CI.
 - **Internal:** Build the Android JNI libraries with `cargo-ndk` instead of the `rust-android-gradle` Gradle plugin.
 - **Internal:** Upgraded the Android/Kotlin build to Android Gradle Plugin `9.3.0` / Gradle `9.5.0` (Kotlin `2.3.21`, `compileSdk` 36), migrating `api/android` to the AGP 9 variant APIs and splitting the example app into a `com.android.kotlin.multiplatform.library` shared module and a standalone `com.android.application` module.
 - **Internal:** Bumped `syn` from `2.0` to `3.0`, updating the proc-macro crates for its breaking changes.
@@ -39,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Swift: `WpRequestExecutor.sleep(millis:)` converted milliseconds to nanoseconds with the wrong factor (`* 1_000` instead of `* 1_000_000`), so it slept 1000× too short — a `Retry-After: 30` waited 30 ms instead of 30 s. `RetryAfterMiddleware` then re-sent immediately, the server kept returning 429, and after `max_retries` the caller observed `MisconfiguredRateLimitError` where honoring the backoff would usually have succeeded. The executor now waits the full interval, and no longer risks a `fatalError` if the sleep's task is cancelled.
+- Swift: Classify invalid-SSL failures from the failed handshake's `SecTrust` (`URLError.failureURLPeerTrust`), via `SecTrustCopyCertificateChain`, instead of reading the undocumented `NSErrorPeerCertificateChainKey` `userInfo` string that has no public constant. Behavior is unchanged on every platform: iOS/macOS/tvOS still surface the presented certificate as `certificateNotValidForName`, and watchOS — which exposes no peer trust — still degrades to `genericSslError`. ([#1510](https://github.com/Automattic/wordpress-rs/issues/1510))
 
 ### Security
 

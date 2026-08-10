@@ -291,13 +291,14 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     private func getPeerCertificateChain(_ error: Error) -> [SslCertificateInfo]? {
-        let nserror = error as NSError
-        let info = nserror.userInfo
-
         #if os(Linux) // Linux doesn't support `SecCertificate`
         return []
         #else
-        guard let certChainArray = info["NSErrorPeerCertificateChainKey"] as? [SecCertificate] else {
+        // The certificate chain the server presented during the failed TLS handshake.
+        guard
+            let trust = (error as? URLError)?.failureURLPeerTrust,
+            let certChainArray = SecTrustCopyCertificateChain(trust) as? [SecCertificate]
+        else {
             return nil
         }
 
