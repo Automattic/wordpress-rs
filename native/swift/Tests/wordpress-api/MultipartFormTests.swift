@@ -509,14 +509,22 @@ struct MultipartFormUploadTests {
     func uploadRemovesTempFileOnFailure() async throws {
         let file = try Self.makeTempFile()
 
-        await #expect(throws: (any Error).self) {
-            try await upload(
-                body: .onDisk(file),
-                with: Self.stubRequest(behavior: .failure),
-                session: Self.stubbedSession(),
-                delegate: nil
-            )
-        }
+        // Match the exact error the stub injects (URLError(.notConnectedToInternet)), which propagates
+        // raw through `completionHandler` → `result.get()`. Pinning the code (not just "some error")
+        // keeps this test guarding the failed-*transfer* path: a future early throw in `upload(...)`
+        // would surface a different error and fail here, rather than silently passing on the always-run
+        // cleanup `defer`.
+        await #expect(
+            performing: {
+                try await upload(
+                    body: .onDisk(file),
+                    with: Self.stubRequest(behavior: .failure),
+                    session: Self.stubbedSession(),
+                    delegate: nil
+                )
+            },
+            throws: { ($0 as? URLError)?.code == .notConnectedToInternet }
+        )
 
         #expect(!FileManager.default.fileExists(atPath: file.path))
     }
@@ -552,7 +560,7 @@ struct MultipartFormUploadTests {
 /// A stateless `URLProtocol` that returns a canned response so `upload(...)` can be exercised
 /// without real networking. The desired behavior is carried on the request via a header rather than
 /// shared mutable state, so concurrently-running tests don't interfere with each other.
-final class StubURLProtocol: URLProtocol {
+private final class StubURLProtocol: URLProtocol {
     static let behaviorHeader = "X-Stub-Behavior"
     static let expectedFileHeader = "X-Stub-Expected-File"
 
