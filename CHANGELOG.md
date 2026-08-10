@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - **Internal:** Bumped the transitive `rand` dependency to `0.9.3` and `0.8.6` to clear [RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097.html) (`GHSA-cq8v-f236-94qc`), a low-severity unsoundness in `rand` 0.9.2 / 0.8.5. Lockfile-only; the affected code path (a custom `log` logger calling `rand::rng()` during reseed) is not exercised here.
+- **Internal:** Bumped `wp_rs_web`'s transitive `nanoid` dependency from `3.3.16` to `3.3.18` to clear [CVE-2026-67213](https://nvd.nist.gov/vuln/detail/CVE-2026-67213) ([GHSA-2v37-7h3g-55p8](https://github.com/advisories/GHSA-2v37-7h3g-55p8)), a denial-of-service via an infinite loop in `nanoid`'s `customAlphabet`/`customRandom` when called with a size of `0`. Lockfile-only; `nanoid` is pulled in only by Tailwind's build-time `postcss`, which never reaches the affected functions.
 
 ## [0.6.0] - 2026-07-16
 
