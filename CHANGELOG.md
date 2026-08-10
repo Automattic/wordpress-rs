@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- REST URL resolution can now attach endpoint query parameters via `ParsedUrl.by_appending_query_pairs` (Swift/Kotlin), so consumers building `?rest_route=` URLs no longer re-implement the `?`→`&` merge. It preserves any existing query, is order-stable, keeps duplicate keys, and form-urlencodes names and values — the same encoding `WpOrgSiteApiUrlResolver.resolve` already produces. Pairs are passed as the new `QueryPair` record ([#1543](https://github.com/Automattic/wordpress-rs/issues/1543)).
 - WordPress.com `POST /me/transactions` endpoint for redeeming a shopping cart with the account's WordPress.com credits, completing a domain purchase
 - WordPress.com `GET /sites/<site_id>/purchases` endpoint for listing a site's purchases (plans, domains, and other subscriptions)
 - Publish the Kotlin bindings' per-endpoint Markdown API reference as an `ai-docs` Maven classifier zip on `rs.wordpress.api:kotlin`, generated from the UniFFI bindings for agent/tooling consumption
