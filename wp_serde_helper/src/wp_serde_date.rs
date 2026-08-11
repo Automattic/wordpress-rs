@@ -1,10 +1,52 @@
+use chrono::{DateTime, NaiveDateTime, Utc};
+
 // https://core.trac.wordpress.org/ticket/41032
 const WP_DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 const MYSQL_DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
+/// Parse a datetime in any of the forms WordPress and WordPress.com send it:
+/// with a timezone offset (`2026-08-06T09:15:49+00:00`), the offsetless
+/// WordPress form (`2026-08-06T09:15:49`), that form with sub-second
+/// precision, MySQL's (`2026-08-06 09:15:49`), and a unix timestamp.
+///
+/// The offsetless forms are read as UTC, so only pass values already known to
+/// be GMT.
+///
+/// # Errors
+///
+/// Returns an error if the value matches none of those forms.
+pub fn parse_wp_date_time(s: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
+    // WP.org REST API Format
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, WP_DATE_FORMAT) {
+        return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+    }
+
+    // ISO-8601
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Ok(dt.with_timezone(&Utc));
+    }
+
+    // Unix Timestamp (wrapped in a string)
+    if let Ok(timestamp) = s.parse::<i64>()
+        && let Some(dt) = DateTime::<Utc>::from_timestamp(timestamp, 0)
+    {
+        return Ok(dt);
+    }
+
+    // MySQL format
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, MYSQL_DATE_FORMAT) {
+        return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+    }
+
+    // WP format with sub-second precision. Its error stands in for the whole
+    // set when nothing matches.
+    NaiveDateTime::parse_from_str(s, &format!("{WP_DATE_FORMAT}.%f"))
+        .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+}
+
 pub mod wp_utc_date_format {
-    use super::{MYSQL_DATE_FORMAT, WP_DATE_FORMAT};
-    use chrono::{DateTime, NaiveDateTime, Utc};
+    use super::{WP_DATE_FORMAT, parse_wp_date_time};
+    use chrono::{DateTime, Utc};
     use serde::{self, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
@@ -28,38 +70,8 @@ pub mod wp_utc_date_format {
                     "Invalid date : {timestamp}"
                 )))
             }
-            DateRepresentation::String(s) => {
-                // WP.org REST API Format
-                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, WP_DATE_FORMAT) {
-                    return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
-                }
-
-                // ISO-8601
-                if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
-                    return Ok(dt.with_timezone(&Utc));
-                }
-
-                // Unix Timestamp (wrapped in a string)
-                if let Ok(timestamp) = s.parse::<i64>()
-                    && let Some(dt) = DateTime::<Utc>::from_timestamp(timestamp, 0)
-                {
-                    return Ok(dt);
-                }
-
-                // MySQL format
-                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, MYSQL_DATE_FORMAT) {
-                    return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
-                }
-
-                // WP format with sub-second precision
-                if let Ok(dt) = NaiveDateTime::parse_from_str(&s, &format!("{WP_DATE_FORMAT}.%f")) {
-                    return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
-                }
-
-                Err(serde::de::Error::custom(format!(
-                    "Invalid date format: {s}"
-                )))
-            }
+            DateRepresentation::String(s) => parse_wp_date_time(&s)
+                .map_err(|_| serde::de::Error::custom(format!("Invalid date format: {s}"))),
         }
     }
 

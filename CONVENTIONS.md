@@ -18,4 +18,4 @@ Decide from what the endpoint implementation produces, not from the field's name
 
 Some endpoints send boolean `false` rather than `null` when a date doesn't apply; `deserialize_optional_date_string` covers that for `WpDateString`. `deserialize_optional_wp_gmt_date_time` treats `null` and `""` as absent.
 
-Those helpers and `WpGmtDateTime`'s own `Deserialize` accept an offset, the offsetless WordPress form, MySQL's, and a unix timestamp. Its `FromStr` accepts only the first — it is chrono's. Parse through serde unless you know the value carries an offset.
+Reading a `WpGmtDateTime` accepts an offset, the offsetless WordPress form, MySQL's, and a unix timestamp, the same way through serde, `FromStr` and those helpers. The offsetless forms are read as UTC, so only reach for this type once you know the value is GMT.
