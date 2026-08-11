@@ -1,4 +1,5 @@
 use crate::{
+    date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
@@ -42,10 +43,10 @@ pub struct StatsDevicesParams {
     pub period: Option<StatsDevicesPeriod>,
     /// The date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The start date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub start_date: Option<String>,
+    pub start_date: Option<WpDateString>,
     /// The maximum number of entries to return.
     #[uniffi(default = None)]
     pub max: Option<u32>,
@@ -116,8 +117,8 @@ mod tests {
 
         let params = StatsDevicesParams {
             period: Some(StatsDevicesPeriod::Day),
-            date: Some("2026-02-20".to_string()),
-            start_date: Some("2026-02-14".to_string()),
+            date: Some(WpDateString("2026-02-20".to_string())),
+            start_date: Some(WpDateString("2026-02-14".to_string())),
             max: Some(10),
             num: Some(1),
             days: Some(1),
@@ -142,7 +143,7 @@ mod tests {
 
         let params = StatsDevicesParams {
             period: Some(StatsDevicesPeriod::Day),
-            date: Some("2026-02-20".to_string()),
+            date: Some(WpDateString("2026-02-20".to_string())),
             ..Default::default()
         };
 

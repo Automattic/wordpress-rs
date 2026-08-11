@@ -1,3 +1,4 @@
+use crate::date::WpDateString;
 use crate::url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -61,13 +62,13 @@ pub struct StatsUtmParams {
     pub max: Option<u32>,
     /// The date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The number of days to include in the query.
     #[uniffi(default = None)]
     pub days: Option<u32>,
     /// The start date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub start_date: Option<String>,
+    pub start_date: Option<WpDateString>,
     /// Whether to include top posts data in the response.
     #[uniffi(default = true)]
     pub query_top_posts: bool,
@@ -175,9 +176,9 @@ mod tests {
 
         let params = StatsUtmParams {
             max: Some(0),
-            date: Some("2026-03-24".to_string()),
+            date: Some(WpDateString("2026-03-24".to_string())),
             days: Some(365),
-            start_date: Some("2026-03-24".to_string()),
+            start_date: Some(WpDateString("2026-03-24".to_string())),
             query_top_posts: true,
         };
 
@@ -198,7 +199,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let params = StatsUtmParams {
-            date: Some("2026-03-24".to_string()),
+            date: Some(WpDateString("2026-03-24".to_string())),
             days: Some(1),
             ..Default::default()
         };
