@@ -84,10 +84,10 @@ pub struct PostListParams {
     pub search: Option<String>,
     /// Limit response to posts published after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub after: Option<WpDateString>,
+    pub after: Option<WpGmtDateTime>,
     /// Limit response to posts modified after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_after: Option<WpDateString>,
+    pub modified_after: Option<WpGmtDateTime>,
     /// Limit result set to posts assigned to specific authors.
     #[uniffi(default = [])]
     pub author: Vec<UserId>,
@@ -96,10 +96,10 @@ pub struct PostListParams {
     pub author_exclude: Vec<UserId>,
     /// Limit response to posts published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub before: Option<WpDateString>,
+    pub before: Option<WpGmtDateTime>,
     /// Limit response to posts modified before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_before: Option<WpDateString>,
+    pub modified_before: Option<WpGmtDateTime>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
     pub exclude: Vec<PostId>,
@@ -739,8 +739,8 @@ mod tests {
         SparseField, generate,
         terms::TermId,
         unit_test_common::{
-            assert_expected_and_from_query_pairs, unit_test_example_date_string_as_option,
-            unit_test_example_date_string_as_query_value,
+            assert_expected_and_from_query_pairs, unit_test_example_date_as_option,
+            unit_test_example_date_as_query_value,
         },
     };
     use rstest::*;
@@ -751,12 +751,12 @@ mod tests {
     #[case(generate!(PostListParams, (page, Some(2))), "page=2")]
     #[case(generate!(PostListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(PostListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(PostListParams, (after, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("after"))]
-    #[case(generate!(PostListParams, (modified_after, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("modified_after"))]
+    #[case(generate!(PostListParams, (after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("after"))]
+    #[case(generate!(PostListParams, (modified_after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_after"))]
     #[case(generate!(PostListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
     #[case(generate!(PostListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
-    #[case(generate!(PostListParams, (before, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("before"))]
-    #[case(generate!(PostListParams, (modified_before, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("modified_before"))]
+    #[case(generate!(PostListParams, (before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("before"))]
+    #[case(generate!(PostListParams, (modified_before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_before"))]
     #[case(generate!(PostListParams, (exclude, vec![PostId(1), PostId(2)])), "exclude=1%2C2")]
     #[case(generate!(PostListParams, (include, vec![PostId(1), PostId(2)])), "include=1%2C2")]
     #[case(generate!(PostListParams, (offset, Some(2))), "offset=2")]
@@ -1005,10 +1005,10 @@ mod tests {
     }
 
     fn expected_query_pairs_for_post_list_params_with_all_fields() -> String {
-        let after = unit_test_example_date_string_as_query_value("after");
-        let modified_after = unit_test_example_date_string_as_query_value("modified_after");
-        let before = unit_test_example_date_string_as_query_value("before");
-        let modified_before = unit_test_example_date_string_as_query_value("modified_before");
+        let after = unit_test_example_date_as_query_value("after");
+        let modified_after = unit_test_example_date_as_query_value("modified_after");
+        let before = unit_test_example_date_as_query_value("before");
+        let modified_before = unit_test_example_date_as_query_value("modified_before");
         format!(
             "page=2&per_page=2&search=foo&{after}&{modified_after}&author=1%2C2&author_exclude=1%2C2&{before}&{modified_before}&exclude=1%2C2&include=1%2C2&offset=2&order=asc&orderby=author&search_columns=post_content%2Cpost_excerpt%2Cpost_title&slug=foo%2Cbar&status=draft%2Cfuture%2Cpending%2Cprivate%2Cpublish%2Cfoo&tax_relation=AND&categories=1%2C2&categories_exclude=1%2C2&tags=1%2C2&tags_exclude=1%2C2&sticky=true&parent=1&parent_exclude=1%2C2&menu_order=1"
         )
@@ -1016,16 +1016,16 @@ mod tests {
 
     fn post_list_params_with_all_fields() -> PostListParams {
         PostListParams {
-            after: unit_test_example_date_string_as_option(),
+            after: unit_test_example_date_as_option(),
             author: vec![UserId(1), UserId(2)],
             author_exclude: vec![UserId(1), UserId(2)],
-            before: unit_test_example_date_string_as_option(),
+            before: unit_test_example_date_as_option(),
             categories: vec![TermId(1), TermId(2)],
             categories_exclude: vec![TermId(1), TermId(2)],
             exclude: vec![PostId(1), PostId(2)],
             include: vec![PostId(1), PostId(2)],
-            modified_after: unit_test_example_date_string_as_option(),
-            modified_before: unit_test_example_date_string_as_option(),
+            modified_after: unit_test_example_date_as_option(),
+            modified_before: unit_test_example_date_as_option(),
             offset: Some(2),
             order: Some(WpApiParamOrder::Asc),
             orderby: Some(WpApiParamPostsOrderBy::Author),

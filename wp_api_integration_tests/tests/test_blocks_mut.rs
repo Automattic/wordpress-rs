@@ -2,7 +2,6 @@ use macro_helper::{generate_update_block_status_test, generate_update_test};
 use wp_api::blocks::{
     BlockCreateParams, BlockId, BlockStatus, BlockUpdateParams, BlockWithEditContext,
 };
-use wp_api::date::WpDateString;
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
@@ -80,7 +79,7 @@ async fn trash_block() {
 generate_update_test!(
     update_date,
     date,
-    WpDateString("2024-09-09T12:00:00".to_string()),
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
     |updated_block| {
         assert_eq!(updated_block.date.0, "2024-09-09T12:00:00");
     }
@@ -135,7 +134,7 @@ async fn update_status_to_future() {
     test_update_block(
         &BlockUpdateParams {
             status: Some(BlockStatus::Future),
-            date: Some(WpDateString("2026-09-09T12:00:00".to_string())),
+            date: Some(unwrapped_wp_gmt_date_time("2026-09-09T12:00:00+0000")),
             ..Default::default()
         },
         |updated_block| {

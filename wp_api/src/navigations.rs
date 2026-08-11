@@ -130,16 +130,16 @@ pub struct NavigationListParams {
     pub search: Option<String>,
     /// Limit response to posts published after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub after: Option<WpDateString>,
+    pub after: Option<String>,
     /// Limit response to posts modified after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_after: Option<WpDateString>,
+    pub modified_after: Option<String>,
     /// Limit response to posts published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub before: Option<WpDateString>,
+    pub before: Option<String>,
     /// Limit response to posts modified before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_before: Option<WpDateString>,
+    pub modified_before: Option<String>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
     pub exclude: Vec<NavigationId>,

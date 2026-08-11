@@ -1,4 +1,3 @@
-use wp_api::date::WpDateString;
 use wp_api::navigations::{
     NavigationId, NavigationListParams, NavigationRetrieveParams, NavigationStatus,
     SparseNavigationFieldWithEditContext, SparseNavigationFieldWithEmbedContext,
@@ -108,10 +107,10 @@ fn navigation_id() -> NavigationId {
 #[case::page(generate!(NavigationListParams, (page, Some(1))))]
 #[case::per_page(generate!(NavigationListParams, (per_page, Some(3))))]
 #[case::search(generate!(NavigationListParams, (search, Some("foo".to_string()))))]
-#[case::after(generate!(NavigationListParams, (after, Some(WpDateString("2020-08-14T17:00:00".to_string())))))]
-#[case::modified_after(generate!(NavigationListParams, (modified_after, Some(WpDateString("2024-01-14T17:00:00".to_string())))))]
-#[case::before(generate!(NavigationListParams, (before, Some(WpDateString("2023-08-14T17:00:00".to_string())))))]
-#[case::modified_before(generate!(NavigationListParams, (modified_before, Some(WpDateString("2024-01-14T17:00:00".to_string())))))]
+#[case::after(generate!(NavigationListParams, (after, Some("2020-08-14T17:00:00".to_string()))))]
+#[case::modified_after(generate!(NavigationListParams, (modified_after, Some("2024-01-14T17:00:00".to_string()))))]
+#[case::before(generate!(NavigationListParams, (before, Some("2023-08-14T17:00:00".to_string()))))]
+#[case::modified_before(generate!(NavigationListParams, (modified_before, Some("2024-01-14T17:00:00".to_string()))))]
 #[case::exclude(generate!(NavigationListParams, (exclude, vec![NavigationId(1), NavigationId(2)])))]
 #[case::include(generate!(NavigationListParams, (include, vec![NavigationId(1)])))]
 #[case::offset(generate!(NavigationListParams, (offset, Some(2))))]

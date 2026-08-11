@@ -1,4 +1,3 @@
-use wp_api::date::WpDateString;
 use wp_api::{
     posts::{
         PostId, PostListParams, PostRetrieveParams, PostStatus, SparseAnyPostFieldWithEditContext,
@@ -281,12 +280,12 @@ async fn list_with_post_endpoint_type_using_default_params(
 #[case::page(generate!(PostListParams, (page, Some(1))))]
 #[case::per_page(generate!(PostListParams, (per_page, Some(3))))]
 #[case::search(generate!(PostListParams, (search, Some("foo".to_string()))))]
-#[case::after(generate!(PostListParams, (after, Some(WpDateString("2020-08-14T17:00:00".to_string())))))]
-#[case::modified_after(generate!(PostListParams, (modified_after, Some(WpDateString("2024-01-14T17:00:00".to_string())))))]
+#[case::after(generate!(PostListParams, (after, Some(unwrapped_wp_gmt_date_time("2020-08-14T17:00:00+0200")))))]
+#[case::modified_after(generate!(PostListParams, (modified_after, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0200")))))]
 #[case::author(generate!(PostListParams, (author, vec![FIRST_USER_ID, SECOND_USER_ID])))]
 #[case::author_exclude(generate!(PostListParams, (author_exclude, vec![SECOND_USER_ID])))]
-#[case::before(generate!(PostListParams, (before, Some(WpDateString("2023-08-14T17:00:00".to_string())))))]
-#[case::modified_before(generate!(PostListParams, (modified_before, Some(WpDateString("2024-01-14T17:00:00".to_string())))))]
+#[case::before(generate!(PostListParams, (before, Some(unwrapped_wp_gmt_date_time("2023-08-14T17:00:00+0000")))))]
+#[case::modified_before(generate!(PostListParams, (modified_before, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0000")))))]
 #[case::exclude(generate!(PostListParams, (exclude, vec![PostId(1), PostId(2)])))]
 #[case::include(generate!(PostListParams, (include, vec![PostId(1)])))]
 #[case::offset(generate!(PostListParams, (offset, Some(2))))]

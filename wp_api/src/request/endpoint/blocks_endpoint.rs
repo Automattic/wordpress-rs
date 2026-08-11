@@ -46,7 +46,7 @@ mod tests {
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
         },
         unit_test_common::{
-            unit_test_example_date_string_as_option, unit_test_example_date_string_as_query_value,
+            unit_test_example_date_as_option, unit_test_example_date_as_query_value,
         },
     };
     use rstest::*;
@@ -57,10 +57,10 @@ mod tests {
     #[case(generate!(BlockListParams, (page, Some(2))), "page=2")]
     #[case(generate!(BlockListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(BlockListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(BlockListParams, (after, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("after"))]
-    #[case(generate!(BlockListParams, (modified_after, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("modified_after"))]
-    #[case(generate!(BlockListParams, (before, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("before"))]
-    #[case(generate!(BlockListParams, (modified_before, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("modified_before"))]
+    #[case(generate!(BlockListParams, (after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("after"))]
+    #[case(generate!(BlockListParams, (modified_after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_after"))]
+    #[case(generate!(BlockListParams, (before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("before"))]
+    #[case(generate!(BlockListParams, (modified_before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_before"))]
     #[case(generate!(BlockListParams, (exclude, vec![BlockId(1), BlockId(2)])), "exclude=1%2C2")]
     #[case(generate!(BlockListParams, (include, vec![BlockId(1), BlockId(2)])), "include=1%2C2")]
     #[case(generate!(BlockListParams, (offset, Some(2))), "offset=2")]

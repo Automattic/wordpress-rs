@@ -57,14 +57,6 @@ impl Display for WpDateString {
     }
 }
 
-impl FromStr for WpDateString {
-    type Err = std::convert::Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(s.to_string()))
-    }
-}
-
 impl_as_query_value_from_to_string!(WpDateString);
 
 /// Deserialize an `Option<WpDateString>` that may be a string, `null`, or

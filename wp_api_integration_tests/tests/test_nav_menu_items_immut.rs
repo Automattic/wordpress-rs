@@ -1,4 +1,3 @@
-use wp_api::date::WpDateString;
 use wp_api::{
     WpApiParamOrder,
     nav_menu_items::{
@@ -109,10 +108,10 @@ fn nav_menu_item_id_for_retrieve_tests() -> NavMenuItemId {
 #[case::default(NavMenuItemListParams::default())]
 #[case::per_page(generate!(NavMenuItemListParams, (per_page, Some(5))))]
 #[case::search(generate!(NavMenuItemListParams, (search, Some("test".to_string()))))]
-#[case::after(generate!(NavMenuItemListParams, (after, Some(WpDateString("2020-08-14T17:00:00".to_string())))))]
-#[case::modified_after(generate!(NavMenuItemListParams, (modified_after, Some(WpDateString("2024-01-14T17:00:00".to_string())))))]
-#[case::before(generate!(NavMenuItemListParams, (before, Some(WpDateString("2023-08-14T17:00:00".to_string())))))]
-#[case::modified_before(generate!(NavMenuItemListParams, (modified_before, Some(WpDateString("2024-01-14T17:00:00".to_string())))))]
+#[case::after(generate!(NavMenuItemListParams, (after, Some(unwrapped_wp_gmt_date_time("2020-08-14T17:00:00+0200")))))]
+#[case::modified_after(generate!(NavMenuItemListParams, (modified_after, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0200")))))]
+#[case::before(generate!(NavMenuItemListParams, (before, Some(unwrapped_wp_gmt_date_time("2023-08-14T17:00:00+0000")))))]
+#[case::modified_before(generate!(NavMenuItemListParams, (modified_before, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0000")))))]
 #[case::exclude(generate!(NavMenuItemListParams, (exclude, vec![NavMenuItemId(1), NavMenuItemId(2)])))]
 #[case::include(generate!(NavMenuItemListParams, (include, vec![nav_menu_item_id_for_retrieve_tests()])))]
 #[case::offset(generate!(NavMenuItemListParams, (offset, Some(2))))]
