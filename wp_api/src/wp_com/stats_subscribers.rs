@@ -2,8 +2,7 @@ use crate::{
     date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::stats_visits::StatsPeriodLabel,
-    wp_com::stats_visits::StatsVisitsDataValue,
+    wp_com::stats_visits::{StatsPeriodLabel, StatsVisitsDataValue},
 };
 use serde::{Deserialize, Serialize};
 

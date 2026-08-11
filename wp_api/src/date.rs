@@ -1,6 +1,6 @@
 use crate::impl_as_query_value_from_to_string;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::IntoDeserializer};
 use std::{fmt::Display, str::FromStr};
 use wp_serde_helper::wp_utc_date_format;
 
@@ -71,13 +71,14 @@ where
         .map(|opt| opt.map(WpDateString))
 }
 
-/// Deserialize an `Option<WpGmtDateTime>` where the API may send an ISO-8601
-/// datetime string, `null`, or an empty string `""`.
+/// Deserialize an `Option<WpGmtDateTime>` where the API may send a datetime
+/// string, `null`, or an empty string `""`.
 ///
-/// Some WordPress.com endpoints return `""` (or omit the field) instead of
-/// `null` when a datetime is not set; both map to `None`. Populated values are
-/// parsed by [`WpGmtDateTime`]'s ISO-8601 handling (which accepts a timezone
-/// offset such as `+00:00`).
+/// Some WordPress endpoints return `""` (or omit the field) instead of `null`
+/// when a datetime is not set; both map to `None`. A populated value accepts
+/// every form [`WpGmtDateTime`] itself does — an offset such as `+00:00`, the
+/// offsetless `2026-08-06T09:15:49`, MySQL's `2026-08-06 09:15:49`, and a unix
+/// timestamp.
 pub fn deserialize_optional_wp_gmt_date_time<'de, D>(
     deserializer: D,
 ) -> Result<Option<WpGmtDateTime>, D::Error>
@@ -85,9 +86,10 @@ where
     D: serde::Deserializer<'de>,
 {
     match Option::<String>::deserialize(deserializer)? {
-        Some(s) if !s.trim().is_empty() => WpGmtDateTime::from_str(&s)
-            .map(Some)
-            .map_err(serde::de::Error::custom),
+        Some(s) if !s.trim().is_empty() => {
+            let value: serde::de::value::StringDeserializer<D::Error> = s.into_deserializer();
+            wp_utc_date_format::deserialize(value).map(|date_time| Some(WpGmtDateTime(date_time)))
+        }
         _ => Ok(None),
     }
 }
@@ -149,5 +151,34 @@ mod tests {
             WpGmtDateTime::from_timestamp(seconds).0.to_rfc3339(),
             expected_date_str
         );
+    }
+
+    #[derive(serde::Deserialize)]
+    struct OptionalGmtDateTime {
+        #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
+        value: Option<WpGmtDateTime>,
+    }
+
+    #[rstest]
+    #[case::offset(r#"{"value": "2026-08-06T09:15:49+00:00"}"#)]
+    #[case::offsetless(r#"{"value": "2026-08-06T09:15:49"}"#)]
+    #[case::mysql(r#"{"value": "2026-08-06 09:15:49"}"#)]
+    fn test_deserialize_optional_wp_gmt_date_time(#[case] json: &str) {
+        let parsed: OptionalGmtDateTime =
+            serde_json::from_str(json).expect("Test case should be a valid JSON");
+        assert_eq!(
+            parsed.value.expect("present").0.to_rfc3339(),
+            "2026-08-06T09:15:49+00:00"
+        );
+    }
+
+    #[rstest]
+    #[case::empty_string(r#"{"value": ""}"#)]
+    #[case::null(r#"{"value": null}"#)]
+    #[case::absent(r#"{}"#)]
+    fn test_deserialize_optional_wp_gmt_date_time_absent(#[case] json: &str) {
+        let parsed: OptionalGmtDateTime =
+            serde_json::from_str(json).expect("Test case should be a valid JSON");
+        assert!(parsed.value.is_none());
     }
 }
