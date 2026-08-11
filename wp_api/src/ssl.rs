@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use x509_cert::{
     Certificate,
@@ -113,6 +114,36 @@ impl SslCertificateInfo {
             }
         }
         hostnames
+    }
+
+    /// Whether the hostname check should be waived for `host`, given a
+    /// caller-configured allow-list mapping a certificate name to the extra hosts
+    /// accepted for the certificate that presents it.
+    ///
+    /// This is the shared decision behind the native certificate-name exceptions
+    /// (`allowAlternativeNames(_:forCommonName:)` on Swift,
+    /// `addAllowedAlternativeNamesForHostname` on Kotlin). It waives *only* the
+    /// hostname check — the caller still validates the chain — so it returns `true`
+    /// only when `host` was explicitly allow-listed under a name this certificate
+    /// actually presents.
+    ///
+    /// The match is against `presented_hostnames` (the Common Name *and* the SANs),
+    /// so it is correct for SAN-only certificates that omit the Common Name and for
+    /// certificates whose subject carries extra RDNs (`O`, `L`, `C`, …) — the cases
+    /// hand-rolled Common Name parsing on the native side got wrong (a bare
+    /// `"CN=".replace`, or reading the Common Name alone). Comparison is
+    /// ASCII-case-insensitive: DNS names are case-insensitive, and neither the
+    /// certificate's names nor the connecting host is guaranteed to share casing.
+    fn host_is_allow_listed(&self, host: String, allow_list: HashMap<String, Vec<String>>) -> bool {
+        let presented = self.presented_hostnames();
+        allow_list.iter().any(|(cert_name, allowed_hosts)| {
+            presented
+                .iter()
+                .any(|name| name.eq_ignore_ascii_case(cert_name))
+                && allowed_hosts
+                    .iter()
+                    .any(|allowed| allowed.eq_ignore_ascii_case(&host))
+        })
     }
 }
 
@@ -239,5 +270,96 @@ mod tests {
             cert.presented_hostnames(),
             ["san-only.example", "alt.example"]
         );
+    }
+
+    // A self-signed leaf whose subject carries a Common Name *and* extra RDNs
+    // (`subject=CN=shop.example.com,O=Example Retail Ltd,L=London,C=GB`), with
+    // `subjectAltName=DNS:shop.example.com,DNS:www.shop.example.com`. This is the
+    // ordinary shape of a CA-issued OV certificate; the native hostname exceptions
+    // mis-parsed it with a bare `session.peerPrincipal.name.replace("CN=", "")`,
+    // which leaves the trailing RDNs attached and never matches a Common-Name key.
+    // Regenerate with:
+    //   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+    //     -keyout /dev/null -days 3650 \
+    //     -subj "/CN=shop.example.com/O=Example Retail Ltd/L=London/C=GB" \
+    //     -addext "subjectAltName=DNS:shop.example.com,DNS:www.shop.example.com" | \
+    //     openssl x509 -outform DER | base64
+    const CERT_MULTI_RDN: &str = "MIICNzCCAdygAwIBAgIUZ7dH4RigDnEZ6oN2maVXtWZgx/8wCgYIKoZIzj0EAwIwVjEZMBcGA1UEAwwQc2hvcC5leGFtcGxlLmNvbTEbMBkGA1UECgwSRXhhbXBsZSBSZXRhaWwgTHRkMQ8wDQYDVQQHDAZMb25kb24xCzAJBgNVBAYTAkdCMB4XDTI2MDgxMjE3MDQxMloXDTM2MDgwOTE3MDQxMlowVjEZMBcGA1UEAwwQc2hvcC5leGFtcGxlLmNvbTEbMBkGA1UECgwSRXhhbXBsZSBSZXRhaWwgTHRkMQ8wDQYDVQQHDAZMb25kb24xCzAJBgNVBAYTAkdCMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEosBXt449v/tZ6qTzFhxwPhHnUdF5B39mGNfIb9uGgwU68r2nBmtJY9cJZoUaBMEgBW613kHkQFL9haVgw7ZNTKOBhzCBhDAdBgNVHQ4EFgQUQJUQxkxD4QLtXKb3kId5rXEB6ugwHwYDVR0jBBgwFoAUQJUQxkxD4QLtXKb3kId5rXEB6ugwDwYDVR0TAQH/BAUwAwEB/zAxBgNVHREEKjAoghBzaG9wLmV4YW1wbGUuY29tghR3d3cuc2hvcC5leGFtcGxlLmNvbTAKBggqhkjOPQQDAgNJADBGAiEA+I6ZpJdr0hW9GvT7+XOxVHdQKe5JPsHrMyzCZnaf56wCIQDUir0aKKlBSDlPBE2H10C0VhvaTtVel1GOFRe7N4H7xA==";
+
+    fn allow_list(pairs: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
+        pairs
+            .iter()
+            .map(|(key, hosts)| {
+                (
+                    key.to_string(),
+                    hosts.iter().map(|h| h.to_string()).collect(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn multi_rdn_subject_extracts_only_the_common_name() {
+        // The native bug lived in hand-rolled `"CN=".replace` DN parsing; the shared
+        // x509 parser extracts just the CN RDN from a multi-RDN subject.
+        let cert = parse_certificate(der(CERT_MULTI_RDN)).expect("certificate should parse");
+        assert_eq!(cert.common_name, Some("shop.example.com".to_string()));
+        assert_eq!(
+            cert.presented_hostnames(),
+            ["shop.example.com", "www.shop.example.com"]
+        );
+    }
+
+    #[test]
+    fn host_is_allow_listed_matches_a_multi_rdn_common_name() {
+        // Regression for the reported bug: a caller keying the exception on the
+        // certificate's Common Name reaches an otherwise-unmatched host, even though
+        // the subject carries `O`/`L`/`C` RDNs that broke the native match.
+        let cert = parse_certificate(der(CERT_MULTI_RDN)).expect("certificate should parse");
+        assert!(cert.host_is_allow_listed(
+            "internal-lb.example.net".to_string(),
+            allow_list(&[("shop.example.com", &["internal-lb.example.net"])]),
+        ));
+    }
+
+    #[test]
+    fn host_is_allow_listed_matches_a_san_only_certificate() {
+        // Regression for the SAN-only case: the certificate has no Common Name, so
+        // keying the exception on a SAN must still work (the native Swift path
+        // returned early on a nil Common Name and never fired).
+        let cert =
+            parse_certificate(der(CERT_WITHOUT_CN)).expect("SAN-only certificate should parse");
+        assert!(cert.host_is_allow_listed(
+            "internal-lb.example.net".to_string(),
+            allow_list(&[("sanonly.example.com", &["internal-lb.example.net"])]),
+        ));
+    }
+
+    #[test]
+    fn host_is_allow_listed_matches_on_a_san_key_and_is_case_insensitive() {
+        let cert = parse_certificate(der(CERT_WITH_CN)).expect("certificate should parse");
+        // Keyed on a SAN (`www.example.com`) rather than the Common Name, with mixed
+        // casing on both the key and the host — DNS names are case-insensitive.
+        assert!(cert.host_is_allow_listed(
+            "Extra.Host.Example".to_string(),
+            allow_list(&[("WWW.EXAMPLE.COM", &["extra.host.example"])]),
+        ));
+    }
+
+    #[test]
+    fn host_is_allow_listed_rejects_unlisted_host_and_unpresented_key() {
+        let cert = parse_certificate(der(CERT_MULTI_RDN)).expect("certificate should parse");
+        // Host absent from the allow-list's values.
+        assert!(!cert.host_is_allow_listed(
+            "not-allowed.example".to_string(),
+            allow_list(&[("shop.example.com", &["internal-lb.example.net"])]),
+        ));
+        // Key is not a name this certificate presents.
+        assert!(!cert.host_is_allow_listed(
+            "internal-lb.example.net".to_string(),
+            allow_list(&[("other-cert.example.com", &["internal-lb.example.net"])]),
+        ));
+        // Empty allow-list waives nothing.
+        assert!(!cert.host_is_allow_listed("internal-lb.example.net".to_string(), allow_list(&[])));
     }
 }

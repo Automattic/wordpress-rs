@@ -302,9 +302,8 @@ Reference Implementation: https://valid-looking-url-but-not-actually.foo
 # 17: Invalid SSL Certificate
 
 Requirements:
-1. The site MUST be a WordPress Installation
-2. The site MUST use HTTPS
-3. The site's SSL certificate MUST be invalid due to one of:
+1. The site MUST use HTTPS
+2. The site's SSL certificate MUST be invalid due to one of:
    - Self-signed certificate
    - Expired certificate
    - Certificate with mismatched domain
@@ -318,4 +317,6 @@ Behavior:
 1. The system MUST reject the login attempt
 2. The system MUST display the error: "Unable to establish a secure connection to `${DOMAIN}`. The site's SSL certificate is invalid or expired"
 
-Reference Implementation: https://wordpress-1315525-4803651.cloudwaysapps.com
+Reference Implementation: https://wrong.host.badssl.com (mismatched domain), https://self-signed.badssl.com (self-signed)
+
+Note: [badssl.com](https://badssl.com) hosts a certificate for each invalid-certificate variant. The TLS handshake fails before any WordPress detection, so these hosts exercise the certificate-validation signal without needing to be WordPress installations.

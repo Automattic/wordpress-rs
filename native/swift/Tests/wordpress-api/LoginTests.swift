@@ -293,9 +293,12 @@ class LoginTests {
 
     @Test("Login Spec Example 17: Invalid SSL Certificate")
     func testInvalidHTTPsFails() async throws {
+        // `wrong.host.badssl.com` serves a valid, trusted certificate for `*.badssl.com`. A
+        // single-label wildcard doesn't cover the three-label host, so the chain is fine but the
+        // name doesn't match — the pure name-mismatch case.
         await #expect(
             performing: {
-                _ = try await self.client.details(ofSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
+                _ = try await self.client.details(ofSite: "https://wrong.host.badssl.com")
             },
             throws: { error in
                 let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
@@ -316,13 +319,13 @@ class LoginTests {
                     return false
                 }
 
-                #expect(hostname == "wordpress-1315525-4803651.cloudwaysapps.com")
+                #expect(hostname == "wrong.host.badssl.com")
                 // The presented names are the leaf certificate's Common Name and
                 // its SANs, not only the CN. Assert the certificate's identity is
                 // reported and the requested host is absent, without pinning the
                 // exact SAN list (it changes when the certificate is reissued).
-                #expect(presentedHostnames.contains("vanilla.wpmt.co"))
-                #expect(!presentedHostnames.contains("wordpress-1315525-4803651.cloudwaysapps.com"))
+                #expect(presentedHostnames.contains("*.badssl.com"))
+                #expect(!presentedHostnames.contains("wrong.host.badssl.com"))
                 #endif
 
                 return true
@@ -331,19 +334,83 @@ class LoginTests {
     }
 
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
-    @Test("Login Spec Example 18: Invalid SSL Certificate with explicit exception", .enabled(if: !isLinux()))
+    @Test("Login Spec Example 17: Invalid SSL Certificate with explicit exception", .enabled(if: !isLinux()))
     func testInvalidHttpsWithExceptionWorks() async throws {
+        // Allow-list the name-mismatched host for the certificate's common name. The chain is
+        // still valid, so `allowAlternativeNames` accepts it and the request gets past the handshake.
         let executor = WpRequestExecutor(urlSession: .init(configuration: .ephemeral))
-        executor.allowSSL(altNames: ["wordpress-1315525-4803651.cloudwaysapps.com"], forCommonName: "vanilla.wpmt.co")
+        executor.allowAlternativeNames(["wrong.host.badssl.com"], forCommonName: "*.badssl.com")
         let client = WordPressLoginClient(requestExecutor: executor)
-        _ = try await client.details(ofSite: "https://wordpress-1315525-4803651.cloudwaysapps.com")
+
+        await #expect(
+            performing: {
+                _ = try await client.details(ofSite: "https://wrong.host.badssl.com")
+            },
+            throws: { error in
+                // The certificate is accepted, so discovery gets past the handshake and fails only
+                // because badssl.com isn't a WordPress site. Assert that specific failure so the
+                // test pins that the request actually reached the host — "not an SSL error" would
+                // also hold for a DNS failure, a timeout, or a reset that never touched badssl.com.
+                guard let failure = try self.getFindApiRootFailure(from: error),
+                    case .probablyNotAWordPressSite = failure
+                else {
+                    Issue.record("Expected discovery to reach the host and fail as .probablyNotAWordPressSite")
+                    return false
+                }
+                return true
+            }
+        )
     }
 
+    /// `allowAlternativeNames(_:forCommonName:)` must not become a blanket bypass: a self-signed
+    /// certificate is rejected even when its host is allow-listed, because the chain is still
+    /// validated. Regression test for https://github.com/Automattic/wordpress-rs/issues/1512.
+    @Test("Alternative-name exception still validates the certificate chain", .enabled(if: !isLinux()))
+    func testAllowAlternativeNamesStillValidatesChain() async throws {
+        let executor = WpRequestExecutor(urlSession: .init(configuration: .ephemeral))
+        executor.allowAlternativeNames(["self-signed.badssl.com"], forCommonName: "*.badssl.com")
+        let client = WordPressLoginClient(requestExecutor: executor)
+
+        await #expect(
+            performing: {
+                _ = try await client.details(ofSite: "https://self-signed.badssl.com")
+            },
+            throws: { error in
+                let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
+                guard case .invalidSslError = reason else {
+                    Issue.record("A self-signed certificate must be rejected as an `invalidSslError`")
+                    return false
+                }
+                return true
+            }
+        )
+    }
+
+    /// `disableCertificateValidation(forHost:)` is the explicit full-bypass counterpart to
+    /// `allowAlternativeNames(_:forCommonName:)`: it accepts even a self-signed certificate.
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
-    @Test("Login Spec Example 19: Alternative name in SSL Certificate", .enabled(if: !isLinux()))
-    func testAlternameWorks() async throws {
-        // "vanilla1.wpmt.co" is one of the alternative names in vanilla.wpmt.co certificate.
-        _ = try await self.client.details(ofSite: "https://vanilla1.wpmt.co")
+    @Test("Disable certificate validation for a host", .enabled(if: !isLinux()))
+    func testDisableCertificateValidationWorks() async throws {
+        let executor = WpRequestExecutor(urlSession: .init(configuration: .ephemeral))
+        executor.disableCertificateValidation(forHost: "self-signed.badssl.com")
+        let client = WordPressLoginClient(requestExecutor: executor)
+
+        await #expect(
+            performing: {
+                _ = try await client.details(ofSite: "https://self-signed.badssl.com")
+            },
+            throws: { error in
+                // The self-signed certificate is accepted, so discovery reaches the host and fails
+                // only because badssl.com isn't a WordPress site — not merely "not an SSL error".
+                guard let failure = try self.getFindApiRootFailure(from: error),
+                    case .probablyNotAWordPressSite = failure
+                else {
+                    Issue.record("Expected discovery to reach the host and fail as .probablyNotAWordPressSite")
+                    return false
+                }
+                return true
+            }
+        )
     }
 
     /// Regression for a SAN-only (Common-Name-less) leaf certificate — see #1508.

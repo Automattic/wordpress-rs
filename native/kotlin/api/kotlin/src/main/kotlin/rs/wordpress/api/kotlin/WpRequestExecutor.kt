@@ -33,7 +33,9 @@ import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.security.cert.CertificateException
 import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLException
 import javax.net.ssl.SSLPeerUnverifiedException
 
 const val USER_AGENT_HEADER_NAME = "User-Agent"
@@ -199,7 +201,7 @@ class WpRequestExecutor @JvmOverloads constructor(
     ): WpNetworkResponse {
         // Hoisted above the `try` so the `IOException` handler can distinguish a cancelled
         // request (`call.isCanceled()`) from other I/O failures.
-        val call = httpClient.getClient().newCall(urlRequest)
+        val call = httpClient.getClient(host = urlRequest.url.host).newCall(urlRequest)
         val reason: RequestExecutionErrorReason = try {
             // Notify upload listener if this is an upload request
             if (notifyUploadListener) {
@@ -231,6 +233,17 @@ class WpRequestExecutor @JvmOverloads constructor(
             RequestExecutionErrorReason.CancellationError
         } catch (e: SSLPeerUnverifiedException) {
             RequestExecutionErrorReason.invalidSSLError(e, urlRequest.url)
+        } catch (e: SSLException) {
+            // A chain-validation failure (self-signed, expired, or untrusted-root certificate) surfaces
+            // as an `SSLException` other than `SSLPeerUnverifiedException`, carrying a
+            // `CertificateException` in its cause chain (`ValidatorException` extends it). Classify it as
+            // an SSL error rather than letting it fall through to `GenericError`; a TLS-version or cipher
+            // mismatch or a reset mid-handshake isn't a certificate problem.
+            if (generateSequence(e.cause) { it.cause }.any { it is CertificateException }) {
+                RequestExecutionErrorReason.InvalidSslError(reason = InvalidSslErrorReason.GenericSslError)
+            } else {
+                RequestExecutionErrorReason.GenericError(errorMessage = e.localizedMessage ?: e.toString())
+            }
         } catch (e: UnknownHostException) {
             RequestExecutionErrorReason.unknownHost(e, networkAvailabilityProvider)
         } catch (e: NoRouteToHostException) {

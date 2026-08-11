@@ -72,8 +72,60 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         }
     }
 
+    /// Accepts an *otherwise-valid* certificate whose name doesn't cover the host
+    /// being connected to.
+    ///
+    /// When a site presents a certificate that is trusted and unexpired but whose
+    /// common name / alternative names don't include the requested host,
+    /// URLSession rejects the connection. This lets the caller add `altNames` as
+    /// accepted hosts for the certificate whose common name is `name`. The
+    /// certificate chain is still validated — only the hostname check is relaxed.
+    /// To accept a certificate that fails chain validation (self-signed, expired,
+    /// untrusted root), use ``disableCertificateValidation(forHost:)`` instead.
+    ///
+    /// - Note: This is a no-op on Linux, where the URLSession server-trust
+    ///   challenge handler is unavailable until
+    ///   [swift-corelibs-foundation#4937](https://github.com/swiftlang/swift-corelibs-foundation/pull/4937)
+    ///   lands; a name-mismatched host fails to connect there rather than being
+    ///   accepted.
+    public func allowAlternativeNames(_ altNames: [String], forCommonName name: String) {
+        executorDelegate.allowAlternativeNames(altNames, forCommonName: name)
+    }
+
+    @available(
+        *,
+        deprecated,
+        message: """
+            Ambiguous, and now stricter: it validates the certificate chain (it previously \
+            accepted any certificate). Use `allowAlternativeNames(_:forCommonName:)` to accept a \
+            valid certificate whose name doesn't cover the host, or \
+            `disableCertificateValidation(forHost:)` to accept an invalid or self-signed \
+            certificate.
+            """
+    )
     public func allowSSL(altNames: [String], forCommonName name: String) {
-        executorDelegate.allowSSL(altNames: altNames, forCommonName: name)
+        allowAlternativeNames(altNames, forCommonName: name)
+    }
+
+    /// Disables TLS certificate validation entirely for `host`, so *any*
+    /// certificate it presents — self-signed, expired, or issued by an untrusted
+    /// root — is accepted.
+    ///
+    /// This removes the protection TLS provides and exposes the connection to
+    /// man-in-the-middle attacks, so only use it for hosts the caller controls
+    /// (for example a local development or staging server with a self-signed
+    /// certificate). To instead accept an otherwise-valid certificate whose name
+    /// doesn't cover the host, use ``allowAlternativeNames(_:forCommonName:)``,
+    /// which keeps chain validation intact.
+    ///
+    /// - Warning: This is a no-op on Linux. The URLSession server-trust challenge
+    ///   handler that consumes the opt-out is unavailable there until
+    ///   [swift-corelibs-foundation#4937](https://github.com/swiftlang/swift-corelibs-foundation/pull/4937)
+    ///   lands, so validation stays enforced and a self-signed host fails to
+    ///   connect rather than being trusted. The behavior fails closed (secure),
+    ///   but the opt-out silently has no effect.
+    public func disableCertificateValidation(forHost host: String) {
+        executorDelegate.disableCertificateValidation(forHost: host)
     }
 
     func perform(_ request: NetworkRequestContent) async -> Result<WpNetworkResponse, RequestExecutionError> {
@@ -376,11 +428,18 @@ private final class RequestExecutorDelegate:
     private let lock = NSLock()
     private var redirects: [String: [WpRedirect]] = [:]
     let delegate: URLSessionTaskDelegate?
-    // When a site's domain is not included in its SSL certificate's common name and alternative names,
-    // URLSession rejects the HTTPs connection. Here we allow the consumers to add additional
-    // alternative names.
-    // The key is SSL certificate common name.
+
+    // Layer 1: accept an *otherwise-valid* certificate whose name doesn't cover
+    // the host. When a site's domain isn't in its certificate's common name or
+    // alternative names, URLSession rejects the connection; this lets consumers
+    // add extra accepted hostnames. Chain validation is still enforced (see
+    // `trustIsValidIgnoringHostname`). The key is the SSL certificate common name.
     private var additionalAlternativeNames: [String: Set<String>] = [:]
+
+    // Layer 2: accept *any* certificate — valid or not — for these hosts,
+    // disabling validation entirely. Keyed by host rather than by certificate,
+    // because an untrusted certificate's own fields can't be relied upon.
+    private var hostsWithoutCertificateValidation: Set<String> = []
 
     init(delegate: URLSessionTaskDelegate?, redirects: [String: [WpRedirect]] = [:]) {
         self.delegate = delegate
@@ -393,19 +452,28 @@ private final class RequestExecutorDelegate:
         }
     }
 
-    func allowSSL(altNames: [String], forCommonName name: String) {
+    func allowAlternativeNames(_ altNames: [String], forCommonName name: String) {
+        // Store the configured names as-is. The name comparison lives in the shared
+        // `SslCertificateInfo.hostIsAllowListed` matcher (the Rust core), which compares
+        // case-insensitively against the certificate's Common Name and SANs, so the delegate
+        // doesn't normalize casing here.
         lock.withLock {
             additionalAlternativeNames[name, default: []].formUnion(altNames)
         }
     }
 
-    private func alternateNames(forCertificate cert: SslCertificateInfo) -> Set<String> {
-        // The allowlist is keyed on the certificate's Common Name, so a SAN-only
-        // certificate that omits its CN can't be matched here — there's no key to
-        // look it up under. Fall through to default handling in that case.
-        guard let commonName = cert.commonName() else { return [] }
-        return lock.withLock {
-            additionalAlternativeNames[commonName] ?? []
+    func disableCertificateValidation(forHost host: String) {
+        // Store lower-cased and match lower-cased in `allowsAnyCertificate(forHost:)`:
+        // `challenge.protectionSpace.host` casing isn't guaranteed, so a caller passing
+        // "Dev.Local" would otherwise never match and silently get the error they opted out of.
+        lock.withLock {
+            _ = hostsWithoutCertificateValidation.insert(host.lowercased())
+        }
+    }
+
+    private func allowsAnyCertificate(forHost host: String) -> Bool {
+        lock.withLock {
+            hostsWithoutCertificateValidation.contains(host.lowercased())
         }
     }
 
@@ -415,17 +483,81 @@ private final class RequestExecutorDelegate:
         task: URLSessionTask,
         didReceive challenge: URLAuthenticationChallenge
     ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
-        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-            let trust = challenge.protectionSpace.serverTrust,
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+            let trust = challenge.protectionSpace.serverTrust
+        else {
+            return (.performDefaultHandling, nil)
+        }
+
+        let host = challenge.protectionSpace.host
+
+        // Layer 2: the consumer has opted this host out of certificate validation
+        // entirely, so accept whatever it presents — valid or not.
+        if allowsAnyCertificate(forHost: host) {
+            return (.useCredential, URLCredential(trust: trust))
+        }
+
+        // Layer 1: accept an otherwise-valid certificate whose name doesn't cover
+        // this host, when the host is allow-listed for a name the certificate
+        // presents. The shared `hostIsAllowListed` matcher does the name comparison
+        // (Common Name and SANs, case-insensitively); `trustIsValidIgnoringHostname`
+        // keeps chain validation intact. Snapshot the allow-list and skip the leaf
+        // parse entirely when nothing is configured — the overwhelmingly common case.
+        let allowList = lock.withLock { additionalAlternativeNames.mapValues { Array($0) } }
+        if !allowList.isEmpty,
             let certificateChain = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
-            let cert = certificateChain.first,
-            let cert = parseCertificate(data: SecCertificateCopyData(cert) as Data),
-            alternateNames(forCertificate: cert).contains(challenge.protectionSpace.host)
+            let leaf = certificateChain.first,
+            let cert = parseCertificate(data: SecCertificateCopyData(leaf) as Data),
+            cert.hostIsAllowListed(host: host, allowList: allowList),
+            await trustIsValidIgnoringHostname(trust)
         {
             return (.useCredential, URLCredential(trust: trust))
         }
 
         return (.performDefaultHandling, nil)
+    }
+
+    /// Re-evaluates the presented certificate chain with the standard SSL chain
+    /// checks — signature, issuer, validity dates, and anchoring to a trusted
+    /// root — while skipping only hostname verification.
+    ///
+    /// `allowAlternativeNames(_:forCommonName:)` exists to tolerate a host that's
+    /// missing from an *otherwise-valid* certificate; it must not become a
+    /// blanket bypass. Returning `.useCredential` without re-evaluating would
+    /// accept any self-signed certificate whose common name copies the
+    /// legitimate one (public information), enabling a MITM against every
+    /// allow-listed host.
+    private func trustIsValidIgnoringHostname(_ trust: SecTrust) async -> Bool {
+        // Evaluate a *copy* built from the presented chain rather than mutating the
+        // challenge's own `SecTrust`: the caller hands that same object to
+        // `.performDefaultHandling` on the failure path, and this function's one job
+        // is to not relax more than intended. `SecPolicyCreateSSL(true, nil)` is a
+        // server SSL policy with no hostname to match, so the copy is still checked
+        // for signature, issuer, validity, and anchoring — only the name check that
+        // `allowAlternativeNames` relaxes is waived.
+        guard let chain = SecTrustCopyCertificateChain(trust) else {
+            return false
+        }
+        let policy = SecPolicyCreateSSL(true, nil)
+        var copy: SecTrust?
+        guard SecTrustCreateWithCertificates(chain, policy, &copy) == errSecSuccess,
+            let copy
+        else {
+            return false
+        }
+
+        // The delegate method is `async` and runs on the cooperative pool, so don't
+        // block it: `SecTrustEvaluateWithError` is synchronous and can reach the
+        // network for missing intermediates, a CRL, or OCSP. Hop it to a background
+        // queue. `SecTrust` isn't `Sendable`, but this copy is confined to that one
+        // evaluation, so `nonisolated(unsafe)` lets it cross the boundary.
+        nonisolated(unsafe) let evaluatedTrust = copy
+        let queue = DispatchQueue.global()
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            queue.async {
+                continuation.resume(returning: SecTrustEvaluateWithError(evaluatedTrust, nil))
+            }
+        }
     }
     #endif
 

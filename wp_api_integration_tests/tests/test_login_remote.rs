@@ -329,13 +329,14 @@ async fn login_spec_16_invalid_url() {
 
 #[tokio::test]
 #[parallel]
-#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
+#[ignore = "flaky: hits external badssl.com SSL-validation sites that can time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_17_invalid_https_fails() {
     // Spec Example 17
-    let request_execution_error_reason =
-        login_err("https://wordpress-1315525-4803651.cloudwaysapps.com")
-            .await
-            .to_fetch_home_page_reason();
+    // `wrong.host.badssl.com` serves a valid, trusted `*.badssl.com` certificate that doesn't
+    // cover the host, so the chain is fine but the name doesn't match.
+    let request_execution_error_reason = login_err("https://wrong.host.badssl.com")
+        .await
+        .to_fetch_home_page_reason();
     assert!(
         matches!(
             request_execution_error_reason,
@@ -349,16 +350,26 @@ async fn login_spec_17_invalid_https_fails() {
 
 #[tokio::test]
 #[parallel]
-#[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
+#[ignore = "flaky: hits external badssl.com SSL-validation sites that can time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_17_invalid_https_with_exception_works() {
     // Spec Example 17 (with exception)
-    assert_eq!(
-        login_url_with_executor(
-            Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
-            "https://wordpress-1315525-4803651.cloudwaysapps.com"
-        )
-        .await,
-        "https://vanilla.wpmt.co/wp-admin/authorize-application.php"
+    // With `danger_accept_invalid_certs`, the self-signed certificate is accepted, so discovery
+    // gets past the TLS handshake and fails only because badssl.com isn't a WordPress site.
+    let find_api_root_failure = discovery_helper(
+        Arc::new(ReqwestRequestExecutor::new_with_default_timeout(true)),
+        vec![],
+        "https://self-signed.badssl.com",
+    )
+    .await
+    .expect_err("Expected api discovery to fail because badssl.com isn't a WordPress site")
+    .to_find_api_root_failure();
+
+    assert!(
+        matches!(
+            find_api_root_failure,
+            FindApiRootFailure::ProbablyNotAWordPressSite
+        ),
+        "Expected the certificate to be accepted and discovery to reach ProbablyNotAWordPressSite, got: {find_api_root_failure:?}"
     );
 }
 
