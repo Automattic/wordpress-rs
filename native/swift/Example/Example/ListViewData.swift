@@ -88,11 +88,7 @@ extension PluginWithEditContext: ListViewDataConvertable {
 
 extension ApplicationPasswordWithEditContext: ListViewDataConvertable {
     var creationDateString: String {
-        guard let date = Date.fromWordPressDate(self.created) else {
-            return self.created
-        }
-
-        return RelativeDateTimeFormatter().string(for: date) ?? self.created
+        RelativeDateTimeFormatter().string(for: self.created) ?? self.created.formatted()
     }
 
     var asListViewData: ListViewData {
