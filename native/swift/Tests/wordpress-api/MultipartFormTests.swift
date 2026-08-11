@@ -529,6 +529,39 @@ struct MultipartFormUploadTests {
         #expect(!FileManager.default.fileExists(atPath: file.path))
     }
 
+    @Test("upload deletes the on-disk temp file after cancellation")
+    func uploadRemovesTempFileOnCancellation() async throws {
+        let file = try Self.makeTempFile()
+
+        // Exercise the third cleanup path the fix promises: cancellation. A `.hang` stub keeps the
+        // transfer in flight, and the delegate signals once `upload(...)` has created and resumed the
+        // task — so we cancel a genuinely in-flight upload deterministically (no `sleep`). Cancelling
+        // before the task exists would leave the hanging upload with nothing to cancel, and deadlock.
+        let started = StartGate()
+        let delegate = TaskCreationNotifier(gate: started)
+
+        let uploadTask = Task {
+            _ = try await upload(
+                body: .onDisk(file),
+                with: Self.stubRequest(behavior: .hang),
+                session: Self.stubbedSession(),
+                delegate: delegate
+            )
+        }
+
+        await started.wait()
+        uploadTask.cancel()
+
+        // Cancelling surfaces URLError(.cancelled) through the completion handler, which propagates out
+        // of upload(...); pin the code, matching the failure test.
+        await #expect(
+            performing: { try await uploadTask.value },
+            throws: { ($0 as? URLError)?.code == .cancelled }
+        )
+
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+    }
+
     // MARK: - Helpers
 
     private static func makeTempFile() throws -> URL {
@@ -567,6 +600,7 @@ private final class StubURLProtocol: URLProtocol {
     enum Behavior: String {
         case success
         case failure
+        case hang
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -602,6 +636,56 @@ private final class StubURLProtocol: URLProtocol {
             client?.urlProtocolDidFinishLoading(self)
         case .failure:
             client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+        case .hang:
+            // Never respond: the transfer stays in flight until the task is cancelled, so the
+            // cancellation test can exercise upload(...)'s onCancel path.
+            break
         }
+    }
+}
+
+/// A one-shot async latch. `fulfill()` may run before or after `wait()`; `wait()` returns once
+/// `fulfill()` has been called. Lets the cancellation test cancel only after the upload task is in
+/// flight — deterministically, without a `sleep`. Lock-based, mirroring `TaskCancellation`.
+private final class StartGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isFulfilled = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func fulfill() {
+        lock.lock()
+        isFulfilled = true
+        let waiter = continuation
+        continuation = nil
+        lock.unlock()
+        waiter?.resume()
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if isFulfilled {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                self.continuation = continuation
+                lock.unlock()
+            }
+        }
+    }
+}
+
+/// Signals a `StartGate` when `URLSession` reports the upload task was created — i.e. once
+/// `upload(...)` has created and resumed it — so the cancellation test cancels an in-flight transfer
+/// rather than racing task creation.
+private final class TaskCreationNotifier: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let gate: StartGate
+
+    init(gate: StartGate) {
+        self.gate = gate
+    }
+
+    func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
+        gate.fulfill()
     }
 }
