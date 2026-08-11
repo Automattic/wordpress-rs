@@ -165,12 +165,12 @@ mod tests {
 
         let visits = response.visits.visits_data();
         assert_eq!(visits.len(), 30);
-        assert_eq!(visits[0].period, "2026-02-09");
+        assert_eq!(visits[0].period.0, "2026-02-09");
         assert_eq!(visits[0].visits, 1384);
 
         let visitors = response.visits.visitors_data();
         assert_eq!(visitors.len(), 30);
-        assert_eq!(visitors[0].period, "2026-02-09");
+        assert_eq!(visitors[0].period.0, "2026-02-09");
         assert_eq!(visitors[0].visitors, 376);
     }
 

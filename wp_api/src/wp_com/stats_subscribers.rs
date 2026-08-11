@@ -2,6 +2,7 @@ use crate::{
     date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
+    wp_com::stats_visits::StatsPeriodLabel,
     wp_com::stats_visits::StatsVisitsDataValue,
 };
 use serde::{Deserialize, Serialize};
@@ -138,7 +139,7 @@ impl StatsSubscribersResponse {
 fn get_stats_subscribers_data(
     handle: &str,
     response: &StatsSubscribersResponse,
-) -> Vec<(String, u64)> {
+) -> Vec<(StatsPeriodLabel, u64)> {
     let period_index = match response.fields.iter().position(|f| f == "period") {
         Some(i) => i,
         None => return vec![],
@@ -156,7 +157,7 @@ fn get_stats_subscribers_data(
             if let Some(period) = row.get(period_index).and_then(|v| v.as_string())
                 && let Some(value) = row.get(field_index).and_then(|v| v.as_number())
             {
-                return Some((period.clone(), value));
+                return Some((StatsPeriodLabel(period.clone()), value));
             }
 
             None
@@ -167,21 +168,14 @@ fn get_stats_subscribers_data(
 /// A subscriber count data point.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsSubscribersDataPoint {
-    /// The span this point covers, labelled to match the requested
-    /// [`StatsSubscribersUnit`]: `"2026-01-27"` for a day, `"2026W02W23"` for
-    /// a week, `"2025-11-01"` for a month, `"2024"` for a year.
-    ///
-    /// This is a label rather than a date — the week form isn't one at all —
-    /// so it stays a `String` where a date would be a `WpDateString`.
-    pub period: String,
+    pub period: StatsPeriodLabel,
     pub subscribers: u64,
 }
 
 /// A paid subscriber count data point.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsSubscribersPaidDataPoint {
-    /// Labelled as [`StatsSubscribersDataPoint::period`].
-    pub period: String,
+    pub period: StatsPeriodLabel,
     pub subscribers_paid: u64,
 }
 
@@ -289,7 +283,7 @@ mod tests {
         assert_eq!(
             subscribers[0],
             StatsSubscribersDataPoint {
-                period: "2026-01-27".to_string(),
+                period: StatsPeriodLabel("2026-01-27".to_string()),
                 subscribers: 89,
             }
         );
@@ -299,7 +293,7 @@ mod tests {
         assert_eq!(
             paid[0],
             StatsSubscribersPaidDataPoint {
-                period: "2026-01-27".to_string(),
+                period: StatsPeriodLabel("2026-01-27".to_string()),
                 subscribers_paid: 0,
             }
         );
@@ -321,7 +315,7 @@ mod tests {
         assert_eq!(
             subscribers[0],
             StatsSubscribersDataPoint {
-                period: "2026W02W23".to_string(),
+                period: StatsPeriodLabel("2026W02W23".to_string()),
                 subscribers: 89,
             }
         );
@@ -343,7 +337,7 @@ mod tests {
         assert_eq!(
             subscribers[3],
             StatsSubscribersDataPoint {
-                period: "2025-11-01".to_string(),
+                period: StatsPeriodLabel("2025-11-01".to_string()),
                 subscribers: 90,
             }
         );
@@ -365,7 +359,7 @@ mod tests {
         assert_eq!(
             subscribers[2],
             StatsSubscribersDataPoint {
-                period: "2024".to_string(),
+                period: StatsPeriodLabel("2024".to_string()),
                 subscribers: 114,
             }
         );

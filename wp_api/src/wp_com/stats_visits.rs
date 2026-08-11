@@ -157,7 +157,7 @@ impl StatsVisitsResponse {
     }
 }
 
-fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(String, u64)> {
+fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(StatsPeriodLabel, u64)> {
     let period_index = match response.fields.iter().position(|f| f == "period") {
         Some(i) => i,
         None => return vec![],
@@ -175,58 +175,59 @@ fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(String, 
             if let Some(period) = row.get(period_index).and_then(|v| v.as_string())
                 && let Some(value) = row.get(field_index).and_then(|v| v.as_number())
             {
-                return Some((period.clone(), value));
+                return Some((StatsPeriodLabel(period.clone()), value));
             }
             None
         })
         .collect()
 }
 
+uniffi::custom_newtype!(StatsPeriodLabel, String);
+/// The span a time-series data point covers, labelled to match the unit the
+/// caller asked for: `"2026-01-27"` for a day, `"2026W02W23"` for a week,
+/// `"2025-11-01"` for a month, `"2024"` for a year, and
+/// `"2026-01-17 01:00:00"` for an hour.
+///
+/// Only the daily form is a date, so this is neither a [`WpDateString`] nor a
+/// [`crate::date::WpGmtDateTime`] — it identifies a span rather than a point
+/// in time.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct StatsPeriodLabel(pub String);
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitsDataPoint {
-    /// The span this point covers, labelled to match the requested
-    /// [`StatsVisitsUnit`]: `"2026-01-27"` for a day, `"2026W02W23"` for a
-    /// week, `"2025-11-01"` for a month, `"2024"` for a year, and
-    /// `"2026-01-17 01:00:00"` for an hour.
-    ///
-    /// This is a label rather than a date — the week form isn't one at all —
-    /// so it stays a `String` where a date would be a `WpDateString`.
-    pub period: String,
+    pub period: StatsPeriodLabel,
     pub visits: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitorsDataPoint {
-    /// Labelled as [`StatsVisitsDataPoint::period`].
-    pub period: String,
+    pub period: StatsPeriodLabel,
     pub visitors: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsLikesDataPoint {
-    /// Labelled as [`StatsVisitsDataPoint::period`].
-    pub period: String,
+    pub period: StatsPeriodLabel,
     pub likes: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsReblogsDataPoint {
-    /// Labelled as [`StatsVisitsDataPoint::period`].
-    pub period: String,
+    pub period: StatsPeriodLabel,
     pub reblogs: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsCommentsDataPoint {
-    /// Labelled as [`StatsVisitsDataPoint::period`].
-    pub period: String,
+    pub period: StatsPeriodLabel,
     pub comments: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostsDataPoint {
-    /// Labelled as [`StatsVisitsDataPoint::period`].
-    pub period: String,
+    pub period: StatsPeriodLabel,
     pub posts: u64,
 }
 
@@ -414,21 +415,21 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsVisitsDataPoint {
-                period: "2026-01-17 01:00:00".to_string(),
+                period: StatsPeriodLabel("2026-01-17 01:00:00".to_string()),
                 visits: 9,
             }
         );
         assert_eq!(
             data_points[21],
             StatsVisitsDataPoint {
-                period: "2026-01-17 22:00:00".to_string(),
+                period: StatsPeriodLabel("2026-01-17 22:00:00".to_string()),
                 visits: 27,
             }
         );
         assert_eq!(
             data_points[23],
             StatsVisitsDataPoint {
-                period: "2026-01-18 00:00:00".to_string(),
+                period: StatsPeriodLabel("2026-01-18 00:00:00".to_string()),
                 visits: 4,
             }
         );
@@ -447,21 +448,21 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsVisitsDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsPeriodLabel("2025-12-21".to_string()),
                 visits: 67,
             }
         );
         assert_eq!(
             data_points[20],
             StatsVisitsDataPoint {
-                period: "2026-01-10".to_string(),
+                period: StatsPeriodLabel("2026-01-10".to_string()),
                 visits: 57,
             }
         );
         assert_eq!(
             data_points[29],
             StatsVisitsDataPoint {
-                period: "2026-01-19".to_string(),
+                period: StatsPeriodLabel("2026-01-19".to_string()),
                 visits: 50,
             }
         );
@@ -512,21 +513,21 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsVisitorsDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsPeriodLabel("2025-12-21".to_string()),
                 visitors: 60,
             }
         );
         assert_eq!(
             data_points[20],
             StatsVisitorsDataPoint {
-                period: "2026-01-10".to_string(),
+                period: StatsPeriodLabel("2026-01-10".to_string()),
                 visitors: 50,
             }
         );
         assert_eq!(
             data_points[29],
             StatsVisitorsDataPoint {
-                period: "2026-01-19".to_string(),
+                period: StatsPeriodLabel("2026-01-19".to_string()),
                 visitors: 47,
             }
         );
@@ -546,14 +547,14 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsLikesDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsPeriodLabel("2025-12-21".to_string()),
                 likes: 0,
             }
         );
         assert_eq!(
             data_points[15],
             StatsLikesDataPoint {
-                period: "2026-01-05".to_string(),
+                period: StatsPeriodLabel("2026-01-05".to_string()),
                 likes: 1,
             }
         );
@@ -572,7 +573,7 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsReblogsDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsPeriodLabel("2025-12-21".to_string()),
                 reblogs: 0,
             }
         );
@@ -591,7 +592,7 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsCommentsDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsPeriodLabel("2025-12-21".to_string()),
                 comments: 0,
             }
         );
@@ -610,7 +611,7 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsPostsDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsPeriodLabel("2025-12-21".to_string()),
                 posts: 0,
             }
         );
