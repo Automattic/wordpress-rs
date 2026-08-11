@@ -34,6 +34,10 @@ sealed class WpRequestResult<T> {
         val filePath: String
     ) : WpRequestResult<T>()
 
+    data class MediaFileUnreadable<T>(
+        val filePath: String
+    ) : WpRequestResult<T>()
+
     data class SiteUrlParsingError<T>(
         val reason: String,
     ) : WpRequestResult<T>()
@@ -78,6 +82,7 @@ fun WpRequestResult<*>.toLogErrorString(): String? = when (this) {
         "RequestExecutionFailed(status=$statusCode, reason=$reason, " +
             "method=$requestMethod, url=$requestUrl)"
     is WpRequestResult.MediaFileNotFound -> "MediaFileNotFound(path=$filePath)"
+    is WpRequestResult.MediaFileUnreadable -> "MediaFileUnreadable(path=$filePath)"
     is WpRequestResult.SiteUrlParsingError -> "SiteUrlParsingError(reason=$reason)"
     is WpRequestResult.ResponseParsingError ->
         "ResponseParsingError(reason=$reason, method=$requestMethod, " +

@@ -25,6 +25,7 @@ fun <T> WpRequestResult<T>.errorDescription(): String = when (this) {
         "Failed to parse response: $reason"
     is WpRequestResult.SiteUrlParsingError -> "Invalid site URL: $reason"
     is WpRequestResult.MediaFileNotFound -> "File not found: $filePath"
+    is WpRequestResult.MediaFileUnreadable -> "File could not be read: $filePath"
     is WpRequestResult.UnknownError ->
         "Unknown error (HTTP $statusCode)"
 }

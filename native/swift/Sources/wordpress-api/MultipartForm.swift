@@ -1,12 +1,14 @@
 import Foundation
 
 enum MultipartFormError: Swift.Error, LocalizedError {
-    case inaccessibleFile(underlyingError: Error)
+    /// A file field could not be read. `filePath` is the field's source path — set for
+    /// `fileAtPath:` fields, `nil` for in-memory `text:` / `data:` fields.
+    case inaccessibleFile(underlyingError: Error, filePath: String?)
     case impossible
 
     var errorDescription: String? {
         switch self {
-        case let .inaccessibleFile(underlyingError: underlyingError):
+        case let .inaccessibleFile(underlyingError, _):
             return underlyingError.localizedDescription
         case .impossible:
             return "An unknown error occurred."
@@ -35,6 +37,11 @@ struct MultipartFormField {
     let mimeType: String?
     let bytes: UInt64
 
+    /// The full source path this field was built from (`nil` for an in-memory field).
+    /// `filename` keeps only the basename; this retains the path so a read failure can
+    /// name the file.
+    let sourcePath: String?
+
     fileprivate let inputStream: InputStream
 
     init(text: String, name: String, filename: String? = nil, mimeType: String? = nil) {
@@ -47,6 +54,7 @@ struct MultipartFormField {
         self.filename = filename
         self.bytes = UInt64(data.count)
         self.mimeType = mimeType
+        self.sourcePath = nil
     }
 
     init(fileAtPath path: String, name: String, filename: String? = nil, mimeType: String? = nil) throws {
@@ -54,7 +62,7 @@ struct MultipartFormField {
         do {
             attrs = try FileManager.default.attributesOfItem(atPath: path)
         } catch {
-            throw MultipartFormError.inaccessibleFile(underlyingError: error)
+            throw MultipartFormError.inaccessibleFile(underlyingError: error, filePath: path)
         }
 
         guard let inputStream = InputStream(fileAtPath: path),
@@ -69,6 +77,7 @@ struct MultipartFormField {
         self.filename = filename ?? path.split(separator: "/").last.flatMap({ String($0) })
         self.bytes = bytes
         self.mimeType = mimeType
+        self.sourcePath = path
     }
 
     /// Creates a field backed by an arbitrary `InputStream`.
@@ -77,12 +86,22 @@ struct MultipartFormField {
     /// returning `-1`); production code uses the `text:`, `data:`, and
     /// `fileAtPath:` initializers above. `bytes` has no default so a caller can't
     /// silently under-estimate a large stream into the in-memory serialization path.
-    init(inputStream: InputStream, name: String, filename: String? = nil, mimeType: String? = nil, bytes: UInt64) {
+    /// `sourcePath` lets a test stand in for a `fileAtPath:` field so a read failure
+    /// carries a path, mirroring production.
+    init(
+        inputStream: InputStream,
+        name: String,
+        filename: String? = nil,
+        mimeType: String? = nil,
+        bytes: UInt64,
+        sourcePath: String? = nil
+    ) {
         self.inputStream = inputStream
         self.name = name
         self.filename = filename
         self.mimeType = mimeType
         self.bytes = bytes
+        self.sourcePath = sourcePath
     }
 }
 
@@ -184,7 +203,8 @@ extension Array where Element == MultipartFormField {
                 // classified error rather than crashing.
                 if bytesRead < 0 {
                     throw MultipartFormError.inaccessibleFile(
-                        underlyingError: field.inputStream.streamError ?? POSIXError(.EIO)
+                        underlyingError: field.inputStream.streamError ?? POSIXError(.EIO),
+                        filePath: field.sourcePath
                     )
                 }
                 if bytesRead == 0 {
@@ -208,7 +228,8 @@ extension Array where Element == MultipartFormField {
             // catching it would need the bytes-written reconciliation the issue rejected.
             if field.inputStream.streamStatus == .error {
                 throw MultipartFormError.inaccessibleFile(
-                    underlyingError: field.inputStream.streamError ?? POSIXError(.EIO)
+                    underlyingError: field.inputStream.streamError ?? POSIXError(.EIO),
+                    filePath: field.sourcePath
                 )
             }
 

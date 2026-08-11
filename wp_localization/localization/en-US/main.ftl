@@ -8,6 +8,8 @@ response_parsing_error = Response couldn't be parsed: {$reason}.
 
 media_file_not_found = Media file not found at {$path}.
 
+media_file_unreadable = Media file at {$path} could not be read.
+
 invalid_http_status_code = Invalid HTTP status code: {$status_code}.
 
 request_execution_failed = Failed to send HTTP.

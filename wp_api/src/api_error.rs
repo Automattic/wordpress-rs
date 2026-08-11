@@ -42,6 +42,11 @@ pub enum WpApiError {
     MediaFileNotFound {
         file_path: String,
     },
+    /// A media file that exists but could not be read while its multipart body was
+    /// being serialized. See [`RequestExecutionError::MediaFileUnreadable`].
+    MediaFileUnreadable {
+        file_path: String,
+    },
     ResponseParsingError {
         reason: String,
         response: String,
@@ -75,6 +80,7 @@ impl WpApiError {
             | WpApiError::WpError { status_code, .. } => Some(*status_code),
             WpApiError::RequestExecutionFailed { status_code, .. } => *status_code,
             WpApiError::MediaFileNotFound { .. }
+            | WpApiError::MediaFileUnreadable { .. }
             | WpApiError::ResponseParsingError { .. }
             | WpApiError::SiteUrlParsingError { .. } => None,
         }
@@ -120,6 +126,9 @@ impl WpSupportsLocalization for WpApiError {
             WpApiError::RequestExecutionFailed { reason, .. } => reason.message_bundle(),
             WpApiError::MediaFileNotFound { file_path } => {
                 WpMessages::media_file_not_found(file_path)
+            }
+            WpApiError::MediaFileUnreadable { file_path } => {
+                WpMessages::media_file_unreadable(file_path)
             }
             WpApiError::ResponseParsingError { reason, .. } => {
                 WpMessages::response_parsing_error(reason)
@@ -610,6 +619,14 @@ pub enum RequestExecutionError {
     MediaFileNotFound {
         file_path: String,
     },
+    /// A media file that exists but could not be read while its multipart body was
+    /// being serialized (e.g. deleted mid-upload, or a storage read error).
+    ///
+    /// Distinct from [`RequestExecutionError::MediaFileNotFound`], raised when the
+    /// file can't be opened at all: here it opened and then failed partway through.
+    MediaFileUnreadable {
+        file_path: String,
+    },
 }
 
 impl WpSupportsLocalization for RequestExecutionError {
@@ -618,6 +635,9 @@ impl WpSupportsLocalization for RequestExecutionError {
             RequestExecutionError::RequestExecutionFailed { reason, .. } => reason.message_bundle(),
             RequestExecutionError::MediaFileNotFound { file_path } => {
                 WpMessages::media_file_not_found(file_path)
+            }
+            RequestExecutionError::MediaFileUnreadable { file_path } => {
+                WpMessages::media_file_unreadable(file_path)
             }
         }
     }
@@ -869,6 +889,9 @@ impl From<RequestExecutionError> for WpApiError {
             },
             RequestExecutionError::MediaFileNotFound { file_path } => {
                 Self::MediaFileNotFound { file_path }
+            }
+            RequestExecutionError::MediaFileUnreadable { file_path } => {
+                Self::MediaFileUnreadable { file_path }
             }
         }
     }
