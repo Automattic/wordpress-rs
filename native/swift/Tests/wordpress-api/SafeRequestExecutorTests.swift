@@ -61,6 +61,45 @@ struct SafeRequestExecutorTests {
             return
         }
     }
+
+    // End-to-end companion to the test above. The test above drives the classification switch in
+    // isolation; this one drives a real `WordPressAPI` request through the production
+    // `WpNetworkRequest.perform` machinery (the `withCheckedContinuation` +
+    // `dataTask(completionHandler:)` + `withTaskCancellationHandler` path) and back through the
+    // Rust client, asserting the timeout surfaces to the caller as a `WpApiError` carrying
+    // `.httpTimeoutError`. It guards the whole chain the stub cannot reach — so a future refactor of
+    // the continuation/completion path that re-drops a timeout to `.genericError` is caught here.
+    // Mirrors Kotlin's `MockWebServer` + `SocketPolicy.NO_RESPONSE` end-to-end test.
+    @Test("A URLSession timeout surfaces end-to-end as .httpTimeoutError", .timeLimit(.minutes(1)))
+    func testTimeoutSurfacesEndToEndAsHttpTimeoutError() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [NeverRespondingURLProtocol.self]
+        configuration.timeoutIntervalForRequest = 0.3
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+
+        let api = try WordPressAPI(
+            siteInfo: .selfHosted(
+                siteUrl: ParsedUrl.parse(input: "https://example.com"),
+                apiRoot: ParsedUrl.parse(input: "https://example.com/wp-json")
+            ),
+            authenticationProvider: .none(),
+            executor: WpRequestExecutor(urlSession: session),
+            middlewarePipeline: .default,
+            appNotifier: nil
+        )
+
+        do {
+            _ = try await api.apiRoot.get()
+            Issue.record("Expected the request to time out, but it succeeded")
+        } catch {
+            let reason = (error as? CarriesRequestExecutionErrorReason)?.executionErrorReason
+            guard case .some(.httpTimeoutError) = reason else {
+                Issue.record("Expected .httpTimeoutError, got \(String(describing: reason)) (error: \(error))")
+                return
+            }
+        }
+    }
     #endif
 }
 
