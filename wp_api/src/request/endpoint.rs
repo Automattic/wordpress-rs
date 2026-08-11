@@ -49,6 +49,9 @@ pub mod widgets_endpoint;
 pub mod wp_block_editor_endpoint;
 pub mod wp_site_health_tests_endpoint;
 
+#[cfg(test)]
+mod plain_permalinks_url_tests;
+
 pub const WP_JSON_PATH_SEGMENTS: [&str; 1] = ["wp-json"];
 
 uniffi::custom_newtype!(WpEndpointUrl, String);
