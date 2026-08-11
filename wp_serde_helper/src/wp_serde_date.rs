@@ -1,8 +1,50 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Datelike, NaiveDateTime, Utc};
+use std::fmt::Display;
 
 // https://core.trac.wordpress.org/ticket/41032
 const WP_DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 const MYSQL_DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+
+/// The spellings in which WordPress's never-set date reaches a client.
+///
+/// WordPress stores `0000-00-00 00:00:00` to mean a datetime was never
+/// written; core writes it deliberately for a draft whose publish date should
+/// float until the post is published, so it is a legal value rather than
+/// corruption. Endpoints that guard it send `null`. The ones that don't format
+/// it, and PHP's date parser turns the zero month and day into 30 November of
+/// 1 BCE, spelling that year with three or four digits depending on the format
+/// used.
+const NOT_SET_SPELLINGS: [&str; 3] = ["0000-00-00", "-001-11-30", "-0001-11-30"];
+
+/// The instant PHP derives from the zero date, as a unix timestamp. Reached by
+/// any spelling of it that one of the accepted formats happens to parse.
+const NOT_SET_TIMESTAMP: i64 = -62_169_984_000;
+
+/// Why a value could not be read as a WordPress datetime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WpDateTimeParseError {
+    /// The value is WordPress's never-set date rather than a datetime.
+    ///
+    /// A field that can legitimately be unset is an `Option`, and its
+    /// deserializer reads this as `None`. Every other read path treats it as
+    /// an error, because the only alternative is an instant in 1 BCE that is
+    /// indistinguishable from real data once parsed.
+    NotSet,
+    /// The value matches none of the forms WordPress sends, or resolves to an
+    /// instant before year 1, which no WordPress datetime legitimately has.
+    Invalid,
+}
+
+impl Display for WpDateTimeParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotSet => write!(f, "Date is WordPress's never-set value"),
+            Self::Invalid => write!(f, "Invalid date format"),
+        }
+    }
+}
+
+impl std::error::Error for WpDateTimeParseError {}
 
 /// Parse a datetime in any of the forms WordPress and WordPress.com send it:
 /// with a timezone offset (`2026-08-06T09:15:49+00:00`), the offsetless
@@ -14,38 +56,81 @@ const MYSQL_DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 ///
 /// # Errors
 ///
-/// Returns an error if the value matches none of those forms.
-pub fn parse_wp_date_time(s: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
+/// Returns [`WpDateTimeParseError::NotSet`] for WordPress's never-set date,
+/// and [`WpDateTimeParseError::Invalid`] if the value matches none of the
+/// forms above.
+pub fn parse_wp_date_time(s: &str) -> Result<DateTime<Utc>, WpDateTimeParseError> {
+    if NOT_SET_SPELLINGS
+        .iter()
+        .any(|spelling| s.starts_with(spelling))
+    {
+        return Err(WpDateTimeParseError::NotSet);
+    }
+
+    parse_known_format(s)
+        .ok_or(WpDateTimeParseError::Invalid)
+        .and_then(reject_instant_no_wp_date_has)
+}
+
+/// Read a unix timestamp as a WordPress datetime, holding it to the same rules
+/// as a string value.
+///
+/// # Errors
+///
+/// As [`parse_wp_date_time`].
+pub fn wp_date_time_from_timestamp(seconds: i64) -> Result<DateTime<Utc>, WpDateTimeParseError> {
+    DateTime::<Utc>::from_timestamp(seconds, 0)
+        .ok_or(WpDateTimeParseError::Invalid)
+        .and_then(reject_instant_no_wp_date_has)
+}
+
+fn parse_known_format(s: &str) -> Option<DateTime<Utc>> {
+    let from_naive = |dt| Some(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+
     // WP.org REST API Format
     if let Ok(dt) = NaiveDateTime::parse_from_str(s, WP_DATE_FORMAT) {
-        return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+        return from_naive(dt);
     }
 
     // ISO-8601
     if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
-        return Ok(dt.with_timezone(&Utc));
+        return Some(dt.with_timezone(&Utc));
     }
 
     // Unix Timestamp (wrapped in a string)
-    if let Ok(timestamp) = s.parse::<i64>()
-        && let Some(dt) = DateTime::<Utc>::from_timestamp(timestamp, 0)
-    {
-        return Ok(dt);
+    if let Ok(timestamp) = s.parse::<i64>() {
+        return DateTime::<Utc>::from_timestamp(timestamp, 0);
     }
 
     // MySQL format
     if let Ok(dt) = NaiveDateTime::parse_from_str(s, MYSQL_DATE_FORMAT) {
-        return Ok(DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+        return from_naive(dt);
     }
 
-    // WP format with sub-second precision. Its error stands in for the whole
-    // set when nothing matches.
+    // WP format with sub-second precision
     NaiveDateTime::parse_from_str(s, &format!("{WP_DATE_FORMAT}.%f"))
-        .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
+        .ok()
+        .and_then(from_naive)
+}
+
+/// Reject an instant that parsed cleanly but that no WordPress datetime can
+/// hold, so it never reaches a caller looking like real data.
+fn reject_instant_no_wp_date_has(
+    date_time: DateTime<Utc>,
+) -> Result<DateTime<Utc>, WpDateTimeParseError> {
+    if date_time.timestamp() == NOT_SET_TIMESTAMP {
+        return Err(WpDateTimeParseError::NotSet);
+    }
+
+    if date_time.year() < 1 {
+        return Err(WpDateTimeParseError::Invalid);
+    }
+
+    Ok(date_time)
 }
 
 pub mod wp_utc_date_format {
-    use super::{WP_DATE_FORMAT, parse_wp_date_time};
+    use super::{WP_DATE_FORMAT, parse_wp_date_time, wp_date_time_from_timestamp};
     use chrono::{DateTime, Utc};
     use serde::{self, Deserialize, Deserializer, Serializer};
 
@@ -61,17 +146,11 @@ pub mod wp_utc_date_format {
         D: Deserializer<'de>,
     {
         match DateRepresentation::deserialize(deserializer)? {
-            DateRepresentation::Int(timestamp) => {
-                if let Some(dt) = DateTime::<Utc>::from_timestamp(timestamp, 0) {
-                    return Ok(dt);
-                }
-
-                Err(serde::de::Error::custom(format!(
-                    "Invalid date : {timestamp}"
-                )))
+            DateRepresentation::Int(timestamp) => wp_date_time_from_timestamp(timestamp)
+                .map_err(|e| serde::de::Error::custom(format!("{e}: {timestamp}"))),
+            DateRepresentation::String(s) => {
+                parse_wp_date_time(&s).map_err(|e| serde::de::Error::custom(format!("{e}: {s}")))
             }
-            DateRepresentation::String(s) => parse_wp_date_time(&s)
-                .map_err(|_| serde::de::Error::custom(format!("Invalid date format: {s}"))),
         }
     }
 
@@ -126,6 +205,59 @@ mod tests {
         assert!(
             serde_json::from_str::<Foo>(&json_str).is_err(),
             "Expected error for invalid date"
+        );
+    }
+
+    /// WordPress's never-set date is recognised as such in each spelling it
+    /// arrives in, rather than read as a datetime.
+    ///
+    /// The offsetless and MySQL-shaped spellings used to parse cleanly and
+    /// return 30 November of 1 BCE as a real instant; the offset-bearing ones
+    /// were rejected. One value, two behaviours, decided by which format the
+    /// endpoint used.
+    #[rstest]
+    #[case::zero_date_column("0000-00-00 00:00:00")]
+    #[case::zero_date_column_iso("0000-00-00T00:00:00")]
+    #[case::zero_date_column_with_offset("0000-00-00T00:00:00+00:00")]
+    #[case::three_digit_year_with_offset("-001-11-30T00:00:00+00:00")]
+    #[case::four_digit_year_with_offset("-0001-11-30T00:00:00+00:00")]
+    #[case::three_digit_year("-001-11-30T00:00:00")]
+    #[case::four_digit_year("-0001-11-30T00:00:00")]
+    #[case::three_digit_year_mysql("-001-11-30 00:00:00")]
+    #[case::four_digit_year_mysql("-0001-11-30 00:00:00")]
+    #[case::unix_timestamp("-62169984000")]
+    fn test_never_set_date_is_recognised(#[case] value: &str) {
+        assert_eq!(
+            parse_wp_date_time(value),
+            Err(WpDateTimeParseError::NotSet),
+            "{value} is WordPress's never-set date"
+        );
+    }
+
+    /// An instant before year 1 that isn't the never-set date is malformed,
+    /// not absent — the two are different failures and stay distinguishable.
+    #[rstest]
+    #[case::bce("-0500-01-01T00:00:00")]
+    #[case::year_zero("0000-01-01T00:00:00")]
+    fn test_instant_before_year_one_is_invalid(#[case] value: &str) {
+        assert_eq!(
+            parse_wp_date_time(value),
+            Err(WpDateTimeParseError::Invalid),
+            "no WordPress date is before year 1"
+        );
+    }
+
+    /// A field that isn't an `Option` has no way to say "absent", so the
+    /// never-set date has to fail rather than resolve to an instant.
+    #[rstest]
+    #[case::string(r#""0000-00-00 00:00:00""#)]
+    #[case::offsetless_string(r#""-0001-11-30T00:00:00""#)]
+    #[case::timestamp("-62169984000")]
+    fn test_never_set_date_fails_a_required_field(#[case] date_string: &str) {
+        let json_str = format!("{{\"wp_utc_date_time\": {date_string}}}");
+        assert!(
+            serde_json::from_str::<Foo>(&json_str).is_err(),
+            "Expected error for WordPress's never-set date"
         );
     }
 }
