@@ -43,7 +43,7 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00")
 );
 
 generate_update_test!(update_slug, slug, "new_slug".to_string());

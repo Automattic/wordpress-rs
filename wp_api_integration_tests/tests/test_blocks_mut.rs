@@ -79,7 +79,7 @@ async fn trash_block() {
 generate_update_test!(
     update_date,
     date,
-    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00"),
     |updated_block| {
         assert_eq!(updated_block.date.0, "2024-09-09T12:00:00");
     }
@@ -88,11 +88,11 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00"),
     |updated_block| {
         assert_eq!(
             updated_block.date_gmt,
-            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00")
         );
     }
 );
@@ -134,7 +134,7 @@ async fn update_status_to_future() {
     test_update_block(
         &BlockUpdateParams {
             status: Some(BlockStatus::Future),
-            date: Some(unwrapped_wp_gmt_date_time("2026-09-09T12:00:00+0000")),
+            date: Some(unwrapped_wp_gmt_date_time("2026-09-09T12:00:00+00:00")),
             ..Default::default()
         },
         |updated_block| {
