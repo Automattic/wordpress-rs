@@ -482,7 +482,13 @@ struct MultipartFormCleanupTests {
     }
 }
 
-@Suite("MultipartForm upload cleanup", .enabled(if: !isLinux()))
+// These drive `upload(...)` through a custom `URLProtocol` that intercepts `uploadTask(fromFile:)`.
+// That interception works on macOS and iOS but not dependably on the tvOS/watchOS simulators, where it
+// fails in CI. Compile it out entirely off those platforms — not just a runtime skip — so a
+// compile-only difference can't break them either; the platform-agnostic cleanup logic stays covered
+// by the macOS and iOS runs plus the cross-platform `MultipartFormCleanupTests` above.
+#if os(macOS) || os(iOS)
+@Suite("MultipartForm upload cleanup")
 struct MultipartFormUploadTests {
 
     @Test("upload deletes the on-disk temp file after a successful transfer")
@@ -689,3 +695,4 @@ private final class TaskCreationNotifier: NSObject, URLSessionTaskDelegate, @unc
         gate.fulfill()
     }
 }
+#endif
