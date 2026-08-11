@@ -23,6 +23,10 @@ testing {
     suites {
         val test by getting(JvmTestSuite::class) {
             useJUnit(rootProject.libs.versions.junit.get())
+
+            dependencies {
+                implementation(libs.okhttp)
+            }
         }
 
         register<JvmTestSuite>("integrationTest") {
