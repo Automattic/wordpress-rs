@@ -118,16 +118,16 @@ pub struct BlockListParams {
     pub search: Option<String>,
     /// Limit response to posts published after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub after: Option<WpGmtDateTime>,
+    pub after: Option<WpDateString>,
     /// Limit response to posts modified after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_after: Option<WpGmtDateTime>,
+    pub modified_after: Option<WpDateString>,
     /// Limit response to posts published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub before: Option<WpGmtDateTime>,
+    pub before: Option<WpDateString>,
     /// Limit response to posts modified before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_before: Option<WpGmtDateTime>,
+    pub modified_before: Option<WpDateString>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
     pub exclude: Vec<BlockId>,
@@ -201,7 +201,7 @@ pub struct BlockCreateParams {
     /// The date the post was published, in the site's timezone.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<WpGmtDateTime>,
+    pub date: Option<WpDateString>,
     /// The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -237,7 +237,7 @@ pub struct BlockUpdateParams {
     /// The date the post was published, in the site's timezone.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<WpGmtDateTime>,
+    pub date: Option<WpDateString>,
     /// The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]

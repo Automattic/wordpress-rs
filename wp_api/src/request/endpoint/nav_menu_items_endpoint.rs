@@ -47,7 +47,7 @@ mod tests {
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
         },
         unit_test_common::{
-            unit_test_example_date_as_option, unit_test_example_date_as_query_value,
+            unit_test_example_date_string_as_option, unit_test_example_date_string_as_query_value,
         },
     };
     use rstest::*;
@@ -71,10 +71,10 @@ mod tests {
     #[case(generate!(NavMenuItemListParams, (page, Some(2))), "page=2")]
     #[case(generate!(NavMenuItemListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(NavMenuItemListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(NavMenuItemListParams, (after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("after"))]
-    #[case(generate!(NavMenuItemListParams, (modified_after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_after"))]
-    #[case(generate!(NavMenuItemListParams, (before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("before"))]
-    #[case(generate!(NavMenuItemListParams, (modified_before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_before"))]
+    #[case(generate!(NavMenuItemListParams, (after, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("after"))]
+    #[case(generate!(NavMenuItemListParams, (modified_after, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("modified_after"))]
+    #[case(generate!(NavMenuItemListParams, (before, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("before"))]
+    #[case(generate!(NavMenuItemListParams, (modified_before, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("modified_before"))]
     #[case(generate!(NavMenuItemListParams, (exclude, vec![NavMenuItemId(1), NavMenuItemId(2)])), "exclude=1%2C2")]
     #[case(generate!(NavMenuItemListParams, (include, vec![NavMenuItemId(1), NavMenuItemId(2)])), "include=1%2C2")]
     #[case(generate!(NavMenuItemListParams, (offset, Some(2))), "offset=2")]
@@ -207,10 +207,10 @@ mod tests {
     }
 
     fn expected_query_pairs_for_nav_menu_item_list_params_with_all_fields() -> String {
-        let after = unit_test_example_date_as_query_value("after");
-        let modified_after = unit_test_example_date_as_query_value("modified_after");
-        let before = unit_test_example_date_as_query_value("before");
-        let modified_before = unit_test_example_date_as_query_value("modified_before");
+        let after = unit_test_example_date_string_as_query_value("after");
+        let modified_after = unit_test_example_date_string_as_query_value("modified_after");
+        let before = unit_test_example_date_string_as_query_value("before");
+        let modified_before = unit_test_example_date_string_as_query_value("modified_before");
         format!(
             "page=2&per_page=2&search=foo&{after}&{modified_after}&{before}&{modified_before}&exclude=1%2C2&include=1%2C2&offset=2&order=asc&orderby=author&search_columns=post_content%2Cpost_excerpt%2Cpost_title&slug=foo%2Cbar&status=draft%2Cpublish&tax_relation=AND&menus=179%2C180&menus_exclude=179%2C180&menu_order=1"
         )
@@ -218,12 +218,12 @@ mod tests {
 
     fn nav_menu_item_list_params_with_all_fields() -> NavMenuItemListParams {
         NavMenuItemListParams {
-            after: unit_test_example_date_as_option(),
-            before: unit_test_example_date_as_option(),
+            after: unit_test_example_date_string_as_option(),
+            before: unit_test_example_date_string_as_option(),
             exclude: vec![NavMenuItemId(1), NavMenuItemId(2)],
             include: vec![NavMenuItemId(1), NavMenuItemId(2)],
-            modified_after: unit_test_example_date_as_option(),
-            modified_before: unit_test_example_date_as_option(),
+            modified_after: unit_test_example_date_string_as_option(),
+            modified_before: unit_test_example_date_string_as_option(),
             offset: Some(2),
             order: Some(WpApiParamOrder::Asc),
             orderby: Some(WpApiParamPostsOrderBy::Author),

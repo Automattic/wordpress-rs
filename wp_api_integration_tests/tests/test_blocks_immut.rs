@@ -2,6 +2,7 @@ use wp_api::blocks::{
     BlockId, BlockListParams, BlockRetrieveParams, BlockStatus, SparseBlockFieldWithEditContext,
     SparseBlockFieldWithEmbedContext, SparseBlockFieldWithViewContext, WpApiParamBlocksOrderBy,
 };
+use wp_api::date::WpDateString;
 use wp_api_integration_tests::prelude::*;
 
 #[tokio::test]
@@ -106,10 +107,10 @@ fn block_id() -> BlockId {
 #[case::page(generate!(BlockListParams, (page, Some(1))))]
 #[case::per_page(generate!(BlockListParams, (per_page, Some(3))))]
 #[case::search(generate!(BlockListParams, (search, Some("foo".to_string()))))]
-#[case::after(generate!(BlockListParams, (after, Some(unwrapped_wp_gmt_date_time("2020-08-14T17:00:00+0200")))))]
-#[case::modified_after(generate!(BlockListParams, (modified_after, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0200")))))]
-#[case::before(generate!(BlockListParams, (before, Some(unwrapped_wp_gmt_date_time("2023-08-14T17:00:00+0200")))))]
-#[case::modified_before(generate!(BlockListParams, (modified_before, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0200")))))]
+#[case::after(generate!(BlockListParams, (after, Some(WpDateString("2020-08-14T17:00:00".to_string())))))]
+#[case::modified_after(generate!(BlockListParams, (modified_after, Some(WpDateString("2024-01-14T17:00:00".to_string())))))]
+#[case::before(generate!(BlockListParams, (before, Some(WpDateString("2023-08-14T17:00:00".to_string())))))]
+#[case::modified_before(generate!(BlockListParams, (modified_before, Some(WpDateString("2024-01-14T17:00:00".to_string())))))]
 #[case::exclude(generate!(BlockListParams, (exclude, vec![BlockId(1), BlockId(2)])))]
 #[case::include(generate!(BlockListParams, (include, vec![BlockId(1)])))]
 #[case::offset(generate!(BlockListParams, (offset, Some(2))))]

@@ -1,4 +1,5 @@
 use serde_json::Value;
+use wp_api::date::WpDateString;
 use wp_api::{
     comments::{
         CommentId, CommentListParams, CommentRetrieveParams, CommentStatus, CommentType,
@@ -231,11 +232,11 @@ async fn parse_extras() {
 #[case::page(generate!(CommentListParams, (page, Some(1))))]
 #[case::per_page(generate!(CommentListParams, (per_page, Some(3))))]
 #[case::search(generate!(CommentListParams, (search, Some("foo".to_string()))))]
-#[case::after(generate!(CommentListParams, (after, Some(unwrapped_wp_gmt_date_time("2020-08-14T17:00:00+0200")))))]
+#[case::after(generate!(CommentListParams, (after, Some(WpDateString("2020-08-14T17:00:00".to_string())))))]
 #[case::author(generate!(CommentListParams, (author, vec![FIRST_USER_ID, SECOND_USER_ID])))]
 #[case::author_exclude(generate!(CommentListParams, (author_exclude, vec![SECOND_USER_ID])))]
 #[case::author_email(generate!(CommentListParams, (author_email, Some(FIRST_USER_EMAIL.to_string()))))]
-#[case::before(generate!(CommentListParams, (before, Some(unwrapped_wp_gmt_date_time("2023-08-14T17:00:00+0000")))))]
+#[case::before(generate!(CommentListParams, (before, Some(WpDateString("2023-08-14T17:00:00".to_string())))))]
 #[case::exclude(generate!(CommentListParams, (exclude, vec![CommentId(1), CommentId(2)])))]
 #[case::include(generate!(CommentListParams, (include, vec![CommentId(1)])))]
 #[case::offset(generate!(CommentListParams, (offset, Some(2))))]

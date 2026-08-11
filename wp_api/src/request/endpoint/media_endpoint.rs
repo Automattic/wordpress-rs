@@ -48,7 +48,7 @@ mod tests {
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
         },
         unit_test_common::{
-            unit_test_example_date_as_option, unit_test_example_date_as_query_value,
+            unit_test_example_date_string_as_option, unit_test_example_date_string_as_query_value,
         },
     };
     use rstest::*;
@@ -69,12 +69,12 @@ mod tests {
     #[case(generate!(MediaListParams, (page, Some(2))), "page=2")]
     #[case(generate!(MediaListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(MediaListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(MediaListParams, (after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("after"))]
-    #[case(generate!(MediaListParams, (modified_after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_after"))]
+    #[case(generate!(MediaListParams, (after, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("after"))]
+    #[case(generate!(MediaListParams, (modified_after, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("modified_after"))]
     #[case(generate!(MediaListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
     #[case(generate!(MediaListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
-    #[case(generate!(MediaListParams, (before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("before"))]
-    #[case(generate!(MediaListParams, (modified_before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("modified_before"))]
+    #[case(generate!(MediaListParams, (before, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("before"))]
+    #[case(generate!(MediaListParams, (modified_before, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("modified_before"))]
     #[case(generate!(MediaListParams, (exclude, vec![MediaId(1), MediaId(2)])), "exclude=1%2C2")]
     #[case(generate!(MediaListParams, (include, vec![MediaId(1), MediaId(2)])), "include=1%2C2")]
     #[case(generate!(MediaListParams, (offset, Some(2))), "offset=2")]
@@ -235,10 +235,10 @@ mod tests {
     }
 
     fn expected_query_pairs_for_media_list_params_with_all_fields() -> String {
-        let after = unit_test_example_date_as_query_value("after");
-        let modified_after = unit_test_example_date_as_query_value("modified_after");
-        let before = unit_test_example_date_as_query_value("before");
-        let modified_before = unit_test_example_date_as_query_value("modified_before");
+        let after = unit_test_example_date_string_as_query_value("after");
+        let modified_after = unit_test_example_date_string_as_query_value("modified_after");
+        let before = unit_test_example_date_string_as_query_value("before");
+        let modified_before = unit_test_example_date_string_as_query_value("modified_before");
         format!(
             "page=11&per_page=22&search=s_q&{after}&{modified_after}&author=111%2C112&author_exclude=211%2C212&{before}&{modified_before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=slug&parent=44444%2C44445&parent_exclude=55555%2C55556&search_columns=post_content%2Cpost_excerpt&slug=sl_1%2Csl_2&status=inherit%2Cprivate%2Ctrash&media_type=image&mime_type=image%2Fjpeg"
         )
@@ -249,12 +249,12 @@ mod tests {
             page: Some(11),
             per_page: Some(22),
             search: Some("s_q".to_string()),
-            after: unit_test_example_date_as_option(),
-            modified_after: unit_test_example_date_as_option(),
+            after: unit_test_example_date_string_as_option(),
+            modified_after: unit_test_example_date_string_as_option(),
             author: vec![UserId(111), UserId(112)],
             author_exclude: vec![UserId(211), UserId(212)],
-            before: unit_test_example_date_as_option(),
-            modified_before: unit_test_example_date_as_option(),
+            before: unit_test_example_date_string_as_option(),
+            modified_before: unit_test_example_date_string_as_option(),
             exclude: vec![MediaId(1111), MediaId(1112)],
             include: vec![MediaId(2111), MediaId(2112)],
             offset: Some(11111),

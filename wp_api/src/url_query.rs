@@ -192,12 +192,6 @@ impl<'a> UrlQueryPairsMap<'a> {
         indexed_values.sort_by_key(|(index, _)| *index);
         indexed_values.into_iter().map(|(_, v)| v).collect()
     }
-
-    pub(crate) fn get_wp_date_time<'b>(&self, key: impl Into<&'b str>) -> Option<WpGmtDateTime> {
-        self.inner
-            .get(key.into())
-            .and_then(|v| v.parse::<WpGmtDateTime>().ok())
-    }
 }
 
 pub trait FromUrlQueryPairs

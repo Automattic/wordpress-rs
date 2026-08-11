@@ -1,5 +1,5 @@
 use crate::{
-    date::WpGmtDateTime,
+    date::WpDateString,
     request::{RequestMethod, WpNetworkHeaderMap, WpNetworkResponse, endpoint::WpEndpointUrl},
     url_query::{AppendUrlQueryPairs, FromUrlQueryPairs, UrlQueryPairsMap},
 };
@@ -29,17 +29,13 @@ where
 }
 
 #[cfg(test)]
-pub fn unit_test_example_date_as_option() -> Option<WpGmtDateTime> {
-    Some(
-        "2024-02-09T02:14:13+0000"
-            .parse::<WpGmtDateTime>()
-            .expect("Example date is parseable"),
-    )
+pub fn unit_test_example_date_string_as_option() -> Option<WpDateString> {
+    Some(WpDateString("2024-02-09T02:14:13".to_string()))
 }
 
 #[cfg(test)]
-pub fn unit_test_example_date_as_query_value(key: &str) -> String {
-    format!("{key}=2024-02-09T02%3A14%3A13%2B00%3A00")
+pub fn unit_test_example_date_string_as_query_value(key: &str) -> String {
+    format!("{key}=2024-02-09T02%3A14%3A13")
 }
 
 #[cfg(test)]

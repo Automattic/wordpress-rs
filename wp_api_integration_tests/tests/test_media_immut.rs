@@ -1,3 +1,4 @@
+use wp_api::date::WpDateString;
 use wp_api::{
     media::{
         MediaId, MediaListParams, MediaStatus, MediaTypeParam, SparseMediaFieldWithEditContext,
@@ -105,12 +106,12 @@ async fn paginate_list_media_with_edit_context(#[case] params: MediaListParams) 
 #[case::page(generate!(MediaListParams, (page, Some(1))))]
 #[case::per_page(generate!(MediaListParams, (per_page, Some(3))))]
 #[case::search(generate!(MediaListParams, (search, Some("foo".to_string()))))]
-#[case::after(generate!(MediaListParams, (after, Some(unwrapped_wp_gmt_date_time("2020-08-14T17:00:00+0200")))))]
-#[case::modified_after(generate!(MediaListParams, (modified_after, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0200")))))]
+#[case::after(generate!(MediaListParams, (after, Some(WpDateString("2020-08-14T17:00:00".to_string())))))]
+#[case::modified_after(generate!(MediaListParams, (modified_after, Some(WpDateString("2024-01-14T17:00:00".to_string())))))]
 #[case::author(generate!(MediaListParams, (author, vec![FIRST_USER_ID, SECOND_USER_ID])))]
 #[case::author_exclude(generate!(MediaListParams, (author_exclude, vec![SECOND_USER_ID])))]
-#[case::before(generate!(MediaListParams, (before, Some(unwrapped_wp_gmt_date_time("2023-08-14T17:00:00+0000")))))]
-#[case::modified_before(generate!(MediaListParams, (modified_before, Some(unwrapped_wp_gmt_date_time("2024-01-14T17:00:00+0000")))))]
+#[case::before(generate!(MediaListParams, (before, Some(WpDateString("2023-08-14T17:00:00".to_string())))))]
+#[case::modified_before(generate!(MediaListParams, (modified_before, Some(WpDateString("2024-01-14T17:00:00".to_string())))))]
 #[case::exclude(generate!(MediaListParams, (exclude, vec![MediaId(1), MediaId(2)])))]
 #[case::include(generate!(MediaListParams, (include, vec![MediaId(1)])))]
 #[case::offset(generate!(MediaListParams, (offset, Some(2))))]

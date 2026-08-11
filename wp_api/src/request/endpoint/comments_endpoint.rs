@@ -49,7 +49,7 @@ mod tests {
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
         },
         unit_test_common::{
-            unit_test_example_date_as_option, unit_test_example_date_as_query_value,
+            unit_test_example_date_string_as_option, unit_test_example_date_string_as_query_value,
         },
     };
     use rstest::*;
@@ -60,11 +60,11 @@ mod tests {
     #[case(generate!(CommentListParams, (page, Some(2))), "page=2")]
     #[case(generate!(CommentListParams, (per_page, Some(2))), "per_page=2")]
     #[case(generate!(CommentListParams, (search, Some("foo".to_string()))), "search=foo")]
-    #[case(generate!(CommentListParams, (after, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("after"))]
+    #[case(generate!(CommentListParams, (after, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("after"))]
     #[case(generate!(CommentListParams, (author, vec![UserId(1), UserId(2)])), "author=1%2C2")]
     #[case(generate!(CommentListParams, (author_exclude, vec![UserId(1), UserId(2)])), "author_exclude=1%2C2")]
     #[case(generate!(CommentListParams, (author_email, Some("foo".to_string()))), "author_email=foo")]
-    #[case(generate!(CommentListParams, (before, unit_test_example_date_as_option())), &unit_test_example_date_as_query_value("before"))]
+    #[case(generate!(CommentListParams, (before, unit_test_example_date_string_as_option())), &unit_test_example_date_string_as_query_value("before"))]
     #[case(generate!(CommentListParams, (exclude, vec![CommentId(1), CommentId(2)])), "exclude=1%2C2")]
     #[case(generate!(CommentListParams, (include, vec![CommentId(1), CommentId(2)])), "include=1%2C2")]
     #[case(generate!(CommentListParams, (offset, Some(2))), "offset=2")]
@@ -169,8 +169,8 @@ mod tests {
     }
 
     fn expected_query_pairs_for_comment_list_params_with_all_fields() -> String {
-        let after = unit_test_example_date_as_query_value("after");
-        let before = unit_test_example_date_as_query_value("before");
+        let after = unit_test_example_date_string_as_query_value("after");
+        let before = unit_test_example_date_string_as_query_value("before");
         format!(
             "page=11&per_page=22&search=s_q&{after}&author=111%2C112&author_exclude=211%2C212&author_email=a_email%40example.com&{before}&exclude=1111%2C1112&include=2111%2C2112&offset=11111&order=desc&orderby=type&parent=44444%2C44445&parent_exclude=55555%2C55556&post=66666%2C66667&status=spam&type=pingback&password=p_q"
         )
@@ -181,11 +181,11 @@ mod tests {
             page: Some(11),
             per_page: Some(22),
             search: Some("s_q".to_string()),
-            after: unit_test_example_date_as_option(),
+            after: unit_test_example_date_string_as_option(),
             author: vec![UserId(111), UserId(112)],
             author_exclude: vec![UserId(211), UserId(212)],
             author_email: Some("a_email@example.com".to_string()),
-            before: unit_test_example_date_as_option(),
+            before: unit_test_example_date_string_as_option(),
             exclude: vec![CommentId(1111), CommentId(1112)],
             include: vec![CommentId(2111), CommentId(2112)],
             offset: Some(11111),
