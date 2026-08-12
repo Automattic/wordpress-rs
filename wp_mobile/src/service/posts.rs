@@ -640,7 +640,7 @@ impl PostService {
     /// # Returns
     /// - `Ok(Vec<FullEntity>)` with posts found in cache
     /// - `Err` if database error occurs
-    pub fn read_posts_by_ids_from_db(
+    pub fn read_post_full_entities_by_ids_from_db(
         &self,
         ids: &[i64],
     ) -> Result<Vec<FullEntity<AnyPostWithEditContext>>, wp_mobile_cache::SqliteDbError> {
