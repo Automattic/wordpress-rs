@@ -74,7 +74,8 @@ impl From<PostId> for StatsPostTarget {
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 #[serde(from = "RawStatsPostResponse", into = "RawStatsPostResponse")]
 pub struct StatsPostResponse {
-    /// The date the stats were generated for, in the site's timezone.
+    /// The date the stats were generated for, as `YYYY-MM-DD` in the site's
+    /// timezone.
     pub date: WpDateString,
     /// The target's all-time view count.
     pub views: u64,

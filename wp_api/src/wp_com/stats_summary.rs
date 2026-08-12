@@ -64,7 +64,8 @@ pub struct StatsSummaryStats {
     /// The most active recent day for comments. The API derives this from a
     /// comment's GMT timestamp, so it carries a time of day that isn't part of
     /// what the field reports.
-    /// Empty strings from the API are treated as `None`.
+    ///
+    /// An empty string, `null`, or an absent field all read as `None`.
     #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
     pub comments_most_active_recent_day: Option<WpGmtDateTime>,
     /// The most active time for comments.
