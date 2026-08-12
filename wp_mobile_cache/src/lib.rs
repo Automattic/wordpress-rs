@@ -332,7 +332,7 @@ impl WpApiCache {
 
     pub fn start_listening_for_updates(&self, delegate: std::sync::Arc<dyn DatabaseDelegate>) {
         self.execute(|connection| {
-            connection.update_hook(Some(
+            if let Err(e) = connection.update_hook(Some(
                 move |action: Action, db_name: &str, table_name: &str, row_id: i64| {
                     match DbTable::try_from(table_name) {
                         Ok(table) => {
@@ -353,13 +353,17 @@ impl WpApiCache {
                         }
                     }
                 },
-            ));
+            )) {
+                log::warn!("Failed to register update hook: {}", e);
+            }
         });
     }
 
     pub fn stop_listening_for_updates(&self) {
         self.execute(|connection| {
-            connection.update_hook(None::<fn(Action, &str, &str, i64)>);
+            if let Err(e) = connection.update_hook(None::<fn(Action, &str, &str, i64)>) {
+                log::warn!("Failed to clear update hook: {}", e);
+            }
         });
     }
 
