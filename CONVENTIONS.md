@@ -4,7 +4,7 @@ Rules for modelling the WordPress and WordPress.com REST APIs in this crate, so 
 
 ## Dates
 
-Every field holding a point in time is one of two types. Never a bare `String`.
+When you model a point in time, reach for one of these two types rather than a bare `String`.
 
 **`WpGmtDateTime`** — the value resolves to an absolute instant, because it is UTC or carries an offset. The bindings lower it to a unix timestamp, so a value that isn't genuinely an instant becomes a wrong one.
 
@@ -16,7 +16,7 @@ Decide from what the endpoint implementation produces, not from the field's name
 
 ### Absent and unparseable values
 
-Some endpoints send boolean `false` rather than `null` when a date doesn't apply; `deserialize_optional_date_string` covers that for `WpDateString`. `deserialize_optional_wp_gmt_date_time` treats `null` and `""` as absent.
+`wp_com`'s domain fields send boolean `false` rather than `null` when a date doesn't apply; `deserialize_optional_date_string` covers that for `WpDateString`. `deserialize_optional_wp_gmt_date_time` treats `null` and `""` as absent.
 
 Reading a `WpGmtDateTime` accepts an offset, the offsetless WordPress form, MySQL's, and a unix timestamp, the same way through serde, `FromStr` and those helpers. The offsetless forms are read as UTC, so only reach for this type once you know the value is GMT.
 

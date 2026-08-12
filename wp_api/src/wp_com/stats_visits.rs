@@ -184,13 +184,14 @@ fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(StatsPer
 
 uniffi::custom_newtype!(StatsPeriodLabel, String);
 /// The span a time-series data point covers, labelled to match the unit the
-/// caller asked for: `"2026-01-27"` for a day, `"2026W02W23"` for a week,
-/// `"2025-11-01"` for a month, `"2024"` for a year, and
-/// `"2026-01-17 01:00:00"` for an hour.
+/// caller asked for. The two endpoints that send it build their labels
+/// separately and don't agree, so treat it as opaque rather than parsing it:
+/// `/stats/subscribers` sends `"2026-01-27"` for a day, `"2026W02W23"` for a
+/// week and `"2026"` for a year, while `/stats/visits` sends
+/// `"2026-01-17 01:00:00"` for an hour and `"2025-12-21"` for a day.
 ///
-/// Only the daily form is a date, so this is neither a [`WpDateString`] nor a
-/// [`crate::date::WpGmtDateTime`] — it identifies a span rather than a point
-/// in time.
+/// It names a span rather than a point in time, so it is neither a
+/// [`WpDateString`] nor a [`crate::date::WpGmtDateTime`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct StatsPeriodLabel(pub String);

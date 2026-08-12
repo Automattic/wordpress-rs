@@ -40,9 +40,8 @@ uniffi::custom_newtype!(WpDateString, String);
 /// because its time is in the site's timezone rather than GMT
 /// (`"2026-08-06 09:15:49"`).
 ///
-/// Use [`WpGmtDateTime`] instead wherever the API gives a GMT or offset-bearing
-/// value; every date field should be one or the other rather than a bare
-/// `String`.
+/// Use [`WpGmtDateTime`] instead wherever the API gives a GMT or
+/// offset-bearing value.
 ///
 /// Some PHP endpoints return `false` instead of `null` when a date is not
 /// applicable. Use [`deserialize_optional_date_string`] on fields that

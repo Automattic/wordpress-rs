@@ -1006,8 +1006,8 @@ pub struct SiteDomain {
     /// Google Workspace email subscription, if configured.
     pub google_apps_subscription: Option<GoogleAppsSubscription>,
     /// How long a pending registration is expected to take, phrased for
-    /// display — `"48 hours"`. Despite the name this is a duration, not a
-    /// point in time, so it is not a date.
+    /// display. Despite the name this is a duration, not a point in time, so
+    /// it is not a date.
     pub pending_registration_time: Option<String>,
     /// Whether a WHOIS update is pending.
     pub pending_whois_update: Option<bool>,

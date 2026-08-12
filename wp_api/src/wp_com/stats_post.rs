@@ -227,7 +227,7 @@ fn daily_views(fields: &[String], data: Vec<Vec<StatsVisitsDataValue>>) -> Vec<S
 /// A single day's view count from the daily view history.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostDailyView {
-    /// The day the views were recorded on, in the site's timezone.
+    /// The day the views were bucketed into.
     pub period: WpDateString,
     /// The number of views on that day.
     pub views: u64,
@@ -320,7 +320,7 @@ impl From<StatsPostChange> for RawStatsPostChange {
 /// A single day within a [`StatsPostWeek`].
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostDay {
-    /// The day, in the site's timezone.
+    /// The day the views were bucketed into.
     pub day: WpDateString,
     /// The number of views on that day.
     pub count: u64,
