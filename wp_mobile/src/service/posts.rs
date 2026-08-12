@@ -700,6 +700,27 @@ impl PostService {
         .into()
     }
 
+    /// Read posts by their WordPress post IDs from the database cache.
+    ///
+    /// Cache-only: no network request is made, so this is safe to call for
+    /// resolving display data (e.g. post titles for a comments list) without
+    /// triggering fetches. IDs not present in the cache are silently omitted
+    /// from the result; callers that need to distinguish missing posts must
+    /// compare the result against the requested IDs.
+    ///
+    /// Results are returned in the order of `post_ids`.
+    pub fn read_posts_by_ids_from_db(
+        &self,
+        post_ids: Vec<PostId>,
+    ) -> Result<Vec<AnyPostWithEditContext>, wp_mobile_cache::SqliteDbError> {
+        let ids: Vec<i64> = post_ids.iter().map(|post_id| post_id.0).collect();
+        Ok(self
+            .read_post_full_entities_by_ids_from_db(&ids)?
+            .into_iter()
+            .map(|full_entity| full_entity.data)
+            .collect())
+    }
+
     /// Get the total count of posts for this site
     ///
     /// Returns the number of posts stored in the cache for this site.
@@ -1089,6 +1110,60 @@ mod tests {
         // Assert: Post was found and matches what we inserted
         let full_entity = result.expect("Post should be found in cache");
         test_post.assert_matches(&full_entity.data);
+    }
+
+    #[rstest]
+    fn test_read_posts_by_ids_from_db_returns_present_and_omits_missing(
+        post_service_ctx: PostServiceTestContext,
+    ) {
+        // Setup: one post in the cache; PostId(99999) is never inserted
+        let test_post = insert_test_post(&post_service_ctx);
+
+        let posts = post_service_ctx
+            .post_service
+            .read_posts_by_ids_from_db(vec![test_post.id, PostId(99999)])
+            .expect("Database read should succeed");
+
+        // Assert: the cached post is returned, the missing ID is omitted
+        assert_eq!(posts.len(), 1, "missing IDs must be omitted, not errors");
+        test_post.assert_matches(&posts[0]);
+    }
+
+    #[rstest]
+    fn test_read_posts_by_ids_from_db_is_site_scoped(post_service_ctx: PostServiceTestContext) {
+        // Setup: a post that belongs to a different site in the same database
+        let other_site = post_service_ctx
+            .cache
+            .execute(|conn| {
+                SiteRepository.upsert_self_hosted_site(
+                    conn,
+                    &SelfHostedSite {
+                        url: "https://other.local".to_string(),
+                        api_root: "https://other.local/wp-json".to_string(),
+                    },
+                )
+            })
+            .expect("Site creation should succeed")
+            .db_site;
+        let other_post = PostBuilder::minimal()
+            .with_id(7)
+            .with_title("Other Site Post")
+            .with_slug("other-site-post")
+            .build();
+        post_service_ctx
+            .cache
+            .execute(|conn| {
+                PostRepository::<EditContext>::new().upsert(conn, &other_site, &other_post)
+            })
+            .expect("Post insert should succeed");
+
+        let posts = post_service_ctx
+            .post_service
+            .read_posts_by_ids_from_db(vec![PostId(7)])
+            .expect("Database read should succeed");
+
+        // Assert: the service only reads posts for its own site
+        assert!(posts.is_empty(), "another site's post must not be returned");
     }
 
     #[rstest]
