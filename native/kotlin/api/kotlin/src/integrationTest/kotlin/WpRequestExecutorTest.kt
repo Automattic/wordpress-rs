@@ -20,6 +20,7 @@ import uniffi.wp_api.WpAuthenticationProvider
 import java.io.File
 import java.net.URI
 import java.util.concurrent.TimeUnit
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -279,6 +280,55 @@ class WpRequestExecutorTest {
         assertIs<RequestExecutionErrorReason.ConnectionError>(
             (result as WpRequestResult.RequestExecutionFailed<*>).reason
         )
+    }
+
+    @Test
+    fun `a file that fails while its bytes are read is mapped to MediaFileUnreadable`() = runTest {
+        // A file that passes the pre-upload check (`exists()`/`isFile`/`canRead()`) but then fails
+        // when OkHttp reads its bytes to stream the body — e.g. deleted after the check, or a storage
+        // read error. This drives the whole executor -> caller chain that `MediaFileRequestBodyTest`
+        // only covers in isolation: `MediaFileRequestBody` tags the read failure as
+        // `MediaFileUnreadableException`, `executeRequestSafely` catches it *before* the generic
+        // `IOException`, and it surfaces as `WpRequestResult.MediaFileUnreadable` carrying the path.
+        // Guards against dropping/reordering that catch, which would re-drop it to `GenericError`.
+        // The body write fails before any response is read, so an enqueued response is never used —
+        // it only keeps a regression that lets the request complete from blocking on an empty queue.
+        mockWebServer.enqueue(MockResponse())
+
+        val filePath = "/tmp/wp-rs-test/gone-after-check.jpg"
+        // Lies about being present and readable so `canBeUploaded()` passes, but points at a path with
+        // no file, so okio's `file.source()` throws `FileNotFoundException` exactly where OkHttp
+        // streams the request body — a deterministic, uid-independent stand-in for a mid-upload read
+        // failure (a genuine one is a non-deterministic TOCTOU race against the pre-upload check).
+        val unreadableFileResolver = object : FileResolver {
+            override fun getFile(path: String): File = object : File(filePath) {
+                override fun exists() = true
+                override fun isFile() = true
+                override fun canRead() = true
+                override fun length() = 8L
+            }
+        }
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true },
+            fileResolver = unreadableFileResolver
+        )
+
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.media().create(
+                params = MediaCreateParams(title = "Unreadable upload", filePath = filePath)
+            )
+        }
+
+        assertIs<WpRequestResult.MediaFileUnreadable<*>>(result)
+        assertEquals(filePath, (result as WpRequestResult.MediaFileUnreadable<*>).filePath)
     }
 
     /**
