@@ -283,6 +283,33 @@ class ApiUrlDiscoveryTest {
         assertContains(presentedHostnames, "vanilla.wpmt.co")
     }
 
+    // `wrong.host.badssl.com` serves a valid `*.badssl.com` certificate on a host
+    // it doesn't cover — a genuine name mismatch whose identities live in the SANs.
+    // The old code reported only the Common Name; assert the `badssl.com` SAN is
+    // now included too.
+    //
+    // The CN-less case (`no-common-name.badssl.com`) isn't exercised here: that
+    // certificate is expired, which OkHttp raises as an `SSLHandshakeException` —
+    // not the `SSLPeerUnverifiedException` that routes to certificate inspection —
+    // and the inspection's re-connect would fail on the expiry regardless. The
+    // Rust `parse_certificate` unit test covers the CN-less parse directly.
+    @Test
+    fun testNameMismatchReportsAllPresentedNames() = runTest {
+        val reason = loginClient.apiDiscovery("https://wrong.host.badssl.com")
+            .assertFailureFindApiRoot().getRequestExecutionErrorReason()
+        assertInstanceOf(RequestExecutionErrorReason.InvalidSslError::class.java, reason)
+
+        val sslError = (reason as RequestExecutionErrorReason.InvalidSslError).reason
+        assertInstanceOf(
+            InvalidSslErrorReason.CertificateNotValidForName::class.java,
+            sslError
+        )
+
+        val presentedHostnames =
+            (sslError as InvalidSslErrorReason.CertificateNotValidForName).presentedHostnames
+        assertContains(presentedHostnames, "badssl.com")
+    }
+
     @Test // Spec Example 17 (with exception)
     fun testInvalidHttpsWithExceptionWorks() = runTest {
         val httpClient = WpHttpClient.DefaultHttpClient(emptyList())

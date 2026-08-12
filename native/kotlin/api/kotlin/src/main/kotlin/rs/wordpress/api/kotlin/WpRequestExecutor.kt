@@ -356,11 +356,15 @@ private fun RequestExecutionErrorReason.Companion.invalidSSLError(
 
         try {
             // Certificate is parsed by the Rust shared implementation.
+            // `serverCertificates` is leaf-first, so the site's certificate is the
+            // first element. Report every hostname it presents (Common Name plus
+            // SANs), not only its Common Name — a modern SAN-only certificate may
+            // omit the Common Name entirely.
             val certificates = newConnection.serverCertificates.map { parseCertificate(it.encoded) }
             RequestExecutionErrorReason.InvalidSslError(
                 reason = InvalidSslErrorReason.CertificateNotValidForName(
                     hostname = requestUrl.host,
-                    presentedHostnames = listOfNotNull(certificates.first()?.commonName())
+                    presentedHostnames = certificates.firstOrNull()?.presentedHostnames() ?: emptyList()
                 )
             )
         } finally {
