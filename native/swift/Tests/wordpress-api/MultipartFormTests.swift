@@ -2,6 +2,10 @@ import Foundation
 import Testing
 @testable import WordPressAPI
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 class MultipartFormTests {
 
     /// An `InputStream` that yields `prefix`, then simulates a failure by returning
@@ -541,3 +545,253 @@ class MultipartFormTests {
         #expect(body == expected)
     }
 }
+
+// Regression tests for #1540: a multipart body estimated over 10 MB (or built with
+// `forceWriteToFile: true`) is serialized to a UUID-named temp file under
+// `FileManager.default.temporaryDirectory` and uploaded via `URLSession.uploadTask(fromFile:)`.
+// `URLSession` treats that file as caller-owned — it reads it for the duration of the transfer but
+// never deletes it — so every large upload leaked a temp file until the OS eventually reclaimed it.
+// The cleanup lives in `MultipartFormContent.removeTemporaryFileIfNeeded()`, invoked from
+// `upload(...)` once the transfer finishes on any path.
+
+@Suite("MultipartForm temp-file cleanup")
+struct MultipartFormCleanupTests {
+
+    @Test("removeTemporaryFileIfNeeded deletes the temp file an on-disk body created")
+    func removesOnDiskTempFile() throws {
+        // Use the production serialization path so the file under test is a real temp file that
+        // `multipartFormDataStream` created, not one the test fabricated.
+        let content = try [MultipartFormField(text: "hello", name: "field")]
+            .multipartFormDataStream(boundary: "test-boundary", forceWriteToFile: true)
+
+        guard case let .onDisk(url) = content else {
+            Issue.record("forceWriteToFile: true should serialize to disk, got \(content)")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: url.path))
+
+        content.removeTemporaryFileIfNeeded()
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test("removeTemporaryFileIfNeeded is a harmless no-op for an in-memory body")
+    func inMemoryCleanupIsNoOp() {
+        // An in-memory body owns no file; cleanup must simply do nothing rather than crash.
+        MultipartFormContent.inMemory(Data("in memory".utf8)).removeTemporaryFileIfNeeded()
+    }
+}
+
+// These drive `upload(...)` through a custom `URLProtocol` that intercepts `uploadTask(fromFile:)`.
+// That interception works on macOS and iOS but not dependably on the tvOS/watchOS simulators, where it
+// fails in CI. Compile it out entirely off those platforms — not just a runtime skip — so a
+// compile-only difference can't break them either; the platform-agnostic cleanup logic stays covered
+// by the macOS and iOS runs plus the cross-platform `MultipartFormCleanupTests` above.
+#if os(macOS) || os(iOS)
+@Suite("MultipartForm upload cleanup")
+struct MultipartFormUploadTests {
+
+    @Test("upload deletes the on-disk temp file after a successful transfer")
+    func uploadRemovesTempFileOnSuccess() async throws {
+        let file = try Self.makeTempFile()
+
+        // `expectingFileAt:` makes the stub assert the temp file still exists while the transfer is
+        // in flight (see `StubURLProtocol.startLoading`). Together with the post-return `!fileExists`
+        // check below, this brackets the file's lifetime — it must outlive the transfer, then be
+        // gone — so a regression that deletes it too early fails here, not just one that leaks it.
+        let (data, response) = try await upload(
+            body: .onDisk(file),
+            with: Self.stubRequest(behavior: .success, expectingFileAt: file.path),
+            session: Self.stubbedSession(),
+            delegate: nil
+        )
+
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(String(data: data, encoding: .utf8) == "ok")
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test("upload deletes the on-disk temp file after a failed transfer")
+    func uploadRemovesTempFileOnFailure() async throws {
+        let file = try Self.makeTempFile()
+
+        // Match the exact error the stub injects (URLError(.notConnectedToInternet)), which propagates
+        // raw through `completionHandler` → `result.get()`. Pinning the code (not just "some error")
+        // keeps this test guarding the failed-*transfer* path: a future early throw in `upload(...)`
+        // would surface a different error and fail here, rather than silently passing on the always-run
+        // cleanup `defer`.
+        await #expect(
+            performing: {
+                try await upload(
+                    body: .onDisk(file),
+                    with: Self.stubRequest(behavior: .failure),
+                    session: Self.stubbedSession(),
+                    delegate: nil
+                )
+            },
+            throws: { ($0 as? URLError)?.code == .notConnectedToInternet }
+        )
+
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test("upload deletes the on-disk temp file after cancellation")
+    func uploadRemovesTempFileOnCancellation() async throws {
+        let file = try Self.makeTempFile()
+
+        // Exercise the third cleanup path the fix promises: cancellation. A `.hang` stub keeps the
+        // transfer in flight, and the delegate signals once `upload(...)` has created and resumed the
+        // task — so we cancel a genuinely in-flight upload deterministically (no `sleep`). Cancelling
+        // before the task exists would leave the hanging upload with nothing to cancel, and deadlock.
+        let started = StartGate()
+        let delegate = TaskCreationNotifier(gate: started)
+
+        let uploadTask = Task {
+            _ = try await upload(
+                body: .onDisk(file),
+                with: Self.stubRequest(behavior: .hang),
+                session: Self.stubbedSession(),
+                delegate: delegate
+            )
+        }
+
+        await started.wait()
+        uploadTask.cancel()
+
+        // Cancelling surfaces URLError(.cancelled) through the completion handler, which propagates out
+        // of upload(...); pin the code, matching the failure test.
+        await #expect(
+            performing: { try await uploadTask.value },
+            throws: { ($0 as? URLError)?.code == .cancelled }
+        )
+
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+    }
+
+    // MARK: - Helpers
+
+    private static func makeTempFile() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data("multipart body bytes".utf8).write(to: url)
+        return url
+    }
+
+    private static func stubbedSession() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [StubURLProtocol.self]
+        return URLSession(configuration: config)
+    }
+
+    private static func stubRequest(
+        behavior: StubURLProtocol.Behavior,
+        expectingFileAt expectedFilePath: String? = nil
+    ) -> URLRequest {
+        var request = URLRequest(url: URL(string: "https://example.com/upload")!)
+        request.httpMethod = "POST"
+        request.setValue(behavior.rawValue, forHTTPHeaderField: StubURLProtocol.behaviorHeader)
+        if let expectedFilePath {
+            request.setValue(expectedFilePath, forHTTPHeaderField: StubURLProtocol.expectedFileHeader)
+        }
+        return request
+    }
+}
+
+/// A stateless `URLProtocol` that returns a canned response so `upload(...)` can be exercised
+/// without real networking. The desired behavior is carried on the request via a header rather than
+/// shared mutable state, so concurrently-running tests don't interfere with each other.
+private final class StubURLProtocol: URLProtocol {
+    static let behaviorHeader = "X-Stub-Behavior"
+    static let expectedFileHeader = "X-Stub-Expected-File"
+
+    enum Behavior: String {
+        case success
+        case failure
+        case hang
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func stopLoading() {}
+
+    override func startLoading() {
+        // A `.onDisk` upload's temp file must survive until the transfer completes; deleting it any
+        // earlier — e.g. hoisting the cleanup out of `upload(...)`'s `defer` — would fail a real large
+        // upload mid-read. `startLoading()` runs while the transfer is in flight, before we signal
+        // completion below, so the file must still exist here. If a caller passed its path and it's
+        // already gone, surface a distinct error so the upload test's assertions fail loudly instead
+        // of a premature-delete regression slipping through a "gone afterward" check.
+        let expectedFilePath = request.value(forHTTPHeaderField: Self.expectedFileHeader)
+        if let expectedFilePath, !FileManager.default.fileExists(atPath: expectedFilePath) {
+            client?.urlProtocol(self, didFailWithError: URLError(.fileDoesNotExist))
+            return
+        }
+
+        let headerValue = request.value(forHTTPHeaderField: Self.behaviorHeader)
+        let behavior = headerValue.flatMap(Behavior.init(rawValue:)) ?? .success
+
+        switch behavior {
+        case .success:
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: [:]
+            )!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data("ok".utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        case .failure:
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+        case .hang:
+            // Never respond: the transfer stays in flight until the task is cancelled, so the
+            // cancellation test can exercise upload(...)'s onCancel path.
+            break
+        }
+    }
+}
+
+/// A one-shot async latch. `fulfill()` may run before or after `wait()`; `wait()` returns once
+/// `fulfill()` has been called. Lets the cancellation test cancel only after the upload task is in
+/// flight — deterministically, without a `sleep`. Lock-based, mirroring `TaskCancellation`.
+private final class StartGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isFulfilled = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func fulfill() {
+        lock.lock()
+        isFulfilled = true
+        let waiter = continuation
+        continuation = nil
+        lock.unlock()
+        waiter?.resume()
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if isFulfilled {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                self.continuation = continuation
+                lock.unlock()
+            }
+        }
+    }
+}
+
+/// Signals a `StartGate` when `URLSession` reports the upload task was created — i.e. once
+/// `upload(...)` has created and resumed it — so the cancellation test cancels an in-flight transfer
+/// rather than racing task creation.
+private final class TaskCreationNotifier: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let gate: StartGate
+
+    init(gate: StartGate) {
+        self.gate = gate
+    }
+
+    func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
+        gate.fulfill()
+    }
+}
+#endif
