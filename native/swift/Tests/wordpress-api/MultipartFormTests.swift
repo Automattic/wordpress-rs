@@ -136,6 +136,105 @@ class MultipartFormTests {
     }
 
     @Test
+    func inaccessibleFileErrorCarriesSourcePathForFileField() throws {
+        // A file-backed field that fails mid-read carries its source path, so the executor
+        // can name the file. `sourcePath` stands in for the path a `fileAtPath:` field retains.
+        let path = "/tmp/uploads/photo.jpg"
+        let form: [MultipartFormField] = [
+            MultipartFormField(
+                inputStream: FailingInputStream(prefix: Array("partial".utf8)),
+                name: "file",
+                filename: "photo.jpg",
+                mimeType: "image/jpeg",
+                bytes: 0,
+                sourcePath: path
+            )
+        ]
+
+        do {
+            _ = try form.multipartFormDataStream(boundary: "boundary")
+            Issue.record("Expected serialization to throw when the stream read fails")
+        } catch let error as MultipartFormError {
+            guard case let .inaccessibleFile(_, filePath) = error else {
+                Issue.record("Expected .inaccessibleFile, got \(error)")
+                return
+            }
+            #expect(filePath == path)
+        }
+    }
+
+    @Test
+    func inaccessibleFileErrorHasNoPathForInMemoryField() throws {
+        // An in-memory field (no backing file) that fails carries a `nil` path, so the
+        // executor's `filePath?` guard doesn't misclassify it as `MediaFileUnreadable`
+        // and it correctly falls through to `.genericError`.
+        let form: [MultipartFormField] = [
+            MultipartFormField(
+                inputStream: FailingInputStream(),
+                name: "field1",
+                bytes: 0
+            )
+        ]
+
+        do {
+            _ = try form.multipartFormDataStream(boundary: "boundary")
+            Issue.record("Expected serialization to throw when the stream read fails")
+        } catch let error as MultipartFormError {
+            guard case let .inaccessibleFile(_, filePath) = error else {
+                Issue.record("Expected .inaccessibleFile, got \(error)")
+                return
+            }
+            #expect(filePath == nil)
+        }
+    }
+
+    @Test
+    func inaccessibleFileWithPathMapsToMediaFileUnreadable() throws {
+        // The executor maps a mid-read failure that carries a source path to the dedicated
+        // `.MediaFileUnreadable`, naming the file.
+        let mapped = try #require(
+            MultipartFormError.inaccessibleFile(underlyingError: POSIXError(.EIO), filePath: "/tmp/uploads/photo.jpg")
+                .asRequestExecutionError
+        )
+        guard case let .MediaFileUnreadable(filePath) = mapped else {
+            Issue.record("Expected .MediaFileUnreadable, got \(mapped)")
+            return
+        }
+        #expect(filePath == "/tmp/uploads/photo.jpg")
+    }
+
+    @Test
+    func inaccessibleFileWithoutPathStaysGeneric() throws {
+        // A serialization failure with no backing file (nil path) — or `.impossible` — has
+        // nothing to classify, so it maps to `nil` and the executor lets it fall through to
+        // `.genericError`. This pins the `filePath?` guard: relaxing it to accept a nil path
+        // would misclassify a non-file serialization failure as `MediaFileUnreadable`.
+        #expect(
+            MultipartFormError.inaccessibleFile(underlyingError: POSIXError(.EIO), filePath: nil)
+                .asRequestExecutionError == nil
+        )
+        #expect(MultipartFormError.impossible.asRequestExecutionError == nil)
+    }
+
+    @Test
+    func fileFieldRetainsFullSourcePath() throws {
+        // The production `fileAtPath:` init must retain the full source path (not just the
+        // basename in `filename`); a regression to nil would send every real upload's mid-read
+        // failure to a path-less `.genericError`, which the stream-layer tests wouldn't catch.
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".jpg").path
+        #expect(FileManager.default.createFile(atPath: path, contents: Data("x".utf8)))
+        defer { try? FileManager.default.removeItem(atPath: path) }
+
+        let field = try MultipartFormField(fileAtPath: path, name: "file")
+        #expect(field.sourcePath == path)
+
+        // In-memory fields have no backing file, so they carry no source path.
+        #expect(MultipartFormField(text: "hi", name: "field").sourcePath == nil)
+        #expect(MultipartFormField(data: Data("d".utf8), name: "field").sourcePath == nil)
+    }
+
+    @Test
     func serializationThrowsWhenStreamFailsImmediately() throws {
         // The first read fails (e.g. the file was deleted before any bytes were read).
         let form: [MultipartFormField] = [

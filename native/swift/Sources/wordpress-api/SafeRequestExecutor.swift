@@ -650,6 +650,21 @@ extension WpNetworkRequest: NetworkRequestContent {
     }
 }
 
+extension MultipartFormError {
+    /// The executor error this serialization failure maps to, or `nil` to fall through
+    /// to `.genericError`. A file-backed field with a read failure (non-nil `filePath`)
+    /// becomes `.MediaFileUnreadable`; an in-memory field (nil path) or `.impossible`
+    /// has no file to name and stays generic.
+    var asRequestExecutionError: RequestExecutionError? {
+        switch self {
+        case let .inaccessibleFile(_, filePath?):
+            return .MediaFileUnreadable(filePath: filePath)
+        case .inaccessibleFile(_, nil), .impossible:
+            return nil
+        }
+    }
+}
+
 extension WpMultipartFormRequest: NetworkRequestContent {
 
     func encodeBody(into request: inout URLRequest) throws {
@@ -698,7 +713,15 @@ extension WpMultipartFormRequest: NetworkRequestContent {
 
         let boundery = String(format: "wordpressrs.%08x", Int.random(in: Int.min..<Int.max))
         request.setValue("multipart/form-data; boundary=\(boundery)", forHTTPHeaderField: "Content-Type")
-        let body = try form.multipartFormDataStream(boundary: boundery, forceWriteToFile: false)
+
+        let body: MultipartFormContent
+        do {
+            body = try form.multipartFormDataStream(boundary: boundery, forceWriteToFile: false)
+        } catch let error as MultipartFormError {
+            // Map a mid-read failure to `.MediaFileUnreadable` (see `asRequestExecutionError`);
+            // anything with no file to name re-throws and falls through to `.genericError`.
+            throw error.asRequestExecutionError ?? error
+        }
 
         // `upload(...)` owns the temp file's lifetime and removes it once the transfer finishes. Arm
         // cleanup here too, where serialization acquires the file, so a future edit that throws

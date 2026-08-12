@@ -8,12 +8,18 @@ import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
+import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttp
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okio.Buffer
+import okio.BufferedSink
+import okio.ForwardingSource
+import okio.Source
+import okio.source
 import uniffi.wp_api.InvalidSslErrorReason
 import uniffi.wp_api.RequestContext
 import uniffi.wp_api.RequestExecutionErrorReason
@@ -139,7 +145,9 @@ class WpRequestExecutor @JvmOverloads constructor(
                     }
                     val mimeType = fileInfo.mimeType ?: "application/octet-stream"
                     val filename = fileInfo.fileName ?: file.name
-                    val requestBody = file.asRequestBody(mimeType.toMediaType())
+                    // A `MediaFileRequestBody` (not `file.asRequestBody`) so a failure while OkHttp
+                    // reads the file mid-upload surfaces as `MediaFileUnreadable`, not `GenericError`.
+                    val requestBody = MediaFileRequestBody(file, fileInfo.filePath, mimeType.toMediaType())
                     multipartBodyBuilder.addFormDataPart(
                         name = field.name,
                         filename = filename,
@@ -244,6 +252,10 @@ class WpRequestExecutor @JvmOverloads constructor(
             // (the superclass of `SocketTimeoutException` above); classify it as a timeout so it isn't
             // mislabeled a `CancellationError` by the `isCanceled()` check below.
             RequestExecutionErrorReason.HttpTimeoutError
+        } catch (e: MediaFileUnreadableException) {
+            // A file that passed the pre-upload check but failed while OkHttp read its bytes.
+            // Tagged by `MediaFileRequestBody`; classified before the generic `IOException` below.
+            throw RequestExecutionException.MediaFileUnreadable(filePath = e.filePath)
         } catch (e: IOException) {
             // An explicit `CancellableCall.cancel()` throws a base `IOException("Canceled")` with
             // `isCanceled() == true` — classify only that as `CancellationError` (matching Swift's
@@ -396,3 +408,51 @@ private fun requestExecutionFailedWith(
         requestUrl = requestUrl,
         requestMethod = requestMethod,
     )
+
+/**
+ * A media file that failed while its bytes were read to stream an upload (deleted after
+ * the pre-upload check, or a storage read error). Subclasses [IOException] so it flows
+ * through OkHttp's request-body path to the executor, which maps it to
+ * [RequestExecutionException.MediaFileUnreadable]. `internal` for unit testing.
+ */
+internal class MediaFileUnreadableException(
+    val filePath: String,
+    cause: IOException,
+) : IOException(cause)
+
+/**
+ * Streams [file] as a request body, reporting a *read* (file) failure as
+ * [MediaFileUnreadableException] while a *write* (socket) failure stays an ordinary
+ * `IOException`. Mirrors the Swift executor's read-vs-generic split.
+ */
+internal class MediaFileRequestBody(
+    private val file: File,
+    private val filePath: String,
+    private val mediaType: MediaType?,
+) : RequestBody() {
+    override fun contentType(): MediaType? = mediaType
+
+    override fun contentLength(): Long = file.length()
+
+    override fun writeTo(sink: BufferedSink) {
+        val fileSource = try {
+            file.source()
+        } catch (e: IOException) {
+            throw MediaFileUnreadableException(filePath, e)
+        }
+        readTaggingSource(filePath, fileSource).use { source ->
+            sink.writeAll(source)
+        }
+    }
+}
+
+/** Wraps [delegate] so a failed read throws [MediaFileUnreadableException]. `internal` for tests. */
+internal fun readTaggingSource(filePath: String, delegate: Source): Source =
+    object : ForwardingSource(delegate) {
+        override fun read(sink: Buffer, byteCount: Long): Long =
+            try {
+                super.read(sink, byteCount)
+            } catch (e: IOException) {
+                throw MediaFileUnreadableException(filePath, e)
+            }
+    }

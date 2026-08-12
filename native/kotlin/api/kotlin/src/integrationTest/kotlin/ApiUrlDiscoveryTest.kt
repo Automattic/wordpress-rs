@@ -414,5 +414,6 @@ private fun RequestExecutionException.reason(): RequestExecutionErrorReason? {
     return when (this) {
         is RequestExecutionException.RequestExecutionFailed -> this.reason
         is RequestExecutionException.MediaFileNotFound -> null
+        is RequestExecutionException.MediaFileUnreadable -> null
     }
 }

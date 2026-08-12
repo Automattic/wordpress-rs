@@ -100,6 +100,49 @@ struct SafeRequestExecutorTests {
             }
         }
     }
+
+    // End-to-end companion for `MediaFileUnreadable` (#1546), mirroring the timeout test above and
+    // Kotlin's `MockWebServer` executor test. A directory at the upload path passes field
+    // construction (`attributesOfItem` is a `stat`, needing no read permission) but fails the stream
+    // read (EISDIR) — the deterministic, uid-independent sibling of a genuine mid-read. Serialization
+    // happens before any network I/O, so no `URLProtocol` is needed. This guards the chain the
+    // isolated `MultipartFormTests` can't reach — `WpMultipartFormRequest.perform`'s do/catch, the
+    // `asRequestExecutionError` mapping, and the Rust round-trip — so a future refactor that re-drops
+    // the failure to `.genericError` is caught here.
+    @Test("A mid-read serialization failure surfaces end-to-end as .MediaFileUnreadable", .timeLimit(.minutes(1)))
+    func testMediaFileUnreadableSurfacesEndToEnd() async throws {
+        // A directory opens (`stat` succeeds) yet can't be read as a file. `chmod 000` would be
+        // bypassed when tests run as root (common in CI); a directory's EISDIR is enforced for every uid.
+        let directoryPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true).path
+        try FileManager.default.createDirectory(atPath: directoryPath, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: directoryPath) }
+
+        // Serialization fails before the upload, so the session is never used for I/O; the short
+        // request timeout only bounds a hang if a regression ever lets the request reach the network.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 0.3
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+
+        let api = try WordPressAPI(
+            siteInfo: .selfHosted(
+                siteUrl: ParsedUrl.parse(input: "https://example.com"),
+                apiRoot: ParsedUrl.parse(input: "https://example.com/wp-json")
+            ),
+            authenticationProvider: .none(),
+            executor: WpRequestExecutor(urlSession: session),
+            middlewarePipeline: .default,
+            appNotifier: nil
+        )
+
+        await #expect(
+            throws: WpApiError.MediaFileUnreadable(filePath: directoryPath),
+            performing: {
+                _ = try await api.media.create(params: .init(filePath: directoryPath))
+            }
+        )
+    }
     #endif
 }
 
