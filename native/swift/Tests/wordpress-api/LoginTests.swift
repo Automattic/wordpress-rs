@@ -372,6 +372,12 @@ class LoginTests {
                     return false
                 }
                 #else
+                // Breadcrumb (#1498): this endpoint's certificate is expired, so the failure is a
+                // bad-date one that the executor currently reports as `certificateNotValidForName`.
+                // Once #1498 remaps bad-date failures to `genericSslError`, this endpoint yields no
+                // presented hostnames and the assertion below breaks — move it to a non-expired
+                // Common-Name-less certificate then (e.g. a local mock, #1208). The parsing itself
+                // is already covered #1498-proof by the Rust `ssl` unit tests.
                 guard case .certificateNotValidForName(_, let presentedHostnames) = underlyingReason else {
                     Issue.record("The underlying error must be `certificateNotValidForName`")
                     return false
