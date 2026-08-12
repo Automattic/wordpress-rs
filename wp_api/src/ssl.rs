@@ -187,7 +187,7 @@ mod tests {
     fn presented_hostnames_prepend_common_name_and_dedupe() {
         // CN present and also repeated in the SANs: the CN leads, and the
         // duplicate SAN is dropped.
-        let cert = parse_certificate(der(CERT_WITH_CN)).unwrap();
+        let cert = parse_certificate(der(CERT_WITH_CN)).expect("certificate with CN should parse");
         assert_eq!(
             cert.presented_hostnames(),
             ["example.com", "www.example.com"]
@@ -195,7 +195,8 @@ mod tests {
 
         // No CN: the presented hostnames are exactly the SANs, so a client still
         // has something to compare the requested host against.
-        let san_only = parse_certificate(der(CERT_WITHOUT_CN)).unwrap();
+        let san_only =
+            parse_certificate(der(CERT_WITHOUT_CN)).expect("SAN-only certificate should parse");
         assert_eq!(
             san_only.presented_hostnames(),
             ["sanonly.example.com", "alt.example.com"]
