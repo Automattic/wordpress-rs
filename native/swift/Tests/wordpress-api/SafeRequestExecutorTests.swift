@@ -153,6 +153,13 @@ struct SafeRequestExecutorTests {
     // reason is `.deviceIsOfflineError`. These codes are produced by device state a test can't set
     // (cellular policy, roaming, an in-progress call), so injecting the `URLError` is the only way to
     // exercise the branch.
+    //
+    // Excluded on watchOS: unlike a natural `.timedOut` (which round-trips fine there), watchOS's URL
+    // loading system does not faithfully deliver these cellular-radio codes when they are *injected*
+    // via `URLProtocolClient`, so the stub can't drive the branch on that platform. The classifier
+    // itself is platform-agnostic (`errorIsDeviceIsOffline` has no `#if`), and is exercised on macOS,
+    // iOS, and tvOS. The watchOS simulator leg of build #6181 caught this.
+    #if !os(watchOS)
     @Test(
         "OS 'can't use the network right now' codes are classified as .deviceIsOfflineError",
         arguments: [URLError.Code.dataNotAllowed, .internationalRoamingOff, .callIsActive]
@@ -178,6 +185,7 @@ struct SafeRequestExecutorTests {
             return
         }
     }
+    #endif // !os(watchOS)
     #endif
 }
 
@@ -214,6 +222,8 @@ private final class NeverRespondingURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+// Only used by the watchOS-excluded test above, so gated identically to avoid an unused-type warning.
+#if !os(watchOS)
 /// A `URLProtocol` that fails every request with the `URLError.Code` carried in a request header,
 /// letting a test drive a specific OS error code through the real URLSession completion path
 /// without depending on device state (cellular policy, roaming, an in-progress call) it can't set.
@@ -251,4 +261,5 @@ private struct FailingRequest: NetworkRequestContent {
         return try await session.data(for: request)
     }
 }
+#endif // !os(watchOS)
 #endif
