@@ -143,6 +143,41 @@ struct SafeRequestExecutorTests {
             }
         )
     }
+
+    // Regression test for #1501: three `URLError` codes that mean the device can't use the network
+    // right now — cellular data disallowed (`.dataNotAllowed`), international roaming off
+    // (`.internationalRoamingOff`), and an active call holding a single-radio device
+    // (`.callIsActive`) — had no branch in `errorIsDeviceIsOffline`, so they fell through to the
+    // catch-all `.genericError` instead of `.deviceIsOfflineError`. Drive each code through the real
+    // URLSession completion path via a `URLProtocol` that fails the request with it, and assert the
+    // reason is `.deviceIsOfflineError`. These codes are produced by device state a test can't set
+    // (cellular policy, roaming, an in-progress call), so injecting the `URLError` is the only way to
+    // exercise the branch.
+    @Test(
+        "OS 'can't use the network right now' codes are classified as .deviceIsOfflineError",
+        arguments: [URLError.Code.dataNotAllowed, .internationalRoamingOff, .callIsActive]
+    )
+    func testDeviceCannotUseNetworkCodesAreClassifiedAsDeviceIsOffline(code: URLError.Code) async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [FailingURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+        let executor = WpRequestExecutor(urlSession: session)
+
+        let result = await executor.perform(FailingRequest(code: code))
+
+        guard case .failure(let error) = result,
+            case .RequestExecutionFailed(_, _, let reason, _, _) = error
+        else {
+            Issue.record("Expected a RequestExecutionFailed failure for \(code), got \(result)")
+            return
+        }
+
+        guard case .deviceIsOfflineError = reason else {
+            Issue.record("Expected .deviceIsOfflineError for \(code), got \(reason)")
+            return
+        }
+    }
     #endif
 }
 
@@ -177,5 +212,43 @@ private final class NeverRespondingURLProtocol: URLProtocol {
         // Intentionally never call the client.
     }
     override func stopLoading() {}
+}
+
+/// A `URLProtocol` that fails every request with the `URLError.Code` carried in a request header,
+/// letting a test drive a specific OS error code through the real URLSession completion path
+/// without depending on device state (cellular policy, roaming, an in-progress call) it can't set.
+private final class FailingURLProtocol: URLProtocol {
+    static let codeHeader = "X-Test-URLError-Code"
+
+    override static func canInit(with request: URLRequest) -> Bool { true }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let rawCode = request.value(forHTTPHeaderField: Self.codeHeader).flatMap { Int($0) }
+        let code = rawCode.map { URLError.Code(rawValue: $0) } ?? .unknown
+        client?.urlProtocol(self, didFailWithError: URLError(code))
+    }
+    override func stopLoading() {}
+}
+
+/// A `NetworkRequestContent` that issues its request through the executor's session, tagging it with
+/// the `URLError.Code` for `FailingURLProtocol` to fail with.
+private struct FailingRequest: NetworkRequestContent {
+    let code: URLError.Code
+
+    func requestId() -> String { "1501-device-offline-regression" }
+    func method() -> RequestMethod { .get }
+    func url() -> WpEndpointUrl { "https://example.com/wp-json/" }
+    func headerMap() -> WpNetworkHeaderMap { .empty }
+    func encodeBody(into _: inout URLRequest) throws {}
+
+    func perform(
+        in session: URLSession,
+        withAdditionalHeaders _: [String: String],
+        delegate _: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        var request = URLRequest(url: URL(string: url())!)
+        request.setValue(String(code.rawValue), forHTTPHeaderField: FailingURLProtocol.codeHeader)
+        return try await session.data(for: request)
+    }
 }
 #endif

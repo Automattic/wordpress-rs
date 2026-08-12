@@ -317,9 +317,22 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     private func errorIsDeviceIsOffline(_ error: Error) -> Bool {
+        // The device can't use the network right now; the site itself is not
+        // implicated. Two codes mean there's no connection at all
+        // (`.notConnectedToInternet`, and `.networkConnectionLost` for a connection
+        // severed mid-request); three more mean the OS is refusing network use even
+        // though the hardware is present — cellular data disallowed for the app or by
+        // carrier policy (`.dataNotAllowed`, the common Wi-Fi-off case), roaming
+        // turned off while abroad (`.internationalRoamingOff`), or a voice call
+        // holding the radio on an older single-radio device (`.callIsActive`). This
+        // matches what Kotlin callers get through the `NetworkAvailabilityProvider`
+        // gate. See #1501.
         [
             .networkConnectionLost,
-            .notConnectedToInternet
+            .notConnectedToInternet,
+            .dataNotAllowed,
+            .internationalRoamingOff,
+            .callIsActive
         ]
         .contains((error as? URLError)?.code)
     }
