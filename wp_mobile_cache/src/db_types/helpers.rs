@@ -135,6 +135,20 @@ where
         .map_err(|e| SqliteDbError::SqliteError(format!("Failed to parse datetime: {}", e)))
 }
 
+/// Helper to parse an optional DateTime-like type from a string column.
+pub fn parse_optional_datetime<T, C>(row: &Row, column: C) -> Result<Option<T>, SqliteDbError>
+where
+    T: FromStr,
+    T::Err: std::fmt::Display,
+    C: ColumnIndex,
+{
+    let datetime_str: Option<String> = row.get_column(column)?;
+    datetime_str
+        .map(|s| s.parse())
+        .transpose()
+        .map_err(|e| SqliteDbError::SqliteError(format!("Failed to parse datetime: {}", e)))
+}
+
 /// Helper to deserialize a JSON array of ID wrapper types.
 /// This handles the case where we store `Vec<TermId>` as `Vec<i64>` in JSON.
 pub fn deserialize_json_id_array<T>(

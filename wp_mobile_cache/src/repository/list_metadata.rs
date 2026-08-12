@@ -7,6 +7,7 @@ use crate::{
     },
     repository::QueryExecutor,
 };
+use wp_api::date::WpGmtDateTime;
 
 /// Repository for managing list metadata in the database.
 ///
@@ -388,7 +389,7 @@ impl ListMetadataRepository {
                     [
                         Box::new(list_metadata_id),
                         Box::new(item.entity_id),
-                        Box::new(item.modified_gmt.clone()),
+                        Box::new(item.modified_gmt.map(|dt| dt.to_string())),
                         Box::new(item.parent),
                         Box::new(item.menu_order),
                     ]
@@ -662,7 +663,7 @@ pub struct ListMetadataItemInput {
     /// Entity ID (post ID, comment ID, etc.)
     pub entity_id: i64,
     /// Last modified timestamp (for staleness detection)
-    pub modified_gmt: Option<String>,
+    pub modified_gmt: Option<WpGmtDateTime>,
     /// Parent entity ID (for hierarchical post types like pages)
     pub parent: Option<i64>,
     /// Menu order (for hierarchical post types)
@@ -907,13 +908,13 @@ mod tests {
         let items = vec![
             ListMetadataItemInput {
                 entity_id: 100,
-                modified_gmt: Some("2024-01-01T00:00:00Z".to_string()),
+                modified_gmt: Some("2024-01-01T00:00:00Z".parse().expect("Test date is valid")),
                 parent: Some(50),
                 menu_order: Some(1),
             },
             ListMetadataItemInput {
                 entity_id: 200,
-                modified_gmt: Some("2024-01-02T00:00:00Z".to_string()),
+                modified_gmt: Some("2024-01-02T00:00:00Z".parse().expect("Test date is valid")),
                 parent: Some(50),
                 menu_order: Some(2),
             },
