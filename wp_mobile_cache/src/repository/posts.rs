@@ -310,6 +310,66 @@ impl<C: PostContext> PostRepository<C> {
         }))
     }
 
+    /// Select multiple posts by their WordPress post IDs for a given site.
+    ///
+    /// Unlike calling `select_by_post_id` in a loop, this runs one query for
+    /// the posts and one for their term relationships, which keeps the time
+    /// the shared connection is held proportional to two queries rather than
+    /// two per ID. IDs with no matching post are omitted from the result.
+    /// Row order follows SQLite's scan order, not `post_ids`; callers that
+    /// need input order must reorder.
+    pub fn select_by_post_ids(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &DbSite,
+        post_ids: &[i64],
+    ) -> Result<Vec<FullEntity<C::DbPost>>, SqliteDbError> {
+        if post_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Batch load term relationships for all requested posts
+        let term_repo = TermRelationshipRepository;
+        let terms_map = term_repo.get_terms_for_objects(executor, site, post_ids)?;
+
+        // Inline the numeric IDs directly rather than binding one variable per
+        // ID. They are i64 values (no injection risk), and inlining keeps the
+        // query clear of SQLite's bound-variable limit, which a large batch of
+        // IDs could otherwise exceed. This mirrors
+        // TermRelationshipRepository::get_terms_for_objects above.
+        let ids_str = post_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "SELECT * FROM {} WHERE db_site_id = ? AND id IN ({})",
+            Self::table_name(),
+            ids_str
+        );
+
+        let mut stmt = executor.prepare(&sql)?;
+        let posts = stmt
+            .query_map([site.row_id], |row| {
+                let post_id: i64 = row.get("id")?;
+                C::from_row_with_terms(row, || {
+                    Ok(terms_map.get(&post_id).cloned().unwrap_or_default())
+                })
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(SqliteDbError::from)?;
+
+        Ok(posts
+            .into_iter()
+            .map(|db_post| {
+                let rowid = C::rowid(&db_post);
+                let entity_id = Arc::new(EntityId::new(*site, C::table(), rowid));
+                FullEntity::new(entity_id, db_post)
+            })
+            .collect())
+    }
+
     /// Select `modified_gmt` timestamps for multiple posts by their WordPress post IDs.
     ///
     /// This is a lightweight query used for staleness detection - it only fetches

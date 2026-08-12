@@ -632,7 +632,10 @@ impl PostService {
     /// Read posts by IDs from the database cache.
     ///
     /// Returns full entity data for all requested IDs that exist in the cache.
-    /// Posts not in the cache are silently omitted from the result.
+    /// Posts not in the cache are silently omitted from the result. Each
+    /// distinct ID yields at most one entity: duplicate IDs in `ids` collapse
+    /// to a single result at the first occurrence's position. The result
+    /// follows the order of `ids`.
     ///
     /// # Arguments
     /// * `ids` - Post IDs to load
@@ -650,17 +653,21 @@ impl PostService {
 
         let repo = PostRepository::<EditContext>::new();
 
-        // TODO: query database for all IDs in one call instead of iterating?
         self.cache.execute(|connection| {
-            ids.iter()
-                .map(|&id| repo.select_by_post_id(connection, &self.db_site, PostId(id)))
-                .collect::<Result<Vec<_>, _>>()
+            repo.select_by_post_ids(connection, &self.db_site, ids)
                 .map(|posts| {
-                    posts
+                    // The IN query returns one row per distinct matching post in
+                    // scan order. Reorder to follow `ids`, taking each post out
+                    // of the map on first use so a repeated ID resolves once
+                    // (set-style lookup) instead of aliasing the same entity.
+                    let mut by_id: std::collections::HashMap<i64, _> = posts
                         .into_iter()
-                        .flatten()
-                        .map(|db_post| FullEntity::new(db_post.entity_id, db_post.data.post))
-                        .collect()
+                        .map(|db_post| {
+                            let full_entity = FullEntity::new(db_post.entity_id, db_post.data.post);
+                            (full_entity.data.id.0, full_entity)
+                        })
+                        .collect();
+                    ids.iter().filter_map(|id| by_id.remove(id)).collect()
                 })
         })
     }
@@ -708,7 +715,9 @@ impl PostService {
     /// from the result; callers that need to distinguish missing posts must
     /// compare the result against the requested IDs.
     ///
-    /// Results are returned in the order of `post_ids`.
+    /// Results follow the order of `post_ids`. Each distinct ID yields at most
+    /// one post: duplicate IDs collapse to a single entry at the first
+    /// occurrence's position, so this behaves as a set-style batch lookup.
     pub fn read_posts_by_ids_from_db(
         &self,
         post_ids: Vec<PostId>,
@@ -1164,6 +1173,53 @@ mod tests {
 
         // Assert: the service only reads posts for its own site
         assert!(posts.is_empty(), "another site's post must not be returned");
+    }
+
+    #[rstest]
+    fn test_read_posts_by_ids_from_db_orders_dedupes_and_maps_terms(
+        post_service_ctx: PostServiceTestContext,
+    ) {
+        use wp_api::terms::TermId;
+
+        // Two cached posts, each with a distinct category, to exercise the
+        // batched multi-row path and per-post term association.
+        let first = PostBuilder::minimal()
+            .with_id(101)
+            .with_title("First")
+            .with_slug("first")
+            .with_categories(vec![TermId(11)])
+            .build();
+        let second = PostBuilder::minimal()
+            .with_id(102)
+            .with_title("Second")
+            .with_slug("second")
+            .with_categories(vec![TermId(22)])
+            .build();
+        post_service_ctx
+            .cache
+            .execute(|conn| {
+                let repo = PostRepository::<EditContext>::new();
+                repo.upsert(conn, &post_service_ctx.db_site, &first)?;
+                repo.upsert(conn, &post_service_ctx.db_site, &second)
+            })
+            .expect("Post inserts should succeed");
+
+        // Request in reverse order, with a duplicate and a missing ID mixed in.
+        let posts = post_service_ctx
+            .post_service
+            .read_posts_by_ids_from_db(vec![PostId(102), PostId(101), PostId(102), PostId(99999)])
+            .expect("Database read should succeed");
+
+        // Set-style lookup: distinct posts in first-occurrence order, missing
+        // omitted, the repeated ID resolved once.
+        assert_eq!(
+            posts.iter().map(|p| p.id).collect::<Vec<_>>(),
+            vec![PostId(102), PostId(101)],
+            "results follow first-occurrence order with duplicates collapsed"
+        );
+        // Batched term relationships are associated with the correct post.
+        assert_eq!(posts[0].categories, Some(vec![TermId(22)]));
+        assert_eq!(posts[1].categories, Some(vec![TermId(11)]));
     }
 
     #[rstest]
