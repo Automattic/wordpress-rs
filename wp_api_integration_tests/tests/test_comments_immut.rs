@@ -45,6 +45,24 @@ async fn list_with_view_context(#[case] params: CommentListParams) {
 
 #[tokio::test]
 #[parallel]
+async fn list_with_status_approve_returns_comments() {
+    let response = api_client()
+        .comments()
+        .list_with_edit_context(&CommentListParams {
+            status: Some(CommentStatus::Approved),
+            per_page: Some(100),
+            ..Default::default()
+        })
+        .await
+        .assert_response();
+    assert!(
+        !response.data.is_empty(),
+        "listing comments with the approved status filter must not return an empty set"
+    );
+}
+
+#[tokio::test]
+#[parallel]
 async fn retrieve_with_edit_context() {
     api_client()
         .comments()
