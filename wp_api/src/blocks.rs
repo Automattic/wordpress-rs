@@ -201,7 +201,7 @@ pub struct BlockCreateParams {
     /// The date the post was published, in the site's timezone.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<WpGmtDateTime>,
+    pub date: Option<WpDateString>,
     /// The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -237,7 +237,7 @@ pub struct BlockUpdateParams {
     /// The date the post was published, in the site's timezone.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<WpGmtDateTime>,
+    pub date: Option<WpDateString>,
     /// The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
