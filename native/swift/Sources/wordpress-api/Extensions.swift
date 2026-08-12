@@ -72,7 +72,9 @@ extension RequestExecutionErrorReason {
         requestExecutionErrorReasonIsSiteUnreachable(reason: self)
     }
 
-    /// Whether the request failed because the device has no network connection.
+    /// Whether the request failed because the device can't use the network right
+    /// now — either it has no connection, or the OS is refusing network use even
+    /// with a radio present (e.g. cellular data disabled for the app).
     ///
     /// Distinct from ``isSiteUnreachable``: the site itself may be perfectly
     /// healthy.
@@ -100,7 +102,9 @@ public extension CarriesRequestExecutionErrorReason {
         executionErrorReason?.isSiteUnreachable ?? false
     }
 
-    /// Whether the request failed because the device has no network connection.
+    /// Whether the request failed because the device can't use the network right
+    /// now — either it has no connection, or the OS is refusing network use even
+    /// with a radio present (e.g. cellular data disabled for the app).
     ///
     /// See ``RequestExecutionErrorReason/isDeviceOffline`` for the platform
     /// differences that apply.
