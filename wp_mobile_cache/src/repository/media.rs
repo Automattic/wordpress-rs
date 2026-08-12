@@ -146,13 +146,15 @@ impl<C: MediaContext> MediaRepository<C> {
     /// Select `modified_gmt` timestamps for multiple media items by their WordPress media IDs.
     ///
     /// Lightweight query used for staleness detection; media not present in the cache are
-    /// omitted from the result.
+    /// omitted from the result. A cached item whose `modified_gmt` is absent or unreadable
+    /// maps to `None`, so a caller can tell it apart from one that isn't cached and decide
+    /// for itself rather than being handed silence.
     pub fn select_modified_gmt_by_ids(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         media_ids: &[MediaId],
-    ) -> Result<HashMap<MediaId, WpGmtDateTime>, SqliteDbError> {
+    ) -> Result<HashMap<MediaId, Option<WpGmtDateTime>>, SqliteDbError> {
         if media_ids.is_empty() {
             return Ok(HashMap::new());
         }
@@ -172,18 +174,15 @@ impl<C: MediaContext> MediaRepository<C> {
         let mut stmt = executor.prepare(&sql)?;
         let rows = stmt.query_map([site.row_id], |row| {
             let id: i64 = row.get(0)?;
-            let modified_gmt_str: String = row.get(1)?;
+            let modified_gmt_str: Option<String> = row.get(1)?;
             Ok((id, modified_gmt_str))
         })?;
 
         Ok(rows
             .filter_map(|row_result| {
-                row_result.ok().and_then(|(id, modified_gmt_str)| {
-                    modified_gmt_str
-                        .parse::<WpGmtDateTime>()
-                        .ok()
-                        .map(|modified_gmt| (MediaId(id), modified_gmt))
-                })
+                let (id, modified_gmt_str) = row_result.ok()?;
+                let modified_gmt = modified_gmt_str.and_then(|s| s.parse::<WpGmtDateTime>().ok());
+                Some((MediaId(id), modified_gmt))
             })
             .collect())
     }

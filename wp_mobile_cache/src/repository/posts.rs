@@ -315,22 +315,21 @@ impl<C: PostContext> PostRepository<C> {
     /// This is a lightweight query used for staleness detection - it only fetches
     /// the `id` and `modified_gmt` columns without loading the full post data.
     ///
-    /// Returns a HashMap mapping post IDs to their cached `modified_gmt` timestamps.
-    /// Posts not found in the cache are simply omitted from the result.
+    /// Posts not found in the cache are omitted from the result. A cached post
+    /// whose `modified_gmt` is absent or unreadable maps to `None`, so a caller
+    /// can tell it apart from one that isn't cached and decide for itself
+    /// rather than being handed silence.
     ///
     /// # Arguments
     /// * `executor` - Database connection or transaction
     /// * `site` - The site to query posts for
     /// * `post_ids` - WordPress post IDs to look up
-    ///
-    /// # Returns
-    /// HashMap where keys are post IDs and values are their `modified_gmt` timestamps.
     pub fn select_modified_gmt_by_ids(
         &self,
         executor: &impl QueryExecutor,
         site: &DbSite,
         post_ids: &[PostId],
-    ) -> Result<HashMap<PostId, WpGmtDateTime>, SqliteDbError> {
+    ) -> Result<HashMap<PostId, Option<WpGmtDateTime>>, SqliteDbError> {
         if post_ids.is_empty() {
             return Ok(HashMap::new());
         }
@@ -350,18 +349,15 @@ impl<C: PostContext> PostRepository<C> {
         let mut stmt = executor.prepare(&sql)?;
         let rows = stmt.query_map([site.row_id], |row| {
             let id: i64 = row.get(0)?;
-            let modified_gmt_str: String = row.get(1)?;
+            let modified_gmt_str: Option<String> = row.get(1)?;
             Ok((id, modified_gmt_str))
         })?;
 
         Ok(rows
             .filter_map(|row_result| {
-                row_result.ok().and_then(|(id, modified_gmt_str)| {
-                    modified_gmt_str
-                        .parse::<WpGmtDateTime>()
-                        .ok()
-                        .map(|modified_gmt| (PostId(id), modified_gmt))
-                })
+                let (id, modified_gmt_str) = row_result.ok()?;
+                let modified_gmt = modified_gmt_str.and_then(|s| s.parse::<WpGmtDateTime>().ok());
+                Some((PostId(id), modified_gmt))
             })
             .collect())
     }
@@ -1079,6 +1075,47 @@ mod tests {
     };
     use rstest::*;
     use wp_api::posts::{AnyPostWithEditContext, PostStatus};
+
+    /// A cached `modified_gmt` that can't be read maps to `None` instead of
+    /// dropping the row, so a caller can tell "cached but unreadable" apart
+    /// from "not cached at all".
+    ///
+    /// Dropping it made the staleness check treat the post as current, because
+    /// a missing entry there means "not stale" — so the row would never be
+    /// refetched and the stale copy stayed in the cache indefinitely.
+    #[rstest]
+    #[case::never_set_date("'-0001-11-30T00:00:00'")]
+    #[case::unparseable("'not a date'")]
+    fn test_unreadable_cached_modified_gmt_maps_to_none(
+        mut test_ctx: TestContext,
+        #[case] stored_value: &str,
+    ) {
+        let post = PostBuilder::minimal().build();
+        let post_id = post.id;
+        test_ctx
+            .post_repo
+            .upsert(&mut test_ctx.conn, &test_ctx.site, &post)
+            .expect("Failed to insert post");
+
+        test_ctx
+            .conn
+            .execute(
+                &format!("UPDATE posts_edit_context SET modified_gmt = {stored_value}"),
+                [],
+            )
+            .expect("Failed to overwrite the cached timestamp");
+
+        let cached = test_ctx
+            .post_repo
+            .select_modified_gmt_by_ids(&test_ctx.conn, &test_ctx.site, &[post_id])
+            .expect("Failed to select cached timestamps");
+
+        assert_eq!(
+            cached.get(&post_id),
+            Some(&None),
+            "an unreadable timestamp should be present as None, not missing"
+        );
+    }
 
     /// Verify that PostEditContextColumn enum values match the actual database schema.
     /// This test protects against column reordering in migrations breaking the positional index mapping.
