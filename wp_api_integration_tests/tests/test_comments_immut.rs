@@ -3,7 +3,7 @@ use wp_api::{
     comments::{
         CommentId, CommentListParams, CommentRetrieveParams, CommentStatus, CommentType,
         SparseCommentFieldWithEditContext, SparseCommentFieldWithEmbedContext,
-        SparseCommentFieldWithViewContext, WpApiParamCommentsOrderBy,
+        SparseCommentFieldWithViewContext, WpApiParamCommentsOrderBy, WpApiParamCommentsStatus,
     },
     posts::PostId,
     users::UserAvatarSize,
@@ -49,7 +49,7 @@ async fn list_with_status_approve_returns_comments() {
     let response = api_client()
         .comments()
         .list_with_edit_context(&CommentListParams {
-            status: Some(CommentStatus::Approved),
+            status: Some(WpApiParamCommentsStatus::Approve),
             per_page: Some(100),
             ..Default::default()
         })
@@ -59,6 +59,32 @@ async fn list_with_status_approve_returns_comments() {
         !response.data.is_empty(),
         "listing comments with the approved status filter must not return an empty set"
     );
+}
+
+#[tokio::test]
+#[parallel]
+async fn list_with_status_all_and_any_are_supersets() {
+    let count = |status| async move {
+        api_client()
+            .comments()
+            .list_with_edit_context(&CommentListParams {
+                status: Some(status),
+                per_page: Some(100),
+                ..Default::default()
+            })
+            .await
+            .assert_response()
+            .data
+            .len()
+    };
+    let approve = count(WpApiParamCommentsStatus::Approve).await;
+    let all = count(WpApiParamCommentsStatus::All).await;
+    let any = count(WpApiParamCommentsStatus::Any).await;
+    // The test site seeds hold comments (excluded from approve) and
+    // spam/trash comments (excluded from all).
+    assert!(approve > 0, "approve must not be empty");
+    assert!(all > approve, "all (approve + hold) must exceed approve");
+    assert!(any > all, "any (no status filter) must exceed all");
 }
 
 #[tokio::test]
@@ -262,10 +288,12 @@ async fn parse_extras() {
 #[case::parent(generate!(CommentListParams, (parent, vec![CommentId(1), CommentId(2)])))]
 #[case::parent_exclude(generate!(CommentListParams, (parent, vec![CommentId(1), CommentId(2)])))]
 #[case::post(generate!(CommentListParams, (post, vec![PostId(1), PostId(2)])))]
-#[case::status_hold(generate!(CommentListParams, (status, Some(CommentStatus::Hold))))]
-#[case::status_approve(generate!(CommentListParams, (status, Some(CommentStatus::Approved))))]
-#[case::status_spam(generate!(CommentListParams, (status, Some(CommentStatus::Spam))))]
-#[case::status_trash(generate!(CommentListParams, (status, Some(CommentStatus::Trash))))]
+#[case::status_hold(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Hold))))]
+#[case::status_approve(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Approve))))]
+#[case::status_all(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::All))))]
+#[case::status_any(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Any))))]
+#[case::status_spam(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Spam))))]
+#[case::status_trash(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Trash))))]
 #[case::comment_type_comment(generate!(CommentListParams, (comment_type, Some(CommentType::Comment))))]
 #[case::comment_type_pingback(generate!(CommentListParams, (comment_type, Some(CommentType::Pingback))))]
 #[case::comment_type_trackback(generate!(CommentListParams, (comment_type, Some(CommentType::Trackback))))]

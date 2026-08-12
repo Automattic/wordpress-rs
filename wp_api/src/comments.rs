@@ -130,8 +130,12 @@ pub struct CommentListParams {
     pub post: Vec<PostId>,
     /// Limit result set to comments assigned a specific status. Requires authorization.
     /// Default: approve
+    ///
+    /// This is a [`WpApiParamCommentsStatus`], not a [`CommentStatus`],
+    /// because the query vocabulary differs from the stored status
+    /// vocabulary. See the type's documentation.
     #[uniffi(default = None)]
-    pub status: Option<CommentStatus>,
+    pub status: Option<WpApiParamCommentsStatus>,
     /// Limit result set to comments assigned a specific type. Requires authorization.
     /// Default: comment
     #[uniffi(default = None)]
@@ -465,6 +469,54 @@ fn comment_status_from_string(value: String) -> CommentStatus {
     CommentStatus::from_str(value.as_str()).unwrap_or(CommentStatus::Custom(value))
 }
 
+/// Comment status values accepted by the `status` query param when listing
+/// comments.
+///
+/// This is deliberately a different type from [`CommentStatus`]. WordPress
+/// core's `WP_Comment_Query` recognizes the query values `approve`, `hold`,
+/// `all`, and `any`, and passes any other value through as a literal
+/// `comment_approved` column value. Approved comments are stored as `'1'`,
+/// so querying with the stored/response vocabulary (`status=approved`)
+/// matches nothing and silently returns an empty result set.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[uniffi::export(Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum WpApiParamCommentsStatus {
+    /// Approved and pending (hold) comments. Spam and trash are excluded.
+    All,
+    /// Every comment regardless of status, including spam, trash, and
+    /// custom statuses. `WP_Comment_Query` removes the status predicate
+    /// entirely for this value.
+    Any,
+    /// Approved comments. This is the server default when no status is sent,
+    /// and the only value permitted for unauthenticated requests.
+    Approve,
+    /// Pending comments.
+    Hold,
+    Spam,
+    Trash,
+    /// A custom `comment_approved` value, passed through as a literal.
+    #[serde(untagged)]
+    #[strum(default)]
+    Custom(String),
+}
+
+impl_as_query_value_from_to_string!(WpApiParamCommentsStatus);
+
 #[uniffi::export]
 fn comment_type_from_string(value: String) -> CommentType {
     CommentType::from_str(value.as_str()).unwrap_or(CommentType::Custom(value))
@@ -509,11 +561,13 @@ mod tests {
     #[case(generate!(CommentListParams, (parent, vec![CommentId(44444), CommentId(44445)])), "parent=44444%2C44445")]
     #[case(generate!(CommentListParams, (parent_exclude, vec![CommentId(55555), CommentId(55556)])), "parent_exclude=55555%2C55556")]
     #[case(generate!(CommentListParams, (post, vec![PostId(66666), PostId(66667)])), "post=66666%2C66667")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Hold))), "status=hold")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Approved))), "status=approved")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Spam))), "status=spam")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Trash))), "status=trash")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Custom("foo".to_string())))), "status=foo")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::All))), "status=all")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Any))), "status=any")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Approve))), "status=approve")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Hold))), "status=hold")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Spam))), "status=spam")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Trash))), "status=trash")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Custom("foo".to_string())))), "status=foo")]
     #[case(generate!(CommentListParams, (comment_type, Some(CommentType::Comment))), "type=comment")]
     #[case(generate!(CommentListParams, (comment_type, Some(CommentType::Pingback))), "type=pingback")]
     #[case(generate!(CommentListParams, (comment_type, Some(CommentType::Trackback))), "type=trackback")]
@@ -536,7 +590,7 @@ mod tests {
             parent: vec![CommentId(44444), CommentId(44445)],
             parent_exclude: vec![CommentId(55555), CommentId(55556)],
             post: vec![PostId(66666), PostId(66667)],
-            status: Some(CommentStatus::Spam),
+            status: Some(WpApiParamCommentsStatus::Spam),
             comment_type: Some(CommentType::Pingback),
             password: Some("p_q".to_string()),
         },

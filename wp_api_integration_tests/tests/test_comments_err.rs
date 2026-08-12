@@ -2,6 +2,7 @@ use wp_api::{
     comments::{
         CommentCreateParams, CommentCreateParamsBuilder, CommentDeleteParams, CommentListParams,
         CommentRetrieveParams, CommentStatus, CommentType, CommentUpdateParams,
+        WpApiParamCommentsStatus,
     },
     posts::PostId,
 };
@@ -321,7 +322,12 @@ async fn list_err_forbidden_param_comment_type(
 #[rstest]
 #[parallel]
 async fn list_err_forbidden_param_status(
-    #[values(CommentStatus::Hold, CommentStatus::Spam, CommentStatus::Trash)] status: CommentStatus,
+    #[values(
+        WpApiParamCommentsStatus::Hold,
+        WpApiParamCommentsStatus::Spam,
+        WpApiParamCommentsStatus::Trash
+    )]
+    status: WpApiParamCommentsStatus,
 ) {
     api_client_as_subscriber()
         .comments()
