@@ -699,48 +699,68 @@ extension WpMultipartFormRequest: NetworkRequestContent {
         let boundery = String(format: "wordpressrs.%08x", Int.random(in: Int.min..<Int.max))
         request.setValue("multipart/form-data; boundary=\(boundery)", forHTTPHeaderField: "Content-Type")
         let body = try form.multipartFormDataStream(boundary: boundery, forceWriteToFile: false)
+
+        // `upload(...)` owns the temp file's lifetime and removes it once the transfer finishes. Arm
+        // cleanup here too, where serialization acquires the file, so a future edit that throws
+        // between this line and the `upload(...)` call below can't silently reintroduce the #1540
+        // leak. Idempotent with upload's own `defer`: a second `removeItem` on an already-deleted
+        // file is a harmless no-op.
+        defer { body.removeTemporaryFileIfNeeded() }
         return try await upload(body: body, with: request, session: session, delegate: delegate)
     }
+}
 
-    private func upload(
-        body: MultipartFormContent,
-        with request: URLRequest,
-        session: URLSession,
-        delegate: URLSessionTaskDelegate?
-    ) async throws -> (Data, URLResponse) {
-        let cancellation = TaskCancellation()
-        return try await withTaskCancellationHandler {
-            let result: Result<(Data, URLResponse), Error> = await withCheckedContinuation { continuation in
-                let completion = completionHandler(continuation)
-                let task =
-                    switch body {
-                    case let .inMemory(data):
-                        session.uploadTask(with: request, from: data, completionHandler: completion)
-                    case let .onDisk(file):
-                        session.uploadTask(with: request, fromFile: file, completionHandler: completion)
-                    }
-                cancellation.task = task
+/// Uploads a serialized multipart `body` — either in memory or a temporary file on disk — over
+/// `URLSession`, awaiting completion.
+///
+/// A `.onDisk` body must be cleaned up once the transfer finishes. `URLSession`'s
+/// `uploadTask(fromFile:)` reads the file asynchronously for the duration of the transfer and never
+/// deletes it, so the file has to outlive serialization (it can't be removed in
+/// `multipartFormDataStream`) and can only be removed here, after the upload completes on any path —
+/// success, failure, or cancellation. Without this, every large upload leaks a temp file (#1540).
+///
+/// This is a free function rather than a method because it needs no state from the request, which
+/// also lets tests drive it directly against a stubbed `URLSession`.
+func upload(
+    body: MultipartFormContent,
+    with request: URLRequest,
+    session: URLSession,
+    delegate: URLSessionTaskDelegate?
+) async throws -> (Data, URLResponse) {
+    defer { body.removeTemporaryFileIfNeeded() }
 
-                // See https://github.com/Automattic/wordpress-rs/pull/1046
-                #if !os(Linux)
-                task.delegate = delegate
-                #endif
+    let cancellation = TaskCancellation()
+    return try await withTaskCancellationHandler {
+        let result: Result<(Data, URLResponse), Error> = await withCheckedContinuation { continuation in
+            let completion = completionHandler(continuation)
+            let task =
+                switch body {
+                case let .inMemory(data):
+                    session.uploadTask(with: request, from: data, completionHandler: completion)
+                case let .onDisk(file):
+                    session.uploadTask(with: request, fromFile: file, completionHandler: completion)
+                }
+            cancellation.task = task
 
-                task.resume()
+            // See https://github.com/Automattic/wordpress-rs/pull/1046
+            #if !os(Linux)
+            task.delegate = delegate
+            #endif
 
-                #if !os(Linux)
-                delegate?.urlSession?(session, didCreateTask: task)
-                #endif
-            }
+            task.resume()
 
-            if let task = cancellation.task {
-                notifyTaskResult(delegate: delegate, session: session, task: task, result: result)
-            }
-
-            return try result.get()
-        } onCancel: {
-            cancellation.cancel()
+            #if !os(Linux)
+            delegate?.urlSession?(session, didCreateTask: task)
+            #endif
         }
+
+        if let task = cancellation.task {
+            notifyTaskResult(delegate: delegate, session: session, task: task, result: result)
+        }
+
+        return try result.get()
+    } onCancel: {
+        cancellation.cancel()
     }
 }
 
