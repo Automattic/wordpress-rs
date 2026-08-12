@@ -1,12 +1,12 @@
 import Foundation
 
 enum MultipartFormError: Swift.Error, LocalizedError {
-    case inaccessbileFile(underlyingError: Error)
+    case inaccessibleFile(underlyingError: Error)
     case impossible
 
     var errorDescription: String? {
         switch self {
-        case let .inaccessbileFile(underlyingError: underlyingError):
+        case let .inaccessibleFile(underlyingError: underlyingError):
             return underlyingError.localizedDescription
         case .impossible:
             return "An unknown error occurred."
@@ -54,7 +54,7 @@ struct MultipartFormField {
         do {
             attrs = try FileManager.default.attributesOfItem(atPath: path)
         } catch {
-            throw MultipartFormError.inaccessbileFile(underlyingError: error)
+            throw MultipartFormError.inaccessibleFile(underlyingError: error)
         }
 
         guard let inputStream = InputStream(fileAtPath: path),
@@ -69,6 +69,20 @@ struct MultipartFormField {
         self.filename = filename ?? path.split(separator: "/").last.flatMap({ String($0) })
         self.bytes = bytes
         self.mimeType = mimeType
+    }
+
+    /// Creates a field backed by an arbitrary `InputStream`.
+    ///
+    /// Exposed for tests that need to exercise stream-read failures (`read`
+    /// returning `-1`); production code uses the `text:`, `data:`, and
+    /// `fileAtPath:` initializers above. `bytes` has no default so a caller can't
+    /// silently under-estimate a large stream into the in-memory serialization path.
+    init(inputStream: InputStream, name: String, filename: String? = nil, mimeType: String? = nil, bytes: UInt64) {
+        self.inputStream = inputStream
+        self.name = name
+        self.filename = filename
+        self.mimeType = mimeType
+        self.bytes = bytes
     }
 }
 
@@ -112,7 +126,14 @@ extension Array where Element == MultipartFormField {
             dest.open()
             defer { dest.close() }
 
-            writeMultipartFormData(destination: dest, boundary: boundary)
+            try writeMultipartFormData(destination: dest, boundary: boundary)
+        } catch {
+            // Serialization failed partway through (e.g. a stream read error). Don't
+            // leave a half-written temp file behind.
+            if let tempFilePath {
+                try? FileManager.default.removeItem(atPath: tempFilePath)
+            }
+            throw error
         }
 
         // Return the result as `InputStream`
@@ -127,7 +148,7 @@ extension Array where Element == MultipartFormField {
         throw MultipartFormError.impossible
     }
 
-    private func writeMultipartFormData(destination dest: OutputStream, boundary: String) {
+    private func writeMultipartFormData(destination dest: OutputStream, boundary: String) throws {
         for field in self {
             dest.writeMultipartForm(boundary: boundary, isEnd: false)
 
@@ -153,8 +174,24 @@ extension Array where Element == MultipartFormField {
             let maxLength = 1024
             var buffer = [UInt8](repeating: 0, count: maxLength)
             while field.inputStream.hasBytesAvailable {
-                let bytes = field.inputStream.read(&buffer, maxLength: maxLength)
-                dest.write(data: Data(bytesNoCopy: &buffer, count: bytes, deallocator: .none))
+                let bytesRead = field.inputStream.read(&buffer, maxLength: maxLength)
+
+                // `read` returns 0 at the end of the stream and -1 on failure — for
+                // example when the file was deleted after the field was constructed, or
+                // a mid-read I/O error occurs on an external / file-provider / iCloud-
+                // evicted volume. A negative count traps in
+                // `Data(bytesNoCopy:count:deallocator:)`, so abort serialization with a
+                // classified error rather than crashing.
+                if bytesRead < 0 {
+                    throw MultipartFormError.inaccessibleFile(
+                        underlyingError: field.inputStream.streamError ?? POSIXError(.EIO)
+                    )
+                }
+                if bytesRead == 0 {
+                    break
+                }
+
+                dest.write(data: Data(bytesNoCopy: &buffer, count: bytesRead, deallocator: .none))
             }
 
             dest.writeMultipartFormLineBreak()
