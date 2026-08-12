@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- REST URL resolution can now attach endpoint query parameters via `ParsedUrl.by_appending_query_pairs` (Swift/Kotlin), so consumers building `?rest_route=` URLs no longer re-implement the `?`→`&` merge. It preserves any existing query, is order-stable, keeps duplicate keys, and form-urlencodes names and values — the same encoding `WpOrgSiteApiUrlResolver.resolve` already produces. Pairs are passed as the new `QueryPair` record ([#1543](https://github.com/Automattic/wordpress-rs/issues/1543)).
 - WordPress.com `POST /me/transactions` endpoint for redeeming a shopping cart with the account's WordPress.com credits, completing a domain purchase
 - WordPress.com `GET /sites/<site_id>/purchases` endpoint for listing a site's purchases (plans, domains, and other subscriptions)
 - Publish the Kotlin bindings' per-endpoint Markdown API reference as an `ai-docs` Maven classifier zip on `rs.wordpress.api:kotlin`, generated from the UniFFI bindings for agent/tooling consumption
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Documented how to pick an xcframework build for local work, and added `make help` descriptions for the `xcframework-only-*` targets. Verifying a UniFFI change needs only `make xcframework-only-macos`, not the full 11-target `make xcframework`.
 - **Internal:** Fixed `make xcframework-only-<platform>` building the per-target libraries but never assembling them into the xcframework. The `@# Help:` comments added for those `make help` descriptions became each rule's recipe and silently shadowed the shared `xcframework-only-%` pattern rule that ran the assemble step; each rule now runs the assemble step directly.
 - **Internal:** Update translations.
+- **Internal:** Added a golden URL table (`plain_permalinks_url_tests`) asserting all 45 self-hosted endpoints resolve to the correct `?rest_route=` URL on a plain-permalinks site, by driving each endpoint's real URL builder through a `rest_route`-seeded `WpOrgSiteApiUrlResolver`. To guard the table's accuracy against an independent source, the 22 non-parameterized routes are also checked (`index_self_href_url_tests`) against WordPress's own published URL — the `_links.self.href` captured in a real-site REST index fixture — and the parameterized (ID-bearing) routes, which the index never publishes a URL for, are exercised end-to-end by a new plain-permalinks integration test that fetches a real object by numeric id over `?rest_route=`.
 
 ### Fixed
 

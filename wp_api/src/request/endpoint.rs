@@ -49,6 +49,11 @@ pub mod widgets_endpoint;
 pub mod wp_block_editor_endpoint;
 pub mod wp_site_health_tests_endpoint;
 
+#[cfg(test)]
+mod index_self_href_url_tests;
+#[cfg(test)]
+mod plain_permalinks_url_tests;
+
 pub const WP_JSON_PATH_SEGMENTS: [&str; 1] = ["wp-json"];
 
 uniffi::custom_newtype!(WpEndpointUrl, String);
@@ -244,5 +249,39 @@ mod tests {
                 .url(),
             expected
         );
+    }
+
+    /// The consumer flow the query-append primitive unblocks:
+    /// `resolver.resolve(ns, segments).by_appending_query_pairs([...])`, correct
+    /// on both API-root forms.
+    #[rstest]
+    #[case::pretty_permalinks(
+        "https://example.com/wp-json",
+        "https://example.com/wp-json/wp/v2/themes?context=edit&exclude=core%2Cgutenberg"
+    )]
+    #[case::plain_permalinks_rest_route_form(
+        "https://example.com/index.php?rest_route=/",
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes&context=edit&exclude=core%2Cgutenberg"
+    )]
+    fn resolve_then_append_query_pairs(#[case] api_root: &str, #[case] expected: &str) {
+        use crate::parsed_url::QueryPair;
+
+        let resolver =
+            WpOrgSiteApiUrlResolver::new(ParsedUrl::parse(api_root).expect("valid url").into());
+        let resolved = resolver.resolve(
+            WpNamespace::WpV2.namespace_value().to_string(),
+            vec!["themes".to_string()],
+        );
+        let result = resolved.by_appending_query_pairs(vec![
+            QueryPair {
+                name: "context".to_string(),
+                value: "edit".to_string(),
+            },
+            QueryPair {
+                name: "exclude".to_string(),
+                value: "core,gutenberg".to_string(),
+            },
+        ]);
+        assert_eq!(result.url(), expected);
     }
 }
