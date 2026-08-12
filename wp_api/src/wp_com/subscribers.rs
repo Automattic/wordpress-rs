@@ -334,7 +334,8 @@ pub struct IndividualSubscriberStats {
     emails_sent: u64,
     unique_opens: u64,
     unique_clicks: u64,
-    blog_registration_date: String,
+    /// When the site was registered, in GMT.
+    blog_registration_date: WpGmtDateTime,
 }
 
 // MARK: - Add Subscribers
