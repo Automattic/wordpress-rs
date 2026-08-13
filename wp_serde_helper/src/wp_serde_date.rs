@@ -14,6 +14,13 @@ const MYSQL_DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 /// it, and PHP's date parser turns the zero month and day into 30 November of
 /// 1 BCE, spelling that year with three or four digits depending on the format
 /// used.
+///
+/// These are the renderings of the zero date in its own timezone. Converting
+/// it to another first lands on a different day — `Europe/Berlin` to UTC gives
+/// `-0001-11-29 23:06:32` — which no prefix here matches, so it is rejected as
+/// malformed rather than recognised as unset. That distinction only changes
+/// whether an optional field reads `None` or errors; either way the value
+/// never reaches a caller as an instant.
 const NOT_SET_SPELLINGS: [&str; 3] = ["0000-00-00", "-001-11-30", "-0001-11-30"];
 
 /// The instant PHP derives from the zero date, as a unix timestamp. Reached by
