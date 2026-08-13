@@ -286,7 +286,7 @@ async fn parse_extras() {
 #[case::order(generate!(CommentListParams, (order, Some(WpApiParamOrder::Asc))))]
 #[case::orderby(generate!(CommentListParams, (orderby, Some(WpApiParamCommentsOrderBy::Id))))]
 #[case::parent(generate!(CommentListParams, (parent, vec![CommentId(1), CommentId(2)])))]
-#[case::parent_exclude(generate!(CommentListParams, (parent, vec![CommentId(1), CommentId(2)])))]
+#[case::parent_exclude(generate!(CommentListParams, (parent_exclude, vec![CommentId(1), CommentId(2)])))]
 #[case::post(generate!(CommentListParams, (post, vec![PostId(1), PostId(2)])))]
 #[case::status_hold(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Hold))))]
 #[case::status_approve(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Approve))))]
