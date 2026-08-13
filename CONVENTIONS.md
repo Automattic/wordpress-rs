@@ -8,7 +8,7 @@ A type is a promise. Two values share one only when they are the same thing — 
 
 Reach for helpers where they genuinely overlap. That is what the similarity is for; the type is not.
 
-This costs a few more names and saves the failure where a field is typed as something it resembles, and the resemblance quietly stops holding.
+The cost is a few more type names. Without it, a field ends up typed as something it merely resembles, and nothing tells you on the day the resemblance stops holding.
 
 ## Dates
 
