@@ -324,6 +324,8 @@ async fn list_err_forbidden_param_comment_type(
 async fn list_err_forbidden_param_status(
     #[values(
         WpApiParamCommentsStatus::Hold,
+        WpApiParamCommentsStatus::All,
+        WpApiParamCommentsStatus::Any,
         WpApiParamCommentsStatus::Spam,
         WpApiParamCommentsStatus::Trash
     )]
