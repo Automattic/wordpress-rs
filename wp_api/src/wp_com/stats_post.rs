@@ -100,6 +100,12 @@ pub struct StatsPostResponse {
     ///
     /// Empty if the response doesn't name both the `period` and `views`
     /// columns.
+    ///
+    /// Also empty when the endpoint has no history to pad — a homepage, or a
+    /// target whose publish date it can't read. It answers those with a single
+    /// placeholder row whose period is a year-less `M-DD` and whose count is
+    /// the string `"0"` rather than a number, and a row whose count isn't a
+    /// number is dropped.
     pub daily_views: Vec<StatsPostDailyView>,
     /// The highest view count the target reached in a single month.
     pub highest_month: u64,
@@ -577,6 +583,12 @@ mod tests {
         vec![("2026-08-04", 5), ("2026-08-06", 7)]
     )]
     #[case::missing_views_column(&["period"], r#"[["2026-08-04"]]"#, vec![])]
+    // The endpoint answers a target it has no history to pad — a homepage, or
+    // one whose publish date it can't read — with a single placeholder row.
+    // Its period is a year-less `M-DD`, which is not a date, and its count is
+    // the string `"0"`, which is what drops the row. If that count ever
+    // arrives as a number the period reaches `WpDateString`, and this fails.
+    #[case::no_history_placeholder(&["period", "views"], r#"[["8-06", "0"]]"#, vec![])]
     fn test_stats_post_daily_views_column_handling(
         #[case] fields: &[&str],
         #[case] data: &str,
