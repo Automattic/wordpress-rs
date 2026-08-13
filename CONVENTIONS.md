@@ -4,11 +4,9 @@ Rules for modelling the WordPress and WordPress.com REST APIs in this crate, so 
 
 ## Types
 
-A type is a promise. Two values share one only when they are the same thing — not nearly, not for now. Ask whether they are, and if you can't answer yes without adding a qualifier, the answer is no and they get separate types. "Same shape today", "same apart from one endpoint", "same unless the server does X" are all no.
+A type is a promise. Two values share one only when they are the same thing — not nearly, not for now. If you can't say yes without a qualifier, the answer is no. "Same shape today", "same apart from one endpoint", "same unless the server does X" are all no.
 
-Reach for helpers where they genuinely overlap. That is what the similarity is for; the type is not.
-
-The cost is a few more type names. Without it, a field ends up typed as something it merely resembles, and nothing tells you on the day the resemblance stops holding.
+Share helpers where they genuinely overlap; that's what the overlap is good for.
 
 ## Dates
 
@@ -20,14 +18,16 @@ When you model a point in time, reach for one of these two types rather than a b
 
 Where an endpoint sends both forms of the same timestamp, model both — the GMT one as `WpGmtDateTime`, its local twin as `WpDateString`.
 
-Decide from what the endpoint implementation produces, not from the field's name or the schema's wording. Both directions bite: a "most active day" is an instant, because it comes off a comment's GMT timestamp, while a "last updated" can be prose for display. Query parameters are no different — `/wp/v2`'s `after` is documented as ISO-8601 and matched against the site-local `post_date` column, but `WP_Date_Query` converts an offset-bearing value into the site's timezone first, so `WpGmtDateTime` is right for it.
+Every way of reading a `WpGmtDateTime` accepts the same set: an offset-bearing value, the offsetless WordPress form, MySQL's, and a unix timestamp. The offsetless forms are read as UTC, so only reach for this type once you know the value is GMT.
+
+Decide from what the endpoint implementation produces, not from the field's name or the schema's wording. Both directions bite: a "most active day" is an instant, because it comes off a comment's GMT timestamp, while a "last updated" can be prose for display.
+
+Query parameters are no different. `/wp/v2`'s `after` is documented as ISO-8601 and matched against the site-local `post_date` column, but `WP_Date_Query` converts an offset-bearing value into the site's timezone first, so `WpGmtDateTime` is right for it.
 
 ### Absent and unparseable values
 
 `wp_com`'s domain fields send boolean `false` rather than `null` when a date doesn't apply; `deserialize_optional_date_string` covers that for `WpDateString`. `deserialize_optional_wp_gmt_date_time` treats `null` and `""` as absent.
 
-Reading a `WpGmtDateTime` accepts an offset, the offsetless WordPress form, MySQL's, and a unix timestamp, the same way through serde, `FromStr` and those helpers. The offsetless forms are read as UTC, so only reach for this type once you know the value is GMT.
-
 WordPress's never-set date — `0000-00-00 00:00:00`, and what PHP's formatters make of it — is not a datetime. `deserialize_optional_wp_gmt_date_time` reads it as `None`; everywhere else it is an error, because the alternative is an instant in 1 BCE that looks like data.
 
-That cuts both ways, so check the endpoint before choosing. Where it guards the column it sends `null` and any shape works. Where it formats the column unguarded, the never-set date arrives on the wire, and a field that isn't an `Option` reading through that helper will fail the whole response rather than just itself. `/wp/v2` guards posts but not users or comments.
+So a field on an endpoint that doesn't guard the column has to be an `Option` — otherwise one such record fails the entire response. `/wp/v2` guards posts, but not users or comments.
