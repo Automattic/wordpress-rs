@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING:** `CommentListParams.status` now takes `WpApiParamCommentsStatus` instead of `CommentStatus`, fixing `status=approved` silently returning no comments and adding typed `all`/`any`. Use `.approve` in place of `Custom("approve")`.
 - **BREAKING:** `product_type` fields on `Product` and `WPComProduct` changed from `String` to `ProductType`. Callers that match on or construct these values will need to wrap/unwrap with `ProductType(...)`.
 - **BREAKING:** The cache now enables SQLite foreign key enforcement on every connection it prepares, and fails with `SqliteDbError::ForeignKeysUnavailable` if the setting doesn't take effect. Removing a site relies on `ON DELETE CASCADE` to clear its cached rows, so on builds where enforcement defaulted to off those rows were silently left behind.
 - **BREAKING:** `ShoppingCart.coupon` changed from `String` to `CouponCode`, and `ShoppingCartCostOverride.override_code` from `String` to `CostOverrideCode`, so the shopping cart and site plans describe these values with the same types. Callers will need to wrap/unwrap with `CouponCode(...)` / `CostOverrideCode(...)`.
