@@ -25,10 +25,18 @@ const NOT_SET_TIMESTAMP: i64 = -62_169_984_000;
 pub enum WpDateTimeParseError {
     /// The value is WordPress's never-set date rather than a datetime.
     ///
-    /// A field that can legitimately be unset is an `Option`, and its
+    /// A field that can legitimately be unset is an `Option` whose
     /// deserializer reads this as `None`. Every other read path treats it as
     /// an error, because the only alternative is an instant in 1 BCE that is
     /// indistinguishable from real data once parsed.
+    ///
+    /// The trade-off that choice carries: on a field that is *not* optional,
+    /// serde aborts the whole document, so one row with a never-set date
+    /// fails an entire list response rather than losing one field. Whether a
+    /// given field needs to be optional depends on the endpoint — some guard
+    /// the column and send `null`, some format it unguarded and send this. If
+    /// a response starts failing to parse and the message names this error,
+    /// the fix is to make that field optional, not to loosen the parser.
     NotSet,
     /// The value matches none of the forms WordPress sends, or resolves to an
     /// instant before year 1, which no WordPress datetime legitimately has.

@@ -21,3 +21,5 @@ Decide from what the endpoint implementation produces, not from the field's name
 Reading a `WpGmtDateTime` accepts an offset, the offsetless WordPress form, MySQL's, and a unix timestamp, the same way through serde, `FromStr` and those helpers. The offsetless forms are read as UTC, so only reach for this type once you know the value is GMT.
 
 WordPress's never-set date — `0000-00-00 00:00:00`, and what PHP's formatters make of it — is not a datetime. `deserialize_optional_wp_gmt_date_time` reads it as `None`; everywhere else it is an error, because the alternative is an instant in 1 BCE that looks like data.
+
+That cuts both ways, so check the endpoint before choosing. Where it guards the column it sends `null` and any shape works. Where it formats the column unguarded, the never-set date arrives on the wire, and a field that isn't an `Option` reading through that helper will fail the whole response rather than just itself. `/wp/v2` guards posts but not users or comments.

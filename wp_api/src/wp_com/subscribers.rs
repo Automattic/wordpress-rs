@@ -337,8 +337,15 @@ pub struct IndividualSubscriberStats {
     emails_sent: u64,
     unique_opens: u64,
     unique_clicks: u64,
-    /// When the site was registered, in GMT.
-    blog_registration_date: WpGmtDateTime,
+    /// When the site was registered, in GMT. `None` when it was never set:
+    /// this endpoint returns the column verbatim without guarding it, so a
+    /// site with no registration date arrives as WordPress's never-set date
+    /// rather than `null`.
+    #[serde(
+        default,
+        deserialize_with = "crate::date::deserialize_optional_wp_gmt_date_time"
+    )]
+    blog_registration_date: Option<WpGmtDateTime>,
 }
 
 // MARK: - Add Subscribers

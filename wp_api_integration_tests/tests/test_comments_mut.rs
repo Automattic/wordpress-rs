@@ -175,7 +175,7 @@ generate_update_test!(
     |updated_comment, updated_comment_from_wp_cli| {
         assert_eq!(
             updated_comment.date_gmt,
-            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00")
+            Some(unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00"))
         );
         assert_eq!(updated_comment_from_wp_cli.date_gmt, "2024-09-09 12:00:00");
     }

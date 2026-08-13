@@ -389,7 +389,15 @@ pub struct SparseComment {
     pub content: Option<SparseCommentContent>,
     #[WpContext(edit, embed, view)]
     pub date: Option<WpDateString>,
+    /// The date the comment was published, as GMT. `None` when it was never
+    /// set: this endpoint formats the column without guarding it, so a comment
+    /// with no date arrives as WordPress's never-set date rather than `null`.
     #[WpContext(edit, view)]
+    #[WpContextualOption]
+    #[serde(
+        default,
+        deserialize_with = "crate::date::deserialize_optional_wp_gmt_date_time"
+    )]
     pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]
     pub link: Option<String>,
@@ -481,6 +489,20 @@ mod tests {
         },
     };
     use rstest::*;
+
+    /// `/wp/v2/comments` formats `comment_date_gmt` without guarding the
+    /// never-set date, so a comment that has none arrives as that value rather
+    /// than `null`. It has to read as absent — anything else fails the whole
+    /// page, taking every other comment in the response with it.
+    #[rstest]
+    #[case::never_set(r#""-0001-11-30T00:00:00""#)]
+    #[case::null("null")]
+    #[case::empty_string(r#""""#)]
+    fn test_comment_date_gmt_reads_as_absent(#[case] date_gmt: &str) {
+        let json = format!(r#"{{"date_gmt": {date_gmt}}}"#);
+        let comment: SparseComment = serde_json::from_str(&json).expect("Unable to parse JSON");
+        assert_eq!(comment.date_gmt, None);
+    }
 
     #[rstest]
     #[case(CommentListParams::default(), "")]
