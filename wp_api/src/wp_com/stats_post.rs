@@ -224,18 +224,50 @@ fn daily_views(fields: &[String], data: Vec<Vec<StatsVisitsDataValue>>) -> Vec<S
             continue;
         };
         daily_views.push(StatsPostDailyView {
-            period: WpDateString::new(period),
+            period: StatsPostViewPeriod::new(period),
             views,
         });
     }
     daily_views
 }
 
+/// The span a per-post view-history row covers.
+///
+/// This endpoint takes no unit, so the label is a day (`"2013-06-20"`) in
+/// every response observed — except when it has no history to report, where it
+/// substitutes a year-less month and day (`"8-06"`).
+///
+/// Don't read a date out of it: the no-history label carries no year, so there
+/// is no date in it to read. Display it, or group by it.
+///
+/// Every stats endpoint builds its own labels and none of them agree, which is
+/// why each has its own type rather than a shared one; see
+/// [`crate::wp_com::stats_visits::StatsVisitsPeriod`] and
+/// [`crate::wp_com::stats_subscribers::StatsSubscribersPeriod`].
+///
+/// It names a span rather than a point in time, so it is neither a
+/// [`WpDateString`] nor a [`WpGmtDateTime`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, uniffi::Record)]
+#[serde(transparent)]
+pub struct StatsPostViewPeriod {
+    pub value: String,
+}
+
+impl StatsPostViewPeriod {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
+        }
+    }
+}
+
 /// A single day's view count from the daily view history.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostDailyView {
-    /// The day the views were bucketed into.
-    pub period: WpDateString,
+    /// The span the views were bucketed into — a day, in practice, though the
+    /// endpoint substitutes a year-less `M-DD` when it has no history to
+    /// report. A label rather than a date, so don't parse it.
+    pub period: StatsPostViewPeriod,
     /// The number of views on that day.
     pub views: u64,
 }
@@ -561,14 +593,14 @@ mod tests {
         assert_eq!(
             daily_views[0],
             StatsPostDailyView {
-                period: WpDateString::new("2013-06-20".to_string()),
+                period: StatsPostViewPeriod::new("2013-06-20".to_string()),
                 views: 1194,
             }
         );
         assert_eq!(
             daily_views[4],
             StatsPostDailyView {
-                period: WpDateString::new("2026-08-06".to_string()),
+                period: StatsPostViewPeriod::new("2026-08-06".to_string()),
                 views: 0,
             }
         );
@@ -603,7 +635,7 @@ mod tests {
         let expected: Vec<StatsPostDailyView> = expected
             .into_iter()
             .map(|(period, views)| StatsPostDailyView {
-                period: WpDateString::new(period.to_string()),
+                period: StatsPostViewPeriod::new(period.to_string()),
                 views,
             })
             .collect();
@@ -627,7 +659,7 @@ mod tests {
         assert_eq!(response.daily_views.len(), 3);
         assert_eq!(
             response.daily_views[0].period,
-            WpDateString::new("2013-05-19".to_string())
+            StatsPostViewPeriod::new("2013-05-19".to_string())
         );
         assert_eq!(response.daily_views[0].views, 73);
         assert_eq!(

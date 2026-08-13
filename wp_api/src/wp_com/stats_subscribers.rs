@@ -2,7 +2,7 @@ use crate::{
     date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::stats_visits::{StatsPeriodLabel, StatsVisitsDataValue},
+    wp_com::stats_visits::StatsVisitsDataValue,
 };
 use serde::{Deserialize, Serialize};
 
@@ -138,7 +138,7 @@ impl StatsSubscribersResponse {
 fn get_stats_subscribers_data(
     handle: &str,
     response: &StatsSubscribersResponse,
-) -> Vec<(StatsPeriodLabel, u64)> {
+) -> Vec<(StatsSubscribersPeriod, u64)> {
     let period_index = match response.fields.iter().position(|f| f == "period") {
         Some(i) => i,
         None => return vec![],
@@ -156,7 +156,7 @@ fn get_stats_subscribers_data(
             if let Some(period) = row.get(period_index).and_then(|v| v.as_string())
                 && let Some(value) = row.get(field_index).and_then(|v| v.as_number())
             {
-                return Some((StatsPeriodLabel(period.clone()), value));
+                return Some((StatsSubscribersPeriod::new(period.clone()), value));
             }
 
             None
@@ -164,17 +164,47 @@ fn get_stats_subscribers_data(
         .collect()
 }
 
+/// The span a `/stats/subscribers` data point covers, labelled to match the
+/// unit the caller asked for: `"2026-01-27"` for a day, `"2026W02W23"` for a
+/// week, the first of the month for a month, and the bare year (`"2026"`) for
+/// a year.
+///
+/// Don't read a date out of it. Its shape follows the unit, and a weekly label
+/// such as `2026W02W23` is not a date in any format. Display it, or group by
+/// it.
+///
+/// Every stats endpoint builds its own labels and none of them agree, which is
+/// why each has its own type rather than a shared one; see
+/// [`crate::wp_com::stats_visits::StatsVisitsPeriod`] and
+/// [`crate::wp_com::stats_post::StatsPostViewPeriod`].
+///
+/// It names a span rather than a point in time, so it is neither a
+/// [`crate::date::WpDateString`] nor a [`crate::date::WpGmtDateTime`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, uniffi::Record)]
+#[serde(transparent)]
+pub struct StatsSubscribersPeriod {
+    pub value: String,
+}
+
+impl StatsSubscribersPeriod {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
+        }
+    }
+}
+
 /// A subscriber count data point.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsSubscribersDataPoint {
-    pub period: StatsPeriodLabel,
+    pub period: StatsSubscribersPeriod,
     pub subscribers: u64,
 }
 
 /// A paid subscriber count data point.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsSubscribersPaidDataPoint {
-    pub period: StatsPeriodLabel,
+    pub period: StatsSubscribersPeriod,
     pub subscribers_paid: u64,
 }
 
@@ -282,7 +312,7 @@ mod tests {
         assert_eq!(
             subscribers[0],
             StatsSubscribersDataPoint {
-                period: StatsPeriodLabel("2026-01-27".to_string()),
+                period: StatsSubscribersPeriod::new("2026-01-27".to_string()),
                 subscribers: 89,
             }
         );
@@ -292,7 +322,7 @@ mod tests {
         assert_eq!(
             paid[0],
             StatsSubscribersPaidDataPoint {
-                period: StatsPeriodLabel("2026-01-27".to_string()),
+                period: StatsSubscribersPeriod::new("2026-01-27".to_string()),
                 subscribers_paid: 0,
             }
         );
@@ -314,7 +344,7 @@ mod tests {
         assert_eq!(
             subscribers[0],
             StatsSubscribersDataPoint {
-                period: StatsPeriodLabel("2026W02W23".to_string()),
+                period: StatsSubscribersPeriod::new("2026W02W23".to_string()),
                 subscribers: 89,
             }
         );
@@ -336,7 +366,7 @@ mod tests {
         assert_eq!(
             subscribers[3],
             StatsSubscribersDataPoint {
-                period: StatsPeriodLabel("2025-11-01".to_string()),
+                period: StatsSubscribersPeriod::new("2025-11-01".to_string()),
                 subscribers: 90,
             }
         );
@@ -358,7 +388,7 @@ mod tests {
         assert_eq!(
             subscribers[2],
             StatsSubscribersDataPoint {
-                period: StatsPeriodLabel("2024".to_string()),
+                period: StatsSubscribersPeriod::new("2024".to_string()),
                 subscribers: 114,
             }
         );

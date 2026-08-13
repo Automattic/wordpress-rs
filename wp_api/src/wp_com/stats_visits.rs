@@ -157,7 +157,7 @@ impl StatsVisitsResponse {
     }
 }
 
-fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(StatsPeriodLabel, u64)> {
+fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(StatsVisitsPeriod, u64)> {
     let period_index = match response.fields.iter().position(|f| f == "period") {
         Some(i) => i,
         None => return vec![],
@@ -175,60 +175,75 @@ fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(StatsPer
             if let Some(period) = row.get(period_index).and_then(|v| v.as_string())
                 && let Some(value) = row.get(field_index).and_then(|v| v.as_number())
             {
-                return Some((StatsPeriodLabel(period.clone()), value));
+                return Some((StatsVisitsPeriod::new(period.clone()), value));
             }
             None
         })
         .collect()
 }
 
-uniffi::custom_newtype!(StatsPeriodLabel, String);
-/// The span a time-series data point covers, labelled to match the unit the
-/// caller asked for. The two endpoints that send it build their labels
-/// separately and don't agree, so treat it as opaque rather than parsing it:
-/// `/stats/subscribers` sends `"2026-01-27"` for a day, `"2026W02W23"` for a
-/// week and `"2026"` for a year, while `/stats/visits` sends
-/// `"2026-01-17 01:00:00"` for an hour and `"2025-12-21"` for a day.
+/// The span a `/stats/visits` data point covers, labelled to match the unit
+/// the caller asked for: `"2025-12-21"` for a day, `"2026-01-17 01:00:00"` for
+/// an hour, and for a year the first of January rather than the bare year.
+///
+/// Don't read a date out of it. Its shape follows the unit, and a yearly label
+/// is the first of January standing in for the whole year — so it parses as a
+/// date and means something else. Display it, or group by it.
+///
+/// Every stats endpoint builds its own labels and none of them agree, which is
+/// why each has its own type rather than a shared one; see
+/// [`crate::wp_com::stats_subscribers::StatsSubscribersPeriod`] and
+/// [`crate::wp_com::stats_post::StatsPostViewPeriod`].
 ///
 /// It names a span rather than a point in time, so it is neither a
 /// [`WpDateString`] nor a [`crate::date::WpGmtDateTime`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, uniffi::Record)]
 #[serde(transparent)]
-pub struct StatsPeriodLabel(pub String);
+pub struct StatsVisitsPeriod {
+    pub value: String,
+}
+
+impl StatsVisitsPeriod {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitsDataPoint {
-    pub period: StatsPeriodLabel,
+    pub period: StatsVisitsPeriod,
     pub visits: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitorsDataPoint {
-    pub period: StatsPeriodLabel,
+    pub period: StatsVisitsPeriod,
     pub visitors: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsLikesDataPoint {
-    pub period: StatsPeriodLabel,
+    pub period: StatsVisitsPeriod,
     pub likes: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsReblogsDataPoint {
-    pub period: StatsPeriodLabel,
+    pub period: StatsVisitsPeriod,
     pub reblogs: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsCommentsDataPoint {
-    pub period: StatsPeriodLabel,
+    pub period: StatsVisitsPeriod,
     pub comments: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostsDataPoint {
-    pub period: StatsPeriodLabel,
+    pub period: StatsVisitsPeriod,
     pub posts: u64,
 }
 
@@ -416,21 +431,21 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsVisitsDataPoint {
-                period: StatsPeriodLabel("2026-01-17 01:00:00".to_string()),
+                period: StatsVisitsPeriod::new("2026-01-17 01:00:00".to_string()),
                 visits: 9,
             }
         );
         assert_eq!(
             data_points[21],
             StatsVisitsDataPoint {
-                period: StatsPeriodLabel("2026-01-17 22:00:00".to_string()),
+                period: StatsVisitsPeriod::new("2026-01-17 22:00:00".to_string()),
                 visits: 27,
             }
         );
         assert_eq!(
             data_points[23],
             StatsVisitsDataPoint {
-                period: StatsPeriodLabel("2026-01-18 00:00:00".to_string()),
+                period: StatsVisitsPeriod::new("2026-01-18 00:00:00".to_string()),
                 visits: 4,
             }
         );
@@ -449,21 +464,21 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsVisitsDataPoint {
-                period: StatsPeriodLabel("2025-12-21".to_string()),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 visits: 67,
             }
         );
         assert_eq!(
             data_points[20],
             StatsVisitsDataPoint {
-                period: StatsPeriodLabel("2026-01-10".to_string()),
+                period: StatsVisitsPeriod::new("2026-01-10".to_string()),
                 visits: 57,
             }
         );
         assert_eq!(
             data_points[29],
             StatsVisitsDataPoint {
-                period: StatsPeriodLabel("2026-01-19".to_string()),
+                period: StatsVisitsPeriod::new("2026-01-19".to_string()),
                 visits: 50,
             }
         );
@@ -514,21 +529,21 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsVisitorsDataPoint {
-                period: StatsPeriodLabel("2025-12-21".to_string()),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 visitors: 60,
             }
         );
         assert_eq!(
             data_points[20],
             StatsVisitorsDataPoint {
-                period: StatsPeriodLabel("2026-01-10".to_string()),
+                period: StatsVisitsPeriod::new("2026-01-10".to_string()),
                 visitors: 50,
             }
         );
         assert_eq!(
             data_points[29],
             StatsVisitorsDataPoint {
-                period: StatsPeriodLabel("2026-01-19".to_string()),
+                period: StatsVisitsPeriod::new("2026-01-19".to_string()),
                 visitors: 47,
             }
         );
@@ -548,14 +563,14 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsLikesDataPoint {
-                period: StatsPeriodLabel("2025-12-21".to_string()),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 likes: 0,
             }
         );
         assert_eq!(
             data_points[15],
             StatsLikesDataPoint {
-                period: StatsPeriodLabel("2026-01-05".to_string()),
+                period: StatsVisitsPeriod::new("2026-01-05".to_string()),
                 likes: 1,
             }
         );
@@ -574,7 +589,7 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsReblogsDataPoint {
-                period: StatsPeriodLabel("2025-12-21".to_string()),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 reblogs: 0,
             }
         );
@@ -593,7 +608,7 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsCommentsDataPoint {
-                period: StatsPeriodLabel("2025-12-21".to_string()),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 comments: 0,
             }
         );
@@ -612,7 +627,7 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsPostsDataPoint {
-                period: StatsPeriodLabel("2025-12-21".to_string()),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 posts: 0,
             }
         );

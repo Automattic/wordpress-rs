@@ -2,6 +2,14 @@
 
 Rules for modelling the WordPress and WordPress.com REST APIs in this crate, so the same decisions don't get re-argued on every endpoint.
 
+## Types
+
+A type is a promise. Two values share one only when they are the same thing — not nearly, not for now. Ask whether they are, and if you can't answer yes without adding a qualifier, the answer is no and they get separate types. "Same shape today", "same apart from one endpoint", "same unless the server does X" are all no.
+
+Reach for helpers where they genuinely overlap. That is what the similarity is for; the type is not.
+
+This costs a few more names and saves the failure where a field is typed as something it resembles, and the resemblance quietly stops holding.
+
 ## Dates
 
 When you model a point in time, reach for one of these two types rather than a bare `String`.
