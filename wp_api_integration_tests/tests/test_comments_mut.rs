@@ -1,7 +1,7 @@
 use macro_helper::generate_update_test;
 use wp_api::comments::{
     CommentCreateParams, CommentCreateParamsBuilder, CommentDeleteParams, CommentStatus,
-    CommentUpdateParams, CommentWithEditContext,
+    CommentUpdateParams, CommentWithEditContext, CommentWithViewContext,
 };
 use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliComment;
@@ -12,7 +12,7 @@ async fn create_comment_with_just_content() {
     test_create_comment(
         &CommentCreateParams::new(FIRST_POST_ID, "foo".to_string()),
         |created_comment, comment_from_wp_cli| {
-            assert_eq!(created_comment.content.raw, "foo");
+            assert!(created_comment.content.rendered.contains("foo"));
             assert_eq!(comment_from_wp_cli.content, "foo");
         },
     )
@@ -27,7 +27,7 @@ async fn create_comment_with_content_and_status() {
             .status(Some(CommentStatus::Hold))
             .build(),
         |created_comment, comment_from_wp_cli| {
-            assert_eq!(created_comment.content.raw, "foo");
+            assert!(created_comment.content.rendered.contains("foo"));
             assert_eq!(created_comment.status, CommentStatus::Hold);
             assert_eq!(comment_from_wp_cli.content, "foo");
         },
@@ -227,7 +227,7 @@ generate_update_test!(
 
 async fn test_create_comment<F>(params: &CommentCreateParams, assert: F)
 where
-    F: Fn(CommentWithEditContext, WpCliComment),
+    F: Fn(CommentWithViewContext, WpCliComment),
 {
     let created_comment = api_client()
         .comments()
