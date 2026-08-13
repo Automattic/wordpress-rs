@@ -203,9 +203,10 @@ impl MediaService {
 
     /// Find stale media items by comparing fetched metadata timestamps with cached DB values.
     ///
-    /// A media item is considered stale if it's currently in `Fresh` state in
-    /// the state store, and either its fetched `modified_gmt` differs from the
-    /// cached one or the cached one is missing or unreadable.
+    /// A media item is considered stale if:
+    /// 1. It's currently in `Fresh` state in the state store
+    /// 2. Its fetched `modified_gmt` differs from the cached `modified_gmt` in the database,
+    ///    or the cached value is missing or unreadable
     pub(crate) fn find_stale_media_by_timestamp(
         &self,
         metadata: &[EntityMetadata],

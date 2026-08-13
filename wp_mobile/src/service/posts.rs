@@ -211,9 +211,10 @@ impl PostService {
 
     /// Find stale posts by comparing fetched metadata timestamps with cached DB values.
     ///
-    /// A post is considered stale if it's currently in `Fresh` state in the
-    /// state store, and either its fetched `modified_gmt` differs from the
-    /// cached one or the cached one is missing or unreadable.
+    /// A post is considered stale if:
+    /// 1. It's currently in `Fresh` state in the state store
+    /// 2. Its fetched `modified_gmt` differs from the cached `modified_gmt` in the database,
+    ///    or the cached value is missing or unreadable
     ///
     /// Returns empty vector if no stale posts found or if DB query fails.
     pub(crate) fn find_stale_posts_by_timestamp(
