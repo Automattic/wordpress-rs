@@ -136,6 +136,81 @@ async fn untrash_comment_restores_previous_status() {
     RestoreServer::db().await;
 }
 
+// ASPIRATIONAL / currently FAILING — the proposed contract for the not-spam/not-trash path.
+//
+// Today `unspam()`/`untrash()` blindly POST `status=unspam|untrash`. WordPress core
+// (`wp_unspam_comment`/`wp_untrash_comment`) restores the status saved in
+// `_wp_trash_meta_status`; when the comment is NOT currently spam/trash that meta is absent,
+// core falls back to `hold` and returns HTTP 200 — silently demoting an approved comment
+// into the moderation queue (NOT the HTTP 500 the endpoint's doc comment claims). The desired
+// contract: the client refuses to unspam/untrash a comment that isn't spam/trash, surfaces an
+// error, and leaves the comment untouched. These fail today and should pass once a
+// precondition guard is added.
+
+#[tokio::test]
+#[serial]
+async fn unspam_on_non_spam_comment_should_error_without_demoting() {
+    // FIRST_COMMENT_ID is approved in the seed data — it is NOT spam.
+    let result = api_client().comments().unspam(&FIRST_COMMENT_ID).await;
+
+    // Read the resulting server-side status, then restore before asserting.
+    let status = api_client()
+        .comments()
+        .retrieve_with_edit_context(
+            &FIRST_COMMENT_ID,
+            &wp_api::comments::CommentRetrieveParams::default(),
+        )
+        .await
+        .assert_response()
+        .data
+        .status;
+    RestoreServer::db().await;
+
+    // The approved comment must never be demoted...
+    assert_eq!(
+        status,
+        CommentStatus::Approved,
+        "unspam silently demoted an approved comment"
+    );
+    // ...and the caller must be told, not handed a bogus success.
+    assert!(
+        result.is_err(),
+        "unspam on a non-spam comment should return an error, not silently succeed"
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn untrash_on_non_trashed_comment_should_error_without_demoting() {
+    // FIRST_COMMENT_ID is approved in the seed data — it is NOT trash.
+    let result = api_client().comments().untrash(&FIRST_COMMENT_ID).await;
+
+    // Read the resulting server-side status, then restore before asserting.
+    let status = api_client()
+        .comments()
+        .retrieve_with_edit_context(
+            &FIRST_COMMENT_ID,
+            &wp_api::comments::CommentRetrieveParams::default(),
+        )
+        .await
+        .assert_response()
+        .data
+        .status;
+    RestoreServer::db().await;
+
+    // The approved comment must never be demoted...
+    assert_eq!(
+        status,
+        CommentStatus::Approved,
+        "untrash silently demoted an approved comment"
+    );
+    // ...and the caller must be told, not handed a bogus success.
+    assert!(
+        result.is_err(),
+        "untrash on a non-trashed comment should return an error, not silently succeed"
+    );
+}
+
 generate_update_test!(
     update_author,
     author,
