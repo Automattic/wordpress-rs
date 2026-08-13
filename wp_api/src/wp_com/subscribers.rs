@@ -18,7 +18,7 @@ pub struct Subscriber {
     pub is_email_subscriber: bool,
     /// When the subscription started. `None` when WordPress.com has never set
     /// it, which it reports with its never-set date rather than `null`.
-    #[serde(deserialize_with = "deserialize_optional_wp_gmt_date_time")]
+    #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
     pub date_subscribed: Option<WpGmtDateTime>,
     pub subscription_status: Option<String>,
     pub avatar: String,

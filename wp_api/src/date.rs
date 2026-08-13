@@ -72,22 +72,41 @@ where
 
 /// Deserialize an `Option<WpGmtDateTime>` for a field that may be unset.
 ///
-/// `null`, an absent field, an empty string, and WordPress's never-set date
-/// read as `None`. A populated value accepts every form [`WpGmtDateTime`]
-/// does; anything else is an error.
+/// `null`, an empty string, and WordPress's never-set date read as `None`, as
+/// does an absent field on a member carrying `#[serde(default)]`. A populated
+/// value accepts every form [`WpGmtDateTime`] does, including a bare timestamp
+/// sent as a JSON number; anything else is an error.
 pub fn deserialize_optional_wp_gmt_date_time<'de, D>(
     deserializer: D,
 ) -> Result<Option<WpGmtDateTime>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    match Option::<String>::deserialize(deserializer)? {
-        Some(s) if !s.trim().is_empty() => match WpGmtDateTime::from_str(&s) {
-            Ok(date_time) => Ok(Some(date_time)),
-            Err(WpDateTimeParseError::NotSet) => Ok(None),
-            Err(e) => Err(serde::de::Error::custom(format!("{e}: {s}"))),
-        },
-        _ => Ok(None),
+    /// The two shapes a populated value arrives in, matching what the
+    /// non-optional path accepts.
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Populated {
+        String(String),
+        Timestamp(i64),
+    }
+
+    let parsed = match Option::<Populated>::deserialize(deserializer)? {
+        Some(Populated::String(s)) if !s.trim().is_empty() => {
+            WpGmtDateTime::from_str(&s).map_err(|e| (e, s))
+        }
+        Some(Populated::Timestamp(seconds)) => {
+            wp_serde_helper::wp_date_time_from_timestamp(seconds)
+                .map(WpGmtDateTime)
+                .map_err(|e| (e, seconds.to_string()))
+        }
+        _ => return Ok(None),
+    };
+
+    match parsed {
+        Ok(date_time) => Ok(Some(date_time)),
+        Err((WpDateTimeParseError::NotSet, _)) => Ok(None),
+        Err((e, value)) => Err(serde::de::Error::custom(format!("{e}: {value}"))),
     }
 }
 
@@ -178,6 +197,23 @@ mod tests {
     #[case::offsetless(r#"{"value": "2026-08-06T09:15:49"}"#)]
     #[case::mysql(r#"{"value": "2026-08-06 09:15:49"}"#)]
     fn test_deserialize_optional_wp_gmt_date_time(#[case] json: &str) {
+        let parsed: OptionalGmtDateTime =
+            serde_json::from_str(json).expect("Test case should be a valid JSON");
+        assert_eq!(
+            parsed.value.expect("present").0.to_rfc3339(),
+            "2026-08-06T09:15:49+00:00"
+        );
+    }
+
+    /// The optional path accepts the same set as the non-optional one. The
+    /// timestamp cases are the ones that diverged: it read the value as a
+    /// string, so a bare JSON number errored where `WpGmtDateTime`'s own
+    /// `Deserialize` accepted it.
+    #[rstest]
+    #[case::timestamp_as_number(r#"{"value": 1786007749}"#)]
+    #[case::timestamp_as_string(r#"{"value": "1786007749"}"#)]
+    #[case::sub_second(r#"{"value": "2026-08-06T09:15:49.000000"}"#)]
+    fn test_deserialize_optional_wp_gmt_date_time_matches_the_required_path(#[case] json: &str) {
         let parsed: OptionalGmtDateTime =
             serde_json::from_str(json).expect("Test case should be a valid JSON");
         assert_eq!(
