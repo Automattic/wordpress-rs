@@ -177,8 +177,8 @@ class PostCollectionViewModel(
                         title = fullEntity.data.title?.rendered ?: "<no-title>",
                         contentPreview = fullEntity.data.content.rendered.take(100),
                         status = fullEntity.data.status.toString(),
-                        date = fullEntity.data.date,
-                        modified = fullEntity.data.modified,
+                        date = fullEntity.data.date.value,
+                        modified = fullEntity.data.modified.value,
                         author = fullEntity.data.author?.toString()
                     )
                 }
