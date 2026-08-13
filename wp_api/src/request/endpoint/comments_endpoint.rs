@@ -38,9 +38,9 @@ mod tests {
     use crate::{
         UserId, WpApiParamOrder,
         comments::{
-            CommentDeleteParams, CommentId, CommentRetrieveParams, CommentStatus, CommentType,
+            CommentDeleteParams, CommentId, CommentRetrieveParams, CommentType,
             SparseCommentFieldWithEditContext, SparseCommentFieldWithEmbedContext,
-            SparseCommentFieldWithViewContext, WpApiParamCommentsOrderBy,
+            SparseCommentFieldWithViewContext, WpApiParamCommentsOrderBy, WpApiParamCommentsStatus,
         },
         generate,
         posts::PostId,
@@ -80,11 +80,13 @@ mod tests {
     #[case(generate!(CommentListParams, (parent, vec![CommentId(44444), CommentId(44445)])), "parent=44444%2C44445")]
     #[case(generate!(CommentListParams, (parent_exclude, vec![CommentId(55555), CommentId(55556)])), "parent_exclude=55555%2C55556")]
     #[case(generate!(CommentListParams, (post, vec![PostId(66666), PostId(66667)])), "post=66666%2C66667")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Hold))), "status=hold")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Approved))), "status=approved")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Spam))), "status=spam")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Trash))), "status=trash")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Custom("foo".to_string())))), "status=foo")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::All))), "status=all")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Any))), "status=any")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Approve))), "status=approve")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Hold))), "status=hold")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Spam))), "status=spam")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Trash))), "status=trash")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Custom("foo".to_string())))), "status=foo")]
     #[case(generate!(CommentListParams, (comment_type, Some(CommentType::Comment))), "type=comment")]
     #[case(generate!(CommentListParams, (comment_type, Some(CommentType::Pingback))), "type=pingback")]
     #[case(generate!(CommentListParams, (comment_type, Some(CommentType::Trackback))), "type=trackback")]
@@ -194,7 +196,7 @@ mod tests {
             parent: vec![CommentId(44444), CommentId(44445)],
             parent_exclude: vec![CommentId(55555), CommentId(55556)],
             post: vec![PostId(66666), PostId(66667)],
-            status: Some(CommentStatus::Spam),
+            status: Some(WpApiParamCommentsStatus::Spam),
             comment_type: Some(CommentType::Pingback),
             password: Some("p_q".to_string()),
         }

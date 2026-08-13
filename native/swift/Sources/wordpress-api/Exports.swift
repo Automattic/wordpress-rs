@@ -186,6 +186,7 @@ public typealias CommentCreateParams = WordPressAPIInternal.CommentCreateParams
 public typealias CommentUpdateParams = WordPressAPIInternal.CommentUpdateParams
 public typealias CommentDeleteParams = WordPressAPIInternal.CommentDeleteParams
 public typealias CommentStatus = WordPressAPIInternal.CommentStatus
+public typealias WpApiParamCommentsStatus = WordPressAPIInternal.WpApiParamCommentsStatus
 public typealias CommentType = WordPressAPIInternal.CommentType
 public typealias CommentsRequestExecutor = WordPressAPIInternal.CommentsRequestExecutor
 
