@@ -8,7 +8,15 @@ use wp_serde_helper::{WpDateTimeParseError, parse_wp_date_time, wp_utc_date_form
 pub struct WpGmtDateTime(#[serde(with = "wp_utc_date_format")] pub DateTime<Utc>);
 
 impl WpGmtDateTime {
-    pub fn from_timestamp(seconds: i64) -> Self {
+    /// Build an instant from a timestamp that did not come from WordPress, and
+    /// so is not held to WordPress's rules — an X.509 certificate's validity
+    /// bounds, for instance. Falls back to the unix epoch if the value is out
+    /// of range.
+    ///
+    /// A timestamp arriving *from* WordPress or across the bindings goes
+    /// through [`wp_serde_helper::wp_date_time_from_timestamp`], which rejects
+    /// the never-set date rather than resolving it.
+    pub(crate) fn from_unchecked_timestamp(seconds: i64) -> Self {
         let date_time =
             DateTime::<Utc>::from_timestamp(seconds, 0).unwrap_or(DateTime::<Utc>::UNIX_EPOCH);
         Self(date_time)
@@ -31,7 +39,7 @@ impl Display for WpGmtDateTime {
 
 uniffi::custom_type!(WpGmtDateTime, i64, {
     lower: |date_time| date_time.0.timestamp(),
-    try_lift: |seconds| Ok(WpGmtDateTime::from_timestamp(seconds)),
+    try_lift: |seconds| Ok(wp_serde_helper::wp_date_time_from_timestamp(seconds).map(WpGmtDateTime)?),
 });
 
 uniffi::custom_newtype!(WpDateString, String);
@@ -164,9 +172,20 @@ mod tests {
     #[case::year_3000(32503680000, "3000-01-01T00:00:00+00:00")]
     fn test_gmt_date_time_from_time_stamp(#[case] seconds: i64, #[case] expected_date_str: &str) {
         assert_eq!(
-            WpGmtDateTime::from_timestamp(seconds).0.to_rfc3339(),
+            WpGmtDateTime::from_unchecked_timestamp(seconds)
+                .0
+                .to_rfc3339(),
             expected_date_str
         );
+    }
+
+    /// The bindings lift a `WpGmtDateTime` from a timestamp, so that lift is a
+    /// parse boundary and holds to the same rules as every other read.
+    #[rstest]
+    #[case::never_set(-62169984000)]
+    #[case::before_year_one(-62200000000)]
+    fn test_lifting_an_impossible_timestamp_is_rejected(#[case] seconds: i64) {
+        assert!(wp_serde_helper::wp_date_time_from_timestamp(seconds).is_err());
     }
 
     #[rstest]

@@ -127,7 +127,7 @@ pub struct SSLCertificateIssuer {
 
 impl From<x509_cert::time::Time> for WpGmtDateTime {
     fn from(date_time: x509_cert::time::Time) -> Self {
-        WpGmtDateTime::from_timestamp(date_time.to_unix_duration().as_secs() as i64)
+        WpGmtDateTime::from_unchecked_timestamp(date_time.to_unix_duration().as_secs() as i64)
     }
 }
 
