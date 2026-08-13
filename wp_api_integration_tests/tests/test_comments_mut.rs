@@ -37,6 +37,22 @@ async fn create_comment_with_content_and_status() {
 
 #[tokio::test]
 #[serial]
+async fn create_comment_as_subscriber() {
+    // Core returns a view-context response to users without `moderate_comments`,
+    // so the create response must parse for a subscriber as well.
+    let created_comment = api_client_as_subscriber()
+        .comments()
+        .create(&CommentCreateParams::new(FIRST_POST_ID, "foo".to_string()))
+        .await
+        .assert_response()
+        .data;
+    let created_comment_from_wp_cli = Backend::comment(&created_comment.id).await;
+    assert_eq!(created_comment_from_wp_cli.content, "foo");
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
 async fn delete_comment() {
     // Delete the comment using the API and ensure it's successful
     let comment_delete_response = api_client()
