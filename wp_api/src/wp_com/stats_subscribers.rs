@@ -193,7 +193,7 @@ mod tests {
         let params = StatsSubscribersParams {
             unit: Some(StatsSubscribersUnit::Day),
             quantity: Some(30),
-            date: Some(WpDateString("2026-02-26".to_string())),
+            date: Some(WpDateString::new("2026-02-26".to_string())),
             stat_fields: vec![
                 StatsSubscribersStatField::Subscribers,
                 StatsSubscribersStatField::SubscribersPaid,
@@ -269,7 +269,7 @@ mod tests {
         let response: StatsSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-01-27");
+        assert_eq!(response.date.value, "2026-01-27");
         assert_eq!(response.unit, "day");
         assert_eq!(
             response.fields,
@@ -305,7 +305,7 @@ mod tests {
         let response: StatsSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-02-26");
+        assert_eq!(response.date.value, "2026-02-26");
         assert_eq!(response.unit, "week");
         assert_eq!(response.data.len(), 12);
 
@@ -327,7 +327,7 @@ mod tests {
         let response: StatsSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-02-26");
+        assert_eq!(response.date.value, "2026-02-26");
         assert_eq!(response.unit, "month");
         assert_eq!(response.data.len(), 6);
 
@@ -349,7 +349,7 @@ mod tests {
         let response: StatsSubscribersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-02-26");
+        assert_eq!(response.date.value, "2026-02-26");
         assert_eq!(response.unit, "year");
         assert_eq!(response.data.len(), 3);
 

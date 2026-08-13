@@ -227,7 +227,7 @@ mod tests {
         );
         assert_eq!(
             first_post.date,
-            Some(WpDateString("2023-08-17 15:40:59".to_string()))
+            Some(WpDateString::new("2023-08-17 15:40:59".to_string()))
         );
         assert_eq!(first_post.title, Some("Example Post Title".to_string()));
         assert_eq!(first_post.post_type, Some("post".to_string()));

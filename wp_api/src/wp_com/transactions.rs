@@ -226,7 +226,7 @@ mod tests {
         assert_eq!(domain.blog_id, Some(WpComSiteId(98765432)));
         assert_eq!(
             domain.expiry,
-            Some(WpDateString("2030-01-15".to_string())),
+            Some(WpDateString::new("2030-01-15".to_string())),
             "expiry is a date without a time component"
         );
         assert!(domain.product_name_short.is_none());

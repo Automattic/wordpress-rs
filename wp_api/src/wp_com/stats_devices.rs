@@ -117,8 +117,8 @@ mod tests {
 
         let params = StatsDevicesParams {
             period: Some(StatsDevicesPeriod::Day),
-            date: Some(WpDateString("2026-02-20".to_string())),
-            start_date: Some(WpDateString("2026-02-14".to_string())),
+            date: Some(WpDateString::new("2026-02-20".to_string())),
+            start_date: Some(WpDateString::new("2026-02-14".to_string())),
             max: Some(10),
             num: Some(1),
             days: Some(1),
@@ -143,7 +143,7 @@ mod tests {
 
         let params = StatsDevicesParams {
             period: Some(StatsDevicesPeriod::Day),
-            date: Some(WpDateString("2026-02-20".to_string())),
+            date: Some(WpDateString::new("2026-02-20".to_string())),
             ..Default::default()
         };
 

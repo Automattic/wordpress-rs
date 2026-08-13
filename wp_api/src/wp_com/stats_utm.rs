@@ -176,9 +176,9 @@ mod tests {
 
         let params = StatsUtmParams {
             max: Some(0),
-            date: Some(WpDateString("2026-03-24".to_string())),
+            date: Some(WpDateString::new("2026-03-24".to_string())),
             days: Some(365),
-            start_date: Some(WpDateString("2026-03-24".to_string())),
+            start_date: Some(WpDateString::new("2026-03-24".to_string())),
             query_top_posts: true,
         };
 
@@ -199,7 +199,7 @@ mod tests {
         .expect("Failed to parse url");
 
         let params = StatsUtmParams {
-            date: Some(WpDateString("2026-03-24".to_string())),
+            date: Some(WpDateString::new("2026-03-24".to_string())),
             days: Some(1),
             ..Default::default()
         };

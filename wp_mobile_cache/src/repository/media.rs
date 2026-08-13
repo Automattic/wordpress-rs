@@ -428,10 +428,10 @@ impl MediaRepository<EditContext> {
                 rusqlite::named_params! {
                     ":db_site_id": site.row_id,
                     ":id": media.id.0,
-                    ":date": media.date.0,
+                    ":date": media.date.value,
                     ":date_gmt": media.date_gmt.to_string(),
                     ":link": media.link,
-                    ":modified": media.modified.0,
+                    ":modified": media.modified.value,
                     ":modified_gmt": media.modified_gmt.to_string(),
                     ":slug": media.slug,
                     ":status": media.status.to_string(),

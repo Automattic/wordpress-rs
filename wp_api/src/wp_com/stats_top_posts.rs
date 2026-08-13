@@ -185,8 +185,8 @@ mod tests {
 
         let params = StatsTopPostsParams {
             period: Some(StatsTopPostsPeriod::Day),
-            start_date: Some(WpDateString("2026-01-26".to_string())),
-            date: Some(WpDateString("2026-01-26".to_string())),
+            start_date: Some(WpDateString::new("2026-01-26".to_string())),
+            date: Some(WpDateString::new("2026-01-26".to_string())),
             max: Some(10),
             num: Some(30),
             locale: Some(WPComLanguage::English),
@@ -213,7 +213,7 @@ mod tests {
         let params = StatsTopPostsParams {
             period: Some(StatsTopPostsPeriod::Week),
             start_date: None,
-            date: Some(WpDateString("2026-01-19".to_string())),
+            date: Some(WpDateString::new("2026-01-19".to_string())),
             max: None,
             num: None,
             locale: None,
@@ -239,7 +239,7 @@ mod tests {
 
         let params = StatsTopPostsParams {
             period: Some(StatsTopPostsPeriod::Day),
-            date: Some(WpDateString("2026-01-26".to_string())),
+            date: Some(WpDateString::new("2026-01-26".to_string())),
             summarize: false,
             skip_archives: None,
             ..Default::default()
@@ -286,7 +286,7 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.date.0.is_empty());
+        assert!(!response.date.value.is_empty());
         assert!(response.period.is_some());
         assert!(!response.period.as_ref().unwrap().is_empty());
 
@@ -303,7 +303,7 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-01-25");
+        assert_eq!(response.date.value, "2026-01-25");
         assert_eq!(response.period, Some("week".to_string()));
 
         let summary = response
@@ -359,7 +359,7 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.date.0.is_empty());
+        assert!(!response.date.value.is_empty());
         assert!(response.summary.is_none());
         assert!(response.days.is_some());
     }
@@ -371,7 +371,7 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-01-26");
+        assert_eq!(response.date.value, "2026-01-26");
         assert!(response.period.is_none());
         assert!(response.summary.is_none());
 
@@ -406,7 +406,7 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with null values");
 
-        assert_eq!(response.date.0, "2026-01-28");
+        assert_eq!(response.date.value, "2026-01-28");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = response
@@ -437,7 +437,7 @@ mod tests {
         );
         assert_eq!(
             all_values.date,
-            Some(WpDateString("2026-01-28 10:00:00".to_string()))
+            Some(WpDateString::new("2026-01-28 10:00:00".to_string()))
         );
         assert_eq!(all_values.title, Some("A Post With All Fields".to_string()));
         assert_eq!(all_values.post_type, Some("post".to_string()));
@@ -466,7 +466,7 @@ mod tests {
         let response: StatsTopPostsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with missing dropped_ids");
 
-        assert_eq!(response.date.0, "2026-01-28");
+        assert_eq!(response.date.value, "2026-01-28");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = response

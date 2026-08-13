@@ -211,8 +211,8 @@ mod tests {
 
         let params = StatsTopAuthorsParams {
             period: Some(StatsTopAuthorsPeriod::Day),
-            start_date: Some(WpDateString("2026-01-30".to_string())),
-            date: Some(WpDateString("2026-02-05".to_string())),
+            start_date: Some(WpDateString::new("2026-01-30".to_string())),
+            date: Some(WpDateString::new("2026-02-05".to_string())),
             max: Some(10),
             num: Some(7),
             locale: Some(WPComLanguage::English),
@@ -238,7 +238,7 @@ mod tests {
         let params = StatsTopAuthorsParams {
             period: Some(StatsTopAuthorsPeriod::Week),
             start_date: None,
-            date: Some(WpDateString("2026-02-05".to_string())),
+            date: Some(WpDateString::new("2026-02-05".to_string())),
             max: None,
             num: None,
             locale: None,
@@ -263,7 +263,7 @@ mod tests {
 
         let params = StatsTopAuthorsParams {
             period: Some(StatsTopAuthorsPeriod::Day),
-            date: Some(WpDateString("2026-02-05".to_string())),
+            date: Some(WpDateString::new("2026-02-05".to_string())),
             summarize: false,
             ..Default::default()
         };
@@ -301,7 +301,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.date.0.is_empty());
+        assert!(!response.date.value.is_empty());
         assert!(response.period.is_some());
         assert!(!response.period.as_ref().unwrap().is_empty());
 
@@ -318,7 +318,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = response
@@ -347,7 +347,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.date.0.is_empty());
+        assert!(!response.date.value.is_empty());
         assert!(response.summary.is_none());
         assert!(response.days.is_some());
     }
@@ -359,7 +359,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
         assert!(response.period.is_none());
         assert!(response.summary.is_none());
 
@@ -401,7 +401,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with empty response");
 
-        assert_eq!(response.date.0, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = response
@@ -418,7 +418,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with null values");
 
-        assert_eq!(response.date.0, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
 
         let summary = response
             .summary
@@ -488,7 +488,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with mixed follow_data");
 
-        assert_eq!(response.date.0, "2026-02-02");
+        assert_eq!(response.date.value, "2026-02-02");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = response

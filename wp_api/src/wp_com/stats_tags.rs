@@ -102,7 +102,7 @@ mod tests {
         let response: StatsTagsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-03-12");
+        assert_eq!(response.date.value, "2026-03-12");
         assert_eq!(response.tags.len(), 3);
 
         let first = &response.tags[0];
@@ -124,7 +124,7 @@ mod tests {
         let response: StatsTagsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-03-12");
+        assert_eq!(response.date.value, "2026-03-12");
         assert!(response.tags.is_empty());
     }
 }

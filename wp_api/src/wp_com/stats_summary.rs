@@ -129,7 +129,7 @@ mod tests {
         let response: StatsSummaryResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-03-10");
+        assert_eq!(response.date.value, "2026-03-10");
 
         // Verify stats
         assert_eq!(response.stats.visitors_today, 222);
@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(response.stats.visitors, 154791);
         assert_eq!(response.stats.views_today, 745);
         assert_eq!(response.stats.views_yesterday, 1405);
-        assert_eq!(response.stats.views_best_day.0, "2022-02-22");
+        assert_eq!(response.stats.views_best_day.value, "2022-02-22");
         assert_eq!(response.stats.views_best_day_total, 4615);
         assert_eq!(response.stats.views, 6782783);
         assert_eq!(response.stats.comments, 0);
@@ -182,7 +182,7 @@ mod tests {
         let response: StatsSummaryResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-03-10");
+        assert_eq!(response.date.value, "2026-03-10");
 
         // Verify all stats are zero
         assert_eq!(response.stats.visitors_today, 0);
@@ -190,7 +190,7 @@ mod tests {
         assert_eq!(response.stats.visitors, 0);
         assert_eq!(response.stats.views_today, 0);
         assert_eq!(response.stats.views_yesterday, 0);
-        assert_eq!(response.stats.views_best_day.0, "");
+        assert_eq!(response.stats.views_best_day.value, "");
         assert_eq!(response.stats.views_best_day_total, 0);
         assert_eq!(response.stats.views, 0);
         assert_eq!(response.stats.comments, 0);

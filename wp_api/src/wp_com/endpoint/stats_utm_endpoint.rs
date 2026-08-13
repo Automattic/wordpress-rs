@@ -74,9 +74,9 @@ mod tests {
         let utm_keys = StatsUtmKeys(vec![StatsUtmKey::UtmSource]);
         let params = StatsUtmParams {
             max: Some(10),
-            date: Some(WpDateString("2026-03-24".to_string())),
+            date: Some(WpDateString::new("2026-03-24".to_string())),
             days: Some(30),
-            start_date: Some(WpDateString("2026-02-22".to_string())),
+            start_date: Some(WpDateString::new("2026-02-22".to_string())),
             query_top_posts: false,
         };
         validate_wp_com_rest_v1_1_endpoint(

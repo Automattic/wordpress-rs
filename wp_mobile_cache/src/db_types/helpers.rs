@@ -22,7 +22,8 @@ pub fn get_date_string<C>(row: &Row, column: C) -> Result<WpDateString, SqliteDb
 where
     C: ColumnIndex,
 {
-    Ok(WpDateString(row.get_column(column)?))
+    let value: String = row.get_column(column)?;
+    Ok(WpDateString::new(value))
 }
 
 /// Helper to get an optional ID wrapper type from a row.

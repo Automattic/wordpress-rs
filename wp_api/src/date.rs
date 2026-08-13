@@ -42,7 +42,6 @@ uniffi::custom_type!(WpGmtDateTime, i64, {
     try_lift: |seconds| Ok(wp_serde_helper::wp_date_time_from_timestamp(seconds).map(WpGmtDateTime)?),
 });
 
-uniffi::custom_newtype!(WpDateString, String);
 /// A date the API sends as a string that can't be resolved to an instant —
 /// either because it carries no time (`"2026-08-06"`, e.g. domain expiry) or
 /// because its time is in the site's timezone rather than GMT
@@ -54,13 +53,23 @@ uniffi::custom_newtype!(WpDateString, String);
 /// Some PHP endpoints return `false` instead of `null` when a date is not
 /// applicable. Use [`deserialize_optional_date_string`] on fields that
 /// exhibit this pattern.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 #[serde(transparent)]
-pub struct WpDateString(pub String);
+pub struct WpDateString {
+    pub value: String,
+}
+
+impl WpDateString {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
+        }
+    }
+}
 
 impl Display for WpDateString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.value)
     }
 }
 
@@ -75,7 +84,7 @@ where
     D: serde::Deserializer<'de>,
 {
     wp_serde_helper::deserialize_false_or_string_or_null(deserializer)
-        .map(|opt| opt.map(WpDateString))
+        .map(|opt| opt.map(WpDateString::new))
 }
 
 /// Deserialize an `Option<WpGmtDateTime>` for a field that may be unset.

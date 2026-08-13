@@ -181,7 +181,7 @@ impl From<StatsPostResponse> for RawStatsPostResponse {
                 .into_iter()
                 .map(|daily_view| {
                     vec![
-                        StatsVisitsDataValue::String(daily_view.period.0),
+                        StatsVisitsDataValue::String(daily_view.period.value),
                         StatsVisitsDataValue::Number(daily_view.views),
                     ]
                 })
@@ -224,7 +224,7 @@ fn daily_views(fields: &[String], data: Vec<Vec<StatsVisitsDataValue>>) -> Vec<S
             continue;
         };
         daily_views.push(StatsPostDailyView {
-            period: WpDateString(period),
+            period: WpDateString::new(period),
             views,
         });
     }
@@ -433,7 +433,7 @@ mod tests {
     fn test_stats_post_response_details() {
         let response = parse(WITH_VIEWS);
 
-        assert_eq!(response.date, WpDateString("2026-08-06".to_string()));
+        assert_eq!(response.date, WpDateString::new("2026-08-06".to_string()));
         assert_eq!(response.views, 19096);
         assert_eq!(response.highest_month, 3224);
         assert_eq!(response.highest_day_average, 293);
@@ -460,11 +460,14 @@ mod tests {
             "The Last Version of FeedDemon is Here, and it's Free"
         );
         assert_eq!(post.excerpt, "The wait is over.");
-        assert_eq!(post.date, WpDateString("2013-06-20 09:15:49".to_string()));
+        assert_eq!(
+            post.date,
+            WpDateString::new("2013-06-20 09:15:49".to_string())
+        );
         assert_eq!(post.date_gmt.0.to_rfc3339(), "2013-06-20T13:15:49+00:00");
         assert_eq!(
             post.modified,
-            WpDateString("2013-06-23 21:57:23".to_string())
+            WpDateString::new("2013-06-23 21:57:23".to_string())
         );
         assert_eq!(
             post.modified_gmt.0.to_rfc3339(),
@@ -495,7 +498,10 @@ mod tests {
 
         let first = &weeks[0];
         assert_eq!(first.days.len(), 7);
-        assert_eq!(first.days[0].day, WpDateString("2026-06-29".to_string()));
+        assert_eq!(
+            first.days[0].day,
+            WpDateString::new("2026-06-29".to_string())
+        );
         assert_eq!(first.days[0].count, 2);
         assert_eq!(first.total, 7);
         assert_eq!(first.average, 1);
@@ -555,14 +561,14 @@ mod tests {
         assert_eq!(
             daily_views[0],
             StatsPostDailyView {
-                period: WpDateString("2013-06-20".to_string()),
+                period: WpDateString::new("2013-06-20".to_string()),
                 views: 1194,
             }
         );
         assert_eq!(
             daily_views[4],
             StatsPostDailyView {
-                period: WpDateString("2026-08-06".to_string()),
+                period: WpDateString::new("2026-08-06".to_string()),
                 views: 0,
             }
         );
@@ -597,7 +603,7 @@ mod tests {
         let expected: Vec<StatsPostDailyView> = expected
             .into_iter()
             .map(|(period, views)| StatsPostDailyView {
-                period: WpDateString(period.to_string()),
+                period: WpDateString::new(period.to_string()),
                 views,
             })
             .collect();
@@ -621,7 +627,7 @@ mod tests {
         assert_eq!(response.daily_views.len(), 3);
         assert_eq!(
             response.daily_views[0].period,
-            WpDateString("2013-05-19".to_string())
+            WpDateString::new("2013-05-19".to_string())
         );
         assert_eq!(response.daily_views[0].views, 73);
         assert_eq!(

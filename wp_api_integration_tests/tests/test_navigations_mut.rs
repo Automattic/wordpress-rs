@@ -87,9 +87,9 @@ async fn trash_navigation() {
 generate_update_test!(
     update_date,
     date,
-    WpDateString("2024-09-09T12:00:00".to_string()),
+    WpDateString::new("2024-09-09T12:00:00".to_string()),
     |updated_navigation| {
-        assert_eq!(updated_navigation.date.0, "2024-09-09T12:00:00");
+        assert_eq!(updated_navigation.date.value, "2024-09-09T12:00:00");
     }
 );
 
@@ -153,7 +153,7 @@ async fn update_status_to_future() {
     test_update_navigation(
         &NavigationUpdateParams {
             status: Some(NavigationStatus::Future),
-            date: Some(WpDateString("2026-09-09T12:00:00".to_string())),
+            date: Some(WpDateString::new("2026-09-09T12:00:00".to_string())),
             ..Default::default()
         },
         |updated_navigation| {

@@ -275,7 +275,7 @@ mod tests {
         let params = StatsVisitsParams {
             unit: Some(StatsVisitsUnit::Hour),
             quantity: Some(24),
-            end_date: Some(WpDateString("2025-01-15".to_string())),
+            end_date: Some(WpDateString::new("2025-01-15".to_string())),
             start_date: None,
             stat_fields: vec![],
             locale: Some(WPComLanguage::English),
@@ -323,8 +323,8 @@ mod tests {
         let params = StatsVisitsParams {
             unit: Some(StatsVisitsUnit::Month),
             quantity: Some(12),
-            end_date: Some(WpDateString("2026-07-13".to_string())),
-            start_date: Some(WpDateString("2025-08-01".to_string())),
+            end_date: Some(WpDateString::new("2026-07-13".to_string())),
+            start_date: Some(WpDateString::new("2025-08-01".to_string())),
             stat_fields: vec![StatsVisitsField::Views, StatsVisitsField::Visitors],
             locale: None,
         };
@@ -370,7 +370,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.date.0.is_empty());
+        assert!(!response.date.value.is_empty());
         assert!(!response.unit.is_empty());
         assert!(!response.fields.is_empty());
     }
@@ -382,7 +382,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-01-18 00:00:00");
+        assert_eq!(response.date.value, "2026-01-18 00:00:00");
         assert_eq!(response.unit, "hour");
         assert_eq!(
             response.fields,
@@ -472,7 +472,7 @@ mod tests {
     #[test]
     fn test_get_stats_visits_data_empty_response() {
         let response = StatsVisitsResponse {
-            date: WpDateString("2026-01-19".to_string()),
+            date: WpDateString::new("2026-01-19".to_string()),
             unit: "day".to_string(),
             fields: vec![
                 "period".to_string(),

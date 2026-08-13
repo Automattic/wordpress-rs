@@ -1101,7 +1101,7 @@ mod tests {
         // Date-only `"YYYY-MM-DD"` expiry, the real-world format from the API.
         assert_eq!(
             registration.expiry,
-            Some(WpDateString("2027-01-01".to_string()))
+            Some(WpDateString::new("2027-01-01".to_string()))
         );
         // The API returns `subscription_id` as a string, not a number.
         assert_eq!(registration.subscription_id, Some(SubscriptionId(55555)));
@@ -1693,14 +1693,14 @@ mod tests {
         assert_eq!(registered.expired, Some(false));
         assert_eq!(
             registered.expiry,
-            Some(WpDateString("2027-03-15".to_string()))
+            Some(WpDateString::new("2027-03-15".to_string()))
         );
         assert_eq!(registered.expiry_soon, Some(false));
         assert_eq!(registered.has_registration, Some(true));
         assert_eq!(registered.has_private_registration, Some(true));
         assert_eq!(
             registered.registration_date,
-            Some(WpDateString("2024-03-15".to_string()))
+            Some(WpDateString::new("2024-03-15".to_string()))
         );
         assert_eq!(registered.is_renewable, Some(true));
         assert_eq!(registered.is_redeemable, Some(false));
@@ -1722,11 +1722,11 @@ mod tests {
         assert_eq!(registered.contact_info_disclosure_available, Some(true));
         assert_eq!(
             registered.auto_renewal_date,
-            Some(WpDateString("2027-03-15".to_string()))
+            Some(WpDateString::new("2027-03-15".to_string()))
         );
         assert_eq!(
             registered.renewable_until,
-            Some(WpDateString("2027-04-15".to_string()))
+            Some(WpDateString::new("2027-04-15".to_string()))
         );
     }
 
@@ -1748,7 +1748,7 @@ mod tests {
         assert_eq!(google.is_eligible_for_introductory_offer, Some(false));
         assert_eq!(
             google.subscribed_date,
-            Some(WpDateString("2024-07-15T10:00:00+00:00".to_string()))
+            Some(WpDateString::new("2024-07-15T10:00:00+00:00".to_string()))
         );
         assert_eq!(google.subscription_id, Some(SubscriptionId(55001)));
         assert_eq!(google.owned_by_user_id, Some(WpComUserId(33001)));

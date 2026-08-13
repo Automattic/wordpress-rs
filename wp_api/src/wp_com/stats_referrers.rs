@@ -270,8 +270,8 @@ mod tests {
 
         let params = StatsReferrersParams {
             period: Some(StatsReferrersPeriod::Day),
-            date: Some(WpDateString("2026-01-26".to_string())),
-            start_date: Some(WpDateString("2026-01-26".to_string())),
+            date: Some(WpDateString::new("2026-01-26".to_string())),
+            start_date: Some(WpDateString::new("2026-01-26".to_string())),
             max: Some(10),
             num: Some(30),
             locale: Some(WPComLanguage::English),
@@ -297,7 +297,7 @@ mod tests {
 
         let params = StatsReferrersParams {
             period: Some(StatsReferrersPeriod::Week),
-            date: Some(WpDateString("2026-01-19".to_string())),
+            date: Some(WpDateString::new("2026-01-19".to_string())),
             start_date: None,
             max: None,
             num: None,
@@ -324,7 +324,7 @@ mod tests {
 
         let params = StatsReferrersParams {
             period: Some(StatsReferrersPeriod::Day),
-            date: Some(WpDateString("2026-01-26".to_string())),
+            date: Some(WpDateString::new("2026-01-26".to_string())),
             summarize: false,
             skip_archives: None,
             ..Default::default()
@@ -384,7 +384,7 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         // Common assertion: date is always present
-        assert!(!response.date.0.is_empty());
+        assert!(!response.date.value.is_empty());
 
         if expect_summary {
             // summarize=1 response: has period and summary, no days
@@ -433,7 +433,7 @@ mod tests {
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-01-26");
+        assert_eq!(response.date.value, "2026-01-26");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = response
@@ -535,7 +535,7 @@ mod tests {
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-01-26");
+        assert_eq!(response.date.value, "2026-01-26");
         assert!(response.period.is_none());
         assert!(response.summary.is_none());
 
@@ -601,7 +601,7 @@ mod tests {
         let response: StatsReferrersResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with null values");
 
-        assert_eq!(response.date.0, "2026-01-28");
+        assert_eq!(response.date.value, "2026-01-28");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = response

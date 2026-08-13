@@ -37,7 +37,7 @@ async fn delete_media() {
 generate_update_test!(
     update_date,
     date,
-    WpDateString("2024-09-09T12:00:00".to_string())
+    WpDateString::new("2024-09-09T12:00:00".to_string())
 );
 
 generate_update_test!(

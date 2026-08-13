@@ -173,9 +173,9 @@ async fn trash_page() {
 generate_update_test!(
     update_date,
     date,
-    WpDateString("2024-09-09T12:00:00".to_string()),
+    WpDateString::new("2024-09-09T12:00:00".to_string()),
     |updated_page, updated_page_from_wp_cli| {
-        assert_eq!(updated_page.date.0, "2024-09-09T12:00:00");
+        assert_eq!(updated_page.date.value, "2024-09-09T12:00:00");
         assert_eq!(updated_page_from_wp_cli.date, "2024-09-09 12:00:00");
     }
 );
@@ -382,7 +382,7 @@ async fn update_status_to_future() {
         &PostUpdateParams {
             status: Some(PostStatus::Future),
             // Publish date has to be in the future
-            date: Some(WpDateString("2026-09-09T12:00:00".to_string())),
+            date: Some(WpDateString::new("2026-09-09T12:00:00".to_string())),
             ..Default::default()
         },
         |updated_page, updated_page_from_wp_cli| {

@@ -44,7 +44,7 @@ async fn test_load_next_page_with_duplicate_items_all_fresh() {
     for i in 1..=5 {
         let params = PostCreateParams {
             title: Some(format!("Test Post {}", i)),
-            date: Some(WpDateString(format!("{}{:02}T12:00:00", base_date, i))),
+            date: Some(WpDateString::new(format!("{}{:02}T12:00:00", base_date, i))),
             status: Some(PostStatus::Future),
             ..Default::default()
         };
@@ -76,7 +76,7 @@ async fn test_load_next_page_with_duplicate_items_all_fresh() {
     assert_eq!(collection.current_page(), Some(1));
 
     // Step 3: Create another future post
-    let new_post_date = WpDateString(format!("{}04T06:00:00", base_date));
+    let new_post_date = WpDateString::new(format!("{}04T06:00:00", base_date));
     let new_post_params = PostCreateParams {
         title: Some("New Post That Pushes One to Page 2".to_string()),
         date: Some(new_post_date),

@@ -182,8 +182,8 @@ mod tests {
 
         let params = StatsCountryViewsParams {
             period: Some(StatsCountryViewsPeriod::Day),
-            date: Some(WpDateString("2026-01-29".to_string())),
-            start_date: Some(WpDateString("2026-01-29".to_string())),
+            date: Some(WpDateString::new("2026-01-29".to_string())),
+            start_date: Some(WpDateString::new("2026-01-29".to_string())),
             max: Some(10),
             num: Some(1),
             days: Some(1),
@@ -209,8 +209,8 @@ mod tests {
 
         let params = StatsCountryViewsParams {
             period: Some(StatsCountryViewsPeriod::Day),
-            date: Some(WpDateString("2026-01-29".to_string())),
-            start_date: Some(WpDateString("2026-01-23".to_string())),
+            date: Some(WpDateString::new("2026-01-29".to_string())),
+            start_date: Some(WpDateString::new("2026-01-23".to_string())),
             locale: Some(WPComLanguage::English),
             ..Default::default()
         };
@@ -275,7 +275,7 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         // Common assertion: date is always present
-        assert!(!response.date.0.is_empty());
+        assert!(!response.date.value.is_empty());
 
         if expect_summary {
             // summarize=1 response: has summary, no days
@@ -310,7 +310,7 @@ mod tests {
         let response: StatsCountryViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-01-29");
+        assert_eq!(response.date.value, "2026-01-29");
         assert!(response.summary.is_some());
         assert!(response.days.is_none());
 
@@ -349,7 +349,7 @@ mod tests {
         let response: StatsCountryViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date.0, "2026-01-29");
+        assert_eq!(response.date.value, "2026-01-29");
         assert!(response.summary.is_none());
         assert!(response.days.is_some());
 
@@ -384,7 +384,7 @@ mod tests {
         let response: StatsCountryViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with null values");
 
-        assert_eq!(response.date.0, "2026-01-29");
+        assert_eq!(response.date.value, "2026-01-29");
 
         let summary = response
             .summary
@@ -441,7 +441,7 @@ mod tests {
         let response: StatsCountryViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with empty response");
 
-        assert_eq!(response.date.0, "2026-01-29");
+        assert_eq!(response.date.value, "2026-01-29");
 
         let summary = response
             .summary
