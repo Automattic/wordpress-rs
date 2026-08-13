@@ -16,6 +16,16 @@ enum CommentsRequest {
     Trash,
     #[post(url = "/comments/<comment_id>", params = &CommentUpdateParams, output = crate::comments::CommentWithEditContext)]
     Update,
+    // Unspam and Untrash mirror wp-admin's "Not Spam" and "Restore" actions
+    // via the dedicated `unspam`/`untrash` values of the REST `status` param.
+    // They restore the comment's saved pre-spam/pre-trash status from comment
+    // meta and fire the `unspam_comment`/`untrash_comment` hooks, which a
+    // plain status write (e.g. `hold`) would not do. The server rejects them
+    // (HTTP 500) when the comment is not currently spam/trash.
+    #[post(url = "/comments/<comment_id>", output = crate::comments::CommentWithEditContext)]
+    Unspam,
+    #[post(url = "/comments/<comment_id>", output = crate::comments::CommentWithEditContext)]
+    Untrash,
 }
 
 impl DerivedRequest for CommentsRequest {
@@ -23,6 +33,8 @@ impl DerivedRequest for CommentsRequest {
         match self {
             CommentsRequest::Delete => vec![("force", true.to_string())],
             CommentsRequest::Trash => vec![("force", false.to_string())],
+            CommentsRequest::Unspam => vec![("status", "unspam".to_string())],
+            CommentsRequest::Untrash => vec![("status", "untrash".to_string())],
             _ => vec![],
         }
     }
@@ -285,6 +297,22 @@ mod tests {
         validate_wp_v2_endpoint(
             endpoint.trash(&CommentId(54), &CommentDeleteParams::new(password)),
             expected_path,
+        );
+    }
+
+    #[rstest]
+    fn unspam_comment(endpoint: CommentsRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.unspam(&CommentId(54)),
+            "/comments/54?status=unspam",
+        );
+    }
+
+    #[rstest]
+    fn untrash_comment(endpoint: CommentsRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.untrash(&CommentId(54)),
+            "/comments/54?status=untrash",
         );
     }
 
