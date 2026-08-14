@@ -76,7 +76,7 @@ class WpComApiClient(
         } catch (exception: WpApiException) {
             mapWpApiExceptionToWpRequestResult<T>(exception)
         }
-        errorLogger?.let { logger -> result.toLogErrorString()?.let(logger::logError) }
+        errorLogger?.let { logger -> result.toLogErrorString(logger.policy)?.let(logger::logError) }
         result
     }
 }

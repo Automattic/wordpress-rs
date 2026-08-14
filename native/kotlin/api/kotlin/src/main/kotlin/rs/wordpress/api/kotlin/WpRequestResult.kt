@@ -4,6 +4,8 @@ import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.WpRedirect
+import uniffi.wp_api.redactRequestUrlForLog
+import uniffi.wp_api.summarizeResponseBodyForLog
 
 sealed class WpRequestResult<T> {
     data class Success<T>(val response: T) : WpRequestResult<T>()
@@ -67,27 +69,43 @@ sealed class WpRequestResult<T> {
  * A concise description of a failed request for diagnostics, or `null` when the
  * request succeeded.
  *
- * Intended for logs and crash reporting ONLY — it may include raw response
- * bodies and request URLs. Never surface this to users; show a localized,
- * user-facing message instead.
+ * [policy] decides how much of the request URL and the failed response body the
+ * description carries; its defaults write down neither a query parameter's value
+ * nor the body's contents.
+ *
+ * Intended for logs and crash reporting ONLY. Never surface this to users; show
+ * a localized, user-facing message instead.
  */
-fun WpRequestResult<*>.toLogErrorString(): String? = when (this) {
+fun WpRequestResult<*>.toLogErrorString(
+    policy: RequestErrorLogPolicy = RequestErrorLogPolicy()
+): String? = when (this) {
     is WpRequestResult.Success -> null
     is WpRequestResult.WpError ->
         "WpError(code=$errorCode, status=$statusCode, message=$errorMessage, " +
-            "method=$requestMethod, url=$requestUrl)"
+            "method=$requestMethod, url=${policy.redactedUrl(requestUrl)})"
     is WpRequestResult.InvalidHttpStatusCode ->
-        "InvalidHttpStatusCode(status=$statusCode, method=$requestMethod, url=$requestUrl)"
+        "InvalidHttpStatusCode(status=$statusCode, method=$requestMethod, " +
+            "url=${policy.redactedUrl(requestUrl)})"
     is WpRequestResult.RequestExecutionFailed ->
         "RequestExecutionFailed(status=$statusCode, reason=$reason, " +
-            "method=$requestMethod, url=$requestUrl)"
+            "method=$requestMethod, url=${policy.redactedUrl(requestUrl)})"
     is WpRequestResult.MediaFileNotFound -> "MediaFileNotFound(path=$filePath)"
     is WpRequestResult.MediaFileUnreadable -> "MediaFileUnreadable(path=$filePath)"
     is WpRequestResult.SiteUrlParsingError -> "SiteUrlParsingError(reason=$reason)"
     is WpRequestResult.ResponseParsingError ->
         "ResponseParsingError(reason=$reason, method=$requestMethod, " +
-            "url=$requestUrl, response=$response)"
+            "url=${policy.redactedUrl(requestUrl)}${policy.responseField(response)})"
     is WpRequestResult.UnknownError ->
         "UnknownError(status=$statusCode, method=$requestMethod, " +
-            "url=$requestUrl, response=$response)"
+            "url=${policy.redactedUrl(requestUrl)}${policy.responseField(response)})"
 }
+
+private fun RequestErrorLogPolicy.redactedUrl(requestUrl: String): String =
+    redactRequestUrlForLog(requestUrl, this.requestUrl)
+
+/**
+ * The `response=` portion of a log line, or an empty string when the policy
+ * leaves the body out entirely.
+ */
+private fun RequestErrorLogPolicy.responseField(response: String): String =
+    summarizeResponseBodyForLog(response, responseBody)?.let { ", response=$it" }.orEmpty()
