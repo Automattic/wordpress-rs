@@ -26,6 +26,7 @@ pub mod date;
 pub mod decimal2;
 pub mod global_styles;
 pub mod global_styles_revisions;
+pub mod log_redaction;
 pub mod login;
 pub mod media;
 pub mod menu_locations;
