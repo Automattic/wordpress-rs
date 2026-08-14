@@ -767,6 +767,27 @@ impl RequestExecutionErrorReason {
         matches!(self, Self::DeviceIsOfflineError { .. })
     }
 
+    /// The host (with its port, when the URL names one) of the request that
+    /// failed, for the `hostname` these reasons carry.
+    ///
+    /// The full request URL would leak whatever its query string holds — a
+    /// protected post's password, a WordPress.com access token — into both the
+    /// localized message these reasons produce and any log line that prints
+    /// them. Yields an empty string for a URL with no host, which cannot be one
+    /// that reached a server.
+    fn hostname_of(request_url: &str) -> String {
+        let Ok(url) = url::Url::parse(request_url) else {
+            return String::new();
+        };
+        let Some(host) = url.host_str() else {
+            return String::new();
+        };
+        match url.port() {
+            Some(port) => format!("{host}:{port}"),
+            None => host.to_string(),
+        }
+    }
+
     pub fn try_from_response(response: &WpNetworkResponse) -> Option<Self> {
         if response.status_code != 401 && response.status_code != 403 {
             return None;
@@ -785,12 +806,12 @@ impl RequestExecutionErrorReason {
                 Some(method) => {
                     if response.request_header_map.has_http_authentication() {
                         RequestExecutionErrorReason::HttpAuthenticationRejectedError {
-                            hostname: response.request_url.0.clone(),
+                            hostname: Self::hostname_of(&response.request_url.0),
                             method: Some(method),
                         }
                     } else {
                         RequestExecutionErrorReason::HttpAuthenticationRequiredError {
-                            hostname: response.request_url.0.clone(),
+                            hostname: Self::hostname_of(&response.request_url.0),
                             method: Some(method),
                         }
                     }
@@ -798,12 +819,12 @@ impl RequestExecutionErrorReason {
                 None => {
                     if response.request_header_map.has_http_authentication() {
                         RequestExecutionErrorReason::HttpAuthenticationRejectedError {
-                            hostname: response.request_url.0.clone(),
+                            hostname: Self::hostname_of(&response.request_url.0),
                             method: None,
                         }
                     } else {
                         RequestExecutionErrorReason::HttpForbiddenError {
-                            hostname: response.request_url.0.clone(),
+                            hostname: Self::hostname_of(&response.request_url.0),
                         }
                     }
                 }
@@ -960,6 +981,26 @@ mod tests {
         let body = br#"{"error":"invalid_token","error_description":"The token is invalid"}"#;
 
         assert_eq!(WpError::try_parse(body), None);
+    }
+
+    /// The `hostname` these reasons carry names the site, and nothing else. It
+    /// reaches both a user-facing localized message and any log line that
+    /// prints the reason, so a query string must not survive in it.
+    #[rstest]
+    #[case::plain("https://example.com/wp-json/wp/v2/users/me", "example.com")]
+    #[case::drops_the_query(
+        "https://example.com/wp-json/wp/v2/posts/7?password=hunter2",
+        "example.com"
+    )]
+    #[case::drops_authority_credentials("https://admin:hunter2@example.com/wp-json", "example.com")]
+    #[case::keeps_a_non_default_port("http://localhost:8888/wp-json", "localhost:8888")]
+    #[case::drops_the_fragment("https://example.com/callback#access_token=abc", "example.com")]
+    #[case::unparsable_url_yields_nothing("wp-json/wp/v2/users", "")]
+    fn hostname_of_names_the_site_only(#[case] request_url: &str, #[case] expected: &str) {
+        assert_eq!(
+            RequestExecutionErrorReason::hostname_of(request_url),
+            expected
+        );
     }
 
     #[test]
