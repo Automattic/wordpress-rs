@@ -7,6 +7,7 @@ import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpAuthenticationProvider
@@ -55,6 +56,81 @@ class RequestErrorLogTest {
         assertNotNull(message)
         assertTrue(message.contains("response=<"), message)
         assertFalse(message.contains("person@example.com"), message)
+    }
+
+    @Test
+    fun `the default policy withholds the message a WpError carries`() {
+        // `errorMessage` is the `message` field lifted out of the response body,
+        // so the body policy governs it too. The error code and status carry the
+        // diagnosis without it.
+        val message = wpError(TOKEN_INFO_URL).toLogErrorString()
+
+        assertNotNull(message)
+        assertFalse(message.contains(PERSONAL_DATA), message)
+        assertFalse(message.contains("message="), message)
+        assertTrue(message.contains("code=Unauthorized"), message)
+        assertTrue(message.contains("status=401"), message)
+    }
+
+    @Test
+    fun `a full policy restores the message a WpError carries`() {
+        val message = wpError(TOKEN_INFO_URL).toLogErrorString(
+            RequestErrorLogPolicy(WpRequestUrlLogDetail.FULL, WpResponseBodyLogDetail.FULL)
+        )
+
+        assertNotNull(message)
+        assertTrue(message.contains("message=$ERROR_MESSAGE"), message)
+    }
+
+    @Test
+    fun `the default policy withholds the reason a response failed to parse with`() {
+        // serde quotes the offending value in its message, e.g.
+        // `invalid type: string "person@example.com", expected u64`, so the
+        // reason is body-derived and follows the body policy.
+        val message = WpRequestResult.ResponseParsingError<Unit>(
+            reason = """invalid type: string "$PERSONAL_DATA", expected u64""",
+            response = ERROR_BODY,
+            requestUrl = TOKEN_INFO_URL,
+            requestMethod = RequestMethod.GET
+        ).toLogErrorString()
+
+        assertNotNull(message)
+        assertFalse(message.contains(PERSONAL_DATA), message)
+        assertFalse(message.contains("reason="), message)
+        // The body's shape still says what failed to parse.
+        assertTrue(message.contains("response=<"), message)
+    }
+
+    @Test
+    fun `a request execution failure logs a hostname, not the whole url`() {
+        // The reason carries a `hostname`; it must not smuggle the query string
+        // back into a line whose `url=` field was redacted.
+        val message = WpRequestResult.RequestExecutionFailed<Unit>(
+            statusCode = 403u,
+            redirects = null,
+            reason = RequestExecutionErrorReason.HttpForbiddenError(
+                hostname = "public-api.wordpress.com"
+            ),
+            requestUrl = TOKEN_INFO_URL,
+            requestMethod = RequestMethod.GET
+        ).toLogErrorString(
+            RequestErrorLogPolicy(WpRequestUrlLogDetail.PATH_ONLY, WpResponseBodyLogDetail.OMITTED)
+        )
+
+        assertNotNull(message)
+        assertFalse(message.contains(ACCESS_TOKEN), message)
+        assertFalse(message.contains("client_id"), message)
+    }
+
+    @Test
+    fun `a media file path is logged whatever the policy says`() {
+        // The policy covers the URL and the response; a local file path comes
+        // from neither. Pinned so the boundary is a decision, not a surprise.
+        val message = WpRequestResult.MediaFileNotFound<Unit>(filePath = MEDIA_PATH).toLogErrorString(
+            RequestErrorLogPolicy(WpRequestUrlLogDetail.PATH_ONLY, WpResponseBodyLogDetail.OMITTED)
+        )
+
+        assertEquals("MediaFileNotFound(path=$MEDIA_PATH)", message)
     }
 
     @Test
@@ -123,7 +199,7 @@ class RequestErrorLogTest {
 
     private fun wpError(requestUrl: String) = WpRequestResult.WpError<Unit>(
         errorCode = WpErrorCode.Unauthorized(),
-        errorMessage = "Sorry, you are not allowed to do that.",
+        errorMessage = ERROR_MESSAGE,
         statusCode = 401u,
         response = ERROR_BODY,
         requestUrl = requestUrl,
@@ -140,11 +216,13 @@ class RequestErrorLogTest {
 
     companion object {
         private const val ACCESS_TOKEN = "s3cr3t-access-token"
+        private const val PERSONAL_DATA = "person@example.com"
         private const val TOKEN_INFO_URL =
             "https://public-api.wordpress.com/oauth2/token-info?client_id=11&token=$ACCESS_TOKEN"
         private const val REDACTED_TOKEN_INFO_URL =
             "https://public-api.wordpress.com/oauth2/token-info?client_id=REDACTED&token=REDACTED"
-        private const val ERROR_BODY =
-            """{"code":"invalid_token","message":"person@example.com is not authorized"}"""
+        private const val ERROR_MESSAGE = "$PERSONAL_DATA is not authorized"
+        private const val ERROR_BODY = """{"code":"invalid_token","message":"$ERROR_MESSAGE"}"""
+        private const val MEDIA_PATH = "/storage/emulated/0/DCIM/Camera/holiday.jpg"
     }
 }

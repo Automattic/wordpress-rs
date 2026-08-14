@@ -8,14 +8,30 @@ import uniffi.wp_api.WpResponseBodyLogDetail
  * [RequestErrorLogger] receives.
  *
  * The defaults keep what identifies the request — status, error code, method,
- * endpoint, and which query parameters were sent — without writing down any
- * value the request or the response carried. Widen a field only for a client
- * whose traffic is known not to carry credentials or personal data.
+ * and endpoint — without writing down any value the request or the response
+ * carried. Widen a field only for a client whose traffic is known not to carry
+ * credentials or personal data.
  *
- * Some query parameters are redacted whichever [WpRequestUrlLogDetail] is
- * chosen; see `redact_request_url_for_log` in the `wp_api` crate for the list.
+ * [requestUrl] governs the `url=` field. Some query parameters are redacted
+ * whichever [WpRequestUrlLogDetail] is chosen; see `redactRequestUrlForLog` for
+ * the list.
+ *
+ * [responseBody] governs every field taken from the failed response: the
+ * `response=` body, the `message=` a `WpError` carries, and the `reason=` a
+ * response failed to parse with. The latter two are free text with no shape to
+ * summarize, so they appear only at [WpResponseBodyLogDetail.FULL].
+ *
+ * Two things no policy reaches, because they come from neither the URL nor the
+ * response: the local file path on `MediaFileNotFound` and
+ * `MediaFileUnreadable`, and the platform error text inside a
+ * `RequestExecutionFailed` reason.
  */
 data class RequestErrorLogPolicy(
     val requestUrl: WpRequestUrlLogDetail = WpRequestUrlLogDetail.QUERY_KEYS_ONLY,
-    val responseBody: WpResponseBodyLogDetail = WpResponseBodyLogDetail.SUMMARY,
-)
+    val responseBody: WpResponseBodyLogDetail = WpResponseBodyLogDetail.SUMMARY
+) {
+    companion object {
+        /** Writes down no value the request or the response carried. */
+        val DEFAULT = RequestErrorLogPolicy()
+    }
+}

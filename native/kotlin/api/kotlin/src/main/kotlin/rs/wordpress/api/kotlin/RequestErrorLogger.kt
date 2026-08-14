@@ -18,7 +18,7 @@ fun interface RequestErrorLogger {
      * request or the response carried.
      */
     val policy: RequestErrorLogPolicy
-        get() = RequestErrorLogPolicy()
+        get() = RequestErrorLogPolicy.DEFAULT
 
     companion object {
         /**
@@ -26,6 +26,10 @@ fun interface RequestErrorLogger {
          * default level of detail — a login client, whose URLs carry
          * credentials, wants less; a client serving a screen that is hard to
          * debug may want more.
+         *
+         * [policy] wins over any policy [sink] declares of its own, so wrapping
+         * a logger that was deliberately made strict widens it. Wrap the sink
+         * where it is built rather than where it is passed to a client.
          */
         fun withPolicy(
             policy: RequestErrorLogPolicy,
