@@ -179,7 +179,7 @@ class RequestErrorLogTest {
                 httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
                 networkAvailabilityProvider = NetworkAvailabilityProvider { true }
             ),
-            errorLogger = RequestErrorLogger.withPolicy(
+            errorLogger = WpRequestErrorLogger(
                 RequestErrorLogPolicy(
                     WpRequestUrlLogDetail.PATH_ONLY,
                     WpResponseBodyLogDetail.OMITTED
@@ -195,6 +195,31 @@ class RequestErrorLogTest {
         val message = loggedErrors.single()
         assertFalse(message.contains("per_page"), message)
         assertFalse(message.contains("response="), message)
+    }
+
+    @Test
+    fun `a login client logs a failed discovery through its policy`() = runTest {
+        // The site URL a user types can carry HTTP Basic credentials, and the
+        // API root's response body is a server's to choose, so discovery
+        // follows the same policy as any other request.
+        mockWebServer.enqueue(MockResponse().setResponseCode(500).setBody("<html>nope</html>"))
+
+        val loggedErrors = mutableListOf<String>()
+        val loginClient = WpLoginClient(
+            requestExecutor = WpRequestExecutor(
+                httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+                networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+            ),
+            errorLogger = WpRequestErrorLogger { message -> loggedErrors.add(message) }
+        )
+
+        val siteUrl = mockWebServer.url("/").toString().replace("http://", "http://admin:hunter2@")
+        loginClient.apiDiscovery(siteUrl)
+
+        val message = loggedErrors.singleOrNull()
+        assertNotNull(message, "expected exactly one logged failure: $loggedErrors")
+        assertFalse(message.contains("hunter2"), message)
+        assertFalse(message.contains("nope"), message)
     }
 
     private fun wpError(requestUrl: String) = WpRequestResult.WpError<Unit>(

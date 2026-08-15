@@ -36,6 +36,63 @@ sealed class ApiDiscoveryResult {
     }
 }
 
+/**
+ * A concise description of a failed discovery attempt for diagnostics, or
+ * `null` when discovery succeeded.
+ *
+ * [policy] decides how much of the URLs involved and of the API root's response
+ * the description carries, exactly as it does for [WpRequestResult].
+ *
+ * Intended for logs and crash reporting ONLY. Never surface this to users;
+ * [userFacingErrorMessage] is the one to show.
+ */
+fun ApiDiscoveryResult.toLogErrorString(
+    policy: RequestErrorLogPolicy = RequestErrorLogPolicy.DEFAULT
+): String? = when (this) {
+    is ApiDiscoveryResult.Success -> null
+    // The site URL is what failed to parse, so there is no URL to report, and
+    // the parse error names no part of the input.
+    is ApiDiscoveryResult.FailureParseSiteUrl ->
+        "FailureParseSiteUrl(reason=${error::class.simpleName})"
+    is ApiDiscoveryResult.FailureFindApiRoot ->
+        "FailureFindApiRoot(siteUrl=${policy.redactedUrl(parsedSiteUrl.toString())}, " +
+            "reason=${findApiRootFailure.toLogString(policy)})"
+    is ApiDiscoveryResult.FailureFetchAndParseApiRoot ->
+        "FailureFetchAndParseApiRoot(siteUrl=${policy.redactedUrl(parsedSiteUrl.toString())}, " +
+            "apiRootUrl=${policy.redactedUrl(apiRootUrl.toString())}, " +
+            "reason=${fetchAndParseApiRootFailure.toLogString(policy)})"
+}
+
+private fun FindApiRootFailure.toLogString(policy: RequestErrorLogPolicy): String = when (this) {
+    is FindApiRootFailure.FetchHomepage -> "FetchHomepage(${error.toLogString(policy)})"
+    is FindApiRootFailure.ProbablyNotAWordPressSite -> "ProbablyNotAWordPressSite"
+    is FindApiRootFailure.RestApiDisabled -> "RestApiDisabled"
+}
+
+private fun FetchAndParseApiRootFailure.toLogString(policy: RequestErrorLogPolicy): String =
+    when (this) {
+        is FetchAndParseApiRootFailure.FetchApiRoot ->
+            "FetchApiRoot(${error.toLogString(policy)})"
+        is FetchAndParseApiRootFailure.ParseApiRoot ->
+            "ParseApiRoot(bodyType=$responseBodyType, reason=$reason" +
+                policy.responseTextField("parsingError", parsingErrorMessage) +
+                policy.responseField(responseBody) + ")"
+        is FetchAndParseApiRootFailure.WpError ->
+            "WpError(code=${errorCode::class.simpleName}, status=$statusCode" +
+                policy.responseTextField("message", errorMessage) + ")"
+        is FetchAndParseApiRootFailure.ApplicationPasswordsNotSupported ->
+            "ApplicationPasswordsNotSupported(reason=$reason)"
+    }
+
+private fun RequestExecutionException.toLogString(policy: RequestErrorLogPolicy): String =
+    when (this) {
+        is RequestExecutionException.RequestExecutionFailed ->
+            "RequestExecutionFailed(status=$statusCode, reason=$reason, " +
+                "method=$requestMethod, url=${policy.redactedUrl(requestUrl)})"
+        is RequestExecutionException.MediaFileNotFound -> "MediaFileNotFound(path=$filePath)"
+        is RequestExecutionException.MediaFileUnreadable -> "MediaFileUnreadable(path=$filePath)"
+    }
+
 private fun FindApiRootFailure.userFacingMessage(url: String): String {
     val reason = when (this) {
         is FindApiRootFailure.FetchHomepage ->
