@@ -773,8 +773,7 @@ impl RequestExecutionErrorReason {
     /// The full request URL would leak whatever its query string holds — a
     /// protected post's password, a WordPress.com access token — into both the
     /// localized message these reasons produce and any log line that prints
-    /// them. Yields an empty string for a URL with no host, which cannot be one
-    /// that reached a server.
+    /// them. Yields an empty string for a URL with no host.
     fn hostname_of(request_url: &str) -> String {
         let Ok(url) = url::Url::parse(request_url) else {
             return String::new();
