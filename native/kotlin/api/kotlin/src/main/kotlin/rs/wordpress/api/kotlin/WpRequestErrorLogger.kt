@@ -1,5 +1,7 @@
 package rs.wordpress.api.kotlin
 
+import uniffi.wp_api.WpRequestErrorLogPolicy
+
 /**
  * A [RequestErrorLogger] that hands each message to [sink], at [policy].
  *
@@ -15,12 +17,12 @@ package rs.wordpress.api.kotlin
  *
  * ```kotlin
  * WpRequestErrorLogger(
- *     RequestErrorLogPolicy(WpRequestUrlLogDetail.PATH_ONLY, WpResponseBodyLogDetail.OMITTED)
+ *     WpRequestErrorLogPolicy(WpRequestUrlLogDetail.PATH_ONLY, WpResponseBodyLogDetail.OMITTED)
  * ) { message -> AppLog.e(AppLog.T.API, message) }
  * ```
  */
 class WpRequestErrorLogger(
-    override val policy: RequestErrorLogPolicy = RequestErrorLogPolicy.DEFAULT,
+    override val policy: WpRequestErrorLogPolicy = DEFAULT_REQUEST_ERROR_LOG_POLICY,
     private val sink: (String) -> Unit
 ) : RequestErrorLogger {
     override fun logError(message: String) = sink(message)

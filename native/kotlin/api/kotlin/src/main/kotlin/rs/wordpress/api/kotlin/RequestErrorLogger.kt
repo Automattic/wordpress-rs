@@ -1,8 +1,14 @@
 package rs.wordpress.api.kotlin
 
+import uniffi.wp_api.AutoDiscoveryAttemptFailure
+import uniffi.wp_api.WpApiException
+import uniffi.wp_api.WpRequestErrorLogPolicy
+import uniffi.wp_api.autoDiscoveryFailureLogDescription
+import uniffi.wp_api.wpApiErrorLogDescription
+
 /**
- * Receives a concise, log-only description of a failed request (the value of
- * [toLogErrorString]). Invoked only when a request fails — never on success.
+ * Receives a concise, log-only description of a failed request. Invoked only
+ * when a request fails — never on success.
  *
  * Implementations forward the message to their platform logger or
  * crash-reporting breadcrumbs, and decide through [policy] how much of the
@@ -17,5 +23,13 @@ interface RequestErrorLogger {
     fun logError(message: String)
 
     /** How much of each failed request reaches [logError]. */
-    val policy: RequestErrorLogPolicy
+    val policy: WpRequestErrorLogPolicy
 }
+
+/** Describes [exception] at this logger's policy and hands it to [RequestErrorLogger.logError]. */
+internal fun RequestErrorLogger.logFailedRequest(exception: WpApiException) =
+    logError(wpApiErrorLogDescription(exception, policy))
+
+/** Describes [failure] at this logger's policy and hands it to [RequestErrorLogger.logError]. */
+internal fun RequestErrorLogger.logFailedDiscovery(failure: AutoDiscoveryAttemptFailure) =
+    logError(autoDiscoveryFailureLogDescription(failure, policy))

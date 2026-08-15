@@ -71,12 +71,11 @@ class WpComApiClient(
     suspend fun <T> request(
         executeRequest: suspend (UniffiWpComApiClient) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
-        val result = try {
+        try {
             WpRequestResult.Success(response = executeRequest(requestBuilder))
         } catch (exception: WpApiException) {
+            errorLogger?.logFailedRequest(exception)
             mapWpApiExceptionToWpRequestResult<T>(exception)
         }
-        errorLogger?.let { logger -> result.toLogErrorString(logger.policy)?.let(logger::logError) }
-        result
     }
 }

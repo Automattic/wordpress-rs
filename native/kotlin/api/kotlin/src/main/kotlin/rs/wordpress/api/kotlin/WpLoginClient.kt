@@ -40,16 +40,11 @@ class WpLoginClient @JvmOverloads constructor(
     suspend fun apiDiscovery(
         siteUrl: String
     ): ApiDiscoveryResult = withContext(dispatcher) {
-        val result = discover(siteUrl)
-        errorLogger?.let { logger -> result.toLogErrorString(logger.policy)?.let(logger::logError) }
-        result
-    }
-
-    private suspend fun discover(siteUrl: String): ApiDiscoveryResult =
         try {
             val success = internalClient.apiDiscovery(siteUrl, null)
             ApiDiscoveryResult.Success(success)
         } catch (exception: AutoDiscoveryAttemptFailure) {
+            errorLogger?.logFailedDiscovery(exception)
             when (exception) {
                 is AutoDiscoveryAttemptFailure.ParseSiteUrl -> ApiDiscoveryResult.FailureParseSiteUrl(
                     error = exception.error,
@@ -66,4 +61,5 @@ class WpLoginClient @JvmOverloads constructor(
                 )
             }
         }
+    }
 }
