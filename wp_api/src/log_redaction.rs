@@ -1,14 +1,36 @@
-//! Redaction primitives for the diagnostic log line a client writes when a
-//! request fails.
+//! The diagnostic log line a client writes when a request fails.
 //!
 //! A failed request is worth logging, but the two most useful fields — the
 //! request URL and the response body — are also the two that can carry secrets
-//! and personal data. These helpers reduce each field to a chosen level of
-//! detail so a caller can log failures without deciding, at every call site,
-//! what is safe to write down.
+//! and personal data. A [`WpRequestErrorLogPolicy`] reduces each to a chosen
+//! level of detail, so a caller decides once what is safe to write down rather
+//! than at every call site.
+//!
+//! The line itself is composed here rather than in each set of bindings, so
+//! that every platform reports a failure the same way.
 
+use crate::api_error::{RequestExecutionError, WpApiError};
+use crate::login::url_discovery::{
+    AutoDiscoveryAttemptFailure, FetchAndParseApiRootFailure, FindApiRootFailure,
+};
 use serde_json::Value;
 use url::Url;
+
+/// How much of a failed request is written to a diagnostic log line.
+///
+/// [`request_url`](Self::request_url) governs the `url=` field.
+/// [`response_body`](Self::response_body) governs every field drawn from the
+/// response: the body itself, the `message` a `WpError` carries, and the
+/// `reason` a response failed to parse with.
+///
+/// Neither reaches the local file path on a media failure, nor the platform
+/// error text inside a request execution failure — those come from neither the
+/// URL nor the response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
+pub struct WpRequestErrorLogPolicy {
+    pub request_url: WpRequestUrlLogDetail,
+    pub response_body: WpResponseBodyLogDetail,
+}
 
 /// How much of a request URL to write to a diagnostic log line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -268,10 +290,219 @@ fn summarize_body(body: &str) -> String {
     }
 }
 
+/// A concise description of a failed request, for logs and crash reporting
+/// ONLY. Never surface it to users; localize the error instead.
+#[uniffi::export]
+pub fn wp_api_error_log_description(error: &WpApiError, policy: WpRequestErrorLogPolicy) -> String {
+    match error {
+        WpApiError::WpError {
+            error_code,
+            error_message,
+            status_code,
+            request_url,
+            request_method,
+            ..
+        } => format!(
+            "WpError(code={error_code:?}, status={status_code}{}, method={request_method:?}, url={})",
+            text_field("message", error_message, policy),
+            url_field(request_url, policy),
+        ),
+        WpApiError::InvalidHttpStatusCode {
+            status_code,
+            request_url,
+            request_method,
+        } => format!(
+            "InvalidHttpStatusCode(status={status_code}, method={request_method:?}, url={})",
+            url_field(request_url, policy),
+        ),
+        WpApiError::RequestExecutionFailed {
+            status_code,
+            reason,
+            request_url,
+            request_method,
+            ..
+        } => format!(
+            "RequestExecutionFailed(status={}, reason={reason:?}, method={request_method:?}, url={})",
+            optional_status(*status_code),
+            url_field(request_url, policy),
+        ),
+        WpApiError::MediaFileNotFound { file_path } => {
+            format!("MediaFileNotFound(path={file_path})")
+        }
+        WpApiError::MediaFileUnreadable { file_path } => {
+            format!("MediaFileUnreadable(path={file_path})")
+        }
+        WpApiError::SiteUrlParsingError { reason } => {
+            format!("SiteUrlParsingError(reason={reason})")
+        }
+        WpApiError::ResponseParsingError {
+            reason,
+            response,
+            request_url,
+            request_method,
+        } => format!(
+            "ResponseParsingError(method={request_method:?}{}, url={}{})",
+            text_field("reason", reason, policy),
+            url_field(request_url, policy),
+            response_field(response, policy),
+        ),
+        WpApiError::UnknownError {
+            status_code,
+            response,
+            request_url,
+            request_method,
+        } => format!(
+            "UnknownError(status={status_code}, method={request_method:?}, url={}{})",
+            url_field(request_url, policy),
+            response_field(response, policy),
+        ),
+    }
+}
+
+/// A concise description of a failed API discovery attempt, for logs and crash
+/// reporting ONLY.
+#[uniffi::export]
+pub fn auto_discovery_failure_log_description(
+    failure: &AutoDiscoveryAttemptFailure,
+    policy: WpRequestErrorLogPolicy,
+) -> String {
+    match failure {
+        // The site URL is what failed to parse, so there is no URL to redact
+        // and report; the parse error names no part of the input.
+        AutoDiscoveryAttemptFailure::ParseSiteUrl { error } => {
+            format!("ParseSiteUrl(reason={error:?})")
+        }
+        AutoDiscoveryAttemptFailure::FindApiRoot {
+            parsed_site_url,
+            find_api_root_failure,
+        } => format!(
+            "FindApiRoot(siteUrl={}, reason={})",
+            url_field(parsed_site_url.as_str(), policy),
+            find_api_root_failure_description(find_api_root_failure, policy),
+        ),
+        AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+            parsed_site_url,
+            api_root_url,
+            fetch_and_parse_api_root_failure,
+        } => format!(
+            "FetchAndParseApiRoot(siteUrl={}, apiRootUrl={}, reason={})",
+            url_field(parsed_site_url.as_str(), policy),
+            url_field(api_root_url.as_str(), policy),
+            fetch_and_parse_description(fetch_and_parse_api_root_failure, policy),
+        ),
+    }
+}
+
+fn find_api_root_failure_description(
+    failure: &FindApiRootFailure,
+    policy: WpRequestErrorLogPolicy,
+) -> String {
+    match failure {
+        FindApiRootFailure::FetchHomepage { error } => format!(
+            "FetchHomepage({})",
+            request_execution_error_description(error, policy)
+        ),
+        FindApiRootFailure::ProbablyNotAWordPressSite => "ProbablyNotAWordPressSite".to_string(),
+        FindApiRootFailure::RestApiDisabled => "RestApiDisabled".to_string(),
+    }
+}
+
+fn fetch_and_parse_description(
+    failure: &FetchAndParseApiRootFailure,
+    policy: WpRequestErrorLogPolicy,
+) -> String {
+    match failure {
+        FetchAndParseApiRootFailure::FetchApiRoot { error } => format!(
+            "FetchApiRoot({})",
+            request_execution_error_description(error, policy)
+        ),
+        FetchAndParseApiRootFailure::ParseApiRoot {
+            parsing_error_message,
+            response_body,
+            response_body_type,
+            reason,
+        } => format!(
+            "ParseApiRoot(bodyType={response_body_type:?}, reason={reason:?}{}{})",
+            text_field("parsingError", parsing_error_message, policy),
+            response_field(response_body, policy),
+        ),
+        FetchAndParseApiRootFailure::WpError {
+            error_code,
+            error_message,
+            status_code,
+        } => format!(
+            "WpError(code={error_code:?}, status={status_code}{})",
+            text_field("message", error_message, policy),
+        ),
+        // `api_details` is the whole parsed API root; only the reason is worth
+        // a log line.
+        FetchAndParseApiRootFailure::ApplicationPasswordsNotSupported { reason, .. } => {
+            format!("ApplicationPasswordsNotSupported(reason={reason:?})")
+        }
+    }
+}
+
+/// Not exported: a request execution failure reaches the bindings inside a
+/// `WpApiError` or an `AutoDiscoveryAttemptFailure`, never on its own.
+fn request_execution_error_description(
+    error: &RequestExecutionError,
+    policy: WpRequestErrorLogPolicy,
+) -> String {
+    match error {
+        RequestExecutionError::RequestExecutionFailed {
+            status_code,
+            reason,
+            request_url,
+            request_method,
+            ..
+        } => format!(
+            "RequestExecutionFailed(status={}, reason={reason:?}, method={request_method:?}, url={})",
+            optional_status(*status_code),
+            url_field(request_url, policy),
+        ),
+        RequestExecutionError::MediaFileNotFound { file_path } => {
+            format!("MediaFileNotFound(path={file_path})")
+        }
+        RequestExecutionError::MediaFileUnreadable { file_path } => {
+            format!("MediaFileUnreadable(path={file_path})")
+        }
+    }
+}
+
+fn url_field(request_url: &str, policy: WpRequestErrorLogPolicy) -> String {
+    redact_request_url_for_log(request_url, policy.request_url)
+}
+
+/// The `, response=…` portion of a line, or nothing when the policy leaves the
+/// body out.
+fn response_field(response: &str, policy: WpRequestErrorLogPolicy) -> String {
+    summarize_response_body_for_log(response, policy.response_body)
+        .map(|summary| format!(", response={summary}"))
+        .unwrap_or_default()
+}
+
+/// A `, name=…` portion carrying free text the response supplied, or nothing
+/// when the policy is not logging the body.
+fn text_field(name: &str, text: &str, policy: WpRequestErrorLogPolicy) -> String {
+    redact_response_text_for_log(text, policy.response_body)
+        .map(|text| format!(", {name}={text}"))
+        .unwrap_or_default()
+}
+
+/// A status code that a transport failure may not have reached the server to
+/// receive.
+fn optional_status(status_code: Option<u32>) -> String {
+    status_code.map_or_else(|| "none".to_string(), |code| code.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api_error::{RequestExecutionErrorReason, WpErrorCode};
+    use crate::parsed_url::ParsedUrl;
+    use crate::request::{RequestMethod, ResponseBodyType};
     use rstest::rstest;
+    use std::sync::Arc;
 
     #[rstest]
     #[case::keeps_scheme_host_and_path(
@@ -551,6 +782,217 @@ mod tests {
         let logged = summarize_response_body_for_log(&body, WpResponseBodyLogDetail::Full)
             .expect("Full should always produce a value");
         assert!(logged.starts_with('é'));
+    }
+
+    const ACCESS_TOKEN: &str = "s3cr3t-access-token";
+    const PERSONAL_DATA: &str = "person@example.com";
+    const TOKEN_INFO_URL: &str =
+        "https://public-api.wordpress.com/oauth2/token-info?client_id=11&token=s3cr3t-access-token";
+    const ERROR_BODY: &str =
+        r#"{"code":"invalid_token","message":"person@example.com is not authorized"}"#;
+
+    const DEFAULT_POLICY: WpRequestErrorLogPolicy = WpRequestErrorLogPolicy {
+        request_url: WpRequestUrlLogDetail::QueryKeysOnly,
+        response_body: WpResponseBodyLogDetail::Summary,
+    };
+    const STRICT_POLICY: WpRequestErrorLogPolicy = WpRequestErrorLogPolicy {
+        request_url: WpRequestUrlLogDetail::PathOnly,
+        response_body: WpResponseBodyLogDetail::Omitted,
+    };
+    const FULL_POLICY: WpRequestErrorLogPolicy = WpRequestErrorLogPolicy {
+        request_url: WpRequestUrlLogDetail::Full,
+        response_body: WpResponseBodyLogDetail::Full,
+    };
+
+    fn wp_error() -> WpApiError {
+        WpApiError::WpError {
+            error_code: WpErrorCode::Unauthorized,
+            error_message: format!("{PERSONAL_DATA} is not authorized"),
+            status_code: 401,
+            response: ERROR_BODY.to_string(),
+            request_url: TOKEN_INFO_URL.to_string(),
+            request_method: RequestMethod::GET,
+        }
+    }
+
+    fn unknown_error() -> WpApiError {
+        WpApiError::UnknownError {
+            status_code: 400,
+            response: ERROR_BODY.to_string(),
+            request_url: TOKEN_INFO_URL.to_string(),
+            request_method: RequestMethod::GET,
+        }
+    }
+
+    #[test]
+    fn the_default_policy_keeps_query_keys_and_drops_their_values() {
+        let described = wp_api_error_log_description(&wp_error(), DEFAULT_POLICY);
+        assert!(described.contains("client_id=REDACTED"), "{described}");
+        assert!(described.contains("token=REDACTED"), "{described}");
+        assert!(!described.contains(ACCESS_TOKEN), "{described}");
+    }
+
+    #[test]
+    fn the_default_policy_withholds_the_message_a_wp_error_carries() {
+        // `error_message` is the `message` field lifted out of the response
+        // body, so the body policy governs it. The code and status carry the
+        // diagnosis without it.
+        let described = wp_api_error_log_description(&wp_error(), DEFAULT_POLICY);
+        assert!(!described.contains(PERSONAL_DATA), "{described}");
+        assert!(!described.contains("message="), "{described}");
+        assert!(described.contains("code=Unauthorized"), "{described}");
+        assert!(described.contains("status=401"), "{described}");
+    }
+
+    #[test]
+    fn a_full_policy_restores_the_message_a_wp_error_carries() {
+        let described = wp_api_error_log_description(&wp_error(), FULL_POLICY);
+        assert!(
+            described.contains(&format!("message={PERSONAL_DATA} is not authorized")),
+            "{described}"
+        );
+    }
+
+    #[test]
+    fn the_default_policy_summarizes_the_response_body_instead_of_quoting_it() {
+        let described = wp_api_error_log_description(&unknown_error(), DEFAULT_POLICY);
+        assert!(described.contains("response=<"), "{described}");
+        assert!(!described.contains(PERSONAL_DATA), "{described}");
+    }
+
+    #[test]
+    fn an_omitted_body_leaves_no_response_field_at_all() {
+        let described = wp_api_error_log_description(&unknown_error(), STRICT_POLICY);
+        assert!(!described.contains("response="), "{described}");
+    }
+
+    #[test]
+    fn a_path_only_url_leaves_no_query_string_at_all() {
+        let described = wp_api_error_log_description(&unknown_error(), STRICT_POLICY);
+        assert!(
+            described.contains("url=https://public-api.wordpress.com/oauth2/token-info"),
+            "{described}"
+        );
+        assert!(!described.contains("client_id"), "{described}");
+    }
+
+    #[test]
+    fn a_full_policy_quotes_the_url_and_body_minus_the_always_redacted_parameters() {
+        let described = wp_api_error_log_description(&unknown_error(), FULL_POLICY);
+        assert!(described.contains("client_id=11"), "{described}");
+        assert!(
+            described.contains(&format!("response={ERROR_BODY}")),
+            "{described}"
+        );
+        assert!(!described.contains(ACCESS_TOKEN), "{described}");
+    }
+
+    #[test]
+    fn the_default_policy_withholds_the_reason_a_response_failed_to_parse_with() {
+        // serde quotes the offending value in its message, so the reason is
+        // body-derived and follows the body policy. The body's shape still says
+        // what failed to parse.
+        let error = WpApiError::ResponseParsingError {
+            reason: format!(r#"invalid type: string "{PERSONAL_DATA}", expected u64"#),
+            response: ERROR_BODY.to_string(),
+            request_url: TOKEN_INFO_URL.to_string(),
+            request_method: RequestMethod::GET,
+        };
+
+        let described = wp_api_error_log_description(&error, DEFAULT_POLICY);
+        assert!(!described.contains(PERSONAL_DATA), "{described}");
+        assert!(!described.contains("reason="), "{described}");
+        assert!(described.contains("response=<"), "{described}");
+    }
+
+    #[test]
+    fn a_request_execution_failure_names_the_host_not_the_whole_url() {
+        // The reason carries a `hostname`; it must not smuggle the query string
+        // back into a line whose `url=` was redacted.
+        let error = WpApiError::RequestExecutionFailed {
+            status_code: Some(403),
+            redirects: None,
+            reason: RequestExecutionErrorReason::HttpForbiddenError {
+                hostname: "public-api.wordpress.com".to_string(),
+            },
+            request_url: TOKEN_INFO_URL.to_string(),
+            request_method: RequestMethod::GET,
+        };
+
+        let described = wp_api_error_log_description(&error, STRICT_POLICY);
+        assert!(!described.contains(ACCESS_TOKEN), "{described}");
+        assert!(!described.contains("client_id"), "{described}");
+    }
+
+    #[test]
+    fn a_transport_failure_without_a_status_says_so() {
+        let error = WpApiError::RequestExecutionFailed {
+            status_code: None,
+            redirects: None,
+            reason: RequestExecutionErrorReason::HttpTimeoutError,
+            request_url: "https://example.com/wp-json".to_string(),
+            request_method: RequestMethod::GET,
+        };
+
+        assert!(
+            wp_api_error_log_description(&error, DEFAULT_POLICY).contains("status=none"),
+            "a missing status should read as `none`"
+        );
+    }
+
+    #[rstest]
+    #[case(DEFAULT_POLICY)]
+    #[case(STRICT_POLICY)]
+    fn a_media_file_path_is_logged_whatever_the_policy_says(
+        #[case] policy: WpRequestErrorLogPolicy,
+    ) {
+        // The policy covers the URL and the response; a local file path comes
+        // from neither. Pinned so the boundary is a decision, not a surprise.
+        let error = WpApiError::MediaFileNotFound {
+            file_path: "/storage/emulated/0/DCIM/Camera/holiday.jpg".to_string(),
+        };
+        assert_eq!(
+            wp_api_error_log_description(&error, policy),
+            "MediaFileNotFound(path=/storage/emulated/0/DCIM/Camera/holiday.jpg)"
+        );
+    }
+
+    #[test]
+    fn a_discovery_failure_redacts_the_site_url_the_user_typed() {
+        // A self-hosted site URL can carry HTTP Basic credentials.
+        let failure = AutoDiscoveryAttemptFailure::FindApiRoot {
+            parsed_site_url: Arc::new(
+                ParsedUrl::parse("https://admin:hunter2@example.com/").expect("valid URL"),
+            ),
+            find_api_root_failure: FindApiRootFailure::ProbablyNotAWordPressSite,
+        };
+
+        let described = auto_discovery_failure_log_description(&failure, DEFAULT_POLICY);
+        assert!(!described.contains("hunter2"), "{described}");
+        assert!(
+            described.contains("ProbablyNotAWordPressSite"),
+            "{described}"
+        );
+    }
+
+    #[test]
+    fn a_discovery_failure_summarizes_an_unreadable_api_root() {
+        let failure = AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+            parsed_site_url: Arc::new(ParsedUrl::parse("https://example.com/").expect("valid URL")),
+            api_root_url: Arc::new(
+                ParsedUrl::parse("https://example.com/wp-json/").expect("valid URL"),
+            ),
+            fetch_and_parse_api_root_failure: FetchAndParseApiRootFailure::ParseApiRoot {
+                parsing_error_message: format!(r#"invalid type: string "{PERSONAL_DATA}""#),
+                response_body: ERROR_BODY.to_string(),
+                response_body_type: ResponseBodyType::ValidJson,
+                reason: None,
+            },
+        };
+
+        let described = auto_discovery_failure_log_description(&failure, DEFAULT_POLICY);
+        assert!(!described.contains(PERSONAL_DATA), "{described}");
+        assert!(described.contains("response=<"), "{described}");
     }
 
     #[test]
