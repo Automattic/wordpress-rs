@@ -2,6 +2,9 @@ package rs.wordpress.api.kotlin
 
 import uniffi.wp_api.WpRequestUrlLogDetail
 import uniffi.wp_api.WpResponseBodyLogDetail
+import uniffi.wp_api.redactRequestUrlForLog
+import uniffi.wp_api.redactResponseTextForLog
+import uniffi.wp_api.summarizeResponseBodyForLog
 
 /**
  * How much of a failed request is written to the log line a
@@ -35,3 +38,21 @@ data class RequestErrorLogPolicy(
         val DEFAULT = RequestErrorLogPolicy()
     }
 }
+
+/** A request URL reduced to what [RequestErrorLogPolicy.requestUrl] allows. */
+internal fun RequestErrorLogPolicy.redactedUrl(url: String): String =
+    redactRequestUrlForLog(url, requestUrl)
+
+/**
+ * The `response=` portion of a log line, or an empty string when the policy
+ * leaves the body out entirely.
+ */
+internal fun RequestErrorLogPolicy.responseField(response: String): String =
+    summarizeResponseBodyForLog(response, responseBody)?.let { ", response=$it" }.orEmpty()
+
+/**
+ * A `name=` portion of a log line carrying free text the failed response
+ * supplied, or an empty string when the policy is not logging the body.
+ */
+internal fun RequestErrorLogPolicy.responseTextField(name: String, text: String): String =
+    redactResponseTextForLog(text, responseBody)?.let { ", $name=$it" }.orEmpty()

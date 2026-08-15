@@ -4,43 +4,18 @@ package rs.wordpress.api.kotlin
  * Receives a concise, log-only description of a failed request (the value of
  * [toLogErrorString]). Invoked only when a request fails — never on success.
  *
- * Implementations should forward the message to their platform logger or
- * crash-reporting breadcrumbs. Even under the strictest [policy] the message
+ * Implementations forward the message to their platform logger or
+ * crash-reporting breadcrumbs, and decide through [policy] how much of the
+ * failure the message describes. Even under the strictest policy the message
  * describes a failure rather than explaining it, so it must NEVER be surfaced
  * to users.
+ *
+ * [WpRequestErrorLogger] implements this over a lambda, with a policy that
+ * writes down no value the request or the response carried.
  */
-fun interface RequestErrorLogger {
+interface RequestErrorLogger {
     fun logError(message: String)
 
-    /**
-     * How much of each failed request reaches [logError]. Defaults to
-     * [RequestErrorLogPolicy]'s own defaults, which write down no value the
-     * request or the response carried.
-     */
+    /** How much of each failed request reaches [logError]. */
     val policy: RequestErrorLogPolicy
-        get() = RequestErrorLogPolicy.DEFAULT
-
-    companion object {
-        /**
-         * A logger that receives failed requests at [policy] rather than the
-         * default level of detail — a login client, whose URLs carry
-         * credentials, wants less; a client serving a screen that is hard to
-         * debug may want more.
-         *
-         * [policy] wins over any policy [sink] declares of its own, so wrapping
-         * a logger that was deliberately made strict widens it. Wrap the sink
-         * where it is built rather than where it is passed to a client.
-         */
-        fun withPolicy(
-            policy: RequestErrorLogPolicy,
-            sink: RequestErrorLogger
-        ): RequestErrorLogger = ConfiguredRequestErrorLogger(policy, sink)
-    }
-}
-
-private class ConfiguredRequestErrorLogger(
-    override val policy: RequestErrorLogPolicy,
-    private val sink: RequestErrorLogger
-) : RequestErrorLogger {
-    override fun logError(message: String) = sink.logError(message)
 }

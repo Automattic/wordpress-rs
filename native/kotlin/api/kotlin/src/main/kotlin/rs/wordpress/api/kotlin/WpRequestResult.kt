@@ -4,9 +4,6 @@ import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.WpRedirect
-import uniffi.wp_api.redactRequestUrlForLog
-import uniffi.wp_api.redactResponseTextForLog
-import uniffi.wp_api.summarizeResponseBodyForLog
 
 sealed class WpRequestResult<T> {
     data class Success<T>(val response: T) : WpRequestResult<T>()
@@ -107,20 +104,3 @@ fun WpRequestResult<*>.toLogErrorString(
         "UnknownError(status=$statusCode, method=$requestMethod, " +
             "url=${policy.redactedUrl(requestUrl)}${policy.responseField(response)})"
 }
-
-private fun RequestErrorLogPolicy.redactedUrl(requestUrl: String): String =
-    redactRequestUrlForLog(requestUrl, this.requestUrl)
-
-/**
- * The `response=` portion of a log line, or an empty string when the policy
- * leaves the body out entirely.
- */
-private fun RequestErrorLogPolicy.responseField(response: String): String =
-    summarizeResponseBodyForLog(response, responseBody)?.let { ", response=$it" }.orEmpty()
-
-/**
- * A `name=` portion of a log line carrying free text the failed response
- * supplied, or an empty string when the policy is not logging the body.
- */
-private fun RequestErrorLogPolicy.responseTextField(name: String, text: String): String =
-    redactResponseTextForLog(text, responseBody)?.let { ", $name=$it" }.orEmpty()
