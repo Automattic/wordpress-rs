@@ -52,8 +52,8 @@ class RequestErrorLogTest {
 
         val message = loggedErrors.singleOrNull()
         assertNotNull(message, "expected exactly one logged failure: $loggedErrors")
-        // The default policy keeps the parameter names and drops their values.
-        assertTrue(message.contains("per_page=REDACTED"), message)
+        // The default policy keeps query values; only credentials are redacted.
+        assertTrue(message.contains("per_page=5"), message)
     }
 
     @Test

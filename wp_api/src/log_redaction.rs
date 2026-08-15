@@ -49,20 +49,27 @@ pub enum WpRequestUrlLogDetail {
     /// The URL as it was sent, except for the query parameters that are
     /// redacted in every mode (see [`redact_request_url_for_log`]).
     ///
-    /// Personal data that is not a credential survives: a comment list sends
-    /// `author_email`, and every list endpoint sends whatever the user typed
-    /// as `search`. Choose this only for traffic known not to carry either.
+    /// No credential survives this, but personal data does: a comment list
+    /// sends `author_email`, and every list endpoint sends whatever the user
+    /// typed as `search`. Choose [`QueryKeysOnly`](Self::QueryKeysOnly) for a
+    /// client that should record neither.
     Full,
 }
 
-/// How much of a failed response's body to write to a diagnostic log line.
+/// How much of a failed response to write to a diagnostic log line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpResponseBodyLogDetail {
-    /// The body is left out of the log line altogether.
+    /// Nothing the response carried appears in the line.
     Omitted,
-    /// A description of the body's size and shape, without its contents.
+    /// The response's own account of the failure — the `message` a `WpError`
+    /// carries, or the reason a body could not be parsed — plus the size and
+    /// shape of the body itself.
+    ///
+    /// A server writes those messages, so one can name a user: WordPress
+    /// echoes an invalid parameter's value, and a plugin may filter `message`
+    /// into anything. What it will not carry is a credential the request sent.
     Summary,
-    /// The body as it was received.
+    /// The above, and the body verbatim.
     Full,
 }
 
@@ -191,18 +198,20 @@ pub fn summarize_response_body_for_log(
 }
 
 /// Passes through free text taken out of a failed response — the `message` a
-/// `WpError` carries, or the reason a response failed to parse — only when the
-/// body is being logged in full, and `None` otherwise.
+/// `WpError` carries, or the reason a response failed to parse — unless the
+/// response is being left out of the line altogether.
 ///
-/// Such text has no shape to summarize, so it has no middle setting: it is
-/// either part of the body being logged or it is not. It is also the one thing
-/// in the log line a server chooses freely, so what does pass through is fitted
-/// to a single line.
+/// Such text has no shape to summarize, so it has no middle setting: it is the
+/// response's account of what went wrong, and it is either reported or it is
+/// not. It is also the one thing in the line a server chooses freely, so what
+/// passes through is fitted to a single line.
 #[uniffi::export]
 pub fn redact_response_text_for_log(text: &str, detail: WpResponseBodyLogDetail) -> Option<String> {
     match detail {
-        WpResponseBodyLogDetail::Omitted | WpResponseBodyLogDetail::Summary => None,
-        WpResponseBodyLogDetail::Full => Some(fit_to_one_log_line(text)),
+        WpResponseBodyLogDetail::Omitted => None,
+        WpResponseBodyLogDetail::Summary | WpResponseBodyLogDetail::Full => {
+            Some(fit_to_one_log_line(text))
+        }
     }
 }
 
@@ -726,25 +735,25 @@ mod tests {
         );
     }
 
-    #[rstest]
-    #[case(WpResponseBodyLogDetail::Omitted)]
-    #[case(WpResponseBodyLogDetail::Summary)]
-    fn free_text_from_a_response_is_kept_back_unless_the_body_is_logged_in_full(
-        #[case] detail: WpResponseBodyLogDetail,
-    ) {
+    #[test]
+    fn free_text_from_a_response_is_kept_back_only_when_the_response_is_omitted() {
         assert_eq!(
-            redact_response_text_for_log("person@example.com is not authorized", detail),
+            redact_response_text_for_log(
+                "person@example.com is not authorized",
+                WpResponseBodyLogDetail::Omitted
+            ),
             None
         );
     }
 
-    #[test]
-    fn free_text_survives_when_the_body_is_logged_in_full() {
+    #[rstest]
+    #[case(WpResponseBodyLogDetail::Summary)]
+    #[case(WpResponseBodyLogDetail::Full)]
+    fn free_text_survives_when_the_response_is_reported_at_all(
+        #[case] detail: WpResponseBodyLogDetail,
+    ) {
         assert_eq!(
-            redact_response_text_for_log(
-                "Sorry, you are not allowed",
-                WpResponseBodyLogDetail::Full
-            ),
+            redact_response_text_for_log("Sorry, you are not allowed", detail),
             Some("Sorry, you are not allowed".to_string())
         );
     }
@@ -791,9 +800,17 @@ mod tests {
     const ERROR_BODY: &str =
         r#"{"code":"invalid_token","message":"person@example.com is not authorized"}"#;
 
+    /// Mirrors the default the bindings apply: a failure is described as fully
+    /// as it can be without recording a credential.
     const DEFAULT_POLICY: WpRequestErrorLogPolicy = WpRequestErrorLogPolicy {
-        request_url: WpRequestUrlLogDetail::QueryKeysOnly,
+        request_url: WpRequestUrlLogDetail::Full,
         response_body: WpResponseBodyLogDetail::Summary,
+    };
+    /// The privacy-oriented alternative, for a client that should record no
+    /// value at all.
+    const PRIVATE_POLICY: WpRequestErrorLogPolicy = WpRequestErrorLogPolicy {
+        request_url: WpRequestUrlLogDetail::QueryKeysOnly,
+        response_body: WpResponseBodyLogDetail::Omitted,
     };
     const STRICT_POLICY: WpRequestErrorLogPolicy = WpRequestErrorLogPolicy {
         request_url: WpRequestUrlLogDetail::PathOnly,
@@ -825,32 +842,40 @@ mod tests {
     }
 
     #[test]
-    fn the_default_policy_keeps_query_keys_and_drops_their_values() {
+    fn the_default_policy_keeps_query_values_but_never_a_credential() {
+        // The default is security-oriented: it describes the request as fully
+        // as it can without recording something that grants access.
         let described = wp_api_error_log_description(&wp_error(), DEFAULT_POLICY);
-        assert!(described.contains("client_id=REDACTED"), "{described}");
+        assert!(described.contains("client_id=11"), "{described}");
         assert!(described.contains("token=REDACTED"), "{described}");
         assert!(!described.contains(ACCESS_TOKEN), "{described}");
     }
 
     #[test]
-    fn the_default_policy_withholds_the_message_a_wp_error_carries() {
-        // `error_message` is the `message` field lifted out of the response
-        // body, so the body policy governs it. The code and status carry the
-        // diagnosis without it.
+    fn the_privacy_policy_drops_query_values_as_well() {
+        let described = wp_api_error_log_description(&wp_error(), PRIVATE_POLICY);
+        assert!(!described.contains("client_id=11"), "{described}");
+        assert!(!described.contains(ACCESS_TOKEN), "{described}");
+    }
+
+    #[test]
+    fn the_default_policy_keeps_the_message_a_wp_error_carries() {
+        // The server's account of the failure is what makes a report
+        // actionable, and it cannot carry a credential the request sent.
         let described = wp_api_error_log_description(&wp_error(), DEFAULT_POLICY);
-        assert!(!described.contains(PERSONAL_DATA), "{described}");
-        assert!(!described.contains("message="), "{described}");
+        assert!(
+            described.contains(&format!("message={PERSONAL_DATA} is not authorized")),
+            "{described}"
+        );
         assert!(described.contains("code=Unauthorized"), "{described}");
         assert!(described.contains("status=401"), "{described}");
     }
 
     #[test]
-    fn a_full_policy_restores_the_message_a_wp_error_carries() {
-        let described = wp_api_error_log_description(&wp_error(), FULL_POLICY);
-        assert!(
-            described.contains(&format!("message={PERSONAL_DATA} is not authorized")),
-            "{described}"
-        );
+    fn an_omitted_response_withholds_the_message_a_wp_error_carries() {
+        let described = wp_api_error_log_description(&wp_error(), PRIVATE_POLICY);
+        assert!(!described.contains(PERSONAL_DATA), "{described}");
+        assert!(!described.contains("message="), "{described}");
     }
 
     #[test]
@@ -864,6 +889,18 @@ mod tests {
     fn an_omitted_body_leaves_no_response_field_at_all() {
         let described = wp_api_error_log_description(&unknown_error(), STRICT_POLICY);
         assert!(!described.contains("response="), "{described}");
+    }
+
+    #[test]
+    fn the_default_policy_never_quotes_the_body_itself() {
+        // The body is the one part of a response no policy short of `Full`
+        // reports, however useful the message it wraps.
+        let described = wp_api_error_log_description(&unknown_error(), DEFAULT_POLICY);
+        assert!(described.contains("response=<"), "{described}");
+        assert!(
+            !described.contains(r#"{"code":"invalid_token""#),
+            "{described}"
+        );
     }
 
     #[test]
@@ -888,10 +925,10 @@ mod tests {
     }
 
     #[test]
-    fn the_default_policy_withholds_the_reason_a_response_failed_to_parse_with() {
-        // serde quotes the offending value in its message, so the reason is
-        // body-derived and follows the body policy. The body's shape still says
-        // what failed to parse.
+    fn the_reason_a_response_failed_to_parse_follows_the_response_policy() {
+        // serde quotes the offending value, so the reason can name a user. It
+        // is still the only field that says *why* the parse failed, so the
+        // default keeps it and the privacy-oriented policy drops it.
         let error = WpApiError::ResponseParsingError {
             reason: format!(r#"invalid type: string "{PERSONAL_DATA}", expected u64"#),
             response: ERROR_BODY.to_string(),
@@ -900,9 +937,11 @@ mod tests {
         };
 
         let described = wp_api_error_log_description(&error, DEFAULT_POLICY);
-        assert!(!described.contains(PERSONAL_DATA), "{described}");
-        assert!(!described.contains("reason="), "{described}");
-        assert!(described.contains("response=<"), "{described}");
+        assert!(described.contains("reason=invalid type"), "{described}");
+
+        let withheld = wp_api_error_log_description(&error, PRIVATE_POLICY);
+        assert!(!withheld.contains(PERSONAL_DATA), "{withheld}");
+        assert!(!withheld.contains("reason="), "{withheld}");
     }
 
     #[test]
@@ -991,8 +1030,14 @@ mod tests {
         };
 
         let described = auto_discovery_failure_log_description(&failure, DEFAULT_POLICY);
-        assert!(!described.contains(PERSONAL_DATA), "{described}");
+        // The parser's account of the failure is reported; the body it choked
+        // on is only described.
+        assert!(
+            described.contains("parsingError=invalid type"),
+            "{described}"
+        );
         assert!(described.contains("response=<"), "{described}");
+        assert!(!described.contains(ERROR_BODY), "{described}");
     }
 
     #[test]
