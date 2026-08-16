@@ -16,8 +16,8 @@ import uniffi.wp_api.wpApiErrorLogDescription
  * describes a failure rather than explaining it, so it must NEVER be surfaced
  * to users.
  *
- * [WpRequestErrorLogger] implements this over a lambda, with a policy that
- * writes down no value the request or the response carried.
+ * [WpRequestErrorLogger] implements this over a lambda, at
+ * [DEFAULT_REQUEST_ERROR_LOG_POLICY].
  */
 interface RequestErrorLogger {
     fun logError(message: String)

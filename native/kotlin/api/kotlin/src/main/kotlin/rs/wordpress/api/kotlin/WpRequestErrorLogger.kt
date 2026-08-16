@@ -5,8 +5,9 @@ import uniffi.wp_api.WpRequestErrorLogPolicy
 /**
  * A [RequestErrorLogger] that hands each message to [sink], at [policy].
  *
- * The policy defaults to writing down no value the request or the response
- * carried, so the common case is just the sink:
+ * The policy defaults to [DEFAULT_REQUEST_ERROR_LOG_POLICY], which keeps query
+ * parameter values and the response's account of the failure but never a
+ * credential, so the common case is just the sink:
  *
  * ```kotlin
  * WpRequestErrorLogger { message -> AppLog.e(AppLog.T.API, message) }
