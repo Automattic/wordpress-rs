@@ -68,6 +68,7 @@ pub enum WpResponseBodyLogDetail {
     /// A server writes those messages, so one can name a user: WordPress
     /// echoes an invalid parameter's value, and a plugin may filter `message`
     /// into anything. What it will not carry is a credential the request sent.
+    /// At least it's not supposed to.
     Summary,
     /// The above, and the body verbatim.
     Full,
@@ -75,8 +76,7 @@ pub enum WpResponseBodyLogDetail {
 
 /// Substrings that make a query parameter's name a secret whatever it is
 /// prefixed or suffixed with, so `refresh_token` and `id_token` are covered
-/// alongside `access_token`. A key containing one of these is never innocent,
-/// which is what separates them from [`ALWAYS_REDACTED_QUERY_KEYS`].
+/// alongside `access_token`. A key containing one of these is not expected to be innocent.
 const ALWAYS_REDACTED_KEY_SUBSTRINGS: &[&str] = &["token", "secret", "password"];
 
 /// Query parameter names that are secrets in full but whose substrings are
@@ -128,11 +128,10 @@ const MAX_LOGGED_TEXT_BYTES: usize = 8192;
 /// Three things are removed at every level, because they are secrets wherever
 /// they appear: credentials in the authority (`https://user:pass@host/`), the
 /// fragment (an OAuth2 implicit-flow redirect returns the access token in it),
-/// and the value of any query parameter whose name contains `token`, `secret`
-/// or `password`, or is one of `api_key`, `apikey`, `auth`, `authorization`,
-/// `code`, `hmac`, `nonce`, `passwd`, `pw`, `pwd`, `session`, `sig`,
-/// `signature` or `_wpnonce`. Names are matched case-insensitively and with a
-/// `[]` suffix ignored.
+/// and the value of any query parameter named by
+/// `ALWAYS_REDACTED_KEY_SUBSTRINGS` or `ALWAYS_REDACTED_QUERY_KEYS`, which is
+/// where those names and the reasoning behind them live. Matching ignores case
+/// and a `[]` suffix.
 ///
 /// A URL that cannot be parsed cannot be redacted, so none of it is returned.
 /// An IDN host comes back punycoded, which is what the request used.
