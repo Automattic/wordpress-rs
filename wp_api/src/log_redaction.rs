@@ -123,6 +123,10 @@ const MAX_SUMMARIZED_KEYS: usize = 20;
 /// enough that a hostile site cannot flood a crash report.
 const MAX_LOGGED_TEXT_BYTES: usize = 8192;
 
+/// The bound for server-supplied text that names something rather than
+/// explaining it, such as a JSON object's key. Anything longer is not a name.
+const MAX_LOGGED_IDENTIFIER_BYTES: usize = 64;
+
 /// Reduces `url` to the requested level of detail for a diagnostic log line.
 ///
 /// Three things are removed at every level, because they are secrets wherever
@@ -217,16 +221,21 @@ pub fn redact_response_text_for_log(text: &str, detail: WpResponseBodyLogDetail)
 /// Keeps server-supplied text to one bounded log line: line breaks are escaped
 /// so it cannot forge a second entry, and anything past
 /// [`MAX_LOGGED_TEXT_BYTES`] is dropped and counted.
+fn fit_to_one_log_line(text: &str) -> String {
+    fit_to_log_line(text, MAX_LOGGED_TEXT_BYTES)
+}
+
+/// As [`fit_to_one_log_line`], to a caller-chosen bound.
 ///
 /// Truncation lands on a character boundary, so the result is never a partial
 /// UTF-8 sequence.
-fn fit_to_one_log_line(text: &str) -> String {
+fn fit_to_log_line(text: &str, max_bytes: usize) -> String {
     let escaped = text.replace('\r', "\\r").replace('\n', "\\n");
-    if escaped.len() <= MAX_LOGGED_TEXT_BYTES {
+    if escaped.len() <= max_bytes {
         return escaped;
     }
 
-    let mut end = MAX_LOGGED_TEXT_BYTES;
+    let mut end = max_bytes;
     while end > 0 && !escaped.is_char_boundary(end) {
         end -= 1;
     }
@@ -258,10 +267,14 @@ fn is_endpoint_key(key: &str) -> bool {
 
 /// Describes a body's size and shape without repeating anything it contains.
 ///
-/// Object keys are named because they are schema rather than data, and they
-/// are what tells a `{"code","message","data"}` error apart from a truncated
-/// payload. Everything else reduces to a size and a shape — an HTML error page
-/// or a partial upload has no keys to report.
+/// Object keys are named because they are usually schema rather than data, and
+/// they are what tells a `{"code","message","data"}` error apart from a
+/// truncated payload. Everything else reduces to a size and a shape — an HTML
+/// error page or a partial upload has no keys to report.
+///
+/// A key is still chosen by whoever wrote the response, so each is fitted to
+/// the line like any other server text: a body keyed by a megabyte of text, or
+/// by a newline, can neither flood a crash report nor forge a second entry.
 ///
 /// The byte count is of the body as decoded, which for a response that was not
 /// valid UTF-8 differs from what arrived on the wire.
@@ -280,7 +293,7 @@ fn summarize_body(body: &str) -> String {
             let listed = keys
                 .iter()
                 .take(MAX_SUMMARIZED_KEYS)
-                .copied()
+                .map(|key| fit_to_log_line(key, MAX_LOGGED_IDENTIFIER_BYTES))
                 .collect::<Vec<_>>()
                 .join(", ");
             match keys.len().checked_sub(MAX_SUMMARIZED_KEYS) {
@@ -757,17 +770,42 @@ mod tests {
         );
     }
 
-    #[rstest]
-    #[case::response_body(WpResponseBodyLogDetail::Full)]
-    fn a_full_body_cannot_forge_a_second_log_line(#[case] detail: WpResponseBodyLogDetail) {
+    #[test]
+    fn a_full_body_cannot_forge_a_second_log_line() {
         // A site controls its response body, so a newline in it would otherwise
         // read as a separate log entry.
-        let summary = summarize_response_body_for_log("first\nE/Forged: second", detail)
-            .expect("Full should always produce a value");
-        assert!(!summary.contains('\n'), "got: {summary}");
+        let logged = summarize_response_body_for_log(
+            "first\nE/Forged: second",
+            WpResponseBodyLogDetail::Full,
+        )
+        .expect("Full should always produce a value");
+        assert!(!logged.contains('\n'), "got: {logged}");
+        assert!(logged.contains("first\\nE/Forged: second"), "got: {logged}");
+    }
+
+    #[test]
+    fn a_summarized_key_cannot_forge_a_second_log_line() {
+        // A key is as much the site's choice as the body around it, and
+        // `Summary` is the default policy rather than an opt-in.
+        let logged = summarize_response_body_for_log(
+            "{\"a\\nE/Forged: second\":1}",
+            WpResponseBodyLogDetail::Summary,
+        )
+        .expect("Summary should always produce a value");
+        assert!(!logged.contains('\n'), "got: {logged}");
+    }
+
+    #[test]
+    fn a_summarized_key_is_capped() {
+        // `MAX_SUMMARIZED_KEYS` bounds how many keys are listed; without a
+        // bound on each, one key is enough to flood a crash report.
+        let body = format!(r#"{{"{}":1}}"#, "k".repeat(100_000));
+        let logged = summarize_response_body_for_log(&body, WpResponseBodyLogDetail::Summary)
+            .expect("Summary should always produce a value");
         assert!(
-            summary.contains("first\\nE/Forged: second"),
-            "got: {summary}"
+            logged.len() < 200,
+            "one key should not carry the line away, got {} bytes",
+            logged.len()
         );
     }
 
