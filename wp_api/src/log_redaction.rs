@@ -71,6 +71,9 @@ pub enum WpResponseBodyLogDetail {
     /// At least it's not supposed to.
     Summary,
     /// The above, and the body verbatim.
+    ///
+    /// A `WpError` reports no separate body: its `code` and `message` are the
+    /// body's own fields, already named above.
     Full,
 }
 

@@ -77,7 +77,9 @@ class RequestErrorLogTest {
         val message = loggedErrors.singleOrNull()
         assertNotNull(message, "expected exactly one logged failure: $loggedErrors")
         assertFalse(message.contains("per_page"), message)
-        assertFalse(message.contains("response="), message)
+        // The fixture is a `WpError`, which reports no `response=` at any
+        // policy, so `message=` is what distinguishes OMITTED from the default.
+        assertFalse(message.contains("message="), message)
     }
 
     @Test
