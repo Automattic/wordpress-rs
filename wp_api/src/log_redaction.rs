@@ -523,8 +523,9 @@ fn optional_status(status_code: Option<u32>) -> String {
 mod tests {
     use super::*;
     use crate::api_error::{RequestExecutionErrorReason, WpErrorCode};
-    use crate::parsed_url::ParsedUrl;
-    use crate::request::{RequestMethod, ResponseBodyType};
+    use crate::parsed_url::{ParseUrlError, ParsedUrl};
+    use crate::request::endpoint::WpEndpointUrl;
+    use crate::request::{RequestMethod, ResponseBodyType, WpNetworkHeaderMap, WpNetworkResponse};
     use rstest::rstest;
     use std::sync::Arc;
 
@@ -826,11 +827,17 @@ mod tests {
 
     #[test]
     fn capping_a_full_body_does_not_split_a_character() {
-        // A multi-byte character straddling the cap must not be cut in half.
-        let body = "é".repeat(MAX_LOGGED_TEXT_BYTES);
+        // The leading ASCII byte puts the cap in the middle of a two-byte
+        // character, which is the case the boundary walk exists for. Without
+        // it, 8192 lands on a boundary anyway and the walk never runs.
+        let body = format!("x{}", "é".repeat(MAX_LOGGED_TEXT_BYTES));
         let logged = summarize_response_body_for_log(&body, WpResponseBodyLogDetail::Full)
             .expect("Full should always produce a value");
-        assert!(logged.starts_with('é'));
+        assert!(logged.ends_with("more bytes)"), "got: {logged}");
+        assert!(
+            logged.len() < body.len(),
+            "the body should have been capped"
+        );
     }
 
     const ACCESS_TOKEN: &str = "s3cr3t-access-token";
@@ -986,14 +993,25 @@ mod tests {
 
     #[test]
     fn a_request_execution_failure_names_the_host_not_the_whole_url() {
-        // The reason carries a `hostname`; it must not smuggle the query string
-        // back into a line whose `url=` was redacted.
+        // Build the reason the way production does, from a response whose URL
+        // carries a credential. Handing it a hostname already known to be clean
+        // would assert nothing: the reason is the field that can reintroduce a
+        // URL the policy has already reduced.
+        let response = WpNetworkResponse {
+            status_code: 403,
+            body: b"<html>Forbidden</html>".to_vec(),
+            response_header_map: Arc::new(WpNetworkHeaderMap::default()),
+            request_url: WpEndpointUrl(TOKEN_INFO_URL.to_string()),
+            request_method: RequestMethod::GET,
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+        };
+        let reason = RequestExecutionErrorReason::try_from_response(&response)
+            .expect("a 403 whose body is not a WpError is an execution failure");
+
         let error = WpApiError::RequestExecutionFailed {
             status_code: Some(403),
             redirects: None,
-            reason: RequestExecutionErrorReason::HttpForbiddenError {
-                hostname: "public-api.wordpress.com".to_string(),
-            },
+            reason,
             request_url: TOKEN_INFO_URL.to_string(),
             request_method: RequestMethod::GET,
         };
@@ -1001,6 +1019,84 @@ mod tests {
         let described = wp_api_error_log_description(&error, STRICT_POLICY);
         assert!(!described.contains(ACCESS_TOKEN), "{described}");
         assert!(!described.contains("client_id"), "{described}");
+    }
+
+    /// Each arm renders, names itself, and keeps a planted credential out of
+    /// the line at every policy.
+    #[rstest]
+    #[case::invalid_status(
+        WpApiError::InvalidHttpStatusCode {
+            status_code: 999,
+            request_url: TOKEN_INFO_URL.to_string(),
+            request_method: RequestMethod::GET,
+        },
+        "InvalidHttpStatusCode"
+    )]
+    #[case::site_url_parsing(
+        WpApiError::SiteUrlParsingError { reason: "empty host".to_string() },
+        "SiteUrlParsingError"
+    )]
+    #[case::media_unreadable(
+        WpApiError::MediaFileUnreadable { file_path: "/tmp/a.jpg".to_string() },
+        "MediaFileUnreadable"
+    )]
+    fn every_error_arm_names_itself_and_leaks_nothing(
+        #[case] error: WpApiError,
+        #[case] expected_name: &str,
+    ) {
+        for policy in [DEFAULT_POLICY, PRIVATE_POLICY, FULL_POLICY] {
+            let described = wp_api_error_log_description(&error, policy);
+            assert!(described.starts_with(expected_name), "{described}");
+            assert!(!described.contains(ACCESS_TOKEN), "{described}");
+        }
+    }
+
+    /// The discovery arms, including the two that reach
+    /// `request_execution_error_description` — the only path to it, and the one
+    /// this branch added logging for.
+    #[rstest]
+    #[case::fetch_homepage(
+        FindApiRootFailure::FetchHomepage {
+            error: RequestExecutionError::RequestExecutionFailed {
+                status_code: None,
+                redirects: None,
+                reason: RequestExecutionErrorReason::HttpTimeoutError,
+                request_url: TOKEN_INFO_URL.to_string(),
+                request_method: RequestMethod::GET,
+            },
+        },
+        "FetchHomepage"
+    )]
+    #[case::rest_api_disabled(FindApiRootFailure::RestApiDisabled, "RestApiDisabled")]
+    #[case::not_wordpress(
+        FindApiRootFailure::ProbablyNotAWordPressSite,
+        "ProbablyNotAWordPressSite"
+    )]
+    fn every_find_api_root_arm_names_itself_and_leaks_nothing(
+        #[case] find_api_root_failure: FindApiRootFailure,
+        #[case] expected_name: &str,
+    ) {
+        let failure = AutoDiscoveryAttemptFailure::FindApiRoot {
+            parsed_site_url: Arc::new(ParsedUrl::parse("https://example.com/").expect("valid URL")),
+            find_api_root_failure,
+        };
+
+        for policy in [DEFAULT_POLICY, PRIVATE_POLICY, FULL_POLICY] {
+            let described = auto_discovery_failure_log_description(&failure, policy);
+            assert!(described.contains(expected_name), "{described}");
+            assert!(!described.contains(ACCESS_TOKEN), "{described}");
+        }
+    }
+
+    #[test]
+    fn an_unparsable_site_url_names_only_the_parse_failure() {
+        let failure = AutoDiscoveryAttemptFailure::ParseSiteUrl {
+            error: ParseUrlError::EmptyHost,
+        };
+        assert_eq!(
+            auto_discovery_failure_log_description(&failure, DEFAULT_POLICY),
+            "ParseSiteUrl(reason=EmptyHost)"
+        );
     }
 
     #[test]
