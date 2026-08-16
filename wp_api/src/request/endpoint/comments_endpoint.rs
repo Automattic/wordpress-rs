@@ -8,7 +8,11 @@ enum CommentsRequest {
     List,
     #[contextual_get(url = "/comments/<comment_id>", params = &crate::comments::CommentRetrieveParams, output = crate::comments::SparseComment, filter_by = crate::comments::SparseCommentField)]
     Retrieve,
-    #[post(url = "/comments", params = &crate::comments::CommentCreateParams, output = crate::comments::CommentWithEditContext)]
+    // The output is a view-context type because core decides the create-response
+    // context by capability (`edit` only for users with `moderate_comments`,
+    // `view` otherwise) and ignores the request's `?context=`. Edit-context JSON
+    // is a superset of view-context JSON, so this parses for every role.
+    #[post(url = "/comments", params = &crate::comments::CommentCreateParams, output = crate::comments::CommentWithViewContext)]
     Create,
     #[delete(url = "/comments/<comment_id>", params = &crate::comments::CommentDeleteParams, output = crate::comments::CommentDeleteResponse)]
     Delete,

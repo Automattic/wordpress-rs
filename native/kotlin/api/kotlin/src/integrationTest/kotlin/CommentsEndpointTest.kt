@@ -70,7 +70,7 @@ class CommentsEndpointTest {
             requestBuilder.comments()
                 .create(CommentCreateParams(post = 1, content = "foo", status = CommentStatus.Hold))
         }.assertSuccessAndRetrieveData().data
-        assertEquals("foo", createdComment.content.raw)
+        assert(createdComment.content.rendered.contains("foo"))
         assertEquals(CommentStatus.Hold, createdComment.status)
         restoreTestServer()
     }
