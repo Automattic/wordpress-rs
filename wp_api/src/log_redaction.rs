@@ -9,7 +9,7 @@
 //! The line itself is composed here rather than in each set of bindings, so
 //! that every platform reports a failure the same way.
 
-use crate::api_error::{RequestExecutionError, WpApiError};
+use crate::api_error::{RequestExecutionError, WpApiError, WpErrorCode};
 use crate::login::url_discovery::{
     AutoDiscoveryAttemptFailure, FetchAndParseApiRootFailure, FindApiRootFailure,
 };
@@ -59,7 +59,9 @@ pub enum WpRequestUrlLogDetail {
 /// How much of a failed response to write to a diagnostic log line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum WpResponseBodyLogDetail {
-    /// Nothing the response carried appears in the line.
+    /// Nothing the response carried appears in the line, beyond the error code
+    /// it was parsed into. The code names the failure rather than describing
+    /// it, and without it the line says only that a request failed.
     Omitted,
     /// The response's own account of the failure — the `message` a `WpError`
     /// carries, or the reason a body could not be parsed — plus the size and
@@ -127,7 +129,8 @@ const MAX_SUMMARIZED_KEYS: usize = 20;
 const MAX_LOGGED_TEXT_BYTES: usize = 8192;
 
 /// The bound for server-supplied text that names something rather than
-/// explaining it, such as a JSON object's key. Anything longer is not a name.
+/// explaining it — a JSON object's key, or an error code outside
+/// [`WpErrorCode`]'s own variants. Anything longer is not a name.
 const MAX_LOGGED_IDENTIFIER_BYTES: usize = 64;
 
 /// Reduces `url` to the requested level of detail for a diagnostic log line.
@@ -327,7 +330,8 @@ pub fn wp_api_error_log_description(error: &WpApiError, policy: WpRequestErrorLo
             request_method,
             ..
         } => format!(
-            "WpError(code={error_code:?}, status={status_code}{}, method={request_method:?}, url={})",
+            "WpError(code={}, status={status_code}{}, method={request_method:?}, url={})",
+            error_code_description(error_code),
             text_field("message", error_message, policy),
             url_field(request_url, policy),
         ),
@@ -455,7 +459,8 @@ fn fetch_and_parse_description(
             error_message,
             status_code,
         } => format!(
-            "WpError(code={error_code:?}, status={status_code}{})",
+            "WpError(code={}, status={status_code}{})",
+            error_code_description(error_code),
             text_field("message", error_message, policy),
         ),
         // `api_details` is the whole parsed API root; only the reason is worth
@@ -495,6 +500,24 @@ fn request_execution_error_description(
 
 fn url_field(request_url: &str, policy: WpRequestErrorLogPolicy) -> String {
     redact_request_url_for_log(request_url, policy.request_url)
+}
+
+/// Names the error code, at every policy: it is the field that says what
+/// failed, and unlike the response's `message` it is an identifier rather than
+/// prose.
+///
+/// Every variant but one is a fixed name. [`WpErrorCode::CustomError`] holds
+/// the response's `code` field verbatim, for any code outside the enum, so it
+/// is fitted to the line — a plugin is free to put a newline in it, which would
+/// otherwise split the entry in two.
+fn error_code_description(error_code: &WpErrorCode) -> String {
+    match error_code {
+        WpErrorCode::CustomError(code) => format!(
+            "CustomError({})",
+            fit_to_log_line(code, MAX_LOGGED_IDENTIFIER_BYTES)
+        ),
+        named => format!("{named:?}"),
+    }
 }
 
 /// The `, response=…` portion of a line, or nothing when the policy leaves the
@@ -1086,6 +1109,28 @@ mod tests {
             assert!(described.contains(expected_name), "{described}");
             assert!(!described.contains(ACCESS_TOKEN), "{described}");
         }
+    }
+
+    #[test]
+    fn an_error_code_outside_the_enum_cannot_forge_a_second_log_line() {
+        // `CustomError` holds the response's `code` field verbatim, and a
+        // plugin sets that freely. It is reported at every policy, so it is the
+        // one field a site could otherwise use to split the entry in two.
+        let error = WpApiError::WpError {
+            error_code: WpErrorCode::CustomError("a\nE/Forged: second".to_string()),
+            error_message: "nope".to_string(),
+            status_code: 400,
+            response: ERROR_BODY.to_string(),
+            request_url: TOKEN_INFO_URL.to_string(),
+            request_method: RequestMethod::GET,
+        };
+
+        let described = wp_api_error_log_description(&error, PRIVATE_POLICY);
+        assert!(!described.contains('\n'), "{described}");
+        assert!(
+            described.contains("CustomError(a\\nE/Forged"),
+            "{described}"
+        );
     }
 
     #[test]
