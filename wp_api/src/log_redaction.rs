@@ -69,8 +69,9 @@ pub enum WpResponseBodyLogDetail {
     ///
     /// A server writes those messages, so one can name a user: WordPress
     /// echoes an invalid parameter's value, and a plugin may filter `message`
-    /// into anything. What it will not carry is a credential the request sent.
-    /// At least it's not supposed to.
+    /// into anything. A credential the request sent is not supposed to come
+    /// back in one — but that is a convention a server keeps, not something
+    /// this library can enforce.
     Summary,
     /// The above, and the body verbatim.
     ///
