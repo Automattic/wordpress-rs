@@ -266,7 +266,9 @@ class ApiUrlDiscoveryTest {
 
     @Test // Spec Example 17
     fun testInvalidHTTPsFails() = runTest {
-        val reason = loginClient.apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
+        // `wrong.host.badssl.com` serves a valid, trusted `*.badssl.com` certificate that doesn't
+        // cover the host, so the chain is fine but the name doesn't match.
+        val reason = loginClient.apiDiscovery("https://wrong.host.badssl.com")
             .assertFailureFindApiRoot().getRequestExecutionErrorReason()
         assertInstanceOf(RequestExecutionErrorReason.InvalidSslError::class.java, reason)
 
@@ -279,8 +281,8 @@ class ApiUrlDiscoveryTest {
         val hostname = (sslError as InvalidSslErrorReason.CertificateNotValidForName).hostname
         val presentedHostnames = sslError.presentedHostnames
 
-        assertEquals(hostname, "wordpress-1315525-4803651.cloudwaysapps.com")
-        assertContains(presentedHostnames, "vanilla.wpmt.co")
+        assertEquals(hostname, "wrong.host.badssl.com")
+        assertContains(presentedHostnames, "*.badssl.com")
     }
 
     // `wrong.host.badssl.com` serves a valid `*.badssl.com` certificate on a host
@@ -311,22 +313,6 @@ class ApiUrlDiscoveryTest {
     }
 
     @Test // Spec Example 17 (with exception)
-    fun testInvalidHttpsWithExceptionWorks() = runTest {
-        val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
-        val executor = WpRequestExecutor(httpClient, NetworkAvailabilityProvider { true })
-        httpClient.addAllowedAlternativeNamesForHostname(
-            "vanilla.wpmt.co",
-            listOf("wordpress-1315525-4803651.cloudwaysapps.com")
-        )
-
-        assertEquals(
-            "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            WpLoginClient(requestExecutor = executor).apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
-                .assertSuccess().assertApplicationPasswordsUrl()
-        )
-    }
-
-    @Test
     fun testAllowedHostnamesDoesNotBreakValidSites() = runTest {
         val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
         val executor = WpRequestExecutor(httpClient, NetworkAvailabilityProvider { true })
@@ -334,20 +320,49 @@ class ApiUrlDiscoveryTest {
 
         // First, configure an allowed hostname override for a specific cert/hostname pair
         httpClient.addAllowedAlternativeNamesForHostname(
-            "vanilla.wpmt.co",
-            listOf("wordpress-1315525-4803651.cloudwaysapps.com")
+            "*.badssl.com",
+            listOf("wrong.host.badssl.com")
         )
 
-        // The override should work
-        assertEquals(
-            "https://vanilla.wpmt.co/wp-admin/authorize-application.php",
-            loginClient.apiDiscovery("https://wordpress-1315525-4803651.cloudwaysapps.com")
-                .assertSuccess().assertApplicationPasswordsUrl()
-        )
+        // The override gets the mismatched host past the handshake; it then fails discovery only
+        // because badssl.com isn't a WordPress site.
+        val overrideReason = loginClient.apiDiscovery("https://wrong.host.badssl.com").assertFailureFindApiRoot()
+        assertInstanceOf(FindApiRootFailure.ProbablyNotAWordPressSite::class.java, overrideReason)
 
         // Other valid SSL sites should still work via fallback to default hostname verification.
         // google.com uses wildcard/SAN certificates which require proper OkHttp verification.
         val reason = loginClient.apiDiscovery("https://google.com").assertFailureFindApiRoot()
+        assertInstanceOf(FindApiRootFailure.ProbablyNotAWordPressSite::class.java, reason)
+    }
+
+    @Test // Alternative-name exception must not bypass chain validation
+    fun testAllowedHostnamesStillValidatesCertificateChain() = runTest {
+        val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
+        val executor = WpRequestExecutor(httpClient, NetworkAvailabilityProvider { true })
+        httpClient.addAllowedAlternativeNamesForHostname(
+            "*.badssl.com",
+            listOf("self-signed.badssl.com")
+        )
+
+        // Allow-listing only relaxes the hostname check; the chain is still validated by the default
+        // trust manager, so a self-signed certificate is rejected even for an allow-listed host.
+        val reason = WpLoginClient(requestExecutor = executor)
+            .apiDiscovery("https://self-signed.badssl.com")
+            .assertFailureFindApiRoot().getRequestExecutionErrorReason()
+        assertInstanceOf(RequestExecutionErrorReason.InvalidSslError::class.java, reason)
+    }
+
+    @Test // Layer 2: disabling validation accepts any certificate
+    fun testDisableCertificateValidationWorks() = runTest {
+        val httpClient = WpHttpClient.DefaultHttpClient(emptyList())
+        val executor = WpRequestExecutor(httpClient, NetworkAvailabilityProvider { true })
+        httpClient.disableCertificateValidation("self-signed.badssl.com")
+
+        // With validation disabled for the host, even a self-signed certificate is accepted, so the
+        // request gets past the handshake; discovery then fails only because badssl.com isn't a
+        // WordPress site.
+        val reason = WpLoginClient(requestExecutor = executor)
+            .apiDiscovery("https://self-signed.badssl.com").assertFailureFindApiRoot()
         assertInstanceOf(FindApiRootFailure.ProbablyNotAWordPressSite::class.java, reason)
     }
 
