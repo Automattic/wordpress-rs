@@ -923,6 +923,41 @@ mod tests {
         }
     }
 
+    /// The WordPress REST API names the error code field `code`.
+    #[test]
+    fn test_parses_wp_rest_api_error_body() {
+        let body =
+            br#"{"code":"rest_cannot_view","message":"Sorry, you are not allowed to do that."}"#;
+        let parsed = WpError::try_parse(body).expect("body should parse as an error");
+
+        assert_eq!(parsed.code, WpErrorCode::CannotView);
+        assert_eq!(parsed.message, "Sorry, you are not allowed to do that.");
+    }
+
+    /// WordPress.com REST v1.x names it `error` instead. Both shapes have to
+    /// reach callers as `WpApiError::WpError`, or a v1.x rejection arrives as
+    /// an opaque `UnknownError` with no code to branch on.
+    #[test]
+    fn test_parses_wp_com_rest_v1_error_body() {
+        let body = br#"{"error":"invalid_query","message":"Domain searches must contain a word"}"#;
+        let parsed = WpError::try_parse(body).expect("body should parse as an error");
+
+        assert_eq!(
+            parsed.code,
+            WpErrorCode::CustomError("invalid_query".to_string())
+        );
+        assert_eq!(parsed.message, "Domain searches must contain a word");
+    }
+
+    /// OAuth2 rejections carry `error` without a `message`, so they stay
+    /// outside this shape and fall through to the other error paths.
+    #[test]
+    fn test_does_not_parse_oauth2_error_body() {
+        let body = br#"{"error":"invalid_token","error_description":"The token is invalid"}"#;
+
+        assert_eq!(WpError::try_parse(body), None);
+    }
+
     #[test]
     fn test_is_site_unreachable_matches_dns_and_connection_failures() {
         // The site is unreachable whether its host didn't resolve (DNS) or the
