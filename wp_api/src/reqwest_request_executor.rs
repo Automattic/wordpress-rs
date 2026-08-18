@@ -187,13 +187,6 @@ fn request_execution_error_from_reqwest(
     request_url: String,
     request_method: RequestMethod,
 ) -> RequestExecutionError {
-    // `reqwest::Error`'s `Display` ends with ` for url (…)`, and that URL is the
-    // request as sent — query string, and so any credential in it, included.
-    // The reasons below carry this text into log lines and into the localized
-    // message a user sees, neither of which should hold a credential, so drop
-    // the URL before any of them stringify it. The caller already has the URL
-    // in `request_url`, which is redacted where it is used.
-    let error = error.without_url();
     let status_code = error.status().map(|s| s.as_u16() as u32);
     let reason = if error.is_timeout() {
         RequestExecutionErrorReason::HttpTimeoutError
