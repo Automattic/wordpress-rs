@@ -206,6 +206,10 @@ impl ParsedRequestError for WpApiError {
 // This type is used to parse the API errors. It then gets converted to `WpApiError::WpError`.
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct WpError {
+    /// The WordPress REST API sends the code as `code`; WordPress.com REST
+    /// v1.x sends it as `error`. Codes only the latter uses land in
+    /// [`WpErrorCode::CustomError`].
+    #[serde(alias = "error")]
     pub code: WpErrorCode,
     pub message: String,
 }
