@@ -224,12 +224,11 @@ test-swift-tvOS: xcframework
 test-swift-watchOS: xcframework
 	scripts/xcodebuild-test.sh watchOS-26-5
 
-# Line tables preserve file/line backtraces without full debug info's CI memory cost.
 test-rust-lib:
-	$(rust_docker_run) env CARGO_PROFILE_TEST_DEBUG=line-tables-only cargo test --lib -- --nocapture
+	$(rust_docker_run) cargo test --lib -- --nocapture
 
 test-rust-doc:
-	$(rust_docker_run) env CARGO_PROFILE_TEST_DEBUG=line-tables-only cargo test --doc -- --nocapture
+	$(rust_docker_run) cargo test --doc -- --nocapture
 
 test-rust-wp-derived-request-parser:
 	$(rust_docker_run) cargo test --package wp_derive_request_builder
