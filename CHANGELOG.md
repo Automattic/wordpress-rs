@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Internal:** Build Rust test binaries with `debug = "line-tables-only"` instead of full debug info, via `[profile.test]` in the workspace `Cargo.toml`. This caps the memory a `cargo test` link consumes on CI, where full debug info was losing Buildkite agents. Backtraces still resolve to file and line; a debugger can no longer print locals. Override with `CARGO_PROFILE_TEST_DEBUG=full`.
+
 ## [0.7.0] - 2026-08-18
 
 ### Added
