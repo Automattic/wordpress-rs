@@ -1,13 +1,130 @@
 use crate::context::TestContext;
 use libtest_mimic::Trial;
 use std::sync::Arc;
+use wp_api::api_error::{WpApiError, WpErrorCode};
 use wp_api::wp_com::domains::{
     AllDomainsParams, CountryCode, DomainAvailabilityParams, DomainAvailabilityStatus,
-    DomainListItemStatusType, DomainName, DomainSubtypeId, SetPrimaryDomainParams, SiteDomainType,
+    DomainListItemStatusType, DomainName, DomainSubtypeId, DomainSuggestionsParams,
+    SetPrimaryDomainParams, SiteDomainType,
 };
+
+fn suggestions_params(query: &str) -> DomainSuggestionsParams {
+    DomainSuggestionsParams {
+        query: query.to_string(),
+        quantity: Some(5),
+        tlds: None,
+        vendor: None,
+        only_wordpressdotcom: None,
+        include_wordpressdotcom: None,
+        include_dotblogsubdomain: None,
+        segment_id: None,
+    }
+}
+
+/// Asserts that the suggestions endpoint rejects `params` with `expected_code`.
+///
+/// WordPress.com REST v1.x reports the code under `error`, where the WordPress
+/// REST API uses `code`. Reading it back here pins that a rejection reaches
+/// callers as `WpApiError::WpError` with the code intact, instead of an opaque
+/// `UnknownError` they cannot branch on.
+async fn expect_suggestions_error_code(
+    ctx: &TestContext,
+    params: DomainSuggestionsParams,
+    expected_code: &str,
+) -> Result<(), libtest_mimic::Failed> {
+    match ctx.client.domains().suggestions(&params).await {
+        Ok(response) => Err(format!(
+            "expected the request to be rejected, got {} suggestions",
+            response.data.len()
+        )
+        .into()),
+        Err(WpApiError::WpError { error_code, .. }) => {
+            let expected = WpErrorCode::CustomError(expected_code.to_string());
+            if error_code == expected {
+                Ok(())
+            } else {
+                Err(format!("expected error code {expected:?}, got {error_code:?}").into())
+            }
+        }
+        Err(other) => {
+            Err(format!("expected WpError carrying the API error code, got {other:?}").into())
+        }
+    }
+}
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut trials = vec![];
+
+    // GET /domains/suggestions/
+    trials.push(Trial::test("domains::suggestions", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                let suggestions = ctx
+                    .client
+                    .domains()
+                    .suggestions(&suggestions_params("coolsite"))
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .data;
+
+                if suggestions.is_empty() {
+                    return Err("expected non-empty suggestions list".into());
+                }
+
+                Ok(())
+            })
+        }
+    }));
+
+    // A query the API refuses. Callers branch on the code to show "no results
+    // for that search" rather than a failure, so the code has to survive the
+    // trip through `WpApiError`.
+    trials.push(Trial::test("domains::suggestions_invalid_query", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                expect_suggestions_error_code(&ctx, suggestions_params(""), "invalid_query").await
+            })
+        }
+    }));
+
+    // A query the API accepts but has no domains for. Distinct from
+    // `invalid_query` and from a genuine request failure.
+    trials.push(Trial::test("domains::suggestions_empty_results", {
+        let ctx = Arc::clone(&ctx);
+        move || {
+            ctx.runtime.block_on(async {
+                expect_suggestions_error_code(
+                    &ctx,
+                    suggestions_params(&"z".repeat(200)),
+                    "empty_results",
+                )
+                .await
+            })
+        }
+    }));
+
+    // Quantity is validated at both ends of its range.
+    trials.push(Trial::test(
+        "domains::suggestions_quantity_below_minimum",
+        {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    expect_suggestions_error_code(
+                        &ctx,
+                        DomainSuggestionsParams {
+                            quantity: Some(0),
+                            ..suggestions_params("coolsite")
+                        },
+                        "invalid_minimum_quantity",
+                    )
+                    .await
+                })
+            }
+        },
+    ));
 
     trials.push(Trial::test("domains::supported_countries", {
         let ctx = Arc::clone(&ctx);
