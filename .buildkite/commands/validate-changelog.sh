@@ -2,28 +2,15 @@
 
 set -euo pipefail
 
-# The top-level "- " entries under "## [Unreleased]", read from stdin and
-# sorted so comm can diff two of these sets.
-unreleased_entries() {
+# Prints the number of Unreleased entries and versioned release headings.
+changelog_counts() {
   awk '
     $0 == "## [Unreleased]" { in_unreleased = 1; next }
-    in_unreleased && /^## / { exit }
-    in_unreleased && /^- / { print }
-  ' | LC_ALL=C sort -u
-}
-
-# Pass, deleting any failure comment from a prior run so a green run leaves no
-# residue. The delete no-ops if the comment does not exist.
-pass() {
-  printf '%s\n' "$1"
-  comment_on_pr --id changelog-check --if-exist delete "" || true
-  exit 0
-}
-
-fail() {
-  printf '\n%s\n\n' "$1" >&2
-  comment_on_pr --id changelog-check "$1"
-  exit 1
+    in_unreleased && /^## / { in_unreleased = 0 }
+    in_unreleased && /^- / { entries++ }
+    /^## \[[0-9]+\.[0-9]+\.[0-9]+/ { versions++ }
+    END { print entries + 0, versions + 0 }
+  '
 }
 
 # Only enforce on PR builds — the check is about *new* entries being added
@@ -45,33 +32,18 @@ echo "--- :git: Fetching origin/${BASE_BRANCH}"
 git fetch --no-tags origin "$BASE_BRANCH"
 
 MERGE_BASE="$(git merge-base "origin/${BASE_BRANCH}" HEAD)"
-CHANGELOG_DIFF="$(git diff "$MERGE_BASE" HEAD -- CHANGELOG.md)"
 
-if ! grep -Fqx '## [Unreleased]' CHANGELOG.md; then
-  fail ':warning: **`CHANGELOG.md` has no `## [Unreleased]` section.**
+read -r BASE_ENTRIES BASE_VERSIONS < <(
+  git show "${MERGE_BASE}:CHANGELOG.md" | changelog_counts
+)
+read -r ENTRIES VERSIONS < <(changelog_counts < CHANGELOG.md)
 
-Restore the section and add this pull request’s changelog entry beneath it.'
-fi
-
-# Release PRs open a new versioned section instead of adding entries to
-# Unreleased. Detect this from the diff, as detect-release.sh does, so it works
-# regardless of the branch name. The here-string avoids a pipefail/SIGPIPE when
-# grep -q exits after finding an early match in a large diff.
-if grep -qE '^\+## \[[0-9]+\.[0-9]+\.[0-9]+' <<< "$CHANGELOG_DIFF"; then
-  pass "CHANGELOG.md opens a new release section"
-fi
-
-# Compare only Unreleased entries so edits to an already released section
-# cannot satisfy the check.
-ADDED_ENTRIES="$(
-  comm -13 \
-    <(git show "${MERGE_BASE}:CHANGELOG.md" | unreleased_entries) \
-    <(unreleased_entries < CHANGELOG.md)
-)"
-
-if [[ -n "$ADDED_ENTRIES" ]]; then
-  pass "CHANGELOG.md adds an entry under ## [Unreleased]:
-$ADDED_ENTRIES"
+# Normal PRs add an Unreleased entry; release PRs add a version heading.
+if (( ENTRIES > BASE_ENTRIES || VERSIONS > BASE_VERSIONS )); then
+  echo "CHANGELOG.md update is valid"
+  # Delete any failure comment from a prior run so a green run leaves no residue.
+  comment_on_pr --id changelog-check --if-exist delete "" || true
+  exit 0
 fi
 
 FAILURE_MESSAGE=$(cat <<'EOF'
@@ -90,4 +62,6 @@ If the change genuinely has no user-visible impact (e.g. CI-only tweaks, interna
 EOF
 )
 
-fail "$FAILURE_MESSAGE"
+printf '\n%s\n\n' "$FAILURE_MESSAGE" >&2
+comment_on_pr --id changelog-check "$FAILURE_MESSAGE"
+exit 1
