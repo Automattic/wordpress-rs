@@ -24,6 +24,18 @@ members = [
 ]
 resolver = "3"
 
+# Test binaries carry line tables instead of full debug info, which caps the
+# memory a `cargo test` link consumes on CI. Backtraces still resolve to file
+# and line; a debugger can no longer print locals or format values. For a
+# debugging session, override per invocation:
+#
+#   CARGO_PROFILE_TEST_DEBUG=full cargo test
+#
+# This profile covers every crate a `cargo test` run builds, dependencies
+# included — not just the crate under test.
+[profile.test]
+debug = "line-tables-only"
+
 [workspace.dependencies]
 aes-gcm = "0.11"
 android_logger = "0.15"

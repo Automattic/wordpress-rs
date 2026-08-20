@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Internal:** Build Rust test binaries with `debug = "line-tables-only"` instead of full debug info, via `[profile.test]` in the workspace `Cargo.toml`. This caps the memory a `cargo test` link consumes on CI, where full debug info was losing Buildkite agents. Backtraces still resolve to file and line; a debugger can no longer print locals. Override with `CARGO_PROFILE_TEST_DEBUG=full`.
+
 ## [0.7.0] - 2026-08-18
 
 ### Added
@@ -48,7 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Internal:** Use line-table-only debug info for Rust tests to prevent OOM-induced Buildkite agent loss while retaining file/line backtraces.
 - Swift: `WpRequestExecutor` classifies three more `URLError` codes that mean the device can't use the network right now — cellular data disallowed for the app or by carrier policy (`dataNotAllowed`, the common Wi-Fi-off case), international roaming turned off while abroad (`internationalRoamingOff`), and a voice call holding the radio on a single-radio device (`callIsActive`) — as `DeviceIsOfflineError` instead of the catch-all `GenericError`. `errorIsDeviceIsOffline` previously matched only `notConnectedToInternet` and `networkConnectionLost`, so these fell through and a caller wanting "we're offline" had to match `GenericError`, which also covers unrelated failures. This matches what Kotlin callers effectively get through the `NetworkAvailabilityProvider` gate. ([#1501](https://github.com/Automattic/wordpress-rs/issues/1501))
 - Swift: `WpRequestExecutor` classifies a URLSession timeout (`URLError.timedOut`) as `HttpTimeoutError` instead of the catch-all `GenericError`. The timeout had no branch in the executor's error dispatch, so `HttpTimeoutError` was unreachable on Apple platforms and a caller wanting "retry on timeout" had to match `GenericError`, which also covers unrelated failures. This brings Swift to parity with reqwest (`is_timeout()`) and Kotlin (`SocketTimeoutException`). ([#1491](https://github.com/Automattic/wordpress-rs/issues/1491))
 - Swift: Large (>10 MB) multipart uploads leaked their temporary file. A form estimated over 10 MB (or built with `forceWriteToFile: true`) is serialized to a UUID-named temp file under `FileManager.default.temporaryDirectory` and handed to `URLSession.uploadTask(fromFile:)`, which treats the file as caller-owned — it reads it during the transfer but never deletes it — so every large media upload (4K video, ProRAW, multi-file posts) left a temp file behind for the OS to reclaim later. `upload(...)` now removes the file once the transfer completes, on success, failure, or cancellation. ([#1540](https://github.com/Automattic/wordpress-rs/issues/1540))
