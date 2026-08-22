@@ -114,14 +114,23 @@ pub fn user_wants_to_talk_to_a_human(context: &BotMessageContext) -> bool {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct BotMessageContextSource {
+    // Only `title` and `content` are guaranteed. Some bots (e.g.
+    // `jetpack-workflow-chat_mobile_support`) omit the remaining fields, so they
+    // must be optional to avoid failing the untagged `MessageContext` match.
     pub title: String,
-    pub url: String,
-    pub heading: String,
     pub content: String,
-    pub blog_id: WpComSiteId,
-    pub post_id: u64,
-    pub score: f64,
-    pub last_indexed_at: WpGmtDateTime,
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(default)]
+    pub heading: Option<String>,
+    #[serde(default)]
+    pub blog_id: Option<WpComSiteId>,
+    #[serde(default)]
+    pub post_id: Option<u64>,
+    #[serde(default)]
+    pub score: Option<f64>,
+    #[serde(default)]
+    pub last_indexed_at: Option<WpGmtDateTime>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
@@ -306,6 +315,32 @@ mod tests {
         };
         assert!(context.sources.is_empty());
         assert!(context.flags.is_empty());
+    }
+
+    #[test]
+    fn test_bot_create_conversation_minimal_sources_deserialization() {
+        // Some bots (e.g. `jetpack-workflow-chat_mobile_support`) return sources
+        // that only carry `title`, `content`, and `url`, omitting `heading`,
+        // `blog_id`, `post_id`, `score`, and `last_indexed_at`. These should still
+        // deserialize rather than failing the untagged `MessageContext` match.
+        let json = include_str!(
+            "../../tests/wpcom/support_bots/create-conversation-response-minimal-sources.json"
+        );
+        let conversation: BotConversation = serde_json::from_str(json)
+            .expect("Failed to deserialize bot conversation with minimal sources");
+        assert_eq!(conversation.chat_id, 6315078);
+        let context = match &conversation.messages[0].context {
+            MessageContext::Bot(context) => context,
+            MessageContext::User(_) => panic!("expected a bot message context"),
+        };
+        assert_eq!(context.sources.len(), 5);
+        assert_eq!(context.sources[0].title, "Import Subscribers");
+        assert_eq!(
+            context.sources[0].url.as_deref(),
+            Some("https://jetpack.com/support/newsletter/import-subscribers/")
+        );
+        assert!(context.sources[0].heading.is_none());
+        assert!(context.sources[0].blog_id.is_none());
     }
 
     #[rstest]
