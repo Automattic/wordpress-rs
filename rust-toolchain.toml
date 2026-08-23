@@ -7,6 +7,6 @@
 #   - `rust_stable_toolchain` in `Makefile`
 #   - `FROM rust:<version>` in `wp_rs_web/Dockerfile`
 [toolchain]
-channel = "1.97.1"
+channel = "1.98.0"
 components = ["clippy", "rustfmt"]
 profile = "minimal"
