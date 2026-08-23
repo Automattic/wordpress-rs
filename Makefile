@@ -8,7 +8,7 @@ docker_container_repo_dir=/app
 # Pinned Rust toolchain version. Keep in lockstep with `rust-toolchain.toml` and
 # `wp_rs_web/Dockerfile` so local `cargo`, the CI Docker image, and the pinned
 # toolchain never drift. See https://github.com/Automattic/wordpress-rs/issues/1436.
-rust_stable_toolchain := 1.97.1
+rust_stable_toolchain := 1.98.0
 rust_docker_container := public.ecr.aws/docker/library/rust:$(rust_stable_toolchain)
 
 docker_opts_shared := --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
