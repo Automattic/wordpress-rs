@@ -17,7 +17,7 @@ pub struct Subscriber {
     pub email_address: String,
     pub is_email_subscriber: bool,
     /// When the subscription started. `None` when WordPress.com has never set
-    /// it, which it reports with its never-set date rather than `null`.
+    /// it, which it reports with its zero date rather than `null`.
     #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
     pub date_subscribed: Option<WpGmtDateTime>,
     pub subscription_status: Option<String>,
@@ -339,7 +339,7 @@ pub struct IndividualSubscriberStats {
     unique_clicks: u64,
     /// When the site was registered, in GMT. `None` when it was never set:
     /// this endpoint returns the column verbatim without guarding it, so a
-    /// site with no registration date arrives as WordPress's never-set date
+    /// site with no registration date arrives as WordPress's zero date
     /// rather than `null`.
     #[serde(
         default,
@@ -589,7 +589,7 @@ mod tests {
         assert_eq!(response.subscribers.len(), 4);
     }
 
-    /// The fixture's second subscriber carries WordPress.com's never-set date,
+    /// The fixture's second subscriber carries WordPress.com's zero date,
     /// which reads as absent rather than failing the whole list.
     #[test]
     fn test_subscriber_list_reads_a_never_set_date_as_absent() {
@@ -602,7 +602,7 @@ mod tests {
         assert_eq!(response.subscribers[1].date_subscribed, None);
     }
 
-    /// A `date_subscribed` that is neither a datetime nor the never-set date
+    /// A `date_subscribed` that is neither a datetime nor the zero date
     /// still fails the response — absent and malformed stay distinct.
     #[rstest]
     #[case::not_a_date("banana")]

@@ -505,7 +505,7 @@ pub struct SparseUser {
     pub slug: Option<String>,
     /// When the account was registered. `None` when it was never set: this
     /// endpoint formats the column without guarding it, so an account that has
-    /// no registration date arrives as WordPress's never-set date rather than
+    /// no registration date arrives as WordPress's zero date rather than
     /// `null`.
     #[WpContext(edit)]
     #[WpContextualOption]

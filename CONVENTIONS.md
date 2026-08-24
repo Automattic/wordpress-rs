@@ -28,6 +28,6 @@ Query parameters are no different. `/wp/v2`'s `after` is documented as ISO-8601 
 
 `wp_com`'s domain fields send boolean `false` rather than `null` when a date doesn't apply; `deserialize_optional_date_string` covers that for `WpDateString`. `deserialize_optional_wp_gmt_date_time` treats `null` and `""` as absent.
 
-WordPress's never-set date — `0000-00-00 00:00:00`, and what PHP's formatters make of it — is not a datetime. `deserialize_optional_wp_gmt_date_time` reads it as `None`; everywhere else it is an error, because the alternative is an instant in 1 BCE that looks like data.
+WordPress's zero date — `0000-00-00 00:00:00`, and what PHP's formatters make of it — is not a datetime. `deserialize_optional_wp_gmt_date_time` reads it as `None`; everywhere else it is an error, because the alternative is an instant in 1 BCE that looks like data.
 
 So a field on an endpoint that doesn't guard the column has to be an `Option` — otherwise one such record fails the entire response. `/wp/v2` guards posts, but not users or comments.

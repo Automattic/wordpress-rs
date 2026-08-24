@@ -391,7 +391,7 @@ pub struct SparseComment {
     pub date: Option<WpDateString>,
     /// The date the comment was published, as GMT. `None` when it was never
     /// set: this endpoint formats the column without guarding it, so a comment
-    /// with no date arrives as WordPress's never-set date rather than `null`.
+    /// with no date arrives as WordPress's zero date rather than `null`.
     #[WpContext(edit, view)]
     #[WpContextualOption]
     #[serde(
@@ -491,7 +491,7 @@ mod tests {
     use rstest::*;
 
     /// `/wp/v2/comments` formats `comment_date_gmt` without guarding the
-    /// never-set date, so a comment that has none arrives as that value rather
+    /// zero date, so a comment that has none arrives as that value rather
     /// than `null`. It has to read as absent — anything else fails the whole
     /// page, taking every other comment in the response with it.
     #[rstest]

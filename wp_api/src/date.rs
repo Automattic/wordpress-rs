@@ -15,7 +15,7 @@ impl WpGmtDateTime {
     ///
     /// A timestamp arriving *from* WordPress or across the bindings goes
     /// through [`wp_serde_helper::wp_date_time_from_timestamp`], which rejects
-    /// the never-set date rather than resolving it.
+    /// the zero date rather than resolving it.
     pub(crate) fn from_unchecked_timestamp(seconds: i64) -> Self {
         let date_time =
             DateTime::<Utc>::from_timestamp(seconds, 0).unwrap_or(DateTime::<Utc>::UNIX_EPOCH);
@@ -89,7 +89,7 @@ where
 
 /// Deserialize an `Option<WpGmtDateTime>` for a field that may be unset.
 ///
-/// `null`, an empty string, and WordPress's never-set date read as `None`, as
+/// `null`, an empty string, and WordPress's zero date read as `None`, as
 /// does an absent field on a member carrying `#[serde(default)]`. A populated
 /// value accepts every form [`WpGmtDateTime`] does, including a bare timestamp
 /// sent as a JSON number; anything else is an error.
