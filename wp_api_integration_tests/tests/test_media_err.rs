@@ -166,6 +166,7 @@ fn api_client_with_medir_err_networking(test_type: MediaErrNetworkingTestType) -
             request_executor: Arc::new(MediaErrNetworking::new(test_type)),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     )
 }

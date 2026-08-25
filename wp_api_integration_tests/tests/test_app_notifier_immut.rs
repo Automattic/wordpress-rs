@@ -66,6 +66,7 @@ fn api_client(
             request_executor,
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier,
+            language_provider: None,
         },
     )
 }

@@ -84,6 +84,7 @@ use crate::{
             },
         },
     },
+    wp_com::language::WpComLanguageProvider,
 };
 use std::sync::Arc;
 
@@ -140,9 +141,12 @@ impl WpApiRequestBuilder {
         api_url_resolver: Arc<dyn ApiUrlResolver>,
         auth_provider: Arc<WpAuthenticationProvider>,
     ) -> Self {
+        // No WordPress.org namespace reads a locale query parameter.
+        let language_provider: Option<Arc<dyn WpComLanguageProvider>> = None;
         api_client_generate_request_builder!(
             api_url_resolver,
-            auth_provider;
+            auth_provider,
+            language_provider;
             api_root,
             application_passwords,
             block_directory,
@@ -316,6 +320,10 @@ pub struct WpApiClientDelegate {
     pub request_executor: Arc<dyn RequestExecutor>,
     pub middleware_pipeline: Arc<WpApiMiddlewarePipeline>,
     pub app_notifier: Arc<dyn WpAppNotifier>,
+    /// Supplies the locale query parameter for namespaces that accept one. Namespaces
+    /// that don't, including every WordPress.org namespace, ignore this.
+    #[uniffi(default = None)]
+    pub language_provider: Option<Arc<dyn WpComLanguageProvider>>,
 }
 
 pub trait IsWpApiClientDelegate {
@@ -396,12 +404,13 @@ macro_rules! api_client_generate_endpoint_impl {
 
 #[macro_export]
 macro_rules! api_client_generate_request_builder {
-    ($api_url_resolver:ident, $authentication:ident; $($element:expr),*) => {
+    ($api_url_resolver:ident, $authentication:ident, $language_provider:ident; $($element:expr),*) => {
         paste::paste! {
             Self {
                 $($element: [<$element:camel RequestBuilder>]::new(
                     $api_url_resolver.clone(),
                     $authentication.clone(),
+                    $language_provider.clone(),
                 )
                 .into(),)*
             }

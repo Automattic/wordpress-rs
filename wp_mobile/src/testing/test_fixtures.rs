@@ -84,6 +84,7 @@ pub fn mock_api_client() -> Arc<WpApiClient> {
             request_executor: mock_executor,
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     )
     .into()

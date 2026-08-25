@@ -65,6 +65,7 @@ async fn login_and_fetch_users_me_on_plain_permalinks_site() {
             request_executor: executor,
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     );
 
