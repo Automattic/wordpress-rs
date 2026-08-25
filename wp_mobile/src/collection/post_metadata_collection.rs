@@ -477,7 +477,7 @@ impl PostMetadataCollectionWithEditContext {
     fn post_to_item_input(post: &AnyPostWithEditContext) -> ListMetadataItemInput {
         ListMetadataItemInput {
             entity_id: post.id.0,
-            modified_gmt: Some(post.modified_gmt.to_string()),
+            modified_gmt: Some(post.modified_gmt),
             parent: post.parent.map(|p| p.0),
             menu_order: post.menu_order.map(|m| m as i64),
         }
@@ -497,7 +497,7 @@ impl PostMetadataCollectionWithEditContext {
         } else if let Some(metadata) = metadata_by_id.get(&id) {
             ListMetadataItemInput {
                 entity_id: id,
-                modified_gmt: metadata.modified_gmt.as_ref().map(|d| d.to_string()),
+                modified_gmt: metadata.modified_gmt,
                 parent: metadata.parent,
                 menu_order: metadata.menu_order,
             }

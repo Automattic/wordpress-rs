@@ -1,4 +1,5 @@
 use crate::{
+    date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::language::WPComLanguage,
@@ -43,10 +44,10 @@ pub struct StatsCityViewsParams {
     pub period: Option<StatsCityViewsPeriod>,
     /// The date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The start date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub start_date: Option<String>,
+    pub start_date: Option<WpDateString>,
     /// The maximum number of cities to return.
     #[uniffi(default = None)]
     pub max: Option<u32>,
@@ -107,7 +108,7 @@ impl AppendUrlQueryPairs for StatsCityViewsParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsCityViewsResponse {
     /// The date for the stats query.
-    pub date: String,
+    pub date: WpDateString,
     /// Country information keyed by country code.
     /// Can be `null`, an empty array `[]`, or a map of country codes to info.
     #[serde(
@@ -192,8 +193,8 @@ mod tests {
 
         let params = StatsCityViewsParams {
             period: Some(StatsCityViewsPeriod::Day),
-            date: Some("2026-02-05".to_string()),
-            start_date: Some("2026-01-30".to_string()),
+            date: Some(WpDateString::new("2026-02-05".to_string())),
+            start_date: Some(WpDateString::new("2026-01-30".to_string())),
             max: Some(10),
             num: Some(1),
             days: Some(1),
@@ -219,8 +220,8 @@ mod tests {
 
         let params = StatsCityViewsParams {
             period: Some(StatsCityViewsPeriod::Day),
-            date: Some("2026-02-05".to_string()),
-            start_date: Some("2026-01-30".to_string()),
+            date: Some(WpDateString::new("2026-02-05".to_string())),
+            start_date: Some(WpDateString::new("2026-01-30".to_string())),
             locale: Some(WPComLanguage::English),
             ..Default::default()
         };
@@ -274,7 +275,7 @@ mod tests {
         let response: StatsCityViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.date.is_empty());
+        assert!(!response.date.value.is_empty());
 
         if expect_summary {
             assert!(
@@ -307,7 +308,7 @@ mod tests {
         let response: StatsCityViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
         assert!(response.summary.is_some());
         assert!(response.days.is_none());
 
@@ -352,7 +353,7 @@ mod tests {
         let response: StatsCityViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
         assert!(response.summary.is_none());
         assert!(response.days.is_some());
 
@@ -395,7 +396,7 @@ mod tests {
         let response: StatsCityViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with null values");
 
-        assert_eq!(response.date, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
 
         let summary = response
             .summary
@@ -459,7 +460,7 @@ mod tests {
         let response: StatsCityViewsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with empty response");
 
-        assert_eq!(response.date, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
 
         let summary = response
             .summary

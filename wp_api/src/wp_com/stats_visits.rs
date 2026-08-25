@@ -1,4 +1,5 @@
 use crate::{
+    date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::language::WPComLanguage,
@@ -73,10 +74,10 @@ pub struct StatsVisitsParams {
     pub quantity: Option<u32>,
     /// The end date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub end_date: Option<String>,
+    pub end_date: Option<WpDateString>,
     /// The start date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub start_date: Option<String>,
+    pub start_date: Option<WpDateString>,
     /// The specific stat fields to include in the response.
     /// When empty, the API returns its default set of fields.
     #[uniffi(default = [])]
@@ -102,7 +103,7 @@ impl AppendUrlQueryPairs for StatsVisitsParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitsResponse {
     /// The date for the stats query.
-    pub date: String,
+    pub date: WpDateString,
     /// The time unit used for grouping.
     pub unit: String,
     /// Field names for the data arrays.
@@ -156,7 +157,7 @@ impl StatsVisitsResponse {
     }
 }
 
-fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(String, u64)> {
+fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(StatsVisitsPeriod, u64)> {
     let period_index = match response.fields.iter().position(|f| f == "period") {
         Some(i) => i,
         None => return vec![],
@@ -174,46 +175,75 @@ fn get_stats_data(handle: &str, response: &StatsVisitsResponse) -> Vec<(String, 
             if let Some(period) = row.get(period_index).and_then(|v| v.as_string())
                 && let Some(value) = row.get(field_index).and_then(|v| v.as_number())
             {
-                return Some((period.clone(), value));
+                return Some((StatsVisitsPeriod::new(period.clone()), value));
             }
             None
         })
         .collect()
 }
 
+/// The span a `/stats/visits` data point covers, labelled to match the unit
+/// the caller asked for: `"2025-12-21"` for a day, `"2026-01-17 01:00:00"` for
+/// an hour, and for a year the first of January rather than the bare year.
+///
+/// Don't read a date out of it. Its shape follows the unit, and a yearly label
+/// is the first of January standing in for the whole year — so it parses as a
+/// date and means something else. Display it, or group by it.
+///
+/// Every stats endpoint builds its own labels and none of them agree, which is
+/// why each has its own type rather than a shared one; see
+/// [`crate::wp_com::stats_subscribers::StatsSubscribersPeriod`] and
+/// [`crate::wp_com::stats_post::StatsPostViewPeriod`].
+///
+/// It names a span rather than a point in time, so it is neither a
+/// [`WpDateString`] nor a [`crate::date::WpGmtDateTime`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, uniffi::Record)]
+#[serde(transparent)]
+pub struct StatsVisitsPeriod {
+    pub value: String,
+}
+
+impl StatsVisitsPeriod {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitsDataPoint {
-    pub period: String,
+    pub period: StatsVisitsPeriod,
     pub visits: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVisitorsDataPoint {
-    pub period: String,
+    pub period: StatsVisitsPeriod,
     pub visitors: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsLikesDataPoint {
-    pub period: String,
+    pub period: StatsVisitsPeriod,
     pub likes: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsReblogsDataPoint {
-    pub period: String,
+    pub period: StatsVisitsPeriod,
     pub reblogs: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsCommentsDataPoint {
-    pub period: String,
+    pub period: StatsVisitsPeriod,
     pub comments: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsPostsDataPoint {
-    pub period: String,
+    pub period: StatsVisitsPeriod,
     pub posts: u64,
 }
 
@@ -260,7 +290,7 @@ mod tests {
         let params = StatsVisitsParams {
             unit: Some(StatsVisitsUnit::Hour),
             quantity: Some(24),
-            end_date: Some("2025-01-15".to_string()),
+            end_date: Some(WpDateString::new("2025-01-15".to_string())),
             start_date: None,
             stat_fields: vec![],
             locale: Some(WPComLanguage::English),
@@ -308,8 +338,8 @@ mod tests {
         let params = StatsVisitsParams {
             unit: Some(StatsVisitsUnit::Month),
             quantity: Some(12),
-            end_date: Some("2026-07-13".to_string()),
-            start_date: Some("2025-08-01".to_string()),
+            end_date: Some(WpDateString::new("2026-07-13".to_string())),
+            start_date: Some(WpDateString::new("2025-08-01".to_string())),
             stat_fields: vec![StatsVisitsField::Views, StatsVisitsField::Visitors],
             locale: None,
         };
@@ -355,7 +385,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.date.is_empty());
+        assert!(!response.date.value.is_empty());
         assert!(!response.unit.is_empty());
         assert!(!response.fields.is_empty());
     }
@@ -367,7 +397,7 @@ mod tests {
         let response: StatsVisitsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-01-18 00:00:00");
+        assert_eq!(response.date.value, "2026-01-18 00:00:00");
         assert_eq!(response.unit, "hour");
         assert_eq!(
             response.fields,
@@ -401,21 +431,21 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsVisitsDataPoint {
-                period: "2026-01-17 01:00:00".to_string(),
+                period: StatsVisitsPeriod::new("2026-01-17 01:00:00".to_string()),
                 visits: 9,
             }
         );
         assert_eq!(
             data_points[21],
             StatsVisitsDataPoint {
-                period: "2026-01-17 22:00:00".to_string(),
+                period: StatsVisitsPeriod::new("2026-01-17 22:00:00".to_string()),
                 visits: 27,
             }
         );
         assert_eq!(
             data_points[23],
             StatsVisitsDataPoint {
-                period: "2026-01-18 00:00:00".to_string(),
+                period: StatsVisitsPeriod::new("2026-01-18 00:00:00".to_string()),
                 visits: 4,
             }
         );
@@ -434,21 +464,21 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsVisitsDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 visits: 67,
             }
         );
         assert_eq!(
             data_points[20],
             StatsVisitsDataPoint {
-                period: "2026-01-10".to_string(),
+                period: StatsVisitsPeriod::new("2026-01-10".to_string()),
                 visits: 57,
             }
         );
         assert_eq!(
             data_points[29],
             StatsVisitsDataPoint {
-                period: "2026-01-19".to_string(),
+                period: StatsVisitsPeriod::new("2026-01-19".to_string()),
                 visits: 50,
             }
         );
@@ -457,7 +487,7 @@ mod tests {
     #[test]
     fn test_get_stats_visits_data_empty_response() {
         let response = StatsVisitsResponse {
-            date: "2026-01-19".to_string(),
+            date: WpDateString::new("2026-01-19".to_string()),
             unit: "day".to_string(),
             fields: vec![
                 "period".to_string(),
@@ -499,21 +529,21 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsVisitorsDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 visitors: 60,
             }
         );
         assert_eq!(
             data_points[20],
             StatsVisitorsDataPoint {
-                period: "2026-01-10".to_string(),
+                period: StatsVisitsPeriod::new("2026-01-10".to_string()),
                 visitors: 50,
             }
         );
         assert_eq!(
             data_points[29],
             StatsVisitorsDataPoint {
-                period: "2026-01-19".to_string(),
+                period: StatsVisitsPeriod::new("2026-01-19".to_string()),
                 visitors: 47,
             }
         );
@@ -533,14 +563,14 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsLikesDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 likes: 0,
             }
         );
         assert_eq!(
             data_points[15],
             StatsLikesDataPoint {
-                period: "2026-01-05".to_string(),
+                period: StatsVisitsPeriod::new("2026-01-05".to_string()),
                 likes: 1,
             }
         );
@@ -559,7 +589,7 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsReblogsDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 reblogs: 0,
             }
         );
@@ -578,7 +608,7 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsCommentsDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 comments: 0,
             }
         );
@@ -597,7 +627,7 @@ mod tests {
         assert_eq!(
             data_points[0],
             StatsPostsDataPoint {
-                period: "2025-12-21".to_string(),
+                period: StatsVisitsPeriod::new("2025-12-21".to_string()),
                 posts: 0,
             }
         );

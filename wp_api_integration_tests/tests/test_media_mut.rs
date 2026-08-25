@@ -1,4 +1,5 @@
 use macro_helper::generate_update_test;
+use wp_api::date::WpDateString;
 use wp_api::{
     media::{MediaCreateParams, MediaUpdateParams},
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
@@ -33,12 +34,16 @@ async fn delete_media() {
     RestoreServer::db().await;
 }
 
-generate_update_test!(update_date, date, "2024-09-09T12:00:00".to_string());
+generate_update_test!(
+    update_date,
+    date,
+    WpDateString::new("2024-09-09T12:00:00".to_string())
+);
 
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00")
 );
 
 generate_update_test!(update_slug, slug, "new_slug".to_string());

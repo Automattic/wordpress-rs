@@ -31,7 +31,7 @@ where
 #[cfg(test)]
 pub fn unit_test_example_date_as_option() -> Option<WpGmtDateTime> {
     Some(
-        "2024-02-09T02:14:13+0000"
+        "2024-02-09T02:14:13+00:00"
             .parse::<WpGmtDateTime>()
             .expect("Example date is parseable"),
     )

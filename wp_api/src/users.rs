@@ -1,5 +1,6 @@
 use crate::{
     EnumFromStrParsingError, JsonValue, OptionFromStr, WpApiParamOrder, WpResponseString,
+    date::WpGmtDateTime,
     impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
@@ -502,8 +503,17 @@ pub struct SparseUser {
     pub nickname: Option<String>,
     #[WpContext(edit, embed, view)]
     pub slug: Option<String>,
+    /// When the account was registered. `None` when it was never set: this
+    /// endpoint formats the column without guarding it, so an account that has
+    /// no registration date arrives as WordPress's zero date rather than
+    /// `null`.
     #[WpContext(edit)]
-    pub registered_date: Option<String>,
+    #[WpContextualOption]
+    #[serde(
+        default,
+        deserialize_with = "crate::date::deserialize_optional_wp_gmt_date_time"
+    )]
+    pub registered_date: Option<WpGmtDateTime>,
     #[WpContext(edit)]
     pub roles: Option<Vec<UserRole>>,
     #[WpContext(edit)]
@@ -526,6 +536,20 @@ mod tests {
         unit_test_common::{assert_expected_and_from_query_pairs, assert_expected_query_pairs},
     };
     use rstest::*;
+
+    /// `/wp/v2/users` formats `user_registered` without guarding the never-set
+    /// date, so an account that has none arrives as that value rather than
+    /// `null`. It has to read as absent — anything else fails the whole page,
+    /// taking every other user in the response with it.
+    #[rstest]
+    #[case::never_set(r#""-001-11-30T00:00:00+00:00""#)]
+    #[case::null("null")]
+    #[case::empty_string(r#""""#)]
+    fn test_user_registered_date_reads_as_absent(#[case] registered_date: &str) {
+        let json = format!(r#"{{"registered_date": {registered_date}}}"#);
+        let user: SparseUser = serde_json::from_str(&json).expect("Unable to parse JSON");
+        assert_eq!(user.registered_date, None);
+    }
 
     #[rstest]
     #[case(UserListParams::default(), "")]

@@ -3,6 +3,7 @@ use wp_api::comments::{
     CommentCreateParams, CommentCreateParamsBuilder, CommentDeleteParams, CommentStatus,
     CommentUpdateParams, CommentWithEditContext, CommentWithViewContext,
 };
+use wp_api::date::WpDateString;
 use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliComment;
 
@@ -176,9 +177,9 @@ generate_update_test!(
 generate_update_test!(
     update_date,
     date,
-    "2024-09-09T12:00:00".to_string(),
+    WpDateString::new("2024-09-09T12:00:00".to_string()),
     |updated_comment, updated_comment_from_wp_cli| {
-        assert_eq!(updated_comment.date, "2024-09-09T12:00:00");
+        assert_eq!(updated_comment.date.value, "2024-09-09T12:00:00");
         assert_eq!(updated_comment_from_wp_cli.date, "2024-09-09 12:00:00");
     }
 );
@@ -186,11 +187,11 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00"),
     |updated_comment, updated_comment_from_wp_cli| {
         assert_eq!(
             updated_comment.date_gmt,
-            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+            Some(unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00"))
         );
         assert_eq!(updated_comment_from_wp_cli.date_gmt, "2024-09-09 12:00:00");
     }

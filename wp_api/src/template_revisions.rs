@@ -1,5 +1,7 @@
 use crate::{
-    UserId, WpApiParamOrder, impl_as_query_value_from_to_string,
+    UserId, WpApiParamOrder,
+    date::WpDateString,
+    impl_as_query_value_from_to_string,
     posts::PostId,
     templates::{
         SparseTemplateContentWrapper, SparseTemplateTitleWrapper, TemplateId, TemplateStatus,
@@ -113,9 +115,9 @@ pub struct SparseTemplateRevision {
     #[WpContextualOption]
     #[serde(
         default,
-        deserialize_with = "wp_serde_helper::deserialize_false_or_string"
+        deserialize_with = "crate::date::deserialize_optional_date_string"
     )]
-    pub modified: Option<String>,
+    pub modified: Option<WpDateString>,
     #[WpContext(edit, view, embed)]
     pub is_custom: Option<bool>,
     #[WpContext(edit, view, embed)]

@@ -1,6 +1,6 @@
 use crate::{
     JsonValue, UserId,
-    date::WpGmtDateTime,
+    date::{WpDateString, WpGmtDateTime},
     global_styles::GlobalStylesId,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
@@ -36,11 +36,11 @@ pub struct SparseGlobalStylesRevision {
     #[WpContext(edit, embed, view)]
     pub author: Option<UserId>,
     #[WpContext(edit, embed, view)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     #[WpContext(edit, view)]
     pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, view)]
-    pub modified: Option<String>,
+    pub modified: Option<WpDateString>,
     #[WpContext(edit, view)]
     pub modified_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]

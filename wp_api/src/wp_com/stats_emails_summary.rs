@@ -1,5 +1,7 @@
 use crate::{
-    WpApiParamOrder, impl_as_query_value_from_to_string,
+    WpApiParamOrder,
+    date::WpDateString,
+    impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
 };
 use serde::{Deserialize, Serialize};
@@ -106,8 +108,8 @@ pub struct StatsEmailsSummaryPost {
     pub id: u64,
     /// The URL of the post.
     pub href: Option<String>,
-    /// The publication date of the post.
-    pub date: Option<String>,
+    /// The publication date of the post, in the site's timezone.
+    pub date: Option<WpDateString>,
     /// The title of the post.
     pub title: Option<String>,
     /// The type of the content (post, page, etc.).
@@ -223,7 +225,10 @@ mod tests {
             first_post.href,
             Some("https://example.com/post-1".to_string())
         );
-        assert_eq!(first_post.date, Some("2023-08-17 15:40:59".to_string()));
+        assert_eq!(
+            first_post.date,
+            Some(WpDateString::new("2023-08-17 15:40:59".to_string()))
+        );
         assert_eq!(first_post.title, Some("Example Post Title".to_string()));
         assert_eq!(first_post.post_type, Some("post".to_string()));
         assert_eq!(first_post.opens, Some(13));

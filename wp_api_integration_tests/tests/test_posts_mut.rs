@@ -2,6 +2,7 @@ use macro_helper::{
     generate_update_post_format_test, generate_update_post_status_test, generate_update_test,
 };
 use std::collections::HashMap;
+use wp_api::date::WpDateString;
 use wp_api::posts::{
     AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostFormat,
     PostListParams, PostMeta, PostPingStatus, PostRetrieveParams, PostStatus, PostUpdateParams,
@@ -284,9 +285,9 @@ async fn trash_post() {
 generate_update_test!(
     update_date,
     date,
-    "2024-09-09T12:00:00".to_string(),
+    WpDateString::new("2024-09-09T12:00:00".to_string()),
     |updated_post, updated_post_from_wp_cli| {
-        assert_eq!(updated_post.date, "2024-09-09T12:00:00");
+        assert_eq!(updated_post.date.value, "2024-09-09T12:00:00");
         assert_eq!(updated_post_from_wp_cli.date, "2024-09-09 12:00:00");
     }
 );
@@ -294,11 +295,11 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00"),
     |updated_post, updated_post_from_wp_cli| {
         assert_eq!(
             updated_post.date_gmt,
-            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00")
         );
         assert_eq!(updated_post_from_wp_cli.date_gmt, "2024-09-09 12:00:00");
     }
@@ -561,7 +562,7 @@ async fn update_status_to_future() {
         &PostUpdateParams {
             status: Some(PostStatus::Future),
             // Publish date has to be in the future
-            date: Some("2026-09-09T12:00:00".to_string()),
+            date: Some(WpDateString::new("2026-09-09T12:00:00".to_string())),
             ..Default::default()
         },
         |updated_post, updated_post_from_wp_cli| {

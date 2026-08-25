@@ -12,4 +12,6 @@ pub use numeric::*;
 pub use offset::*;
 pub use string::*;
 pub use vec::*;
-pub use wp_serde_date::wp_utc_date_format;
+pub use wp_serde_date::{
+    WpDateTimeParseError, parse_wp_date_time, wp_date_time_from_timestamp, wp_utc_date_format,
+};

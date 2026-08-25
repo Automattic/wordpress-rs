@@ -1,6 +1,7 @@
 use crate::RowId;
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput};
 use std::fmt;
+use wp_api::date::WpGmtDateTime;
 
 /// Type-safe wrapper for list keys.
 ///
@@ -96,7 +97,7 @@ pub struct DbListMetadataItem {
     /// Entity ID (post ID, comment ID, etc.)
     pub entity_id: i64,
     /// Last modified timestamp (for staleness detection)
-    pub modified_gmt: Option<String>,
+    pub modified_gmt: Option<WpGmtDateTime>,
     /// Parent entity ID (for hierarchical post types like pages)
     pub parent: Option<i64>,
     /// Menu order (for hierarchical post types)

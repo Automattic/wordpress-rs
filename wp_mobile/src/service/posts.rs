@@ -213,7 +213,8 @@ impl PostService {
     ///
     /// A post is considered stale if:
     /// 1. It's currently in `Fresh` state in the state store
-    /// 2. Its fetched `modified_gmt` differs from the cached `modified_gmt` in the database
+    /// 2. Its fetched `modified_gmt` differs from the cached `modified_gmt` in the database,
+    ///    or the cached value is missing or unreadable
     ///
     /// Returns empty vector if no stale posts found or if DB query fails.
     pub(crate) fn find_stale_posts_by_timestamp(
@@ -250,14 +251,14 @@ impl PostService {
         // Compare timestamps and collect stale IDs
         metadata
             .iter()
-            .filter_map(|m| {
-                if let Some(fetched_modified) = &m.modified_gmt
-                    && let Some(cached_modified) = cached_timestamps.get(&PostId(m.id))
-                    && fetched_modified != cached_modified
-                {
-                    Some(m.id)
-                } else {
-                    None
+            .filter_map(|m| match cached_timestamps.get(&PostId(m.id))? {
+                // The cached timestamp is missing or unreadable, so there is
+                // nothing to prove the post is current. Refetch it rather than
+                // leave it cached forever.
+                None => Some(m.id),
+                Some(cached_modified) => {
+                    let fetched_modified = m.modified_gmt.as_ref()?;
+                    (fetched_modified != cached_modified).then_some(m.id)
                 }
             })
             .collect()

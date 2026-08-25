@@ -1,6 +1,6 @@
 use crate::{
     UserId, WpApiParamOrder,
-    date::WpGmtDateTime,
+    date::{WpDateString, WpGmtDateTime},
     impl_as_query_value_from_to_string,
     navigations::NavigationId,
     url_query::{
@@ -81,11 +81,11 @@ pub struct SparseNavigationRevision {
     #[WpContext(edit, embed, view)]
     pub author: Option<UserId>,
     #[WpContext(edit, embed, view)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     #[WpContext(edit, view)]
     pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, view)]
-    pub modified: Option<String>,
+    pub modified: Option<WpDateString>,
     #[WpContext(edit, view)]
     pub modified_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]

@@ -1,4 +1,5 @@
 use crate::{
+    date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::language::WPComLanguage,
@@ -41,10 +42,10 @@ pub struct StatsVideoPlaysParams {
     pub period: Option<StatsVideoPlaysPeriod>,
     /// The date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The start date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub start_date: Option<String>,
+    pub start_date: Option<WpDateString>,
     /// The maximum number of video plays to return.
     #[uniffi(default = None)]
     pub max: Option<u32>,
@@ -108,7 +109,7 @@ impl AppendUrlQueryPairs for StatsVideoPlaysParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsVideoPlaysResponse {
     /// The date for the stats query.
-    pub date: String,
+    pub date: WpDateString,
     /// The time period used for grouping.
     pub period: Option<String>,
     /// The days data containing the summary.
@@ -173,8 +174,8 @@ mod tests {
 
         let params = StatsVideoPlaysParams {
             period: Some(StatsVideoPlaysPeriod::Day),
-            date: Some("2026-02-18".to_string()),
-            start_date: Some("2026-02-12".to_string()),
+            date: Some(WpDateString::new("2026-02-18".to_string())),
+            start_date: Some(WpDateString::new("2026-02-12".to_string())),
             max: Some(10),
             num: Some(30),
             locale: Some(WPComLanguage::English),
@@ -200,7 +201,7 @@ mod tests {
 
         let params = StatsVideoPlaysParams {
             period: Some(StatsVideoPlaysPeriod::Week),
-            date: Some("2026-02-18".to_string()),
+            date: Some(WpDateString::new("2026-02-18".to_string())),
             start_date: None,
             max: None,
             num: None,
@@ -227,7 +228,7 @@ mod tests {
 
         let params = StatsVideoPlaysParams {
             period: Some(StatsVideoPlaysPeriod::Day),
-            date: Some("2026-02-18".to_string()),
+            date: Some(WpDateString::new("2026-02-18".to_string())),
             summarize: false,
             complete_stats: None,
             ..Default::default()
@@ -277,7 +278,7 @@ mod tests {
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
         // Common assertion: date is always present
-        assert!(!response.date.is_empty());
+        assert!(!response.date.value.is_empty());
         assert!(response.period.is_some());
     }
 
@@ -288,7 +289,7 @@ mod tests {
         let response: StatsVideoPlaysResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-02-18");
+        assert_eq!(response.date.value, "2026-02-18");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = &response.days.summary;
@@ -312,7 +313,7 @@ mod tests {
         let response: StatsVideoPlaysResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with null values");
 
-        assert_eq!(response.date, "2026-02-18");
+        assert_eq!(response.date.value, "2026-02-18");
 
         let summary = &response.days.summary;
         assert_eq!(summary.data.len(), 2);

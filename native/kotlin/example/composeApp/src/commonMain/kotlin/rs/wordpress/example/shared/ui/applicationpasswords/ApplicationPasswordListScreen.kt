@@ -61,7 +61,7 @@ fun ApplicationPasswordListScreen(
                 items(applicationPasswords) { appPassword ->
                     ListItem(
                         headlineContent = { Text(appPassword.name) },
-                        supportingContent = { Text(appPassword.created) }
+                        supportingContent = { Text(appPassword.created.toString()) }
                     )
                 }
             }
