@@ -2,19 +2,36 @@
 
 set -euo pipefail
 
-# Prints the number of Unreleased entries and versioned release headings.
-changelog_counts() {
+# Prints the non-whitespace contents of every Unreleased section.
+unreleased_section() {
   awk '
-    $0 == "## [Unreleased]" { in_unreleased = 1; next }
+    /^## \[Unreleased\][[:space:]]*$/ { in_unreleased = 1; next }
     in_unreleased && /^## / { in_unreleased = 0 }
-    in_unreleased && /^- / { entries++ }
-    /^## \[[0-9]+\.[0-9]+\.[0-9]+/ { versions++ }
-    END { print entries + 0, versions + 0 }
+    in_unreleased && /[^[:space:]]/ { print }
   '
 }
 
-# Only enforce on PR builds — the check is about *new* entries being added
-# alongside the change that ships them.
+pass() {
+  echo "$1"
+  # Delete any warning or failure comment left by a prior run.
+  comment_on_pr --id changelog-check --if-exist delete "" || true
+  exit 0
+}
+
+fail() {
+  printf '\n%s\n\n' "$1" >&2
+  comment_on_pr --id changelog-check "$1" || true
+  exit 1
+}
+
+warn() {
+  printf '\n%s\n\n' "$1" >&2
+  # A GitHub failure must not turn this advisory result into a failed job.
+  comment_on_pr --id changelog-check "$1" || true
+  exit 0
+}
+
+# Only enforce on PR builds, where there is a base branch to compare against.
 if [[ "${BUILDKITE_PULL_REQUEST:-false}" == "false" ]]; then
   echo "Not a PR build — skipping changelog check"
   exit 0
@@ -32,24 +49,23 @@ echo "--- :git: Fetching origin/${BASE_BRANCH}"
 git fetch --no-tags origin "$BASE_BRANCH"
 
 MERGE_BASE="$(git merge-base "origin/${BASE_BRANCH}" HEAD)"
+CHANGED_FILES="$(git diff --name-only "$MERGE_BASE" HEAD)"
 
-read -r BASE_ENTRIES BASE_VERSIONS < <(
-  git show "${MERGE_BASE}:CHANGELOG.md" | changelog_counts
-)
-read -r ENTRIES VERSIONS < <(changelog_counts < CHANGELOG.md)
-
-# Normal PRs add an Unreleased entry; release PRs add a version heading.
-if (( ENTRIES > BASE_ENTRIES || VERSIONS > BASE_VERSIONS )); then
-  echo "CHANGELOG.md update is valid"
-  # Delete any failure comment from a prior run so a green run leaves no residue.
-  comment_on_pr --id changelog-check --if-exist delete "" || true
-  exit 0
+if [[ -z "$CHANGED_FILES" ]]; then
+  pass "PR has no changed files — skipping changelog check"
 fi
 
-FAILURE_MESSAGE=$(cat <<'EOF'
-:warning: **No changelog entry was added under `## [Unreleased]`.**
+if [[ ! -f CHANGELOG.md ]]; then
+  fail ':warning: **`CHANGELOG.md` is missing.**
 
-Every PR should add an entry under the `## [Unreleased]` section of `CHANGELOG.md` describing the change for our users. Entries added under an already released version do not satisfy this check. The format follows [Keep a Changelog 1.0.0](https://keepachangelog.com/en/1.0.0/) — use one of:
+Restore the file so releases and future pull requests can continue updating it.'
+fi
+
+if ! grep -Fxq "CHANGELOG.md" <<< "$CHANGED_FILES"; then
+  FAILURE_MESSAGE=$(cat <<'EOF'
+:warning: **`CHANGELOG.md` was not updated in this PR.**
+
+Every PR should add an entry under the `## [Unreleased]` section of `CHANGELOG.md` describing the change for our users. The format follows [Keep a Changelog 1.0.0](https://keepachangelog.com/en/1.0.0/) — use one of:
 
 - `### Added` — for new features
 - `### Changed` — for changes in existing functionality (prefix `**BREAKING:**` if breaking)
@@ -60,8 +76,38 @@ Every PR should add an entry under the `## [Unreleased]` section of `CHANGELOG.m
 
 If the change genuinely has no user-visible impact (e.g. CI-only tweaks, internal refactors), add a short entry under `### Changed` noting that.
 EOF
+  )
+
+  fail "$FAILURE_MESSAGE"
+fi
+
+if ! grep -Eq '^## \[Unreleased\][[:space:]]*$' CHANGELOG.md; then
+  fail ':warning: **`CHANGELOG.md` has no `## [Unreleased]` section.**
+
+Restore the section; the release flow relies on it to collect the next release notes.'
+fi
+
+# Dedicated changelog PRs may intentionally correct an already released entry.
+if [[ "$CHANGED_FILES" == "CHANGELOG.md" ]]; then
+  pass "Only CHANGELOG.md changed — allowing a dedicated changelog correction"
+fi
+
+BASE_UNRELEASED=""
+if git cat-file -e "${MERGE_BASE}:CHANGELOG.md" 2>/dev/null; then
+  # Consume the whole file so git show cannot receive SIGPIPE under pipefail.
+  BASE_UNRELEASED="$(git show "${MERGE_BASE}:CHANGELOG.md" | unreleased_section)"
+fi
+CURRENT_UNRELEASED="$(unreleased_section < CHANGELOG.md)"
+
+if [[ "$CURRENT_UNRELEASED" != "$BASE_UNRELEASED" ]]; then
+  pass "CHANGELOG.md changes the ## [Unreleased] section"
+fi
+
+WARNING_MESSAGE=$(cat <<'EOF'
+:warning: **No substantive change under `## [Unreleased]` was detected.**
+
+`CHANGELOG.md` was updated, but its `## [Unreleased]` section was not. If this PR changes code, please add or update an entry there. If the changelog update is intentionally correcting an older release, no action is needed.
+EOF
 )
 
-printf '\n%s\n\n' "$FAILURE_MESSAGE" >&2
-comment_on_pr --id changelog-check "$FAILURE_MESSAGE"
-exit 1
+warn "$WARNING_MESSAGE"
