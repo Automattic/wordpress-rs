@@ -7,7 +7,13 @@ unreleased_section() {
   awk '
     /^## \[Unreleased\][[:space:]]*$/ { in_unreleased = 1; next }
     in_unreleased && /^## / { in_unreleased = 0 }
-    in_unreleased && /[^[:space:]]/ { print }
+    in_unreleased {
+      line = $0
+      gsub(/[[:space:]]+/, " ", line)
+      sub(/^ /, "", line)
+      sub(/ $/, "", line)
+      if (line != "") print line
+    }
   '
 }
 
