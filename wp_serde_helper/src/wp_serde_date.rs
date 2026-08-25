@@ -5,19 +5,21 @@ use std::fmt::Display;
 const WP_DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 const MYSQL_DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
-/// The spellings in which WordPress's zero date reaches a client.
+/// The spellings in which the zero date reaches a client without parsing.
 ///
-/// These are its renderings in its own timezone. Converting it to another
-/// first lands on a different day — `Europe/Berlin` to UTC gives
-/// `-0001-11-29 23:06:32` — which no prefix here matches, so it is rejected as
-/// malformed rather than recognised as unset. That distinction only changes
-/// whether an optional field reads `None` or errors; either way the value
-/// never reaches a caller as an instant.
+/// A spelling that does parse is caught by its instant instead, against
+/// [`ZERO_DATE_TIMESTAMP`]. These two never will: `0000-00-00 00:00:00` has a
+/// month and day out of range, and the three-digit-year form isn't valid
+/// RFC 3339.
 const ZERO_DATE_SPELLINGS: [&str; 3] = ["0000-00-00", "-001-11-30", "-0001-11-30"];
 
-/// The instant PHP derives from the zero date, as a unix timestamp. Reached by
-/// any spelling of it that one of the accepted formats happens to parse.
+/// The instant PHP derives from the zero date, as a unix timestamp.
 const ZERO_DATE_TIMESTAMP: i64 = -62_169_984_000;
+
+/// How far a timezone conversion can move that instant. Offsets run from UTC-12
+/// to UTC+14, so anything landing within a day of it is the zero date rather
+/// than a date somebody meant.
+const ZERO_DATE_TOLERANCE_SECONDS: i64 = 24 * 60 * 60;
 
 /// Why a value could not be read as a WordPress datetime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,10 +133,14 @@ fn parse_known_format(s: &str) -> Option<DateTime<Utc>> {
 
 /// Reject an instant that parsed cleanly but that no WordPress datetime can
 /// hold, so it never reaches a caller looking like real data.
+///
+/// The zero date is matched on a window rather than the exact instant, because
+/// an endpoint that converts it out of the site's timezone before formatting
+/// shifts it by that offset — far enough to land on a neighbouring day.
 fn reject_instant_no_wp_date_has(
     date_time: DateTime<Utc>,
 ) -> Result<DateTime<Utc>, WpDateTimeParseError> {
-    if date_time.timestamp() == ZERO_DATE_TIMESTAMP {
+    if (date_time.timestamp() - ZERO_DATE_TIMESTAMP).abs() <= ZERO_DATE_TOLERANCE_SECONDS {
         return Err(WpDateTimeParseError::NotSet);
     }
 
@@ -242,6 +248,12 @@ mod tests {
     #[case::three_digit_year_mysql("-001-11-30 00:00:00")]
     #[case::four_digit_year_mysql("-0001-11-30 00:00:00")]
     #[case::unix_timestamp("-62169984000")]
+    // An endpoint that converts the zero date out of the site's timezone before
+    // formatting shifts the instant, far enough to land on a neighbouring day.
+    // `Europe/Berlin` to UTC gives the first of these.
+    #[case::shifted_west("-0001-11-29 23:06:32")]
+    #[case::shifted_furthest_west("-0001-11-29 10:00:00")]
+    #[case::shifted_furthest_east("-0001-11-30 14:00:00")]
     fn test_zero_date_is_recognised(#[case] value: &str) {
         assert_eq!(
             parse_wp_date_time(value),
