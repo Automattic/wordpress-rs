@@ -5,12 +5,10 @@ use std::fmt::Display;
 const WP_DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 const MYSQL_DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
-/// The spellings in which the zero date reaches a client without parsing.
+/// The spellings of the zero date that `parse_known_format` cannot read.
 ///
-/// A spelling that does parse is caught by its instant instead, against
-/// [`ZERO_DATE_TIMESTAMP`]. These two never will: `0000-00-00 00:00:00` has a
-/// month and day out of range, and the three-digit-year form isn't valid
-/// RFC 3339.
+/// Every other spelling resolves to an instant and is recognised by
+/// [`ZERO_DATE_TIMESTAMP`] instead. These have to be matched as text.
 const ZERO_DATE_SPELLINGS: [&str; 3] = ["0000-00-00", "-001-11-30", "-0001-11-30"];
 
 /// The instant PHP derives from the zero date, as a unix timestamp.
@@ -78,6 +76,9 @@ impl std::error::Error for WpDateTimeParseError {}
 /// and [`WpDateTimeParseError::Invalid`] if the value matches none of the
 /// forms above.
 pub fn parse_wp_date_time(s: &str) -> Result<DateTime<Utc>, WpDateTimeParseError> {
+    // None of the formats in `parse_known_format` reads these values, so
+    // letting them through would return `Invalid` error. They are known WordPress zero
+    // dates, so `NotSet` is the error type we want instead.
     if ZERO_DATE_SPELLINGS
         .iter()
         .any(|spelling| s.starts_with(spelling))
