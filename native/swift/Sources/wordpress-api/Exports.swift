@@ -302,7 +302,6 @@ public typealias WpComSiteIdentifier = WordPressAPIInternal.WpComSiteIdentifier
 
 // MARK: Languages
 public typealias WPComLanguage = WordPressAPIInternal.WpComLanguage
-public typealias LanguagesGetParams = WordPressAPIInternal.LanguagesGetParams
 
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams
