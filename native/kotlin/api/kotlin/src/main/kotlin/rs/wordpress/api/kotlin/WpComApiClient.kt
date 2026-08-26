@@ -11,32 +11,42 @@ import uniffi.wp_api.WpApiException
 import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAppNotifier
 import uniffi.wp_api.WpAuthenticationProvider
+import uniffi.wp_api.WpComLanguageProvider
 
 class WpComApiClient(
     authProvider: WpAuthenticationProvider,
     private val requestExecutor: RequestExecutor,
     private val appNotifier: WpAppNotifier = EmptyAppNotifier(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val errorLogger: RequestErrorLogger? = null
+    private val errorLogger: RequestErrorLogger? = null,
+    /**
+     * Supplies the language every request asks WordPress.com to localize its response to.
+     * Leave it `null` to send no locale and let the server choose.
+     */
+    private val languageProvider: WpComLanguageProvider? = null
 ) {
 
     /**
      * Convenience constructor that accepts a list of OkHttp interceptors.
      * Uses [WpRequestExecutor] internally with the provided interceptors.
      */
+    // Trailing params are all optional config with defaults; the count is benign here.
+    @Suppress("LongParameterList")
     constructor(
         authProvider: WpAuthenticationProvider,
         interceptors: List<Interceptor>,
         networkAvailabilityProvider: NetworkAvailabilityProvider,
         appNotifier: WpAppNotifier = EmptyAppNotifier(),
         dispatcher: CoroutineDispatcher = Dispatchers.IO,
-        errorLogger: RequestErrorLogger? = null
+        errorLogger: RequestErrorLogger? = null,
+        languageProvider: WpComLanguageProvider? = null
     ) : this(
         authProvider,
         requestExecutor = WpRequestExecutor(interceptors, networkAvailabilityProvider),
         appNotifier,
         dispatcher,
-        errorLogger
+        errorLogger,
+        languageProvider
     )
 
     // Don't expose `WpRequestBuilder` directly so we can control how it's used
@@ -46,7 +56,8 @@ class WpComApiClient(
                 authProvider,
                 requestExecutor = requestExecutor,
                 middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
-                appNotifier
+                appNotifier,
+                languageProvider = languageProvider
             )
         )
     }

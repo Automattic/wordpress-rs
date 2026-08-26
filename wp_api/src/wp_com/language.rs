@@ -1,10 +1,24 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use crate::url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension};
 use serde::{Deserialize, Serialize};
 
-/// This file is optimized for really fast code, not to be pretty. Between the compiler
-/// and the tests, we shouldn't have to worry about half-implemented language codes.
+// This file is optimized for really fast code, not to be pretty. Between the compiler
+// and the tests, we shouldn't have to worry about half-implemented language codes.
+
+/// Supplies the language WordPress.com API responses should be localized to.
+///
+/// The client owns where the value comes from — the device language, an in-app
+/// language override, or the account setting — and is free to cache it. It's asked
+/// once per request, so a client that reads a live value doesn't need to notify
+/// `wp_api` when the language changes.
+#[uniffi::export(with_foreign)]
+pub trait WpComLanguageProvider: Send + Sync + Debug {
+    /// The language to request, or `None` to send no locale at all, which leaves the
+    /// choice to the server. Return `None` when the client's language doesn't map to
+    /// a [`WPComLanguage`].
+    fn current_language(&self) -> Option<WPComLanguage>;
+}
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WpComRemoteLanguage {

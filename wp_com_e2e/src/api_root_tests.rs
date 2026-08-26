@@ -28,6 +28,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             request_executor: Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60))),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     );
 

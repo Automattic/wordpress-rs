@@ -61,6 +61,7 @@ pub fn api_client() -> WpApiClient {
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     )
 }
@@ -76,6 +77,7 @@ pub fn api_client_as_author() -> WpApiClient {
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     )
 }
@@ -91,6 +93,7 @@ pub fn api_client_as_subscriber() -> WpApiClient {
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     )
 }
@@ -103,6 +106,7 @@ pub fn api_client_with_auth_provider(auth_provider: Arc<WpAuthenticationProvider
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     )
 }
@@ -138,6 +142,7 @@ pub async fn api_client_with_account_credentials(
             request_executor,
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     )
 }
@@ -151,6 +156,7 @@ pub fn wp_com_client() -> WpComApiClient {
         request_executor: Arc::new(ReqwestRequestExecutor::default()),
         middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
         app_notifier: Arc::new(EmptyAppNotifier),
+        language_provider: None,
     })
 }
 
@@ -163,6 +169,7 @@ pub fn wp_com_client_with_invalid_token() -> WpComApiClient {
         request_executor: Arc::new(ReqwestRequestExecutor::default()),
         middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
         app_notifier: Arc::new(EmptyAppNotifier),
+        language_provider: None,
     })
 }
 
@@ -181,6 +188,7 @@ pub fn api_client_backed_by_wp_com(site_id: String) -> WpApiClient {
             request_executor: Arc::new(ReqwestRequestExecutor::default()),
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     )
 }

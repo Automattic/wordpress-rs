@@ -960,7 +960,7 @@ pub async fn fetch_authentication_state(
     }
 
     let request =
-        ApplicationPasswordsRequestBuilder::new(api_url_resolver, authentication_provider)
+        ApplicationPasswordsRequestBuilder::new(api_url_resolver, authentication_provider, None)
             .retrieve_current_with_edit_context()
             .into();
     let response = request_executor.execute(request).await?;

@@ -71,6 +71,7 @@ use crate::{
         segments_endpoint::{SegmentsRequestBuilder, SegmentsRequestExecutor},
         sites_endpoint::{SitesRequestBuilder, SitesRequestExecutor},
     },
+    wp_com::language::WpComLanguageProvider,
 };
 use std::sync::Arc;
 
@@ -118,12 +119,16 @@ pub struct WpComApiRequestBuilder {
 }
 
 impl WpComApiRequestBuilder {
-    pub fn new(auth_provider: Arc<WpAuthenticationProvider>) -> Self {
+    pub fn new(
+        auth_provider: Arc<WpAuthenticationProvider>,
+        language_provider: Option<Arc<dyn WpComLanguageProvider>>,
+    ) -> Self {
         let api_url_resolver: Arc<dyn ApiUrlResolver> =
             Arc::new(WpComApiClientInternalUrlResolver::default());
         api_client_generate_request_builder!(
             api_url_resolver,
-            auth_provider;
+            auth_provider,
+            language_provider;
             domains,
             followers,
             jetpack_connection,

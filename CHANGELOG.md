@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- WordPress.com requests now carry a locale query parameter, taken from a `WpComLanguageProvider` set on `WpApiClientDelegate.language_provider`. `/rest/v1.1`, `/rest/v1.2` and `/rest/v1.3` get `locale`; `/wpcom/v2` gets `_locale`; `/oauth2` and every WordPress.org namespace get neither. The provider is asked once per request, so a client is free to return a live value.
+
 ### Fixed
 
 - **BREAKING:** Support-bot message sources (`BotMessageContextSource`) now parse when the bot only returns `title`, `content`, and `url`. Some bots (e.g. `jetpack-workflow-chat_mobile_support`) omit `heading`, `blog_id`, `post_id`, `score`, and `last_indexed_at`, which previously failed the untagged `MessageContext` match and aborted parsing of the whole conversation response. Those five fields plus `url` are now optional (`Option<...>`), so binding consumers reading them as non-null must handle the nullable type.

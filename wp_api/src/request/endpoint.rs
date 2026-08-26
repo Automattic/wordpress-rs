@@ -112,6 +112,15 @@ pub trait DerivedRequest {
 
 pub trait AsNamespace: Send + Sync {
     fn namespace_value(&self) -> &'static str;
+
+    /// The query parameter name this namespace reads to localize a response, or
+    /// `None` for namespaces that don't accept one.
+    ///
+    /// Namespaces that return a name have the parameter appended to every request
+    /// built for them, using the value from the client's language provider.
+    fn locale_param_name(&self) -> Option<&'static str> {
+        None
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, EnumIter)]

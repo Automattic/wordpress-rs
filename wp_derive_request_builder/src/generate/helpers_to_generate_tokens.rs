@@ -356,6 +356,27 @@ pub fn fn_body_additional_query_pairs(enum_ident: &Ident, variant_ident: &Ident)
     }
 }
 
+/// Appends the locale query parameter for namespaces that read one, using the name
+/// the namespace asks for and the language the client's provider returns.
+///
+/// Expands to a no-op at runtime for namespaces without a locale parameter, which
+/// includes every WordPress.org namespace.
+pub fn fn_body_locale_query_pair(enum_ident: &Ident, variant_ident: &Ident) -> TokenStream {
+    quote! {
+        if let Some(locale_param_name) =
+            #enum_ident::namespace(&#enum_ident::#variant_ident).locale_param_name()
+        {
+            if let Some(language) = self
+                .language_provider
+                .as_ref()
+                .and_then(|provider| provider.current_language())
+            {
+                url.query_pairs_mut().append_pair(locale_param_name, language.slug_str());
+            }
+        }
+    }
+}
+
 pub fn fn_body_fields_query_pairs(
     crate_ident: &Ident,
     context_and_filter_handler: &ContextAndFilterHandler,
