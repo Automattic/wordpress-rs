@@ -226,7 +226,7 @@ class WpRequestExecutorTest {
                 wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
                 authProvider = WpAuthenticationProvider.none(),
                 requestExecutor = executor,
-                errorLogger = RequestErrorLogger { message -> loggedErrors.add(message) }
+                errorLogger = WpRequestErrorLogger { message -> loggedErrors.add(message) }
             )
 
             var observedResult: WpRequestResult<*>? = null

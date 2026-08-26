@@ -12,7 +12,8 @@ import uniffi.wp_api.WpApiMiddlewarePipeline
 class WpLoginClient @JvmOverloads constructor(
     requestExecutor: RequestExecutor,
     middlewarePipeline: WpApiMiddlewarePipeline = WpApiMiddlewarePipeline(listOf()),
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val errorLogger: RequestErrorLogger? = null
 ) {
 
     private val internalClient: UniffiWpLoginClient =
@@ -27,11 +28,13 @@ class WpLoginClient @JvmOverloads constructor(
         interceptors: List<Interceptor> = listOf(),
         networkAvailabilityProvider: NetworkAvailabilityProvider,
         middlewarePipeline: WpApiMiddlewarePipeline = WpApiMiddlewarePipeline(listOf()),
-        dispatcher: CoroutineDispatcher = Dispatchers.IO
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        errorLogger: RequestErrorLogger? = null
     ) : this(
         requestExecutor = WpRequestExecutor(interceptors, networkAvailabilityProvider),
         middlewarePipeline = middlewarePipeline,
-        dispatcher = dispatcher
+        dispatcher = dispatcher,
+        errorLogger = errorLogger
     )
 
     suspend fun apiDiscovery(
@@ -41,6 +44,7 @@ class WpLoginClient @JvmOverloads constructor(
             val success = internalClient.apiDiscovery(siteUrl, null)
             ApiDiscoveryResult.Success(success)
         } catch (exception: AutoDiscoveryAttemptFailure) {
+            errorLogger?.logFailedDiscovery(exception)
             when (exception) {
                 is AutoDiscoveryAttemptFailure.ParseSiteUrl -> ApiDiscoveryResult.FailureParseSiteUrl(
                     error = exception.error,
