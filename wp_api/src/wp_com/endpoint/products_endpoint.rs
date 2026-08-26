@@ -28,7 +28,6 @@ mod tests {
             endpoint::tests::{
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
             },
-            language::WPComLanguage,
             products::{ProductTypeFilter, ProductsParams},
         },
     };
@@ -45,7 +44,6 @@ mod tests {
         validate_wp_com_rest_v1_1_endpoint(
             endpoint.list(&ProductsParams {
                 product_type: Some(ProductTypeFilter::Domains),
-                ..Default::default()
             }),
             "/products?type=domains",
         );
@@ -56,7 +54,6 @@ mod tests {
         validate_wp_com_rest_v1_1_endpoint(
             endpoint.list(&ProductsParams {
                 product_type: Some(ProductTypeFilter::Jetpack),
-                ..Default::default()
             }),
             "/products?type=jetpack",
         );
@@ -69,31 +66,8 @@ mod tests {
                 product_type: Some(ProductTypeFilter::Other {
                     value: "theme".to_string(),
                 }),
-                ..Default::default()
             }),
             "/products?type=theme",
-        );
-    }
-
-    #[rstest]
-    fn list_with_locale(endpoint: ProductsRequestEndpoint) {
-        validate_wp_com_rest_v1_1_endpoint(
-            endpoint.list(&ProductsParams {
-                locale: Some(WPComLanguage::Spanish),
-                ..Default::default()
-            }),
-            "/products?locale=es",
-        );
-    }
-
-    #[rstest]
-    fn list_with_type_and_locale(endpoint: ProductsRequestEndpoint) {
-        validate_wp_com_rest_v1_1_endpoint(
-            endpoint.list(&ProductsParams {
-                product_type: Some(ProductTypeFilter::Domains),
-                locale: Some(WPComLanguage::Japanese),
-            }),
-            "/products?type=domains&locale=ja",
         );
     }
 

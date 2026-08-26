@@ -2,7 +2,6 @@ use crate::{
     date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Serialize};
 
@@ -82,9 +81,6 @@ pub struct StatsVisitsParams {
     /// When empty, the API returns its default set of fields.
     #[uniffi(default = [])]
     pub stat_fields: Vec<StatsVisitsField>,
-    /// The locale for the response.
-    #[uniffi(default = None)]
-    pub locale: Option<WPComLanguage>,
 }
 
 impl AppendUrlQueryPairs for StatsVisitsParams {
@@ -94,8 +90,7 @@ impl AppendUrlQueryPairs for StatsVisitsParams {
             .append_option_query_value_pair("quantity", self.quantity.as_ref())
             .append_option_query_value_pair("date", self.end_date.as_ref())
             .append_option_query_value_pair("start_date", self.start_date.as_ref())
-            .append_vec_query_value_pair("stat_fields", self.stat_fields.as_ref())
-            .append_option_query_value_pair("locale", self.locale.as_ref());
+            .append_vec_query_value_pair("stat_fields", self.stat_fields.as_ref());
     }
 }
 
@@ -293,7 +288,6 @@ mod tests {
             end_date: Some(WpDateString::new("2025-01-15".to_string())),
             start_date: None,
             stat_fields: vec![],
-            locale: Some(WPComLanguage::English),
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -301,7 +295,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/visits?unit=hour&quantity=24&date=2025-01-15&locale=en"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/visits?unit=hour&quantity=24&date=2025-01-15"
         );
     }
 
@@ -317,7 +311,6 @@ mod tests {
             end_date: None,
             start_date: None,
             stat_fields: vec![],
-            locale: None,
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -341,7 +334,6 @@ mod tests {
             end_date: Some(WpDateString::new("2026-07-13".to_string())),
             start_date: Some(WpDateString::new("2025-08-01".to_string())),
             stat_fields: vec![StatsVisitsField::Views, StatsVisitsField::Visitors],
-            locale: None,
         };
 
         let mut query_pairs = url.query_pairs_mut();
@@ -365,7 +357,6 @@ mod tests {
             end_date: None,
             start_date: None,
             stat_fields: vec![],
-            locale: None,
         };
 
         let mut query_pairs = url.query_pairs_mut();

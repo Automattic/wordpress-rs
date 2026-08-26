@@ -1,23 +1,8 @@
 use crate::{
     date::{WpDateString, WpGmtDateTime, deserialize_optional_wp_gmt_date_time},
-    url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::{language::WPComLanguage, stats_visits::StatsVisitsResponse},
+    wp_com::stats_visits::StatsVisitsResponse,
 };
 use serde::{Deserialize, Serialize};
-
-/// Parameters for the stats summary endpoint.
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
-pub struct StatsSummaryParams {
-    /// The locale for the response.
-    #[uniffi(default = None)]
-    pub locale: Option<WPComLanguage>,
-}
-
-impl AppendUrlQueryPairs for StatsSummaryParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut.append_option_query_value_pair("locale", self.locale.as_ref());
-    }
-}
 
 /// Response from the stats summary endpoint.
 ///
@@ -85,42 +70,6 @@ pub struct StatsSummaryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_stats_summary_params_serialization_with_locale() {
-        let mut url =
-            url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats")
-                .expect("Failed to parse url");
-
-        let params = StatsSummaryParams {
-            locale: Some(WPComLanguage::Spanish),
-        };
-
-        let mut query_pairs = url.query_pairs_mut();
-        params.append_query_pairs(&mut query_pairs);
-
-        assert_eq!(
-            query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats?locale=es"
-        );
-    }
-
-    #[test]
-    fn test_stats_summary_params_serialization_default() {
-        let mut url =
-            url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats")
-                .expect("Failed to parse url");
-
-        let params = StatsSummaryParams::default();
-
-        let mut query_pairs = url.query_pairs_mut();
-        params.append_query_pairs(&mut query_pairs);
-
-        assert_eq!(
-            query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats?"
-        );
-    }
 
     #[test]
     fn test_stats_summary_response_deserialization() {

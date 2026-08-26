@@ -29,7 +29,6 @@ mod tests {
             endpoint::tests::{
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_3_endpoint,
             },
-            language::WPComLanguage,
         },
     };
     use rstest::*;
@@ -50,44 +49,15 @@ mod tests {
     }
 
     #[rstest]
-    fn list_with_locale(endpoint: SitePlansRequestEndpoint) {
-        validate_wp_com_rest_v1_3_endpoint(
-            endpoint.list(
-                &WpComSiteId(12345),
-                &SitePlansParams {
-                    locale: Some(WPComLanguage::Spanish),
-                    ..Default::default()
-                },
-            ),
-            "/sites/12345/plans?locale=es",
-        );
-    }
-
-    #[rstest]
     fn list_with_coupon_code(endpoint: SitePlansRequestEndpoint) {
         validate_wp_com_rest_v1_3_endpoint(
             endpoint.list(
                 &WpComSiteId(12345),
                 &SitePlansParams {
                     coupon_code: Some(CouponCode("SPRING25".to_string())),
-                    ..Default::default()
                 },
             ),
             "/sites/12345/plans?coupon_code=SPRING25",
-        );
-    }
-
-    #[rstest]
-    fn list_with_locale_and_coupon_code(endpoint: SitePlansRequestEndpoint) {
-        validate_wp_com_rest_v1_3_endpoint(
-            endpoint.list(
-                &WpComSiteId(12345),
-                &SitePlansParams {
-                    locale: Some(WPComLanguage::Japanese),
-                    coupon_code: Some(CouponCode("SPRING25".to_string())),
-                },
-            ),
-            "/sites/12345/plans?locale=ja&coupon_code=SPRING25",
         );
     }
 

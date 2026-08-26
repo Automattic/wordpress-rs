@@ -2,7 +2,6 @@ use crate::{
     date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Serialize};
 
@@ -52,9 +51,6 @@ pub struct StatsVideoPlaysParams {
     /// The number of periods to include in the response.
     #[uniffi(default = None)]
     pub num: Option<u32>,
-    /// The locale for the response.
-    #[uniffi(default = None)]
-    pub locale: Option<WPComLanguage>,
     /// Whether to return a summary of the data.
     ///
     /// - `true` (default): Response contains summarized data
@@ -78,7 +74,6 @@ impl Default for StatsVideoPlaysParams {
             start_date: None,
             max: None,
             num: None,
-            locale: None,
             summarize: true,
             complete_stats: Some(true),
         }
@@ -93,7 +88,6 @@ impl AppendUrlQueryPairs for StatsVideoPlaysParams {
             .append_option_query_value_pair("start_date", self.start_date.as_ref())
             .append_option_query_value_pair("max", self.max.as_ref())
             .append_option_query_value_pair("num", self.num.as_ref())
-            .append_option_query_value_pair("locale", self.locale.as_ref())
             .append_query_value_pair("summarize", &(self.summarize as u32))
             .append_option_query_value_pair(
                 "complete_stats",
@@ -178,7 +172,6 @@ mod tests {
             start_date: Some(WpDateString::new("2026-02-12".to_string())),
             max: Some(10),
             num: Some(30),
-            locale: Some(WPComLanguage::English),
             summarize: true,
             complete_stats: Some(true),
         };
@@ -188,7 +181,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/video-plays?period=day&date=2026-02-18&start_date=2026-02-12&max=10&num=30&locale=en&summarize=1&complete_stats=1"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/video-plays?period=day&date=2026-02-18&start_date=2026-02-12&max=10&num=30&summarize=1&complete_stats=1"
         );
     }
 
@@ -205,7 +198,6 @@ mod tests {
             start_date: None,
             max: None,
             num: None,
-            locale: None,
             summarize: true,
             complete_stats: Some(true),
         };

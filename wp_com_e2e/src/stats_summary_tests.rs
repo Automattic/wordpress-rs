@@ -1,6 +1,6 @@
 use libtest_mimic::Trial;
 use std::sync::Arc;
-use wp_api::wp_com::{sites::SitesListParams, stats_summary::StatsSummaryParams};
+use wp_api::wp_com::sites::SitesListParams;
 
 use crate::context::TestContext;
 
@@ -24,7 +24,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         ctx.runtime.block_on(async {
                             ctx.client
                                 .stats_summary()
-                                .get_stats_summary(&site_id, &StatsSummaryParams::default())
+                                .get_stats_summary(&site_id)
                                 .await
                                 .map_err(|e| e.to_string())?;
                             Ok(())

@@ -4,7 +4,6 @@ use crate::{
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::{
         CostOverrideCode, CouponCode, CurrencyCode, TimeSpanUnit,
-        language::WPComLanguage,
         products::{BillPeriodDays, ProductId, ProductSlug, ProductTierId},
         purchases::PurchaseId,
     },
@@ -18,10 +17,6 @@ wp_content_string_id!(PlanFeatureKey);
 /// Query parameters for `GET /sites/<site_id>/plans`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct SitePlansParams {
-    /// Locale for the response's translated strings — taglines, badges, feature
-    /// titles and discount reasons.
-    #[uniffi(default = None)]
-    pub locale: Option<WPComLanguage>,
     /// Coupon code to price the plans with. Plans the coupon doesn't apply to
     /// are returned at their normal price.
     #[uniffi(default = None)]
@@ -30,9 +25,7 @@ pub struct SitePlansParams {
 
 impl AppendUrlQueryPairs for SitePlansParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair("locale", self.locale.as_ref())
-            .append_option_query_value_pair("coupon_code", self.coupon_code.as_ref());
+        query_pairs_mut.append_option_query_value_pair("coupon_code", self.coupon_code.as_ref());
     }
 }
 

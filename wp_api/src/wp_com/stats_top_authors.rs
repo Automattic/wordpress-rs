@@ -2,7 +2,6 @@ use crate::{
     date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
@@ -53,9 +52,6 @@ pub struct StatsTopAuthorsParams {
     /// The number of periods to include in the response.
     #[uniffi(default = None)]
     pub num: Option<u32>,
-    /// The locale for the response.
-    #[uniffi(default = None)]
-    pub locale: Option<WPComLanguage>,
     /// Whether to return a summary of the data.
     ///
     /// - `true` (default): Response contains `summary` field with aggregated data
@@ -72,7 +68,6 @@ impl Default for StatsTopAuthorsParams {
             date: None,
             max: None,
             num: None,
-            locale: None,
             summarize: true,
         }
     }
@@ -86,7 +81,6 @@ impl AppendUrlQueryPairs for StatsTopAuthorsParams {
             .append_option_query_value_pair("date", self.date.as_ref())
             .append_option_query_value_pair("max", self.max.as_ref())
             .append_option_query_value_pair("num", self.num.as_ref())
-            .append_option_query_value_pair("locale", self.locale.as_ref())
             .append_query_value_pair("summarize", &(self.summarize as u32));
     }
 }
@@ -215,7 +209,6 @@ mod tests {
             date: Some(WpDateString::new("2026-02-05".to_string())),
             max: Some(10),
             num: Some(7),
-            locale: Some(WPComLanguage::English),
             summarize: true,
         };
 
@@ -224,7 +217,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-authors?period=day&start_date=2026-01-30&date=2026-02-05&max=10&num=7&locale=en&summarize=1"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-authors?period=day&start_date=2026-01-30&date=2026-02-05&max=10&num=7&summarize=1"
         );
     }
 
@@ -241,7 +234,6 @@ mod tests {
             date: Some(WpDateString::new("2026-02-05".to_string())),
             max: None,
             num: None,
-            locale: None,
             summarize: true,
         };
 
@@ -286,7 +278,6 @@ mod tests {
         assert!(params.start_date.is_none());
         assert!(params.max.is_none());
         assert!(params.num.is_none());
-        assert!(params.locale.is_none());
     }
 
     #[rstest]

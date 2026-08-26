@@ -2,7 +2,6 @@ use crate::{
     date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -57,9 +56,6 @@ pub struct StatsCountryViewsParams {
     /// The number of days to include in the response.
     #[uniffi(default = None)]
     pub days: Option<u32>,
-    /// The locale for the response.
-    #[uniffi(default = None)]
-    pub locale: Option<WPComLanguage>,
     /// Whether to return a summary of the data.
     ///
     /// - `true` (default): Response contains `summary` field with aggregated country
@@ -80,7 +76,6 @@ impl Default for StatsCountryViewsParams {
             max: None,
             num: None,
             days: None,
-            locale: None,
             summarize: true,
         }
     }
@@ -95,7 +90,6 @@ impl AppendUrlQueryPairs for StatsCountryViewsParams {
             .append_option_query_value_pair("max", self.max.as_ref())
             .append_option_query_value_pair("num", self.num.as_ref())
             .append_option_query_value_pair("days", self.days.as_ref())
-            .append_option_query_value_pair("locale", self.locale.as_ref())
             .append_query_value_pair("summarize", &(self.summarize as u32));
     }
 }
@@ -187,7 +181,6 @@ mod tests {
             max: Some(10),
             num: Some(1),
             days: Some(1),
-            locale: Some(WPComLanguage::English),
             summarize: true,
         };
 
@@ -196,7 +189,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-29&max=10&num=1&days=1&locale=en&summarize=1"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-29&max=10&num=1&days=1&summarize=1"
         );
     }
 
@@ -211,7 +204,6 @@ mod tests {
             period: Some(StatsCountryViewsPeriod::Day),
             date: Some(WpDateString::new("2026-01-29".to_string())),
             start_date: Some(WpDateString::new("2026-01-23".to_string())),
-            locale: Some(WPComLanguage::English),
             ..Default::default()
         };
 
@@ -221,7 +213,7 @@ mod tests {
         // Default summarize is true, which serializes to summarize=1
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-23&locale=en&summarize=1"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/country-views?period=day&date=2026-01-29&start_date=2026-01-23&summarize=1"
         );
     }
 

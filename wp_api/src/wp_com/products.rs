@@ -2,7 +2,7 @@ use crate::{
     date::WpGmtDateTime,
     decimal2::Decimal2,
     url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension},
-    wp_com::{CurrencyCode, TimeSpanUnit, language::WPComLanguage},
+    wp_com::{CurrencyCode, TimeSpanUnit},
     wp_content_string_id,
 };
 use serde::{Deserialize, Serialize};
@@ -119,16 +119,11 @@ pub struct ProductsParams {
     /// Filter by product type.
     #[uniffi(default = None)]
     pub product_type: Option<ProductTypeFilter>,
-    /// Locale for localized product names and descriptions.
-    #[uniffi(default = None)]
-    pub locale: Option<WPComLanguage>,
 }
 
 impl AppendUrlQueryPairs for ProductsParams {
     fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut
-            .append_option_query_value_pair("type", self.product_type.as_ref())
-            .append_option_query_value_pair("locale", self.locale.as_ref());
+        query_pairs_mut.append_option_query_value_pair("type", self.product_type.as_ref());
     }
 }
 
