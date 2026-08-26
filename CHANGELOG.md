@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Internal:** Require pull requests to update `CHANGELOG.md` and warn when code changes do not update `## [Unreleased]`.
 - **Internal:** Build Rust test binaries with `debug = "line-tables-only"` instead of full debug info, via `[profile.test]` in the workspace `Cargo.toml`. This caps the memory a `cargo test` link consumes on CI, where full debug info was losing Buildkite agents. Backtraces still resolve to file and line; a debugger can no longer print locals. Override with `CARGO_PROFILE_TEST_DEBUG=full`.
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.97.1` to `1.98.0` in lockstep across local development, CI, and the web image. No new clippy lints surfaced ([#1436](https://github.com/Automattic/wordpress-rs/issues/1436)).
 
