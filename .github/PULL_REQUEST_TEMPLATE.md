@@ -12,4 +12,4 @@
 
 ## Changelog
 
-- [ ] I've updated `CHANGELOG.md`, normally under `## [Unreleased]`, using the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) categories (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`). Prefix breaking changes with `**BREAKING:**`.
+- [ ] I've added an entry to `CHANGELOG.md` under `## [Unreleased]`, using the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) categories (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`). Prefix breaking changes with `**BREAKING:**`.

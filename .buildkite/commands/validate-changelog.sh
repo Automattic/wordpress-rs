@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# Prints the non-whitespace contents of every Unreleased section.
+# Prints non-empty contents of every Unreleased section with whitespace normalized.
 unreleased_section() {
   awk '
     /^## \[Unreleased\][[:space:]]*$/ { in_unreleased = 1; next }
@@ -32,7 +32,8 @@ fail() {
 
 warn() {
   printf '\n%s\n\n' "$1" >&2
-  # A GitHub failure must not turn this advisory result into a failed job.
+  # Keep the advisory visible in Buildkite if posting it to GitHub fails.
+  buildkite-agent annotate "$1" --style warning --context changelog-check || true
   comment_on_pr --id changelog-check "$1" || true
   exit 0
 }
