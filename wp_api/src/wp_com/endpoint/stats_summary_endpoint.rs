@@ -1,15 +1,12 @@
 use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
-    wp_com::{
-        WpComNamespace, WpComSiteId,
-        stats_summary::{StatsSummaryParams, StatsSummaryResponse},
-    },
+    wp_com::{WpComNamespace, WpComSiteId, stats_summary::StatsSummaryResponse},
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum StatsSummaryRequest {
-    #[get(url = "/sites/<wp_com_site_id>/stats", params = &StatsSummaryParams, output = StatsSummaryResponse)]
+    #[get(url = "/sites/<wp_com_site_id>/stats", output = StatsSummaryResponse)]
     GetStatsSummary,
 }
 

@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** Support-bot message sources (`BotMessageContextSource`) now parse when the bot only returns `title`, `content`, and `url`. Some bots (e.g. `jetpack-workflow-chat_mobile_support`) omit `heading`, `blog_id`, `post_id`, `score`, and `last_indexed_at`, which previously failed the untagged `MessageContext` match and aborted parsing of the whole conversation response. Those five fields plus `url` are now optional (`Option<...>`), so binding consumers reading them as non-null must handle the nullable type.
 
+### Removed
+
+- **BREAKING:** The per-endpoint `locale` parameter is gone from every WordPress.com params type that carried one — `ProductsParams`, `SitePlansParams`, and the `Stats*Params` types. The locale now comes from the client's `WpComLanguageProvider`, so drop the field from any call site that sets it. `StatsSummaryParams`, `StatsInsightsParams` and `LanguagesGetParams` held nothing else and are removed entirely, so `get_stats_summary`, `get_stats_insights` and the languages `get` no longer take a params argument.
+
 ### Changed
 
 - **Internal:** Require pull requests to update `CHANGELOG.md` and warn when code changes do not update `## [Unreleased]`.

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::url_query::{AppendUrlQueryPairs, AsQueryValue, QueryPairs, QueryPairsExtension};
+use crate::url_query::AsQueryValue;
 use serde::{Deserialize, Serialize};
 
 // This file is optimized for really fast code, not to be pretty. Between the compiler
@@ -29,21 +29,6 @@ pub struct WpComRemoteLanguage {
 }
 
 pub type WpComRemoteLanguageMap = HashMap<String, WpComRemoteLanguage>;
-
-/// Parameters for fetching language names from the WordPress.com API.
-#[derive(Debug, Default, Serialize, uniffi::Record)]
-pub struct LanguagesGetParams {
-    /// The locale to use for returning language names.
-    /// When specified, language names will be returned in this locale.
-    #[uniffi(default = None)]
-    pub locale: Option<WPComLanguage>,
-}
-
-impl AppendUrlQueryPairs for LanguagesGetParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut.append_option_query_value_pair("_locale", self.locale.as_ref());
-    }
-}
 
 /// WordPress.com language codes with their IDs as discriminants
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, uniffi::Enum)]
@@ -1568,43 +1553,5 @@ mod tests {
                 id
             );
         }
-    }
-
-    #[test]
-    fn test_languages_get_params_with_english_locale() {
-        let mut url =
-            url::Url::parse("https://public-api.wordpress.com/wpcom/v2/i18n/language-names")
-                .expect("Failed to parse url");
-
-        let params = LanguagesGetParams {
-            locale: Some(WPComLanguage::English),
-        };
-
-        let mut query_pairs = url.query_pairs_mut();
-        params.append_query_pairs(&mut query_pairs);
-
-        assert_eq!(
-            query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/wpcom/v2/i18n/language-names?_locale=en"
-        );
-    }
-
-    #[test]
-    fn test_languages_get_params_with_portuguese_brazil_locale() {
-        let mut url =
-            url::Url::parse("https://public-api.wordpress.com/wpcom/v2/i18n/language-names")
-                .expect("Failed to parse url");
-
-        let params = LanguagesGetParams {
-            locale: Some(WPComLanguage::PortugueseBrazil),
-        };
-
-        let mut query_pairs = url.query_pairs_mut();
-        params.append_query_pairs(&mut query_pairs);
-
-        assert_eq!(
-            query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/wpcom/v2/i18n/language-names?_locale=pt-br"
-        );
     }
 }

@@ -1,7 +1,3 @@
-use crate::{
-    url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::language::WPComLanguage,
-};
 use serde::{
     Deserialize, Serialize,
     de::{self, DeserializeOwned},
@@ -26,20 +22,6 @@ where
         serde_json::from_value(serde_json::Value::Object(map)).map_err(de::Error::custom)
     } else {
         Ok(HashMap::new())
-    }
-}
-
-/// Parameters for the stats insights endpoint.
-#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
-pub struct StatsInsightsParams {
-    /// The locale for the response.
-    #[uniffi(default = None)]
-    pub locale: Option<WPComLanguage>,
-}
-
-impl AppendUrlQueryPairs for StatsInsightsParams {
-    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
-        query_pairs_mut.append_option_query_value_pair("locale", self.locale.as_ref());
     }
 }
 
@@ -99,42 +81,6 @@ pub struct StatsInsightsYearData {
 mod tests {
     use super::*;
     use rstest::*;
-
-    #[test]
-    fn test_stats_insights_params_serialization_with_locale() {
-        let mut url =
-            url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/insights")
-                .expect("Failed to parse url");
-
-        let params = StatsInsightsParams {
-            locale: Some(WPComLanguage::Spanish),
-        };
-
-        let mut query_pairs = url.query_pairs_mut();
-        params.append_query_pairs(&mut query_pairs);
-
-        assert_eq!(
-            query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/insights?locale=es"
-        );
-    }
-
-    #[test]
-    fn test_stats_insights_params_serialization_default() {
-        let mut url =
-            url::Url::parse("https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/insights")
-                .expect("Failed to parse url");
-
-        let params = StatsInsightsParams::default();
-
-        let mut query_pairs = url.query_pairs_mut();
-        params.append_query_pairs(&mut query_pairs);
-
-        assert_eq!(
-            query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/insights?"
-        );
-    }
 
     #[test]
     fn test_stats_insights_response_deserialization() {
