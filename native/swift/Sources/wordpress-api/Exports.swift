@@ -11,6 +11,7 @@ public typealias RequestExecutionError = WordPressAPIInternal.RequestExecutionEr
 public typealias InvalidSslErrorReason = WordPressAPIInternal.InvalidSslErrorReason
 public typealias ParsedUrl = WordPressAPIInternal.ParsedUrl
 public typealias QueryPair = WordPressAPIInternal.QueryPair
+public typealias ResolvedUrl = WordPressAPIInternal.ResolvedUrl
 public typealias WpUuid = WordPressAPIInternal.WpUuid
 public typealias WpNetworkRequest = WordPressAPIInternal.WpNetworkRequest
 public typealias WpNetworkResponse = WordPressAPIInternal.WpNetworkResponse
