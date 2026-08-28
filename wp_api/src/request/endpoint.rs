@@ -1,4 +1,5 @@
 use crate::parsed_url::ParsedUrl;
+use crate::resolved_url::ResolvedUrl;
 use std::sync::Arc;
 use strum_macros::EnumIter;
 use url::Url;
@@ -140,7 +141,10 @@ impl AsNamespace for WpNamespace {
 
 #[uniffi::export(with_foreign)]
 pub trait ApiUrlResolver: Send + Sync {
-    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl>;
+    /// Resolves an endpoint to a [`ResolvedUrl`], which carries both the request
+    /// URL to fetch (`url()`) and the canonical, origin-less route key that
+    /// preloading editors match on (`canonical_route_key()`).
+    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ResolvedUrl>;
 
     /// Returns the route key for an endpoint, matching the keys used in
     /// `WpApiDetails.routes`. Implementations must produce the same path
@@ -167,11 +171,15 @@ impl WpOrgSiteApiUrlResolver {
 
 #[uniffi::export]
 impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
-    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
-        Arc::new(
-            self.api_root_url
-                .by_extending_rest_api_path([namespace].into_iter().chain(endpoint_segments))
-                .into(),
+    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ResolvedUrl> {
+        let route_path = self.route_path(namespace.clone(), endpoint_segments.join("/"));
+        let url = self
+            .api_root_url
+            .by_extending_rest_api_path([namespace].into_iter().chain(endpoint_segments));
+        ResolvedUrl::new(
+            Arc::new(ParsedUrl::new(url)),
+            self.api_root_url.clone(),
+            route_path,
         )
     }
 
@@ -287,5 +295,83 @@ mod tests {
             },
         ]);
         assert_eq!(result.url(), expected);
+        // The canonical route key is origin-less and identical on every API-root
+        // form — the request URLs above differ, but the key does not.
+        assert_eq!(
+            result.canonical_route_key(),
+            "/wp/v2/themes?context=edit&exclude=core%2Cgutenberg"
+        );
+    }
+
+    /// End-to-end through `resolve()`: for the same endpoint, a pretty
+    /// (`…/wp-json/…`) and a plain (`…?rest_route=…`) API root build different
+    /// request URLs but the **same** `canonical_route_key()` — the invariant the
+    /// preload middleware relies on. Covers a query-less key (no `?`), multiple
+    /// params, an encoded value, and a route with embedded slashes.
+    #[rstest]
+    #[case::two_pairs(
+        "themes",
+        vec![("context", "edit"), ("status", "active")],
+        "https://example.com/wp-json/wp/v2/themes?context=edit&status=active",
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes&context=edit&status=active",
+        "/wp/v2/themes?context=edit&status=active"
+    )]
+    #[case::no_query(
+        "themes",
+        vec![],
+        "https://example.com/wp-json/wp/v2/themes",
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes",
+        "/wp/v2/themes"
+    )]
+    #[case::encoded_value(
+        "themes",
+        vec![("exclude", "core,gutenberg")],
+        "https://example.com/wp-json/wp/v2/themes?exclude=core%2Cgutenberg",
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes&exclude=core%2Cgutenberg",
+        "/wp/v2/themes?exclude=core%2Cgutenberg"
+    )]
+    #[case::embedded_slash_route(
+        "block-renderer/core/paragraph",
+        vec![("context", "edit")],
+        "https://example.com/wp-json/wp/v2/block-renderer/core/paragraph?context=edit",
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fblock-renderer%2Fcore%2Fparagraph&context=edit",
+        "/wp/v2/block-renderer/core/paragraph?context=edit"
+    )]
+    fn resolved_url_request_and_key(
+        #[case] segment: &str,
+        #[case] pairs: Vec<(&str, &str)>,
+        #[case] expected_pretty_url: &str,
+        #[case] expected_plain_url: &str,
+        #[case] expected_key: &str,
+    ) {
+        use crate::parsed_url::QueryPair;
+
+        for (root, expected_url) in [
+            ("https://example.com/wp-json", expected_pretty_url),
+            (
+                "https://example.com/index.php?rest_route=/",
+                expected_plain_url,
+            ),
+        ] {
+            let resolver =
+                WpOrgSiteApiUrlResolver::new(ParsedUrl::parse(root).expect("valid url").into());
+            let resolved = resolver
+                .resolve(
+                    WpNamespace::WpV2.namespace_value().to_string(),
+                    vec![segment.to_string()],
+                )
+                .by_appending_query_pairs(
+                    pairs
+                        .iter()
+                        .map(|(name, value)| QueryPair {
+                            name: name.to_string(),
+                            value: value.to_string(),
+                        })
+                        .collect(),
+                );
+            assert_eq!(resolved.url(), expected_url);
+            // Identical for BOTH roots.
+            assert_eq!(resolved.canonical_route_key(), expected_key);
+        }
     }
 }

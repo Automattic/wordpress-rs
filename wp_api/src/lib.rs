@@ -44,6 +44,7 @@ pub mod post_types;
 pub mod posts;
 pub mod prelude;
 pub mod request;
+pub mod resolved_url;
 pub mod search_results;
 pub mod sidebars;
 pub mod site_settings;
