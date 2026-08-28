@@ -23,9 +23,22 @@ use super::{ApiUrlResolver, WpOrgSiteApiUrlResolver};
 use crate::parsed_url::ParsedUrl;
 use serde_json::Value;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 const API_ROOT: &str = "https://jetpack.wpmt.co/wp-json";
+
+/// The committed real-site REST index fixture, parsed once for the whole module
+/// (it is ~770 KB, so re-reading and re-parsing it per assertion would be
+/// wasteful).
+static REST_INDEX: LazyLock<Value> = LazyLock::new(|| {
+    let mut path = PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
+    path.push("test-data");
+    path.push("api-details");
+    path.push("test-case-03.json");
+    let json = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("failed to read REST index fixture {}: {e}", path.display()));
+    serde_json::from_str(&json).expect("REST index fixture is valid JSON")
+});
 
 fn resolver() -> Arc<dyn ApiUrlResolver> {
     Arc::new(WpOrgSiteApiUrlResolver::new(
@@ -44,14 +57,7 @@ fn strip_query(url: &str) -> &str {
 /// Panics if the fixture has no such route, so a mistyped route key fails the
 /// test loudly instead of silently asserting against a value invented here.
 fn published_self_href(route: &str) -> String {
-    let mut path = PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
-    path.push("test-data");
-    path.push("api-details");
-    path.push("test-case-03.json");
-    let json = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("failed to read REST index fixture {}: {e}", path.display()));
-    let index: Value = serde_json::from_str(&json).expect("REST index fixture is valid JSON");
-    index["routes"][route]["_links"]["self"][0]["href"]
+    REST_INDEX["routes"][route]["_links"]["self"][0]["href"]
         .as_str()
         .unwrap_or_else(|| panic!("fixture publishes no `_links.self[0].href` for route `{route}`"))
         .to_string()
