@@ -11,7 +11,7 @@
 //! is the source of truth, not a golden copied into this file.
 //!
 //! The REST index only emits a concrete `self` href for routes without path
-//! parameters, so this covers the 22 collection/singleton endpoints; the
+//! parameters, so this covers the 30 collection/singleton endpoints; the
 //! ID-bearing ones are covered end-to-end by the plain-permalinks integration
 //! tests instead.
 //!
@@ -299,4 +299,103 @@ fn wp_site_health_tests() {
         strip_query(&built),
         published_self_href("/wp-site-health/v1/tests/background-updates")
     );
+}
+
+// --- Collection routes the index also publishes a `self` href for. Their
+// `plain_permalinks_url_tests` entries exercise the parameterized (retrieve)
+// form, so the server-sourced oracle here locks the shared route-path prefix. ---
+
+#[test]
+fn themes() {
+    let endpoint = super::themes_endpoint::ThemesRequestEndpoint::new(resolver());
+    let built = endpoint
+        .list_with_edit_context(&crate::themes::ThemeListParams::default())
+        .as_str()
+        .to_string();
+    assert_eq!(strip_query(&built), published_self_href("/wp/v2/themes"));
+}
+
+#[test]
+fn plugins() {
+    let endpoint = super::plugins_endpoint::PluginsRequestEndpoint::new(resolver());
+    let built = endpoint
+        .list_with_edit_context(&crate::PluginListParams::default())
+        .as_str()
+        .to_string();
+    assert_eq!(strip_query(&built), published_self_href("/wp/v2/plugins"));
+}
+
+#[test]
+fn templates() {
+    let endpoint = super::templates_endpoint::TemplatesRequestEndpoint::new(resolver());
+    let built = endpoint
+        .list_with_edit_context(&crate::templates::TemplateListParams::default())
+        .as_str()
+        .to_string();
+    assert_eq!(strip_query(&built), published_self_href("/wp/v2/templates"));
+}
+
+#[test]
+fn template_parts() {
+    let endpoint = super::template_parts_endpoint::TemplatePartsRequestEndpoint::new(resolver());
+    let built = endpoint
+        .list_with_edit_context(&crate::template_parts::TemplatePartListParams::default())
+        .as_str()
+        .to_string();
+    assert_eq!(
+        strip_query(&built),
+        published_self_href("/wp/v2/template-parts")
+    );
+}
+
+#[test]
+fn nav_menus() {
+    let endpoint = super::nav_menus_endpoint::NavMenusRequestEndpoint::new(resolver());
+    let built = endpoint
+        .list_with_edit_context(&crate::nav_menus::NavMenuListParams::default())
+        .as_str()
+        .to_string();
+    assert_eq!(strip_query(&built), published_self_href("/wp/v2/menus"));
+}
+
+#[test]
+fn nav_menu_items() {
+    let endpoint = super::nav_menu_items_endpoint::NavMenuItemsRequestEndpoint::new(resolver());
+    let built = endpoint
+        .list_with_edit_context(&crate::nav_menu_items::NavMenuItemListParams::default())
+        .as_str()
+        .to_string();
+    assert_eq!(
+        strip_query(&built),
+        published_self_href("/wp/v2/menu-items")
+    );
+}
+
+#[test]
+fn categories() {
+    let endpoint = super::terms_endpoint::TermsRequestEndpoint::new(resolver());
+    let built = endpoint
+        .list_with_edit_context(
+            &super::terms_endpoint::TermEndpointType::Categories,
+            &crate::terms::TermListParams::default(),
+        )
+        .as_str()
+        .to_string();
+    assert_eq!(
+        strip_query(&built),
+        published_self_href("/wp/v2/categories")
+    );
+}
+
+#[test]
+fn tags() {
+    let endpoint = super::terms_endpoint::TermsRequestEndpoint::new(resolver());
+    let built = endpoint
+        .list_with_edit_context(
+            &super::terms_endpoint::TermEndpointType::Tags,
+            &crate::terms::TermListParams::default(),
+        )
+        .as_str()
+        .to_string();
+    assert_eq!(strip_query(&built), published_self_href("/wp/v2/tags"));
 }
