@@ -1,6 +1,7 @@
 use crate::{
     parsed_url::ParsedUrl,
     request::endpoint::{ApiUrlResolver, AsNamespace, WpNamespace},
+    resolved_url::ResolvedUrl,
     wp_com::WpComBaseUrl,
 };
 use std::sync::Arc;
@@ -67,7 +68,7 @@ impl WpComDotOrgApiUrlResolver {
 
 #[uniffi::export]
 impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
-    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
+    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ResolvedUrl> {
         {
             if !WpNamespace::iter().any(|n| n.namespace_value() == namespace) {
                 panic!(
@@ -78,6 +79,9 @@ impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
             }
         }
 
+        let route_path = self.route_path(namespace.clone(), endpoint_segments.join("/"));
+        let api_root: Arc<ParsedUrl> = Arc::new(self.base_url.clone());
+
         // The API root endpoint needs special handling for WordPress.com
         if namespace == WpNamespace::None.namespace_value() && endpoint_segments.is_empty() {
             let url_string = format!(
@@ -86,18 +90,15 @@ impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
             );
             let parsed_url =
                 ParsedUrl::parse(&url_string).expect("WordPress.com API root URL is valid");
-            return Arc::new(parsed_url);
+            return ResolvedUrl::new(Arc::new(parsed_url), api_root, route_path);
         }
 
-        Arc::new(
-            self.base_url
-                .by_extending_and_splitting_by_forward_slash(
-                    vec![namespace, "sites".to_string(), self.site_id.to_string()]
-                        .into_iter()
-                        .chain(endpoint_segments),
-                )
-                .into(),
-        )
+        let url = self.base_url.by_extending_and_splitting_by_forward_slash(
+            vec![namespace, "sites".to_string(), self.site_id.to_string()]
+                .into_iter()
+                .chain(endpoint_segments),
+        );
+        ResolvedUrl::new(Arc::new(ParsedUrl::new(url)), api_root, route_path)
     }
 
     fn route_path(&self, namespace: String, endpoint_path: String) -> String {
@@ -130,7 +131,7 @@ impl Default for WpComApiClientInternalUrlResolver {
 }
 
 impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
-    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
+    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ResolvedUrl> {
         {
             if WpNamespace::iter().any(|n| n.namespace_value() == namespace) {
                 panic!(
@@ -138,12 +139,14 @@ impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
                 );
             }
         }
-        Arc::new(
-            self.base_url
-                .by_extending_and_splitting_by_forward_slash(
-                    vec![namespace].into_iter().chain(endpoint_segments),
-                )
-                .into(),
+        let route_path = self.route_path(namespace.clone(), endpoint_segments.join("/"));
+        let url = self.base_url.by_extending_and_splitting_by_forward_slash(
+            vec![namespace].into_iter().chain(endpoint_segments),
+        );
+        ResolvedUrl::new(
+            Arc::new(ParsedUrl::new(url)),
+            Arc::new(self.base_url.clone()),
+            route_path,
         )
     }
 
@@ -207,6 +210,7 @@ pub(crate) mod tests {
         assert_eq!(
             resolver
                 .resolve(namespace.to_string(), endpoint_segments)
+                .url()
                 .url(),
             expected_url
         );

@@ -283,7 +283,7 @@ pub fn fn_body_get_url_from_api_url_resolver(
         })
         .collect::<Vec<TokenStream>>();
     quote! {
-        let mut url = std::sync::Arc::unwrap_or_clone(self.api_url_resolver.resolve( #enum_ident::namespace(&#enum_ident::#variant_ident).namespace_value().to_string() , vec![#(#url_parts,)*])).inner;
+        let mut url = std::sync::Arc::unwrap_or_clone(self.api_url_resolver.resolve( #enum_ident::namespace(&#enum_ident::#variant_ident).namespace_value().to_string() , vec![#(#url_parts,)*]).url()).inner;
     }
 }
 
