@@ -4,9 +4,10 @@
 //! the discovered root and silently collapsed to the API index.
 //!
 //! Each test flips the shared integration-test server to plain permalinks for
-//! the duration of the test, then restores the original structure as its last
-//! step (the same pattern the other `_mut` tests use with `RestoreServer::db()`).
-//! They are `#[serial]` because they mutate a *global* server setting.
+//! the duration of the test via a `PlainPermalinks` guard that restores the
+//! original structure on drop — including on unwind, so a failed assertion can't
+//! leave the shared server mis-configured. They are `#[serial]` because they
+//! mutate a *global* server setting.
 //!
 //! [#1366]: https://github.com/Automattic/wordpress-rs/issues/1366
 
@@ -23,13 +24,31 @@ use wp_api::{
 };
 use wp_api_integration_tests::prelude::{AssertResponse, TestCredentials, serial};
 
+/// Flips the shared server to plain (`?rest_route=`) permalinks and restores the
+/// original structure on drop — including on unwind, so a failed assertion can't
+/// leave the shared server mis-configured for the rest of the run.
+struct PlainPermalinks(String);
+
+impl PlainPermalinks {
+    fn set() -> Self {
+        let original = wp_cli::get_permalink_structure();
+        wp_cli::set_permalink_structure("");
+        Self(original)
+    }
+}
+
+impl Drop for PlainPermalinks {
+    fn drop(&mut self) {
+        wp_cli::set_permalink_structure(&self.0);
+    }
+}
+
 #[tokio::test]
 #[serial]
 async fn login_and_fetch_users_me_on_plain_permalinks_site() {
-    // Capture the server's current (date-based) permalink structure so we can
-    // put it back at the end, then switch the site to "Plain".
-    let original_permalink_structure = wp_cli::get_permalink_structure();
-    wp_cli::set_permalink_structure("");
+    // Switch the shared server to "Plain" permalinks; `_plain` restores the
+    // original structure on drop, even if an assertion below panics.
+    let _plain = PlainPermalinks::set();
 
     let executor = Arc::new(ReqwestRequestExecutor::default());
     let client = discover_and_build_admin_client(executor).await;
@@ -41,9 +60,6 @@ async fn login_and_fetch_users_me_on_plain_permalinks_site() {
         .assert_response()
         .data;
     assert_eq!(user.id.0, 1, "admin user should have id 1");
-
-    // Restore the original permalink structure for subsequent tests.
-    wp_cli::set_permalink_structure(&original_permalink_structure);
 }
 
 /// Companion to the `/users/me` check above, but through a *parameterized*
@@ -56,8 +72,7 @@ async fn login_and_fetch_users_me_on_plain_permalinks_site() {
 #[tokio::test]
 #[serial]
 async fn fetch_object_by_id_on_plain_permalinks_site() {
-    let original_permalink_structure = wp_cli::get_permalink_structure();
-    wp_cli::set_permalink_structure("");
+    let _plain = PlainPermalinks::set();
 
     let executor = Arc::new(ReqwestRequestExecutor::default());
     let client = discover_and_build_admin_client(executor).await;
@@ -71,8 +86,6 @@ async fn fetch_object_by_id_on_plain_permalinks_site() {
         .assert_response()
         .data;
     assert_eq!(user.id.0, 1, "retrieving user 1 should return user 1");
-
-    wp_cli::set_permalink_structure(&original_permalink_structure);
 }
 
 /// Discovers the (rest_route) API root on the now-plain-permalinks site and
