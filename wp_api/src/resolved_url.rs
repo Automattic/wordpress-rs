@@ -26,6 +26,16 @@ pub struct ResolvedUrl {
     route_path: String,
 }
 
+impl ResolvedUrl {
+    /// The request URL as a borrowed string slice — the Rust-side, zero-copy
+    /// counterpart to [`url`](Self::url), mirroring [`ParsedUrl::as_str`]. Not
+    /// exported across the FFI (a borrow can't cross it), so Swift/Kotlin use
+    /// `url()` instead.
+    pub fn as_str(&self) -> &str {
+        self.inner.as_str()
+    }
+}
+
 #[uniffi::export]
 impl ResolvedUrl {
     /// Assembles a `ResolvedUrl` from its parts.
@@ -150,20 +160,20 @@ mod tests {
     }
 
     #[test]
-    fn url_and_parsed_url_return_the_request_url() {
+    fn url_accessors_return_the_request_url() {
         let resolved = resolved(
             "https://example.com/wp-json/wp/v2/themes?context=edit",
             "https://example.com/wp-json",
             "/wp/v2/themes",
         );
-        // `url()` mirrors `ParsedUrl::url()` — the URL string.
-        assert_eq!(
-            resolved.url(),
-            "https://example.com/wp-json/wp/v2/themes?context=edit"
-        );
+        let expected = "https://example.com/wp-json/wp/v2/themes?context=edit";
+        // `url()` mirrors `ParsedUrl::url()` — the owned URL string.
+        assert_eq!(resolved.url(), expected);
+        // `as_str()` mirrors `ParsedUrl::as_str()` — the same value, borrowed.
+        assert_eq!(resolved.as_str(), expected);
         // `parsed_url()` is the escape hatch to the `ParsedUrl` object; its own
         // `url()` returns the same string.
-        assert_eq!(resolved.parsed_url().url(), resolved.url());
+        assert_eq!(resolved.parsed_url().url(), expected);
     }
 
     #[test]
