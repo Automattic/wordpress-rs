@@ -957,7 +957,7 @@ mod tests {
         let resolver = wp_org_resolver();
         let resolved = resolver
             .resolve(namespace.to_string(), vec![endpoint_path.to_string()])
-            .url();
+            .parsed_url();
         let route_key = resolver.route_path(namespace.to_string(), endpoint_path.to_string());
 
         assert!(
@@ -980,7 +980,7 @@ mod tests {
         let resolver = wp_com_resolver("mobile.blog");
         let resolved = resolver
             .resolve(namespace.to_string(), vec![endpoint_path.to_string()])
-            .url();
+            .parsed_url();
         let route_key = resolver.route_path(namespace.to_string(), endpoint_path.to_string());
 
         assert!(

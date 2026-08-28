@@ -45,8 +45,16 @@ impl ResolvedUrl {
         })
     }
 
-    /// The request URL to actually fetch.
-    pub fn url(&self) -> Arc<ParsedUrl> {
+    /// The request URL to actually fetch, as a string. Mirrors
+    /// [`ParsedUrl::url`], so a `resolve(...).url()` call site keeps returning
+    /// the same string it did when `resolve` returned a `ParsedUrl`.
+    pub fn url(&self) -> String {
+        self.inner.to_string()
+    }
+
+    /// The request URL to actually fetch, as a [`ParsedUrl`] — the escape hatch
+    /// for anywhere a `ParsedUrl` is needed (further query edits, comparisons).
+    pub fn parsed_url(&self) -> Arc<ParsedUrl> {
         Arc::new(ParsedUrl::new(self.inner.clone()))
     }
 
@@ -142,16 +150,20 @@ mod tests {
     }
 
     #[test]
-    fn url_returns_the_request_url() {
+    fn url_and_parsed_url_return_the_request_url() {
         let resolved = resolved(
             "https://example.com/wp-json/wp/v2/themes?context=edit",
             "https://example.com/wp-json",
             "/wp/v2/themes",
         );
+        // `url()` mirrors `ParsedUrl::url()` — the URL string.
         assert_eq!(
-            resolved.url().url(),
+            resolved.url(),
             "https://example.com/wp-json/wp/v2/themes?context=edit"
         );
+        // `parsed_url()` is the escape hatch to the `ParsedUrl` object; its own
+        // `url()` returns the same string.
+        assert_eq!(resolved.parsed_url().url(), resolved.url());
     }
 
     #[test]
@@ -164,7 +176,7 @@ mod tests {
         let appended = resolved
             .by_appending_query_pairs(query_pairs(&[("context", "edit"), ("status", "active")]));
         assert_eq!(
-            appended.url().url(),
+            appended.url(),
             "https://example.com/wp-json/wp/v2/themes?context=edit&status=active"
         );
         assert_eq!(

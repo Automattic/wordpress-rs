@@ -254,7 +254,6 @@ mod tests {
         assert_eq!(
             resolver
                 .resolve(namespace.to_string(), endpoint_segments)
-                .url()
                 .url(),
             expected
         );
@@ -295,7 +294,7 @@ mod tests {
                 value: "core,gutenberg".to_string(),
             },
         ]);
-        assert_eq!(result.url().url(), expected);
+        assert_eq!(result.url(), expected);
         // The canonical route key is origin-less and identical on every API-root
         // form — the request URLs above differ, but the key does not.
         assert_eq!(
@@ -370,7 +369,7 @@ mod tests {
                         })
                         .collect(),
                 );
-            assert_eq!(resolved.url().url(), expected_url);
+            assert_eq!(resolved.url(), expected_url);
             // Identical for BOTH roots.
             assert_eq!(resolved.canonical_route_key(), expected_key);
         }

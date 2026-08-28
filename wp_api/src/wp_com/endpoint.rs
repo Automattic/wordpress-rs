@@ -210,7 +210,6 @@ pub(crate) mod tests {
         assert_eq!(
             resolver
                 .resolve(namespace.to_string(), endpoint_segments)
-                .url()
                 .url(),
             expected_url
         );
