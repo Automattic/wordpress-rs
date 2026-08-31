@@ -334,8 +334,12 @@ private fun RequestExecutionErrorReason.Companion.unknownHost(
     networkAvailabilityProvider: NetworkAvailabilityProvider
 ): RequestExecutionErrorReason {
     if (!networkAvailabilityProvider.isNetworkAvailable()) {
+        // Leave the message empty so the library renders its own localized, translated
+        // offline string (`device_is_offline`). The raw `UnknownHostException` text is a
+        // DNS diagnostic, not something to show a user; iOS instead passes Apple's
+        // localized `URLError` description here, which the library renders as-is.
         return RequestExecutionErrorReason.DeviceIsOfflineError(
-            errorMessage = e.localizedMessage ?: "No internet connection"
+            errorMessage = ""
         )
     }
 

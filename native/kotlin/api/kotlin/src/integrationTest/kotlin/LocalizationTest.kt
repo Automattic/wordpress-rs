@@ -6,9 +6,10 @@ import uniffi.wp_api.FetchAndParseApiRootFailure
 import uniffi.wp_api.FindApiRootFailure
 import uniffi.wp_api.ParseUrlException
 import uniffi.wp_api.ParsedUrl
+import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.WpErrorCode
 import uniffi.wp_api.localizedDescription
-import uniffi.wp_localization.wpLocaleResolve
+import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -21,8 +22,8 @@ import kotlin.test.assertFailsWith
  */
 class LocalizationTest {
 
-    private val enUs = wpLocaleResolve(listOf("en-US"))
-    private val trTr = wpLocaleResolve(listOf("tr-TR"))
+    private val enUs = listOf(Locale.forLanguageTag("en-US"))
+    private val trTr = listOf(Locale.forLanguageTag("tr-TR"))
 
     @Test
     fun parseUrlErrorRendersLocalizedMessage() {
@@ -67,5 +68,36 @@ class LocalizationTest {
         )
 
         assertEquals("This site is private.", failure.localizedDescription(enUs))
+    }
+
+    /**
+     * An offline device supplies no platform message, so the library renders its own
+     * localized, translated string rather than echoing the raw `UnknownHostException` text.
+     * This is the empty-`errorMessage` path the Kotlin executor now takes.
+     */
+    @Test
+    fun deviceOfflineWithoutPlatformMessageRendersLocalizedFallback() {
+        val offline = RequestExecutionErrorReason.DeviceIsOfflineError(errorMessage = "")
+
+        assertEquals(
+            "No internet connection. Please check your network settings and try again.",
+            offline.localizedDescription(enUs),
+        )
+    }
+
+    /**
+     * When a platform executor supplies its own already-localized offline description — as the
+     * Swift executor does with Apple's `URLError` — it is preserved rather than replaced.
+     */
+    @Test
+    fun deviceOfflineWithPlatformMessagePassesItThrough() {
+        val offline = RequestExecutionErrorReason.DeviceIsOfflineError(
+            errorMessage = "The Internet connection appears to be offline.",
+        )
+
+        assertEquals(
+            "The Internet connection appears to be offline.",
+            offline.localizedDescription(enUs),
+        )
     }
 }

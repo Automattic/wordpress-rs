@@ -27,7 +27,7 @@ class LocalizedErrorParityTest {
             .map { it.parameterTypes[0] }
             .toSet()
 
-        // `T.localizedDescription(locale)` compiles to `localizedDescription(T, WpLocale)`;
+        // `T.localizedDescription(locales)` compiles to `localizedDescription(T, List)`;
         // its `$default` overload is a distinct method name, so it's excluded here.
         val extended = methods
             .filter { it.name == "localizedDescription" }

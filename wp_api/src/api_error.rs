@@ -880,7 +880,15 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
                 WpMessages::http_forbidden_error(hostname)
             }
             RequestExecutionErrorReason::DeviceIsOfflineError { error_message } => {
-                WpMessages::just(error_message)
+                // A platform executor may hand us its own already-localized offline
+                // string (e.g. Apple's `URLError.localizedDescription`); pass that
+                // through. When it supplies none (empty), render our own translated
+                // message rather than echoing a raw diagnostic like a DNS failure.
+                if error_message.is_empty() {
+                    WpMessages::device_is_offline()
+                } else {
+                    WpMessages::just(error_message)
+                }
             }
             RequestExecutionErrorReason::ConnectionError { reason } => {
                 WpMessages::connection_error(reason)
@@ -1019,6 +1027,35 @@ mod tests {
         let reason = device_is_offline();
         assert!(reason.is_device_offline());
         assert!(!reason.is_site_unreachable());
+    }
+
+    /// An offline device supplies no platform message, so the library renders its own
+    /// localized, translated string rather than echoing a raw DNS diagnostic. This is the
+    /// empty-`error_message` path the Kotlin executor now takes.
+    #[test]
+    fn device_offline_without_platform_message_renders_localized_fallback() {
+        use wp_localization::{WpLocale, WpLocalizable};
+        let offline = RequestExecutionErrorReason::DeviceIsOfflineError {
+            error_message: String::new(),
+        };
+        assert_eq!(
+            offline.localize(Some(WpLocale::from("en-US"))),
+            "No internet connection. Please check your network settings and try again."
+        );
+    }
+
+    /// When a platform executor supplies its own already-localized offline description (as the
+    /// Swift executor does with Apple's `URLError`), it is preserved rather than replaced.
+    #[test]
+    fn device_offline_with_platform_message_passes_it_through() {
+        use wp_localization::{WpLocale, WpLocalizable};
+        let offline = RequestExecutionErrorReason::DeviceIsOfflineError {
+            error_message: "The Internet connection appears to be offline.".to_string(),
+        };
+        assert_eq!(
+            offline.localize(Some(WpLocale::from("en-US"))),
+            "The Internet connection appears to be offline."
+        );
     }
 
     /// Neither predicate should fire for the other reasons, which represent a
