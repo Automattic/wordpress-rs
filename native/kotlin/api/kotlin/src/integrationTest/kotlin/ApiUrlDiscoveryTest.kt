@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Assertions.assertInstanceOf
 import uniffi.wp_api.ApplicationPasswordsNotSupportedReason
 import uniffi.wp_api.ApplicationPasswordsNotSupportedReason.ApplicationPasswordsDisabledForHttpSite
 import uniffi.wp_api.ApplicationPasswordsNotSupportedReason.SiteIsLocalDevelopmentEnvironment
+import uniffi.wp_api.AutoDiscoveryAttemptFailure
 import uniffi.wp_api.AutoDiscoveryAttemptSuccess
 import uniffi.wp_api.applicationPasswordsUrl
 import uniffi.wp_api.FetchAndParseApiRootFailure
@@ -376,19 +377,27 @@ private fun AutoDiscoveryAttemptSuccess.assertApplicationPasswordsUrl(): String 
     return parsedUrl.url()
 }
 
+private fun ApiDiscoveryResult.assertFailure(): AutoDiscoveryAttemptFailure {
+    assert(this is ApiDiscoveryResult.Failure)
+    return (this as ApiDiscoveryResult.Failure).failure
+}
+
 private fun ApiDiscoveryResult.assertFailureParseSiteUrl(): ParseUrlException {
-    assert(this is ApiDiscoveryResult.FailureParseSiteUrl)
-    return (this as ApiDiscoveryResult.FailureParseSiteUrl).error
+    val failure = assertFailure()
+    assert(failure is AutoDiscoveryAttemptFailure.ParseSiteUrl)
+    return (failure as AutoDiscoveryAttemptFailure.ParseSiteUrl).error
 }
 
 private fun ApiDiscoveryResult.assertFailureFindApiRoot(): FindApiRootFailure {
-    assert(this is ApiDiscoveryResult.FailureFindApiRoot)
-    return (this as ApiDiscoveryResult.FailureFindApiRoot).findApiRootFailure
+    val failure = assertFailure()
+    assert(failure is AutoDiscoveryAttemptFailure.FindApiRoot)
+    return (failure as AutoDiscoveryAttemptFailure.FindApiRoot).findApiRootFailure
 }
 
 private fun ApiDiscoveryResult.assertFailureFetchAndParseApiRoot(): FetchAndParseApiRootFailure {
-    assert(this is ApiDiscoveryResult.FailureFetchAndParseApiRoot)
-    return (this as ApiDiscoveryResult.FailureFetchAndParseApiRoot).fetchAndParseApiRootFailure
+    val failure = assertFailure()
+    assert(failure is AutoDiscoveryAttemptFailure.FetchAndParseApiRoot)
+    return (failure as AutoDiscoveryAttemptFailure.FetchAndParseApiRoot).fetchAndParseApiRootFailure
 }
 
 private fun FetchAndParseApiRootFailure.getApplicationPasswordsNotSupportedReason(): ApplicationPasswordsNotSupportedReason? {

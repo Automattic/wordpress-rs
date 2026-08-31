@@ -33,31 +33,29 @@ class LocalizationTest {
     }
 
     /**
-     * Part 2: the wrapper used to mislabel `RestApiDisabled` as "Could not connect to
-     * $url." It now surfaces the actionable, translated reason.
+     * Part 2: `RestApiDisabled` used to be mislabeled "Could not connect to $url." — the
+     * failure `WpLoginClient.apiDiscovery` passes through now carries the actionable,
+     * translated reason.
      */
     @Test
-    fun restApiDisabledSurfacesLocalizedReason() {
+    fun restApiDisabledRendersLocalizedReason() {
         val failure = AutoDiscoveryAttemptFailure.FindApiRoot(
             parsedSiteUrl = ParsedUrl.parse("https://example.com"),
             findApiRootFailure = FindApiRootFailure.RestApiDisabled,
         )
-        val result = ApiDiscoveryResult.FailureFindApiRoot(failure)
 
         assertEquals(
             "The site's REST API is disabled. Please update your site settings to enable REST API.",
             failure.localizedDescription(enUs),
         )
-        // `userFacingErrorMessage()` delegates to the same localized surface (device locale).
-        assertEquals(failure.localizedDescription(), result.userFacingErrorMessage())
     }
 
     /**
      * Part 2 (flagship): a private site used to collapse into "Found a site at $url but
-     * failed to read its API configuration." The server's own reason is now surfaced.
+     * failed to read its API configuration." — the server's own reason now renders.
      */
     @Test
-    fun privateSiteSurfacesServerErrorMessage() {
+    fun privateSiteRendersServerErrorMessage() {
         val failure = AutoDiscoveryAttemptFailure.FetchAndParseApiRoot(
             parsedSiteUrl = ParsedUrl.parse("https://private.example.com"),
             apiRootUrl = ParsedUrl.parse("https://private.example.com/wp-json"),
@@ -67,9 +65,7 @@ class LocalizationTest {
                 statusCode = 401u,
             ),
         )
-        val result = ApiDiscoveryResult.FailureFetchAndParseApiRoot(failure)
 
         assertEquals("This site is private.", failure.localizedDescription(enUs))
-        assertEquals(failure.localizedDescription(), result.userFacingErrorMessage())
     }
 }

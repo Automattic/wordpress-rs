@@ -28,6 +28,7 @@ import uniffi.wp_api.WpComOauthScope
 import uniffi.wp_api.WpComSiteIdentifier
 import uniffi.wp_api.applicationPasswordsUrl
 import uniffi.wp_api.buildTokenRequestUrl
+import uniffi.wp_api.localizedDescription
 import uniffi.wp_api.parseAuthorizationUrl
 import uniffi.wp_api.wordpressComOauth2Configuration
 import uniffi.wp_mobile.Account
@@ -63,10 +64,9 @@ class WelcomeActivity : ComponentActivity() {
                 val apiDiscoveryResult = WpLoginClient(emptyList(), networkAvailabilityProvider).apiDiscovery(url)
                 val success = when (apiDiscoveryResult) {
                     is ApiDiscoveryResult.Success -> apiDiscoveryResult.success
-                    else -> {
+                    is ApiDiscoveryResult.Failure -> {
                         runOnUiThread {
-                            val message = apiDiscoveryResult.userFacingErrorMessage()
-                                ?: "Failed to discover site API"
+                            val message = apiDiscoveryResult.failure.localizedDescription()
                             Toast.makeText(this@WelcomeActivity, message, Toast.LENGTH_LONG).show()
                             onError(message)
                         }
