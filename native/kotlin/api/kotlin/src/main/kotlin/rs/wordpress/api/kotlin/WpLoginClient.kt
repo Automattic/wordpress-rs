@@ -45,20 +45,17 @@ class WpLoginClient @JvmOverloads constructor(
             ApiDiscoveryResult.Success(success)
         } catch (exception: AutoDiscoveryAttemptFailure) {
             errorLogger?.logFailedDiscovery(exception)
+            // Retain the whole `AutoDiscoveryAttemptFailure` rather than destructuring it
+            // away: it is the only discovery type that carries a localized, translated
+            // message (`localizedDescription()`), so dropping it here would discard the
+            // actionable reason for the failure.
             when (exception) {
-                is AutoDiscoveryAttemptFailure.ParseSiteUrl -> ApiDiscoveryResult.FailureParseSiteUrl(
-                    error = exception.error,
-                )
-                is AutoDiscoveryAttemptFailure.FindApiRoot -> ApiDiscoveryResult.FailureFindApiRoot(
-                    parsedSiteUrl = exception.parsedSiteUrl.toURL(),
-                    findApiRootFailure = exception.findApiRootFailure,
-                )
-
-                is AutoDiscoveryAttemptFailure.FetchAndParseApiRoot -> ApiDiscoveryResult.FailureFetchAndParseApiRoot(
-                    parsedSiteUrl = exception.parsedSiteUrl.toURL(),
-                    apiRootUrl = exception.apiRootUrl.toURL(),
-                    fetchAndParseApiRootFailure = exception.fetchAndParseApiRootFailure
-                )
+                is AutoDiscoveryAttemptFailure.ParseSiteUrl ->
+                    ApiDiscoveryResult.FailureParseSiteUrl(exception)
+                is AutoDiscoveryAttemptFailure.FindApiRoot ->
+                    ApiDiscoveryResult.FailureFindApiRoot(exception)
+                is AutoDiscoveryAttemptFailure.FetchAndParseApiRoot ->
+                    ApiDiscoveryResult.FailureFetchAndParseApiRoot(exception)
             }
         }
     }

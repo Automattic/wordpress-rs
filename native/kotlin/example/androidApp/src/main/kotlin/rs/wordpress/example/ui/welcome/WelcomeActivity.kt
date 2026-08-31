@@ -65,7 +65,7 @@ class WelcomeActivity : ComponentActivity() {
                     is ApiDiscoveryResult.Success -> apiDiscoveryResult.success
                     else -> {
                         runOnUiThread {
-                            val message = apiDiscoveryResult.userFacingErrorMessage(url)
+                            val message = apiDiscoveryResult.userFacingErrorMessage()
                                 ?: "Failed to discover site API"
                             Toast.makeText(this@WelcomeActivity, message, Toast.LENGTH_LONG).show()
                             onError(message)

@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - WordPress.com requests now carry a locale query parameter, taken from a `WpComLanguageProvider` set on `WpApiClientDelegate.language_provider`. `/rest/v1.1`, `/rest/v1.2` and `/rest/v1.3` get `locale`; `/wpcom/v2` gets `_locale`; `/oauth2` and every WordPress.org namespace get neither. The provider is asked once per request, so a client is free to return a live value.
+- Kotlin can now read the library's localized, translated message for any error that supports it, via a `localizedDescription(locale)` extension resolving to the device locale by default — e.g. `ParseUrlException.localizedDescription()`, `AutoDiscoveryAttemptFailure.localizedDescription()`. This is the counterpart to Swift's generated `LocalizedError.errorDescription`; both are generated from the same `WpSupportsLocalization` set and render the same FTL translation, so Android no longer hand-rolls English and every localizable type gets its Kotlin message with no per-type edit.
 
 ### Fixed
 
 - **BREAKING:** Support-bot message sources (`BotMessageContextSource`) now parse when the bot only returns `title`, `content`, and `url`. Some bots (e.g. `jetpack-workflow-chat_mobile_support`) omit `heading`, `blog_id`, `post_id`, `score`, and `last_indexed_at`, which previously failed the untagged `MessageContext` match and aborted parsing of the whole conversation response. Those five fields plus `url` are now optional (`Option<...>`), so binding consumers reading them as non-null must handle the nullable type.
+- **BREAKING (Kotlin):** `ApiDiscoveryResult.userFacingErrorMessage()` returns the localized, translated failure reason instead of a hand-rolled English string that collapsed distinct failures into one message. A private site now surfaces the server's own reason (e.g. "This site is private.") rather than "Found a site at $url but failed to read its API configuration.", and `RestApiDisabled` is no longer mislabeled "Could not connect". The method dropped its `url` argument — the localized messages carry their own context — and each `ApiDiscoveryResult.Failure*` variant now wraps the originating `AutoDiscoveryAttemptFailure` as `failure` (the previously destructured fields remain as accessors), so the localizable object is preserved rather than discarded. Call `userFacingErrorMessage()` with no argument, or `failure.localizedDescription()` directly.
 
 ### Removed
 

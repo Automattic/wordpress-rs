@@ -1,64 +1,73 @@
 package rs.wordpress.api.kotlin
 
+import uniffi.wp_api.AutoDiscoveryAttemptFailure
 import uniffi.wp_api.AutoDiscoveryAttemptSuccess
 import uniffi.wp_api.FetchAndParseApiRootFailure
 import uniffi.wp_api.FindApiRootFailure
 import uniffi.wp_api.ParseUrlException
-import uniffi.wp_api.RequestExecutionErrorReason
-import uniffi.wp_api.RequestExecutionException
+import uniffi.wp_api.localizedDescription
 import java.net.URL
 
 sealed class ApiDiscoveryResult {
     data class Success(val success: AutoDiscoveryAttemptSuccess) : ApiDiscoveryResult()
-    data class FailureParseSiteUrl(
-        val error: ParseUrlException
-    ) : ApiDiscoveryResult()
-    data class FailureFindApiRoot(
-        val parsedSiteUrl: URL,
-        val findApiRootFailure: FindApiRootFailure
-    ) : ApiDiscoveryResult()
-    data class FailureFetchAndParseApiRoot(
-        val parsedSiteUrl: URL,
-        val apiRootUrl: URL,
-        val fetchAndParseApiRootFailure: FetchAndParseApiRootFailure
-    ) : ApiDiscoveryResult()
 
     /**
-     * Returns a user-facing error message for failed discovery attempts, or `null` on success.
-     *
-     * @param url The site URL that was used for discovery, included in messages for context.
+     * The site URL could not be parsed. [failure] carries the localized, translated
+     * reason; read it with `localizedDescription()`.
      */
-    fun userFacingErrorMessage(url: String): String? = when (this) {
-        is Success -> null
-        is FailureParseSiteUrl -> "Invalid site URL: $url"
-        is FailureFindApiRoot -> findApiRootFailure.userFacingMessage(url)
-        is FailureFetchAndParseApiRoot -> "Found a site at $url but failed to read its API configuration."
+    data class FailureParseSiteUrl(
+        val failure: AutoDiscoveryAttemptFailure.ParseSiteUrl
+    ) : ApiDiscoveryResult() {
+        val error: ParseUrlException get() = failure.error
     }
-}
 
-private fun FindApiRootFailure.userFacingMessage(url: String): String {
-    val reason = when (this) {
-        is FindApiRootFailure.FetchHomepage ->
-            (error as? RequestExecutionException.RequestExecutionFailed)?.reason
-        else -> null
+    /**
+     * The API root could not be found. [failure] carries the localized, translated
+     * reason; read it with `localizedDescription()`.
+     */
+    data class FailureFindApiRoot(
+        val failure: AutoDiscoveryAttemptFailure.FindApiRoot
+    ) : ApiDiscoveryResult() {
+        val parsedSiteUrl: URL get() = failure.parsedSiteUrl.toURL()
+        val findApiRootFailure: FindApiRootFailure get() = failure.findApiRootFailure
     }
-    return when (reason) {
-        is RequestExecutionErrorReason.DeviceIsOfflineError ->
-            "No internet connection. Please check your network settings and try again."
-        is RequestExecutionErrorReason.NonExistentSiteError ->
-            "Could not find a site at $url. Check the URL and try again."
-        is RequestExecutionErrorReason.InvalidSslError ->
-            "SSL certificate error for $url."
-        is RequestExecutionErrorReason.HttpAuthenticationRequiredError ->
-            "$url requires HTTP authentication."
-        is RequestExecutionErrorReason.HttpAuthenticationRejectedError ->
-            "HTTP authentication credentials were rejected by $url."
-        is RequestExecutionErrorReason.MisconfiguredRateLimitError ->
-            "$url is rate-limiting requests. Try again later."
-        else -> when (this) {
-            is FindApiRootFailure.ProbablyNotAWordPressSite ->
-                "$url does not appear to be a WordPress site."
-            else -> "Could not connect to $url."
+
+    /**
+     * A site was found but its API configuration could not be read. [failure] carries
+     * the localized, translated reason — the server error, the plugin blocking
+     * Application Passwords, and so on — which `localizedDescription()` surfaces without
+     * collapsing the distinct cases into one message.
+     */
+    data class FailureFetchAndParseApiRoot(
+        val failure: AutoDiscoveryAttemptFailure.FetchAndParseApiRoot
+    ) : ApiDiscoveryResult() {
+        val parsedSiteUrl: URL get() = failure.parsedSiteUrl.toURL()
+        val apiRootUrl: URL get() = failure.apiRootUrl.toURL()
+        val fetchAndParseApiRootFailure: FetchAndParseApiRootFailure
+            get() = failure.fetchAndParseApiRootFailure
+    }
+
+    /**
+     * The retained discovery failure, or `null` on success. Every failure variant
+     * wraps an [AutoDiscoveryAttemptFailure], so callers can obtain its localized
+     * message directly via `localizedDescription()`.
+     */
+    val failureOrNull: AutoDiscoveryAttemptFailure?
+        get() = when (this) {
+            is Success -> null
+            is FailureParseSiteUrl -> failure
+            is FailureFindApiRoot -> failure
+            is FailureFetchAndParseApiRoot -> failure
         }
-    }
+
+    /**
+     * Returns the localized, translated user-facing error message for a failed
+     * discovery attempt, or `null` on success.
+     *
+     * The message is rendered from the library's translations (the same ones iOS
+     * shows), resolved to the device locale. It distinguishes every failure — a
+     * private site, a plugin blocking Application Passwords, a disabled REST API,
+     * a network error — rather than collapsing them into a single English string.
+     */
+    fun userFacingErrorMessage(): String? = failureOrNull?.localizedDescription()
 }
