@@ -630,6 +630,8 @@ mod tests {
         );
     }
 
+    // WordPress REST API index (`/wp-json/`) fixtures; each must deserialize into
+    // `WpApiDetails`. See `test-data/api-details/README.md` for what each covers.
     #[rstest]
     #[case("api-details/test-case-01.json")]
     #[case("api-details/test-case-02.json")]
@@ -638,6 +640,7 @@ mod tests {
     #[case("api-details/test-case-05.json")]
     #[case("api-details/test-case-06.json")]
     #[case("api-details/test-case-07.json")]
+    #[case("api-details/test-case-08.json")] // minimal private-site root
     fn test_api_details_json(#[case] input: &str) {
         let json = test_json(input).expect("Failed to read test resource");
 
@@ -646,6 +649,33 @@ mod tests {
         assert!(
             result.is_ok(),
             "Failed to parse json as `WpApiDetails`: {result:#?}"
+        );
+    }
+
+    // Validates that the minimal API root a private site emits parses correctly:
+    // empty `namespaces` and `routes`, no `timezone_string`/`site_icon_url`, and
+    // only the application-passwords authentication endpoint advertised.
+    #[test]
+    fn test_parse_private_site_api_root() {
+        let json =
+            test_json("api-details/test-case-08.json").expect("Failed to read test resource");
+        let result = WpApiDetails::try_from(json.as_slice());
+
+        let api_details =
+            result.unwrap_or_else(|e| panic!("Failed to parse json as `WpApiDetails`: {e:#?}"));
+
+        assert_eq!(api_details.name, "Private Site");
+        assert_eq!(api_details.description, "");
+        assert_eq!(api_details.url, "https://example.com");
+        assert_eq!(api_details.home, "https://example.com");
+        assert_eq!(api_details.gmt_offset, Some(0.0));
+        assert!(api_details.namespaces.is_empty());
+        assert!(api_details.routes.is_empty());
+
+        assert!(api_details.has_application_passwords_authentication_url());
+        assert_eq!(
+            api_details.find_application_passwords_authentication_url(),
+            Some("https://example.com/wp-admin/authorize-application.php".to_string())
         );
     }
 

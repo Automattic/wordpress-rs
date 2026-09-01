@@ -1,0 +1,16 @@
+{
+    "name": "Private Site",
+    "description": "",
+    "url": "https://example.com",
+    "home": "https://example.com",
+    "gmt_offset": 0,
+    "namespaces": [],
+    "authentication": {
+        "application-passwords": {
+            "endpoints": {
+                "authorization": "https://example.com/wp-admin/authorize-application.php"
+            }
+        }
+    },
+    "routes": {}
+}
