@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `unspam` and `untrash` comment endpoints, mirroring wp-admin's "Not Spam" and "Restore" actions. They restore the comment's saved pre-spam/pre-trash status, which a plain `hold` status write would not do. Replaces the `CommentStatus.custom("unspam")` / `custom("untrash")` workaround.
 - WordPress.com `POST /me/transactions` endpoint for redeeming a shopping cart with the account's WordPress.com credits, completing a domain purchase
 - WordPress.com `GET /sites/<site_id>/purchases` endpoint for listing a site's purchases (plans, domains, and other subscriptions)
 - Publish the Kotlin bindings' per-endpoint Markdown API reference as an `ai-docs` Maven classifier zip on `rs.wordpress.api:kotlin`, generated from the UniFFI bindings for agent/tooling consumption
