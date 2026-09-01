@@ -54,28 +54,13 @@ swift-docs-only:
 	tar -czf swift-docs.tar.gz docs
 
 release-on-ci:
-	@[ -n "$(BUILDKITE_API_TOKEN)" ] || (echo "BUILDKITE_API_TOKEN is not set" && exit 1)
-	@[ -n "$(WORDPRESS_RS_NEW_VERSION)" ] || (echo "WORDPRESS_RS_NEW_VERSION is not set" && exit 1)
-
-	@echo "Triggering a release job on Buildkite. New version: $(WORDPRESS_RS_NEW_VERSION)"
-
-	@mkdir -p .build
-	@echo '{ \
-			"commit": "HEAD", \
-			"branch": "trunk", \
-			"message": "Publishing a new release", \
-			"env": {"NEW_VERSION":"${WORDPRESS_RS_NEW_VERSION}"} \
-		}' | jq > .build/buildkite_release_job_request.json
-
-	@curl -s "https://api.buildkite.com/v2/organizations/automattic/pipelines/wordpress-rs/builds" \
-		-H "Authorization: Bearer $(BUILDKITE_API_TOKEN)" \
-		--json @.build/buildkite_release_job_request.json \
-		--output .build/buildkite_release_job_response.json
-
-	@echo "Buildkite job triggerd. See .build/buildkite_release_job_response.json for the buildkite job details."
+	@# Help: Deprecated. Cut releases by merging a version bump PR; see Documentation/RELEASING.md.
+	@echo "'make release-on-ci' no longer triggers a release."
 	@echo ""
-	@echo "Swift package will be released by https://buildkite.com/automattic/wordpress-rs/builds/$$(jq -r '.number' .build/buildkite_release_job_response.json)"
-	@echo "Once that job finishes, Android libraries will be release by https://buildkite.com/automattic/wordpress-rs/builds?branch=$(WORDPRESS_RS_NEW_VERSION)"
+	@echo "Releases are cut by merging a version bump PR to trunk."
+	@echo "See Documentation/RELEASING.md for the full process, including how to force"
+	@echo "or re-run a release from the Buildkite UI."
+	@exit 1
 
 apple-platform-targets-macos := x86_64-apple-darwin aarch64-apple-darwin
 apple-platform-targets-ios := aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
