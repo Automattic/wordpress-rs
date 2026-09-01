@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-01
+
 ### Added
 
 - WordPress.com requests now carry a locale query parameter, taken from a `WpComLanguageProvider` set on `WpApiClientDelegate.language_provider`. `/rest/v1.1`, `/rest/v1.2` and `/rest/v1.3` get `locale`; `/wpcom/v2` gets `_locale`; `/oauth2` and every WordPress.org namespace get neither. The provider is asked once per request, so a client is free to return a live value.
