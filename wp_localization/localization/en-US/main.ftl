@@ -21,6 +21,8 @@ invalid_ssl_error_generic_ssl_error = Unable to establish a secure connection to
 
 non_existent_site_error = A server with the specified hostname could not be found.
 
+device_is_offline = No internet connection. Please check your network settings and try again.
+
 http_authentication_required_error = The server at {$url} requires authentication. Please provide your username and password.
 http_forbidden_error = The server at {$url} denied access to the requested resource. Please check your site's configuration.
 http_timeout_error = The connection timed out

@@ -41,25 +41,12 @@ class WpLoginClient @JvmOverloads constructor(
         siteUrl: String
     ): ApiDiscoveryResult = withContext(dispatcher) {
         try {
-            val success = internalClient.apiDiscovery(siteUrl, null)
-            ApiDiscoveryResult.Success(success)
+            ApiDiscoveryResult.Success(internalClient.apiDiscovery(siteUrl, null))
         } catch (exception: AutoDiscoveryAttemptFailure) {
             errorLogger?.logFailedDiscovery(exception)
-            when (exception) {
-                is AutoDiscoveryAttemptFailure.ParseSiteUrl -> ApiDiscoveryResult.FailureParseSiteUrl(
-                    error = exception.error,
-                )
-                is AutoDiscoveryAttemptFailure.FindApiRoot -> ApiDiscoveryResult.FailureFindApiRoot(
-                    parsedSiteUrl = exception.parsedSiteUrl.toURL(),
-                    findApiRootFailure = exception.findApiRootFailure,
-                )
-
-                is AutoDiscoveryAttemptFailure.FetchAndParseApiRoot -> ApiDiscoveryResult.FailureFetchAndParseApiRoot(
-                    parsedSiteUrl = exception.parsedSiteUrl.toURL(),
-                    apiRootUrl = exception.apiRootUrl.toURL(),
-                    fetchAndParseApiRootFailure = exception.fetchAndParseApiRootFailure
-                )
-            }
+            // Pass the failure straight through: it carries its own sealed variants to
+            // match on and the localized, translated message (`localizedDescription()`).
+            ApiDiscoveryResult.Failure(exception)
         }
     }
 }

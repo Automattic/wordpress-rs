@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.kotlinSerialization)
@@ -89,6 +91,50 @@ sourceSets {
     }
 }
 
+// Marks the block this post-process appends. Also used to strip a prior run's block, so the
+// rewrite in `appendLocalizedErrorExtensions` is idempotent.
+val localizedErrorExtensionsBanner =
+    "\n// Localized error message extensions (generated — parity with Swift).\n"
+
+// Post-processes a generated UniFFI Kotlin binding to give every error type that supports
+// localization a `localizedDescription(locale)` extension, at parity with Swift's generated
+// `LocalizedError.errorDescription` (see `scripts/swift-bindings.sh` →
+// `generate_localized_error_extension`). Keyed off the generated `localize<Type>(value: T, …)`
+// functions — one per Rust `WpSupportsLocalization` impl — rather than a Rust-source grep, so
+// UniFFI's `Error`→`Exception` renaming is handled for free. `LocalizedErrorParityTest` guards it.
+//
+// Idempotent: it re-derives the block from the generated portion of the file (dropping any
+// block a previous run appended) and rewrites in place, so re-running never duplicates the
+// extensions — it is safe to call however the wiring invokes it.
+fun appendLocalizedErrorExtensions(bindingFile: File) {
+    if (!bindingFile.exists()) return
+    val current = bindingFile.readText()
+    // Only the freshly generated portion drives the regex; drop any block we appended before.
+    val generated = current.substringBefore(localizedErrorExtensionsBanner)
+    val localizer = Regex(
+        """fun\s+`?(localize\w+)`?\(\s*`?value`?\s*:\s*(\w+)\s*,\s*`?locale`?\s*:\s*WpLocale\?\s*\)"""
+    )
+    val extensions = localizer.findAll(generated).joinToString("\n") { match ->
+        val (function, receiver) = match.destructured
+        """
+        |fun $receiver.localizedDescription(
+        |    locales: List<java.util.Locale> = listOf(java.util.Locale.getDefault()),
+        |): kotlin.String = $function(
+        |    this,
+        |    uniffi.wp_localization.wpLocaleResolve(locales.map { it.toLanguageTag() }),
+        |)
+        """.trimMargin()
+    }
+    val rewritten = if (extensions.isEmpty()) {
+        generated
+    } else {
+        generated + localizedErrorExtensionsBanner + extensions + "\n"
+    }
+    if (rewritten != current) {
+        bindingFile.writeText(rewritten)
+    }
+}
+
 // UniFFI supports generating bindings for multiple crates from a single library file.
 // When wp_mobile is built, it includes wp_api as a dependency, so libwp_mobile contains
 // metadata for both crates. We generate bindings for each crate from the single library.
@@ -124,6 +170,24 @@ val generateUniFFIBindingsTask = tasks.register<Exec>("generateUniFFIBindings") 
     inputs.file("$cargoProjectRoot/Cargo.lock")
     // Re-generate if the module source code changes
     inputs.dir("$cargoProjectRoot/$rustPrimaryModule/")
+    // Re-run the append when the codegen logic itself changes. Every *Rust* change is
+    // already covered by `nativeLibraryPath` above: adding or renaming a
+    // `WpSupportsLocalization` impl rebuilds the dylib, which re-runs generation and the
+    // `doLast` below. The only thing left to track is edits to `appendLocalizedErrorExtensions`,
+    // which lives in this build script — so fingerprint the script, replacing the old
+    // hand-bumped cache key that a maintainer had to remember to change.
+    inputs.file(project.buildFile)
+
+    // Append the `localizedDescription` extensions after generation, for the same two
+    // crates Swift patches (`patch_wp_api` / `patch_wp_mobile`). `wp_localization` and
+    // `wp_mobile_cache` ship no localizable types, so they're skipped.
+    doLast {
+        listOf("wp_api", "wp_mobile").forEach { namespace ->
+            appendLocalizedErrorExtensions(
+                File("$uniffiGeneratedPath/uniffi/$namespace/$namespace.kt")
+            )
+        }
+    }
 }
 
 tasks.named("compileKotlin").configure {

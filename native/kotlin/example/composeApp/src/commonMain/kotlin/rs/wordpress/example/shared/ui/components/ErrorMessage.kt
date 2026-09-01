@@ -36,7 +36,7 @@ private fun WpErrorCode.displayName(): String = when (this) {
 }
 
 private fun RequestExecutionErrorReason.description(): String = when (this) {
-    is RequestExecutionErrorReason.DeviceIsOfflineError -> "Device is offline: $errorMessage"
+    is RequestExecutionErrorReason.DeviceIsOfflineError -> "Device is offline"
     is RequestExecutionErrorReason.HttpTimeoutError -> "Request timed out"
     is RequestExecutionErrorReason.InvalidSslError -> "SSL error: $reason"
     is RequestExecutionErrorReason.NonExistentSiteError -> errorMessage ?: "Site not found"
