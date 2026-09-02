@@ -50,6 +50,12 @@ if [[ "${BUILDKITE_BRANCH:-}" == dependabot/* ]]; then
   exit 0
 fi
 
+# Localization sync PRs only update generated translation files, which don't map to changelog entries.
+if [[ "${BUILDKITE_BRANCH:-}" == localization/* ]]; then
+  echo "Localization branch — skipping changelog check"
+  exit 0
+fi
+
 BASE_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-trunk}"
 
 echo "--- :git: Fetching origin/${BASE_BRANCH}"
