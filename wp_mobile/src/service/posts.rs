@@ -718,7 +718,7 @@ impl PostService {
     /// Results follow the order of `post_ids`. Each distinct ID yields at most
     /// one post: duplicate IDs collapse to a single entry at the first
     /// occurrence's position, so this behaves as a set-style batch lookup.
-    pub fn read_posts_by_ids_from_db(
+    pub async fn read_posts_by_ids_from_db(
         &self,
         post_ids: Vec<PostId>,
     ) -> Result<Vec<AnyPostWithEditContext>, wp_mobile_cache::SqliteDbError> {
@@ -1122,7 +1122,8 @@ mod tests {
     }
 
     #[rstest]
-    fn test_read_posts_by_ids_from_db_returns_present_and_omits_missing(
+    #[tokio::test]
+    async fn test_read_posts_by_ids_from_db_returns_present_and_omits_missing(
         post_service_ctx: PostServiceTestContext,
     ) {
         // Setup: one post in the cache; PostId(99999) is never inserted
@@ -1131,6 +1132,7 @@ mod tests {
         let posts = post_service_ctx
             .post_service
             .read_posts_by_ids_from_db(vec![test_post.id, PostId(99999)])
+            .await
             .expect("Database read should succeed");
 
         // Assert: the cached post is returned, the missing ID is omitted
@@ -1139,7 +1141,10 @@ mod tests {
     }
 
     #[rstest]
-    fn test_read_posts_by_ids_from_db_is_site_scoped(post_service_ctx: PostServiceTestContext) {
+    #[tokio::test]
+    async fn test_read_posts_by_ids_from_db_is_site_scoped(
+        post_service_ctx: PostServiceTestContext,
+    ) {
         // Setup: a post that belongs to a different site in the same database
         let other_site = post_service_ctx
             .cache
@@ -1169,6 +1174,7 @@ mod tests {
         let posts = post_service_ctx
             .post_service
             .read_posts_by_ids_from_db(vec![PostId(7)])
+            .await
             .expect("Database read should succeed");
 
         // Assert: the service only reads posts for its own site
@@ -1176,7 +1182,8 @@ mod tests {
     }
 
     #[rstest]
-    fn test_read_posts_by_ids_from_db_orders_dedupes_and_maps_terms(
+    #[tokio::test]
+    async fn test_read_posts_by_ids_from_db_orders_dedupes_and_maps_terms(
         post_service_ctx: PostServiceTestContext,
     ) {
         use wp_api::terms::TermId;
@@ -1208,6 +1215,7 @@ mod tests {
         let posts = post_service_ctx
             .post_service
             .read_posts_by_ids_from_db(vec![PostId(102), PostId(101), PostId(102), PostId(99999)])
+            .await
             .expect("Database read should succeed");
 
         // Set-style lookup: distinct posts in first-occurrence order, missing
