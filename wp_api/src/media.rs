@@ -47,6 +47,53 @@ pub enum MediaType {
 
 impl_as_query_value_from_to_string!(MediaType);
 
+#[derive(Debug, Clone, Serialize, Deserialize, uniffi::Object)]
+#[serde(transparent)]
+pub struct MediaTypeWrapper {
+    inner: MediaType,
+}
+
+impl PartialEq for MediaTypeWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner.to_string() == other.inner.to_string()
+    }
+}
+
+impl Eq for MediaTypeWrapper {}
+
+impl std::fmt::Display for MediaTypeWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.inner.fmt(f)
+    }
+}
+
+impl std::str::FromStr for MediaTypeWrapper {
+    type Err = <MediaType as std::str::FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        MediaType::from_str(s).map(|inner| Self { inner })
+    }
+}
+
+impl MediaTypeWrapper {
+    pub fn inner(&self) -> &MediaType {
+        &self.inner
+    }
+}
+
+impl From<MediaType> for MediaTypeWrapper {
+    fn from(inner: MediaType) -> Self {
+        Self { inner }
+    }
+}
+
+#[uniffi::export]
+impl MediaTypeWrapper {
+    fn is_media_type(&self, media_type: MediaType) -> bool {
+        self.inner.to_string() == media_type.to_string()
+    }
+}
+
 // A separate param type is implemented for `MediaType` because the API will accept types such as
 // "audio" & "application" as a parameter, but it'll return "file" for the value of `media_type`
 // field for these media types.
@@ -409,7 +456,7 @@ pub struct SparseMedia {
     #[WpContextualField]
     pub description: Option<SparseMediaDescription>,
     #[WpContext(edit, embed, view)]
-    pub media_type: Option<MediaType>,
+    pub media_type: Option<Arc<MediaTypeWrapper>>,
     #[WpContext(edit, embed, view)]
     pub mime_type: Option<String>,
     #[WpContext(edit, embed, view)]

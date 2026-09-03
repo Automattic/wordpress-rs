@@ -17,7 +17,8 @@ use rusqlite::{OptionalExtension, Row};
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 use wp_api::{
     media::{
-        MediaCaptionWithEditContext, MediaDescriptionWithEditContext, MediaId, MediaWithEditContext,
+        MediaCaptionWithEditContext, MediaDescriptionWithEditContext, MediaId, MediaTypeWrapper,
+        MediaWithEditContext,
     },
     posts::{PostGuidWithEditContext, PostTitleWithEditContext},
     prelude::WpGmtDateTime,
@@ -316,7 +317,7 @@ impl MediaContext for EditContext {
                 raw: row.get_column(DescriptionRaw)?,
                 rendered: row.get_column(DescriptionRendered)?,
             },
-            media_type: parse_enum(row, MediaType)?,
+            media_type: Arc::new(parse_enum::<MediaTypeWrapper, _>(row, MediaType)?),
             mime_type: row.get_column(MimeType)?,
             media_details,
             post_id: get_optional_id(row, PostId)?,
