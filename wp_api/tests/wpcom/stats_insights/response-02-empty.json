@@ -1,10 +1,10 @@
 {
-    "highest_hour": 0,
-    "highest_hour_percent": 0.0,
-    "highest_day_of_week": 0,
-    "highest_day_percent": 0.0,
-    "days": [],
-    "hours": [],
-    "hourly_views": [],
-    "years": []
+  "highest_hour": 0,
+  "highest_hour_percent": 0.0,
+  "highest_day_of_week": 0,
+  "highest_day_percent": 0.0,
+  "days": [],
+  "hours": [],
+  "hourly_views": [],
+  "years": []
 }

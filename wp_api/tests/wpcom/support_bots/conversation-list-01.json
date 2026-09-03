@@ -1,11 +1,11 @@
 [
-    {
-      "chat_id": 1965758,
-      "created_at": "2025-05-15 18:04:40",
-      "last_message": {
-        "content": "Hi there! \ud83d\udc4b \n\nI'd be happy to help, but could you please provide more details about what you're trying to do? Are you referring to:\n\n- The Jetpack Mobile app?\n- The WordPress Mobile app?\n- A specific Jetpack feature?\n\nOnce you clarify, I'll be better able to assist you!",
-        "role": "bot",
-        "created_at": "2025-05-15 18:04:47"
-      }
+  {
+    "chat_id": 1965758,
+    "created_at": "2025-05-15 18:04:40",
+    "last_message": {
+      "content": "Hi there! 👋 \n\nI'd be happy to help, but could you please provide more details about what you're trying to do? Are you referring to:\n\n- The Jetpack Mobile app?\n- The WordPress Mobile app?\n- A specific Jetpack feature?\n\nOnce you clarify, I'll be better able to assist you!",
+      "role": "bot",
+      "created_at": "2025-05-15 18:04:47"
     }
-  ]
+  }
+]

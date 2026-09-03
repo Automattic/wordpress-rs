@@ -42,6 +42,9 @@ steps:
 
           echo "--- :rust: Ensuring Code Conforms to rustfmt"
           make fmt-check-rust
+
+          echo "--- :json: Ensuring JSON Test Fixtures are Pretty-Printed"
+          make fmt-check-json
       - label: ":rust: Build Docs"
         command: |
           echo "--- :rust: Building Documentation"

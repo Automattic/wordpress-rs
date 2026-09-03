@@ -1,32 +1,32 @@
 {
-    "posts": [
-        {
-            "id": 100,
-            "href": null,
-            "date": null,
-            "title": null,
-            "type": null,
-            "opens": null,
-            "clicks": null,
-            "opens_rate": null,
-            "clicks_rate": null,
-            "unique_opens": null,
-            "unique_clicks": null,
-            "total_sends": null
-        },
-        {
-            "id": 200,
-            "href": "https://example.com/post",
-            "date": "2023-09-01 10:00:00",
-            "title": "A Post",
-            "type": "post",
-            "opens": 5,
-            "clicks": 2,
-            "opens_rate": 50.0,
-            "clicks_rate": 25.0,
-            "unique_opens": 3,
-            "unique_clicks": 1,
-            "total_sends": 10
-        }
-    ]
+  "posts": [
+    {
+      "id": 100,
+      "href": null,
+      "date": null,
+      "title": null,
+      "type": null,
+      "opens": null,
+      "clicks": null,
+      "opens_rate": null,
+      "clicks_rate": null,
+      "unique_opens": null,
+      "unique_clicks": null,
+      "total_sends": null
+    },
+    {
+      "id": 200,
+      "href": "https://example.com/post",
+      "date": "2023-09-01 10:00:00",
+      "title": "A Post",
+      "type": "post",
+      "opens": 5,
+      "clicks": 2,
+      "opens_rate": 50.0,
+      "clicks_rate": 25.0,
+      "unique_opens": 3,
+      "unique_clicks": 1,
+      "total_sends": 10
+    }
+  ]
 }

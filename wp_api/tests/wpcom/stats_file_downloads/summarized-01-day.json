@@ -1,72 +1,72 @@
 {
-    "date": "2026-02-18",
-    "period": "day",
-    "days": {
-        "2026-02-18": {
-            "files": [
-                {
-                    "filename": "automattic-w-9.pdf",
-                    "relative_url": "/2025/01/automattic-w-9.pdf",
-                    "download_url": "https://example.files.wordpress.com/2025/01/automattic-w-9.pdf",
-                    "downloads": 4
-                },
-                {
-                    "filename": "wpvip-w-9.pdf",
-                    "relative_url": "/2025/01/wpvip-w-9.pdf",
-                    "download_url": "https://example.files.wordpress.com/2025/01/wpvip-w-9.pdf",
-                    "downloads": 3
-                }
-            ],
-            "other_downloads": 0,
-            "total_downloads": 7
+  "date": "2026-02-18",
+  "period": "day",
+  "days": {
+    "2026-02-18": {
+      "files": [
+        {
+          "filename": "automattic-w-9.pdf",
+          "relative_url": "/2025/01/automattic-w-9.pdf",
+          "download_url": "https://example.files.wordpress.com/2025/01/automattic-w-9.pdf",
+          "downloads": 4
         },
-        "2026-02-17": {
-            "files": [
-                {
-                    "filename": "report.pdf",
-                    "relative_url": "/2026/02/report.pdf",
-                    "download_url": "https://example.files.wordpress.com/2026/02/report.pdf",
-                    "downloads": 2
-                }
-            ],
-            "other_downloads": 0,
-            "total_downloads": 2
+        {
+          "filename": "wpvip-w-9.pdf",
+          "relative_url": "/2025/01/wpvip-w-9.pdf",
+          "download_url": "https://example.files.wordpress.com/2025/01/wpvip-w-9.pdf",
+          "downloads": 3
         }
+      ],
+      "other_downloads": 0,
+      "total_downloads": 7
     },
-    "summary": {
-        "files": [
-            {
-                "filename": "automattic-w-9.pdf",
-                "relative_url": "/2025/01/automattic-w-9.pdf",
-                "download_url": "https://example.files.wordpress.com/2025/01/automattic-w-9.pdf",
-                "downloads": 5
-            },
-            {
-                "filename": "wpvip-w-9.pdf",
-                "relative_url": "/2025/01/wpvip-w-9.pdf",
-                "download_url": "https://example.files.wordpress.com/2025/01/wpvip-w-9.pdf",
-                "downloads": 5
-            },
-            {
-                "filename": "report.pdf",
-                "relative_url": "/2026/02/report.pdf",
-                "download_url": "https://example.files.wordpress.com/2026/02/report.pdf",
-                "downloads": 3
-            },
-            {
-                "filename": "archive.zip",
-                "relative_url": "/2025/05/archive.zip",
-                "download_url": "https://example.files.wordpress.com/2025/05/archive.zip",
-                "downloads": 1
-            },
-            {
-                "filename": "handbook.pdf",
-                "relative_url": "/2025/05/handbook.pdf",
-                "download_url": "https://example.files.wordpress.com/2025/05/handbook.pdf",
-                "downloads": 1
-            }
-        ],
-        "total_downloads": 83,
-        "other_downloads": 0
+    "2026-02-17": {
+      "files": [
+        {
+          "filename": "report.pdf",
+          "relative_url": "/2026/02/report.pdf",
+          "download_url": "https://example.files.wordpress.com/2026/02/report.pdf",
+          "downloads": 2
+        }
+      ],
+      "other_downloads": 0,
+      "total_downloads": 2
     }
+  },
+  "summary": {
+    "files": [
+      {
+        "filename": "automattic-w-9.pdf",
+        "relative_url": "/2025/01/automattic-w-9.pdf",
+        "download_url": "https://example.files.wordpress.com/2025/01/automattic-w-9.pdf",
+        "downloads": 5
+      },
+      {
+        "filename": "wpvip-w-9.pdf",
+        "relative_url": "/2025/01/wpvip-w-9.pdf",
+        "download_url": "https://example.files.wordpress.com/2025/01/wpvip-w-9.pdf",
+        "downloads": 5
+      },
+      {
+        "filename": "report.pdf",
+        "relative_url": "/2026/02/report.pdf",
+        "download_url": "https://example.files.wordpress.com/2026/02/report.pdf",
+        "downloads": 3
+      },
+      {
+        "filename": "archive.zip",
+        "relative_url": "/2025/05/archive.zip",
+        "download_url": "https://example.files.wordpress.com/2025/05/archive.zip",
+        "downloads": 1
+      },
+      {
+        "filename": "handbook.pdf",
+        "relative_url": "/2025/05/handbook.pdf",
+        "download_url": "https://example.files.wordpress.com/2025/05/handbook.pdf",
+        "downloads": 1
+      }
+    ],
+    "total_downloads": 83,
+    "other_downloads": 0
+  }
 }
