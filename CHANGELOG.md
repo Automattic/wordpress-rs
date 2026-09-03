@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `PostService.read_posts_by_ids_from_db(post_ids)`: a cache-only batched read of posts by `PostId` (missing IDs omitted), for resolving data like comment post titles without a fetch.
+
 ## [0.8.0] - 2026-09-01
 
 ### Added

@@ -501,8 +501,8 @@ async fn test_load_posts_by_ids_includes_trashed_post() {
     let cached_posts = ctx
         .service
         .posts()
-        .read_posts_by_ids_from_db(&[created.id.0])
-        .expect("read_posts_by_ids_from_db should succeed");
+        .read_post_full_entities_by_ids_from_db(&[created.id.0])
+        .expect("read_post_full_entities_by_ids_from_db should succeed");
     assert_eq!(cached_posts.len(), 1, "should have 1 cached post");
     assert_eq!(
         cached_posts[0].data.status,
@@ -572,8 +572,8 @@ async fn test_load_posts_by_ids_includes_mixed_status_posts() {
     let cached_posts = ctx
         .service
         .posts()
-        .read_posts_by_ids_from_db(&[draft.id.0, to_trash.id.0])
-        .expect("read_posts_by_ids_from_db should succeed");
+        .read_post_full_entities_by_ids_from_db(&[draft.id.0, to_trash.id.0])
+        .expect("read_post_full_entities_by_ids_from_db should succeed");
     assert_eq!(cached_posts.len(), 2, "should have 2 cached posts");
 
     let draft_post = cached_posts
