@@ -13,6 +13,7 @@ use crate::{
     },
 };
 use serde::{Deserialize, Serialize};
+use wp_serde_helper::deserialize_optional_bool_or_int;
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct DomainSuggestionsParams {
@@ -905,6 +906,10 @@ pub struct SiteDomain {
     /// Whether this is a free WordPress.com subdomain.
     pub wpcom_domain: Option<bool>,
     /// Whether automatic renewal is enabled.
+    ///
+    /// Arrives as either a JSON boolean or `0`/`1` depending on the domain
+    /// type, so both encodings are accepted.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
     pub auto_renewing: Option<bool>,
     /// Whether the domain has expired.
     pub expired: Option<bool>,
@@ -1814,6 +1819,35 @@ mod tests {
         );
         assert_eq!(mapped.supports_domain_connect, Some(true));
         assert_eq!(mapped.has_wpcom_nameservers, Some(false));
+    }
+
+    /// `auto_renewing` arrives as an integer on some domains and a boolean on
+    /// others, and a single response mixes the two. Typing it as a plain
+    /// `bool` failed the whole response with "invalid type: integer 0,
+    /// expected a boolean" for any site with a mapped domain.
+    #[test]
+    fn test_site_domains_auto_renewing_accepts_bool_and_int() {
+        let file = File::open("tests/wpcom/domains/site_domains/with-email-subscriptions.json")
+            .expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(
+            response.domains[1].auto_renewing,
+            Some(false),
+            "the mapped domain encodes it as the integer 0"
+        );
+
+        let file =
+            File::open("tests/wpcom/domains/site_domains/basic.json").expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(
+            response.domains[0].auto_renewing,
+            Some(false),
+            "the wpcom subdomain encodes it as a boolean"
+        );
     }
 
     #[test]
