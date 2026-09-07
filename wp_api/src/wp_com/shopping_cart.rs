@@ -488,9 +488,6 @@ mod tests {
         );
     }
 
-    /// The backend applies a cost override's percentage from a `float`, and
-    /// passes it into the response unconverted, so it is not necessarily whole.
-    /// `SitePlanCostOverride` already models the same value as `Decimal2`.
     #[test]
     fn test_cost_override_accepts_fractional_percentage() {
         let json = r#"{
