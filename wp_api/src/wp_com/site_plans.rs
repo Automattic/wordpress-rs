@@ -56,15 +56,19 @@ pub struct SitePlan {
     pub currency_code: CurrencyCode,
     pub raw_price: Decimal2,
     /// `raw_price` in the currency's smallest unit (e.g. cents).
-    pub raw_price_integer: u64,
+    pub raw_price_integer: i64,
     /// `raw_price` formatted for display, with trailing zeros stripped.
     pub formatted_price: String,
     /// The price before discounts, formatted for display. Formatted zero when
     /// the plan isn't discounted.
     pub formatted_original_price: String,
+    /// The gap between `formatted_original_price` and `raw_price`. Negative on
+    /// a multi-term upgrade, where the prorated original is smaller than the
+    /// price of the longer term being offered.
     pub raw_discount: Decimal2,
-    /// `raw_discount` in the currency's smallest unit.
-    pub raw_discount_integer: u64,
+    /// `raw_discount` in the currency's smallest unit, and signed for the same
+    /// reason.
+    pub raw_discount_integer: i64,
     pub formatted_discount: String,
     /// Localized explanation of the discount, when there is one.
     pub discount_reason: Option<String>,
@@ -180,7 +184,7 @@ pub struct SitePlanIntroductoryOffer {
     pub raw_price: Decimal2,
     /// `raw_price` in the currency's smallest unit.
     #[serde(rename = "introductory_offer_raw_price_integer")]
-    pub raw_price_integer: u64,
+    pub raw_price_integer: i64,
     #[serde(rename = "introductory_offer_interval_unit")]
     pub interval_unit: TimeSpanUnit,
     /// How many `interval_unit`s the offer price covers.
@@ -426,6 +430,36 @@ mod tests {
 
         // Plans without an adjustment get an empty list, not a missing field.
         assert!(plan(&plans, 9001).cost_overrides.is_empty());
+    }
+
+    /// A multi-term upgrade prices the longer term above the prorated original,
+    /// so the backend's `original_cost - raw_cost` discount comes back
+    /// negative. Typing `raw_discount_integer` as `u64` failed the whole
+    /// response with "invalid value: integer -2938200, expected u64", while its
+    /// `Decimal2` twin — the same amount, i64-backed — parsed the value fine.
+    #[test]
+    fn test_negative_discount_on_multiterm_upgrade() {
+        let plans = read_fixture("tests/wpcom/site_plans/paid-plan-site.json");
+        let upgrade = plan(&plans, 9007);
+
+        assert_eq!(upgrade.raw_discount, Decimal2::from_hundredths(-84000));
+        assert_eq!(upgrade.raw_discount_integer, -84000);
+        assert_eq!(upgrade.formatted_discount, "-$840");
+
+        // The two representations of the discount agree, and it is the gap
+        // between the original price and the price actually being offered.
+        assert_eq!(
+            upgrade.raw_discount.hundredths(),
+            upgrade.raw_discount_integer
+        );
+        assert_eq!(
+            upgrade.raw_discount_integer,
+            6000 - upgrade.raw_price_integer,
+            "the discount is original_price - raw_price"
+        );
+
+        // The usual case still goes the other way.
+        assert_eq!(plan(&plans, 9006).raw_discount_integer, 1500);
     }
 
     #[test]
