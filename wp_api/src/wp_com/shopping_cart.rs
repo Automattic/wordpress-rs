@@ -149,16 +149,16 @@ pub struct ShoppingCart {
     pub unmerged_products: Vec<ShoppingCartProduct>,
     pub total_cost: Decimal2,
     pub currency: CurrencyCode,
-    pub total_cost_integer: u64,
+    pub total_cost_integer: i64,
     pub temporary: bool,
     pub tax: ShoppingCartTax,
-    pub coupon_savings_total_integer: u64,
-    pub sub_total_with_taxes_integer: u64,
-    pub sub_total_integer: u64,
+    pub coupon_savings_total_integer: i64,
+    pub sub_total_with_taxes_integer: i64,
+    pub sub_total_integer: i64,
     pub total_tax: Decimal2,
-    pub total_tax_integer: u64,
+    pub total_tax_integer: i64,
     pub credits: Decimal2,
-    pub credits_integer: u64,
+    pub credits_integer: i64,
     pub allowed_payment_methods: Vec<String>,
     pub is_gift_purchase: bool,
     pub messages: ShoppingCartMessages,
@@ -188,7 +188,7 @@ pub struct ShoppingCartProduct {
     #[serde(default)]
     #[uniffi(default = None)]
     pub current_quantity: Option<u32>,
-    pub coupon_savings_integer: u64,
+    pub coupon_savings_integer: i64,
     pub is_sale_coupon_applied: bool,
     pub extra: ShoppingCartProductExtra,
     pub bill_period: String,
@@ -197,18 +197,18 @@ pub struct ShoppingCartProduct {
     pub time_added_to_cart: u64,
     pub is_bundled: bool,
     pub item_original_cost: Decimal2,
-    pub item_original_cost_integer: u64,
-    pub item_original_monthly_cost_integer: u64,
-    pub item_original_cost_for_quantity_one_integer: u64,
-    pub item_subtotal_monthly_cost_integer: u64,
+    pub item_original_cost_integer: i64,
+    pub item_original_monthly_cost_integer: i64,
+    pub item_original_cost_for_quantity_one_integer: i64,
+    pub item_subtotal_monthly_cost_integer: i64,
     pub item_original_subtotal: Decimal2,
-    pub item_original_subtotal_integer: u64,
+    pub item_original_subtotal_integer: i64,
     pub item_subtotal: Decimal2,
-    pub item_subtotal_integer: u64,
+    pub item_subtotal_integer: i64,
     pub item_tax: Decimal2,
     pub item_tax_rate: f64,
     pub item_total: Decimal2,
-    pub item_total_integer: u64,
+    pub item_total_integer: i64,
     pub subscription_id: SubscriptionId,
     pub is_renewal: bool,
     pub is_renewal_and_will_auto_renew: bool,
@@ -276,9 +276,9 @@ pub struct DomainRegistrationExtraInfo {
 /// A pricing variant for a product in the cart.
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct ShoppingCartProductVariant {
-    pub price_before_discounts_integer: u64,
-    pub introductory_offer_discount_integer: u64,
-    pub price_integer: u64,
+    pub price_before_discounts_integer: i64,
+    pub introductory_offer_discount_integer: i64,
+    pub price_integer: i64,
     pub bill_period_in_months: u32,
     pub currency: CurrencyCode,
     pub product_id: ProductId,
@@ -290,16 +290,19 @@ pub struct ShoppingCartProductVariant {
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct ShoppingCartCostOverride {
     pub old_price: Decimal2,
-    pub old_price_integer: u64,
+    pub old_price_integer: i64,
     pub new_price: Decimal2,
-    pub new_price_integer: u64,
+    pub new_price_integer: i64,
     pub old_subtotal: Decimal2,
-    pub old_subtotal_integer: u64,
+    pub old_subtotal_integer: i64,
     pub new_subtotal: Decimal2,
-    pub new_subtotal_integer: u64,
+    pub new_subtotal_integer: i64,
     pub override_code: CostOverrideCode,
     pub does_override_original_cost: bool,
-    pub percentage: u32,
+    /// Discount percentage, where `10` means 10% off. Zero for adjustments
+    /// expressed as an amount rather than a percentage. Fractional, as the
+    /// backend applies it from a float.
+    pub percentage: Decimal2,
     pub first_unit_only: bool,
     pub human_readable_reason: String,
 }
@@ -478,6 +481,34 @@ mod tests {
             domain.cost_overrides[0].human_readable_reason,
             "Free domain for first year"
         );
+        assert_eq!(
+            domain.cost_overrides[0].percentage,
+            Decimal2::from_hundredths(10_000),
+            "a whole percentage still parses"
+        );
+    }
+
+    #[test]
+    fn test_cost_override_accepts_fractional_percentage() {
+        let json = r#"{
+            "old_price": 100,
+            "old_price_integer": 10000,
+            "new_price": 87.5,
+            "new_price_integer": 8750,
+            "old_subtotal": 100,
+            "old_subtotal_integer": 10000,
+            "new_subtotal": 87.5,
+            "new_subtotal_integer": 8750,
+            "override_code": "fake-partial-discount",
+            "does_override_original_cost": false,
+            "percentage": 12.5,
+            "first_unit_only": false,
+            "human_readable_reason": "Fake partial discount"
+        }"#;
+
+        let override_: ShoppingCartCostOverride =
+            serde_json::from_str(json).expect("Unable to parse JSON");
+        assert_eq!(override_.percentage, Decimal2::from_hundredths(1250));
     }
 
     #[test]

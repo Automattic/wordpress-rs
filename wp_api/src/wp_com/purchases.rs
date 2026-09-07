@@ -151,10 +151,10 @@ pub struct SitePurchase {
     pub currency_symbol: String,
     pub price_text: String,
     /// Price in the smallest currency unit (e.g. cents).
-    pub price_integer: u64,
+    pub price_integer: i64,
     pub regular_price_text: String,
     /// Regular (non-discounted) price in the smallest currency unit.
-    pub regular_price_integer: u64,
+    pub regular_price_integer: i64,
     /// Domain name that consumed this bundle's included-domain credit, if any.
     pub included_domain: DomainName,
     pub included_domain_purchase_amount: Decimal2,
@@ -162,7 +162,7 @@ pub struct SitePurchase {
     // Refunds
     pub refund_amount: Decimal2,
     /// Refund amount in the smallest currency unit.
-    pub refund_integer: u64,
+    pub refund_integer: i64,
     pub refund_text: String,
     pub refund_currency_symbol: String,
     pub refund_period_in_days: u32,
@@ -172,7 +172,7 @@ pub struct SitePurchase {
     pub refund_options: Option<Vec<RefundOption>>,
     pub total_refund_amount: Decimal2,
     /// Total refund amount in the smallest currency unit.
-    pub total_refund_integer: u64,
+    pub total_refund_integer: i64,
     pub total_refund_text: String,
     pub total_refund_currency: CurrencyCode,
 

@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `PostService.read_posts_by_ids_from_db(post_ids)`: a cache-only batched read of posts by `PostId` (missing IDs omitted), for resolving data like comment post titles without a fetch.
 
+### Fixed
+
+- `SiteDomain.auto_renewing` now parses when the API sends `0`/`1` rather than a boolean. A single `GET /sites/{site_id}/domains` response mixes both encodings, so any site with a mapped domain failed to parse.
+- **BREAKING:** Every WordPress.com `*_integer` money field is now `i64` instead of `u64`, on `SitePlan`, `SitePlanIntroductoryOffer`, `SitePurchase`, `TransactionReceipt`, `TransactionPurchase` and the `ShoppingCart` types. `SitePlan.raw_discount_integer` arrives negative on a multi-term upgrade, which failed the whole `GET /sites/{site_id}/plans` response. Kotlin and Swift consumers move from `ULong`/`UInt64` to `Long`/`Int64`.
+- **BREAKING:** `ShoppingCartCostOverride.percentage` is now `Decimal2` instead of `u32`, matching `SitePlanCostOverride.percentage`. The backend applies it from a float, so a fractional percentage previously failed the cart response.
+
 ## [0.8.0] - 2026-09-01
 
 ### Added
