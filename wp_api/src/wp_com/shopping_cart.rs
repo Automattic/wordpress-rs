@@ -299,7 +299,10 @@ pub struct ShoppingCartCostOverride {
     pub new_subtotal_integer: i64,
     pub override_code: CostOverrideCode,
     pub does_override_original_cost: bool,
-    pub percentage: u32,
+    /// Discount percentage, where `10` means 10% off. Zero for adjustments
+    /// expressed as an amount rather than a percentage. Fractional, as the
+    /// backend applies it from a float.
+    pub percentage: Decimal2,
     pub first_unit_only: bool,
     pub human_readable_reason: String,
 }
@@ -478,6 +481,37 @@ mod tests {
             domain.cost_overrides[0].human_readable_reason,
             "Free domain for first year"
         );
+        assert_eq!(
+            domain.cost_overrides[0].percentage,
+            Decimal2::from_hundredths(10_000),
+            "a whole percentage still parses"
+        );
+    }
+
+    /// The backend applies a cost override's percentage from a `float`, and
+    /// passes it into the response unconverted, so it is not necessarily whole.
+    /// `SitePlanCostOverride` already models the same value as `Decimal2`.
+    #[test]
+    fn test_cost_override_accepts_fractional_percentage() {
+        let json = r#"{
+            "old_price": 100,
+            "old_price_integer": 10000,
+            "new_price": 87.5,
+            "new_price_integer": 8750,
+            "old_subtotal": 100,
+            "old_subtotal_integer": 10000,
+            "new_subtotal": 87.5,
+            "new_subtotal_integer": 8750,
+            "override_code": "fake-partial-discount",
+            "does_override_original_cost": false,
+            "percentage": 12.5,
+            "first_unit_only": false,
+            "human_readable_reason": "Fake partial discount"
+        }"#;
+
+        let override_: ShoppingCartCostOverride =
+            serde_json::from_str(json).expect("Unable to parse JSON");
+        assert_eq!(override_.percentage, Decimal2::from_hundredths(1250));
     }
 
     #[test]
