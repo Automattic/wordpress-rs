@@ -59,6 +59,9 @@ var package = Package(
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v5)
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
             ]
         ),
         .target(
