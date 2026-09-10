@@ -5,11 +5,13 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import uniffi.wp_api.MediaCreateParams
 import uniffi.wp_api.MediaListParams
+import uniffi.wp_api.MediaType
 import uniffi.wp_api.SparseMediaFieldWithEditContext
 import uniffi.wp_api.WpAuthenticationProvider
 import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 private const val MEDIA_ID_611: Long = 611
 
@@ -30,6 +32,26 @@ class MediaEndpointTest {
             requestBuilder.media().retrieveWithEditContext(MEDIA_ID_611)
         }.assertSuccessAndRetrieveData().data
         assertNotNull(media)
+    }
+
+    @Test
+    fun testMediaTypeWrapperComparison() = runTest {
+        val media = client.request { requestBuilder ->
+            requestBuilder.media().filterRetrieveWithEditContext(
+                mediaId = MEDIA_ID_611,
+                fields = listOf(SparseMediaFieldWithEditContext.MEDIA_TYPE)
+            )
+        }.assertSuccessAndRetrieveData().data
+        val mediaType = assertNotNull(media.mediaType)
+
+        // The wrapper's isMediaType should match the named variant
+        assertTrue(mediaType.isMediaType(MediaType.Image))
+
+        // Crucially: it should also match Custom("image") — this is the forward-compat
+        // guarantee. Code written before `Image` was a named variant used
+        // Custom("image") to check for images. After `Image` gets promoted to a named
+        // variant, that comparison must still work.
+        assertTrue(mediaType.isMediaType(MediaType.Custom("image")))
     }
 
     @Test
