@@ -40,18 +40,28 @@
   "routes": {
     "/tribe/tickets/v1/tickets": {
       "namespace": "tribe/tickets/v1",
-      "methods": ["GET", "POST"],
+      "methods": [
+        "GET",
+        "POST"
+      ],
       "endpoints": [
         {
-          "methods": ["POST"],
+          "methods": [
+            "POST"
+          ],
           "ISSUE": "This plugin has a irregular `args` structure. https://github.com/the-events-calendar/event-tickets",
           "args": [
-            { "required": false },
+            {
+              "required": false
+            },
             {
               "description": {
                 "type": "string",
                 "in": "body",
-                "validate_callback": [{}, "is_string_or_empty"],
+                "validate_callback": [
+                  {},
+                  "is_string_or_empty"
+                ],
                 "sanitize_callback": "sanitize_text_field",
                 "default": ""
               },
@@ -73,6 +83,10 @@
   "site_icon": 0,
   "site_icon_url": "",
   "_links": {
-    "help": [{ "href": "https://developer.wordpress.org/rest-api/" }]
+    "help": [
+      {
+        "href": "https://developer.wordpress.org/rest-api/"
+      }
+    ]
   }
 }

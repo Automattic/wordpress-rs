@@ -1,14 +1,14 @@
 {
-    "date": "2026-02-18",
-    "period": "day",
-    "days": {
-        "summary": {
-            "data": [],
-            "total": {
-                "impressions": 0,
-                "views": 0,
-                "watch_time": 0
-            }
-        }
+  "date": "2026-02-18",
+  "period": "day",
+  "days": {
+    "summary": {
+      "data": [],
+      "total": {
+        "impressions": 0,
+        "views": 0,
+        "watch_time": 0
+      }
     }
+  }
 }

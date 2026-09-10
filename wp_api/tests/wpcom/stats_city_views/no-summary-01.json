@@ -1,196 +1,196 @@
 {
-    "date": "2026-02-05",
-    "days": {
-        "2026-02-05": {
-            "views": [
-                {
-                    "location": "Seattle",
-                    "views": 72,
-                    "country_code": "US",
-                    "coordinates": {
-                        "latitude": "47.604309",
-                        "longitude": "-122.329845"
-                    }
-                },
-                {
-                    "location": "Madrid",
-                    "views": 50,
-                    "country_code": "ES",
-                    "coordinates": {
-                        "latitude": "40.416818",
-                        "longitude": "-3.684733"
-                    }
-                },
-                {
-                    "location": "London",
-                    "views": 38,
-                    "country_code": "GB",
-                    "coordinates": {
-                        "latitude": "51.50853",
-                        "longitude": "-0.12574"
-                    }
-                },
-                {
-                    "location": "Singapore",
-                    "views": 34,
-                    "country_code": "SG",
-                    "coordinates": {
-                        "latitude": "1.289987",
-                        "longitude": "103.850281"
-                    }
-                },
-                {
-                    "location": "Sydney",
-                    "views": 30,
-                    "country_code": "AU",
-                    "coordinates": {
-                        "latitude": "-33.86778",
-                        "longitude": "151.207052"
-                    }
-                }
-            ],
-            "other_views": 168,
-            "total_views": 505
+  "date": "2026-02-05",
+  "days": {
+    "2026-02-05": {
+      "views": [
+        {
+          "location": "Seattle",
+          "views": 72,
+          "country_code": "US",
+          "coordinates": {
+            "latitude": "47.604309",
+            "longitude": "-122.329845"
+          }
         },
-        "2026-02-04": {
-            "views": [
-                {
-                    "location": "Seattle",
-                    "views": 123,
-                    "country_code": "US",
-                    "coordinates": {
-                        "latitude": "47.604309",
-                        "longitude": "-122.329845"
-                    }
-                },
-                {
-                    "location": "Chicago",
-                    "views": 121,
-                    "country_code": "US",
-                    "coordinates": {
-                        "latitude": "41.875772",
-                        "longitude": "-87.620606"
-                    }
-                },
-                {
-                    "location": "London",
-                    "views": 85,
-                    "country_code": "GB",
-                    "coordinates": {
-                        "latitude": "51.50853",
-                        "longitude": "-0.12574"
-                    }
-                },
-                {
-                    "location": "Toronto",
-                    "views": 80,
-                    "country_code": "CA",
-                    "coordinates": {
-                        "latitude": "43.653661",
-                        "longitude": "-79.382924"
-                    }
-                },
-                {
-                    "location": "Madrid",
-                    "views": 74,
-                    "country_code": "ES",
-                    "coordinates": {
-                        "latitude": "40.416818",
-                        "longitude": "-3.684733"
-                    }
-                }
-            ],
-            "other_views": 600,
-            "total_views": 1382
+        {
+          "location": "Madrid",
+          "views": 50,
+          "country_code": "ES",
+          "coordinates": {
+            "latitude": "40.416818",
+            "longitude": "-3.684733"
+          }
         },
-        "2026-02-03": {
-            "views": [
-                {
-                    "location": "Seattle",
-                    "views": 168,
-                    "country_code": "US",
-                    "coordinates": {
-                        "latitude": "47.604309",
-                        "longitude": "-122.329845"
-                    }
-                },
-                {
-                    "location": "Toronto",
-                    "views": 115,
-                    "country_code": "CA",
-                    "coordinates": {
-                        "latitude": "43.653661",
-                        "longitude": "-79.382924"
-                    }
-                },
-                {
-                    "location": "Chicago",
-                    "views": 93,
-                    "country_code": "US",
-                    "coordinates": {
-                        "latitude": "41.875772",
-                        "longitude": "-87.620606"
-                    }
-                },
-                {
-                    "location": "Ashburn",
-                    "views": 91,
-                    "country_code": "US",
-                    "coordinates": {
-                        "latitude": "39.039474",
-                        "longitude": "-77.491809"
-                    }
-                },
-                {
-                    "location": "New York City",
-                    "views": 80,
-                    "country_code": "US",
-                    "coordinates": {
-                        "latitude": "40.713192",
-                        "longitude": "-74.006065"
-                    }
-                }
-            ],
-            "other_views": 505,
-            "total_views": 1363
+        {
+          "location": "London",
+          "views": 38,
+          "country_code": "GB",
+          "coordinates": {
+            "latitude": "51.50853",
+            "longitude": "-0.12574"
+          }
+        },
+        {
+          "location": "Singapore",
+          "views": 34,
+          "country_code": "SG",
+          "coordinates": {
+            "latitude": "1.289987",
+            "longitude": "103.850281"
+          }
+        },
+        {
+          "location": "Sydney",
+          "views": 30,
+          "country_code": "AU",
+          "coordinates": {
+            "latitude": "-33.86778",
+            "longitude": "151.207052"
+          }
         }
+      ],
+      "other_views": 168,
+      "total_views": 505
     },
-    "country-info": {
-        "US": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/d0c9ee2dfb5087992fc9b2fc36c2d78311887d82934678b3118815d1f240951b?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/c582a850fc3fea67cbf9e88f7755a85870239bcf4138c9cf3a6f7c53e5a658ea?s=48",
-            "country_full": "United States",
-            "map_region": "021"
+    "2026-02-04": {
+      "views": [
+        {
+          "location": "Seattle",
+          "views": 123,
+          "country_code": "US",
+          "coordinates": {
+            "latitude": "47.604309",
+            "longitude": "-122.329845"
+          }
         },
-        "ES": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/0060781554370ebece2445877930a4b374d8312ecad053883dbd38e5f271d295?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/9e650d102b495ceba9fb6577a6435f1d23a036d409acefe09c0606b181272ffc?s=48",
-            "country_full": "Spain",
-            "map_region": "039"
+        {
+          "location": "Chicago",
+          "views": 121,
+          "country_code": "US",
+          "coordinates": {
+            "latitude": "41.875772",
+            "longitude": "-87.620606"
+          }
         },
-        "GB": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/ea62907b7e45633b3f9daac0771db98d40cfd749fd0ef28313224e2618468367?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/f8c11df368971fc1b3e2a7e9a2093bee00b3ae20c14298cea0c9ea8dde177141?s=48",
-            "country_full": "United Kingdom",
-            "map_region": "154"
+        {
+          "location": "London",
+          "views": 85,
+          "country_code": "GB",
+          "coordinates": {
+            "latitude": "51.50853",
+            "longitude": "-0.12574"
+          }
         },
-        "SG": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/9aa06d58384440db23a879f5f1f9fab43a81b93a0c87b7354c61eb107c4a4f90?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/7b5fe6c9c2b3bdcf5b1ebfd331a470a57d525d3d703f447e19dd8795b7eae782?s=48",
-            "country_full": "Singapore",
-            "map_region": "035"
+        {
+          "location": "Toronto",
+          "views": 80,
+          "country_code": "CA",
+          "coordinates": {
+            "latitude": "43.653661",
+            "longitude": "-79.382924"
+          }
         },
-        "AU": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/971effecb7738aac20120105101d7edbb81d07ec76c7040e392591d0b6bec071?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/f7f5263143e568cdd10cd7ad7a3b48c05b0a57296941ddf119191d93156e8c34?s=48",
-            "country_full": "Australia",
-            "map_region": "053"
-        },
-        "CA": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/8f783538a662f4b416a3e91154e417f38e0dec3eec8e0b5dbe4c8eb861d26e74?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/cb3ca1445705c8820c0c1398fff2716127d8b7f1eb17b8dbc7522fa4d08ca5f3?s=48",
-            "country_full": "Canada",
-            "map_region": "021"
+        {
+          "location": "Madrid",
+          "views": 74,
+          "country_code": "ES",
+          "coordinates": {
+            "latitude": "40.416818",
+            "longitude": "-3.684733"
+          }
         }
+      ],
+      "other_views": 600,
+      "total_views": 1382
+    },
+    "2026-02-03": {
+      "views": [
+        {
+          "location": "Seattle",
+          "views": 168,
+          "country_code": "US",
+          "coordinates": {
+            "latitude": "47.604309",
+            "longitude": "-122.329845"
+          }
+        },
+        {
+          "location": "Toronto",
+          "views": 115,
+          "country_code": "CA",
+          "coordinates": {
+            "latitude": "43.653661",
+            "longitude": "-79.382924"
+          }
+        },
+        {
+          "location": "Chicago",
+          "views": 93,
+          "country_code": "US",
+          "coordinates": {
+            "latitude": "41.875772",
+            "longitude": "-87.620606"
+          }
+        },
+        {
+          "location": "Ashburn",
+          "views": 91,
+          "country_code": "US",
+          "coordinates": {
+            "latitude": "39.039474",
+            "longitude": "-77.491809"
+          }
+        },
+        {
+          "location": "New York City",
+          "views": 80,
+          "country_code": "US",
+          "coordinates": {
+            "latitude": "40.713192",
+            "longitude": "-74.006065"
+          }
+        }
+      ],
+      "other_views": 505,
+      "total_views": 1363
     }
+  },
+  "country-info": {
+    "US": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/d0c9ee2dfb5087992fc9b2fc36c2d78311887d82934678b3118815d1f240951b?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/c582a850fc3fea67cbf9e88f7755a85870239bcf4138c9cf3a6f7c53e5a658ea?s=48",
+      "country_full": "United States",
+      "map_region": "021"
+    },
+    "ES": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/0060781554370ebece2445877930a4b374d8312ecad053883dbd38e5f271d295?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/9e650d102b495ceba9fb6577a6435f1d23a036d409acefe09c0606b181272ffc?s=48",
+      "country_full": "Spain",
+      "map_region": "039"
+    },
+    "GB": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/ea62907b7e45633b3f9daac0771db98d40cfd749fd0ef28313224e2618468367?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/f8c11df368971fc1b3e2a7e9a2093bee00b3ae20c14298cea0c9ea8dde177141?s=48",
+      "country_full": "United Kingdom",
+      "map_region": "154"
+    },
+    "SG": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/9aa06d58384440db23a879f5f1f9fab43a81b93a0c87b7354c61eb107c4a4f90?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/7b5fe6c9c2b3bdcf5b1ebfd331a470a57d525d3d703f447e19dd8795b7eae782?s=48",
+      "country_full": "Singapore",
+      "map_region": "035"
+    },
+    "AU": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/971effecb7738aac20120105101d7edbb81d07ec76c7040e392591d0b6bec071?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/f7f5263143e568cdd10cd7ad7a3b48c05b0a57296941ddf119191d93156e8c34?s=48",
+      "country_full": "Australia",
+      "map_region": "053"
+    },
+    "CA": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/8f783538a662f4b416a3e91154e417f38e0dec3eec8e0b5dbe4c8eb861d26e74?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/cb3ca1445705c8820c0c1398fff2716127d8b7f1eb17b8dbc7522fa4d08ca5f3?s=48",
+      "country_full": "Canada",
+      "map_region": "021"
+    }
+  }
 }

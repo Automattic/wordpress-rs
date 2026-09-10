@@ -1,46 +1,46 @@
 {
-    "posts": [
-        {
-            "id": 210454,
-            "href": "https://example.com/post-1",
-            "date": "2023-08-17 15:40:59",
-            "title": "Example Post Title",
-            "type": "post",
-            "opens": 13,
-            "clicks": 1,
-            "opens_rate": 0,
-            "clicks_rate": 0,
-            "unique_opens": 0,
-            "unique_clicks": 0,
-            "total_sends": 4
-        },
-        {
-            "id": 210642,
-            "href": "https://example.com/post-2",
-            "date": "2023-08-21 09:12:48",
-            "title": "Another Post Title",
-            "type": "post",
-            "opens": 2,
-            "clicks": 1,
-            "opens_rate": 0,
-            "clicks_rate": 0,
-            "unique_opens": 0,
-            "unique_clicks": 0,
-            "total_sends": 3
-        },
-        {
-            "id": 210796,
-            "href": "https://example.com/post-3",
-            "date": "2023-08-23 12:37:53",
-            "title": "Post With Rates",
-            "type": "post",
-            "opens": 2,
-            "clicks": 1,
-            "opens_rate": 33.33,
-            "clicks_rate": 0,
-            "unique_opens": 1,
-            "unique_clicks": 0,
-            "total_sends": 3
-        }
-    ]
+  "posts": [
+    {
+      "id": 210454,
+      "href": "https://example.com/post-1",
+      "date": "2023-08-17 15:40:59",
+      "title": "Example Post Title",
+      "type": "post",
+      "opens": 13,
+      "clicks": 1,
+      "opens_rate": 0,
+      "clicks_rate": 0,
+      "unique_opens": 0,
+      "unique_clicks": 0,
+      "total_sends": 4
+    },
+    {
+      "id": 210642,
+      "href": "https://example.com/post-2",
+      "date": "2023-08-21 09:12:48",
+      "title": "Another Post Title",
+      "type": "post",
+      "opens": 2,
+      "clicks": 1,
+      "opens_rate": 0,
+      "clicks_rate": 0,
+      "unique_opens": 0,
+      "unique_clicks": 0,
+      "total_sends": 3
+    },
+    {
+      "id": 210796,
+      "href": "https://example.com/post-3",
+      "date": "2023-08-23 12:37:53",
+      "title": "Post With Rates",
+      "type": "post",
+      "opens": 2,
+      "clicks": 1,
+      "opens_rate": 33.33,
+      "clicks_rate": 0,
+      "unique_opens": 1,
+      "unique_clicks": 0,
+      "total_sends": 3
+    }
+  ]
 }

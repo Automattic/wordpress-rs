@@ -1,115 +1,115 @@
 {
-    "chat_id": 1965758,
-    "wpcom_user_id": 158350866,
-    "external_id": null,
-    "external_id_provider": null,
-    "session_id": "2da907bc-67dd-49f0-b8f8-09c47e63176b",
-    "bot_slug": "jetpack-chat-mobile",
-    "bot_version": "1.1.0",
-    "created_at": "2025-05-15 18:04:40",
-    "zendesk_ticket_id": null,
-    "messages": [
-      {
-        "message_id": 5531592,
-        "content": "You're welcome! I'm still not sure what specific feature or functionality you'd like help with. Could you please share more details about what you're trying to do? This will help me provide you with the most relevant assistance.",
-        "role": "bot",
-        "created_at": "2025-05-15 20:04:19",
-        "context": {
-          "question_tags": {
-            "inquiry_type": "message-is-just-greeting",
-            "product": "unknown",
-            "is_legal_inquiry": "false",
-            "is_ai_question": "false",
-            "language": "en"
-          },
-          "sources": [
-            {
-              "title": "SMS Sent",
-              "url": "https:\/\/apps.wordpress.com\/mobile\/sms-thanks\/",
-              "heading": "Thanks \u2014 now go check your messages!",
-              "content": "## Thanks \u2014 now go check your messages!\n\n\nFor some help getting started, [check out our support resources.](https:\/\/apps.wordpress.com\/support\/)",
-              "blog_id": 108068616,
-              "post_id": 3851,
-              "score": 0.29833677,
-              "last_indexed_at": "2025-05-05T08:58:50.247591",
-              "railcar": {
-                "railcar": "R)!P&#lzhSo0",
-                "fetch_algo": "jetpack-chat-mobile-1.1.0",
-                "fetch_position": 0,
-                "rec_blog_id": 108068616,
-                "rec_post_id": 3851,
-                "rec_url": "https:\/\/apps.wordpress.com\/mobile\/sms-thanks\/",
-                "fetch_lang": "en",
-                "fetch_query": "Thanks for the reply!"
-              }
-            },
-            {
-              "title": "Contribute",
-              "url": "https:\/\/apps.wordpress.com\/contribute\/",
-              "heading": "User Feedback",
-              "content": "*Help shape the future of WordPress\u00a0apps*\n## User Feedback\n\n\nIf you're a user or developer and would like to leave feedback about the WordPress mobile apps, contact us on our forums. Your feedback is invaluable and helps us to improve the experience, each and every day. We have\u00a0*Requests and Feedback* forums for [WordPress for iOS](http:\/\/ios.forums.wordpress.org\/forum\/requests-and-feedback) and [WordPress for Android](http:\/\/android.forums.wordpress.org\/forum\/requests-and-feedback).\n\nYou can also send feedback\u00a0directly in the app: Go to\u00a0*Help & Support* on the Me (account) tab, and select *Contact us*.\n## Beta Testing\n\n\nDo you enjoy\u00a0giving feedback on the WordPress apps and\u00a0want to do more? If you like exploring the latest features and don't mind uncovering a few bugs in the process, join our beta testing program!\n### Mobile\n\n\nSign up for the [WordPress for iOS TestFlight beta program](https:\/\/testflight.apple.com\/join\/AkJQt8Pw), or go to [WordPress for Android](https:\/\/play.google.com\/store\/apps\/details?id=org.wordpress.android) in the Google Play Store on your device and opt in to the beta program.\n\nFor details on what to test in each beta version, head to\u00a0[Make WordPress Mobile](https:\/\/make.wordpress.org\/mobile\/).\u00a0Leave feedback directly on that post (requires a WordPress.org account) or submit feedback through TestFlight (iOS) or the Google Play Store (Android).\n### Opting Out\n\n\n**iOS**\n\nOpen the Testflight app and select the app you want to stop testing from the list.\u00a0 On the selected app page, tap\u00a0**Stop Testing**. In the pop up, tap\u00a0**Stop Testing**\u00a0to\u00a0confirm that you want to stop testing the app.\n\n**Android**\n\nOpen the Google Play Store and find the app you want to leave.\u00a0 Tap the app to open the app page.\u00a0 Scroll down and find the section on beta testing.\u00a0 Tap **Leave**.\n### Desktop\n\n\nTo join the WordPress.com desktop app beta, first [download and install the app](https:\/\/apps.wordpress.com\/desktop\/). Then, open the app's Preferences.\u00a0Next to \u201cRelease Channel,\u201d switch from the Stable release to the Beta channel. After a short wait you will be prompted to install the latest beta version. You can [share your desktop app feedback on GitHub](https:\/\/github.com\/Automattic\/wp-desktop\/issues).\n## Developers\n\n\n### GitHub repositories:\n\n\n* [WordPress for iOS](https:\/\/href.li\/?https:\/\/github.com\/wordpress-mobile\/WordPress-iOS)\n* [WordPress for Android](https:\/\/href.li\/?https:\/\/github.com\/wordpress-mobile\/WordPress-Android)\n* [WordPress.com desktop app](https:\/\/github.com\/Automattic\/wp-desktop)\n\n\nAre you passionate about mobile development? Do you want to work on projects that improve the mobile experiences of hundreds of thousands of users around the world?\n\nIf you are a mobile developer and have a passion for enhancing the user experience on small-screen portable devices, you can contribute to the WordPress mobile apps, which are **open-source** projects \u2014 this means anyone, including you, can play a part in its development.\n\nFor details on how to get involved in the WordPress mobile community, take a look at the\u00a0[WordPress Mobile Development Handbook](https:\/\/href.li\/?http:\/\/make.wordpress.org\/mobile\/handbook\/): a guide on tools, code, style guidelines, and more.",
-              "blog_id": 108068616,
-              "post_id": 1843,
-              "score": 0.2302932,
-              "last_indexed_at": "2025-05-05T08:59:05.280753",
-              "railcar": {
-                "railcar": "TMAA!Lcp7TMq",
-                "fetch_algo": "jetpack-chat-mobile-1.1.0",
-                "fetch_position": 1,
-                "rec_blog_id": 108068616,
-                "rec_post_id": 1843,
-                "rec_url": "https:\/\/apps.wordpress.com\/contribute\/",
-                "fetch_lang": "en",
-                "fetch_query": "Thanks for the reply!"
-              }
-            },
-            {
-              "title": "SMS Error",
-              "url": "https:\/\/apps.wordpress.com\/mobile\/sms-error\/",
-              "heading": "Hmm\u2026We weren't able to send a message to that number.",
-              "content": "## Hmm\u2026We weren't able to send a message to that number.\n\n\nTry using the buttons below to download the app.\n\n\n\n",
-              "blog_id": 108068616,
-              "post_id": 3853,
-              "score": 0.20303826,
-              "last_indexed_at": "2025-05-05T08:58:48.126769",
-              "railcar": {
-                "railcar": "zlLiBg@$cpfp",
-                "fetch_algo": "jetpack-chat-mobile-1.1.0",
-                "fetch_position": 2,
-                "rec_blog_id": 108068616,
-                "rec_post_id": 3853,
-                "rec_url": "https:\/\/apps.wordpress.com\/mobile\/sms-error\/",
-                "fetch_lang": "en",
-                "fetch_query": "Thanks for the reply!"
-              }
-            },
-            {
-              "title": "Not receiving the verification code for login",
-              "url": "https:\/\/apps.wordpress.com\/support\/mobile\/login-signup\/i-cant-log-in-because-im-not-receiving-the-verification-code\/",
-              "heading": "If you are unable to access...",
-              "content": "\nIf you are unable to access your SMS code, please follow these steps to regain access to your account:\n\n\n1. **Send an email**: From the email address you used to register your WordPress.com account, send an email to help@wordpress.com.\n2. **Account verification**: In your email, include details that can help us verify your ownership of the account, such as your username and any other relevant information.\n\n\nOnce we receive your email and confirm that you are the account owner, we will provide you with a single-use code to regain access to your account. This process ensures that your account remains secure while allowing you to recover access efficiently.\n\n\n",
-              "blog_id": 108068616,
-              "post_id": 8523,
-              "score": 0.20049194,
-              "last_indexed_at": "2025-05-05T08:57:04.092336",
-              "railcar": {
-                "railcar": "!xGl2Ejs!wmb",
-                "fetch_algo": "jetpack-chat-mobile-1.1.0",
-                "fetch_position": 3,
-                "rec_blog_id": 108068616,
-                "rec_post_id": 8523,
-                "rec_url": "https:\/\/apps.wordpress.com\/support\/mobile\/login-signup\/i-cant-log-in-because-im-not-receiving-the-verification-code\/",
-                "fetch_lang": "en",
-                "fetch_query": "Thanks for the reply!"
-              }
-            }
-          ],
-          "flags": {
-            "forward_to_human_support": false,
-            "canned_response": false
-          }
+  "chat_id": 1965758,
+  "wpcom_user_id": 158350866,
+  "external_id": null,
+  "external_id_provider": null,
+  "session_id": "2da907bc-67dd-49f0-b8f8-09c47e63176b",
+  "bot_slug": "jetpack-chat-mobile",
+  "bot_version": "1.1.0",
+  "created_at": "2025-05-15 18:04:40",
+  "zendesk_ticket_id": null,
+  "messages": [
+    {
+      "message_id": 5531592,
+      "content": "You're welcome! I'm still not sure what specific feature or functionality you'd like help with. Could you please share more details about what you're trying to do? This will help me provide you with the most relevant assistance.",
+      "role": "bot",
+      "created_at": "2025-05-15 20:04:19",
+      "context": {
+        "question_tags": {
+          "inquiry_type": "message-is-just-greeting",
+          "product": "unknown",
+          "is_legal_inquiry": "false",
+          "is_ai_question": "false",
+          "language": "en"
         },
-        "ts": 1747339459
-      }
-    ]
-  }
+        "sources": [
+          {
+            "title": "SMS Sent",
+            "url": "https://apps.wordpress.com/mobile/sms-thanks/",
+            "heading": "Thanks — now go check your messages!",
+            "content": "## Thanks — now go check your messages!\n\n\nFor some help getting started, [check out our support resources.](https://apps.wordpress.com/support/)",
+            "blog_id": 108068616,
+            "post_id": 3851,
+            "score": 0.29833677,
+            "last_indexed_at": "2025-05-05T08:58:50.247591",
+            "railcar": {
+              "railcar": "R)!P&#lzhSo0",
+              "fetch_algo": "jetpack-chat-mobile-1.1.0",
+              "fetch_position": 0,
+              "rec_blog_id": 108068616,
+              "rec_post_id": 3851,
+              "rec_url": "https://apps.wordpress.com/mobile/sms-thanks/",
+              "fetch_lang": "en",
+              "fetch_query": "Thanks for the reply!"
+            }
+          },
+          {
+            "title": "Contribute",
+            "url": "https://apps.wordpress.com/contribute/",
+            "heading": "User Feedback",
+            "content": "*Help shape the future of WordPress apps*\n## User Feedback\n\n\nIf you're a user or developer and would like to leave feedback about the WordPress mobile apps, contact us on our forums. Your feedback is invaluable and helps us to improve the experience, each and every day. We have *Requests and Feedback* forums for [WordPress for iOS](http://ios.forums.wordpress.org/forum/requests-and-feedback) and [WordPress for Android](http://android.forums.wordpress.org/forum/requests-and-feedback).\n\nYou can also send feedback directly in the app: Go to *Help & Support* on the Me (account) tab, and select *Contact us*.\n## Beta Testing\n\n\nDo you enjoy giving feedback on the WordPress apps and want to do more? If you like exploring the latest features and don't mind uncovering a few bugs in the process, join our beta testing program!\n### Mobile\n\n\nSign up for the [WordPress for iOS TestFlight beta program](https://testflight.apple.com/join/AkJQt8Pw), or go to [WordPress for Android](https://play.google.com/store/apps/details?id=org.wordpress.android) in the Google Play Store on your device and opt in to the beta program.\n\nFor details on what to test in each beta version, head to [Make WordPress Mobile](https://make.wordpress.org/mobile/). Leave feedback directly on that post (requires a WordPress.org account) or submit feedback through TestFlight (iOS) or the Google Play Store (Android).\n### Opting Out\n\n\n**iOS**\n\nOpen the Testflight app and select the app you want to stop testing from the list.  On the selected app page, tap **Stop Testing**. In the pop up, tap **Stop Testing** to confirm that you want to stop testing the app.\n\n**Android**\n\nOpen the Google Play Store and find the app you want to leave.  Tap the app to open the app page.  Scroll down and find the section on beta testing.  Tap **Leave**.\n### Desktop\n\n\nTo join the WordPress.com desktop app beta, first [download and install the app](https://apps.wordpress.com/desktop/). Then, open the app's Preferences. Next to “Release Channel,” switch from the Stable release to the Beta channel. After a short wait you will be prompted to install the latest beta version. You can [share your desktop app feedback on GitHub](https://github.com/Automattic/wp-desktop/issues).\n## Developers\n\n\n### GitHub repositories:\n\n\n* [WordPress for iOS](https://href.li/?https://github.com/wordpress-mobile/WordPress-iOS)\n* [WordPress for Android](https://href.li/?https://github.com/wordpress-mobile/WordPress-Android)\n* [WordPress.com desktop app](https://github.com/Automattic/wp-desktop)\n\n\nAre you passionate about mobile development? Do you want to work on projects that improve the mobile experiences of hundreds of thousands of users around the world?\n\nIf you are a mobile developer and have a passion for enhancing the user experience on small-screen portable devices, you can contribute to the WordPress mobile apps, which are **open-source** projects — this means anyone, including you, can play a part in its development.\n\nFor details on how to get involved in the WordPress mobile community, take a look at the [WordPress Mobile Development Handbook](https://href.li/?http://make.wordpress.org/mobile/handbook/): a guide on tools, code, style guidelines, and more.",
+            "blog_id": 108068616,
+            "post_id": 1843,
+            "score": 0.2302932,
+            "last_indexed_at": "2025-05-05T08:59:05.280753",
+            "railcar": {
+              "railcar": "TMAA!Lcp7TMq",
+              "fetch_algo": "jetpack-chat-mobile-1.1.0",
+              "fetch_position": 1,
+              "rec_blog_id": 108068616,
+              "rec_post_id": 1843,
+              "rec_url": "https://apps.wordpress.com/contribute/",
+              "fetch_lang": "en",
+              "fetch_query": "Thanks for the reply!"
+            }
+          },
+          {
+            "title": "SMS Error",
+            "url": "https://apps.wordpress.com/mobile/sms-error/",
+            "heading": "Hmm…We weren't able to send a message to that number.",
+            "content": "## Hmm…We weren't able to send a message to that number.\n\n\nTry using the buttons below to download the app.\n\n\n\n",
+            "blog_id": 108068616,
+            "post_id": 3853,
+            "score": 0.20303826,
+            "last_indexed_at": "2025-05-05T08:58:48.126769",
+            "railcar": {
+              "railcar": "zlLiBg@$cpfp",
+              "fetch_algo": "jetpack-chat-mobile-1.1.0",
+              "fetch_position": 2,
+              "rec_blog_id": 108068616,
+              "rec_post_id": 3853,
+              "rec_url": "https://apps.wordpress.com/mobile/sms-error/",
+              "fetch_lang": "en",
+              "fetch_query": "Thanks for the reply!"
+            }
+          },
+          {
+            "title": "Not receiving the verification code for login",
+            "url": "https://apps.wordpress.com/support/mobile/login-signup/i-cant-log-in-because-im-not-receiving-the-verification-code/",
+            "heading": "If you are unable to access...",
+            "content": "\nIf you are unable to access your SMS code, please follow these steps to regain access to your account:\n\n\n1. **Send an email**: From the email address you used to register your WordPress.com account, send an email to help@wordpress.com.\n2. **Account verification**: In your email, include details that can help us verify your ownership of the account, such as your username and any other relevant information.\n\n\nOnce we receive your email and confirm that you are the account owner, we will provide you with a single-use code to regain access to your account. This process ensures that your account remains secure while allowing you to recover access efficiently.\n\n\n",
+            "blog_id": 108068616,
+            "post_id": 8523,
+            "score": 0.20049194,
+            "last_indexed_at": "2025-05-05T08:57:04.092336",
+            "railcar": {
+              "railcar": "!xGl2Ejs!wmb",
+              "fetch_algo": "jetpack-chat-mobile-1.1.0",
+              "fetch_position": 3,
+              "rec_blog_id": 108068616,
+              "rec_post_id": 8523,
+              "rec_url": "https://apps.wordpress.com/support/mobile/login-signup/i-cant-log-in-because-im-not-receiving-the-verification-code/",
+              "fetch_lang": "en",
+              "fetch_query": "Thanks for the reply!"
+            }
+          }
+        ],
+        "flags": {
+          "forward_to_human_support": false,
+          "canned_response": false
+        }
+      },
+      "ts": 1747339459
+    }
+  ]
+}

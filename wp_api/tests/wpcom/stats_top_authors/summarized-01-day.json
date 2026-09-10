@@ -1,136 +1,136 @@
 {
-    "date": "2026-02-05",
-    "period": "day",
-    "summary": {
-        "authors": [
-            {
-                "name": "Jane Developer",
-                "avatar": "https://0.gravatar.com/avatar/abc123def456?s=64&d=mm&r=G",
-                "views": 1250,
-                "posts": [
-                    {
-                        "id": 12345,
-                        "title": "Getting Started with WordPress REST API",
-                        "url": "https://example.com/getting-started-rest-api",
-                        "views": 800
-                    },
-                    {
-                        "id": 12346,
-                        "title": "Advanced API Authentication",
-                        "url": "https://example.com/advanced-api-auth",
-                        "views": 350
-                    },
-                    {
-                        "id": 12347,
-                        "title": "Building Custom Endpoints",
-                        "url": "https://example.com/custom-endpoints",
-                        "views": 100
-                    }
-                ],
-                "follow_data": {
-                    "type": "wpcom",
-                    "params": {
-                        "feed_id": 98765,
-                        "blog_id": 9288856
-                    }
-                },
-                "author_id": 1001,
-                "other_views": 0
-            },
-            {
-                "name": "John Writer",
-                "avatar": "https://0.gravatar.com/avatar/789xyz?s=64&d=mm&r=G",
-                "views": 890,
-                "posts": [
-                    {
-                        "id": 12350,
-                        "title": "Content Strategy Best Practices",
-                        "url": "https://example.com/content-strategy",
-                        "views": 540
-                    },
-                    {
-                        "id": 12351,
-                        "title": "SEO Fundamentals",
-                        "url": "https://example.com/seo-fundamentals",
-                        "views": 350
-                    }
-                ],
-                "follow_data": {
-                    "type": "wpcom",
-                    "params": {
-                        "feed_id": 98766,
-                        "blog_id": 9288856
-                    }
-                },
-                "author_id": 1002,
-                "other_views": 0
-            },
-            {
-                "name": "Alice Engineer",
-                "avatar": "https://0.gravatar.com/avatar/engineer123?s=64&d=mm&r=G",
-                "views": 650,
-                "posts": [
-                    {
-                        "id": 12360,
-                        "title": "Debugging WordPress Plugins",
-                        "url": "https://example.com/debugging-plugins",
-                        "views": 400
-                    },
-                    {
-                        "id": 12361,
-                        "title": "Performance Optimization Tips",
-                        "url": "https://example.com/performance-tips",
-                        "views": 250
-                    }
-                ],
-                "follow_data": {
-                    "type": "wpcom",
-                    "params": {
-                        "feed_id": 98767,
-                        "blog_id": 9288856
-                    }
-                },
-                "author_id": 1003,
-                "other_views": 0
-            },
-            {
-                "name": "Bob Designer",
-                "avatar": "https://0.gravatar.com/avatar/designer456?s=64&d=mm&r=G",
-                "views": 420,
-                "posts": [
-                    {
-                        "id": 12370,
-                        "title": "Theme Development Guide",
-                        "url": "https://example.com/theme-development",
-                        "views": 420
-                    }
-                ],
-                "follow_data": null,
-                "author_id": 1004,
-                "other_views": 0
-            },
-            {
-                "name": "Carol Contributor",
-                "avatar": null,
-                "views": 180,
-                "posts": [
-                    {
-                        "id": 12380,
-                        "title": "User Experience Improvements",
-                        "url": "https://example.com/ux-improvements",
-                        "views": 180
-                    }
-                ],
-                "follow_data": {
-                    "type": "wpcom",
-                    "params": {
-                        "feed_id": 98769,
-                        "blog_id": 9288856
-                    }
-                },
-                "author_id": 1005,
-                "other_views": 0
-            }
-        ]
-    }
+  "date": "2026-02-05",
+  "period": "day",
+  "summary": {
+    "authors": [
+      {
+        "name": "Jane Developer",
+        "avatar": "https://0.gravatar.com/avatar/abc123def456?s=64&d=mm&r=G",
+        "views": 1250,
+        "posts": [
+          {
+            "id": 12345,
+            "title": "Getting Started with WordPress REST API",
+            "url": "https://example.com/getting-started-rest-api",
+            "views": 800
+          },
+          {
+            "id": 12346,
+            "title": "Advanced API Authentication",
+            "url": "https://example.com/advanced-api-auth",
+            "views": 350
+          },
+          {
+            "id": 12347,
+            "title": "Building Custom Endpoints",
+            "url": "https://example.com/custom-endpoints",
+            "views": 100
+          }
+        ],
+        "follow_data": {
+          "type": "wpcom",
+          "params": {
+            "feed_id": 98765,
+            "blog_id": 9288856
+          }
+        },
+        "author_id": 1001,
+        "other_views": 0
+      },
+      {
+        "name": "John Writer",
+        "avatar": "https://0.gravatar.com/avatar/789xyz?s=64&d=mm&r=G",
+        "views": 890,
+        "posts": [
+          {
+            "id": 12350,
+            "title": "Content Strategy Best Practices",
+            "url": "https://example.com/content-strategy",
+            "views": 540
+          },
+          {
+            "id": 12351,
+            "title": "SEO Fundamentals",
+            "url": "https://example.com/seo-fundamentals",
+            "views": 350
+          }
+        ],
+        "follow_data": {
+          "type": "wpcom",
+          "params": {
+            "feed_id": 98766,
+            "blog_id": 9288856
+          }
+        },
+        "author_id": 1002,
+        "other_views": 0
+      },
+      {
+        "name": "Alice Engineer",
+        "avatar": "https://0.gravatar.com/avatar/engineer123?s=64&d=mm&r=G",
+        "views": 650,
+        "posts": [
+          {
+            "id": 12360,
+            "title": "Debugging WordPress Plugins",
+            "url": "https://example.com/debugging-plugins",
+            "views": 400
+          },
+          {
+            "id": 12361,
+            "title": "Performance Optimization Tips",
+            "url": "https://example.com/performance-tips",
+            "views": 250
+          }
+        ],
+        "follow_data": {
+          "type": "wpcom",
+          "params": {
+            "feed_id": 98767,
+            "blog_id": 9288856
+          }
+        },
+        "author_id": 1003,
+        "other_views": 0
+      },
+      {
+        "name": "Bob Designer",
+        "avatar": "https://0.gravatar.com/avatar/designer456?s=64&d=mm&r=G",
+        "views": 420,
+        "posts": [
+          {
+            "id": 12370,
+            "title": "Theme Development Guide",
+            "url": "https://example.com/theme-development",
+            "views": 420
+          }
+        ],
+        "follow_data": null,
+        "author_id": 1004,
+        "other_views": 0
+      },
+      {
+        "name": "Carol Contributor",
+        "avatar": null,
+        "views": 180,
+        "posts": [
+          {
+            "id": 12380,
+            "title": "User Experience Improvements",
+            "url": "https://example.com/ux-improvements",
+            "views": 180
+          }
+        ],
+        "follow_data": {
+          "type": "wpcom",
+          "params": {
+            "feed_id": 98769,
+            "blog_id": 9288856
+          }
+        },
+        "author_id": 1005,
+        "other_views": 0
+      }
+    ]
+  }
 }

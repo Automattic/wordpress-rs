@@ -1,136 +1,136 @@
 {
-    "date": "2026-02-05",
-    "days": {
-        "2026-02-05": {
-            "views": [
-                {
-                    "location": "Washington",
-                    "views": 73,
-                    "country_code": "US"
-                },
-                {
-                    "location": "Madrid, Comunidad de",
-                    "views": 49,
-                    "country_code": "ES"
-                },
-                {
-                    "location": "England",
-                    "views": 39,
-                    "country_code": "GB"
-                },
-                {
-                    "location": "Singapore",
-                    "views": 34,
-                    "country_code": "SG"
-                },
-                {
-                    "location": "New South Wales",
-                    "views": 30,
-                    "country_code": "AU"
-                }
-            ],
-            "other_views": 157,
-            "total_views": 504
+  "date": "2026-02-05",
+  "days": {
+    "2026-02-05": {
+      "views": [
+        {
+          "location": "Washington",
+          "views": 73,
+          "country_code": "US"
         },
-        "2026-02-04": {
-            "views": [
-                {
-                    "location": "Washington",
-                    "views": 123,
-                    "country_code": "US"
-                },
-                {
-                    "location": "Illinois",
-                    "views": 121,
-                    "country_code": "US"
-                },
-                {
-                    "location": "California",
-                    "views": 103,
-                    "country_code": "US"
-                },
-                {
-                    "location": "England",
-                    "views": 85,
-                    "country_code": "GB"
-                },
-                {
-                    "location": "Ontario",
-                    "views": 80,
-                    "country_code": "CA"
-                }
-            ],
-            "other_views": 546,
-            "total_views": 1382
+        {
+          "location": "Madrid, Comunidad de",
+          "views": 49,
+          "country_code": "ES"
         },
-        "2026-02-03": {
-            "views": [
-                {
-                    "location": "Washington",
-                    "views": 168,
-                    "country_code": "US"
-                },
-                {
-                    "location": "Ontario",
-                    "views": 123,
-                    "country_code": "CA"
-                },
-                {
-                    "location": "Virginia",
-                    "views": 95,
-                    "country_code": "US"
-                },
-                {
-                    "location": "Illinois",
-                    "views": 93,
-                    "country_code": "US"
-                },
-                {
-                    "location": "New York",
-                    "views": 83,
-                    "country_code": "US"
-                }
-            ],
-            "other_views": 489,
-            "total_views": 1363
+        {
+          "location": "England",
+          "views": 39,
+          "country_code": "GB"
+        },
+        {
+          "location": "Singapore",
+          "views": 34,
+          "country_code": "SG"
+        },
+        {
+          "location": "New South Wales",
+          "views": 30,
+          "country_code": "AU"
         }
+      ],
+      "other_views": 157,
+      "total_views": 504
     },
-    "country-info": {
-        "US": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/d0c9ee2dfb5087992fc9b2fc36c2d78311887d82934678b3118815d1f240951b?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/c582a850fc3fea67cbf9e88f7755a85870239bcf4138c9cf3a6f7c53e5a658ea?s=48",
-            "country_full": "United States",
-            "map_region": "021"
+    "2026-02-04": {
+      "views": [
+        {
+          "location": "Washington",
+          "views": 123,
+          "country_code": "US"
         },
-        "ES": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/0060781554370ebece2445877930a4b374d8312ecad053883dbd38e5f271d295?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/9e650d102b495ceba9fb6577a6435f1d23a036d409acefe09c0606b181272ffc?s=48",
-            "country_full": "Spain",
-            "map_region": "039"
+        {
+          "location": "Illinois",
+          "views": 121,
+          "country_code": "US"
         },
-        "GB": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/ea62907b7e45633b3f9daac0771db98d40cfd749fd0ef28313224e2618468367?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/f8c11df368971fc1b3e2a7e9a2093bee00b3ae20c14298cea0c9ea8dde177141?s=48",
-            "country_full": "United Kingdom",
-            "map_region": "154"
+        {
+          "location": "California",
+          "views": 103,
+          "country_code": "US"
         },
-        "SG": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/9aa06d58384440db23a879f5f1f9fab43a81b93a0c87b7354c61eb107c4a4f90?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/7b5fe6c9c2b3bdcf5b1ebfd331a470a57d525d3d703f447e19dd8795b7eae782?s=48",
-            "country_full": "Singapore",
-            "map_region": "035"
+        {
+          "location": "England",
+          "views": 85,
+          "country_code": "GB"
         },
-        "AU": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/971effecb7738aac20120105101d7edbb81d07ec76c7040e392591d0b6bec071?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/f7f5263143e568cdd10cd7ad7a3b48c05b0a57296941ddf119191d93156e8c34?s=48",
-            "country_full": "Australia",
-            "map_region": "053"
-        },
-        "CA": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/8f783538a662f4b416a3e91154e417f38e0dec3eec8e0b5dbe4c8eb861d26e74?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/cb3ca1445705c8820c0c1398fff2716127d8b7f1eb17b8dbc7522fa4d08ca5f3?s=48",
-            "country_full": "Canada",
-            "map_region": "021"
+        {
+          "location": "Ontario",
+          "views": 80,
+          "country_code": "CA"
         }
+      ],
+      "other_views": 546,
+      "total_views": 1382
+    },
+    "2026-02-03": {
+      "views": [
+        {
+          "location": "Washington",
+          "views": 168,
+          "country_code": "US"
+        },
+        {
+          "location": "Ontario",
+          "views": 123,
+          "country_code": "CA"
+        },
+        {
+          "location": "Virginia",
+          "views": 95,
+          "country_code": "US"
+        },
+        {
+          "location": "Illinois",
+          "views": 93,
+          "country_code": "US"
+        },
+        {
+          "location": "New York",
+          "views": 83,
+          "country_code": "US"
+        }
+      ],
+      "other_views": 489,
+      "total_views": 1363
     }
+  },
+  "country-info": {
+    "US": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/d0c9ee2dfb5087992fc9b2fc36c2d78311887d82934678b3118815d1f240951b?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/c582a850fc3fea67cbf9e88f7755a85870239bcf4138c9cf3a6f7c53e5a658ea?s=48",
+      "country_full": "United States",
+      "map_region": "021"
+    },
+    "ES": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/0060781554370ebece2445877930a4b374d8312ecad053883dbd38e5f271d295?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/9e650d102b495ceba9fb6577a6435f1d23a036d409acefe09c0606b181272ffc?s=48",
+      "country_full": "Spain",
+      "map_region": "039"
+    },
+    "GB": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/ea62907b7e45633b3f9daac0771db98d40cfd749fd0ef28313224e2618468367?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/f8c11df368971fc1b3e2a7e9a2093bee00b3ae20c14298cea0c9ea8dde177141?s=48",
+      "country_full": "United Kingdom",
+      "map_region": "154"
+    },
+    "SG": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/9aa06d58384440db23a879f5f1f9fab43a81b93a0c87b7354c61eb107c4a4f90?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/7b5fe6c9c2b3bdcf5b1ebfd331a470a57d525d3d703f447e19dd8795b7eae782?s=48",
+      "country_full": "Singapore",
+      "map_region": "035"
+    },
+    "AU": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/971effecb7738aac20120105101d7edbb81d07ec76c7040e392591d0b6bec071?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/f7f5263143e568cdd10cd7ad7a3b48c05b0a57296941ddf119191d93156e8c34?s=48",
+      "country_full": "Australia",
+      "map_region": "053"
+    },
+    "CA": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/8f783538a662f4b416a3e91154e417f38e0dec3eec8e0b5dbe4c8eb861d26e74?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/cb3ca1445705c8820c0c1398fff2716127d8b7f1eb17b8dbc7522fa4d08ca5f3?s=48",
+      "country_full": "Canada",
+      "map_region": "021"
+    }
+  }
 }

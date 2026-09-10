@@ -1,7 +1,7 @@
 {
-    "code": "authorization_required",
-    "message": "Only users with the permission to edit posts can access this endpoint.",
-    "data": {
-      "status": 401
-    }
+  "code": "authorization_required",
+  "message": "Only users with the permission to edit posts can access this endpoint.",
+  "data": {
+    "status": 401
   }
+}
