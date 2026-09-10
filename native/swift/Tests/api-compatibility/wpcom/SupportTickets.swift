@@ -24,4 +24,23 @@ struct SupportTicketsCompatTests {
             ]
         )
     }
+
+    @Test func `test ticket creation params with attachment urls`() async throws {
+        _ = CreateSupportTicketParams(
+            subject: "Hello World",
+            message: "Test Message",
+            application: "Test Suite",
+            wpcomSiteId: 1234,
+            tags: ["tag1", "tag2"],
+            encryptedLogIds: [UUID().uuidString],
+            attachmentURLs: [URL(fileURLWithPath: "/path/to/file/on/disk")]
+        )
+    }
+
+    @Test func `test ticket reply params with attachment urls`() async throws {
+        _ = AddMessageToSupportConversationParams(
+            message: "This is a reply",
+            attachmentURLs: [URL(fileURLWithPath: "/path/to/file/on/disk")]
+        )
+    }
 }
