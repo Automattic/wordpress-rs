@@ -68,11 +68,6 @@ function patch_wp_api {
     generate_localized_error_extension wp_api "$swift_binding"
     enable_mutability "$swift_binding" PostCreateParams PostUpdateParams
 
-    # Use sed to replace `import SQLite3` with the wrapped version
-  sed -i.bak 's/^import SQLite3$/#if canImport(SQLite3)\
-import SQLite3\
-#endif/' "$swift_binding"
-
     cat >> "$swift_binding" <<'PATCH'
 
 // AnyPostWith*Context types contain `AnyJson` (a reference type) which

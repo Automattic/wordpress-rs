@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["rusqlite/bundled"]
 test-helpers = ["dep:chrono", "dep:integration_test_credentials", "dep:rstest"]
 
 [dependencies]
@@ -15,6 +14,10 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
 wp_api = { path = "../wp_api" }
+
+# Apple builds use system SQLite and must not enable modern_sqlite APIs.
+[target.'cfg(not(target_vendor = "apple"))'.dependencies]
+rusqlite = { workspace = true, features = ["bundled"] }
 
 [dev-dependencies]
 chrono = { workspace = true }

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Apple apps now use system SQLite, avoiding launch crashes caused by a missing `sqlite3_set_errmsg` symbol. Other platforms continue to bundle SQLite.
+
 ### Changed
 
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.98.0` to `1.98.1`.
