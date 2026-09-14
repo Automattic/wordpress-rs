@@ -382,7 +382,7 @@ async fn update_status_to_future() {
         &PostUpdateParams {
             status: Some(PostStatus::Future),
             // Publish date has to be in the future
-            date: Some(WpDateString::new("2026-09-09T12:00:00".to_string())),
+            date: Some(WpDateString::new("2099-09-09T12:00:00".to_string())),
             ..Default::default()
         },
         |updated_page, updated_page_from_wp_cli| {

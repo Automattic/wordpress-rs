@@ -135,7 +135,7 @@ async fn update_status_to_future() {
     test_update_block(
         &BlockUpdateParams {
             status: Some(BlockStatus::Future),
-            date: Some(WpDateString::new("2026-09-09T12:00:00".to_string())),
+            date: Some(WpDateString::new("2099-09-09T12:00:00".to_string())),
             ..Default::default()
         },
         |updated_block| {
