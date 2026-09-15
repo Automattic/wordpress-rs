@@ -199,12 +199,11 @@ async fn login_spec_12_wordpress_subdirectory_with_redirect() {
 #[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_13_wordpress_http_basic_with_missing_credentials() {
     // Spec Example 13 (with missing credentials)
-    let expected_hostname = "https://basic-auth.wpmt.co/";
-    let reason = login_err(expected_hostname)
+    let reason = login_err("https://basic-auth.wpmt.co/")
         .await
         .to_fetch_home_page_reason();
     if let RequestExecutionErrorReason::HttpAuthenticationRequiredError { hostname, .. } = reason {
-        assert_eq!(hostname, expected_hostname);
+        assert_eq!(hostname, "basic-auth.wpmt.co");
     } else {
         panic!(
             "Expected RequestExecutionErrorReason::HttpAuthenticationRequiredError, got: {reason:?}"
@@ -217,20 +216,19 @@ async fn login_spec_13_wordpress_http_basic_with_missing_credentials() {
 #[ignore = "flaky: hits external *.wpmt.co login-discovery sites that time out intermittently; run in the dedicated soft-fail CI step (make test-rust-integration-remote-login)"]
 async fn login_spec_13_wordpress_http_basic_with_invalid_credentials() {
     // Spec Example 13 (with invalid credentials)
-    let expected_hostname = "https://basic-auth.wpmt.co/";
     let reason = discovery_helper(
         Arc::new(ReqwestRequestExecutor::default()),
         vec![Arc::new(ApiDiscoveryAuthenticationMiddleware::new(
             "invalid".to_string(),
             "invalid".to_string(),
         ))],
-        expected_hostname,
+        "https://basic-auth.wpmt.co/",
     )
     .await
     .expect_err("Expected api discovery to fail")
     .to_fetch_home_page_reason();
     if let RequestExecutionErrorReason::HttpAuthenticationRejectedError { hostname, .. } = reason {
-        assert_eq!(hostname, expected_hostname);
+        assert_eq!(hostname, "basic-auth.wpmt.co");
     } else {
         panic!(
             "Expected RequestExecutionErrorReason::HttpAuthenticationRejectedError, got: {reason:?}"

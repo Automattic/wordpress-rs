@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Internal:** The remote login-discovery tests for HTTP Basic sites now expect `RequestExecutionErrorReason`'s `hostname` to be the host alone, matching what the library returns.
+
 ## [0.9.1] - 2026-09-14
 
 ### Fixed
