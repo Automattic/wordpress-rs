@@ -1,6 +1,7 @@
 use super::{AsNamespace, DerivedRequest, WpNamespace};
 use crate::media::{
-    MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams, MediaWithEditContext,
+    MediaCreateParams, MediaId, MediaListParams, MediaPostProcessParams, MediaUpdateParams,
+    MediaWithEditContext,
 };
 use wp_derive_request_builder::WpDerivedRequest;
 
@@ -16,6 +17,8 @@ enum MediaRequest {
     Update,
     #[post(url = "/media", params = &MediaCreateParams, output = MediaWithEditContext, multipart = true)]
     Create,
+    #[post(url = "/media/<media_id>/post-process", params = &MediaPostProcessParams, output = MediaWithEditContext)]
+    PostProcess,
 }
 
 impl DerivedRequest for MediaRequest {
@@ -62,6 +65,14 @@ mod tests {
     #[rstest]
     fn delete_media(endpoint: MediaRequestEndpoint) {
         validate_wp_v2_endpoint(endpoint.delete(&MediaId(54)), "/media/54?force=true");
+    }
+
+    #[rstest]
+    fn post_process_media(endpoint: MediaRequestEndpoint) {
+        validate_wp_v2_endpoint(
+            endpoint.post_process(&MediaId(54)),
+            "/media/54/post-process",
+        );
     }
 
     #[rstest]

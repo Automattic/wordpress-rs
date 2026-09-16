@@ -1,7 +1,7 @@
 use macro_helper::generate_update_test;
 use wp_api::date::WpDateString;
 use wp_api::{
-    media::{MediaCreateParams, MediaUpdateParams},
+    media::{MediaCreateParams, MediaPostProcessAction, MediaPostProcessParams, MediaUpdateParams},
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
 };
 use wp_api_integration_tests::prelude::*;
@@ -30,6 +30,26 @@ async fn delete_media() {
     let media_delete_response = api_client().media().delete(&MEDIA_ID_611).await;
     assert!(media_delete_response.is_ok(), "{media_delete_response:#?}");
     assert!(media_delete_response.unwrap().data.deleted);
+
+    RestoreServer::db().await;
+}
+
+/// The server generates only the sub-sizes the attachment is missing, so this is a no-op
+/// when the test site's attachment already has all of them. It's kept alongside the
+/// mutating tests because the same call does write sub-sizes when any are missing.
+#[tokio::test]
+#[serial]
+async fn post_process_media() {
+    api_client()
+        .media()
+        .post_process(
+            &MEDIA_ID_611,
+            &MediaPostProcessParams {
+                action: MediaPostProcessAction::CreateImageSubsizes,
+            },
+        )
+        .await
+        .assert_response();
 
     RestoreServer::db().await;
 }

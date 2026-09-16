@@ -1,6 +1,9 @@
 use wp_api::{
     auth::WpAuthenticationProvider,
-    media::{MediaCreateParams, MediaId, MediaListParams, MediaUpdateParams},
+    media::{
+        MediaCreateParams, MediaId, MediaListParams, MediaPostProcessAction,
+        MediaPostProcessParams, MediaUpdateParams,
+    },
     posts::WpApiParamPostsOrderBy,
     prelude::*,
     request::{RequestContext, WpMultipartFormField, WpMultipartFormRequest},
@@ -81,6 +84,38 @@ async fn list_err_media_invalid_page_number() {
         })
         .await
         .assert_wp_error(WpErrorCode::PostInvalidPageNumber);
+}
+
+/// Post-processing is gated on the same capability as updating the attachment, so an
+/// author who can't edit someone else's media can't post-process it either.
+#[tokio::test]
+#[parallel]
+async fn post_process_media_err_cannot_edit() {
+    api_client_as_author()
+        .media()
+        .post_process(
+            &MEDIA_ID_611,
+            &MediaPostProcessParams {
+                action: MediaPostProcessAction::CreateImageSubsizes,
+            },
+        )
+        .await
+        .assert_wp_error(WpErrorCode::CannotEdit);
+}
+
+#[tokio::test]
+#[parallel]
+async fn post_process_media_err_post_invalid_id() {
+    api_client()
+        .media()
+        .post_process(
+            &MediaId(99999999),
+            &MediaPostProcessParams {
+                action: MediaPostProcessAction::CreateImageSubsizes,
+            },
+        )
+        .await
+        .assert_wp_error(WpErrorCode::PostInvalidId);
 }
 
 #[tokio::test]
