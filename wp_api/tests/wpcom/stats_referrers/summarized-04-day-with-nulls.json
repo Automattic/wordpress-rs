@@ -1,63 +1,63 @@
 {
-    "date": "2026-01-28",
-    "period": "day",
-    "summary": {
-        "groups": [
-            {
-                "group": null,
-                "name": null,
-                "url": null,
-                "icon": null,
-                "total": null,
-                "follow_data": null,
-                "results": null
-            },
-            {
-                "group": "WordPress.com Reader",
-                "name": "WordPress.com Reader",
-                "url": "https://wordpress.com/reader/",
-                "icon": "https://example.com/icon.png",
-                "total": 100,
-                "follow_data": null,
-                "results": {
-                    "views": 100
-                }
-            },
-            {
-                "group": "Search Engines",
-                "name": "Search Engines",
-                "url": null,
-                "icon": null,
-                "total": 50,
-                "follow_data": null,
-                "results": [
-                    {
-                        "name": null,
-                        "url": null,
-                        "icon": null,
-                        "views": null
-                    },
-                    {
-                        "name": "Google Search",
-                        "url": "http://www.google.com/",
-                        "icon": "https://example.com/google.png",
-                        "views": 25
-                    }
-                ]
-            },
-            {
-                "group": "partial.example.com",
-                "name": null,
-                "url": null,
-                "icon": null,
-                "total": 10,
-                "follow_data": null,
-                "results": {
-                    "views": null
-                }
-            }
-        ],
-        "other_views": 0,
-        "total_views": 160
-    }
+  "date": "2026-01-28",
+  "period": "day",
+  "summary": {
+    "groups": [
+      {
+        "group": null,
+        "name": null,
+        "url": null,
+        "icon": null,
+        "total": null,
+        "follow_data": null,
+        "results": null
+      },
+      {
+        "group": "WordPress.com Reader",
+        "name": "WordPress.com Reader",
+        "url": "https://wordpress.com/reader/",
+        "icon": "https://example.com/icon.png",
+        "total": 100,
+        "follow_data": null,
+        "results": {
+          "views": 100
+        }
+      },
+      {
+        "group": "Search Engines",
+        "name": "Search Engines",
+        "url": null,
+        "icon": null,
+        "total": 50,
+        "follow_data": null,
+        "results": [
+          {
+            "name": null,
+            "url": null,
+            "icon": null,
+            "views": null
+          },
+          {
+            "name": "Google Search",
+            "url": "http://www.google.com/",
+            "icon": "https://example.com/google.png",
+            "views": 25
+          }
+        ]
+      },
+      {
+        "group": "partial.example.com",
+        "name": null,
+        "url": null,
+        "icon": null,
+        "total": 10,
+        "follow_data": null,
+        "results": {
+          "views": null
+        }
+      }
+    ],
+    "other_views": 0,
+    "total_views": 160
+  }
 }

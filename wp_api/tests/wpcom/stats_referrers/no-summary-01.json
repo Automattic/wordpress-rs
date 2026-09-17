@@ -1,54 +1,54 @@
 {
-    "date": "2026-01-26",
-    "days": {
-        "2026-01-26": {
-            "groups": [
-                {
-                    "group": "WordPress.com Reader",
-                    "name": "WordPress.com Reader",
-                    "url": "https://wordpress.com/reader/",
-                    "icon": "https://secure.gravatar.com/blavatar/c5ba929e1803dd1d2865d53b671e5d0a1f64071ecd9d720d7377dce63fdab0a2?s=48",
-                    "total": 8,
-                    "follow_data": null,
-                    "results": {
-                        "views": 8
-                    }
-                },
-                {
-                    "group": "Search Engines",
-                    "name": "Search Engines",
-                    "icon": "https://wordpress.com/i/stats/search-engine.png",
-                    "total": 3,
-                    "follow_data": null,
-                    "results": [
-                        {
-                            "name": "Google Search",
-                            "url": "http://www.google.com/",
-                            "icon": "https://secure.gravatar.com/blavatar/426d27def7eef69afd58ab5280173a02e50c3a2f9d0b9ebce3fb453a69af2b44?s=48",
-                            "views": 3
-                        }
-                    ]
-                }
-            ],
-            "other_views": 2,
-            "total_views": 13
+  "date": "2026-01-26",
+  "days": {
+    "2026-01-26": {
+      "groups": [
+        {
+          "group": "WordPress.com Reader",
+          "name": "WordPress.com Reader",
+          "url": "https://wordpress.com/reader/",
+          "icon": "https://secure.gravatar.com/blavatar/c5ba929e1803dd1d2865d53b671e5d0a1f64071ecd9d720d7377dce63fdab0a2?s=48",
+          "total": 8,
+          "follow_data": null,
+          "results": {
+            "views": 8
+          }
         },
-        "2026-01-25": {
-            "groups": [
-                {
-                    "group": "matticspace.a8c.com",
-                    "name": "matticspace.a8c.com",
-                    "url": "https://matticspace.a8c.com/",
-                    "icon": "https://secure.gravatar.com/blavatar/4c96b73e50179bce58e929ad02c356facb884b16cf51eec883ccd7e2347754a8?s=48",
-                    "total": 5,
-                    "follow_data": null,
-                    "results": {
-                        "views": 5
-                    }
-                }
-            ],
-            "other_views": 0,
-            "total_views": 5
+        {
+          "group": "Search Engines",
+          "name": "Search Engines",
+          "icon": "https://wordpress.com/i/stats/search-engine.png",
+          "total": 3,
+          "follow_data": null,
+          "results": [
+            {
+              "name": "Google Search",
+              "url": "http://www.google.com/",
+              "icon": "https://secure.gravatar.com/blavatar/426d27def7eef69afd58ab5280173a02e50c3a2f9d0b9ebce3fb453a69af2b44?s=48",
+              "views": 3
+            }
+          ]
         }
+      ],
+      "other_views": 2,
+      "total_views": 13
+    },
+    "2026-01-25": {
+      "groups": [
+        {
+          "group": "matticspace.a8c.com",
+          "name": "matticspace.a8c.com",
+          "url": "https://matticspace.a8c.com/",
+          "icon": "https://secure.gravatar.com/blavatar/4c96b73e50179bce58e929ad02c356facb884b16cf51eec883ccd7e2347754a8?s=48",
+          "total": 5,
+          "follow_data": null,
+          "results": {
+            "views": 5
+          }
+        }
+      ],
+      "other_views": 0,
+      "total_views": 5
     }
+  }
 }

@@ -1,10 +1,10 @@
 {
-    "date": "2026-02-26",
-    "unit": "day",
-    "fields": [
-        "period",
-        "subscribers",
-        "subscribers_paid"
-    ],
-    "data": []
+  "date": "2026-02-26",
+  "unit": "day",
+  "fields": [
+    "period",
+    "subscribers",
+    "subscribers_paid"
+  ],
+  "data": []
 }
