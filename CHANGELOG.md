@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Internal:** The remote login-discovery tests for HTTP Basic sites now expect `RequestExecutionErrorReason`'s `hostname` to be the host alone, matching what the library returns.
+- **Internal:** The test server Docker image now installs `zip`, which swiftly 1.2.0 requires to install the Swift toolchain.
 
 ## [0.9.1] - 2026-09-14
 
