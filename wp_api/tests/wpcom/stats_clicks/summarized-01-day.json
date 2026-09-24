@@ -1,46 +1,46 @@
 {
-    "date": "2026-02-18",
-    "period": "day",
-    "summary": {
-        "clicks": [
-            {
-                "icon": "https://secure.gravatar.com/blavatar/example1?s=48",
-                "url": null,
-                "name": "href.li",
-                "views": 17,
-                "children": [
-                    {
-                        "url": "https://href.li/?https://www.example.com/page1",
-                        "name": "example.com/page1",
-                        "views": 2
-                    },
-                    {
-                        "url": "https://href.li/?https://www.example.com/page2",
-                        "name": "example.com/page2",
-                        "views": 1
-                    }
-                ]
-            },
-            {
-                "icon": "https://secure.gravatar.com/blavatar/example2?s=48",
-                "url": null,
-                "name": "example.automattic.com",
-                "views": 3,
-                "children": [
-                    {
-                        "url": "https://example.automattic.com/wp-content/uploads/2019/05/image.png",
-                        "name": "example.automattic.com/wp-content/uploads/2019/05/image.png",
-                        "views": 2
-                    },
-                    {
-                        "url": "https://example.automattic.com/wp-content/uploads/2019/05/image2.png",
-                        "name": "example.automattic.com/wp-content/uploads/2019/05/image2.png",
-                        "views": 1
-                    }
-                ]
-            }
-        ],
-        "other_clicks": 0,
-        "total_clicks": 20
-    }
+  "date": "2026-02-18",
+  "period": "day",
+  "summary": {
+    "clicks": [
+      {
+        "icon": "https://secure.gravatar.com/blavatar/example1?s=48",
+        "url": null,
+        "name": "href.li",
+        "views": 17,
+        "children": [
+          {
+            "url": "https://href.li/?https://www.example.com/page1",
+            "name": "example.com/page1",
+            "views": 2
+          },
+          {
+            "url": "https://href.li/?https://www.example.com/page2",
+            "name": "example.com/page2",
+            "views": 1
+          }
+        ]
+      },
+      {
+        "icon": "https://secure.gravatar.com/blavatar/example2?s=48",
+        "url": null,
+        "name": "example.automattic.com",
+        "views": 3,
+        "children": [
+          {
+            "url": "https://example.automattic.com/wp-content/uploads/2019/05/image.png",
+            "name": "example.automattic.com/wp-content/uploads/2019/05/image.png",
+            "views": 2
+          },
+          {
+            "url": "https://example.automattic.com/wp-content/uploads/2019/05/image2.png",
+            "name": "example.automattic.com/wp-content/uploads/2019/05/image2.png",
+            "views": 1
+          }
+        ]
+      }
+    ],
+    "other_clicks": 0,
+    "total_clicks": 20
+  }
 }

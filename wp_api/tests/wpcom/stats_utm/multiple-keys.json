@@ -1,30 +1,30 @@
 {
-    "top_utm_values": {
-        "[\"impact\",\"affiliate\"]": 5,
-        "[\"trustpilot\",\"company_profile\"]": 1
-    },
-    "top_posts": {
-        "[\"impact\",\"affiliate\"]": [
-            {
-                "id": 146836,
-                "href": "https://fieldguide.automattic.com/my-computers/country-specific-purchasing-and-trade-in-buyback-instructions/computer-purchasing-instructions-for-united-states/",
-                "title": "US - Computer Purchasing Instructions",
-                "views": 3
-            },
-            {
-                "id": 0,
-                "href": "https://fieldguide.automattic.com/",
-                "title": "Home page / Archives",
-                "views": 2
-            }
-        ],
-        "[\"trustpilot\",\"company_profile\"]": [
-            {
-                "id": 0,
-                "href": "https://fieldguide.automattic.com/",
-                "title": "Home page / Archives",
-                "views": 1
-            }
-        ]
-    }
+  "top_utm_values": {
+    "[\"impact\",\"affiliate\"]": 5,
+    "[\"trustpilot\",\"company_profile\"]": 1
+  },
+  "top_posts": {
+    "[\"impact\",\"affiliate\"]": [
+      {
+        "id": 146836,
+        "href": "https://fieldguide.automattic.com/my-computers/country-specific-purchasing-and-trade-in-buyback-instructions/computer-purchasing-instructions-for-united-states/",
+        "title": "US - Computer Purchasing Instructions",
+        "views": 3
+      },
+      {
+        "id": 0,
+        "href": "https://fieldguide.automattic.com/",
+        "title": "Home page / Archives",
+        "views": 2
+      }
+    ],
+    "[\"trustpilot\",\"company_profile\"]": [
+      {
+        "id": 0,
+        "href": "https://fieldguide.automattic.com/",
+        "title": "Home page / Archives",
+        "views": 1
+      }
+    ]
+  }
 }

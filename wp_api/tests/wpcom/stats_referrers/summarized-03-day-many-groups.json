@@ -1,138 +1,138 @@
 {
-    "date": "2026-01-24",
-    "period": "day",
-    "summary": {
-        "groups": [
-            {
-                "group": "chat.a8c.com",
-                "name": "chat.a8c.com",
-                "url": "https://chat.a8c.com/",
-                "icon": "https://secure.gravatar.com/blavatar/2c4db91eefe96556407df6171a361e7b2fb622fa1c86e1f704d29dd5e1c841da?s=48",
-                "total": 55,
-                "follow_data": null,
-                "results": {
-                    "views": 55
-                }
-            },
-            {
-                "group": "WordPress.com Reader",
-                "name": "WordPress.com Reader",
-                "url": "https://wordpress.com/reader/",
-                "icon": "https://secure.gravatar.com/blavatar/c5ba929e1803dd1d2865d53b671e5d0a1f64071ecd9d720d7377dce63fdab0a2?s=48",
-                "total": 46,
-                "follow_data": null,
-                "results": {
-                    "views": 46
-                }
-            },
-            {
-                "group": "Search Engines",
-                "name": "Search Engines",
-                "icon": "https://wordpress.com/i/stats/search-engine.png",
-                "total": 10,
-                "follow_data": null,
-                "results": [
-                    {
-                        "name": "Google Search",
-                        "url": "http://www.google.com/",
-                        "icon": "https://secure.gravatar.com/blavatar/426d27def7eef69afd58ab5280173a02e50c3a2f9d0b9ebce3fb453a69af2b44?s=48",
-                        "views": 10
-                    }
-                ]
-            },
-            {
-                "group": "mail.google.com",
-                "name": "Gmail",
-                "url": "https://mail.google.com/",
-                "icon": null,
-                "total": 7,
-                "follow_data": null,
-                "results": {
-                    "views": 7
-                }
-            },
-            {
-                "group": "matticspace.a8c.com",
-                "name": "matticspace.a8c.com",
-                "url": "https://matticspace.a8c.com/",
-                "icon": "https://secure.gravatar.com/blavatar/4c96b73e50179bce58e929ad02c356facb884b16cf51eec883ccd7e2347754a8?s=48",
-                "total": 7,
-                "follow_data": null,
-                "results": {
-                    "views": 7
-                }
-            },
-            {
-                "group": "looker.a8c.com",
-                "name": "looker.a8c.com",
-                "url": "https://looker.a8c.com/",
-                "icon": "https://secure.gravatar.com/blavatar/df0869bebd92d555ef33475b487931bc6217d83c3280e5cacd00d653058a3bc6?s=48",
-                "total": 4,
-                "follow_data": null,
-                "results": {
-                    "views": 4
-                }
-            },
-            {
-                "group": "jptools.wordpress.com",
-                "name": "jptools.wordpress.com",
-                "url": "https://jptools.wordpress.com/",
-                "icon": null,
-                "total": 2,
-                "follow_data": {
-                    "params": {
-                        "stat-source": "stats_referrer",
-                        "follow-text": "Follow",
-                        "following-text": "Following",
-                        "following-hover-text": "Unfollow",
-                        "blog_domain": "jptools.wordpress.com",
-                        "blog_url": "http://jptools.wordpress.com",
-                        "blog_id": 179655692,
-                        "site_id": 179655692,
-                        "blog_title": "Jetpack Tools",
-                        "is_following": false
-                    },
-                    "type": "follow"
-                },
-                "results": {
-                    "views": 2
-                }
-            },
-            {
-                "group": "chatgpt.com",
-                "name": "chatgpt.com",
-                "url": "https://chatgpt.com/",
-                "icon": "https://secure.gravatar.com/blavatar/c6240ca88eed5b237451d4ceab51a5df1e8bc3b0a4a0e099fbe4b9f0d5cf23a2?s=48",
-                "total": 1,
-                "follow_data": null,
-                "results": {
-                    "views": 1
-                }
-            },
-            {
-                "group": "experiments.a8c.com",
-                "name": "experiments.a8c.com",
-                "url": "https://experiments.a8c.com/",
-                "icon": "https://secure.gravatar.com/blavatar/bb47306c966e1b9943ea8870ac01a0ac05a14db235d259e0d4ffa2ae2eb9e1b4?s=48",
-                "total": 1,
-                "follow_data": null,
-                "results": {
-                    "views": 1
-                }
-            },
-            {
-                "group": "docs.google.com",
-                "name": "docs.google.com",
-                "url": "https://docs.google.com/",
-                "icon": null,
-                "total": 1,
-                "follow_data": null,
-                "results": {
-                    "views": 1
-                }
-            }
-        ],
-        "other_views": 0,
-        "total_views": 142
-    }
+  "date": "2026-01-24",
+  "period": "day",
+  "summary": {
+    "groups": [
+      {
+        "group": "chat.a8c.com",
+        "name": "chat.a8c.com",
+        "url": "https://chat.a8c.com/",
+        "icon": "https://secure.gravatar.com/blavatar/2c4db91eefe96556407df6171a361e7b2fb622fa1c86e1f704d29dd5e1c841da?s=48",
+        "total": 55,
+        "follow_data": null,
+        "results": {
+          "views": 55
+        }
+      },
+      {
+        "group": "WordPress.com Reader",
+        "name": "WordPress.com Reader",
+        "url": "https://wordpress.com/reader/",
+        "icon": "https://secure.gravatar.com/blavatar/c5ba929e1803dd1d2865d53b671e5d0a1f64071ecd9d720d7377dce63fdab0a2?s=48",
+        "total": 46,
+        "follow_data": null,
+        "results": {
+          "views": 46
+        }
+      },
+      {
+        "group": "Search Engines",
+        "name": "Search Engines",
+        "icon": "https://wordpress.com/i/stats/search-engine.png",
+        "total": 10,
+        "follow_data": null,
+        "results": [
+          {
+            "name": "Google Search",
+            "url": "http://www.google.com/",
+            "icon": "https://secure.gravatar.com/blavatar/426d27def7eef69afd58ab5280173a02e50c3a2f9d0b9ebce3fb453a69af2b44?s=48",
+            "views": 10
+          }
+        ]
+      },
+      {
+        "group": "mail.google.com",
+        "name": "Gmail",
+        "url": "https://mail.google.com/",
+        "icon": null,
+        "total": 7,
+        "follow_data": null,
+        "results": {
+          "views": 7
+        }
+      },
+      {
+        "group": "matticspace.a8c.com",
+        "name": "matticspace.a8c.com",
+        "url": "https://matticspace.a8c.com/",
+        "icon": "https://secure.gravatar.com/blavatar/4c96b73e50179bce58e929ad02c356facb884b16cf51eec883ccd7e2347754a8?s=48",
+        "total": 7,
+        "follow_data": null,
+        "results": {
+          "views": 7
+        }
+      },
+      {
+        "group": "looker.a8c.com",
+        "name": "looker.a8c.com",
+        "url": "https://looker.a8c.com/",
+        "icon": "https://secure.gravatar.com/blavatar/df0869bebd92d555ef33475b487931bc6217d83c3280e5cacd00d653058a3bc6?s=48",
+        "total": 4,
+        "follow_data": null,
+        "results": {
+          "views": 4
+        }
+      },
+      {
+        "group": "jptools.wordpress.com",
+        "name": "jptools.wordpress.com",
+        "url": "https://jptools.wordpress.com/",
+        "icon": null,
+        "total": 2,
+        "follow_data": {
+          "params": {
+            "stat-source": "stats_referrer",
+            "follow-text": "Follow",
+            "following-text": "Following",
+            "following-hover-text": "Unfollow",
+            "blog_domain": "jptools.wordpress.com",
+            "blog_url": "http://jptools.wordpress.com",
+            "blog_id": 179655692,
+            "site_id": 179655692,
+            "blog_title": "Jetpack Tools",
+            "is_following": false
+          },
+          "type": "follow"
+        },
+        "results": {
+          "views": 2
+        }
+      },
+      {
+        "group": "chatgpt.com",
+        "name": "chatgpt.com",
+        "url": "https://chatgpt.com/",
+        "icon": "https://secure.gravatar.com/blavatar/c6240ca88eed5b237451d4ceab51a5df1e8bc3b0a4a0e099fbe4b9f0d5cf23a2?s=48",
+        "total": 1,
+        "follow_data": null,
+        "results": {
+          "views": 1
+        }
+      },
+      {
+        "group": "experiments.a8c.com",
+        "name": "experiments.a8c.com",
+        "url": "https://experiments.a8c.com/",
+        "icon": "https://secure.gravatar.com/blavatar/bb47306c966e1b9943ea8870ac01a0ac05a14db235d259e0d4ffa2ae2eb9e1b4?s=48",
+        "total": 1,
+        "follow_data": null,
+        "results": {
+          "views": 1
+        }
+      },
+      {
+        "group": "docs.google.com",
+        "name": "docs.google.com",
+        "url": "https://docs.google.com/",
+        "icon": null,
+        "total": 1,
+        "follow_data": null,
+        "results": {
+          "views": 1
+        }
+      }
+    ],
+    "other_views": 0,
+    "total_views": 142
+  }
 }
