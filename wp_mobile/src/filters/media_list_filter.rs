@@ -153,7 +153,7 @@ impl MediaListFilter {
         // Media type check.
         if let Some(param) = &self.media_type {
             let media_mime_top = media.mime_type.split_once('/').map(|(top, _)| top);
-            let matches = match (param, &media.media_type) {
+            let matches = match (param, media.media_type.inner()) {
                 (MediaTypeParam::Image, MediaType::Image) => true,
                 (MediaTypeParam::Image, MediaType::File) => false,
                 (MediaTypeParam::Video, MediaType::File) => media_mime_top == Some("video"),
