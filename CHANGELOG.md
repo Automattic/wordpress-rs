@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
 
+### Fixed
+
+- Swift: `WpRequestExecutor.cancel(context:)` now cancels every request made for the context, including ones started after the call. Cancelling during a `RetryAfterMiddleware` backoff (or anywhere no request was in flight for a second) previously cancelled nothing, so the retry went out and the call succeeded. Cancellation also now works on Linux, where it was compiled out.
+- Swift: a request started from an already-cancelled `Task` now fails with `CancellationError` instead of running to completion.
+
 ### Changed
 
 - **Internal:** The remote login-discovery tests for HTTP Basic sites now expect `RequestExecutionErrorReason`'s `hostname` to be the host alone, matching what the library returns.
