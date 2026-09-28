@@ -34,11 +34,12 @@ Examples:
 
 The WordPress.com bearer token is read from (in order):
   1. WPCOM_TOKEN environment variable
-  2. ~/.wpcom-token file
-  3. otherwise the script prompts you to paste one (and offers to save it to ~/.wpcom-token)
+  2. `bearer_token` in wp_com_test_credentials.json at the repository root
+     (the same token the WordPress.com integration tests use)
+  3. ~/.wpcom-token file
 
 It is deliberately NOT accepted as a command-line flag: a token passed on the command line
-would be saved in your shell history. Set WPCOM_TOKEN or write ~/.wpcom-token once.
+would be saved in your shell history.
 EOF
 }
 
@@ -166,40 +167,26 @@ case "$platform" in
     *) echo "error: unknown platform '$platform' (expected 'ios' or 'android')" >&2; exit 1 ;;
 esac
 
-# The token is read from the WPCOM_TOKEN environment variable, then a ~/.wpcom-token file.
-# It is intentionally not a command-line argument, to keep it out of shell history.
+# The token is intentionally not a command-line argument, to keep it out of shell history.
 token="${WPCOM_TOKEN:-}"
+
+# The `bearer_token` the WordPress.com integration tests use. `plutil` reads JSON natively on macOS.
+credentials_file="$(cd "$(dirname "$0")/.." && pwd)/wp_com_test_credentials.json"
+if [[ -z "$token" && -f "$credentials_file" ]]; then
+    token="$(plutil -extract bearer_token raw -o - "$credentials_file" 2>/dev/null || true)"
+    # Ignore the unedited placeholder from `wp_com_test_credentials.json-example`.
+    if [[ "$token" == "replace_with_your_oauth2_token" ]]; then
+        token=""
+    fi
+fi
+
 if [[ -z "$token" && -f "$HOME/.wpcom-token" ]]; then
     token="$(tr -d '[:space:]' < "$HOME/.wpcom-token")"
 fi
 
-# Nothing found anywhere — prompt for one. Input is hidden, since it's a secret.
 if [[ -z "$token" ]]; then
-    printf "No WordPress.com token found (WPCOM_TOKEN / ~/.wpcom-token).\n" >&2
-    printf "Paste a bearer token (hidden), or press Return to cancel: " >&2
-    read -rs token || true
-    printf "\n" >&2
-    token="$(printf '%s' "$token" | tr -d '[:space:]')"
-    if [[ -n "$token" ]]; then
-        printf "Token received (%s chars).\n" "${#token}" >&2
-        printf "Save it to ~/.wpcom-token for next time? [y/N] " >&2
-        read -r save_reply || true
-        if [[ "$save_reply" =~ ^[Yy]$ ]]; then
-            token_file="$HOME/.wpcom-token"
-            # umask keeps the new file owner-only; chmod covers an existing, looser file.
-            if (umask 077; printf '%s\n' "$token" > "$token_file"); then
-                chmod 600 "$token_file" 2>/dev/null || true
-                printf "Saved to %s (mode 600).\n" "$token_file" >&2
-            else
-                printf "warning: could not write %s; continuing without saving.\n" "$token_file" >&2
-            fi
-        fi
-    fi
-fi
-
-if [[ -z "$token" ]]; then
-    echo "error: no token — set WPCOM_TOKEN, write ~/.wpcom-token, or paste one when prompted" >&2
-    usage >&2
+    echo "error: no WordPress.com token found. Set \`bearer_token\` in $credentials_file" >&2
+    echo "       (see wp_com_test_credentials.json-example), set WPCOM_TOKEN, or write ~/.wpcom-token." >&2
     exit 1
 fi
 

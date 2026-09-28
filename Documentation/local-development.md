@@ -89,9 +89,16 @@ make example-app-login DEVICE=<id>        # a specific simulator UDID or adb ser
 as flags — `--platform`, `--device`, `--reset`. When more than one simulator or device is running,
 it prompts you to choose.
 
-The token is resolved from `WPCOM_TOKEN`, then `~/.wpcom-token`; if neither is set the script
-prompts you to paste one (hidden) and offers to save it to `~/.wpcom-token`. There's deliberately
-no command-line token flag — a token passed as an argument would be saved in your shell history.
+The token is resolved from, in order:
+
+1. the `WPCOM_TOKEN` environment variable;
+2. `bearer_token` in `wp_com_test_credentials.json` at the repository root — the same token the
+   WordPress.com integration tests use (see `wp_com_test_credentials.json-example`);
+3. a `~/.wpcom-token` file, which also works in fresh worktrees that don't have a copy of
+   `wp_com_test_credentials.json`, and matches WordPress-iOS's `make sim-login`.
+
+There's deliberately no command-line token flag — a token passed as an argument would be saved in
+your shell history.
 
 The app only uses the token when no WordPress.com account is signed in, and only once per launch,
 so signing out stays signed out. To launch with a token by hand:
