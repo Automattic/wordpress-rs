@@ -759,9 +759,10 @@ impl RequestExecutionErrorReason {
     ///
     /// Offline detection depends on a platform signal, so it is not uniform.
     /// Swift derives it from the OS-reported `URLError` codes: the device has no
-    /// connection (`notConnectedToInternet`, `networkConnectionLost`) or is barred
-    /// from using one right now (`dataNotAllowed`, `internationalRoamingOff`,
-    /// `callIsActive`). Kotlin consults a caller-supplied
+    /// connection (`notConnectedToInternet`) or is barred from using one right now
+    /// (`dataNotAllowed`, `internationalRoamingOff`, `callIsActive`). A connection
+    /// severed mid-request (`networkConnectionLost`) counts only when the system's
+    /// network path is also unavailable; on a healthy network it's `HttpError`. Kotlin consults a caller-supplied
     /// `NetworkAvailabilityProvider` when a DNS lookup fails. The
     /// `reqwest` executor has neither and never constructs `DeviceIsOfflineError`,
     /// so this always returns `false` there — an offline request typically

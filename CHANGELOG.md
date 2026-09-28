@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Swift: every request failure now carries the redirects recorded for the request. The offline, timeout, cancellation, and generic branches always reported `redirects: nil`.
 - Swift: a failed HTTP exchange — a malformed or undecodable response (`badServerResponse`, `cannotParseResponse`, `cannotDecodeRawData`, `cannotDecodeContentData`, `zeroByteResource`, `dataLengthExceedsMaximum`, `requestBodyStreamExhausted`) or a redirect loop (`httpTooManyRedirects`, `redirectToNonExistentLocation`) — is now `HttpError`, matching reqwest and Kotlin. The Swift executor never produced `HttpError` before; these all fell through to `GenericError`. A redirect loop carries the recorded redirect chain.
 - reqwest: a redirect loop is now `HttpError` instead of `GenericError`.
+- Swift: a connection severed mid-request (`URLError.networkConnectionLost`) is now `DeviceIsOfflineError` only when the system's network path is also unavailable (via `NWPathMonitor`), and `HttpError` otherwise. It was always `DeviceIsOfflineError`, so a server or proxy reset on a healthy network — which a plain retry usually fixes — looked like the device had gone offline.
 
 ### Changed
 
