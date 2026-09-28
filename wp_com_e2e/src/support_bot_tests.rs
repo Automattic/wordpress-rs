@@ -9,7 +9,9 @@ use wp_api::wp_com::support_bots::{
 
 use crate::context::TestContext;
 
-const BOT_ID: &str = "jetpack-chat-mobile";
+// The Help Center support bot. `jetpack-chat-mobile` ran on the retired chain bot runtime and now
+// returns `410 legacy_chain_bot`.
+const BOT_ID: &str = "wpcom-workflow-support_chat";
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut trials = vec![];
