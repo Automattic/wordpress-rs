@@ -22,6 +22,8 @@ import rs.wordpress.example.shared.App
 import uniffi.wp_api.AutoDiscoveryAttemptSuccess
 import uniffi.wp_api.DiscoveredAuthenticationMechanism
 import uniffi.wp_api.OAuth2Configuration
+import uniffi.wp_api.OAuth2ConfigurationStore
+import uniffi.wp_api.OAuth2ConfigurationStoreException
 import uniffi.wp_api.TokenRequestParameters
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpComOauthScope
@@ -42,6 +44,23 @@ class WelcomeActivity : ComponentActivity() {
     private var siteSpecificOAuthConfig: OAuth2Configuration? = null
     private var siteSpecificOAuthState: String? = null
     private var discoveredSiteHost: String? = null
+
+    // OAuth2 providers this app has client credentials for. Only WordPress.com, and only when the
+    // credentials were supplied at build time.
+    private val oauthConfigurations = OAuth2ConfigurationStore().apply {
+        val clientId = WpComCredentials.CLIENT_ID
+        val clientSecret = WpComCredentials.CLIENT_SECRET
+        if (clientId != null && clientSecret != null) {
+            addConfiguration(
+                wordpressComOauth2Configuration(
+                    clientId = clientId,
+                    clientSecret = clientSecret,
+                    redirectUri = WPCOM_REDIRECT_URI,
+                    scope = listOf(WpComOauthScope.GLOBAL)
+                )
+            )
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,7 +95,7 @@ class WelcomeActivity : ComponentActivity() {
 
                 apiDiscoverySuccess = success
 
-                when (success.authentication) {
+                when (val authentication = success.authentication) {
                     is DiscoveredAuthenticationMechanism.ApplicationPasswords -> {
                         val authUrl = applicationPasswordsUrl(success.authentication)
                         if (authUrl == null) {
@@ -100,15 +119,16 @@ class WelcomeActivity : ComponentActivity() {
                         }
                     }
                     is DiscoveredAuthenticationMechanism.OAuth2 -> {
-                        val clientId = WpComCredentials.CLIENT_ID ?: return@launch
-                        val clientSecret = WpComCredentials.CLIENT_SECRET ?: return@launch
-
-                        val config = wordpressComOauth2Configuration(
-                            clientId = clientId,
-                            clientSecret = clientSecret,
-                            redirectUri = WPCOM_REDIRECT_URI,
-                            scope = listOf(WpComOauthScope.GLOBAL)
-                        )
+                        val config = try {
+                            oauthConfigurations.configurationFor(authentication.endpoints)
+                        } catch (e: OAuth2ConfigurationStoreException) {
+                            runOnUiThread {
+                                val message = e.localizedDescription()
+                                Toast.makeText(this@WelcomeActivity, message, Toast.LENGTH_LONG).show()
+                                onError(message)
+                            }
+                            return@launch
+                        }
                         siteSpecificOAuthConfig = config
 
                         val host = success.parsedSiteUrl.toURL().toURI().host

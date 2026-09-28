@@ -298,6 +298,7 @@ public typealias TokenRequestParameters = WordPressAPIInternal.TokenRequestParam
 public typealias WpComOauthScope = WordPressAPIInternal.WpComOauthScope
 public typealias OAuth2Configuration = WordPressAPIInternal.OAuth2Configuration
 public typealias OAuth2ConfigurationStore = WordPressAPIInternal.OAuth2ConfigurationStore
+public typealias OAuth2ConfigurationStoreError = WordPressAPIInternal.OAuth2ConfigurationStoreError
 public typealias WpComSiteIdentifier = WordPressAPIInternal.WpComSiteIdentifier
 
 // MARK: Languages

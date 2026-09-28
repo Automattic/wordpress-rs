@@ -85,7 +85,12 @@ struct LoginView: View {
                 let loginClient = WordPressLoginClient(urlSession: .shared)
                 let siteDetails = try await loginClient.details(ofSite: url)
 
-                if let applicationPasswordUrl = siteDetails.authentication.loginURL(for: application) {
+                switch siteDetails.authentication {
+                case .applicationPasswords:
+                    guard let applicationPasswordUrl = siteDetails.authentication.loginURL(for: application) else {
+                        preconditionFailure("Application Passwords discovery always carries a login URL")
+                    }
+
                     let callbackUrl = try await self.webAuthenticationSession.authenticate(
                         using: applicationPasswordUrl,
                         callbackURLScheme: "x-wordpress-app"
@@ -94,14 +99,10 @@ struct LoginView: View {
                     let loginDetails = try loginClient.credentials(from: callbackUrl)
                     try await loginManager
                         .setLoginCredentials(to: loginDetails, apiRootURL: siteDetails.parsedSiteUrl.asURL())
-                    return
-                }
+                case .oAuth2(let endpoints):
+                    // Throws a localized error if the site's OAuth provider isn't one this app has credentials for.
+                    let configuration = try loginManager.oauthRegistry.configurationFor(endpoints: endpoints)
 
-                let oauthConfiguration = siteDetails.authentication.oauthEndpoints.flatMap {
-                    loginManager.oauthRegistry.findConfiguration(endpoints: $0)
-                }
-
-                if let configuration = oauthConfiguration {
                     guard let host = siteDetails.parsedSiteUrl.asURL().host() else {
                         preconditionFailure("Invalid site details response")
                     }
@@ -111,12 +112,7 @@ struct LoginView: View {
                         webAuthenticationSession: webAuthenticationSession,
                         blogId: .slug(value: host)
                     )
-                    return
                 }
-
-                // Discovery succeeded, but the site offers no login mechanism this app can use.
-                self.isLoggingIn = false
-                self.loginError = "This site doesn't support Application Passwords or a known OAuth provider."
             } catch let err {
                 handleLoginError(err)
             }

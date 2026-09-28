@@ -108,6 +108,32 @@ class LocalizationTests {
         #expect(englishMessage(failure) == "This site is private.")
     }
 
+    @Test
+    func testUnregisteredOAuthProviderMessage() throws {
+        let store = OAuth2ConfigurationStore()
+        let endpoints = OAuth2Endpoints(
+            authorizationUrl: "https://public-api.wordpress.com/oauth2/authorize",
+            tokenUrl: "https://public-api.wordpress.com/oauth2/token"
+        )
+
+        do {
+            _ = try store.configurationFor(endpoints: endpoints)
+            Issue.record("Got an unexpected successful result")
+        } catch let error as OAuth2ConfigurationStoreError {
+            #expect(
+                localizeOAuth2ConfigurationStoreError(value: error, locale: wpLocaleResolve(langIds: ["en-US"]))
+                    == "This site signs in through an OAuth provider that this app isn't set up to use."
+            )
+            #expect(
+                error.localizedDescription
+                    == localizeOAuth2ConfigurationStoreError(
+                        value: error,
+                        locale: wpLocaleResolve(langIds: Locale.preferredLanguages)
+                    )
+            )
+        }
+    }
+
     private func englishMessage(_ failure: AutoDiscoveryAttemptFailure) -> String {
         localizeAutoDiscoveryAttemptFailure(value: failure, locale: wpLocaleResolve(langIds: ["en-US"]))
     }
