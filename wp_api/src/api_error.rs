@@ -703,6 +703,9 @@ pub enum RequestExecutionErrorReason {
     ConnectionError {
         reason: String,
     },
+    // A connection was established, but the HTTP exchange failed: the server
+    // closed it mid-response, sent something that couldn't be parsed or decoded,
+    // or redirected in a loop.
     HttpError {
         reason: String,
     },

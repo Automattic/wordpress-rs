@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Swift: a request URL Foundation can't parse (possible with the strict parser on iOS 16 / macOS 13) now fails with `NonExistentSiteError` instead of crashing, and a non-HTTP response fails the request instead of hitting a `preconditionFailure`.
 - Swift: `URLError.unsupportedURL` is now classified as `NonExistentSiteError` (like `.badURL`), `.userAuthenticationRequired` as `HttpAuthenticationRequiredError`, and `.clientCertificateRequired` / `.clientCertificateRejected` as `InvalidSslError(GenericSslError)`. All previously fell through to `GenericError`.
 - Swift: every request failure now carries the redirects recorded for the request. The offline, timeout, cancellation, and generic branches always reported `redirects: nil`.
+- Swift: a failed HTTP exchange — a malformed or undecodable response (`badServerResponse`, `cannotParseResponse`, `cannotDecodeRawData`, `cannotDecodeContentData`, `zeroByteResource`, `dataLengthExceedsMaximum`, `requestBodyStreamExhausted`) or a redirect loop (`httpTooManyRedirects`, `redirectToNonExistentLocation`) — is now `HttpError`, matching reqwest and Kotlin. The Swift executor never produced `HttpError` before; these all fell through to `GenericError`. A redirect loop carries the recorded redirect chain.
+- reqwest: a redirect loop is now `HttpError` instead of `GenericError`.
 
 ### Changed
 

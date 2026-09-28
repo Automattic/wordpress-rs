@@ -221,6 +221,13 @@ fn request_execution_error_from_reqwest(
             error_message: Some(error.to_string()),
             suggested_action: None,
         }
+    } else if error.is_redirect() {
+        // The redirect policy gave up — typically a redirect loop from misconfigured
+        // `siteurl` / `home` values. The server answered, so it's an HTTP-level failure,
+        // matching the Swift executor's `httpTooManyRedirects` classification (#1503).
+        RequestExecutionErrorReason::HttpError {
+            reason: error.to_string(),
+        }
     } else {
         RequestExecutionErrorReason::GenericError {
             error_message: error.to_string(),
@@ -381,6 +388,43 @@ mod tests {
     // fallback that maps to `NonExistentSiteError`. This test guards that
     // ordering so a refactor can't silently reclassify a refused connection as
     // an unreachable site.
+    // A redirect loop exhausts reqwest's redirect policy. The server answered every
+    // request, so it's an `HttpError`, not the catch-all `GenericError` (#1503).
+    #[tokio::test]
+    async fn redirect_loop_is_http_error() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = listener.accept().await {
+                let mut buffer = [0; 1024];
+                let _ = stream.read(&mut buffer).await;
+                let _ = stream
+                    .write_all(
+                        b"HTTP/1.1 302 Found\r\nLocation: /\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                    )
+                    .await;
+            }
+        });
+
+        let request = WpNetworkRequest::get(WpEndpointUrl(format!("http://{address}/")));
+        let executor = ReqwestRequestExecutor::new_with_default_timeout(false);
+
+        let error = executor
+            .execute(request.into())
+            .await
+            .expect_err("a redirect loop must fail");
+
+        let RequestExecutionError::RequestExecutionFailed { reason, .. } = error else {
+            panic!("expected RequestExecutionFailed, got: {error:?}");
+        };
+        assert!(
+            matches!(reason, RequestExecutionErrorReason::HttpError { .. }),
+            "a redirect loop must be HttpError, got: {reason:?}"
+        );
+    }
+
     #[tokio::test]
     async fn refused_connection_is_connection_error() {
         // Port 1 on loopback is privileged, so nothing is bound in any test
