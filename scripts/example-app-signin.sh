@@ -169,11 +169,13 @@ esac
 
 # The token is intentionally not a command-line argument, to keep it out of shell history.
 token="${WPCOM_TOKEN:-}"
+token_source="WPCOM_TOKEN"
 
 # The `bearer_token` the WordPress.com integration tests use. `plutil` reads JSON natively on macOS.
 credentials_file="$(cd "$(dirname "$0")/.." && pwd)/wp_com_test_credentials.json"
 if [[ -z "$token" && -f "$credentials_file" ]]; then
     token="$(plutil -extract bearer_token raw -o - "$credentials_file" 2>/dev/null || true)"
+    token_source="wp_com_test_credentials.json"
     # Ignore the unedited placeholder from `wp_com_test_credentials.json-example`.
     if [[ "$token" == "replace_with_your_oauth2_token" ]]; then
         token=""
@@ -182,6 +184,7 @@ fi
 
 if [[ -z "$token" && -f "$HOME/.wpcom-token" ]]; then
     token="$(tr -d '[:space:]' < "$HOME/.wpcom-token")"
+    token_source="~/.wpcom-token"
 fi
 
 if [[ -z "$token" ]]; then
@@ -189,6 +192,7 @@ if [[ -z "$token" ]]; then
     echo "       (see wp_com_test_credentials.json-example), set WPCOM_TOKEN, or write ~/.wpcom-token." >&2
     exit 1
 fi
+echo "Using the WordPress.com token from $token_source"
 
 if [[ -z "$device" ]]; then
     if [[ "$platform" == ios ]]; then resolve_ios_device; else resolve_android_device; fi
