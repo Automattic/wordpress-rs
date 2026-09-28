@@ -13,6 +13,8 @@ use crate::{
     },
 };
 use url::Url;
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 
 /// A complete OAuth2 client configuration for any WordPress hosting provider that
 /// uses OAuth2 for login.
@@ -184,6 +186,37 @@ impl OAuth2ConfigurationStore {
                     && c.endpoints.token_url == endpoints.token_url
             })
             .cloned()
+    }
+
+    /// Like [`Self::find_configuration`], but fails with a localized error when no registered
+    /// configuration matches.
+    ///
+    /// Use this after autodiscovery returns [`crate::login::DiscoveredAuthenticationMechanism::OAuth2`]:
+    /// discovery only reports the endpoints the site advertises, so a site can use an OAuth2
+    /// provider the app has no client credentials for.
+    pub fn configuration_for(
+        &self,
+        endpoints: &OAuth2Endpoints,
+    ) -> Result<OAuth2Configuration, OAuth2ConfigurationStoreError> {
+        self.find_configuration(endpoints).ok_or_else(|| {
+            OAuth2ConfigurationStoreError::NoMatchingConfiguration {
+                endpoints: endpoints.clone(),
+            }
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
+pub enum OAuth2ConfigurationStoreError {
+    /// No registered [`OAuth2Configuration`] has these endpoints.
+    NoMatchingConfiguration { endpoints: OAuth2Endpoints },
+}
+
+impl WpSupportsLocalization for OAuth2ConfigurationStoreError {
+    fn message_bundle(&self) -> MessageBundle<'_> {
+        match self {
+            Self::NoMatchingConfiguration { .. } => WpMessages::oauth_configuration_not_found(),
+        }
     }
 }
 
@@ -380,6 +413,32 @@ mod tests {
         };
 
         assert!(store.find_configuration(&other_endpoints).is_none());
+    }
+
+    #[test]
+    fn test_store_configuration_for_returns_matching_configuration() {
+        let store = OAuth2ConfigurationStore::new();
+        store.add_configuration(test_config());
+
+        let found = store.configuration_for(&test_endpoints()).unwrap();
+        assert_eq!(found.client_id, 12345);
+    }
+
+    #[test]
+    fn test_store_configuration_for_fails_with_localized_error_when_no_match() {
+        let store = OAuth2ConfigurationStore::new();
+
+        let error = store.configuration_for(&test_endpoints()).unwrap_err();
+        assert_eq!(
+            error,
+            OAuth2ConfigurationStoreError::NoMatchingConfiguration {
+                endpoints: test_endpoints()
+            }
+        );
+        assert_eq!(
+            error.message_bundle().localize(None),
+            "This site signs in through an OAuth provider that this app isn't set up to use."
+        );
     }
 
     #[test]

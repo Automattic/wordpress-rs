@@ -52,6 +52,7 @@ cloudflare_error_other = Cloudflare returned an error (code {$code}).
 
 oauth_response_url_error_url_invalid = The site sent an invalid authentication response URL.
 oauth_response_url_error_unsuccessful_login = Unsuccessful Login.
+oauth_configuration_not_found = This site signs in through an OAuth provider that this app isn't set up to use.
 
 boolean_true_is_returned_when_string_is_expected = Expecting a `String` value for this field, but received the boolean `true` instead.
 
