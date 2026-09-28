@@ -235,10 +235,26 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             return failure(.invalidSslError(reason: .genericSslError), for: request)
         }
 
+        // Only report a name mismatch when the name is actually the problem. Darwin reports a genuine
+        // mismatch as `.serverCertificateUntrusted` — the same code as a self-signed certificate — so
+        // the code alone can't tell them apart; the certificate's names can. An expired or
+        // not-yet-valid certificate, or one from an unknown root, is never a name problem. See #1498.
+        let hostname = URL(string: request.url())?.host ?? "unknown host"
+        let codeRulesOutNameMismatch = [
+            .serverCertificateHasBadDate,
+            .serverCertificateNotYetValid,
+            .serverCertificateHasUnknownRoot
+        ]
+        .contains((error as? URLError)?.code)
+
+        guard !codeRulesOutNameMismatch, !siteCertificate.isValidForHost(host: hostname) else {
+            return failure(.invalidSslError(reason: .genericSslError), for: request)
+        }
+
         return failure(
             .invalidSslError(
                 reason: .certificateNotValidForName(
-                    hostname: URL(string: request.url())?.host ?? "unknown host",
+                    hostname: hostname,
                     presentedHostnames: siteCertificate.presentedHostnames()
                 )
             ),

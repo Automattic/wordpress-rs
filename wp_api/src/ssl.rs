@@ -114,6 +114,28 @@ impl SslCertificateInfo {
         }
         hostnames
     }
+
+    /// Whether this certificate names `host`, either exactly or through a
+    /// wildcard.
+    ///
+    /// Only the name is checked — not the chain, dates, or signature. A TLS
+    /// failure for a host the certificate *does* name is not a name mismatch: the
+    /// certificate is expired, self-signed, or untrusted instead. Names compare
+    /// case-insensitively, and a wildcard (`*.example.com`) covers exactly one
+    /// leftmost label (`www.example.com`, but not `example.com` or
+    /// `a.b.example.com`), per RFC 6125.
+    fn is_valid_for_host(&self, host: String) -> bool {
+        let host = host.trim_end_matches('.').to_ascii_lowercase();
+        self.presented_hostnames().iter().any(|name| {
+            let name = name.trim_end_matches('.').to_ascii_lowercase();
+            match name.strip_prefix("*.") {
+                Some(suffix) => host
+                    .split_once('.')
+                    .is_some_and(|(label, rest)| !label.is_empty() && rest == suffix),
+                None => name == host,
+            }
+        })
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, uniffi::Record)]
@@ -135,6 +157,7 @@ impl From<x509_cert::time::Time> for WpGmtDateTime {
 mod tests {
     use super::*;
     use base64::prelude::{BASE64_STANDARD, Engine as _};
+    use rstest::rstest;
 
     // A self-signed leaf with `subject=CN=example.com` and
     // `subjectAltName=DNS:example.com,DNS:www.example.com`. Regenerate with:
@@ -201,6 +224,38 @@ mod tests {
             san_only.presented_hostnames(),
             ["sanonly.example.com", "alt.example.com"]
         );
+    }
+
+    #[rstest]
+    #[case::exact("example.com", true)]
+    #[case::san("www.example.com", true)]
+    #[case::case_insensitive("WWW.Example.COM", true)]
+    #[case::trailing_dot("example.com.", true)]
+    #[case::other_host("other.example.com", false)]
+    #[case::other_domain("example.org", false)]
+    fn is_valid_for_host_matches_presented_names(#[case] host: &str, #[case] expected: bool) {
+        let cert = parse_certificate(der(CERT_WITH_CN)).expect("certificate should parse");
+        assert_eq!(cert.is_valid_for_host(host.to_string()), expected);
+    }
+
+    #[rstest]
+    #[case::one_label("www.example.com", true)]
+    #[case::apex("example.com", false)]
+    #[case::two_labels("a.b.example.com", false)]
+    #[case::suffix_only("wwwexample.com", false)]
+    fn is_valid_for_host_matches_one_wildcard_label(#[case] host: &str, #[case] expected: bool) {
+        let cert = SslCertificateInfo {
+            common_name: Some("*.example.com".to_string()),
+            alternative_names: vec![],
+            issuer: SSLCertificateIssuer {
+                common_name: None,
+                organization: None,
+                country: None,
+            },
+            valid_at: WpGmtDateTime::from_unchecked_timestamp(0),
+            expires_at: WpGmtDateTime::from_unchecked_timestamp(0),
+        };
+        assert_eq!(cert.is_valid_for_host(host.to_string()), expected);
     }
 
     #[test]

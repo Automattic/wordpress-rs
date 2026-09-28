@@ -10,12 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
+- `SslCertificateInfo.is_valid_for_host(host)`: whether the certificate names a host, exactly or through a single-label wildcard.
 
 ### Fixed
 
 - Swift: a request URL Foundation can't parse (possible with the strict parser on iOS 16 / macOS 13) now fails with `NonExistentSiteError` instead of crashing, and a non-HTTP response fails the request instead of hitting a `preconditionFailure`.
 - Swift: `URLError.unsupportedURL` is now classified as `NonExistentSiteError` (like `.badURL`), `.userAuthenticationRequired` as `HttpAuthenticationRequiredError`, and `.clientCertificateRequired` / `.clientCertificateRejected` as `InvalidSslError(GenericSslError)`. All previously fell through to `GenericError`.
 - Swift: every request failure now carries the redirects recorded for the request. The offline, timeout, cancellation, and generic branches always reported `redirects: nil`.
+- Swift: a TLS failure is only reported as `CertificateNotValidForName` when the certificate doesn't name the requested host. An expired, not-yet-valid, self-signed, or untrusted-root certificate issued for the right host is now `GenericSslError`; it was reported as a name mismatch whose presented hostnames included the host itself, which could steer apps toward the `allowSSL` hostname exception for what is really a trust problem.
 
 ### Changed
 
