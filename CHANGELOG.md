@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Internal:** The remote login-discovery tests for HTTP Basic sites now expect `RequestExecutionErrorReason`'s `hostname` to be the host alone, matching what the library returns.
 - **Internal:** The test server Docker image now installs `zip`, which swiftly 1.2.0 requires to install the Swift toolchain.
+- **Internal:** The WordPress.com e2e tests and both example apps' Bot Conversations screens now use the `wpcom-workflow-support_chat` bot. `jetpack-chat-mobile` ran on the retired chain bot runtime and now returns `410 legacy_chain_bot`.
 
 ## [0.9.1] - 2026-09-14
 
