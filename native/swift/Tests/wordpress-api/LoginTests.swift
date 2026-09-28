@@ -346,48 +346,36 @@ class LoginTests {
         _ = try await self.client.details(ofSite: "https://vanilla1.wpmt.co")
     }
 
-    /// Regression for a SAN-only (Common-Name-less) leaf certificate — see #1508.
-    /// `no-common-name.badssl.com` serves a certificate whose subject carries no
-    /// Common Name and a single SAN. Before the fix the leaf failed to parse, the
-    /// `compactMap` dropped it, and element 0 of the survivors — the issuer CA —
-    /// was reported, so `presentedHostnames` was the CA's name (`COMODO ...`)
-    /// rather than the site's.
-    @Test("SAN-only certificate reports its SAN, not the issuer CA")
-    func testCommonNameLessCertificateReportsSan() async throws {
+    /// Regression for #1498: every TLS failure with a parseable leaf certificate was reported as
+    /// `certificateNotValidForName`, including an expired or self-signed certificate issued for the
+    /// requested host — a self-contradictory payload whose "presented hostnames" include the host.
+    /// Such a certificate is a trust problem, not a name problem, so it's `genericSslError`.
+    ///
+    /// `no-common-name.badssl.com` serves an expired certificate for its own host (and, having no
+    /// Common Name, used to cover #1508's SAN-only parsing, which the Rust `ssl` unit tests now
+    /// cover). `self-signed.badssl.com` serves a self-signed certificate for its own host, which
+    /// Darwin reports with the same `serverCertificateUntrusted` code as a genuine name mismatch.
+    @Test(
+        "A certificate issued for the requested host isn't reported as a name mismatch",
+        arguments: ["https://no-common-name.badssl.com", "https://self-signed.badssl.com"]
+    )
+    func testCertificateForRequestedHostIsNotANameMismatch(site: String) async throws {
         await #expect(
             performing: {
-                _ = try await self.client.details(ofSite: "https://no-common-name.badssl.com")
+                _ = try await self.client.details(ofSite: site)
             },
             throws: { error in
                 let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
 
                 guard case .invalidSslError(let underlyingReason) = reason else {
-                    Issue.record("The transport error must be `invalidSslError`")
+                    Issue.record("The transport error must be `invalidSslError`, got \(reason)")
                     return false
                 }
 
-                #if os(watchOS) // watchOS doesn't make the underlying certificate available to us
                 guard case .genericSslError = underlyingReason else {
-                    Issue.record("The underlying error must be `genericSslError`")
+                    Issue.record("The underlying error must be `genericSslError`, got \(underlyingReason)")
                     return false
                 }
-                #else
-                // Breadcrumb (#1498): this endpoint's certificate is expired, so the failure is a
-                // bad-date one that the executor currently reports as `certificateNotValidForName`.
-                // Once #1498 remaps bad-date failures to `genericSslError`, this endpoint yields no
-                // presented hostnames and the assertion below breaks — move it to a non-expired
-                // Common-Name-less certificate then (e.g. a local mock, #1208). The parsing itself
-                // is already covered #1498-proof by the Rust `ssl` unit tests.
-                guard case .certificateNotValidForName(_, let presentedHostnames) = underlyingReason else {
-                    Issue.record("The underlying error must be `certificateNotValidForName`")
-                    return false
-                }
-
-                // The leaf carries no Common Name and exactly one SAN, so that SAN
-                // is the entire presented-hostname list. The bug reported the
-                // COMODO issuer CA's name here instead.
-                #expect(presentedHostnames == ["no-common-name.badssl.com"])
-                #endif
 
                 return true
             }
