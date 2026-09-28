@@ -37,17 +37,41 @@ extension SafeRequestExecutor {
 public final class WpRequestExecutor: SafeRequestExecutor {
     private let session: URLSession
     private let executorDelegate: RequestExecutorDelegate
+    private let networkAvailability: NetworkAvailability
 
     private let additionalHttpHeadersForAllRequests: [String: String]
 
-    public init(
+    public convenience init(
         urlSession: URLSession,
         additionalHttpHeadersForAllRequests: [String: String] = [:],
         userAgent: String = defaultUserAgent(clientSpecificPostfix: UserAgent.postfix),
         notifyingDelegate: URLSessionTaskDelegate? = nil
     ) {
+        #if canImport(Network)
+        let networkAvailability: NetworkAvailability = SystemNetworkAvailability.shared
+        #else
+        let networkAvailability: NetworkAvailability = AssumedNetworkAvailability()
+        #endif
+
+        self.init(
+            urlSession: urlSession,
+            additionalHttpHeadersForAllRequests: additionalHttpHeadersForAllRequests,
+            userAgent: userAgent,
+            notifyingDelegate: notifyingDelegate,
+            networkAvailability: networkAvailability
+        )
+    }
+
+    init(
+        urlSession: URLSession,
+        additionalHttpHeadersForAllRequests: [String: String] = [:],
+        userAgent: String = defaultUserAgent(clientSpecificPostfix: UserAgent.postfix),
+        notifyingDelegate: URLSessionTaskDelegate? = nil,
+        networkAvailability: NetworkAvailability
+    ) {
         self.session = urlSession
         self.executorDelegate = RequestExecutorDelegate(delegate: notifyingDelegate)
+        self.networkAvailability = networkAvailability
 
         var headers = additionalHttpHeadersForAllRequests
         if !headers.contains(where: { $0.key.caseInsensitiveCompare("User-Agent") == .orderedSame }) {
@@ -143,6 +167,15 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             // authenticating proxy) can't be answered. The request never got a response to read an
             // auth scheme from, so the method is unknown. See #1505.
             return .httpAuthenticationRequiredError(hostname: hostname(of: request), method: nil)
+        case .networkConnectionLost:
+            // A connection severed mid-request. That happens when the device drops off the network,
+            // but just as often on a healthy one — a server or proxy reset, a load balancer's idle
+            // timeout, a stale keep-alive connection reused on iOS. Only the network path can tell
+            // the two apart: offline if it's gone, otherwise a failed HTTP exchange, matching
+            // reqwest's `UnexpectedEof`. See #1499.
+            return networkAvailability.isNetworkAvailable
+                ? .httpError(reason: urlError.localizedDescription)
+                : .deviceIsOfflineError(errorMessage: urlError.localizedDescription)
         case .badServerResponse, .cannotParseResponse, .cannotDecodeRawData, .cannotDecodeContentData,
             .zeroByteResource, .dataLengthExceedsMaximum, .requestBodyStreamExhausted:
             // The connection was established but the HTTP exchange itself failed — a malformed or
@@ -343,17 +376,18 @@ public final class WpRequestExecutor: SafeRequestExecutor {
 
     private func errorIsDeviceIsOffline(_ error: Error) -> Bool {
         // The device can't use the network right now; the site itself is not
-        // implicated. Two codes mean there's no connection at all
-        // (`.notConnectedToInternet`, and `.networkConnectionLost` for a connection
-        // severed mid-request); three more mean the OS is refusing network use even
+        // implicated. One code means there's no connection at all
+        // (`.notConnectedToInternet`); three more mean the OS is refusing network use even
         // though the hardware is present — cellular data disallowed for the app or by
         // carrier policy (`.dataNotAllowed`, the common Wi-Fi-off case), roaming
         // turned off while abroad (`.internationalRoamingOff`), or a voice call
         // holding the radio on an older single-radio device (`.callIsActive`). This
         // matches what Kotlin callers get through the `NetworkAvailabilityProvider`
         // gate. See #1501.
+        //
+        // `.networkConnectionLost` is not here: it's only offline when the network
+        // path is gone too, so it's classified in `reason(for:request:)`.
         [
-            .networkConnectionLost,
             .notConnectedToInternet,
             .dataNotAllowed,
             .internationalRoamingOff,

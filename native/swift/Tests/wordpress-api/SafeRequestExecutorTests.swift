@@ -248,6 +248,35 @@ struct SafeRequestExecutorTests {
         #expect(reason == .invalidSslError(reason: .genericSslError))
     }
 
+    // Regression tests for #1499: `.networkConnectionLost` was always `.deviceIsOfflineError`, but
+    // it's also what a server or proxy reset looks like on a healthy network. It's offline only when
+    // the network path is gone too.
+    @Test("A lost connection with no network path is classified as .deviceIsOfflineError")
+    func testConnectionLostWithoutNetworkIsDeviceIsOffline() async throws {
+        let reason = try await failureReason(
+            forInjected: .networkConnectionLost,
+            networkAvailability: StubNetworkAvailability(isNetworkAvailable: false)
+        )
+
+        guard case .deviceIsOfflineError = reason else {
+            Issue.record("Expected .deviceIsOfflineError, got \(reason)")
+            return
+        }
+    }
+
+    @Test("A lost connection on a working network is classified as .httpError")
+    func testConnectionLostWithNetworkIsHttpError() async throws {
+        let reason = try await failureReason(
+            forInjected: .networkConnectionLost,
+            networkAvailability: StubNetworkAvailability(isNetworkAvailable: true)
+        )
+
+        guard case .httpError = reason else {
+            Issue.record("Expected .httpError, got \(reason)")
+            return
+        }
+    }
+
     // Regression tests for #1502 and #1503: the Swift executor never produced `.httpError`, so a
     // failed HTTP exchange — a malformed or undecodable response, or a redirect loop — fell through
     // to `.genericError`, while reqwest and Kotlin report the same class as `HttpError`.
@@ -299,12 +328,15 @@ struct SafeRequestExecutorTests {
         )
     }
 
-    private func failureReason(forInjected code: URLError.Code) async throws -> RequestExecutionErrorReason {
+    private func failureReason(
+        forInjected code: URLError.Code,
+        networkAvailability: NetworkAvailability = StubNetworkAvailability(isNetworkAvailable: true)
+    ) async throws -> RequestExecutionErrorReason {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [FailingURLProtocol.self]
         let session = URLSession(configuration: configuration)
         defer { session.finishTasksAndInvalidate() }
-        let executor = WpRequestExecutor(urlSession: session)
+        let executor = WpRequestExecutor(urlSession: session, networkAvailability: networkAvailability)
 
         let result = await executor.perform(FailingRequest(code: code))
         return try #require(failureReason(result))
@@ -437,6 +469,10 @@ private struct FailingRequest: NetworkRequestContent {
         return try await session.data(for: request)
     }
 }
+private struct StubNetworkAvailability: NetworkAvailability {
+    let isNetworkAvailable: Bool
+}
+
 /// A `URLProtocol` that redirects the first request to `RedirectThenFailRequest.destination`, then
 /// fails the redirected request with the `URLError.Code` carried in a request header — so a test can
 /// assert the recorded redirect trail survives whichever failure branch the code lands in.
