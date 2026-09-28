@@ -143,6 +143,18 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             // authenticating proxy) can't be answered. The request never got a response to read an
             // auth scheme from, so the method is unknown. See #1505.
             return .httpAuthenticationRequiredError(hostname: hostname(of: request), method: nil)
+        case .badServerResponse, .cannotParseResponse, .cannotDecodeRawData, .cannotDecodeContentData,
+            .zeroByteResource, .dataLengthExceedsMaximum, .requestBodyStreamExhausted:
+            // The connection was established but the HTTP exchange itself failed — a malformed or
+            // undecodable response, or a request body that couldn't be resent. This is the class
+            // reqwest (io / h2 failures) and Kotlin report as `HttpError`, which keeps
+            // `GenericError` meaning "unclassified". See #1502.
+            return .httpError(reason: urlError.localizedDescription)
+        case .httpTooManyRedirects, .redirectToNonExistentLocation:
+            // A redirect loop (commonly http <-> https or www <-> apex from misconfigured `siteurl` /
+            // `home` values) or a redirect with no usable `Location`. `failure(_:for:)` attaches the
+            // recorded redirect chain, which is what makes a loop diagnosable. See #1503.
+            return .httpError(reason: urlError.localizedDescription)
         case .clientCertificateRequired, .clientCertificateRejected:
             // The server demanded (or refused) a client certificate during the TLS handshake — a
             // mutual-TLS deployment. It's a TLS failure, but not one about the server's certificate,

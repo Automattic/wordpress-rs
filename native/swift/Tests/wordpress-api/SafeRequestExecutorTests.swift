@@ -45,13 +45,19 @@ struct SafeRequestExecutorTests {
     }
 
     // Regression test for #1515: a response that isn't an `HTTPURLResponse` hit a
-    // `preconditionFailure` in `WpNetworkResponse.init`. It now fails the request instead.
+    // `preconditionFailure` in `WpNetworkResponse.init`. It now throws `.badServerResponse`, which
+    // classifies as `.httpError`.
     @Test("A non-HTTP response fails the request instead of crashing")
     func testNonHTTPResponseFailsTheRequest() async throws {
         let executor = WpRequestExecutor(urlSession: .shared)
 
         let result = await executor.perform(NonHTTPResponseRequest())
-        #expect(failureReason(result) != nil)
+        let reason = try #require(failureReason(result))
+
+        guard case .httpError = reason else {
+            Issue.record("Expected .httpError, got \(reason)")
+            return
+        }
     }
 
     // Regression test for #1491: a URLSession timeout (`URLError.timedOut`) had no branch in
@@ -242,12 +248,32 @@ struct SafeRequestExecutorTests {
         #expect(reason == .invalidSslError(reason: .genericSslError))
     }
 
+    // Regression tests for #1502 and #1503: the Swift executor never produced `.httpError`, so a
+    // failed HTTP exchange — a malformed or undecodable response, or a redirect loop — fell through
+    // to `.genericError`, while reqwest and Kotlin report the same class as `HttpError`.
+    @Test(
+        "HTTP-exchange failures are classified as .httpError",
+        arguments: [
+            URLError.Code.badServerResponse, .cannotParseResponse, .cannotDecodeRawData, .cannotDecodeContentData,
+            .zeroByteResource, .dataLengthExceedsMaximum, .requestBodyStreamExhausted, .httpTooManyRedirects,
+            .redirectToNonExistentLocation
+        ]
+    )
+    func testHttpExchangeFailuresAreClassifiedAsHttpError(code: URLError.Code) async throws {
+        let reason = try await failureReason(forInjected: code)
+
+        guard case .httpError = reason else {
+            Issue.record("Expected .httpError for \(code), got \(reason)")
+            return
+        }
+    }
+
     // Regression test for #1520: the offline, timeout, cancelled, and generic branches hard-coded
     // `redirects: nil`, dropping the redirect trail the delegate had recorded. Redirect once, then
     // fail with each code, and assert the redirect is still attached.
     @Test(
         "A request that redirects and then fails keeps its redirect trail",
-        arguments: [URLError.Code.notConnectedToInternet, .timedOut, .cancelled, .unknown]
+        arguments: [URLError.Code.notConnectedToInternet, .timedOut, .cancelled, .httpTooManyRedirects, .unknown]
     )
     func testRedirectsSurviveEveryFailureBranch(code: URLError.Code) async throws {
         let configuration = URLSessionConfiguration.ephemeral
