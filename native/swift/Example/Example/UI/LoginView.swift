@@ -94,21 +94,29 @@ struct LoginView: View {
                     let loginDetails = try loginClient.credentials(from: callbackUrl)
                     try await loginManager
                         .setLoginCredentials(to: loginDetails, apiRootURL: siteDetails.parsedSiteUrl.asURL())
+                    return
                 }
 
-                if let endpoints = siteDetails.authentication.oauthEndpoints {
-                    if let configuration = loginManager.oauthRegistry.findConfiguration(endpoints: endpoints) {
-                        guard let host = siteDetails.parsedSiteUrl.asURL().host() else {
-                            preconditionFailure("Invalid site details response")
-                        }
+                let oauthConfiguration = siteDetails.authentication.oauthEndpoints.flatMap {
+                    loginManager.oauthRegistry.findConfiguration(endpoints: $0)
+                }
 
-                        try await loginManager.logInToWpCom(
-                            configuration: configuration,
-                            webAuthenticationSession: webAuthenticationSession,
-                            blogId: .slug(value: host)
-                        )
+                if let configuration = oauthConfiguration {
+                    guard let host = siteDetails.parsedSiteUrl.asURL().host() else {
+                        preconditionFailure("Invalid site details response")
                     }
+
+                    try await loginManager.logInToWpCom(
+                        configuration: configuration,
+                        webAuthenticationSession: webAuthenticationSession,
+                        blogId: .slug(value: host)
+                    )
+                    return
                 }
+
+                // Discovery succeeded, but the site offers no login mechanism this app can use.
+                self.isLoggingIn = false
+                self.loginError = "This site doesn't support Application Passwords or a known OAuth provider."
             } catch let err {
                 handleLoginError(err)
             }
@@ -135,6 +143,16 @@ struct LoginView: View {
 
     private func handleLoginError(_ error: Error) {
         self.isLoggingIn = false
+
+        // The user backed out, so there's nothing to report. Showing `localizedDescription` here would
+        // surface Foundation's generic "The operation couldn't be completed" text.
+        if error is CancellationError {
+            return
+        }
+        if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+            return
+        }
+
         self.loginError = error.localizedDescription
     }
 }

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reworded several login-discovery error messages so they explain what went wrong and what to do next: invalid SSL certificates, unknown hostnames, connection timeouts, and an unreadable REST API root response (which also fixes a doubled "the"). Translations for these strings will lag until GlotPress catches up.
 - **Internal:** The remote login-discovery tests for HTTP Basic sites now expect `RequestExecutionErrorReason`'s `hostname` to be the host alone, matching what the library returns.
 - **Internal:** The test server Docker image now installs `zip`, which swiftly 1.2.0 requires to install the Swift toolchain.
 
