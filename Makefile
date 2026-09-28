@@ -186,6 +186,10 @@ swift-example-app-ios:
 	xcrun simctl create "iPhone 17 Pro Test Device" "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
 	bundle exec fastlane run run_tests project:native/swift/Example/Example.xcodeproj scheme:Example build_for_testing:true ensure_devices_found:true device:"iPhone 17 Pro Test Device (26.5)" xcargs:"-skipPackagePluginValidation"
 
+example-app-login:
+	@# Help: Sign an example app into WordPress.com (vars: PLATFORM=ios|android, DEVICE, RESET=1; token from ~/.wpcom-token).
+	./scripts/example-app-signin.sh $(if $(PLATFORM),--platform $(PLATFORM)) $(if $(DEVICE),--device $(DEVICE)) $(if $(RESET),--reset)
+
 test-swift:
 	$(MAKE) test-swift-$(uname)
 
