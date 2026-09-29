@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
 
+### Fixed
+
+- A media upload file that exists but can't be read is now reported as `MediaFileUnreadable` on both platforms, and `MediaFileNotFound` is reserved for a path with nothing at it. Swift reported every field-construction failure (including permission and sandbox denials) as `MediaFileNotFound`, and Kotlin did the same for a directory or a file without read permission, while the other platform reported `MediaFileUnreadable` for the same input. The rustdoc for both variants now describes this split, which is by what's at the path rather than by when the read failed.
+
 ### Changed
 
 - **Internal:** The remote login-discovery tests for HTTP Basic sites now expect `RequestExecutionErrorReason`'s `hostname` to be the host alone, matching what the library returns.
