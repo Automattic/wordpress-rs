@@ -4,7 +4,7 @@ use wp_api::{
     date::WpDateString,
     media::{
         MediaCaptionWithEditContext, MediaDescriptionWithEditContext, MediaDetails, MediaId,
-        MediaStatus, MediaType, MediaWithEditContext,
+        MediaStatus, MediaType, MediaTypeWrapper, MediaWithEditContext,
     },
     posts::{
         PostCommentStatus, PostGuidWithEditContext, PostId, PostPingStatus,
@@ -105,7 +105,7 @@ impl MediaBuilder {
 
     /// Set the media type.
     pub fn with_media_type(mut self, media_type: MediaType) -> Self {
-        self.media.media_type = media_type;
+        self.media.media_type = Arc::new(MediaTypeWrapper::from(media_type));
         self
     }
 
@@ -162,7 +162,7 @@ fn create_minimal_media() -> MediaWithEditContext {
             raw: String::new(),
             rendered: String::new(),
         },
-        media_type: MediaType::File,
+        media_type: Arc::new(MediaTypeWrapper::from(MediaType::File)),
         mime_type: "application/octet-stream".into(),
         media_details: Arc::new(MediaDetails {
             payload: serde_json::value::RawValue::from_string("{}".into()).unwrap(),
@@ -178,7 +178,7 @@ fn create_full_media() -> MediaWithEditContext {
     m.password = Some("secret".into());
     m.post_id = Some(PostId(100));
     m.alt_text = "alt text".into();
-    m.media_type = MediaType::Image;
+    m.media_type = Arc::new(MediaTypeWrapper::from(MediaType::Image));
     m.mime_type = "image/jpeg".into();
     m.caption = MediaCaptionWithEditContext {
         raw: "caption raw".into(),
