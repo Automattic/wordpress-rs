@@ -71,3 +71,45 @@ The Kotlin step builds for the **host**, not Android, so it needs no NDK. Only
 >
 > No output means the framework predates your change — rebuild before trusting
 > a green build.
+
+## Signing an example app into WordPress.com
+
+The Swift and Android example apps accept a WordPress.com bearer token at launch and store it as
+their WordPress.com account, so you can sign a Simulator or emulator in without configuring OAuth
+app credentials in `wp_com_test_credentials.json`. Build and install the app first, then:
+
+```bash
+make example-app-login                    # Swift example app, the booted iOS Simulator
+make example-app-login PLATFORM=android   # Android example app, the connected emulator/device
+make example-app-login RESET=1            # clear the app's data first (clean slate)
+make example-app-login DEVICE=<id>        # a specific simulator UDID or adb serial
+```
+
+`make example-app-login` forwards to `scripts/example-app-signin.sh`, which takes the same options
+as flags — `--platform`, `--device`, `--reset`. When more than one simulator or device is running,
+it prompts you to choose.
+
+The token is resolved from, in order:
+
+1. the `WPCOM_TOKEN` environment variable;
+2. `bearer_token` in `wp_com_test_credentials.json` at the repository root — the same token the
+   WordPress.com integration tests use (see `wp_com_test_credentials.json-example`);
+3. a `~/.wpcom-token` file, which also works in fresh worktrees that don't have a copy of
+   `wp_com_test_credentials.json`, and matches WordPress-iOS's `make sim-login`.
+
+There's deliberately no command-line token flag — a token passed as an argument would be saved in
+your shell history.
+
+The app only uses the token when no WordPress.com account is signed in, and only once per launch,
+so signing out stays signed out. To launch with a token by hand:
+
+```bash
+# iOS Simulator
+xcrun simctl launch --terminate-running-process booted com.automattic.Example -wpcom-token <token>
+
+# Android (single-quote the token — the device shell interprets it)
+adb shell am start -S -n rs.wordpress.example/.ui.welcome.WelcomeActivity --es wpcom-token "'<token>'"
+```
+
+Either way, the token briefly appears in the process list while the launch command runs; that's
+inherent to passing it as a launch argument.

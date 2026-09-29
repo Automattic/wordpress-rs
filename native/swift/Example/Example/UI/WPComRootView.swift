@@ -25,20 +25,24 @@ struct WPComRootView: View {
     var body: some View {
         if loginManager.isLoggedInToWpCom {
             NavigationView {
-                if isLoadingInitialData {
-                    ProgressView()
-                } else {
-                    RootListView(items: rootListItems.grouped)
+                Group {
+                    if isLoadingInitialData {
+                        ProgressView()
+                    } else {
+                        RootListView(items: rootListItems.grouped)
+                    }
+                }
+                // Attached to the sidebar column rather than the `NavigationView`, which doesn't show toolbar
+                // items once it collapses to a single column on iPhone.
+                .toolbar {
+                    Button(action: self.logOutOfWPCom) {
+                        Text("Sign Out")
+                    }
                 }
 
                 EmptyView()
 
                 Text("Select an item from the sidebar.")
-            }
-            .toolbar {
-                Button(action: self.logOutOfWPCom) {
-                    Text("Sign Out")
-                }
             }
             .task {
                 do {
