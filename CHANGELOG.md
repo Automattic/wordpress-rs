@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
 
+### Fixed
+
+- Swift: a request URL Foundation can't parse (possible with the strict parser on iOS 16 / macOS 13) now fails with `NonExistentSiteError` instead of crashing, and a non-HTTP response fails the request instead of hitting a `preconditionFailure`.
+- Swift: `URLError.unsupportedURL` is now classified as `NonExistentSiteError` (like `.badURL`), `.userAuthenticationRequired` as `HttpAuthenticationRequiredError`, and `.clientCertificateRequired` / `.clientCertificateRejected` as `InvalidSslError(GenericSslError)`. All previously fell through to `GenericError`.
+- Swift: every request failure now carries the redirects recorded for the request. The offline, timeout, cancellation, and generic branches always reported `redirects: nil`.
+
 ### Changed
 
 - **Internal:** The remote login-discovery tests for HTTP Basic sites now expect `RequestExecutionErrorReason`'s `hostname` to be the host alone, matching what the library returns.
