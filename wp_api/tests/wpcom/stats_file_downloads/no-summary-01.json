@@ -1,47 +1,47 @@
 {
-    "date": "2026-02-18",
-    "period": "day",
-    "days": {
-        "2026-02-18": {
-            "files": [
-                {
-                    "filename": "automattic-w-9.pdf",
-                    "relative_url": "/2025/01/automattic-w-9.pdf",
-                    "download_url": "https://example.files.wordpress.com/2025/01/automattic-w-9.pdf",
-                    "downloads": 4
-                },
-                {
-                    "filename": "wpvip-w-9.pdf",
-                    "relative_url": "/2025/01/wpvip-w-9.pdf",
-                    "download_url": "https://example.files.wordpress.com/2025/01/wpvip-w-9.pdf",
-                    "downloads": 3
-                },
-                {
-                    "filename": "report.pdf",
-                    "relative_url": "/2026/02/report.pdf",
-                    "download_url": "https://example.files.wordpress.com/2026/02/report.pdf",
-                    "downloads": 2
-                }
-            ],
-            "other_downloads": 0,
-            "total_downloads": 34
+  "date": "2026-02-18",
+  "period": "day",
+  "days": {
+    "2026-02-18": {
+      "files": [
+        {
+          "filename": "automattic-w-9.pdf",
+          "relative_url": "/2025/01/automattic-w-9.pdf",
+          "download_url": "https://example.files.wordpress.com/2025/01/automattic-w-9.pdf",
+          "downloads": 4
         },
-        "2026-02-14": {
-            "files": [],
-            "other_downloads": 0,
-            "total_downloads": 0
+        {
+          "filename": "wpvip-w-9.pdf",
+          "relative_url": "/2025/01/wpvip-w-9.pdf",
+          "download_url": "https://example.files.wordpress.com/2025/01/wpvip-w-9.pdf",
+          "downloads": 3
         },
-        "2026-02-13": {
-            "files": [
-                {
-                    "filename": "contract.pdf",
-                    "relative_url": "/2023/07/contract.pdf",
-                    "download_url": "https://example.files.wordpress.com/2023/07/contract.pdf",
-                    "downloads": 3
-                }
-            ],
-            "other_downloads": 0,
-            "total_downloads": 14
+        {
+          "filename": "report.pdf",
+          "relative_url": "/2026/02/report.pdf",
+          "download_url": "https://example.files.wordpress.com/2026/02/report.pdf",
+          "downloads": 2
         }
+      ],
+      "other_downloads": 0,
+      "total_downloads": 34
+    },
+    "2026-02-14": {
+      "files": [],
+      "other_downloads": 0,
+      "total_downloads": 0
+    },
+    "2026-02-13": {
+      "files": [
+        {
+          "filename": "contract.pdf",
+          "relative_url": "/2023/07/contract.pdf",
+          "download_url": "https://example.files.wordpress.com/2023/07/contract.pdf",
+          "downloads": 3
+        }
+      ],
+      "other_downloads": 0,
+      "total_downloads": 14
     }
+  }
 }

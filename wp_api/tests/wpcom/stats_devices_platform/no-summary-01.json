@@ -1,10 +1,10 @@
 {
-    "top_values": {
-        "mac": 6956,
-        "windows": 142,
-        "linux": 113,
-        "android": 82,
-        "iphone": 80,
-        "ipad": 2
-    }
+  "top_values": {
+    "mac": 6956,
+    "windows": 142,
+    "linux": 113,
+    "android": 82,
+    "iphone": 80,
+    "ipad": 2
+  }
 }

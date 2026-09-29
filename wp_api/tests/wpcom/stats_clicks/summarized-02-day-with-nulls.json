@@ -1,35 +1,35 @@
 {
-    "date": "2026-02-18",
-    "period": "day",
-    "summary": {
-        "clicks": [
-            {
-                "icon": null,
-                "url": null,
-                "name": null,
-                "views": null,
-                "children": null
-            },
-            {
-                "icon": "https://example.com/icon.png",
-                "url": "https://example.com",
-                "name": "example.com",
-                "views": 5,
-                "children": [
-                    {
-                        "url": null,
-                        "name": null,
-                        "views": null
-                    },
-                    {
-                        "url": "https://example.com/page",
-                        "name": "example.com/page",
-                        "views": 3
-                    }
-                ]
-            }
-        ],
-        "other_clicks": 0,
-        "total_clicks": 5
-    }
+  "date": "2026-02-18",
+  "period": "day",
+  "summary": {
+    "clicks": [
+      {
+        "icon": null,
+        "url": null,
+        "name": null,
+        "views": null,
+        "children": null
+      },
+      {
+        "icon": "https://example.com/icon.png",
+        "url": "https://example.com",
+        "name": "example.com",
+        "views": 5,
+        "children": [
+          {
+            "url": null,
+            "name": null,
+            "views": null
+          },
+          {
+            "url": "https://example.com/page",
+            "name": "example.com/page",
+            "views": 3
+          }
+        ]
+      }
+    ],
+    "other_clicks": 0,
+    "total_clicks": 5
+  }
 }

@@ -1,46 +1,46 @@
 {
-    "id": 10000001,
-    "title": "Test Ticket",
-    "description": "Redacted for privacy",
-    "status": "new",
-    "messages": [
+  "id": 10000001,
+  "title": "Test Ticket",
+  "description": "Redacted for privacy",
+  "status": "new",
+  "messages": [
+    {
+      "id": 20000001,
+      "content": "Redacted for privacy",
+      "role": "user",
+      "author": {
+        "id": 30000001,
+        "name": "Test User",
+        "email": "test.user@example.com"
+      },
+      "author_is_current_user": true,
+      "created_at": "2025-10-27T21:30:43+00:00",
+      "attachments": [
         {
-            "id": 20000001,
-            "content": "Redacted for privacy",
-            "role": "user",
-            "author": {
-                "id": 30000001,
-                "name": "Test User",
-                "email": "test.user@example.com"
-            },
-            "author_is_current_user": true,
-            "created_at": "2025-10-27T21:30:43+00:00",
-            "attachments": [
-                {
-                    "id": 40000001,
-                    "filename": "sample-image-1.jpg",
-                    "content_type": "image/jpeg",
-                    "size": 123456,
-                    "url": "https://example.com/attachments/token/token1/?name=sample-image-1.jpg",
-                    "metadata": {
-                        "width": 1000,
-                        "height": 800
-                    }
-                },
-                {
-                    "id": 40000002,
-                    "filename": "sample-image-2.jpg",
-                    "content_type": "image/jpeg",
-                    "size": 654321,
-                    "url": "https://example.com/attachments/token/token2/?name=sample-image-2.jpg",
-                    "metadata": {
-                        "width": 2000,
-                        "height": 1600
-                    }
-                }
-            ]
+          "id": 40000001,
+          "filename": "sample-image-1.jpg",
+          "content_type": "image/jpeg",
+          "size": 123456,
+          "url": "https://example.com/attachments/token/token1/?name=sample-image-1.jpg",
+          "metadata": {
+            "width": 1000,
+            "height": 800
+          }
+        },
+        {
+          "id": 40000002,
+          "filename": "sample-image-2.jpg",
+          "content_type": "image/jpeg",
+          "size": 654321,
+          "url": "https://example.com/attachments/token/token2/?name=sample-image-2.jpg",
+          "metadata": {
+            "width": 2000,
+            "height": 1600
+          }
         }
-    ],
-    "created_at": "2025-10-27T21:30:43+00:00",
-    "updated_at": "2025-10-27T21:30:43+00:00"
+      ]
+    }
+  ],
+  "created_at": "2025-10-27T21:30:43+00:00",
+  "updated_at": "2025-10-27T21:30:43+00:00"
 }

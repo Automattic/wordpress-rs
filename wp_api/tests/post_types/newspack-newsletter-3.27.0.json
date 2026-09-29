@@ -20,7 +20,10 @@
     "description": "",
     "hierarchical": false,
     "has_archive": "newsletter",
-    "visibility": { "show_in_nav_menus": true, "show_ui": true },
+    "visibility": {
+      "show_in_nav_menus": true,
+      "show_ui": true
+    },
     "viewable": true,
     "labels": {
       "name": "Newsletters",
@@ -62,10 +65,14 @@
     },
     "name": "Newsletters",
     "slug": "newspack_nl_cpt",
-    "icon": "data:image\/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBhcmlhLWhpZGRlbj0idHJ1ZSIgZm9jdXNhYmxlPSJmYWxzZSIgZmlsbD0ibm9uZSI+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0zIDdjMC0xLjEuOS0yIDItMmgxNGEyIDIgMCAwIDEgMiAydjEwYTIgMiAwIDAgMS0yIDJINWEyIDIgMCAwIDEtMi0yVjdabTItLjVoMTRjLjMgMCAuNS4yLjUuNXYxTDEyIDEzLjUgNC41IDcuOVY3YzAtLjMuMi0uNS41LS41Wm0tLjUgMy4zVjE3YzAgLjMuMi41LjUuNWgxNGMuMyAwIC41LS4yLjUtLjVWOS44TDEyIDE1LjQgNC41IDkuOFoiPjwvcGF0aD48L3N2Zz4=",
+    "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBhcmlhLWhpZGRlbj0idHJ1ZSIgZm9jdXNhYmxlPSJmYWxzZSIgZmlsbD0ibm9uZSI+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0zIDdjMC0xLjEuOS0yIDItMmgxNGEyIDIgMCAwIDEgMiAydjEwYTIgMiAwIDAgMS0yIDJINWEyIDIgMCAwIDEtMi0yVjdabTItLjVoMTRjLjMgMCAuNS4yLjUuNXYxTDEyIDEzLjUgNC41IDcuOVY3YzAtLjMuMi0uNS41LS41Wm0tLjUgMy4zVjE3YzAgLjMuMi41LjUuNWgxNGMuMyAwIC41LS4yLjUtLjVWOS44TDEyIDE1LjQgNC41IDkuOFoiPjwvcGF0aD48L3N2Zz4=",
     "supports": {
       "author": true,
-      "editor": [{ "notes": true }],
+      "editor": [
+        {
+          "notes": true
+        }
+      ],
       "title": true,
       "custom-fields": true,
       "newspack_blocks": true,
@@ -76,26 +83,30 @@
       "jetpack-post-likes": true,
       "jetpack-sharing-buttons": true
     },
-    "taxonomies": ["category", "post_tag", "newspack_nl_advertiser"],
+    "taxonomies": [
+      "category",
+      "post_tag",
+      "newspack_nl_advertiser"
+    ],
     "rest_base": "newspack_nl_cpt",
-    "rest_namespace": "wp\/v2",
+    "rest_namespace": "wp/v2",
     "template": [],
     "template_lock": false,
     "_links": {
       "collection": [
         {
-          "href": "https:\/\/paper-of-guineafowls.jurassic.ninja\/wp-json\/wp\/v2\/types"
+          "href": "https://paper-of-guineafowls.jurassic.ninja/wp-json/wp/v2/types"
         }
       ],
       "wp:items": [
         {
-          "href": "https:\/\/paper-of-guineafowls.jurassic.ninja\/wp-json\/wp\/v2\/newspack_nl_cpt"
+          "href": "https://paper-of-guineafowls.jurassic.ninja/wp-json/wp/v2/newspack_nl_cpt"
         }
       ],
       "curies": [
         {
           "name": "wp",
-          "href": "https:\/\/api.w.org\/{rel}",
+          "href": "https://api.w.org/{rel}",
           "templated": true
         }
       ]
@@ -122,7 +133,10 @@
     "description": "",
     "hierarchical": false,
     "has_archive": false,
-    "visibility": { "show_in_nav_menus": false, "show_ui": true },
+    "visibility": {
+      "show_in_nav_menus": false,
+      "show_ui": true
+    },
     "viewable": false,
     "labels": {
       "name": "Newsletter Ads",
@@ -177,24 +191,24 @@
       "newspack_nl_ad_placement"
     ],
     "rest_base": "newspack_nl_ads_cpt",
-    "rest_namespace": "wp\/v2",
+    "rest_namespace": "wp/v2",
     "template": [],
     "template_lock": false,
     "_links": {
       "collection": [
         {
-          "href": "https:\/\/paper-of-guineafowls.jurassic.ninja\/wp-json\/wp\/v2\/types"
+          "href": "https://paper-of-guineafowls.jurassic.ninja/wp-json/wp/v2/types"
         }
       ],
       "wp:items": [
         {
-          "href": "https:\/\/paper-of-guineafowls.jurassic.ninja\/wp-json\/wp\/v2\/newspack_nl_ads_cpt"
+          "href": "https://paper-of-guineafowls.jurassic.ninja/wp-json/wp/v2/newspack_nl_ads_cpt"
         }
       ],
       "curies": [
         {
           "name": "wp",
-          "href": "https:\/\/api.w.org\/{rel}",
+          "href": "https://api.w.org/{rel}",
           "templated": true
         }
       ]
