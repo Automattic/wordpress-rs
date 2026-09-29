@@ -16,16 +16,16 @@ request_execution_failed = Failed to send HTTP.
 
 just = {$message}
 
-invalid_ssl_error_certificate_not_valid_for_name = Invalid SSL certificate
-invalid_ssl_error_generic_ssl_error = Unable to establish a secure connection to the server
+invalid_ssl_error_certificate_not_valid_for_name = Unable to establish a secure connection to the site. Its SSL certificate isn't valid for this address.
+invalid_ssl_error_generic_ssl_error = Unable to establish a secure connection to the site. Its SSL certificate may be invalid or expired.
 
-non_existent_site_error = A server with the specified hostname could not be found.
+non_existent_site_error = A server with the specified hostname could not be found. Please check that the website address is correct.
 
 device_is_offline = No internet connection. Please check your network settings and try again.
 
 http_authentication_required_error = The server at {$url} requires authentication. Please provide your username and password.
 http_forbidden_error = The server at {$url} denied access to the requested resource. Please check your site's configuration.
-http_timeout_error = The connection timed out
+http_timeout_error = The connection timed out. The site may be slow or unreachable – please try again later.
 http_cancellation_error = The request was cancelled.
 
 http_authentication_rejected_error = The server at {$url} rejected your credentials. Please provide a valid username and password.
@@ -40,6 +40,7 @@ misconfigured_rate_limit_error = The server is rate limiting requests in a way t
 
 oauth_response_url_error_url_invalid = The site sent an invalid authentication response URL.
 oauth_response_url_error_unsuccessful_login = Unsuccessful Login.
+oauth_configuration_not_found = This site signs in through an OAuth provider that this app isn't set up to use.
 
 boolean_true_is_returned_when_string_is_expected = Expecting a `String` value for this field, but received the boolean `true` instead.
 
@@ -73,7 +74,7 @@ site_is_local_development_environment = This site is a local development environ
 application_passwords_disabled_for_http_site = Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again.
 application_passwords_not_supported = The site does not support Application Passwords.
 
-parse_api_root = Failed to parse the the site's WordPress REST API root response.
+parse_api_root = Found the site, but couldn't read its WordPress REST API response. A plugin or server configuration may be interfering with the REST API.
 parse_api_root_failure_reason_server_fatal_error = Your server encountered an unrecoverable error and couldn't process the request. Please check your server error logs for details.
 parse_api_root_failure_reason_wordfence_blocking_access = Wordfence is blocking access to the site's API. Please check your Wordfence configuration.
 

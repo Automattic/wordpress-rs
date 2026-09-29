@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
+- `OAuth2ConfigurationStore.configuration_for(endpoints)`: like `find_configuration`, but fails with a localized `OAuth2ConfigurationStoreError` when the site's OAuth2 provider isn't registered, so apps can show a message instead of silently doing nothing.
 
 ### Changed
 
+- Reworded several login-discovery error messages so they explain what went wrong and what to do next: invalid SSL certificates, unknown hostnames, connection timeouts, and an unreadable REST API root response (which also fixes a doubled "the"). Translations for these strings will lag until GlotPress catches up.
 - **Internal:** The remote login-discovery tests for HTTP Basic sites now expect `RequestExecutionErrorReason`'s `hostname` to be the host alone, matching what the library returns.
 - **Internal:** The test server Docker image now installs `zip`, which swiftly 1.2.0 requires to install the Swift toolchain.
 - **Internal:** The WordPress.com e2e tests and both example apps' Bot Conversations screens now use the `wpcom-workflow-support_chat` bot. `jetpack-chat-mobile` ran on the retired chain bot runtime and now returns `410 legacy_chain_bot`.
