@@ -335,6 +335,6 @@ Behavior:
 2. The system MUST classify only a `401 rest_not_logged_in` response as a blocked Authorization header. All other failures, including `401` or `403` responses that are not WordPress errors, MUST NOT be classified as a blocked header.
 3. The system MUST NOT use this classification for stored credentials, because some hosts answer a revoked or wrong password with the same response.
 4. The system MUST reject the login attempt.
-5. The system MUST display the error: "Sign-in could not complete because your site's server is not passing login credentials to WordPress. Contact your hosting provider about this error. Your site's Site Health page should list it as “The authorization header is missing”."
+5. The system MUST display the error: "Your server is blocking sign-in with application passwords. Contact your hosting provider for help."
 
 Reference Implementation: None. Tests stub the introspection response.
