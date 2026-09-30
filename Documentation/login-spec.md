@@ -319,3 +319,22 @@ Behavior:
 2. The system MUST display the error: "Unable to establish a secure connection to `${DOMAIN}`. The site's SSL certificate is invalid or expired"
 
 Reference Implementation: https://wordpress-1315525-4803651.cloudwaysapps.com
+
+# 18: Server Drops the Authorization Header
+
+Requirements:
+1. The site MUST be a WordPress Installation with Application Passwords enabled.
+2. The site's server MUST NOT pass the HTTP `Authorization` header to WordPress.
+
+Expected Signals:
+1. The authorization page MUST issue an application password and return it in the callback URL.
+2. An authenticated `GET wp/v2/users/me/application-passwords/introspect?context=edit`, sent with the freshly issued password, MUST receive a `401` status code with the WordPress error code `rest_not_logged_in`.
+
+Behavior:
+1. The system MUST send the request above immediately after it receives the password, before it uses the password for anything else.
+2. The system MUST classify only a `401 rest_not_logged_in` response as a blocked Authorization header. All other failures, including `401` or `403` responses that are not WordPress errors, MUST NOT be classified as a blocked header.
+3. The system MUST NOT use this classification for stored credentials, because some hosts answer a revoked or wrong password with the same response.
+4. The system MUST reject the login attempt.
+5. The system MUST display the error: "Your server is blocking sign-in with application passwords. Contact your hosting provider for help."
+
+Reference Implementation: None. Tests stub the introspection response.
