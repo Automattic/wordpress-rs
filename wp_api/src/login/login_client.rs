@@ -1,5 +1,5 @@
 use super::{
-    WpApiDetails,
+    WpApiApplicationPasswordDetails, WpApiDetails,
     url_discovery::{
         self, API_ROOT_LINK_HEADER, ApiRootUrl, ApplicationPasswordsNotSupportedReason,
         AutoDiscoveryAttempt, AutoDiscoveryAttemptFailure, AutoDiscoveryAttemptResult,
@@ -10,18 +10,29 @@ use super::{
     },
 };
 use crate::{
-    api_error::{RequestExecutionError, WpError},
+    api_error::{
+        RequestExecutionError, RequestExecutionErrorReason, WpApiError, WpError, WpErrorCode,
+    },
+    auth::WpAuthenticationProvider,
     middleware::{PerformsRequests, WpApiMiddlewarePipeline},
     parsed_url::ParsedUrl,
     request::{
         RequestContext, RequestExecutor, RequestMethod, ResponseBodyType, WpNetworkHeaderMap,
         WpNetworkRequest, WpNetworkRequestBody, WpNetworkResponse,
-        endpoint::{WP_JSON_PATH_SEGMENTS, WpEndpointUrl},
+        endpoint::{
+            WP_JSON_PATH_SEGMENTS, WpEndpointUrl, WpOrgSiteApiUrlResolver,
+            application_passwords_endpoint::{
+                ApplicationPasswordsRequestBuilder,
+                ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
+            },
+        },
     },
 };
 use itertools::Itertools;
 use std::sync::Arc;
 use uuid::Uuid;
+use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
+use wp_localization_macro::WpDeriveLocalizable;
 
 #[derive(uniffi::Object)]
 struct UniffiWpLoginClient {
@@ -51,6 +62,19 @@ impl UniffiWpLoginClient {
             .combined_result()
             .cloned()
             .map_err(|e| e.clone())
+    }
+
+    /// See [`WpLoginClient::verify_issued_application_password`]: call it only with an
+    /// application password the site issued moments ago.
+    async fn verify_issued_application_password(
+        &self,
+        api_root_url: Arc<ParsedUrl>,
+        credentials: WpApiApplicationPasswordDetails,
+        context: Option<Arc<RequestContext>>,
+    ) -> Result<(), VerifyIssuedApplicationPasswordError> {
+        self.inner
+            .verify_issued_application_password(api_root_url, credentials, context)
+            .await
     }
 }
 
@@ -397,6 +421,43 @@ impl WpLoginClient {
         })
     }
 
+    /// Sends one authenticated request with an application password the site issued moments
+    /// ago, to find out whether the site's server passes the `Authorization` header to
+    /// WordPress.
+    ///
+    /// Call this only with a freshly issued password: right after the authorization flow
+    /// returns it, or right after the site creates it. Some hosts answer a revoked or wrong
+    /// password with the same `401 rest_not_logged_in` response, so the result is meaningless
+    /// for any other password.
+    pub async fn verify_issued_application_password(
+        &self,
+        api_root_url: Arc<ParsedUrl>,
+        credentials: WpApiApplicationPasswordDetails,
+        context: Option<Arc<RequestContext>>,
+    ) -> Result<(), VerifyIssuedApplicationPasswordError> {
+        let request = ApplicationPasswordsRequestBuilder::new(
+            Arc::new(WpOrgSiteApiUrlResolver::new(api_root_url)),
+            Arc::new(WpAuthenticationProvider::static_with_username_and_password(
+                credentials.user_login,
+                credentials.password,
+            )),
+            None,
+        )
+        .retrieve_current_with_edit_context();
+        let response = self
+            .perform(request.into(), context)
+            .await
+            .map_err(WpApiError::from)?;
+        // Parse the body rather than only checking for an error response: a proxy that answers
+        // 200 with an HTML page has not confirmed the password.
+        let parsed: Result<
+            ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
+            WpApiError,
+        > = response.parse();
+        parsed?;
+        Ok(())
+    }
+
     pub async fn xmlrpc_discovery(
         &self,
         details: AutoDiscoveryAttemptSuccess,
@@ -526,6 +587,46 @@ impl WpLoginClient {
     }
 }
 
+/// The failure of [`WpLoginClient::verify_issued_application_password`].
+#[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
+pub enum VerifyIssuedApplicationPasswordError {
+    /// WordPress answered `401 rest_not_logged_in` to a request that carried the freshly
+    /// issued password, so the `Authorization` header did not reach WordPress.
+    AuthorizationHeaderBlocked { hostname: String, error: WpApiError },
+    /// Any other failure. None of them is expected seconds after the password was issued,
+    /// and none identifies the cause reliably enough to get its own variant.
+    Other { error: WpApiError },
+}
+
+impl From<WpApiError> for VerifyIssuedApplicationPasswordError {
+    fn from(error: WpApiError) -> Self {
+        // Only a WordPress error proves the request reached WordPress. A non-WordPress 401 or
+        // 403 may come from a rule that denies only application-password routes, while the
+        // rest of the sign-in still works, so it is not treated as a blocked header.
+        match &error {
+            WpApiError::WpError {
+                error_code: WpErrorCode::Unauthorized,
+                status_code: 401,
+                request_url,
+                ..
+            } => Self::AuthorizationHeaderBlocked {
+                hostname: RequestExecutionErrorReason::hostname_of(request_url),
+                error,
+            },
+            _ => Self::Other { error },
+        }
+    }
+}
+
+impl WpSupportsLocalization for VerifyIssuedApplicationPasswordError {
+    fn message_bundle(&self) -> MessageBundle<'_> {
+        match self {
+            Self::AuthorizationHeaderBlocked { .. } => WpMessages::authorization_header_blocked(),
+            Self::Other { error } => error.message_bundle(),
+        }
+    }
+}
+
 impl PerformsRequests for WpLoginClient {
     fn get_middleware_pipeline(&self) -> Arc<WpApiMiddlewarePipeline> {
         self.middleware_pipeline.clone()
@@ -539,7 +640,155 @@ impl PerformsRequests for WpLoginClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{api_error::WpErrorCode, unit_test_common::wp_network_response_from_json};
+    use crate::{request::WpMultipartFormRequest, unit_test_common::wp_network_response_from_json};
+    use async_trait::async_trait;
+    use rstest::*;
+    use std::sync::Mutex;
+
+    const INTROSPECT_URL: &str =
+        "https://example.com/wp-json/wp/v2/users/me/application-passwords/introspect?context=edit";
+    const HTML_BODY: &str = "<html><body><h1>Unauthorized</h1></body></html>";
+
+    /// Answers every request with `response`, stamped with the request's URL, and records the
+    /// requests it receives.
+    struct StubExecutor {
+        response: WpNetworkResponse,
+        requests: Mutex<Vec<Arc<WpNetworkRequest>>>,
+    }
+
+    #[async_trait]
+    impl RequestExecutor for StubExecutor {
+        async fn execute(
+            &self,
+            request: Arc<WpNetworkRequest>,
+        ) -> Result<WpNetworkResponse, RequestExecutionError> {
+            self.requests.lock().unwrap().push(request.clone());
+            Ok(WpNetworkResponse {
+                body: self.response.body.clone(),
+                status_code: self.response.status_code,
+                response_header_map: self.response.response_header_map.clone(),
+                request_url: request.url.clone(),
+                request_method: request.method.clone(),
+                request_header_map: request.header_map.clone(),
+            })
+        }
+
+        async fn upload(
+            &self,
+            _request: Arc<WpMultipartFormRequest>,
+        ) -> Result<WpNetworkResponse, RequestExecutionError> {
+            unimplemented!()
+        }
+
+        async fn sleep(&self, _: u64) {}
+
+        fn cancel(&self, _: Arc<RequestContext>) {}
+    }
+
+    async fn verify(
+        response: WpNetworkResponse,
+    ) -> (
+        Result<(), VerifyIssuedApplicationPasswordError>,
+        Vec<Arc<WpNetworkRequest>>,
+    ) {
+        let executor = Arc::new(StubExecutor {
+            response,
+            requests: Mutex::new(vec![]),
+        });
+        let client = WpLoginClient::new_with_default_middleware_pipeline(executor.clone());
+        let result = client
+            .verify_issued_application_password(
+                ParsedUrl::parse("https://example.com/wp-json/")
+                    .unwrap()
+                    .into(),
+                WpApiApplicationPasswordDetails {
+                    site_url: "https://example.com".to_string(),
+                    user_login: "demo".to_string(),
+                    password: "abcd efgh".to_string(),
+                },
+                None,
+            )
+            .await;
+        let requests = executor.requests.lock().unwrap().clone();
+        (result, requests)
+    }
+
+    #[tokio::test]
+    async fn test_verify_issued_application_password_succeeds() {
+        let json = r#"{
+          "uuid": "0b0c1a5e-8c6f-4d4b-9f3e-2f1d7c5b8a90",
+          "app_id": "",
+          "name": "App",
+          "created": "2026-09-30T01:00:00",
+          "last_used": null,
+          "last_ip": null
+        }"#;
+        let (result, requests) = verify(wp_network_response_from_json(json, 200)).await;
+        assert!(result.is_ok(), "{result:#?}");
+
+        assert_eq!(requests.len(), 1);
+        let request = &requests[0];
+        assert_eq!(request.method, RequestMethod::GET);
+        assert_eq!(request.url.0, INTROSPECT_URL);
+        // "demo:abcd efgh" in base64.
+        assert_eq!(
+            request
+                .header_map
+                .to_header_map()
+                .get(http::header::AUTHORIZATION)
+                .unwrap(),
+            "Basic ZGVtbzphYmNkIGVmZ2g="
+        );
+    }
+
+    #[tokio::test]
+    async fn test_verify_issued_application_password_rest_not_logged_in_is_blocked() {
+        let json = r#"{
+          "code": "rest_not_logged_in",
+          "message": "You are not currently logged in.",
+          "data": { "status": 401 }
+        }"#;
+        let (result, _) = verify(wp_network_response_from_json(json, 401)).await;
+        assert!(
+            matches!(
+                &result,
+                Err(VerifyIssuedApplicationPasswordError::AuthorizationHeaderBlocked {
+                    hostname,
+                    error: WpApiError::WpError {
+                        error_code: WpErrorCode::Unauthorized,
+                        status_code: 401,
+                        ..
+                    },
+                }) if hostname == "example.com"
+            ),
+            "{result:#?}"
+        );
+    }
+
+    #[rstest]
+    #[case::html_401(HTML_BODY, 401)]
+    #[case::html_403(HTML_BODY, 403)]
+    #[case::application_passwords_disabled(
+        r#"{"code":"application_passwords_disabled","message":"Application passwords are not available.","data":{"status":401}}"#,
+        401
+    )]
+    #[case::server_error("", 500)]
+    #[case::html_200(HTML_BODY, 200)]
+    #[case::malformed_json_200("{", 200)]
+    #[tokio::test]
+    async fn test_verify_issued_application_password_other_failures(
+        #[case] body: &str,
+        #[case] status_code: u32,
+    ) {
+        let (result, _) = verify(wp_network_response_from_json(body, status_code)).await;
+        assert!(
+            matches!(
+                result,
+                Err(VerifyIssuedApplicationPasswordError::Other { .. })
+            ),
+            "{result:#?}"
+        );
+    }
 
     #[test]
     fn test_parse_api_details_wp_error_rest_forbidden() {
