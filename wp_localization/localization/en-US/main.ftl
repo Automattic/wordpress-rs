@@ -72,7 +72,7 @@ application_password_blocked_by_multiple_plugins = Unable to login to {$url} –
 site_is_local_development_environment = This site is a local development environment. You'll need to enable application passwords to connect to it with the app.
 application_passwords_disabled_for_http_site = Application Passwords is not enabled for this site – this is likely because we can't establish a secure connection to it. Please add an SSL certificate to this site and try again.
 application_passwords_not_supported = The site does not support Application Passwords.
-authorization_header_blocked = Sign-in could not complete because your site's server is not passing login credentials to WordPress. Contact your hosting provider about this error. Your site's Site Health page should list it as “The authorization header is missing”.
+authorization_header_blocked = Your server is blocking sign-in with application passwords. Contact your hosting provider for help.
 
 parse_api_root = Failed to parse the the site's WordPress REST API root response.
 parse_api_root_failure_reason_server_fatal_error = Your server encountered an unrecoverable error and couldn't process the request. Please check your server error logs for details.
