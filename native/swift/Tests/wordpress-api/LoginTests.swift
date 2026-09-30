@@ -331,7 +331,7 @@ class LoginTests {
     }
 
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
-    @Test("Login Spec Example 18: Invalid SSL Certificate with explicit exception", .enabled(if: !isLinux()))
+    @Test("Login Spec Example 17: Invalid SSL Certificate with explicit exception", .enabled(if: !isLinux()))
     func testInvalidHttpsWithExceptionWorks() async throws {
         let executor = WpRequestExecutor(urlSession: .init(configuration: .ephemeral))
         executor.allowSSL(altNames: ["wordpress-1315525-4803651.cloudwaysapps.com"], forCommonName: "vanilla.wpmt.co")
@@ -340,7 +340,7 @@ class LoginTests {
     }
 
     /// This test is unavailable in Linux until https://github.com/swiftlang/swift-corelibs-foundation/pull/4937 lands
-    @Test("Login Spec Example 19: Alternative name in SSL Certificate", .enabled(if: !isLinux()))
+    @Test("Login Spec Example 17: Alternative name in SSL Certificate", .enabled(if: !isLinux()))
     func testAlternameWorks() async throws {
         // "vanilla1.wpmt.co" is one of the alternative names in vanilla.wpmt.co certificate.
         _ = try await self.client.details(ofSite: "https://vanilla1.wpmt.co")
@@ -431,6 +431,43 @@ class LoginTests {
                 #expect(presentedHostnames.contains("badssl.com"))
                 #expect(presentedHostnames.contains("*.badssl.com"))
                 #endif
+
+                return true
+            }
+        )
+    }
+
+    @Test("Login Spec Example 18: Server drops the Authorization header")
+    func testAuthorizationHeaderBlocked() async throws {
+        let notLoggedIn = try WpNetworkResponse.json(
+            #"{"code":"rest_not_logged_in","message":"You are not currently logged in.","data":{"status":401}}"#,
+            statusCode: 401
+        )
+        let stubs = HTTPStubs(stubs: [
+            HTTPStubs.stub(path: "/wp-json/wp/v2/users/me/application-passwords/introspect", with: notLoggedIn)
+        ])
+        let client = WordPressLoginClient(requestExecutor: stubs)
+        let credentials = WpApiApplicationPasswordDetails(
+            siteUrl: "https://example.com",
+            userLogin: "demo",
+            password: "abcd efgh"
+        )
+
+        await #expect(
+            performing: {
+                try await client.verifyIssuedApplicationPassword(
+                    credentials,
+                    apiRootUrl: try ParsedUrl.parse(input: "https://example.com/wp-json/")
+                )
+            },
+            throws: { error in
+                guard case .AuthorizationHeaderBlocked(let hostname, _) = error as? VerifyIssuedApplicationPasswordError
+                else {
+                    Issue.record("The error must be `AuthorizationHeaderBlocked`: \(error)")
+                    return false
+                }
+
+                #expect(hostname == "example.com")
 
                 return true
             }
