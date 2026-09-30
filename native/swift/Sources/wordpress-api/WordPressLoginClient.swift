@@ -64,6 +64,30 @@ public final class WordPressLoginClient: @unchecked Sendable {
         try extractLoginDetailsFromUrl(url: callbackUrl.absoluteString)
     }
 
+    /// Sends one authenticated request with an application password the site issued moments ago, to
+    /// find out whether the site's server passes the `Authorization` header to WordPress.
+    ///
+    /// Call this only with freshly issued credentials, such as the result of ``credentials(from:)``.
+    /// Some hosts answer a revoked or wrong password the same way as a blocked header, so the result
+    /// is meaningless for any other credentials.
+    ///
+    /// - Throws: `VerifyIssuedApplicationPasswordError`.
+    public func verifyIssuedApplicationPassword(
+        _ credentials: WpApiApplicationPasswordDetails,
+        apiRootUrl: ParsedUrl
+    ) async throws {
+        let context = RequestContext()
+        try await withTaskCancellationHandler {
+            try await client.verifyIssuedApplicationPassword(
+                apiRootUrl: apiRootUrl,
+                credentials: credentials,
+                context: context
+            )
+        } onCancel: {
+            requestExecutor.cancel(context: context)
+        }
+    }
+
     public func authenticateTemporarily(
         username: String,
         password: String,

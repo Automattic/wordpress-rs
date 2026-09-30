@@ -108,10 +108,10 @@ final class HTTPStubs: SafeRequestExecutor {
 
 extension WpNetworkResponse {
 
-    static func json(_ content: String) throws -> WpNetworkResponse {
+    static func json(_ content: String, statusCode: UInt32 = 200) throws -> WpNetworkResponse {
         WpNetworkResponse(
             body: content.data(using: .utf8)!,
-            statusCode: 200,
+            statusCode: statusCode,
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: ["Content-Type": "application/json"]),
             requestUrl: "https://example.com",
             requestMethod: .get,
