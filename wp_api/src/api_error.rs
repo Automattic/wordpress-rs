@@ -774,7 +774,7 @@ impl RequestExecutionErrorReason {
     /// protected post's password, a WordPress.com access token — into both the
     /// localized message these reasons produce and any log line that prints
     /// them. Yields an empty string for a URL with no host.
-    fn hostname_of(request_url: &str) -> String {
+    pub(crate) fn hostname_of(request_url: &str) -> String {
         let Ok(url) = url::Url::parse(request_url) else {
             return String::new();
         };
