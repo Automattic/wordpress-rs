@@ -32,13 +32,13 @@ impl std::fmt::Display for WpComSiteIdentifier {
         }
     }
 }
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::str::FromStr;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
-    deserialize_null_as_empty_vec, deserialize_u64_or_none_with_zero_as_none,
-    deserialize_u64_or_string,
+    deserialize_false_as_none, deserialize_false_or_string, deserialize_null_as_empty_vec,
+    deserialize_u64_or_none_with_zero_as_none, deserialize_u64_or_string,
+    deserialize_u64_or_string_or_none_as_t,
 };
 
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
@@ -80,12 +80,15 @@ pub struct SitesListParams {
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum SiteVisibility {
-    /// Return all sites user is a member of, both visible and hidden.
+    /// Return all sites user is a member of, both visible and hidden, along with the sites
+    /// [`SiteVisibility::Deleted`] returns.
     All,
-    /// Only return sites set to visible for the user.'
+    /// Only return sites set to visible for the user.
     Visible,
     /// Only return sites set to hidden for the user.
     Hidden,
+    /// Only return deleted sites that are awaiting purge and that the user can manage.
+    Deleted,
 }
 
 impl_as_query_value_from_to_string!(SiteVisibility);
@@ -128,7 +131,7 @@ pub struct WPComSite {
     pub id: WpComSiteId,
 
     /// The site's handle – useful in URLs.
-    /// Only available from list requests.
+    /// Only available from list requests. Member-only.
     pub slug: Option<WpComSiteSlug>,
 
     /// The site's name as set in Settings > General > Site Title.
@@ -141,8 +144,8 @@ pub struct WPComSite {
     #[serde(rename = "URL")]
     pub url: String,
 
-    /// The user's capabilities for the site.
-    pub capabilities: UserCapabilitiesMap,
+    /// The user's capabilities for the site. Member-only.
+    pub capabilities: Option<UserCapabilitiesMap>,
 
     /// Whether the site is a Jetpack site.
     pub jetpack: bool,
@@ -150,11 +153,12 @@ pub struct WPComSite {
     ///  Whether the site is connected to WP.com.
     pub jetpack_connection: bool,
 
-    /// Whether the site is a Multisite site or not. Always true for WP.com sites.
-    pub is_multisite: bool,
+    /// Whether the site is a Multisite site or not. Always true for WP.com sites. Member-only.
+    pub is_multisite: Option<bool>,
 
-    /// User ID of the site owner.
-    pub site_owner: WpComUserId,
+    /// User ID of the site owner. Member-only. `None` when the site has no administrator.
+    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none_as_t")]
+    pub site_owner: Option<WpComUserId>,
 
     /// The number of posts the site has.
     pub post_count: u64,
@@ -185,8 +189,8 @@ pub struct WPComSite {
     /// Whether the site is single user. Only returned for WP.com sites and for Jetpack sites with version 3.4 or higher.
     pub single_user_site: Option<bool>,
 
-    /// If the site is a VIP site or not.
-    pub is_vip: bool,
+    /// If the site is a VIP site or not. Member-only.
+    pub is_vip: Option<bool>,
 
     /// If the current user is subscribed to this site in the reader.
     pub is_following: bool,
@@ -196,30 +200,31 @@ pub struct WPComSite {
     pub organization_id: Option<u64>,
 
     /// An array of options/settings for the blog. Only viewable by users with post editing rights to the site.
-    pub options: HashMap<String, JsonValue>,
+    pub options: Option<HashMap<String, JsonValue>>,
 
-    /// Details of the current plan for this site.
-    pub plan: WPComPlan,
+    /// Details of the current plan for this site. Member-only.
+    pub plan: Option<WPComPlan>,
 
-    /// Details of the current products for this site.
-    pub products: Vec<WPComProduct>,
+    /// Details of the current products for this site. Member-only.
+    pub products: Option<Vec<WPComProduct>>,
 
-    /// Site meta data for Zendesk
-    pub zendesk_site_meta: WPComZendeskSiteMeta,
+    /// Site meta data for Zendesk. Member-only.
+    pub zendesk_site_meta: Option<WPComZendeskSiteMeta>,
 
     /// Available updates for the site.
     pub updates: Option<WPComSiteAvailableUpdates>,
 
-    /// A list of active Jetpack modules.
-    #[serde(deserialize_with = "deserialize_null_as_empty_vec")]
+    /// A list of active Jetpack modules. Member-only.
+    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
     pub jetpack_modules: Vec<String>,
 
     /// How much space a user has left for uploads
     pub quota: Option<WPComQuota>,
 
-    /// The launch status of the site.
-    #[serde(deserialize_with = "deserialize_launch_status")]
-    pub launch_status: WPComLaunchStatus,
+    /// The launch status of the site. `None` when the site has none, as with Jetpack sites that
+    /// aren't Atomic.
+    #[serde(deserialize_with = "deserialize_false_as_none")]
+    pub launch_status: Option<WPComLaunchStatus>,
 
     /// The migration status of the site.
     pub site_migration: WPComSiteMigrationStatus,
@@ -239,17 +244,17 @@ pub struct WPComSite {
     /// If the site is a WP.com staging site.
     pub is_wpcom_staging_site: bool,
 
-    /// If the site ever used an eCommerce trial.
-    pub was_ecommerce_trial: bool,
+    /// If the site ever used an eCommerce trial. Member-only.
+    pub was_ecommerce_trial: Option<bool>,
 
-    /// If the site ever upgraded to a paid plan from a trial.
-    pub was_upgraded_from_trial: bool,
+    /// If the site ever upgraded to a paid plan from a trial. Member-only.
+    pub was_upgraded_from_trial: Option<bool>,
 
-    /// If the site ever used a migration trial.
-    pub was_migration_trial: bool,
+    /// If the site ever used a migration trial. Member-only.
+    pub was_migration_trial: Option<bool>,
 
-    /// If the site ever used a hosting trial.
-    pub was_hosting_trial: bool,
+    /// If the site ever used a hosting trial. Member-only.
+    pub was_hosting_trial: Option<bool>,
 
     /// If the site flagged as deleted.
     pub is_deleted: bool,
@@ -263,8 +268,8 @@ pub struct WPComSite {
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WPComSiteIcon {
-    pub img: String,
-    pub ico: String,
+    pub img: Option<String>,
+    pub ico: Option<String>,
     pub media_id: Option<u64>,
 }
 
@@ -273,7 +278,9 @@ pub struct WPComSiteLogo {
     #[serde(deserialize_with = "deserialize_u64_or_string")]
     pub id: u64,
     pub sizes: Vec<WPComLogoSize>,
-    pub url: String,
+    /// `None` when the logo setting doesn't point at an attachment.
+    #[serde(deserialize_with = "deserialize_false_or_string")]
+    pub url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
@@ -285,13 +292,27 @@ pub struct WPComLogoSize {
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WPComPlan {
-    pub product_id: u64,
-    pub product_slug: ProductSlug,
-    pub product_name_short: String,
-    pub expired: bool,
-    pub user_is_owner: bool,
-    pub is_free: bool,
+    pub product_id: WpComPlanProductId,
+    pub product_slug: Option<ProductSlug>,
+    pub product_name_short: Option<String>,
+    /// Not sent for VIP sites.
+    pub expired: Option<bool>,
+    /// Not sent for VIP sites.
+    pub user_is_owner: Option<bool>,
+    /// Not sent for VIP sites.
+    pub is_free: Option<bool>,
     pub features: WPComPlanFeatures,
+}
+
+/// The product ID of a site's plan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, uniffi::Enum)]
+pub enum WpComPlanProductId {
+    /// VIP sites send `"vip"` in place of a store product ID.
+    #[serde(rename = "vip")]
+    Vip,
+    /// A store product ID.
+    #[serde(untagged)]
+    Id(u64),
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
@@ -303,17 +324,19 @@ pub struct WPComPlanFeatures {
 pub struct WPComProduct {
     #[serde(deserialize_with = "deserialize_u64_or_string")]
     pub product_id: u64,
-    pub product_slug: ProductSlug,
-    pub product_name: String,
-    pub product_name_short: String,
-    pub product_type: ProductType,
+    pub product_slug: Option<ProductSlug>,
+    pub product_name: Option<String>,
+    pub product_name_short: Option<String>,
+    pub product_type: Option<ProductType>,
     pub expired: bool,
     pub user_is_owner: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct WPComZendeskSiteMeta {
-    pub plan: String,
+    /// `None` when WordPress.com has no Zendesk name for the site's plan.
+    #[serde(deserialize_with = "deserialize_false_or_string")]
+    pub plan: Option<String>,
     pub addon: Vec<String>,
 }
 
@@ -326,27 +349,13 @@ pub struct WPComQuota {
 }
 
 #[derive(
-    Debug,
-    Default,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    uniffi::Enum,
-    strum_macros::EnumString,
-    strum_macros::Display,
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, uniffi::Enum,
 )]
-#[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum WPComLaunchStatus {
-    #[default]
-    Pending,
+    Unlaunched,
     Launched,
     #[serde(untagged)]
-    #[strum(default)]
     Unknown(String),
 }
 
@@ -363,42 +372,6 @@ pub struct WPComSiteAvailableUpdates {
     pub themes: u64,
     pub translations: u64,
     pub total: u64,
-}
-
-pub fn deserialize_launch_status<'de, D>(deserializer: D) -> Result<WPComLaunchStatus, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    deserializer.deserialize_any(DeserializeLaunchStatusVisitor)
-}
-
-pub struct DeserializeLaunchStatusVisitor;
-
-impl serde::de::Visitor<'_> for DeserializeLaunchStatusVisitor {
-    type Value = WPComLaunchStatus;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("WPComLaunchStatus encoded as boolean `false` or a string")
-    }
-
-    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        if !v {
-            Ok(WPComLaunchStatus::Pending)
-        } else {
-            Err(E::invalid_value(serde::de::Unexpected::Bool(v), &self))
-        }
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        WPComLaunchStatus::from_str(v)
-            .map_err(|_| E::invalid_value(serde::de::Unexpected::Str(v), &self))
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
@@ -427,6 +400,8 @@ mod tests {
 
     #[rstest]
     #[case("v1.2-me-sites-01.json", 6)]
+    // A deleted site, which is sent without its member-only fields.
+    #[case("v1.2-me-sites-02.json", 1)]
     fn test_wpcom_site_list_response_deserialization(
         #[case] json_file_path: &str,
         #[case] expected_count: usize,
@@ -480,20 +455,36 @@ mod tests {
 
     #[derive(Debug, Deserialize)]
     pub struct SiteLaunchStatus {
-        #[serde(deserialize_with = "deserialize_launch_status")]
-        pub launch_status: WPComLaunchStatus,
+        #[serde(deserialize_with = "deserialize_false_as_none")]
+        pub launch_status: Option<WPComLaunchStatus>,
     }
 
-    #[rstest] // The launch status is can be encoded as a boolean or a string
-    #[case(r#"{"launch_status": false}"#, WPComLaunchStatus::Pending)]
-    #[case(r#"{"launch_status": "launched"}"#, WPComLaunchStatus::Launched)]
+    #[rstest] // `false` means the site has no launch status, not that it's unlaunched
+    #[case(r#"{"launch_status": false}"#, None)]
+    #[case(
+        r#"{"launch_status": "unlaunched"}"#,
+        Some(WPComLaunchStatus::Unlaunched)
+    )]
+    #[case(r#"{"launch_status": "launched"}"#, Some(WPComLaunchStatus::Launched))]
     fn test_deserialize_launch_status(
         #[case] test_case: &str,
-        #[case] expected_result: WPComLaunchStatus,
+        #[case] expected_result: Option<WPComLaunchStatus>,
     ) {
         let status: SiteLaunchStatus =
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, status.launch_status);
+    }
+
+    #[rstest] // VIP sites send `"vip"` as the plan's product ID, and omit the subscription fields
+    #[case(r#"{"product_id": 1008,"product_slug": "business-bundle","product_name_short": "Business","expired": false,"user_is_owner": true,"is_free": false,"features": {"active": []}}"#, WpComPlanProductId::Id(1008))]
+    #[case(r#"{"product_id": "vip","product_slug": "vip","product_name_short": "VIP","product_variation": "vip","supports": [],"features": {"active": []}}"#, WpComPlanProductId::Vip)]
+    fn test_deserialize_plan_product_id(
+        #[case] test_case: &str,
+        #[case] expected_result: WpComPlanProductId,
+    ) {
+        let plan: WPComPlan =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, plan.product_id);
     }
 
     #[rstest] // The product ID is often encoded as a string instead of a number
@@ -531,6 +522,7 @@ mod tests {
     #[case(SiteVisibility::Visible, "visible")]
     #[case(SiteVisibility::Hidden, "hidden")]
     #[case(SiteVisibility::All, "all")]
+    #[case(SiteVisibility::Deleted, "deleted")]
     fn test_site_visibility_status_to_str(
         #[case] test_case: SiteVisibility,
         #[case] expected_result: &str,
