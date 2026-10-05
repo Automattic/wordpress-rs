@@ -4,11 +4,306 @@ env:
 # Nodes with values to reuse in the pipeline.
 common_params:
   matrix: &wordpress_version_matrix
+    # All versions except for the latest have been disabled until we have version specific
+    # integration tests
+    # - '5.6' # First version to introduce appliation passwords
+    # - '5.7'
+    # - '5.8'
+    # - '5.9'
+    # - '6.0'
+    # - '6.1'
+    # - '6.2'
+    # - '6.3'
+    # - '6.4'
+    # - '6.5'
+    # - '6.6'
     - "6.8.1"
 
-# TEMPORARY – only the steps that use the test server run while iterating on the native one. The
-# full pipeline will be restored before this is ready for review.
 steps:
+  #
+  # Rust Group
+  - group: ":rust: Core Library"
+    key: "rust"
+    steps:
+      - label: ":rust: Build and Test"
+        command: |
+          echo "--- :rust: Building + Testing"
+          make test-rust-lib
+          make test-rust-doc
+      - label: ":rust: Test `#[derive(WpDerivedRequest)]` Parser"
+        command: |
+          # Once we have integration tests running in CI, we can remove this separate step
+          echo "--- :rust: Testing `#[derive(WpDerivedRequest)]` Parser"
+          make test-rust-wp-derived-request-parser
+      - label: ":rust: Lint"
+        command: |
+          echo "--- :rust: Running Clippy"
+          make lint-rust
+
+          echo "--- :rust: Ensuring Code Conforms to rustfmt"
+          make fmt-check-rust
+      - label: ":rust: Build Docs"
+        command: |
+          echo "--- :rust: Building Documentation"
+          make docs-archive
+        artifact_paths:
+          - docs.tar.gz
+      - label: ":rust: Validate Localization Files"
+        command: |
+          echo "--- :rust: Validate localization files"
+          make validate-localizations
+      - label: ":memo: Validate Changelog"
+        command: .buildkite/commands/validate-changelog.sh
+        plugins: [$CI_TOOLKIT]
+
+  #
+  # Swift Group
+  - group: ":swift: Swift Wrapper"
+    key: "swift"
+    steps:
+      - label: ":rust: :darwin: Build {{matrix}}"
+        key: "apple-build"
+        command: .buildkite/build-apple-platform.sh {{matrix}}
+        artifact_paths:
+          - "target/*/release/libwp_mobile.a"
+          - "target/*/release/swift-bindings/**"
+          - "native/swift/Sources/wordpress-api-wrapper/*.swift"
+        matrix:
+          - "macOS"
+          - "iOS"
+          - "tvOS"
+          - "watchOS"
+        plugins: [$CI_TOOLKIT]
+        agents:
+          queue: mac
+      - label: ":swift: :darwin: Assemble xcframework"
+        key: "xcframework"
+        depends_on: "apple-build"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "/Users/builder/.cargo/env"
+
+          echo "--- :ruby: Installing Ruby tools"
+          install_gems
+          echo "--- :xcode: Setting up code signing"
+          bundle exec fastlane set_up_signing_release
+
+          echo "--- :swift: Assembling XCFramework"
+          .buildkite/assemble-xcframework.sh
+          make xcframework-package-checksum
+          make xcframework-sign
+
+        artifact_paths:
+          - target/libwordpressFFI.xcframework.zip
+          - target/libwordpressFFI.xcframework.zip.checksum.txt
+          - native/swift/Sources/wordpress-api-wrapper/*.swift
+        plugins: [$CI_TOOLKIT]
+        agents:
+          queue: mac
+      - label: ":swift: :package: Publish PR XCFramework"
+        command: .buildkite/publish-pr-xcframework.sh
+        depends_on: xcframework
+        plugins: [$CI_TOOLKIT]
+        agents:
+          queue: mac
+        if: build.pull_request.id != null
+      - label: ":swift: :package: Publish trunk XCFramework"
+        command: .buildkite/publish-trunk-xcframework.sh
+        depends_on: xcframework
+        plugins: [$CI_TOOLKIT]
+        agents:
+          queue: mac
+        if: build.branch == "trunk" && build.env("NEW_VERSION") == null
+      - label: ":swift: Build Docs"
+        command: |
+          .buildkite/download-xcframework.sh
+
+          echo "--- :swift: Building Documentation"
+          make swift-docs-only
+        agents:
+          queue: mac
+        depends_on: xcframework
+        artifact_paths:
+          - swift-docs.tar.gz
+      - label: ":swift: :darwin: Build + Test on Simulators"
+        command: .buildkite/swift-test.sh run_tests
+        depends_on: xcframework
+        plugins: [$CI_TOOLKIT]
+        agents:
+          queue: mac
+      - label: ":swift: :darwin: Build for Real Devices"
+        command: .buildkite/swift-test.sh build_for_real_device
+        depends_on: xcframework
+        plugins: [$CI_TOOLKIT]
+        agents:
+          queue: mac
+      - label: ":swift: Lint"
+        command: |
+          .buildkite/download-xcframework.sh
+          echo "--- :swift: swift-format lint"
+          make lint-swift
+        depends_on: xcframework
+        agents:
+          queue: mac
+      - label: ":swift: Validate Package.resolved"
+        command: |
+          .buildkite/download-xcframework.sh
+          echo "--- :swift: Validate Package.resolved"
+          swift package resolve
+          git diff --exit-code
+        depends_on: xcframework
+        agents:
+          queue: mac
+
+      - label: ":swift: Example Apps"
+        command: |
+          .buildkite/download-xcframework.sh
+
+          echo "--- :rubygems: Setting up Gems"
+          install_gems
+
+          echo "--- :computer: Building for macOS"
+          make swift-example-app-mac
+
+          echo "--- :iphone: Building for iOS"
+          make swift-example-app-ios
+        depends_on: xcframework
+        plugins: [$CI_TOOLKIT]
+        agents:
+          queue: mac
+  #
+  # Kotlin Group
+  - group: ":kotlin: Kotlin Wrapper"
+    key: "kotlin"
+    steps:
+      - label: ":kotlin: Detekt"
+        key: "kotlin-detekt"
+        plugins: [$CI_TOOLKIT]
+        artifact_paths:
+          - "**/build/reports/detekt/detekt.html"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+          make setup-rust-android-targets
+
+          echo "--- 🧹 Linting"
+
+          # This is a temporary step until we implement a more graceful way to handle missing credentials
+          printf "site_url\nadmin_username\nadmin_password\nadmin_password_uuid\nsubscriber_username\nsubscriber_password\nsubscriber_password_uuid\n" > test_credentials
+
+          cd ./native/kotlin
+          ./gradlew detektMain detektTest
+        agents:
+          queue: android
+      - label: ":kotlin: buildSrc Unit Tests"
+        key: "kotlin-buildsrc-tests"
+        plugins:
+          - $CI_TOOLKIT
+          - $TEST_COLLECTOR:
+              files: "native/kotlin/buildSrc/build/test-results/test/*.xml"
+              format: "junit"
+        artifact_paths:
+          - "native/kotlin/buildSrc/build/test-results/test/*.xml"
+        command: |
+          # buildSrc holds the AI-docs generator; its tests are pure JVM (no Rust/test server needed)
+          # and aren't part of the main build's task graph, so they run as a dedicated step.
+          echo "--- :kotlin: Running buildSrc unit tests"
+          cd ./native/kotlin
+          ./gradlew -p buildSrc test
+        agents:
+          queue: android
+      - label: ":rust: Build host library"
+        key: "rust-build-host"
+        artifact_paths:
+          - "target/release/libwp_mobile.so"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+
+          echo "--- :rust: Building host library"
+          cargo build --package wp_mobile --release
+        agents:
+          queue: android
+      - label: ":rust: Build Android {{matrix}}"
+        key: "rust-build-android"
+        plugins: [$CI_TOOLKIT]
+        artifact_paths:
+          - "native/kotlin/api/android/build/rustJniLibs/android/**/*"
+        command: .buildkite/build-android-rust-target.sh {{matrix}}
+        matrix:
+          - "arm"
+          - "arm64"
+          - "x86"
+          - "x86_64"
+        agents:
+          queue: android
+      - label: ":kotlin: Publish `rs.wordpress.api:kotlin`"
+        key: "publish-wp-api-kotlin"
+        plugins: [$CI_TOOLKIT]
+        depends_on:
+          - "rust-build-host"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+
+          echo "--- :kotlin: Publishing `rs.wordpress.api:kotlin`"
+          .buildkite/publish-wp-api-kotlin.sh
+        agents:
+          queue: android
+      - label: ":kotlin: Publish `rs.wordpress.api:android`"
+        key: "publish-wp-api-android"
+        plugins: [$CI_TOOLKIT]
+        depends_on:
+          - "publish-wp-api-kotlin"
+          - "rust-build-android"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+
+          echo "--- :kotlin: Publishing `rs.wordpress.api:android`"
+          .buildkite/publish-wp-api-android.sh
+        agents:
+          queue: android
+
+      - label: ":android: Build Example App"
+        plugins: [$CI_TOOLKIT]
+        depends_on:
+          - "publish-wp-api-android"
+        command: |
+          PUBLISHED_WP_API_KOTLIN_VERSION=$$(buildkite-agent meta-data get "PUBLISHED_WP_API_KOTLIN_VERSION")
+          PUBLISHED_WP_API_ANDROID_VERSION=$$(buildkite-agent meta-data get "PUBLISHED_WP_API_ANDROID_VERSION")
+
+          echo "--- :android: Building Sample App"
+          ./native/kotlin/gradlew -p native/kotlin \
+            -PwpApiKotlinVersion="$$PUBLISHED_WP_API_KOTLIN_VERSION" \
+            -PwpApiAndroidVersion="$$PUBLISHED_WP_API_ANDROID_VERSION" \
+            :example:androidApp:assembleDebug
+        agents:
+          queue: android
+
+  # Docker Group
   - group: ":wordpress: End-to-end Tests"
     key: "e2e"
     steps:
@@ -37,6 +332,19 @@ steps:
         agents:
           queue: mac
 
+      - label: ":wordpress: :rust: WordPress.org API"
+        command: |
+          echo "--- :rust: Testing"
+          make test-rust-integration-wordpress-org-api
+
+      - label: ":wordpress: :rust: Remote Login Discovery (flaky)"
+        command: |
+          echo "--- :rust: Running external login-discovery tests (ignored in the main suite)"
+          make test-rust-integration-remote-login
+        # These tests hit real external *.wpmt.co sites and time out intermittently,
+        # so a failure must not fail the build — they run here only for visibility.
+        soft_fail: true
+
       - label: ":wordpress: :kotlin: WordPress {{matrix}}"
         command: ".buildkite/commands/run-kotlin-integration-tests.sh"
         env:
@@ -56,7 +364,6 @@ steps:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix: *wordpress_version_matrix
         plugins:
-          - $CI_TOOLKIT
           - $TEST_COLLECTOR:
               files: "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
               format: "junit"
@@ -73,3 +380,27 @@ steps:
         env:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix: *wordpress_version_matrix
+
+      - label: ":wordpress: WordPress.com e2e Tests"
+        command: |
+          echo "--- :rust: Installing Rust"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
+          source "$$HOME/.cargo/env"
+
+          echo "--- :package: Installing Rust Toolchains"
+          make setup-rust
+
+          echo "--- 🧪 Run e2e Tests"
+          cargo run --bin wp_com_e2e
+        agents:
+          queue: android
+
+  - label: ":wastebasket: Clean up `pr-build/*` branches for closed PRs"
+    command: .buildkite/cleanup-pr-build-branches.sh
+    plugins: [$CI_TOOLKIT]
+    if: build.branch == "trunk" && build.env("NEW_VERSION") == null
+
+  - label: ":mag: Detect release"
+    command: .buildkite/commands/detect-release.sh
+    plugins: [$CI_TOOLKIT]
+    if: build.branch == "trunk"

@@ -25,7 +25,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORDPRESS_VERSION="${WORDPRESS_VERSION:-6.8.1}"
 # The `wordpress:6.8.1` image is built on `php:8.2-apache`.
 PHP_FORMULA="php@8.2"
-# Homebrew only carries LTS releases of MariaDB – this is the closest one to the `mariadb:11.2` image.
+# Homebrew only has versioned formulae for MariaDB's LTS releases – this is the closest one to the
+# `mariadb:11.2` image.
 MARIADB_FORMULA="mariadb@11.4"
 WP_CLI_VERSION="2.12.0"
 WP_CLI_RESTFUL_VERSION="0.4.1"
@@ -168,8 +169,8 @@ install_wp_cli() {
 	# `wp_cli` and `setup-test-site.sh` both run plain `wp`, so put a wrapper on the PATH that runs the
 	# pinned WP-CLI with the pinned PHP, without picking up any WP-CLI configuration from this machine.
 	#
-	# The Docker image never needs to unpack WordPress, which takes WP-CLI more than PHP's default
-	# 128MB of memory – this is the limit that the `wordpress:cli` image sets for the same reason.
+	# The memory limit is raised because, unlike in the Docker image, WordPress has to be unpacked
+	# here – WP-CLI needs more than PHP's default 128MB to do that.
 	cat > "$BIN_DIR/wp" <<-EOF
 		#!/bin/bash
 		export PATH="$MARIADB_PREFIX/bin:\$PATH"
@@ -280,8 +281,7 @@ start_web_server() {
 		DefaultRuntimeDir "$RUN_DIR"
 		PidFile "$RUN_DIR/httpd.pid"
 		ErrorLog "$LOG_DIR/httpd-error.log"
-		LogFormat "%h %l %u %t \"%r\" %>s %b %D" common
-		CustomLog "$LOG_DIR/httpd-access.log" common
+		CustomLog "$LOG_DIR/httpd-access.log" "%h %l %u %t \"%r\" %>s %b %D"
 
 		LoadModule mpm_prefork_module "$modules_dir/mod_mpm_prefork.so"
 		LoadModule unixd_module "$modules_dir/mod_unixd.so"

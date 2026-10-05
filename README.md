@@ -59,7 +59,7 @@ This project has several test suites. Integration tests require Docker, and you 
 | Kotlin Integration Tests         | `cd native/kotlin && ./gradlew :api:kotlin:integrationTest` | `make test-kotlin-integration`   |
 | Swift Unit Tests                 | `swift test`                          | `make test-swift-linux-in-docker` |
 
-### Running the test server without Docker
+#### Running the test server without Docker
 
 On a Mac, the test server can also run directly on the machine. This is how the integration tests run on our macOS CI, where Docker isn't available.
 

@@ -23,6 +23,7 @@ fi
 REPO_ROOT="${WORDPRESS_RS_REPO_ROOT:-/app}"
 
 DOWNLOADS_DIR="$(mktemp -d)"
+trap 'rm -rf "$DOWNLOADS_DIR"' EXIT
 
 ## Wait for the DB to be ready before attempting install – Docker can do this for us, but we get way better
 ## diagnostic information from `wp db check`, whereas if `wp core install` fails it won't tell us about issues
