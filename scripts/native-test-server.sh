@@ -267,9 +267,10 @@ install_wordpress() {
 start_web_server() {
 	local modules_dir="$HTTPD_PREFIX/lib/httpd/modules"
 
-	# Everything listens on port 80 because the tests expect the site at `http://localhost`. macOS
-	# lets unprivileged processes bind to a low port, but only on all interfaces – hence `Listen 80`
-	# rather than `Listen 127.0.0.1:80`.
+	# The tests expect the site at `http://localhost`, so it has to be on port 80. macOS lets
+	# unprivileged processes bind to a low port, but only on all interfaces – hence `Listen 80`
+	# rather than `Listen 127.0.0.1:80`, with `Require local` to turn away any other machine. Unlike
+	# in Docker, the site's PHP runs as the current user.
 	cat > "$HTTPD_CONF" <<-EOF
 		ServerRoot "$STATE_DIR"
 		ServerName localhost
@@ -284,6 +285,7 @@ start_web_server() {
 		LoadModule mpm_prefork_module "$modules_dir/mod_mpm_prefork.so"
 		LoadModule unixd_module "$modules_dir/mod_unixd.so"
 		LoadModule authz_core_module "$modules_dir/mod_authz_core.so"
+		LoadModule authz_host_module "$modules_dir/mod_authz_host.so"
 		LoadModule log_config_module "$modules_dir/mod_log_config.so"
 		LoadModule mime_module "$modules_dir/mod_mime.so"
 		LoadModule dir_module "$modules_dir/mod_dir.so"
@@ -298,7 +300,7 @@ start_web_server() {
 		<Directory "$SITE_DIR">
 			Options FollowSymLinks
 			AllowOverride All
-			Require all granted
+			Require local
 		</Directory>
 
 		<FilesMatch \.php$>

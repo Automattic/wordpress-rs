@@ -4,8 +4,10 @@ env:
 # TEMPORARY – every other step is disabled while iterating on the native test server. The full
 # pipeline will be restored before this is ready for review.
 steps:
-  - label: ":mag: Probe macOS agent"
+  - label: ":stopwatch: Restore benchmark"
     command: .buildkite/commands/probe-macos-agent.sh
+    artifact_paths:
+      - ".wordpress/logs/*.log"
     agents:
       queue: mac
 
@@ -31,6 +33,8 @@ steps:
       - $TEST_COLLECTOR:
           files: "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
           format: "junit"
+          # The agent runs this plugin again outside the VM, where there are no test results
+          missing-error: 0
     artifact_paths:
       - ".wordpress/logs/*.log"
       - "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
