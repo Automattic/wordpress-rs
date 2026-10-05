@@ -269,6 +269,28 @@ stop-server:
 	@# Help: Stop the running server.
 	docker-compose down
 
+# The `-native` targets run the test server directly on this Mac instead of in Docker. That's what
+# our macOS CI uses, because its VMs can't run Docker. See `scripts/native-test-server.sh`.
+test-server-native-deps:
+	@# Help: Install what the native test server needs (PHP, MariaDB, Apache and jo) using Homebrew.
+	./scripts/native-test-server.sh install-deps
+
+test-server-native:
+	@# Help: Start the test server directly on this Mac, without Docker.
+	./scripts/native-test-server.sh start
+
+stop-server-native:
+	@# Help: Stop the native test server.
+	./scripts/native-test-server.sh stop
+
+test-rust-integration-native:
+	@# Help: Run Rust integration tests against the native test server.
+	./scripts/native-test-server.sh exec cargo test -p wp_api_integration_tests -p wp_mobile_integration_tests --no-fail-fast
+
+test-kotlin-integration-native:
+	@# Help: Run Kotlin integration tests against the native test server.
+	cd native/kotlin && ./gradlew :api:kotlin:integrationTest
+
 lint: lint-rust lint-swift
 	@# Help: Run the linter for all languages.
 
