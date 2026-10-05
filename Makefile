@@ -287,10 +287,6 @@ test-rust-integration-native:
 	@# Help: Run Rust integration tests against the native test server.
 	./scripts/native-test-server.sh exec cargo test -p wp_api_integration_tests -p wp_mobile_integration_tests --no-fail-fast
 
-test-kotlin-integration-native:
-	@# Help: Run Kotlin integration tests against the native test server.
-	cd native/kotlin && ./gradlew :api:kotlin:integrationTest
-
 lint: lint-rust lint-swift
 	@# Help: Run the linter for all languages.
 

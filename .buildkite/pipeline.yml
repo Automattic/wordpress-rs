@@ -323,7 +323,7 @@ steps:
 
       # The macOS VMs can't run Docker, so this installs the test server straight into the VM
       - label: ":wordpress: :rust: :darwin: WordPress {{matrix}}"
-        command: ".buildkite/commands/run-integration-tests-native.sh rust"
+        command: ".buildkite/commands/run-rust-integration-tests-native.sh"
         env:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix: *wordpress_version_matrix
@@ -357,23 +357,6 @@ steps:
               format: "junit"
         artifact_paths:
           - "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
-
-      - label: ":wordpress: :kotlin: :darwin: WordPress {{matrix}}"
-        command: ".buildkite/commands/run-integration-tests-native.sh kotlin"
-        env:
-          WORDPRESS_VERSION: "{{matrix}}"
-        matrix: *wordpress_version_matrix
-        plugins:
-          - $TEST_COLLECTOR:
-              files: "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
-              format: "junit"
-              # The agent runs this plugin again outside the VM, where there are no test results
-              missing-error: 0
-        artifact_paths:
-          - ".wordpress/logs/*.log"
-          - "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
-        agents:
-          queue: mac
 
       - label: ":wordpress: :swift: WordPress {{matrix}}"
         command: ".buildkite/commands/run-swift-tests-linux.sh"

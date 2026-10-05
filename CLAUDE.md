@@ -78,7 +78,6 @@ make test-server-native
 
 # Run the integration tests
 make test-rust-integration-native
-make test-kotlin-integration-native
 ```
 
 Test credentials are configured in:
