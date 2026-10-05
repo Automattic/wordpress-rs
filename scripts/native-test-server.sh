@@ -202,8 +202,9 @@ start_database() {
 		exit 1
 	}
 
-	# The database is recreated on every start and restored from a dump after most tests, so there's
-	# nothing worth an `fsync` (which is particularly slow on macOS) on every commit.
+	# Nothing in this database needs to survive a crash – it's recreated on every start, and restored
+	# from a dump after most tests. Not waiting for `fsync`, which is slow on macOS, takes each of
+	# those restores from 1.3s to 0.05s on our CI.
 	nohup "$MARIADB_PREFIX/bin/mariadbd" \
 		--no-defaults \
 		--basedir="$MARIADB_PREFIX" \
@@ -212,7 +213,7 @@ start_database() {
 		--pid-file="$RUN_DIR/mariadb.pid" \
 		--bind-address=127.0.0.1 \
 		--port="$DB_PORT" \
-		--innodb-flush-log-at-trx-commit=0 \
+		--debug-no-sync \
 		> "$LOG_DIR/mariadb.log" 2>&1 &
 
 	wait_for "MariaDB" "$MARIADB_PREFIX/bin/mariadb-admin" --no-defaults --socket="$DB_SOCKET" --user=root ping

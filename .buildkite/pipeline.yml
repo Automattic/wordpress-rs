@@ -1,42 +1,75 @@
 env:
   IMAGE_ID: $IMAGE_ID
 
-# TEMPORARY – every other step is disabled while iterating on the native test server. The full
-# pipeline will be restored before this is ready for review.
+# Nodes with values to reuse in the pipeline.
+common_params:
+  matrix: &wordpress_version_matrix
+    - "6.8.1"
+
+# TEMPORARY – only the steps that use the test server run while iterating on the native one. The
+# full pipeline will be restored before this is ready for review.
 steps:
-  - label: ":stopwatch: Restore benchmark"
-    command: .buildkite/commands/probe-macos-agent.sh
-    artifact_paths:
-      - ".wordpress/logs/*.log"
-    agents:
-      queue: mac
+  - group: ":wordpress: End-to-end Tests"
+    key: "e2e"
+    steps:
+      - label: ":wordpress: :rust: WordPress {{matrix}}"
+        command: |
+          # Give read/write permissions to `./` for all users
+          chmod -R a+rw ./
 
-  - label: ":wordpress: :rust: :darwin: WordPress {{matrix}}"
-    command: ".buildkite/commands/run-integration-tests-native.sh rust"
-    env:
-      WORDPRESS_VERSION: "{{matrix}}"
-    matrix:
-      - "6.8.1"
-    artifact_paths:
-      - ".wordpress/logs/*.log"
-    agents:
-      queue: mac
+          echo "--- :docker: Setting up Test Server"
+          make test-server
 
-  - label: ":wordpress: :kotlin: :darwin: WordPress {{matrix}}"
-    command: ".buildkite/commands/run-integration-tests-native.sh kotlin"
-    env:
-      WORDPRESS_VERSION: "{{matrix}}"
-    matrix:
-      - "6.8.1"
-    plugins:
-      - $CI_TOOLKIT
-      - $TEST_COLLECTOR:
-          files: "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
-          format: "junit"
-          # The agent runs this plugin again outside the VM, where there are no test results
-          missing-error: 0
-    artifact_paths:
-      - ".wordpress/logs/*.log"
-      - "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
-    agents:
-      queue: mac
+          echo "--- 🧪 Running Rust Integration Tests"
+          make test-rust-integration
+        env:
+          WORDPRESS_VERSION: "{{matrix}}"
+        matrix: *wordpress_version_matrix
+
+      # The macOS VMs can't run Docker, so this installs the test server straight into the VM
+      - label: ":wordpress: :rust: :darwin: WordPress {{matrix}}"
+        command: ".buildkite/commands/run-integration-tests-native.sh rust"
+        env:
+          WORDPRESS_VERSION: "{{matrix}}"
+        matrix: *wordpress_version_matrix
+        artifact_paths:
+          - ".wordpress/logs/*.log"
+        agents:
+          queue: mac
+
+      - label: ":wordpress: :kotlin: WordPress {{matrix}}"
+        command: ".buildkite/commands/run-kotlin-integration-tests.sh"
+        env:
+          WORDPRESS_VERSION: "{{matrix}}"
+        matrix: *wordpress_version_matrix
+        plugins:
+          - $CI_TOOLKIT
+          - $TEST_COLLECTOR:
+              files: "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
+              format: "junit"
+        artifact_paths:
+          - "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
+
+      - label: ":wordpress: :kotlin: :darwin: WordPress {{matrix}}"
+        command: ".buildkite/commands/run-integration-tests-native.sh kotlin"
+        env:
+          WORDPRESS_VERSION: "{{matrix}}"
+        matrix: *wordpress_version_matrix
+        plugins:
+          - $CI_TOOLKIT
+          - $TEST_COLLECTOR:
+              files: "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
+              format: "junit"
+              # The agent runs this plugin again outside the VM, where there are no test results
+              missing-error: 0
+        artifact_paths:
+          - ".wordpress/logs/*.log"
+          - "native/kotlin/api/kotlin/build/test-results/integrationTest/*.xml"
+        agents:
+          queue: mac
+
+      - label: ":wordpress: :swift: WordPress {{matrix}}"
+        command: ".buildkite/commands/run-swift-tests-linux.sh"
+        env:
+          WORDPRESS_VERSION: "{{matrix}}"
+        matrix: *wordpress_version_matrix
