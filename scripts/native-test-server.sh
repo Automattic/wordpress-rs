@@ -42,6 +42,7 @@ BIN_DIR="$STATE_DIR/bin"
 WP_CLI_DIR="$STATE_DIR/wp-cli"
 WP_CLI_PHAR="$WP_CLI_DIR/wp-cli-$WP_CLI_VERSION.phar"
 HTTPD_CONF="$STATE_DIR/httpd.conf"
+PHP_INI="$STATE_DIR/php.ini"
 DB_SOCKET="$RUN_DIR/mariadb.sock"
 
 if ! command -v brew > /dev/null; then
@@ -135,6 +136,28 @@ stop() {
 	stop_process "$RUN_DIR/mariadb.pid" mariadbd
 }
 
+# Homebrew's `php.ini` is PHP's development configuration, which reports every deprecation and
+# notice. Replace it with what the `wordpress` Docker image runs: PHP's built-in defaults, plus the
+# settings that the image adds to them.
+configure_php() {
+	cat > "$PHP_INI" <<-'INI'
+		error_reporting = E_ERROR | E_WARNING | E_PARSE | E_CORE_ERROR | E_CORE_WARNING | E_COMPILE_ERROR | E_COMPILE_WARNING | E_RECOVERABLE_ERROR
+		display_errors = Off
+		display_startup_errors = Off
+		log_errors = On
+		error_log = /dev/stderr
+		log_errors_max_len = 1024
+		ignore_repeated_errors = On
+		ignore_repeated_source = Off
+		html_errors = Off
+
+		opcache.memory_consumption = 128
+		opcache.interned_strings_buffer = 8
+		opcache.max_accelerated_files = 4000
+		opcache.revalidate_freq = 2
+	INI
+}
+
 install_wp_cli() {
 	mkdir -p "$BIN_DIR" "$WP_CLI_DIR"
 
@@ -144,13 +167,16 @@ install_wp_cli() {
 
 	# `wp_cli` and `setup-test-site.sh` both run plain `wp`, so put a wrapper on the PATH that runs the
 	# pinned WP-CLI with the pinned PHP, without picking up any WP-CLI configuration from this machine.
+	#
+	# The Docker image never needs to unpack WordPress, which takes WP-CLI more than PHP's default
+	# 128MB of memory – this is the limit that the `wordpress:cli` image sets for the same reason.
 	cat > "$BIN_DIR/wp" <<-EOF
 		#!/bin/bash
 		export PATH="$MARIADB_PREFIX/bin:\$PATH"
 		export WP_CLI_PACKAGES_DIR="$WP_CLI_DIR/packages"
 		export WP_CLI_CACHE_DIR="$WP_CLI_DIR/cache"
 		export WP_CLI_CONFIG_PATH="$WP_CLI_DIR/config.yml"
-		exec "$PHP_PREFIX/bin/php" "$WP_CLI_PHAR" "\$@"
+		exec "$PHP_PREFIX/bin/php" -c "$PHP_INI" -d memory_limit=512M "$WP_CLI_PHAR" "\$@"
 	EOF
 	chmod +x "$BIN_DIR/wp"
 
@@ -244,8 +270,6 @@ start_web_server() {
 	# Everything listens on port 80 because the tests expect the site at `http://localhost`. macOS
 	# lets unprivileged processes bind to a low port, but only on all interfaces – hence `Listen 80`
 	# rather than `Listen 127.0.0.1:80`.
-	#
-	# The PHP settings are the ones that the `wordpress` Docker image sets.
 	cat > "$HTTPD_CONF" <<-EOF
 		ServerRoot "$STATE_DIR"
 		ServerName localhost
@@ -265,6 +289,7 @@ start_web_server() {
 		LoadModule dir_module "$modules_dir/mod_dir.so"
 		LoadModule rewrite_module "$modules_dir/mod_rewrite.so"
 		LoadModule php_module "$PHP_PREFIX/lib/httpd/modules/libphp.so"
+		PHPIniDir "$PHP_INI"
 
 		TypesConfig "$BREW_PREFIX/etc/httpd/mime.types"
 		DirectoryIndex index.php index.html
@@ -279,12 +304,6 @@ start_web_server() {
 		<FilesMatch \.php$>
 			SetHandler application/x-httpd-php
 		</FilesMatch>
-
-		php_flag display_errors off
-		php_flag display_startup_errors off
-		php_flag html_errors off
-		php_flag log_errors on
-		php_value error_log "$LOG_DIR/php-error.log"
 	EOF
 
 	"$HTTPD_PREFIX/bin/httpd" -f "$HTTPD_CONF" -k start
@@ -314,6 +333,7 @@ start() {
 	rm -f "$LOG_DIR"/*.log
 
 	echo "--- :wordpress: Installing WordPress $WORDPRESS_VERSION"
+	configure_php
 	install_wp_cli
 	start_database
 	install_wordpress

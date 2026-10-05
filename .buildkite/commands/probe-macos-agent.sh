@@ -43,3 +43,14 @@ grep -v '^#' /etc/hosts
 echo "--- :mag: Environment variable names"
 env | cut -d= -f1 | sort | tr '\n' ' '
 echo
+
+echo "--- :mag: Gradle configuration without an Android SDK"
+brew install openjdk@21
+JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
+export JAVA_HOME
+echo "GRADLE_OPTS is ${#GRADLE_OPTS} characters long"
+cd native/kotlin || exit 1
+./gradlew :api:kotlin:help
+echo "PROBE RESULT plain: exit=$?"
+./gradlew --configure-on-demand :api:kotlin:help
+echo "PROBE RESULT configure-on-demand: exit=$?"

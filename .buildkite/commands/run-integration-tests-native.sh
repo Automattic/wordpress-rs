@@ -11,6 +11,14 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --def
 
 source "$HOME/.cargo/env"
 
+if [ "$SUITE" = "kotlin" ]; then
+	echo "--- :java: Installing JDK 21"
+	# The JDK in the VM image is newer than the one the Kotlin project's toolchain asks for.
+	brew install openjdk@21
+	JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
+	export JAVA_HOME
+fi
+
 echo "--- :homebrew: Installing Test Server Dependencies"
 make test-server-native-deps
 
