@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
-- `WpLoginClient.verify_issued_application_password`, which detects a site whose server does not pass the `Authorization` header to WordPress. Call it only with a freshly issued application password.
+- `WpLoginClient.verify_issued_application_password`, which detects a site whose server does not pass the `Authorization` header to WordPress. Call it only with a freshly issued application password. It reports a blocked header only when the API root and the `site_url` returned with the password share an origin.
 
 ### Changed
 

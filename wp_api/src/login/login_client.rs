@@ -429,12 +429,21 @@ impl WpLoginClient {
     /// returns it, or right after the site creates it. Some hosts answer a revoked or wrong
     /// password with the same `401 rest_not_logged_in` response, so the result is meaningless
     /// for any other password.
+    ///
+    /// A blocked header is only reported when `api_root_url` has the same origin as
+    /// `credentials.site_url`, the address WordPress returned with the password. When the two
+    /// differ, a redirect between them may have made the HTTP client drop the header, and
+    /// WordPress answers that request the same way as one whose header the server blocked.
     pub async fn verify_issued_application_password(
         &self,
         api_root_url: Arc<ParsedUrl>,
         credentials: WpApiApplicationPasswordDetails,
         context: Option<Arc<RequestContext>>,
     ) -> Result<(), VerifyIssuedApplicationPasswordError> {
+        let is_same_origin = ParsedUrl::parse(&credentials.site_url)
+            .is_ok_and(|site_url| site_url.inner.origin() == api_root_url.inner.origin());
+        let to_error =
+            |error: WpApiError| VerifyIssuedApplicationPasswordError::new(error, is_same_origin);
         let request = ApplicationPasswordsRequestBuilder::new(
             Arc::new(WpOrgSiteApiUrlResolver::new(api_root_url)),
             Arc::new(WpAuthenticationProvider::static_with_username_and_password(
@@ -447,14 +456,14 @@ impl WpLoginClient {
         let response = self
             .perform(request.into(), context)
             .await
-            .map_err(WpApiError::from)?;
+            .map_err(|error| to_error(error.into()))?;
         // Parse the body rather than only checking for an error response: a proxy that answers
         // 200 with an HTML page has not confirmed the password.
         let parsed: Result<
             ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
             WpApiError,
         > = response.parse();
-        parsed?;
+        parsed.map_err(to_error)?;
         Ok(())
     }
 
@@ -598,8 +607,11 @@ pub enum VerifyIssuedApplicationPasswordError {
     Other { error: WpApiError },
 }
 
-impl From<WpApiError> for VerifyIssuedApplicationPasswordError {
-    fn from(error: WpApiError) -> Self {
+impl VerifyIssuedApplicationPasswordError {
+    /// `is_same_origin` is whether the request went to the origin WordPress returned as the
+    /// site's own. Without it, the header may have been dropped by a redirect on the client
+    /// rather than by the site's server.
+    fn new(error: WpApiError, is_same_origin: bool) -> Self {
         // Only a WordPress error proves the request reached WordPress. A non-WordPress 401 or
         // 403 may come from a rule that denies only application-password routes, while the
         // rest of the sign-in still works, so it is not treated as a blocked header.
@@ -609,7 +621,7 @@ impl From<WpApiError> for VerifyIssuedApplicationPasswordError {
                 status_code: 401,
                 request_url,
                 ..
-            } => Self::AuthorizationHeaderBlocked {
+            } if is_same_origin => Self::AuthorizationHeaderBlocked {
                 hostname: RequestExecutionErrorReason::hostname_of(request_url),
                 error,
             },
@@ -648,6 +660,7 @@ mod tests {
     const INTROSPECT_URL: &str =
         "https://example.com/wp-json/wp/v2/users/me/application-passwords/introspect?context=edit";
     const HTML_BODY: &str = "<html><body><h1>Unauthorized</h1></body></html>";
+    const REST_NOT_LOGGED_IN_BODY: &str = r#"{"code":"rest_not_logged_in","message":"You are not currently logged in.","data":{"status":401}}"#;
 
     /// Answers every request with `response`, stamped with the request's URL, and records the
     /// requests it receives.
@@ -691,6 +704,18 @@ mod tests {
         Result<(), VerifyIssuedApplicationPasswordError>,
         Vec<Arc<WpNetworkRequest>>,
     ) {
+        verify_with_site_url("https://example.com", response).await
+    }
+
+    /// Verifies against the API root `https://example.com/wp-json/`, with `site_url` as the
+    /// address the callback returned.
+    async fn verify_with_site_url(
+        site_url: &str,
+        response: WpNetworkResponse,
+    ) -> (
+        Result<(), VerifyIssuedApplicationPasswordError>,
+        Vec<Arc<WpNetworkRequest>>,
+    ) {
         let executor = Arc::new(StubExecutor {
             response,
             requests: Mutex::new(vec![]),
@@ -702,7 +727,7 @@ mod tests {
                     .unwrap()
                     .into(),
                 WpApiApplicationPasswordDetails {
-                    site_url: "https://example.com".to_string(),
+                    site_url: site_url.to_string(),
                     user_login: "demo".to_string(),
                     password: "abcd efgh".to_string(),
                 },
@@ -760,6 +785,53 @@ mod tests {
                         ..
                     },
                 }) if hostname == "example.com"
+            ),
+            "{result:#?}"
+        );
+    }
+
+    #[rstest]
+    #[case::subdirectory_install("https://example.com/wordpress")]
+    #[case::explicit_default_port("https://example.com:443")]
+    #[case::uppercase_host("https://EXAMPLE.com")]
+    #[tokio::test]
+    async fn test_verify_issued_application_password_same_origin_is_blocked(
+        #[case] site_url: &str,
+    ) {
+        let response = wp_network_response_from_json(REST_NOT_LOGGED_IN_BODY, 401);
+        let (result, _) = verify_with_site_url(site_url, response).await;
+        assert!(
+            matches!(
+                result,
+                Err(VerifyIssuedApplicationPasswordError::AuthorizationHeaderBlocked { .. })
+            ),
+            "{result:#?}"
+        );
+    }
+
+    // A redirect from another origin makes the HTTP client drop the `Authorization` header, so
+    // this response does not show that the site's server blocked it.
+    #[rstest]
+    #[case::different_host("https://www.example.com")]
+    #[case::different_scheme("http://example.com")]
+    #[case::different_port("https://example.com:8443")]
+    #[case::not_a_url("")]
+    #[tokio::test]
+    async fn test_verify_issued_application_password_other_origin_is_not_blocked(
+        #[case] site_url: &str,
+    ) {
+        let response = wp_network_response_from_json(REST_NOT_LOGGED_IN_BODY, 401);
+        let (result, _) = verify_with_site_url(site_url, response).await;
+        assert!(
+            matches!(
+                &result,
+                Err(VerifyIssuedApplicationPasswordError::Other {
+                    error: WpApiError::WpError {
+                        error_code: WpErrorCode::Unauthorized,
+                        status_code: 401,
+                        ..
+                    },
+                })
             ),
             "{result:#?}"
         );
