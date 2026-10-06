@@ -70,6 +70,16 @@ make test-server
 cargo test -p wp_api_integration_tests
 ```
 
+On a Mac, the test server can also run without Docker, which is how macOS CI runs it. Install its
+Homebrew dependencies once with `make test-server-native-deps`, then:
+```bash
+# Start test server (stop it with `make stop-server-native`)
+make test-server-native
+
+# Run the integration tests
+make test-rust-integration-native
+```
+
 Test credentials are configured in:
 - `test_credentials.json` (WordPress.org)
 - `wp_com_test_credentials.json` (WordPress.com)
