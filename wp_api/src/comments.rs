@@ -414,7 +414,10 @@ pub struct SparseComment {
     #[serde(rename = "type")]
     #[WpContext(edit, embed, view)]
     pub comment_type: Option<CommentType>,
+    /// `None` when the site has "Show Avatars" turned off, because WordPress
+    /// then leaves the field out of the response entirely.
     #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
     pub author_avatar_urls: Option<HashMap<UserAvatarSize, WpResponseString>>,
     #[serde(flatten)]
     #[WpContext(edit, embed, view)]
@@ -554,6 +557,38 @@ mod tests {
         let json = format!(r#"{{"date_gmt": {date_gmt}}}"#);
         let comment: SparseComment = serde_json::from_str(&json).expect("Unable to parse JSON");
         assert_eq!(comment.date_gmt, None);
+    }
+
+    /// WordPress only registers `author_avatar_urls` while the site's "Show
+    /// Avatars" setting is on, so every comment omits it when that's off.
+    #[test]
+    fn test_comment_without_author_avatar_urls() {
+        let json = r#"{
+            "id": 1,
+            "author": 0,
+            "author_email": "jane@example.com",
+            "author_ip": "127.0.0.1",
+            "author_name": "Jane",
+            "author_url": "",
+            "author_user_agent": "",
+            "content": { "raw": "Hi", "rendered": "<p>Hi</p>\n" },
+            "date": "2026-09-03T10:00:00",
+            "date_gmt": "2026-09-03T08:00:00",
+            "link": "https://example.com/hello-world/#comment-1",
+            "parent": 0,
+            "post": 1,
+            "status": "approved",
+            "type": "comment"
+        }"#;
+        let edit: CommentWithEditContext =
+            serde_json::from_str(json).expect("Unable to parse JSON");
+        assert!(edit.author_avatar_urls.is_none());
+        let view: CommentWithViewContext =
+            serde_json::from_str(json).expect("Unable to parse JSON");
+        assert!(view.author_avatar_urls.is_none());
+        let embed: CommentWithEmbedContext =
+            serde_json::from_str(json).expect("Unable to parse JSON");
+        assert!(embed.author_avatar_urls.is_none());
     }
 
     #[rstest]

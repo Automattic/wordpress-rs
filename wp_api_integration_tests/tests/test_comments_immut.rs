@@ -233,21 +233,22 @@ async fn list_comments_with_edit_context_parse_author_avatar_urls(
 ) {
     api_client()
         .comments()
-        .list_with_view_context(&params)
+        .list_with_edit_context(&params)
         .await
         .assert_response()
         .data
         .into_iter()
-        .for_each(|mut c| {
+        .for_each(|c| {
+            let mut author_avatar_urls = c.author_avatar_urls.expect("Avatars are enabled");
             assert_eq!(
                 size_24_included,
-                c.author_avatar_urls
+                author_avatar_urls
                     .remove(&UserAvatarSize::Size24)
                     .unwrap()
                     .0
                     .is_some(),
                 "{:#?}",
-                c.author_avatar_urls
+                author_avatar_urls
             )
         });
 }

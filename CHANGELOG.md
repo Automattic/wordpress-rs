@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
 
+### Fixed
+
+- **BREAKING:** Comments' `author_avatar_urls` is now optional in every context, so Swift and Kotlin see a nullable map. WordPress omits the field when a site turns off "Show Avatars", which previously failed every comment response from that site.
+
 ### Changed
 
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.98.1` to `1.99.0`.
