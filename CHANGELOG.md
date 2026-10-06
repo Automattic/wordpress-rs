@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** Comments' `author_avatar_urls` is now optional in every context, so Swift and Kotlin see a nullable map. WordPress omits the field when a site turns off "Show Avatars", which previously failed every comment response from that site.
 
+### Fixed
+
+- Swift: `WpRequestExecutor.cancel(context:)` now cancels every request made for the context, including ones started after the call. Cancelling during a `RetryAfterMiddleware` backoff (or anywhere no request was in flight for a second) previously cancelled nothing, so the retry went out and the call succeeded. Cancellation also now works on Linux, where it was compiled out.
+- Swift: a request started from an already-cancelled `Task` now fails with `CancellationError` instead of running to completion.
+
 ### Changed
 
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.98.1` to `1.99.0`.

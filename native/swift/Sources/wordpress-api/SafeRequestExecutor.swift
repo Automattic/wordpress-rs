@@ -64,12 +64,11 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         await perform(request)
     }
 
+    /// Cancel every request made on behalf of `context` — the ones in flight now, and any the Rust
+    /// layer starts for it later (such as a `RetryAfterMiddleware` retry after its backoff). Each
+    /// fails with `.cancellationError`.
     public func cancel(context: RequestContext) {
-        for requestId in context.requestIds() {
-            Task {
-                await self.cancelRequest(withId: requestId)
-            }
-        }
+        executorDelegate.cancel(context: context)
     }
 
     public func allowSSL(altNames: [String], forCommonName name: String) {
@@ -170,27 +169,6 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             .eraseToAnyPublisher()
     }
     #endif
-
-    private func cancelRequest(withId requestId: String) async {
-        #if canImport(Combine)
-        var task = (await self.session.allTasks)
-            .first {
-                $0.originalRequest?.requestId == requestId
-            }
-
-        if task == nil {
-            task = await NotificationCenter.default
-                .publisher(for: RequestExecutorDelegate.didCreateTaskNotification)
-                .compactMap { $0.object as? URLSessionTask }
-                .first { $0.originalRequest?.requestId == requestId }
-                .timeout(.seconds(1), scheduler: DispatchQueue.global())
-                .values
-                .first { _ in true }
-        }
-
-        task?.cancel()
-        #endif
-    }
 
     private func handleHttpsError(
         _ error: Error,
@@ -395,6 +373,13 @@ private final class RequestExecutorDelegate:
     // The key is SSL certificate common name.
     private var additionalAlternativeNames: [String: Set<String>] = [:]
 
+    // In-flight tasks by request ID, and the contexts `cancel(context:)` has been called on. The
+    // contexts are held weakly and consulted as each task is created, so a request the Rust layer
+    // starts for an already-cancelled context — a retry after a backoff, when no task was alive to
+    // cancel — is cancelled as soon as it exists. See #1517.
+    private var tasks: [String: URLSessionTask] = [:]
+    private var cancelledContexts: [WeakRequestContext] = []
+
     init(delegate: URLSessionTaskDelegate?, redirects: [String: [WpRedirect]] = [:]) {
         self.delegate = delegate
         self.redirects = redirects
@@ -403,6 +388,45 @@ private final class RequestExecutorDelegate:
     func redirects(for taskID: String) -> [WpRedirect]? {
         lock.withLock {
             redirects[taskID]
+        }
+    }
+
+    func cancel(context: RequestContext) {
+        let tasksToCancel = lock.withLock {
+            cancelledContexts.removeAll { $0.context == nil }
+            cancelledContexts.append(WeakRequestContext(context))
+            return context.requestIds().compactMap { tasks[$0] }
+        }
+        tasksToCancel.forEach { $0.cancel() }
+    }
+
+    /// Track `task` so `cancel(context:)` can reach it, cancelling it straight away if its request
+    /// belongs to a context that has already been cancelled.
+    ///
+    /// Called directly by the executor rather than through `urlSession(_:didCreateTask:)`, which
+    /// swift-corelibs-foundation never calls — so cancellation works on Linux too. See #1519.
+    func register(_ task: URLSessionTask) {
+        guard let requestId = task.originalRequest?.requestId else { return }
+
+        let isCancelled = lock.withLock {
+            let isCancelled = cancelledContexts.contains { $0.context?.requestIds().contains(requestId) == true }
+            if !isCancelled {
+                tasks[requestId] = task
+            }
+            return isCancelled
+        }
+
+        if isCancelled {
+            task.cancel()
+        }
+    }
+
+    func unregister(_ task: URLSessionTask) {
+        guard let requestId = task.originalRequest?.requestId else { return }
+        lock.withLock {
+            if tasks[requestId] === task {
+                tasks[requestId] = nil
+            }
         }
     }
 
@@ -582,6 +606,14 @@ private final class RequestExecutorDelegate:
     }
 }
 
+private struct WeakRequestContext {
+    weak var context: RequestContext?
+
+    init(_ context: RequestContext) {
+        self.context = context
+    }
+}
+
 private let requestIdHeaderName = "X-REQUEST-ID"
 
 extension URLRequest {
@@ -645,6 +677,7 @@ extension WpNetworkRequest: NetworkRequestContent {
                 task.delegate = delegate
                 #endif
 
+                (delegate as? RequestExecutorDelegate)?.register(task)
                 task.resume()
 
                 #if !os(Linux)
@@ -653,6 +686,7 @@ extension WpNetworkRequest: NetworkRequestContent {
             }
 
             if let task = cancellation.task {
+                (delegate as? RequestExecutorDelegate)?.unregister(task)
                 notifyTaskResult(delegate: delegate, session: session, task: task, result: result)
             }
 
@@ -783,6 +817,7 @@ func upload(
             task.delegate = delegate
             #endif
 
+            (delegate as? RequestExecutorDelegate)?.register(task)
             task.resume()
 
             #if !os(Linux)
@@ -791,6 +826,7 @@ func upload(
         }
 
         if let task = cancellation.task {
+            (delegate as? RequestExecutorDelegate)?.unregister(task)
             notifyTaskResult(delegate: delegate, session: session, task: task, result: result)
         }
 
@@ -800,24 +836,38 @@ func upload(
     }
 }
 
+/// Bridges Swift `Task` cancellation to the `URLSessionTask` a request creates.
+///
+/// `withTaskCancellationHandler` runs `onCancel` immediately when the Swift `Task` is already
+/// cancelled — before the `URLSessionTask` exists. `cancel()` therefore latches, and a task assigned
+/// after it is cancelled on assignment, so a pre-cancelled request fails with `.cancellationError`
+/// instead of running to completion. See #1518.
 private class TaskCancellation: @unchecked Sendable {
     private let lock = NSLock()
     private var _task: URLSessionTask?
+    private var isCancelled = false
 
     var task: URLSessionTask? {
         get {
             lock.withLock { _task }
         }
         set {
-            lock.withLock { _task = newValue }
+            let isCancelled = lock.withLock {
+                _task = newValue
+                return self.isCancelled
+            }
+            if isCancelled {
+                newValue?.cancel()
+            }
         }
     }
 
     func cancel() {
-        lock.withLock {
-            _task?.cancel()
-            _task = nil
+        let task = lock.withLock {
+            isCancelled = true
+            return _task
         }
+        task?.cancel()
     }
 }
 
