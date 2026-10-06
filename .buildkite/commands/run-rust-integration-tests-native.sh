@@ -9,7 +9,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --def
 
 source "$HOME/.cargo/env"
 
-echo "--- :homebrew: Installing Test Server Dependencies"
+echo "--- :beer: Installing Test Server Dependencies"
 make test-server-native-deps
 
 make test-server-native
