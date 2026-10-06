@@ -287,6 +287,11 @@ test-rust-integration-native:
 	@# Help: Run Rust integration tests against the native test server.
 	./scripts/native-test-server.sh exec cargo test -p wp_api_integration_tests -p wp_mobile_integration_tests --no-fail-fast
 
+# Needs an xcframework with a macOS slice – build one with `make xcframework-only-macos`.
+test-swift-integration-native:
+	@# Help: Run Swift integration tests against the native test server.
+	./scripts/native-test-server.sh exec swift test --filter IntegrationTests --no-parallel
+
 lint: lint-rust lint-swift
 	@# Help: Run the linter for all languages.
 

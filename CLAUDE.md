@@ -78,6 +78,9 @@ make test-server-native
 
 # Run the integration tests
 make test-rust-integration-native
+
+# Run the Swift integration tests (needs `make xcframework-only-macos` first)
+make test-swift-integration-native
 ```
 
 Test credentials are configured in:

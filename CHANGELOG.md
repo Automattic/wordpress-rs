@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.98.1` to `1.99.0`.
 - **Internal:** The Docker test server's database now keeps its data in memory (`tmpfs`), which makes restoring it between integration tests about 10x faster.
 - **Internal:** `make test-server-native` runs the integration test server directly on a Mac, without Docker. CI uses it to run the Rust integration tests on macOS, where Docker isn't available.
+- **Internal:** CI now runs the Swift integration tests on macOS too, against the native test server (`make test-swift-integration-native`). The upload progress and cancellation tests are only compiled on macOS, so they didn't run on CI before.
 - **Internal:** The remote login-discovery tests for HTTP Basic sites now expect `RequestExecutionErrorReason`'s `hostname` to be the host alone, matching what the library returns.
 - **Internal:** The test server Docker image now installs `zip`, which swiftly 1.2.0 requires to install the Swift toolchain.
 - **Internal:** The WordPress.com e2e tests and both example apps' Bot Conversations screens now use the `wpcom-workflow-support_chat` bot. `jetpack-chat-mobile` ran on the retired chain bot runtime and now returns `410 legacy_chain_bot`.
