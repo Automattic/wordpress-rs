@@ -61,7 +61,7 @@ This project has several test suites. Integration tests require Docker, and you 
 
 #### Running the test server without Docker
 
-On a Mac, the test server can also run directly on the machine. This is how the Rust and Swift integration tests run on our macOS CI, where Docker isn't available.
+On a Mac, the test server can also run directly on the machine. This is how the Swift integration tests run on our macOS CI, where Docker isn't available.
 
 ```sh
 # Install PHP, MariaDB, Apache and jo using Homebrew
