@@ -27,6 +27,33 @@ struct SafeRequestExecutorTests {
         #expect(elapsed < .seconds(2))
     }
 
+    // Regression test for #1511: `buildURLRequest` force-unwrapped `URL(string:)`, so a URL
+    // Foundation couldn't parse crashed the process. It now throws `.badURL`, which classifies as
+    // `.nonExistentSiteError`. The real trigger is the strict parser on iOS 16 / macOS 13; an empty
+    // string is rejected by every Foundation version, so it exercises the same path on any host.
+    @Test("A URL Foundation can't parse is classified as .nonExistentSiteError instead of crashing")
+    func testUnparseableURLIsClassifiedAsNonExistentSite() async throws {
+        let executor = WpRequestExecutor(urlSession: .shared)
+
+        let result = await executor.perform(UnparseableURLRequest())
+        let reason = try #require(failureReason(result))
+
+        guard case .nonExistentSiteError = reason else {
+            Issue.record("Expected .nonExistentSiteError, got \(reason)")
+            return
+        }
+    }
+
+    // Regression test for #1515: a response that isn't an `HTTPURLResponse` hit a
+    // `preconditionFailure` in `WpNetworkResponse.init`. It now fails the request instead.
+    @Test("A non-HTTP response fails the request instead of crashing")
+    func testNonHTTPResponseFailsTheRequest() async throws {
+        let executor = WpRequestExecutor(urlSession: .shared)
+
+        let result = await executor.perform(NonHTTPResponseRequest())
+        #expect(failureReason(result) != nil)
+    }
+
     // Regression test for #1491: a URLSession timeout (`URLError.timedOut`) had no branch in
     // `perform(_:)`, so it fell through to `.genericError` and `HttpTimeoutError` was unreachable on
     // Apple platforms — even though reqwest (`is_timeout()`) and Kotlin (`SocketTimeoutException`)
@@ -185,8 +212,131 @@ struct SafeRequestExecutorTests {
             return
         }
     }
+    // Regression tests for #1505 and #1506: URLError codes with a closer classification than the
+    // catch-all `.genericError`. Driven through the real URLSession completion path the same way as
+    // the offline codes above, and excluded on watchOS for the same reason.
+    @Test("An unsupported URL is classified as .nonExistentSiteError")
+    func testUnsupportedURLIsClassifiedAsNonExistentSite() async throws {
+        let reason = try await failureReason(forInjected: .unsupportedURL)
+
+        guard case .nonExistentSiteError = reason else {
+            Issue.record("Expected .nonExistentSiteError, got \(reason)")
+            return
+        }
+    }
+
+    @Test("An unanswerable authentication challenge is classified as .httpAuthenticationRequiredError")
+    func testUserAuthenticationRequiredIsClassifiedAsHttpAuthenticationRequired() async throws {
+        let reason = try await failureReason(forInjected: .userAuthenticationRequired)
+
+        #expect(reason == .httpAuthenticationRequiredError(hostname: "example.com", method: nil))
+    }
+
+    @Test(
+        "A client-certificate failure is classified as a generic SSL error",
+        arguments: [URLError.Code.clientCertificateRequired, .clientCertificateRejected]
+    )
+    func testClientCertificateFailuresAreClassifiedAsGenericSslError(code: URLError.Code) async throws {
+        let reason = try await failureReason(forInjected: code)
+
+        #expect(reason == .invalidSslError(reason: .genericSslError))
+    }
+
+    // Regression test for #1520: the offline, timeout, cancelled, and generic branches hard-coded
+    // `redirects: nil`, dropping the redirect trail the delegate had recorded. Redirect once, then
+    // fail with each code, and assert the redirect is still attached.
+    @Test(
+        "A request that redirects and then fails keeps its redirect trail",
+        arguments: [URLError.Code.notConnectedToInternet, .timedOut, .cancelled, .unknown]
+    )
+    func testRedirectsSurviveEveryFailureBranch(code: URLError.Code) async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RedirectThenFailURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+        let executor = WpRequestExecutor(urlSession: session)
+
+        let result = await executor.perform(RedirectThenFailRequest(code: code))
+
+        guard case .failure(.RequestExecutionFailed(_, let redirects, _, _, _)) = result else {
+            Issue.record("Expected a RequestExecutionFailed failure for \(code), got \(result)")
+            return
+        }
+
+        #expect(
+            redirects == [
+                WpRedirect(
+                    source: RedirectThenFailRequest.source.absoluteString,
+                    destination: RedirectThenFailRequest.destination.absoluteString
+                )
+            ]
+        )
+    }
+
+    private func failureReason(forInjected code: URLError.Code) async throws -> RequestExecutionErrorReason {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [FailingURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+        let executor = WpRequestExecutor(urlSession: session)
+
+        let result = await executor.perform(FailingRequest(code: code))
+        return try #require(failureReason(result))
+    }
     #endif // !os(watchOS)
     #endif
+
+    /// The reason a request failed with, or `nil` if it didn't fail with `RequestExecutionFailed`.
+    private func failureReason(
+        _ result: Result<WpNetworkResponse, RequestExecutionError>
+    ) -> RequestExecutionErrorReason? {
+        guard case .failure(.RequestExecutionFailed(_, _, let reason, _, _)) = result else {
+            return nil
+        }
+        return reason
+    }
+}
+
+/// A `NetworkRequestContent` whose URL no version of Foundation can parse, so the executor's own
+/// `buildURLRequest` is what fails.
+private struct UnparseableURLRequest: NetworkRequestContent {
+    func requestId() -> String { "1511-bad-url-regression" }
+    func method() -> RequestMethod { .get }
+    func url() -> WpEndpointUrl { "" }
+    func headerMap() -> WpNetworkHeaderMap { .empty }
+    func encodeBody(into _: inout URLRequest) throws {}
+
+    func perform(
+        in session: URLSession,
+        withAdditionalHeaders headers: [String: String],
+        delegate _: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        try await session.data(for: buildURLRequest(additionalHeaders: headers))
+    }
+}
+
+/// A `NetworkRequestContent` that "completes" with a plain `URLResponse`, which URLSession never
+/// produces for an http(s) load but `WpNetworkResponse.init` must still survive.
+private struct NonHTTPResponseRequest: NetworkRequestContent {
+    func requestId() -> String { "1515-non-http-response-regression" }
+    func method() -> RequestMethod { .get }
+    func url() -> WpEndpointUrl { "https://example.com/wp-json/" }
+    func headerMap() -> WpNetworkHeaderMap { .empty }
+    func encodeBody(into _: inout URLRequest) throws {}
+
+    func perform(
+        in _: URLSession,
+        withAdditionalHeaders _: [String: String],
+        delegate _: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        let response = URLResponse(
+            url: URL(string: url())!,
+            mimeType: nil,
+            expectedContentLength: 0,
+            textEncodingName: nil
+        )
+        return (Data(), response)
+    }
 }
 
 #if !os(Linux)
@@ -259,6 +409,59 @@ private struct FailingRequest: NetworkRequestContent {
         var request = URLRequest(url: URL(string: url())!)
         request.setValue(String(code.rawValue), forHTTPHeaderField: FailingURLProtocol.codeHeader)
         return try await session.data(for: request)
+    }
+}
+/// A `URLProtocol` that redirects the first request to `RedirectThenFailRequest.destination`, then
+/// fails the redirected request with the `URLError.Code` carried in a request header — so a test can
+/// assert the recorded redirect trail survives whichever failure branch the code lands in.
+private final class RedirectThenFailURLProtocol: URLProtocol {
+    override static func canInit(with request: URLRequest) -> Bool { true }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let url = request.url else { return }
+
+        if url == RedirectThenFailRequest.source {
+            let response = HTTPURLResponse(
+                url: url,
+                statusCode: 302,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Location": RedirectThenFailRequest.destination.absoluteString]
+            )!
+            var redirected = request
+            redirected.url = RedirectThenFailRequest.destination
+            client?.urlProtocol(self, wasRedirectedTo: redirected, redirectResponse: response)
+            return
+        }
+
+        let rawCode = request.value(forHTTPHeaderField: FailingURLProtocol.codeHeader).flatMap { Int($0) }
+        let code = rawCode.map { URLError.Code(rawValue: $0) } ?? .unknown
+        client?.urlProtocol(self, didFailWithError: URLError(code))
+    }
+    override func stopLoading() {}
+}
+
+/// A `NetworkRequestContent` that goes through the executor's delegate — which is what records
+/// redirects — and is failed by `RedirectThenFailURLProtocol` after one redirect.
+private struct RedirectThenFailRequest: NetworkRequestContent {
+    static let source = URL(string: "https://example.com/wp-json/")!
+    static let destination = URL(string: "https://www.example.com/wp-json/")!
+
+    let code: URLError.Code
+
+    func requestId() -> String { "1520-redirects-regression-\(code.rawValue)" }
+    func method() -> RequestMethod { .get }
+    func url() -> WpEndpointUrl { Self.source.absoluteString }
+    func headerMap() -> WpNetworkHeaderMap { .empty }
+    func encodeBody(into _: inout URLRequest) throws {}
+
+    func perform(
+        in session: URLSession,
+        withAdditionalHeaders headers: [String: String],
+        delegate: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        var request = try buildURLRequest(additionalHeaders: headers)
+        request.setValue(String(code.rawValue), forHTTPHeaderField: FailingURLProtocol.codeHeader)
+        return try await session.data(for: request, delegate: delegate)
     }
 }
 #endif // !os(watchOS)

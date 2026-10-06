@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** Comments' `author_avatar_urls` is now optional in every context, so Swift and Kotlin see a nullable map. WordPress omits the field when a site turns off "Show Avatars", which previously failed every comment response from that site.
 
+### Fixed
+
+- Swift: a request URL Foundation can't parse (possible with the strict parser on iOS 16 / macOS 13) now fails with `NonExistentSiteError` instead of crashing, and a non-HTTP response fails the request instead of hitting a `preconditionFailure`.
+- Swift: `URLError.unsupportedURL` is now classified as `NonExistentSiteError` (like `.badURL`), `.userAuthenticationRequired` as `HttpAuthenticationRequiredError`, and `.clientCertificateRequired` / `.clientCertificateRejected` as `InvalidSslError(GenericSslError)`. All previously fell through to `GenericError`.
+- Swift: every request failure now carries the redirects recorded for the request. The offline, timeout, cancellation, and generic branches always reported `redirects: nil`.
+
 ### Changed
 
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.98.1` to `1.99.0`.
