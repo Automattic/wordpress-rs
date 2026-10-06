@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
+- `SiteVisibility::Deleted`, for listing only the deleted sites that `GET /me/sites` includes.
+
+### Fixed
+
+- **BREAKING:** `GET /me/sites` no longer fails to parse when the list includes deleted or VIP sites:
+  - Several `WPComSite` fields are now optional
+  - `WPComPlan.product_id` is now a `WpComPlanProductId`, with a `Vip` variant
+  - `WPComLaunchStatus::Pending` is replaced by `Unlaunched`, and `false` reads as `None`
 
 ### Fixed
 
