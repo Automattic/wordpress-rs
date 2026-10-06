@@ -4,22 +4,21 @@ env:
 # TEMP: everything except the step being iterated on is removed – restore the full pipeline before
 # merging.
 steps:
-  - label: ":wordpress: :swift: :darwin: WordPress {{matrix}}"
+  - label: ":wordpress: :swift: :darwin: WordPress 6.8.1 (soak)"
     command: |
       .buildkite/commands/run-swift-integration-tests-native.sh
 
       # TEMP: repeat the tests to find out whether any of them are flaky in the VM
       failures=0
-      for run in $$(seq 1 20); do
+      for run in $$(seq 1 100); do
         echo "--- 🧪 Repeat run $$run"
         make test-swift-integration-native || failures=$$((failures + 1))
       done
-      echo "+++ $$failures of 20 repeat runs failed"
+      echo "+++ $$failures of 100 repeat runs failed"
       [ "$$failures" -eq 0 ]
     env:
-      WORDPRESS_VERSION: "{{matrix}}"
-    matrix:
-      - "6.8.1"
+      WORDPRESS_VERSION: "6.8.1"
+    parallelism: 3
     artifact_paths:
       - ".wordpress/logs/*.log"
     agents:
