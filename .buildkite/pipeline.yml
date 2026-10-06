@@ -321,17 +321,6 @@ steps:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix: *wordpress_version_matrix
 
-      # The macOS VMs can't run Docker, so this installs the test server straight into the VM
-      - label: ":wordpress: :rust: :darwin: WordPress {{matrix}}"
-        command: ".buildkite/commands/run-rust-integration-tests-native.sh"
-        env:
-          WORDPRESS_VERSION: "{{matrix}}"
-        matrix: *wordpress_version_matrix
-        artifact_paths:
-          - ".wordpress/logs/*.log"
-        agents:
-          queue: mac
-
       - label: ":wordpress: :rust: WordPress.org API"
         command: |
           echo "--- :rust: Testing"
@@ -363,6 +352,20 @@ steps:
         env:
           WORDPRESS_VERSION: "{{matrix}}"
         matrix: *wordpress_version_matrix
+
+      # The step above runs on Linux, so this is what covers the integration tests that are only
+      # compiled on macOS. The macOS VMs can't run Docker, so it installs the test server straight
+      # into the VM.
+      - label: ":wordpress: :swift: :darwin: WordPress {{matrix}}"
+        command: ".buildkite/commands/run-swift-integration-tests-native.sh"
+        depends_on: xcframework
+        env:
+          WORDPRESS_VERSION: "{{matrix}}"
+        matrix: *wordpress_version_matrix
+        artifact_paths:
+          - ".wordpress/logs/*.log"
+        agents:
+          queue: mac
 
       - label: ":wordpress: WordPress.com e2e Tests"
         command: |
