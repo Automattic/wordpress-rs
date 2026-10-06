@@ -140,8 +140,14 @@ class WpRequestExecutor @JvmOverloads constructor(
                 is WpMultipartFormField.File -> {
                     val fileInfo = field.file
                     val file = fileResolver.getFile(fileInfo.filePath)
-                    if (file == null || !file.canBeUploaded()) {
+                    if (file == null || !file.exists()) {
                         throw RequestExecutionException.MediaFileNotFound(filePath = fileInfo.filePath)
+                    }
+                    // Something is at the path but it can't be uploaded — a directory, or a file
+                    // without read permission. "Not found" would send the user looking for the
+                    // wrong problem, and it's what the Swift executor reports for the same input.
+                    if (!file.isFile || !file.canRead()) {
+                        throw RequestExecutionException.MediaFileUnreadable(filePath = fileInfo.filePath)
                     }
                     val mimeType = fileInfo.mimeType ?: "application/octet-stream"
                     val filename = fileInfo.fileName ?: file.name
@@ -282,8 +288,6 @@ class WpRequestExecutor @JvmOverloads constructor(
     override fun cancel(context: RequestContext) {
         // No-op
     }
-
-    private fun File.canBeUploaded() = exists() && isFile && canRead()
 
     /**
      * Interface for monitoring the progress and status of a media upload.

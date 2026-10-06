@@ -331,6 +331,59 @@ class WpRequestExecutorTest {
         assertEquals(filePath, (result as WpRequestResult.MediaFileUnreadable<*>).filePath)
     }
 
+    @Test
+    fun `a missing upload file is mapped to MediaFileNotFound`() = runTest {
+        val result = uploadResult(File("/tmp/wp-rs-test/${java.util.UUID.randomUUID()}/missing.jpg"))
+
+        assertIs<WpRequestResult.MediaFileNotFound<*>>(result)
+    }
+
+    @Test
+    fun `a directory at the upload path is mapped to MediaFileUnreadable`() = runTest {
+        // Regression test for #1558: something is at the path, so "not found" is wrong — and the
+        // Swift executor reports `MediaFileUnreadable` for the same input.
+        val directory = kotlin.io.path.createTempDirectory().toFile()
+        try {
+            assertIs<WpRequestResult.MediaFileUnreadable<*>>(uploadResult(directory))
+        } finally {
+            directory.delete()
+        }
+    }
+
+    @Test
+    fun `an upload file without read permission is mapped to MediaFileUnreadable`() = runTest {
+        // Regression test for #1558. `canRead()` is stubbed rather than using `chmod 000`, which is
+        // bypassed when tests run as root (common in CI).
+        val file = File.createTempFile("unreadable", ".jpg")
+        try {
+            val unreadable = object : File(file.path) {
+                override fun canRead() = false
+            }
+            assertIs<WpRequestResult.MediaFileUnreadable<*>>(uploadResult(unreadable))
+        } finally {
+            file.delete()
+        }
+    }
+
+    /** Uploads [file] through the executor, which fails its pre-upload check before any request. */
+    private suspend fun uploadResult(file: File): WpRequestResult<*> {
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true },
+            fileResolver = object : FileResolver {
+                override fun getFile(path: String): File = file
+            }
+        )
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+        return apiClient.request { requestBuilder ->
+            requestBuilder.media().create(params = MediaCreateParams(title = "Upload", filePath = file.path))
+        }
+    }
+
     /**
      * Resolves media fixtures (e.g. `test_media.jpg`) from the test classpath so uploads can be
      * built without touching the real filesystem layout.

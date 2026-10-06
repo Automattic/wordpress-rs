@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** Comments' `author_avatar_urls` is now optional in every context, so Swift and Kotlin see a nullable map. WordPress omits the field when a site turns off "Show Avatars", which previously failed every comment response from that site.
 
+### Fixed
+
+- A media upload file that exists but can't be read is now reported as `MediaFileUnreadable` on both platforms, and `MediaFileNotFound` is reserved for a path with nothing at it. Swift reported every field-construction failure (including permission and sandbox denials) as `MediaFileNotFound`, and Kotlin did the same for a directory or a file without read permission, while the other platform reported `MediaFileUnreadable` for the same input. The rustdoc for both variants now describes this split, which is by what's at the path rather than by when the read failed.
+
 ### Changed
 
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.98.1` to `1.99.0`.
