@@ -59,6 +59,22 @@ This project has several test suites. Integration tests require Docker, and you 
 | Kotlin Integration Tests         | `cd native/kotlin && ./gradlew :api:kotlin:integrationTest` | `make test-kotlin-integration`   |
 | Swift Unit Tests                 | `swift test`                          | `make test-swift-linux-in-docker` |
 
+#### Running the test server without Docker
+
+On a Mac, the test server can also run directly on the machine. This is how the Rust integration tests run on our macOS CI, where Docker isn't available.
+
+```sh
+# Install PHP, MariaDB, Apache and jo using Homebrew
+make test-server-native-deps
+
+# Create a fresh test site and start it – `make stop-server-native` stops it
+make test-server-native
+
+make test-rust-integration-native
+```
+
+The site is served on port 80, like the Docker one, so only one of them can run at a time. Everything the native test server creates lives in `.wordpress/`.
+
 #### Android Studio Configuration
 
 This project generates large Kotlin files that exceed Android Studio's default indexing limits. Add the following VM option to enable proper code indexing:

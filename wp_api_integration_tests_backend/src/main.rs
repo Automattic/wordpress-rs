@@ -10,8 +10,6 @@ use wp_cli::{
     WpCliPost, WpCliPostListArguments, WpCliSiteSettings, WpCliTag, WpCliUser, WpCliUserMeta,
 };
 
-pub(crate) const TEST_SITE_WP_CONTENT_PATH: &str = "/var/www/html/wp-content";
-
 #[derive(Responder)]
 enum Error {
     #[response(status = 500)]
@@ -155,8 +153,9 @@ fn rocket() -> _ {
 async fn inner_restore_wp_content_plugins() {
     println!("Restoring wp-content/plugins");
 
-    let plugins_folder = &format!("{TEST_SITE_WP_CONTENT_PATH}/plugins");
-    let plugins_backup_folder = &format!("{TEST_SITE_WP_CONTENT_PATH}/plugins-backup");
+    let wp_content_path = wp_cli::test_site_path().join("wp-content");
+    let plugins_folder = &wp_content_path.join("plugins");
+    let plugins_backup_folder = &wp_content_path.join("plugins-backup");
 
     std::fs::remove_dir_all(plugins_folder).expect("Failed to remove old plugins");
 
