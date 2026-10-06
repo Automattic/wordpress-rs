@@ -1,161 +1,161 @@
 {
-    "date": "2026-02-05",
-    "country-info": {
-        "US": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/d0c9ee2dfb5087992fc9b2fc36c2d78311887d82934678b3118815d1f240951b?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/c582a850fc3fea67cbf9e88f7755a85870239bcf4138c9cf3a6f7c53e5a658ea?s=48",
-            "country_full": "United States",
-            "map_region": "021"
-        },
-        "CA": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/8f783538a662f4b416a3e91154e417f38e0dec3eec8e0b5dbe4c8eb861d26e74?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/cb3ca1445705c8820c0c1398fff2716127d8b7f1eb17b8dbc7522fa4d08ca5f3?s=48",
-            "country_full": "Canada",
-            "map_region": "021"
-        },
-        "ES": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/0060781554370ebece2445877930a4b374d8312ecad053883dbd38e5f271d295?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/9e650d102b495ceba9fb6577a6435f1d23a036d409acefe09c0606b181272ffc?s=48",
-            "country_full": "Spain",
-            "map_region": "039"
-        },
-        "AU": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/971effecb7738aac20120105101d7edbb81d07ec76c7040e392591d0b6bec071?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/f7f5263143e568cdd10cd7ad7a3b48c05b0a57296941ddf119191d93156e8c34?s=48",
-            "country_full": "Australia",
-            "map_region": "053"
-        },
-        "GB": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/ea62907b7e45633b3f9daac0771db98d40cfd749fd0ef28313224e2618468367?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/f8c11df368971fc1b3e2a7e9a2093bee00b3ae20c14298cea0c9ea8dde177141?s=48",
-            "country_full": "United Kingdom",
-            "map_region": "154"
-        },
-        "IT": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/547b4085563620aea9375046fac616bff0c77bff096aafbfb3ea030776e44182?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/c65c6e4c117d7fdcff026eba91770d6105832ff59e6adc952b66afd718064469?s=48",
-            "country_full": "Italy",
-            "map_region": "039"
-        },
-        "BR": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/125c845fe7f54b4b28b4d86c665d72acf8511f53edc4a798319fbdf529a35179?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/dfd78932da55b72a015faa1161b6b9ba7fa3e326a2eb10c31c8baf691834b5e3?s=48",
-            "country_full": "Brazil",
-            "map_region": "005"
-        },
-        "NL": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/ccf412630dadb1f0d5bcb108ae19a335afdfa9b318c96202e73531437632ae2e?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/5ce80e051629b0e89f07bbf46b8aef4469e4f66f08fbeb07b99d016073c061e5?s=48",
-            "country_full": "Netherlands",
-            "map_region": "155"
-        },
-        "AT": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/abdad097726bceb3fcd6aa348b0eaf549608fa577928a49b77a6724a718a807b?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/2a74b7811814232e5520a97fc35ce25722f0c467fb6e960f3a5b073efbe49847?s=48",
-            "country_full": "Austria",
-            "map_region": "155"
-        },
-        "IN": {
-            "flag_icon": "https://secure.gravatar.com/blavatar/897cf89656acb4fded93aa7e326bd5b3cdd1745d7e88d05a67315393bc9b6896?s=48",
-            "flat_flag_icon": "https://secure.gravatar.com/blavatar/b25dd4cacc153362451cdd6ed8264c2f747f3154a0e40ff66f49750627fdb853?s=48",
-            "country_full": "India",
-            "map_region": "034"
-        }
+  "date": "2026-02-05",
+  "country-info": {
+    "US": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/d0c9ee2dfb5087992fc9b2fc36c2d78311887d82934678b3118815d1f240951b?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/c582a850fc3fea67cbf9e88f7755a85870239bcf4138c9cf3a6f7c53e5a658ea?s=48",
+      "country_full": "United States",
+      "map_region": "021"
     },
-    "summary": {
-        "views": [
-            {
-                "location": "Seattle",
-                "views": 598,
-                "country_code": "US",
-                "coordinates": {
-                    "latitude": "47.604309",
-                    "longitude": "-122.329845"
-                }
-            },
-            {
-                "location": "Toronto",
-                "views": 422,
-                "country_code": "CA",
-                "coordinates": {
-                    "latitude": "43.653661",
-                    "longitude": "-79.382924"
-                }
-            },
-            {
-                "location": "New York City",
-                "views": 413,
-                "country_code": "US",
-                "coordinates": {
-                    "latitude": "40.713192",
-                    "longitude": "-74.006065"
-                }
-            },
-            {
-                "location": "Chicago",
-                "views": 395,
-                "country_code": "US",
-                "coordinates": {
-                    "latitude": "41.875772",
-                    "longitude": "-87.620606"
-                }
-            },
-            {
-                "location": "Madrid",
-                "views": 327,
-                "country_code": "ES",
-                "coordinates": {
-                    "latitude": "40.416818",
-                    "longitude": "-3.684733"
-                }
-            },
-            {
-                "location": "Sydney",
-                "views": 321,
-                "country_code": "AU",
-                "coordinates": {
-                    "latitude": "-33.86778",
-                    "longitude": "151.207052"
-                }
-            },
-            {
-                "location": "London",
-                "views": 313,
-                "country_code": "GB",
-                "coordinates": {
-                    "latitude": "51.50853",
-                    "longitude": "-0.12574"
-                }
-            },
-            {
-                "location": "Milan",
-                "views": 252,
-                "country_code": "IT",
-                "coordinates": {
-                    "latitude": "45.464336",
-                    "longitude": "9.188547"
-                }
-            },
-            {
-                "location": "Sao Paulo",
-                "views": 237,
-                "country_code": "BR",
-                "coordinates": {
-                    "latitude": "-23.547121",
-                    "longitude": "-46.637186"
-                }
-            },
-            {
-                "location": "Amsterdam",
-                "views": 226,
-                "country_code": "NL",
-                "coordinates": {
-                    "latitude": "52.378502",
-                    "longitude": "4.89998"
-                }
-            }
-        ],
-        "other_views": 0,
-        "total_views": 0
+    "CA": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/8f783538a662f4b416a3e91154e417f38e0dec3eec8e0b5dbe4c8eb861d26e74?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/cb3ca1445705c8820c0c1398fff2716127d8b7f1eb17b8dbc7522fa4d08ca5f3?s=48",
+      "country_full": "Canada",
+      "map_region": "021"
+    },
+    "ES": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/0060781554370ebece2445877930a4b374d8312ecad053883dbd38e5f271d295?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/9e650d102b495ceba9fb6577a6435f1d23a036d409acefe09c0606b181272ffc?s=48",
+      "country_full": "Spain",
+      "map_region": "039"
+    },
+    "AU": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/971effecb7738aac20120105101d7edbb81d07ec76c7040e392591d0b6bec071?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/f7f5263143e568cdd10cd7ad7a3b48c05b0a57296941ddf119191d93156e8c34?s=48",
+      "country_full": "Australia",
+      "map_region": "053"
+    },
+    "GB": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/ea62907b7e45633b3f9daac0771db98d40cfd749fd0ef28313224e2618468367?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/f8c11df368971fc1b3e2a7e9a2093bee00b3ae20c14298cea0c9ea8dde177141?s=48",
+      "country_full": "United Kingdom",
+      "map_region": "154"
+    },
+    "IT": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/547b4085563620aea9375046fac616bff0c77bff096aafbfb3ea030776e44182?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/c65c6e4c117d7fdcff026eba91770d6105832ff59e6adc952b66afd718064469?s=48",
+      "country_full": "Italy",
+      "map_region": "039"
+    },
+    "BR": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/125c845fe7f54b4b28b4d86c665d72acf8511f53edc4a798319fbdf529a35179?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/dfd78932da55b72a015faa1161b6b9ba7fa3e326a2eb10c31c8baf691834b5e3?s=48",
+      "country_full": "Brazil",
+      "map_region": "005"
+    },
+    "NL": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/ccf412630dadb1f0d5bcb108ae19a335afdfa9b318c96202e73531437632ae2e?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/5ce80e051629b0e89f07bbf46b8aef4469e4f66f08fbeb07b99d016073c061e5?s=48",
+      "country_full": "Netherlands",
+      "map_region": "155"
+    },
+    "AT": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/abdad097726bceb3fcd6aa348b0eaf549608fa577928a49b77a6724a718a807b?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/2a74b7811814232e5520a97fc35ce25722f0c467fb6e960f3a5b073efbe49847?s=48",
+      "country_full": "Austria",
+      "map_region": "155"
+    },
+    "IN": {
+      "flag_icon": "https://secure.gravatar.com/blavatar/897cf89656acb4fded93aa7e326bd5b3cdd1745d7e88d05a67315393bc9b6896?s=48",
+      "flat_flag_icon": "https://secure.gravatar.com/blavatar/b25dd4cacc153362451cdd6ed8264c2f747f3154a0e40ff66f49750627fdb853?s=48",
+      "country_full": "India",
+      "map_region": "034"
     }
+  },
+  "summary": {
+    "views": [
+      {
+        "location": "Seattle",
+        "views": 598,
+        "country_code": "US",
+        "coordinates": {
+          "latitude": "47.604309",
+          "longitude": "-122.329845"
+        }
+      },
+      {
+        "location": "Toronto",
+        "views": 422,
+        "country_code": "CA",
+        "coordinates": {
+          "latitude": "43.653661",
+          "longitude": "-79.382924"
+        }
+      },
+      {
+        "location": "New York City",
+        "views": 413,
+        "country_code": "US",
+        "coordinates": {
+          "latitude": "40.713192",
+          "longitude": "-74.006065"
+        }
+      },
+      {
+        "location": "Chicago",
+        "views": 395,
+        "country_code": "US",
+        "coordinates": {
+          "latitude": "41.875772",
+          "longitude": "-87.620606"
+        }
+      },
+      {
+        "location": "Madrid",
+        "views": 327,
+        "country_code": "ES",
+        "coordinates": {
+          "latitude": "40.416818",
+          "longitude": "-3.684733"
+        }
+      },
+      {
+        "location": "Sydney",
+        "views": 321,
+        "country_code": "AU",
+        "coordinates": {
+          "latitude": "-33.86778",
+          "longitude": "151.207052"
+        }
+      },
+      {
+        "location": "London",
+        "views": 313,
+        "country_code": "GB",
+        "coordinates": {
+          "latitude": "51.50853",
+          "longitude": "-0.12574"
+        }
+      },
+      {
+        "location": "Milan",
+        "views": 252,
+        "country_code": "IT",
+        "coordinates": {
+          "latitude": "45.464336",
+          "longitude": "9.188547"
+        }
+      },
+      {
+        "location": "Sao Paulo",
+        "views": 237,
+        "country_code": "BR",
+        "coordinates": {
+          "latitude": "-23.547121",
+          "longitude": "-46.637186"
+        }
+      },
+      {
+        "location": "Amsterdam",
+        "views": 226,
+        "country_code": "NL",
+        "coordinates": {
+          "latitude": "52.378502",
+          "longitude": "4.89998"
+        }
+      }
+    ],
+    "other_views": 0,
+    "total_views": 0
+  }
 }

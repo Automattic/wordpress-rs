@@ -1,23 +1,23 @@
 {
-    "date": "2026-02-18",
-    "period": "day",
-    "days": {
-        "summary": {
-            "data": [
-                {
-                    "post_id": 282653,
-                    "title": "example_video_1",
-                    "views": 10,
-                    "impressions": 71,
-                    "watch_time": 0.06972222222222223,
-                    "retention_rate": 33.0
-                }
-            ],
-            "total": {
-                "impressions": 71,
-                "views": 10,
-                "watch_time": 0.06972222222222223
-            }
+  "date": "2026-02-18",
+  "period": "day",
+  "days": {
+    "summary": {
+      "data": [
+        {
+          "post_id": 282653,
+          "title": "example_video_1",
+          "views": 10,
+          "impressions": 71,
+          "watch_time": 0.06972222222222223,
+          "retention_rate": 33.0
         }
+      ],
+      "total": {
+        "impressions": 71,
+        "views": 10,
+        "watch_time": 0.06972222222222223
+      }
     }
+  }
 }

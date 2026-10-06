@@ -1,9 +1,9 @@
 {
-    "top_values": {
-        "chrome": 6431,
-        "firefox": 563,
-        "safari": 259,
-        "edge": 107,
-        "other": 13
-    }
+  "top_values": {
+    "chrome": 6431,
+    "firefox": 563,
+    "safari": 259,
+    "edge": 107,
+    "other": 13
+  }
 }

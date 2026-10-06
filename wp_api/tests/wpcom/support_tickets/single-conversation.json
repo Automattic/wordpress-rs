@@ -68,9 +68,9 @@
         {
           "id": 37725924561684,
           "filename": "test_screenshot_1.jpeg",
-          "content_type": "image\/jpeg",
+          "content_type": "image/jpeg",
           "size": 246171,
-          "url": "https:\/\/a8c.zendesk.com\/attachments\/token\/nZ1I5S7NkM8J8lpf9wAA9V6BL\/?name=test_screenshot_1.jpeg",
+          "url": "https://a8c.zendesk.com/attachments/token/nZ1I5S7NkM8J8lpf9wAA9V6BL/?name=test_screenshot_1.jpeg",
           "metadata": {
             "width": 1179,
             "height": 2556
@@ -93,9 +93,9 @@
         {
           "id": 37726025831316,
           "filename": "test_screenshot_2.jpeg",
-          "content_type": "image\/jpeg",
+          "content_type": "image/jpeg",
           "size": 246171,
-          "url": "https:\/\/a8c.zendesk.com\/attachments\/token\/nGyuwTgotHH3HAnm6WOCmfXuP\/?name=test_screenshot_2.jpeg",
+          "url": "https://a8c.zendesk.com/attachments/token/nGyuwTgotHH3HAnm6WOCmfXuP/?name=test_screenshot_2.jpeg",
           "metadata": {
             "width": 1179,
             "height": 2556
@@ -118,9 +118,9 @@
         {
           "id": 37726236284948,
           "filename": "test_recording_1.mp4",
-          "content_type": "video\/mp4",
+          "content_type": "video/mp4",
           "size": 25897659,
-          "url": "https:\/\/a8c.zendesk.com\/attachments\/token\/pxM2QJE7errXpreLxEgFA4w5L\/?name=test_recording_1.mp4",
+          "url": "https://a8c.zendesk.com/attachments/token/pxM2QJE7errXpreLxEgFA4w5L/?name=test_recording_1.mp4",
           "metadata": {}
         }
       ]

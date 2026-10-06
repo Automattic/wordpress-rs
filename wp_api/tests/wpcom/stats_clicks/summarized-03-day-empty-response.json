@@ -1,9 +1,9 @@
 {
-    "date": "2026-02-18",
-    "period": "day",
-    "summary": {
-        "clicks": [],
-        "other_clicks": 0,
-        "total_clicks": 0
-    }
+  "date": "2026-02-18",
+  "period": "day",
+  "summary": {
+    "clicks": [],
+    "other_clicks": 0,
+    "total_clicks": 0
+  }
 }
