@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
+- `GET /rest/v1.1/sites/<site_id>/stats/archives` endpoint, for views of a site's search, category and other archive pages.
 - `SiteVisibility::Deleted`, for listing only the deleted sites that `GET /me/sites` includes.
 
 ### Fixed
