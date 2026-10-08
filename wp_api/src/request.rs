@@ -636,7 +636,8 @@ impl WpNetworkResponse {
     }
 
     /// Returns the `rel="next"`/`rel="prev"` page from the `Link` header, falling back to
-    /// [`Self::pagination_params_from_total_pages`] when the header is missing.
+    /// [`Self::pagination_params_from_total_pages`] when that rel is missing, even if other `Link`
+    /// headers are present.
     fn pagination_params<P: FromUrlQueryPairs>(
         &self,
         header_key: PaginationHeaderKey,
@@ -645,9 +646,9 @@ impl WpNetworkResponse {
             .or_else(|| self.pagination_params_from_total_pages(header_key))
     }
 
-    /// Builds pagination params from the request's own query when the response has no `Link`
-    /// rel="next"/"prev" header. The WP.com REST proxy drops that header for Atomic and Jetpack
-    /// sites but keeps `X-WP-TotalPages`.
+    /// Builds pagination params from the request's own query when the response's `Link` header has
+    /// no rel="next"/"prev". The WP.com REST proxy replaces the site's `Link` header with its own
+    /// API-discovery link for Atomic and Jetpack sites but keeps `X-WP-TotalPages`.
     fn pagination_params_from_total_pages<P: FromUrlQueryPairs>(
         &self,
         header_key: PaginationHeaderKey,
@@ -655,8 +656,12 @@ impl WpNetworkResponse {
         let total_pages = self.response_header_map.wp_total_pages()?;
         let url = Url::parse(&self.request_url.0).ok()?;
         let mut query_pairs: HashMap<Cow<str>, Cow<str>> = url.query_pairs().collect();
-        // `offset` overrides `page` in WP_Query, so page arithmetic would be wrong.
-        if query_pairs.contains_key("offset") {
+        // A non-zero `offset` overrides `page` in WP_Query, so page arithmetic would be wrong.
+        if query_pairs
+            .get("offset")
+            .and_then(|o| o.parse::<u32>().ok())
+            .is_some_and(|o| o > 0)
+        {
             return None;
         }
         let current_page: u32 = query_pairs
@@ -665,9 +670,13 @@ impl WpNetworkResponse {
             .unwrap_or(1);
         let target_page = match header_key {
             PaginationHeaderKey::Next => {
-                (current_page < total_pages).then_some(current_page + 1)?
+                (current_page < total_pages).then_some(current_page.saturating_add(1))?
             }
-            PaginationHeaderKey::Prev => (current_page > 1).then_some(current_page - 1)?,
+            PaginationHeaderKey::Prev => {
+                // Like core's `Link` header, clamp `prev` to the last page.
+                let prev_page = current_page.saturating_sub(1).min(total_pages);
+                (prev_page > 0).then_some(prev_page)?
+            }
         };
         query_pairs.insert("page".into(), target_page.to_string().into());
         P::from_url_query_pairs(UrlQueryPairsMap::new(query_pairs))
@@ -1328,7 +1337,17 @@ mod tests {
         Some(5),
         None
     )]
+    #[case::wpcom_proxy_link_header(
+        "page=1&per_page=100",
+        Some(r#"<https://public-api.wordpress.com/>; rel="https://api.w.org/""#),
+        Some(11),
+        Some(2),
+        None
+    )]
+    #[case::past_last_page("page=20&per_page=100", None, Some(11), None, Some(11))]
+    #[case::page_zero("page=0&per_page=100", None, Some(11), Some(1), None)]
     #[case::offset("offset=10&per_page=100", None, Some(11), None, None)]
+    #[case::zero_offset("offset=0&per_page=100", None, Some(11), Some(2), None)]
     #[case::no_total_pages("page=1&per_page=100", None, None, None, None)]
     fn test_pagination_params_falls_back_to_total_pages(
         #[case] query: &str,
