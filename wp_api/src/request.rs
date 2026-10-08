@@ -634,6 +634,49 @@ impl WpNetworkResponse {
             })
     }
 
+    /// Returns the `rel="next"`/`rel="prev"` page from the `Link` header, falling back to
+    /// [`Self::pagination_params_from_total_pages`] when that rel is missing, even if other `Link`
+    /// headers are present.
+    fn pagination_params<P: FromUrlQueryPairs>(
+        &self,
+        header_key: PaginationHeaderKey,
+    ) -> Option<P> {
+        self.get_pagination_header(header_key)
+            .or_else(|| self.pagination_params_from_total_pages(header_key))
+    }
+
+    /// Builds pagination params from the request's own query when the response's `Link` header has
+    /// no rel="next"/"prev". The WP.com REST proxy replaces the site's `Link` header with its own
+    /// API-discovery link for Atomic and Jetpack sites but keeps `X-WP-TotalPages`.
+    fn pagination_params_from_total_pages<P: FromUrlQueryPairs>(
+        &self,
+        header_key: PaginationHeaderKey,
+    ) -> Option<P> {
+        let total_pages = self.response_header_map.wp_total_pages()?;
+        let url = Url::parse(&self.request_url.0).ok()?;
+        let mut query_pairs: HashMap<_, _> = url.query_pairs().collect();
+        // A non-zero `offset` overrides `page` in WP_Query, so page arithmetic would be wrong.
+        if query_pairs
+            .get("offset")
+            .is_some_and(|o| o.parse::<u32>().is_ok_and(|o| o > 0))
+        {
+            return None;
+        }
+        let current_page: u32 = query_pairs
+            .get("page")
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(1);
+        let target_page = match header_key {
+            PaginationHeaderKey::Next => current_page.checked_add(1).filter(|&p| p <= total_pages),
+            // Like core's `Link` header, clamp `prev` to the last page.
+            PaginationHeaderKey::Prev => {
+                Some(current_page.saturating_sub(1).min(total_pages)).filter(|&p| p > 0)
+            }
+        }?;
+        query_pairs.insert("page".into(), target_page.to_string().into());
+        P::from_url_query_pairs(UrlQueryPairsMap::new(query_pairs))
+    }
+
     pub fn body_as_string(&self) -> String {
         request_or_response_body_as_string(&self.body)
     }
@@ -665,9 +708,9 @@ impl WpNetworkResponse {
                 let mut parsed_response = ParsedResponse::<DataType, ParamsType>::from(x);
                 if ParamsType::supports_pagination() {
                     parsed_response.next_page_params =
-                        self.get_pagination_header(PaginationHeaderKey::Next);
+                        self.pagination_params(PaginationHeaderKey::Next);
                     parsed_response.prev_page_params =
-                        self.get_pagination_header(PaginationHeaderKey::Prev);
+                        self.pagination_params(PaginationHeaderKey::Prev);
                 }
                 parsed_response.header_map = self.response_header_map;
                 ResponseType::from(parsed_response)
@@ -1246,6 +1289,91 @@ mod tests {
             response.get_link_header("next").first(),
             "response headers: {:?}",
             response.response_header_map.inner
+        );
+    }
+
+    fn pagination_test_response(
+        query: &str,
+        link: Option<&str>,
+        total_pages: Option<u32>,
+    ) -> WpNetworkResponse {
+        let headers = [
+            link.map(|l| ("Link".to_string(), l.to_string())),
+            total_pages.map(|t| (HEADER_KEY_WP_TOTAL_PAGES.to_string(), t.to_string())),
+        ];
+        WpNetworkResponse {
+            body: Vec::with_capacity(0),
+            status_code: 200,
+            response_header_map: Arc::new(
+                WpNetworkHeaderMap::from_map(headers.into_iter().flatten().collect()).unwrap(),
+            ),
+            request_url: WpEndpointUrl(format!(
+                "https://public-api.wordpress.com/wp/v2/sites/1/categories?{query}"
+            )),
+            request_method: RequestMethod::GET,
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+        }
+    }
+
+    #[rstest]
+    #[case::first_page("page=1&per_page=100", None, Some(11), Some(2), None)]
+    #[case::no_page_param("per_page=100", None, Some(11), Some(2), None)]
+    #[case::middle_page("page=5&per_page=100", None, Some(11), Some(6), Some(4))]
+    #[case::last_page("page=11&per_page=100", None, Some(11), None, Some(10))]
+    #[case::single_page("per_page=100", None, Some(1), None, None)]
+    #[case::link_header_wins(
+        "page=1&per_page=100",
+        Some(r#"<https://example.com/wp-json/wp/v2/categories?page=5>; rel="next""#),
+        Some(11),
+        Some(5),
+        None
+    )]
+    #[case::wpcom_proxy_link_header(
+        "page=1&per_page=100",
+        Some(r#"<https://public-api.wordpress.com/>; rel="https://api.w.org/""#),
+        Some(11),
+        Some(2),
+        None
+    )]
+    #[case::past_last_page("page=20&per_page=100", None, Some(11), None, Some(11))]
+    #[case::page_zero("page=0&per_page=100", None, Some(11), Some(1), None)]
+    #[case::offset("offset=10&per_page=100", None, Some(11), None, None)]
+    #[case::zero_offset("offset=0&per_page=100", None, Some(11), Some(2), None)]
+    #[case::no_total_pages("page=1&per_page=100", None, None, None, None)]
+    fn test_pagination_params_falls_back_to_total_pages(
+        #[case] query: &str,
+        #[case] link: Option<&str>,
+        #[case] total_pages: Option<u32>,
+        #[case] expected_next_page: Option<u32>,
+        #[case] expected_prev_page: Option<u32>,
+    ) {
+        let response = pagination_test_response(query, link, total_pages);
+        let next: Option<crate::terms::TermListParams> =
+            response.pagination_params(PaginationHeaderKey::Next);
+        let prev: Option<crate::terms::TermListParams> =
+            response.pagination_params(PaginationHeaderKey::Prev);
+        assert_eq!(next.map(|p| p.page), expected_next_page.map(Some));
+        assert_eq!(prev.map(|p| p.page), expected_prev_page.map(Some));
+    }
+
+    #[test]
+    fn test_pagination_params_from_total_pages_keeps_request_filters() {
+        use crate::terms::{TermId, TermListParams};
+
+        let response = pagination_test_response(
+            "page=1&per_page=100&search=x&include=1%2C2%2C3",
+            None,
+            Some(11),
+        );
+        assert_eq!(
+            response.pagination_params(PaginationHeaderKey::Next),
+            Some(TermListParams {
+                page: Some(2),
+                per_page: Some(100),
+                search: Some("x".to_string()),
+                include: vec![TermId(1), TermId(2), TermId(3)],
+                ..Default::default()
+            })
         );
     }
 
