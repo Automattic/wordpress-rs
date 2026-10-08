@@ -39,7 +39,7 @@ mod tests {
     fn get_stats_archives(endpoint: StatsArchivesRequestEndpoint) {
         validate_wp_com_rest_v1_1_endpoint(
             endpoint.get_stats_archives(
-                &WpComSiteId(9288856),
+                &WpComSiteId(12345),
                 &StatsArchivesParams {
                     period: Some(StatsArchivesPeriod::Day),
                     date: Some(WpDateString::new("2026-10-08".to_string())),
@@ -48,15 +48,15 @@ mod tests {
                     ..Default::default()
                 },
             ),
-            "/sites/9288856/stats/archives?period=day&date=2026-10-08&start_date=2026-10-01&max=10&summarize=1&skip_archives=1",
+            "/sites/12345/stats/archives?period=day&date=2026-10-08&start_date=2026-10-01&max=10&summarize=1&skip_archives=1",
         );
     }
 
     #[rstest]
     fn get_stats_archives_with_default_params(endpoint: StatsArchivesRequestEndpoint) {
         validate_wp_com_rest_v1_1_endpoint(
-            endpoint.get_stats_archives(&WpComSiteId(9288856), &StatsArchivesParams::default()),
-            "/sites/9288856/stats/archives?summarize=1&skip_archives=1",
+            endpoint.get_stats_archives(&WpComSiteId(12345), &StatsArchivesParams::default()),
+            "/sites/12345/stats/archives?summarize=1&skip_archives=1",
         );
     }
 
