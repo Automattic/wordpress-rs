@@ -19,6 +19,7 @@ pub mod segments;
 pub mod shopping_cart;
 pub mod site_plans;
 pub mod sites;
+pub mod stats_archives;
 pub mod stats_city_views;
 pub mod stats_clicks;
 pub mod stats_country_views;

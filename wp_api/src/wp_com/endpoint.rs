@@ -21,6 +21,7 @@ pub mod segments_endpoint;
 pub mod shopping_cart_endpoint;
 pub mod site_plans_endpoint;
 pub mod sites_endpoint;
+pub mod stats_archives_endpoint;
 pub mod stats_city_views_endpoint;
 pub mod stats_clicks_endpoint;
 pub mod stats_country_views_endpoint;
