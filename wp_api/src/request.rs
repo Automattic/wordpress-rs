@@ -17,6 +17,7 @@ use http::{HeaderMap, HeaderName, HeaderValue};
 use regex::Regex;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fmt::Debug,
     str::{FromStr, Utf8Error},
@@ -634,6 +635,44 @@ impl WpNetworkResponse {
             })
     }
 
+    /// Returns the `rel="next"`/`rel="prev"` page from the `Link` header, falling back to
+    /// [`Self::pagination_params_from_total_pages`] when the header is missing.
+    fn pagination_params<P: FromUrlQueryPairs>(
+        &self,
+        header_key: PaginationHeaderKey,
+    ) -> Option<P> {
+        self.get_pagination_header(header_key)
+            .or_else(|| self.pagination_params_from_total_pages(header_key))
+    }
+
+    /// Builds pagination params from the request's own query when the response has no `Link`
+    /// rel="next"/"prev" header. The WP.com REST proxy drops that header for Atomic and Jetpack
+    /// sites but keeps `X-WP-TotalPages`.
+    fn pagination_params_from_total_pages<P: FromUrlQueryPairs>(
+        &self,
+        header_key: PaginationHeaderKey,
+    ) -> Option<P> {
+        let total_pages = self.response_header_map.wp_total_pages()?;
+        let url = Url::parse(&self.request_url.0).ok()?;
+        let mut query_pairs: HashMap<Cow<str>, Cow<str>> = url.query_pairs().collect();
+        // `offset` overrides `page` in WP_Query, so page arithmetic would be wrong.
+        if query_pairs.contains_key("offset") {
+            return None;
+        }
+        let current_page: u32 = query_pairs
+            .get("page")
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(1);
+        let target_page = match header_key {
+            PaginationHeaderKey::Next => {
+                (current_page < total_pages).then_some(current_page + 1)?
+            }
+            PaginationHeaderKey::Prev => (current_page > 1).then_some(current_page - 1)?,
+        };
+        query_pairs.insert("page".into(), target_page.to_string().into());
+        P::from_url_query_pairs(UrlQueryPairsMap::new(query_pairs))
+    }
+
     pub fn body_as_string(&self) -> String {
         request_or_response_body_as_string(&self.body)
     }
@@ -665,9 +704,9 @@ impl WpNetworkResponse {
                 let mut parsed_response = ParsedResponse::<DataType, ParamsType>::from(x);
                 if ParamsType::supports_pagination() {
                     parsed_response.next_page_params =
-                        self.get_pagination_header(PaginationHeaderKey::Next);
+                        self.pagination_params(PaginationHeaderKey::Next);
                     parsed_response.prev_page_params =
-                        self.get_pagination_header(PaginationHeaderKey::Prev);
+                        self.pagination_params(PaginationHeaderKey::Prev);
                 }
                 parsed_response.header_map = self.response_header_map;
                 ResponseType::from(parsed_response)
@@ -1246,6 +1285,85 @@ mod tests {
             response.get_link_header("next").first(),
             "response headers: {:?}",
             response.response_header_map.inner
+        );
+    }
+
+    fn pagination_test_response(
+        query: &str,
+        link: Option<&str>,
+        total_pages: Option<u32>,
+    ) -> WpNetworkResponse {
+        let mut header_map = WpNetworkHeaderMap::default();
+        if let Some(link) = link {
+            header_map.insert(http::header::LINK, link.to_string());
+        }
+        if let Some(total_pages) = total_pages {
+            header_map.insert(
+                HeaderName::from_bytes(HEADER_KEY_WP_TOTAL_PAGES.as_bytes()).unwrap(),
+                total_pages.to_string(),
+            );
+        }
+        WpNetworkResponse {
+            body: Vec::with_capacity(0),
+            status_code: 200,
+            response_header_map: Arc::new(header_map),
+            request_url: WpEndpointUrl(format!(
+                "https://public-api.wordpress.com/wp/v2/sites/1/categories?{query}"
+            )),
+            request_method: RequestMethod::GET,
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+        }
+    }
+
+    #[rstest]
+    #[case::first_page("page=1&per_page=100", None, Some(11), Some(2), None)]
+    #[case::no_page_param("per_page=100", None, Some(11), Some(2), None)]
+    #[case::middle_page("page=5&per_page=100", None, Some(11), Some(6), Some(4))]
+    #[case::last_page("page=11&per_page=100", None, Some(11), None, Some(10))]
+    #[case::single_page("per_page=100", None, Some(1), None, None)]
+    #[case::link_header_wins(
+        "page=1&per_page=100",
+        Some(r#"<https://example.com/wp-json/wp/v2/categories?page=5>; rel="next""#),
+        Some(11),
+        Some(5),
+        None
+    )]
+    #[case::offset("offset=10&per_page=100", None, Some(11), None, None)]
+    #[case::no_total_pages("page=1&per_page=100", None, None, None, None)]
+    fn test_pagination_params_falls_back_to_total_pages(
+        #[case] query: &str,
+        #[case] link: Option<&str>,
+        #[case] total_pages: Option<u32>,
+        #[case] expected_next_page: Option<u32>,
+        #[case] expected_prev_page: Option<u32>,
+    ) {
+        let response = pagination_test_response(query, link, total_pages);
+        let next: Option<crate::terms::TermListParams> =
+            response.pagination_params(PaginationHeaderKey::Next);
+        let prev: Option<crate::terms::TermListParams> =
+            response.pagination_params(PaginationHeaderKey::Prev);
+        assert_eq!(next.map(|p| p.page), expected_next_page.map(Some));
+        assert_eq!(prev.map(|p| p.page), expected_prev_page.map(Some));
+    }
+
+    #[test]
+    fn test_pagination_params_from_total_pages_keeps_request_filters() {
+        use crate::terms::{TermId, TermListParams};
+
+        let response = pagination_test_response(
+            "page=1&per_page=100&search=x&include=1%2C2%2C3",
+            None,
+            Some(11),
+        );
+        assert_eq!(
+            response.pagination_params(PaginationHeaderKey::Next),
+            Some(TermListParams {
+                page: Some(2),
+                per_page: Some(100),
+                search: Some("x".to_string()),
+                include: vec![TermId(1), TermId(2), TermId(3)],
+                ..Default::default()
+            })
         );
     }
 
