@@ -17,7 +17,6 @@ use http::{HeaderMap, HeaderName, HeaderValue};
 use regex::Regex;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{
-    borrow::Cow,
     collections::HashMap,
     fmt::Debug,
     str::{FromStr, Utf8Error},
@@ -655,12 +654,11 @@ impl WpNetworkResponse {
     ) -> Option<P> {
         let total_pages = self.response_header_map.wp_total_pages()?;
         let url = Url::parse(&self.request_url.0).ok()?;
-        let mut query_pairs: HashMap<Cow<str>, Cow<str>> = url.query_pairs().collect();
+        let mut query_pairs: HashMap<_, _> = url.query_pairs().collect();
         // A non-zero `offset` overrides `page` in WP_Query, so page arithmetic would be wrong.
         if query_pairs
             .get("offset")
-            .and_then(|o| o.parse::<u32>().ok())
-            .is_some_and(|o| o > 0)
+            .is_some_and(|o| o.parse::<u32>().is_ok_and(|o| o > 0))
         {
             return None;
         }
@@ -669,15 +667,12 @@ impl WpNetworkResponse {
             .and_then(|p| p.parse().ok())
             .unwrap_or(1);
         let target_page = match header_key {
-            PaginationHeaderKey::Next => {
-                (current_page < total_pages).then_some(current_page.saturating_add(1))?
-            }
+            PaginationHeaderKey::Next => current_page.checked_add(1).filter(|&p| p <= total_pages),
+            // Like core's `Link` header, clamp `prev` to the last page.
             PaginationHeaderKey::Prev => {
-                // Like core's `Link` header, clamp `prev` to the last page.
-                let prev_page = current_page.saturating_sub(1).min(total_pages);
-                (prev_page > 0).then_some(prev_page)?
+                Some(current_page.saturating_sub(1).min(total_pages)).filter(|&p| p > 0)
             }
-        };
+        }?;
         query_pairs.insert("page".into(), target_page.to_string().into());
         P::from_url_query_pairs(UrlQueryPairsMap::new(query_pairs))
     }
@@ -1302,20 +1297,16 @@ mod tests {
         link: Option<&str>,
         total_pages: Option<u32>,
     ) -> WpNetworkResponse {
-        let mut header_map = WpNetworkHeaderMap::default();
-        if let Some(link) = link {
-            header_map.insert(http::header::LINK, link.to_string());
-        }
-        if let Some(total_pages) = total_pages {
-            header_map.insert(
-                HeaderName::from_bytes(HEADER_KEY_WP_TOTAL_PAGES.as_bytes()).unwrap(),
-                total_pages.to_string(),
-            );
-        }
+        let headers = [
+            link.map(|l| ("Link".to_string(), l.to_string())),
+            total_pages.map(|t| (HEADER_KEY_WP_TOTAL_PAGES.to_string(), t.to_string())),
+        ];
         WpNetworkResponse {
             body: Vec::with_capacity(0),
             status_code: 200,
-            response_header_map: Arc::new(header_map),
+            response_header_map: Arc::new(
+                WpNetworkHeaderMap::from_map(headers.into_iter().flatten().collect()).unwrap(),
+            ),
             request_url: WpEndpointUrl(format!(
                 "https://public-api.wordpress.com/wp/v2/sites/1/categories?{query}"
             )),
