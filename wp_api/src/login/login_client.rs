@@ -442,8 +442,6 @@ impl WpLoginClient {
     ) -> Result<(), VerifyIssuedApplicationPasswordError> {
         let is_same_origin = ParsedUrl::parse(&credentials.site_url)
             .is_ok_and(|site_url| site_url.inner.origin() == api_root_url.inner.origin());
-        let to_error =
-            |error: WpApiError| VerifyIssuedApplicationPasswordError::new(error, is_same_origin);
         let request = ApplicationPasswordsRequestBuilder::new(
             Arc::new(WpOrgSiteApiUrlResolver::new(api_root_url)),
             Arc::new(WpAuthenticationProvider::static_with_username_and_password(
@@ -456,14 +454,22 @@ impl WpLoginClient {
         let response = self
             .perform(request.into(), context)
             .await
-            .map_err(|error| to_error(error.into()))?;
+            .map_err(WpApiError::from)?;
         // Parse the body rather than only checking for an error response: a proxy that answers
         // 200 with an HTML page has not confirmed the password.
         let parsed: Result<
             ApplicationPasswordsRequestRetrieveCurrentWithEditContextResponse,
             WpApiError,
         > = response.parse();
-        parsed.map_err(to_error)?;
+        // Across origins, a redirect may have dropped the header on the client, so the
+        // response says nothing about the site's server.
+        parsed.map_err(|error| {
+            if is_same_origin {
+                error.into()
+            } else {
+                VerifyIssuedApplicationPasswordError::Other { error }
+            }
+        })?;
         Ok(())
     }
 
@@ -607,11 +613,8 @@ pub enum VerifyIssuedApplicationPasswordError {
     Other { error: WpApiError },
 }
 
-impl VerifyIssuedApplicationPasswordError {
-    /// `is_same_origin` is whether the request went to the origin WordPress returned as the
-    /// site's own. Without it, the header may have been dropped by a redirect on the client
-    /// rather than by the site's server.
-    fn new(error: WpApiError, is_same_origin: bool) -> Self {
+impl From<WpApiError> for VerifyIssuedApplicationPasswordError {
+    fn from(error: WpApiError) -> Self {
         // Only a WordPress error proves the request reached WordPress. A non-WordPress 401 or
         // 403 may come from a rule that denies only application-password routes, while the
         // rest of the sign-in still works, so it is not treated as a blocked header.
@@ -621,7 +624,7 @@ impl VerifyIssuedApplicationPasswordError {
                 status_code: 401,
                 request_url,
                 ..
-            } if is_same_origin => Self::AuthorizationHeaderBlocked {
+            } => Self::AuthorizationHeaderBlocked {
                 hostname: RequestExecutionErrorReason::hostname_of(request_url),
                 error,
             },
