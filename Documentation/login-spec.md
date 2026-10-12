@@ -334,7 +334,8 @@ Behavior:
 1. The system MUST send the request above immediately after it receives the password, before it uses the password for anything else.
 2. The system MUST classify only a `401 rest_not_logged_in` response as a blocked Authorization header. All other failures, including `401` or `403` responses that are not WordPress errors, MUST NOT be classified as a blocked header.
 3. The system MUST NOT use this classification for stored credentials, because some hosts answer a revoked or wrong password with the same response.
-4. The system MUST reject the login attempt.
-5. The system MUST display the error: "Your server is blocking sign-in with application passwords. Contact your hosting provider for help."
+4. The system MUST NOT classify the response as a blocked header when the API root and the `site_url` returned in the callback URL have different origins. A redirect between the two makes the HTTP client drop the `Authorization` header, and WordPress answers that request with the same response.
+5. The system MUST reject the login attempt.
+6. The system MUST display the error: "Your server is blocking sign-in with application passwords. Contact your hosting provider for help."
 
 Reference Implementation: None. Tests stub the introspection response.
