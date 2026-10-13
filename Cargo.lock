@@ -5707,6 +5707,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "wp_mobile_local_content"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "thiserror 2.0.21",
+ "uniffi",
+ "wp_mobile_sqlite",
+]
+
+[[package]]
 name = "wp_mobile_sqlite"
 version = "0.1.0"
 dependencies = [
