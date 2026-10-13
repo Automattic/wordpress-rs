@@ -46,6 +46,9 @@ impl_as_query_value_from_to_string!(StatsArchivesPeriod);
 #[derive(Debug, PartialEq, Eq, uniffi::Record)]
 pub struct StatsArchivesParams {
     /// The time period for grouping stats.
+    ///
+    /// Only [`StatsArchivesPeriod::Day`] can be combined with summarized output; see
+    /// [`Self::summarize`].
     #[uniffi(default = None)]
     pub period: Option<StatsArchivesPeriod>,
     /// The date to query stats for (format: YYYY-MM-DD).
@@ -54,7 +57,13 @@ pub struct StatsArchivesParams {
     /// The start date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
     pub start_date: Option<WpDateString>,
-    /// The maximum number of entries to return for each archive type.
+    /// The maximum number of results to return. Use 0 for unlimited.
+    ///
+    /// What it caps depends on [`Self::period`], and is not the number of entries per archive
+    /// type either way. With `day` the server applies it as a SQL `LIMIT` over the rows ordered
+    /// by views, making it the top N entries across *all* archive types combined. With any
+    /// other period it instead caps how many archive-type groups each period carries. Omitting
+    /// it leaves the server's default of 10.
     #[uniffi(default = None)]
     pub max: Option<u32>,
     /// The number of periods to include in the response.
@@ -64,13 +73,24 @@ pub struct StatsArchivesParams {
     ///
     /// - `true` (default): Response contains `summary` field with aggregated data
     /// - `false`: Response contains `days` field with per-day breakdown
+    ///
+    /// Only works with [`StatsArchivesPeriod::Day`]. For any other period the server collects
+    /// the summarized rows under a placeholder date key, then bucketing them by period maps
+    /// that placeholder outside every bucket and drops them, leaving
+    /// [`StatsArchivesResponse::summary`] `null` with no data and no error. To summarize a
+    /// week, month or year, request `summarize = false` and aggregate
+    /// [`StatsArchivesResponse::days`] instead.
     #[uniffi(default = true)]
     pub summarize: bool,
-    /// Whether to skip archive pages (date-based archives, category archives, etc.) when
-    /// attributing views to posts.
+    /// Whether to drop the home page from the results.
     ///
-    /// - `true` (default): Archive pages are excluded from results
-    /// - `false`: Archive pages are included in results
+    /// - `true` (default): the `home` group is excluded
+    /// - `false`: the `home` group is included
+    ///
+    /// Despite the name, this does not skip archive pages in general — this endpoint reports
+    /// nothing but archive pages, so that would empty the response. The server folds it into
+    /// its own `migrate_archive_homepage` parameter, whose only effect is to remove the `home`
+    /// group, and marks `skip_archives` as to-be-removed in favour of that one.
     #[uniffi(default = true)]
     pub skip_archives: bool,
 }
