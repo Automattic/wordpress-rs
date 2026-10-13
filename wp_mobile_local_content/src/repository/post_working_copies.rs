@@ -1,4 +1,4 @@
-use rusqlite::{Connection, OptionalExtension, Row};
+use rusqlite::{OptionalExtension, Row};
 use wp_mobile_sqlite::RowExt;
 
 use crate::{
@@ -6,6 +6,7 @@ use crate::{
     db_types::post_working_copy::{
         DbPostWorkingCopy, PostWorkingCopy, PostWorkingCopyColumn, PostWorkingCopyId,
     },
+    repository::QueryExecutor,
 };
 
 const TABLE_NAME: &str = "post_working_copies";
@@ -17,13 +18,13 @@ impl PostWorkingCopyRepository {
     /// Insert a new working copy and return its ID.
     pub fn insert(
         &self,
-        conn: &Connection,
+        executor: &impl QueryExecutor,
         working_copy: &PostWorkingCopy,
     ) -> Result<PostWorkingCopyId, LocalContentError> {
         let sql =
             format!("INSERT INTO {TABLE_NAME} (title, content) VALUES (?, ?) RETURNING rowid");
-        let id = conn.query_row(
-            &sql,
+        let mut stmt = executor.prepare(&sql)?;
+        let id = stmt.query_row(
             rusqlite::params![working_copy.title, working_copy.content],
             |row| row.get(0),
         )?;
@@ -35,7 +36,7 @@ impl PostWorkingCopyRepository {
     /// Returns `false` if no working copy has the given ID.
     pub fn update(
         &self,
-        conn: &Connection,
+        executor: &impl QueryExecutor,
         id: PostWorkingCopyId,
         working_copy: &PostWorkingCopy,
     ) -> Result<bool, LocalContentError> {
@@ -46,7 +47,7 @@ impl PostWorkingCopyRepository {
              updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
              WHERE rowid = ?"
         );
-        let updated = conn.execute(
+        let updated = executor.execute(
             &sql,
             rusqlite::params![working_copy.title, working_copy.content, id],
         )?;
@@ -58,11 +59,12 @@ impl PostWorkingCopyRepository {
     /// Returns `Ok(None)` if no working copy has the given ID.
     pub fn select_by_id(
         &self,
-        conn: &Connection,
+        executor: &impl QueryExecutor,
         id: PostWorkingCopyId,
     ) -> Result<Option<DbPostWorkingCopy>, LocalContentError> {
         let sql = format!("SELECT * FROM {TABLE_NAME} WHERE rowid = ?");
-        let db_working_copy = conn.query_row(&sql, [id], from_row).optional()?;
+        let mut stmt = executor.prepare(&sql)?;
+        let db_working_copy = stmt.query_row([id], from_row).optional()?;
         Ok(db_working_copy)
     }
 }
@@ -85,6 +87,7 @@ fn from_row(row: &Row) -> rusqlite::Result<DbPostWorkingCopy> {
 mod tests {
     use super::*;
     use crate::MIGRATIONS;
+    use rusqlite::Connection;
     use wp_mobile_sqlite::{ColumnIndex, MigrationManager};
 
     fn migrated_connection() -> Connection {
