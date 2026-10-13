@@ -32,6 +32,7 @@ wp_api = { path = "../wp_api" }
 wp_localization = { path = "../wp_localization" }
 wp_localization_macro = { path = "../wp_localization_macro" }
 wp_mobile_cache = { path = "../wp_mobile_cache" }
+wp_mobile_local_content = { path = "../wp_mobile_local_content" }
 
 [dev-dependencies]
 async-trait = { workspace = true }
