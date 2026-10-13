@@ -2,11 +2,33 @@ import Foundation
 import Testing
 import WordPressAPI
 
-struct LocalContentTests {
-    private func openStore(path: String? = nil) throws -> WpLocalContentStore {
-        let store = try WpLocalContentStore(path: path)
+final class LocalContentTests {
+    private let directory: URL
+
+    private var databasePath: String {
+        directory.appendingPathComponent("local_content.db").path
+    }
+
+    init() throws {
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LocalContentTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    private func openStore() throws -> WpLocalContentStore {
+        let store = try WpLocalContentStore(path: databasePath)
         _ = try store.performMigrations()
         return store
+    }
+
+    @Test func openingAnInMemoryDatabaseThrows() {
+        #expect(throws: LocalContentError.self) {
+            try WpLocalContentStore(path: ":memory:")
+        }
     }
 
     @Test func createThenReadReturnsTheCreatedPostWorkingCopy() throws {
@@ -34,21 +56,18 @@ struct LocalContentTests {
     @Test func savingAnUnknownPostWorkingCopyThrows() throws {
         let service = LocalContentService(store: try openStore())
         let unknownId = "00000000-0000-4000-8000-000000000000"
+        let workingCopy = PostWorkingCopy(title: "Title", content: "content")
 
         #expect(throws: LocalContentError.self) {
-            try service.savePostWorkingCopy(id: unknownId, workingCopy: PostWorkingCopy(title: "Title", content: "content"))
+            try service.savePostWorkingCopy(id: unknownId, workingCopy: workingCopy)
         }
     }
 
     @Test func postWorkingCopySurvivesReopeningTheDatabase() throws {
-        let path = FileManager.default.temporaryDirectory
-            .appendingPathComponent("local_content-\(UUID().uuidString).db")
-            .path
-        defer { try? FileManager.default.removeItem(atPath: path) }
         let created = PostWorkingCopy(title: "Kept", content: "kept content")
 
-        let id = try LocalContentService(store: try openStore(path: path)).createPostWorkingCopy(workingCopy: created)
-        let read = try #require(try LocalContentService(store: try openStore(path: path)).readPostWorkingCopy(id: id))
+        let id = try LocalContentService(store: try openStore()).createPostWorkingCopy(workingCopy: created)
+        let read = try #require(try LocalContentService(store: try openStore()).readPostWorkingCopy(id: id))
 
         #expect(read.workingCopy == created)
     }

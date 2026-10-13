@@ -77,6 +77,9 @@ impl From<ConnectionError> for SqliteDbError {
         match err {
             ConnectionError::Sqlite(err) => err.into(),
             ConnectionError::ForeignKeysUnavailable => SqliteDbError::ForeignKeysUnavailable,
+            ConnectionError::NotAnAbsoluteFilePath(_) => {
+                SqliteDbError::SqliteError(err.to_string())
+            }
         }
     }
 }
