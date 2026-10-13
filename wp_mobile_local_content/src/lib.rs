@@ -20,6 +20,8 @@ pub enum LocalContentError {
     ForeignKeysUnavailable,
     #[error("No post working copy with id {}", id.0)]
     PostWorkingCopyNotFound { id: PostWorkingCopyId },
+    #[error("The local content database needs an absolute file path, got {path:?}")]
+    InvalidDatabasePath { path: String },
 }
 
 impl From<rusqlite::Error> for LocalContentError {
@@ -35,6 +37,9 @@ impl From<ConnectionError> for LocalContentError {
         match err {
             ConnectionError::Sqlite(err) => err.into(),
             ConnectionError::ForeignKeysUnavailable => LocalContentError::ForeignKeysUnavailable,
+            ConnectionError::NotAnAbsoluteFilePath(path) => {
+                LocalContentError::InvalidDatabasePath { path }
+            }
         }
     }
 }
@@ -47,12 +52,19 @@ pub struct WpLocalContentStore {
 
 #[uniffi::export]
 impl WpLocalContentStore {
-    /// Open the local content database at `path`, or an in-memory database when
-    /// `path` is `None`.
+    /// Open the local content database file at `path`, creating it if it doesn't exist.
+    ///
+    /// `path` must be an absolute path to a file. In-memory and temporary
+    /// databases are rejected, as are relative paths and `file:` URIs: anything
+    /// stored in them is gone when the process exits, which would break the
+    /// first local content principle, that user content is never lost. See
+    /// `Documentation/local-content-principles.md`.
+    ///
+    /// Fails with `InvalidDatabasePath` if `path` isn't absolute.
     #[uniffi::constructor]
-    pub fn new(path: Option<String>) -> Result<Self, LocalContentError> {
+    pub fn new(path: String) -> Result<Self, LocalContentError> {
         Ok(Self {
-            connection: DbConnection::open(path.as_deref())?,
+            connection: DbConnection::open_file(&path)?,
         })
     }
 
@@ -89,10 +101,30 @@ mod tests {
 
     #[test]
     fn test_migration_works() {
-        let store = WpLocalContentStore::new(None).expect("Opening the store should succeed");
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let path = dir.path().join("local_content.db");
+        let store = WpLocalContentStore::new(
+            path.to_str()
+                .expect("Temp path should be UTF-8")
+                .to_string(),
+        )
+        .expect("Opening the store should succeed");
         let migrations_run = store
             .perform_migrations()
             .expect("Migrations should succeed");
         assert_eq!(migrations_run, MIGRATIONS.len() as i64);
+    }
+
+    #[test]
+    fn test_new_rejects_an_in_memory_database() {
+        let result = WpLocalContentStore::new(":memory:".to_string());
+        assert!(
+            matches!(
+                &result,
+                Err(LocalContentError::InvalidDatabasePath { path }) if path == ":memory:"
+            ),
+            "Expected InvalidDatabasePath, got {:?}",
+            result.err()
+        );
     }
 }
