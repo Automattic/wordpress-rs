@@ -514,7 +514,8 @@ mod tests {
         assert_eq!(search[0].views, Some(4));
     }
 
-    /// The exact bodies that failed in CI before the group maps tolerated `[]`.
+    /// A site with no archive views sends `[]` in place of an empty object, in each of the three
+    /// positions a group map can appear: `summary`, a single day inside `days`, and `days` itself.
     #[rstest]
     #[case(r#"{"date":"2026-10-08","utc_offset":"+03:00","period":"day","summary":[]}"#)]
     #[case(
