@@ -40,7 +40,7 @@ impl LocalContentService {
     ) -> Result<(), LocalContentError> {
         let updated = self
             .store
-            .execute(|conn| PostWorkingCopyRepository.update(conn, id, &working_copy))?;
+            .execute(|conn| PostWorkingCopyRepository.update(conn, &id, &working_copy))?;
         if updated {
             Ok(())
         } else {
@@ -56,6 +56,6 @@ impl LocalContentService {
         id: PostWorkingCopyId,
     ) -> Result<Option<DbPostWorkingCopy>, LocalContentError> {
         self.store
-            .execute(|conn| PostWorkingCopyRepository.select_by_id(conn, id))
+            .execute(|conn| PostWorkingCopyRepository.select_by_id(conn, &id))
     }
 }

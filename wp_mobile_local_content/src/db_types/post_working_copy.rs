@@ -1,34 +1,45 @@
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
+use uuid::Uuid;
 use wp_mobile_sqlite::ColumnIndex;
 
-uniffi::custom_newtype!(PostWorkingCopyId, i64);
+uniffi::custom_newtype!(PostWorkingCopyId, String);
 
-/// Identifies a post working copy within the local content database.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PostWorkingCopyId(pub i64);
+/// Identifies a post working copy: a hyphenated, lowercase v4 UUID.
+///
+/// Unlike the table's `rowid`, it stays unique across databases.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PostWorkingCopyId(pub String);
+
+impl PostWorkingCopyId {
+    pub(crate) fn generate() -> Self {
+        Self(Uuid::new_v4().hyphenated().to_string())
+    }
+}
 
 impl ToSql for PostWorkingCopyId {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(self.0))
+        Ok(ToSqlOutput::from(self.0.as_str()))
     }
 }
 
 impl FromSql for PostWorkingCopyId {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        i64::column_result(value).map(PostWorkingCopyId)
+        String::column_result(value).map(PostWorkingCopyId)
     }
 }
 
 /// Column indexes for post_working_copies table.
 /// These must match the order of columns in the CREATE TABLE statement.
+///
+/// `rowid` (index 0) is internal to the database and never read.
 #[repr(usize)]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PostWorkingCopyColumn {
-    Rowid = 0,
-    Title = 1,
-    Content = 2,
-    CreatedAt = 3,
-    UpdatedAt = 4,
+    Uuid = 1,
+    Title = 2,
+    Content = 3,
+    CreatedAt = 4,
+    UpdatedAt = 5,
 }
 
 impl ColumnIndex for PostWorkingCopyColumn {

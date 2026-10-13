@@ -42,9 +42,10 @@ class LocalContentTest {
     @Test
     fun `saving an unknown post working copy throws`() {
         val service = LocalContentService(openStore())
+        val unknownId = "00000000-0000-4000-8000-000000000000"
 
         assertThrows<LocalContentException.PostWorkingCopyNotFound> {
-            service.savePostWorkingCopy(42L, PostWorkingCopy(title = "Title", content = "content"))
+            service.savePostWorkingCopy(unknownId, PostWorkingCopy(title = "Title", content = "content"))
         }
     }
 
