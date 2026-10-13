@@ -14,8 +14,8 @@ pub mod repository;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum LocalContentError {
-    #[error("SQLite error: {message}")]
-    Sqlite { message: String },
+    #[error("SQLite error: {err_message}")]
+    Sqlite { err_message: String },
     #[error("Foreign key enforcement could not be enabled on the connection")]
     ForeignKeysUnavailable,
     #[error("No post working copy with id {}", id.0)]
@@ -25,7 +25,7 @@ pub enum LocalContentError {
 impl From<rusqlite::Error> for LocalContentError {
     fn from(err: rusqlite::Error) -> Self {
         LocalContentError::Sqlite {
-            message: err.to_string(),
+            err_message: err.to_string(),
         }
     }
 }
