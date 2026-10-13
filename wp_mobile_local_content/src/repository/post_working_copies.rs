@@ -15,18 +15,17 @@ const TABLE_NAME: &str = "post_working_copies";
 pub struct PostWorkingCopyRepository;
 
 impl PostWorkingCopyRepository {
-    /// Insert a new working copy and return its ID.
+    /// Insert a new working copy under a newly generated ID and return that ID.
     pub fn insert(
         &self,
         executor: &impl QueryExecutor,
         working_copy: &PostWorkingCopy,
     ) -> Result<PostWorkingCopyId, LocalContentError> {
-        let sql =
-            format!("INSERT INTO {TABLE_NAME} (title, content) VALUES (?, ?) RETURNING rowid");
-        let mut stmt = executor.prepare(&sql)?;
-        let id = stmt.query_row(
-            rusqlite::params![working_copy.title, working_copy.content],
-            |row| row.get(0),
+        let id = PostWorkingCopyId::generate();
+        let sql = format!("INSERT INTO {TABLE_NAME} (uuid, title, content) VALUES (?, ?, ?)");
+        executor.execute(
+            &sql,
+            rusqlite::params![id, working_copy.title, working_copy.content],
         )?;
         Ok(id)
     }
@@ -37,7 +36,7 @@ impl PostWorkingCopyRepository {
     pub fn update(
         &self,
         executor: &impl QueryExecutor,
-        id: PostWorkingCopyId,
+        id: &PostWorkingCopyId,
         working_copy: &PostWorkingCopy,
     ) -> Result<bool, LocalContentError> {
         let sql = format!(
@@ -45,7 +44,7 @@ impl PostWorkingCopyRepository {
              title = ?,
              content = ?,
              updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-             WHERE rowid = ?"
+             WHERE uuid = ?"
         );
         let updated = executor.execute(
             &sql,
@@ -60,9 +59,9 @@ impl PostWorkingCopyRepository {
     pub fn select_by_id(
         &self,
         executor: &impl QueryExecutor,
-        id: PostWorkingCopyId,
+        id: &PostWorkingCopyId,
     ) -> Result<Option<DbPostWorkingCopy>, LocalContentError> {
-        let sql = format!("SELECT * FROM {TABLE_NAME} WHERE rowid = ?");
+        let sql = format!("SELECT * FROM {TABLE_NAME} WHERE uuid = ?");
         let mut stmt = executor.prepare(&sql)?;
         let db_working_copy = stmt.query_row([id], from_row).optional()?;
         Ok(db_working_copy)
@@ -73,7 +72,7 @@ fn from_row(row: &Row) -> rusqlite::Result<DbPostWorkingCopy> {
     use PostWorkingCopyColumn::*;
 
     Ok(DbPostWorkingCopy {
-        id: row.get_column(Rowid)?,
+        id: row.get_column(Uuid)?,
         working_copy: PostWorkingCopy {
             title: row.get_column(Title)?,
             content: row.get_column(Content)?,
@@ -89,6 +88,9 @@ mod tests {
     use crate::MIGRATIONS;
     use rusqlite::Connection;
     use wp_mobile_sqlite::{ColumnIndex, MigrationManager};
+
+    /// A well-formed v4 UUID that no test inserts.
+    const UNKNOWN_ID: &str = "00000000-0000-4000-8000-000000000000";
 
     fn migrated_connection() -> Connection {
         let conn = Connection::open_in_memory().expect("Failed to open in-memory database");
@@ -120,12 +122,43 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .expect("Failed to collect column names");
 
-        assert_eq!(columns[Rowid.as_index()], "rowid");
+        assert_eq!(columns[0], "rowid");
+        assert_eq!(columns[Uuid.as_index()], "uuid");
         assert_eq!(columns[Title.as_index()], "title");
         assert_eq!(columns[Content.as_index()], "content");
         assert_eq!(columns[CreatedAt.as_index()], "created_at");
         assert_eq!(columns[UpdatedAt.as_index()], "updated_at");
-        assert_eq!(columns.len(), 5, "Expected 5 columns in {TABLE_NAME} table");
+        assert_eq!(columns.len(), 6, "Expected 6 columns in {TABLE_NAME} table");
+    }
+
+    #[test]
+    fn test_insert_assigns_a_distinct_v4_uuid() {
+        let conn = migrated_connection();
+        let repo = PostWorkingCopyRepository;
+
+        let first = repo
+            .insert(&conn, &working_copy("First", "first"))
+            .expect("Insert should succeed");
+        let second = repo
+            .insert(&conn, &working_copy("Second", "second"))
+            .expect("Insert should succeed");
+
+        assert_ne!(first, second);
+        for id in [&first, &second] {
+            let parsed = uuid::Uuid::parse_str(&id.0)
+                .unwrap_or_else(|e| panic!("{:?} should be a UUID: {e}", id.0));
+            assert_eq!(
+                parsed.get_version_num(),
+                4,
+                "{:?} should be a v4 UUID",
+                id.0
+            );
+            assert_eq!(
+                parsed.hyphenated().to_string(),
+                id.0,
+                "IDs should be stored hyphenated and lowercase"
+            );
+        }
     }
 
     #[test]
@@ -139,7 +172,7 @@ mod tests {
 
         let id = repo.insert(&conn, &saved).expect("Insert should succeed");
         let selected = repo
-            .select_by_id(&conn, id)
+            .select_by_id(&conn, &id)
             .expect("Select should succeed")
             .expect("Inserted working copy should exist");
 
@@ -156,16 +189,16 @@ mod tests {
             .insert(&conn, &working_copy("First", "first content"))
             .expect("Insert should succeed");
         let before = repo
-            .select_by_id(&conn, id)
+            .select_by_id(&conn, &id)
             .expect("Select should succeed")
             .expect("Inserted working copy should exist");
 
         let edited = working_copy("Second", "second content");
         let updated = repo
-            .update(&conn, id, &edited)
+            .update(&conn, &id, &edited)
             .expect("Update should succeed");
         let after = repo
-            .select_by_id(&conn, id)
+            .select_by_id(&conn, &id)
             .expect("Select should succeed")
             .expect("Updated working copy should exist");
 
@@ -186,7 +219,7 @@ mod tests {
         let updated = PostWorkingCopyRepository
             .update(
                 &conn,
-                PostWorkingCopyId(42),
+                &PostWorkingCopyId(UNKNOWN_ID.to_string()),
                 &working_copy("Title", "content"),
             )
             .expect("Update should succeed");
@@ -197,7 +230,7 @@ mod tests {
     fn test_select_returns_none_for_unknown_id() {
         let conn = migrated_connection();
         let selected = PostWorkingCopyRepository
-            .select_by_id(&conn, PostWorkingCopyId(42))
+            .select_by_id(&conn, &PostWorkingCopyId(UNKNOWN_ID.to_string()))
             .expect("Select should succeed");
         assert_eq!(selected, None);
     }
