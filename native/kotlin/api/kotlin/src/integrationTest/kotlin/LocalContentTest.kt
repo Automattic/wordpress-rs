@@ -1,18 +1,32 @@
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.io.TempDir
 import uniffi.wp_mobile.LocalContentService
 import uniffi.wp_mobile_local_content.LocalContentException
 import uniffi.wp_mobile_local_content.PostWorkingCopy
 import uniffi.wp_mobile_local_content.WpLocalContentStore
-import kotlin.io.path.createTempDirectory
+import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class LocalContentTest {
-    private fun openStore(path: String? = null): WpLocalContentStore {
-        val store = WpLocalContentStore(path)
+    @TempDir
+    lateinit var tempDir: Path
+
+    private val databasePath: String
+        get() = tempDir.resolve("local_content.db").toString()
+
+    private fun openStore(): WpLocalContentStore {
+        val store = WpLocalContentStore(databasePath)
         store.performMigrations()
         return store
+    }
+
+    @Test
+    fun `opening an in-memory database throws`() {
+        assertThrows<LocalContentException.InvalidDatabasePath> {
+            WpLocalContentStore(":memory:")
+        }
     }
 
     @Test
@@ -51,11 +65,10 @@ class LocalContentTest {
 
     @Test
     fun `post working copy survives reopening the database`() {
-        val path = createTempDirectory().resolve("local_content.db").toString()
         val created = PostWorkingCopy(title = "Kept", content = "kept content")
 
-        val id = LocalContentService(openStore(path)).createPostWorkingCopy(created)
-        val read = assertNotNull(LocalContentService(openStore(path)).readPostWorkingCopy(id))
+        val id = LocalContentService(openStore()).createPostWorkingCopy(created)
+        val read = assertNotNull(LocalContentService(openStore()).readPostWorkingCopy(id))
 
         assertEquals(created, read.workingCopy)
     }

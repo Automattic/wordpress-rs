@@ -5714,6 +5714,7 @@ name = "wp_mobile_local_content"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+ "tempfile",
  "thiserror 2.0.21",
  "uniffi",
  "uuid",
