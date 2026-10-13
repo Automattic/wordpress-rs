@@ -1,0 +1,14 @@
+[package]
+name = "wp_mobile_local_content"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rusqlite = { workspace = true }
+thiserror = { workspace = true }
+uniffi = { workspace = true }
+wp_mobile_sqlite = { path = "../wp_mobile_sqlite" }
+
+# Apple builds use system SQLite and must not enable modern_sqlite APIs.
+[target.'cfg(not(target_vendor = "apple"))'.dependencies]
+rusqlite = { workspace = true, features = ["bundled"] }
