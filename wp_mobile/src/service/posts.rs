@@ -1088,11 +1088,12 @@ mod tests {
     use rusqlite::Connection;
     use wp_api::{posts::PostId, prelude::*, request::endpoint::posts_endpoint::PostEndpointType};
     use wp_mobile_cache::{
-        HookAction, MigrationManager, UpdateHook, WpApiCache,
+        HookAction, MIGRATIONS, UpdateHook, WpApiCache,
         db_types::self_hosted_site::SelfHostedSite,
         repository::{posts::PostRepository, sites::SiteRepository},
         test_fixtures::posts::PostBuilder,
     };
+    use wp_mobile_sqlite::MigrationManager;
 
     #[rstest]
     fn test_get_entity_load_data_returns_cached_post(post_service_ctx: PostServiceTestContext) {
@@ -1550,7 +1551,8 @@ mod tests {
         ));
 
         let mut conn = Connection::open_in_memory().expect("Create in-memory database");
-        let mut migration_manager = MigrationManager::new(&conn).expect("Create migration manager");
+        let mut migration_manager =
+            MigrationManager::new(&conn, &MIGRATIONS).expect("Create migration manager");
         migration_manager
             .perform_migrations()
             .expect("Migrations succeed");
@@ -1625,7 +1627,7 @@ mod tests {
         // Setup: Create in-memory database with migrations
         let mut conn = Connection::open_in_memory().expect("Failed to create in-memory database");
         let mut migration_manager =
-            MigrationManager::new(&conn).expect("Failed to create migration manager");
+            MigrationManager::new(&conn, &MIGRATIONS).expect("Failed to create migration manager");
         migration_manager
             .perform_migrations()
             .expect("Migrations should succeed");
