@@ -5667,6 +5667,7 @@ dependencies = [
  "wp_localization",
  "wp_localization_macro",
  "wp_mobile_cache",
+ "wp_mobile_local_content",
  "wp_mobile_sqlite",
  "zeroize",
 ]
@@ -5698,12 +5699,14 @@ dependencies = [
  "reqwest",
  "rstest",
  "serial_test",
+ "tempfile",
  "tokio",
  "url",
  "wp_api",
  "wp_api_integration_tests",
  "wp_mobile",
  "wp_mobile_cache",
+ "wp_mobile_local_content",
 ]
 
 [[package]]
