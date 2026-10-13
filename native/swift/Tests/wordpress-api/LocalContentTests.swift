@@ -33,9 +33,10 @@ struct LocalContentTests {
 
     @Test func savingAnUnknownPostWorkingCopyThrows() throws {
         let service = LocalContentService(store: try openStore())
+        let unknownId = "00000000-0000-4000-8000-000000000000"
 
         #expect(throws: LocalContentError.self) {
-            try service.savePostWorkingCopy(id: 42, workingCopy: PostWorkingCopy(title: "Title", content: "content"))
+            try service.savePostWorkingCopy(id: unknownId, workingCopy: PostWorkingCopy(title: "Title", content: "content"))
         }
     }
 

@@ -29,7 +29,7 @@ fn test_create_then_read_post_working_copy() {
         .create_post_working_copy(created.clone())
         .expect("Create should succeed");
     let read = service
-        .read_post_working_copy(id)
+        .read_post_working_copy(id.clone())
         .expect("Read should succeed")
         .expect("Created working copy should exist");
 
@@ -46,7 +46,7 @@ fn test_save_then_read_post_working_copy() {
 
     let saved = working_copy("Second", "second");
     service
-        .save_post_working_copy(id, saved.clone())
+        .save_post_working_copy(id.clone(), saved.clone())
         .expect("Save should succeed");
     let read = service
         .read_post_working_copy(id)
@@ -59,9 +59,9 @@ fn test_save_then_read_post_working_copy() {
 #[test]
 fn test_save_unknown_post_working_copy_fails() {
     let service = LocalContentService::new(open_store(None));
-    let id = PostWorkingCopyId(42);
+    let id = PostWorkingCopyId("00000000-0000-4000-8000-000000000000".to_string());
 
-    let result = service.save_post_working_copy(id, working_copy("Title", "content"));
+    let result = service.save_post_working_copy(id.clone(), working_copy("Title", "content"));
 
     assert_eq!(
         result,
