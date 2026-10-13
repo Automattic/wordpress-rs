@@ -1,4 +1,5 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, OpenFlags};
+use std::path::Path;
 use std::sync::Mutex;
 
 use crate::functions::register_url_functions;
@@ -9,6 +10,8 @@ pub enum ConnectionError {
     Sqlite(#[from] rusqlite::Error),
     #[error("Foreign key enforcement could not be enabled on the connection")]
     ForeignKeysUnavailable,
+    #[error("Expected an absolute file path, got {0:?}")]
+    NotAnAbsoluteFilePath(String),
 }
 
 /// A SQLite connection guarded by a mutex.
@@ -27,6 +30,24 @@ impl DbConnection {
             None => Connection::open_in_memory()?,
         };
         Self::try_from(connection)
+    }
+
+    /// Open the database file at `path`, creating it if it doesn't exist.
+    ///
+    /// Unlike [`DbConnection::open`], this only ever opens a file on disk:
+    /// - `path` must be absolute, so `":memory:"`, the empty string (SQLite's
+    ///   temporary database) and paths relative to the process's working
+    ///   directory are rejected.
+    /// - URI filenames are not interpreted, so a `file:` URI or a `?mode=memory`
+    ///   query can't select an in-memory database.
+    pub fn open_file(path: &str) -> Result<Self, ConnectionError> {
+        if !Path::new(path).is_absolute() {
+            return Err(ConnectionError::NotAnAbsoluteFilePath(path.to_string()));
+        }
+        let flags = OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_CREATE
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+        Self::try_from(Connection::open_with_flags(path, flags)?)
     }
 
     /// Execute a database operation with scoped access to the connection.
@@ -154,6 +175,46 @@ pub(crate) mod tests {
             db.execute(|conn| foreign_keys_enabled(conn)),
             "DbConnection::try_from must enable foreign key enforcement rather than \
              inherit whatever the incoming connection had"
+        );
+    }
+
+    #[test]
+    fn test_open_file_rejects_paths_that_are_not_absolute_files() {
+        for path in [":memory:", "", "relative.db", "file:local.db?mode=memory"] {
+            let result = DbConnection::open_file(path);
+            assert!(
+                matches!(&result, Err(ConnectionError::NotAnAbsoluteFilePath(p)) if p == path),
+                "{path:?} should be rejected, got {:?}",
+                result.err()
+            );
+        }
+    }
+
+    #[test]
+    fn test_open_file_treats_uri_syntax_as_a_literal_file_name() {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let path = dir.path().join("local.db?mode=memory");
+        let path = path.to_str().expect("Temp path should be UTF-8");
+
+        let db = DbConnection::open_file(path).expect("Opening the file should succeed");
+        db.execute(|conn| conn.execute("CREATE TABLE t (id INTEGER)", ()))
+            .expect("Creating a table should succeed");
+
+        assert!(
+            Path::new(path).is_file(),
+            "The query string should be part of the file name, not an in-memory database"
+        );
+    }
+
+    #[test]
+    fn test_open_file_enables_foreign_keys() {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let path = dir.path().join("local.db");
+        let db = DbConnection::open_file(path.to_str().expect("Temp path should be UTF-8"))
+            .expect("Opening the file should succeed");
+        assert!(
+            db.execute(|conn| foreign_keys_enabled(conn)),
+            "DbConnection::open_file must enable foreign key enforcement"
         );
     }
 }
