@@ -37,6 +37,14 @@ public typealias SiteInfo = WordPressAPIInternal.SiteInfo
 public typealias AnyPostFilter = WordPressAPIInternal.AnyPostFilter
 public typealias WpApiCache = WordPressAPIInternal.WpApiCache
 
+// MARK: - Local Content
+public typealias WpLocalContentStore = WordPressAPIInternal.WpLocalContentStore
+public typealias LocalContentService = WordPressAPIInternal.LocalContentService
+public typealias LocalContentError = WordPressAPIInternal.LocalContentError
+public typealias PostWorkingCopy = WordPressAPIInternal.PostWorkingCopy
+public typealias PostWorkingCopyId = WordPressAPIInternal.PostWorkingCopyId
+public typealias DbPostWorkingCopy = WordPressAPIInternal.DbPostWorkingCopy
+
 // MARK: - Login
 
 public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApplicationPasswordDetails
