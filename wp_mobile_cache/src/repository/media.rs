@@ -474,7 +474,7 @@ impl MediaRepository<EditContext> {
 mod tests {
     use super::*;
     use crate::{
-        MigrationManager, db_types::self_hosted_site::SelfHostedSite,
+        MIGRATIONS, MigrationManager, db_types::self_hosted_site::SelfHostedSite,
         repository::sites::SiteRepository, test_fixtures::media::MediaBuilder,
     };
     use rusqlite::Connection;
@@ -485,7 +485,7 @@ mod tests {
 
     fn setup_db() -> (Connection, DbSite) {
         let mut conn = Connection::open_in_memory().expect("open in-memory db");
-        let mut mgr = MigrationManager::new(&conn).expect("migration manager");
+        let mut mgr = MigrationManager::new(&conn, &MIGRATIONS).expect("migration manager");
         mgr.perform_migrations().expect("migrations");
         let db_site = SiteRepository
             .upsert_self_hosted_site(

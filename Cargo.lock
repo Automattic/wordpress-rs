@@ -1817,7 +1817,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.9",
+ "socket2 0.6.3",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -5681,6 +5681,7 @@ dependencies = [
  "wp_localization",
  "wp_localization_macro",
  "wp_mobile_cache",
+ "wp_mobile_sqlite",
  "zeroize",
 ]
 
@@ -5700,6 +5701,7 @@ dependencies = [
  "tokio",
  "uniffi",
  "wp_api",
+ "wp_mobile_sqlite",
 ]
 
 [[package]]
@@ -5716,6 +5718,16 @@ dependencies = [
  "wp_api_integration_tests",
  "wp_mobile",
  "wp_mobile_cache",
+]
+
+[[package]]
+name = "wp_mobile_sqlite"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "tempfile",
+ "thiserror 2.0.21",
+ "wp_api",
 ]
 
 [[package]]
