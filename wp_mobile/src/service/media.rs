@@ -818,11 +818,12 @@ mod tests {
     use rusqlite::Connection;
     use wp_api::{media::MediaId, prelude::*};
     use wp_mobile_cache::{
-        MigrationManager, WpApiCache,
+        MIGRATIONS, WpApiCache,
         db_types::self_hosted_site::SelfHostedSite,
         repository::{media::MediaRepository, sites::SiteRepository},
         test_fixtures::media::MediaBuilder,
     };
+    use wp_mobile_sqlite::MigrationManager;
 
     /// Test context bundling MediaService with database and site setup
     pub struct MediaServiceTestContext {
@@ -1005,7 +1006,8 @@ mod tests {
         ));
 
         let mut conn = Connection::open_in_memory().expect("Create in-memory database");
-        let mut migration_manager = MigrationManager::new(&conn).expect("Create migration manager");
+        let mut migration_manager =
+            MigrationManager::new(&conn, &MIGRATIONS).expect("Create migration manager");
         migration_manager
             .perform_migrations()
             .expect("Migrations succeed");
@@ -1227,7 +1229,7 @@ mod tests {
     fn ctx(mock_api_client: Arc<WpApiClient>) -> MediaServiceTestContext {
         let mut conn = Connection::open_in_memory().expect("Failed to create in-memory database");
         let mut migration_manager =
-            MigrationManager::new(&conn).expect("Failed to create migration manager");
+            MigrationManager::new(&conn, &MIGRATIONS).expect("Failed to create migration manager");
         migration_manager
             .perform_migrations()
             .expect("Migrations should succeed");

@@ -16,6 +16,7 @@ members = [
   "wp_localization_validation",
   "wp_mobile",
   "wp_mobile_cache",
+  "wp_mobile_sqlite",
   "wp_rs_cli",
   "wp_rs_web",
   "wp_serde_helper",

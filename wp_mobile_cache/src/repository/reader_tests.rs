@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    MigrationManager, repository::wordpress_com_accounts::WordPressComAccountRepository,
+    MIGRATIONS, MigrationManager, repository::wordpress_com_accounts::WordPressComAccountRepository,
     test_fixtures::get_table_column_names,
 };
 use rusqlite::Connection;
@@ -10,7 +10,7 @@ use wp_api::wp_com::reader_posts::ReaderPostTag;
 
 fn conn() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
-    MigrationManager::new(&conn)
+    MigrationManager::new(&conn, &MIGRATIONS)
         .unwrap()
         .perform_migrations()
         .unwrap();
