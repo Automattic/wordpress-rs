@@ -198,10 +198,11 @@ mod tests {
     use rstest::*;
     use rusqlite::Connection;
     use wp_mobile_cache::{
-        MigrationManager, WpApiCache,
+        MIGRATIONS, WpApiCache,
         db_types::self_hosted_site::SelfHostedSite,
         test_fixtures::{create_test_site, post_types::PostTypeBuilder},
     };
+    use wp_mobile_sqlite::MigrationManager;
 
     struct PostTypeServiceTestContext {
         cache: Arc<WpApiCache>,
@@ -212,7 +213,7 @@ mod tests {
     #[fixture]
     fn post_type_service_ctx() -> PostTypeServiceTestContext {
         let mut conn = Connection::open_in_memory().unwrap();
-        let mut migration_manager = MigrationManager::new(&conn).unwrap();
+        let mut migration_manager = MigrationManager::new(&conn, &MIGRATIONS).unwrap();
         migration_manager
             .perform_migrations()
             .expect("Migrations should succeed");

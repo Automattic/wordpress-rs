@@ -444,7 +444,7 @@ impl SiteRepository {
 mod tests {
     use super::*;
     use crate::{
-        MigrationManager,
+        MIGRATIONS, MigrationManager,
         db_types::row_ext::ColumnIndex,
         db_types::wordpress_com_site::DbWordPressComSiteColumn,
         entity::EntityId,
@@ -459,7 +459,7 @@ mod tests {
     fn test_conn() -> Connection {
         let conn = Connection::open_in_memory().expect("Failed to open in-memory database");
         let mut migration_manager =
-            MigrationManager::new(&conn).expect("Failed to create MigrationManager");
+            MigrationManager::new(&conn, &MIGRATIONS).expect("Failed to create MigrationManager");
         migration_manager
             .perform_migrations()
             .expect("All migrations should succeed");

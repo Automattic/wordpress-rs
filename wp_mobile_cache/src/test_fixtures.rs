@@ -1,5 +1,5 @@
 use crate::{
-    MigrationManager,
+    MIGRATIONS, MigrationManager,
     context::EditContext,
     db_types::{db_site::DbSite, self_hosted_site::SelfHostedSite},
     repository::{
@@ -50,7 +50,7 @@ pub fn test_ctx() -> TestContext {
 
 fn test_db() -> (Connection, DbSite) {
     let mut conn = Connection::open_in_memory().unwrap();
-    let mut migration_manager = MigrationManager::new(&conn).unwrap();
+    let mut migration_manager = MigrationManager::new(&conn, &MIGRATIONS).unwrap();
 
     migration_manager
         .perform_migrations()
