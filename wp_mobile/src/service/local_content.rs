@@ -1,8 +1,13 @@
 use std::sync::Arc;
 use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
-    db_types::post_working_copy::{DbPostWorkingCopy, PostWorkingCopy, PostWorkingCopyId},
-    repository::post_working_copies::PostWorkingCopyRepository,
+    db_types::{
+        working_copy::{
+            DbPageWorkingCopy, DbPostWorkingCopy, PageWorkingCopy, PostWorkingCopy, WorkingCopyId,
+        },
+        working_copy_target::WorkingCopyTarget,
+    },
+    repository::working_copies::WorkingCopyRepository,
 };
 
 /// Service for content created or edited on the device.
@@ -21,41 +26,95 @@ impl LocalContentService {
         Self { store }
     }
 
-    /// Store a new post working copy and return its ID.
+    /// Store a new post working copy with its target and return its ID.
     pub fn create_post_working_copy(
         &self,
         working_copy: PostWorkingCopy,
-    ) -> Result<PostWorkingCopyId, LocalContentError> {
-        self.store
-            .execute(|conn| PostWorkingCopyRepository.insert(conn, &working_copy))
+        target: WorkingCopyTarget,
+    ) -> Result<WorkingCopyId, LocalContentError> {
+        self.store.execute(|conn| {
+            let transaction = conn.transaction()?;
+            let id = WorkingCopyRepository.insert_post(&transaction, &working_copy, &target)?;
+            transaction.commit()?;
+            Ok(id)
+        })
     }
 
-    /// Save new fields for an existing post working copy.
+    /// Save new fields for an existing post working copy. Its target is unchanged.
     ///
-    /// Fails with `PostWorkingCopyNotFound` if no working copy has the given ID.
+    /// Fails with `WorkingCopyNotFound` if no post working copy has the given ID.
     pub fn save_post_working_copy(
         &self,
-        id: PostWorkingCopyId,
+        id: WorkingCopyId,
         working_copy: PostWorkingCopy,
     ) -> Result<(), LocalContentError> {
-        let updated = self
-            .store
-            .execute(|conn| PostWorkingCopyRepository.update(conn, &id, &working_copy))?;
+        let updated = self.store.execute(|conn| {
+            let transaction = conn.transaction()?;
+            let updated = WorkingCopyRepository.update_post(&transaction, &id, &working_copy)?;
+            transaction.commit()?;
+            Ok::<_, LocalContentError>(updated)
+        })?;
         if updated {
             Ok(())
         } else {
-            Err(LocalContentError::PostWorkingCopyNotFound { id })
+            Err(LocalContentError::WorkingCopyNotFound { id })
         }
     }
 
-    /// Read a post working copy from the local content database.
+    /// Read a post working copy and its target from the local content database.
     ///
-    /// Returns `None` if no working copy has the given ID.
+    /// Returns `None` if no post working copy has the given ID.
     pub fn read_post_working_copy(
         &self,
-        id: PostWorkingCopyId,
+        id: WorkingCopyId,
     ) -> Result<Option<DbPostWorkingCopy>, LocalContentError> {
         self.store
-            .execute(|conn| PostWorkingCopyRepository.select_by_id(conn, &id))
+            .execute(|conn| WorkingCopyRepository.select_post(conn, &id))
+    }
+
+    /// Store a new page working copy with its target and return its ID.
+    pub fn create_page_working_copy(
+        &self,
+        working_copy: PageWorkingCopy,
+        target: WorkingCopyTarget,
+    ) -> Result<WorkingCopyId, LocalContentError> {
+        self.store.execute(|conn| {
+            let transaction = conn.transaction()?;
+            let id = WorkingCopyRepository.insert_page(&transaction, &working_copy, &target)?;
+            transaction.commit()?;
+            Ok(id)
+        })
+    }
+
+    /// Save new fields for an existing page working copy. Its target is unchanged.
+    ///
+    /// Fails with `WorkingCopyNotFound` if no page working copy has the given ID.
+    pub fn save_page_working_copy(
+        &self,
+        id: WorkingCopyId,
+        working_copy: PageWorkingCopy,
+    ) -> Result<(), LocalContentError> {
+        let updated = self.store.execute(|conn| {
+            let transaction = conn.transaction()?;
+            let updated = WorkingCopyRepository.update_page(&transaction, &id, &working_copy)?;
+            transaction.commit()?;
+            Ok::<_, LocalContentError>(updated)
+        })?;
+        if updated {
+            Ok(())
+        } else {
+            Err(LocalContentError::WorkingCopyNotFound { id })
+        }
+    }
+
+    /// Read a page working copy and its target from the local content database.
+    ///
+    /// Returns `None` if no page working copy has the given ID.
+    pub fn read_page_working_copy(
+        &self,
+        id: WorkingCopyId,
+    ) -> Result<Option<DbPageWorkingCopy>, LocalContentError> {
+        self.store
+            .execute(|conn| WorkingCopyRepository.select_page(conn, &id))
     }
 }

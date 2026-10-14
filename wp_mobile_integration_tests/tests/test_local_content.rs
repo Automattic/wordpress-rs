@@ -1,9 +1,23 @@
 use std::sync::Arc;
 use tempfile::TempDir;
+use wp_api::{
+    date::WpGmtDateTime,
+    media::MediaId,
+    posts::{PostFormat, PostId},
+    terms::TermId,
+    users::UserId,
+    wp_com::WpComSiteId,
+};
 use wp_mobile::service::local_content::LocalContentService;
 use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
-    db_types::post_working_copy::{PostWorkingCopy, PostWorkingCopyId},
+    db_types::{
+        working_copy::{
+            FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting,
+            Visibility, WorkingCopyCommon, WorkingCopyId,
+        },
+        working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
+    },
 };
 
 /// The database file lives in `dir`, which is deleted when it's dropped.
@@ -15,86 +29,158 @@ fn database_path(dir: &TempDir) -> String {
         .to_string()
 }
 
-fn open_store(path: String) -> Arc<WpLocalContentStore> {
-    let store = WpLocalContentStore::new(path).expect("Opening the store should succeed");
+fn open_service(dir: &TempDir) -> LocalContentService {
+    let store =
+        WpLocalContentStore::new(database_path(dir)).expect("Opening the store should succeed");
     store
         .perform_migrations()
         .expect("Migrations should succeed");
-    Arc::new(store)
+    LocalContentService::new(Arc::new(store))
 }
 
-fn working_copy(title: &str, content: &str) -> PostWorkingCopy {
-    PostWorkingCopy {
+fn date(rfc3339: &str) -> WpGmtDateTime {
+    rfc3339.parse().expect("Date should parse")
+}
+
+fn common(title: &str) -> WorkingCopyCommon {
+    WorkingCopyCommon {
         title: title.to_string(),
-        content: content.to_string(),
+        content: format!("<!-- wp:paragraph --><p>{title}</p><!-- /wp:paragraph -->"),
+        excerpt: String::new(),
+        slug: None,
+        status: StatusSetting::Draft,
+        visibility: Visibility::Public,
+        publish_date: PublishDate::Immediately,
+        author: None,
+        featured_image: FeaturedImage::None,
+    }
+}
+
+fn post(title: &str) -> PostWorkingCopy {
+    PostWorkingCopy {
+        common: common(title),
+        categories: vec![],
+        tags: vec![],
+        format: PostFormat::Standard,
+        sticky: false,
+    }
+}
+
+fn new_post_target() -> WorkingCopyTarget {
+    WorkingCopyTarget {
+        site: SiteIdentity::SelfHosted {
+            url: "https://example.com".to_string(),
+        },
+        remote_post: None,
     }
 }
 
 #[test]
-fn test_create_then_read_post_working_copy() {
+fn test_saved_post_working_copy_survives_reopening_the_database() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
-    let service = LocalContentService::new(open_store(database_path(&dir)));
-    let created = working_copy("Draft title", "Draft content");
+    let target = WorkingCopyTarget {
+        site: SiteIdentity::WordPressCom {
+            site_id: WpComSiteId(123_456_789),
+        },
+        remote_post: Some(RemotePostReference {
+            post_id: PostId(99),
+            base_modified_gmt: date("2023-11-14T22:13:20Z"),
+        }),
+    };
+    let edited = PostWorkingCopy {
+        common: WorkingCopyCommon {
+            status: StatusSetting::Publish,
+            visibility: Visibility::PasswordProtected {
+                password: "secret".to_string(),
+            },
+            publish_date: PublishDate::At {
+                date: date("2030-03-17T17:46:40Z"),
+            },
+            author: Some(UserId(7)),
+            featured_image: FeaturedImage::Remote {
+                media_id: MediaId(42),
+            },
+            ..common("Edited")
+        },
+        categories: vec![TermId(1)],
+        tags: vec!["new tag".to_string()],
+        format: PostFormat::Aside,
+        sticky: true,
+    };
 
-    let id = service
-        .create_post_working_copy(created.clone())
-        .expect("Create should succeed");
-    let read = service
-        .read_post_working_copy(id.clone())
-        .expect("Read should succeed")
-        .expect("Created working copy should exist");
-
-    assert_eq!(read.id, id);
-    assert_eq!(read.working_copy, created);
-}
-
-#[test]
-fn test_save_then_read_post_working_copy() {
-    let dir = tempfile::tempdir().expect("Failed to create temp dir");
-    let service = LocalContentService::new(open_store(database_path(&dir)));
-    let id = service
-        .create_post_working_copy(working_copy("First", "first"))
-        .expect("Create should succeed");
-
-    let saved = working_copy("Second", "second");
-    service
-        .save_post_working_copy(id.clone(), saved.clone())
-        .expect("Save should succeed");
-    let read = service
-        .read_post_working_copy(id)
-        .expect("Read should succeed")
-        .expect("Saved working copy should exist");
-
-    assert_eq!(read.working_copy, saved);
-}
-
-#[test]
-fn test_save_unknown_post_working_copy_fails() {
-    let dir = tempfile::tempdir().expect("Failed to create temp dir");
-    let service = LocalContentService::new(open_store(database_path(&dir)));
-    let id = PostWorkingCopyId("00000000-0000-4000-8000-000000000000".to_string());
-
-    let result = service.save_post_working_copy(id.clone(), working_copy("Title", "content"));
-
-    assert_eq!(
-        result,
-        Err(LocalContentError::PostWorkingCopyNotFound { id })
-    );
-}
-
-#[test]
-fn test_post_working_copy_survives_reopening_the_database() {
-    let dir = tempfile::tempdir().expect("Failed to create temp dir");
-    let created = working_copy("Kept", "kept content");
-
-    let id = LocalContentService::new(open_store(database_path(&dir)))
-        .create_post_working_copy(created.clone())
-        .expect("Create should succeed");
-
-    let read = LocalContentService::new(open_store(database_path(&dir)))
+    let id = {
+        let service = open_service(&dir);
+        let id = service
+            .create_post_working_copy(post("Original"), target.clone())
+            .expect("Create should succeed");
+        service
+            .save_post_working_copy(id.clone(), edited.clone())
+            .expect("Save should succeed");
+        id
+    };
+    let read = open_service(&dir)
         .read_post_working_copy(id)
         .expect("Read should succeed")
         .expect("Working copy should exist after reopening");
 
-    assert_eq!(read.working_copy, created);
+    assert_eq!(read.working_copy, edited);
+    assert_eq!(read.target, target);
+}
+
+#[test]
+fn test_saved_page_working_copy_survives_reopening_the_database() {
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let edited = PageWorkingCopy {
+        common: common("Edited page"),
+        parent: Some(PostId(3)),
+    };
+
+    let id = {
+        let service = open_service(&dir);
+        let id = service
+            .create_page_working_copy(
+                PageWorkingCopy {
+                    common: common("Original page"),
+                    parent: None,
+                },
+                new_post_target(),
+            )
+            .expect("Create should succeed");
+        service
+            .save_page_working_copy(id.clone(), edited.clone())
+            .expect("Save should succeed");
+        id
+    };
+    let read = open_service(&dir)
+        .read_page_working_copy(id)
+        .expect("Read should succeed")
+        .expect("Working copy should exist after reopening");
+
+    assert_eq!(read.working_copy, edited);
+    assert_eq!(read.target, new_post_target());
+}
+
+#[test]
+fn test_saving_a_missing_post_working_copy_fails() {
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let service = open_service(&dir);
+    let page_id = service
+        .create_page_working_copy(
+            PageWorkingCopy {
+                common: common("A page"),
+                parent: None,
+            },
+            new_post_target(),
+        )
+        .expect("Create should succeed");
+    let unknown_id = WorkingCopyId("00000000-0000-4000-8000-000000000000".to_string());
+
+    for id in [unknown_id, page_id] {
+        let result = service.save_post_working_copy(id.clone(), post("Title"));
+        assert_eq!(
+            result,
+            Err(LocalContentError::WorkingCopyNotFound { id }),
+            "Saving as a post should fail for an unknown ID and for a page's ID"
+        );
+    }
 }
