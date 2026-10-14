@@ -1,11 +1,22 @@
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
+import uniffi.wp_api.PostFormat
 import uniffi.wp_mobile.LocalContentService
+import uniffi.wp_mobile_local_content.FeaturedImage
 import uniffi.wp_mobile_local_content.LocalContentException
+import uniffi.wp_mobile_local_content.PageWorkingCopy
 import uniffi.wp_mobile_local_content.PostWorkingCopy
+import uniffi.wp_mobile_local_content.PublishDate
+import uniffi.wp_mobile_local_content.RemotePostReference
+import uniffi.wp_mobile_local_content.SiteIdentity
+import uniffi.wp_mobile_local_content.StatusSetting
+import uniffi.wp_mobile_local_content.Visibility
+import uniffi.wp_mobile_local_content.WorkingCopyCommon
+import uniffi.wp_mobile_local_content.WorkingCopyTarget
 import uniffi.wp_mobile_local_content.WpLocalContentStore
 import java.nio.file.Path
+import java.util.Date
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -16,11 +27,36 @@ class LocalContentTest {
     private val databasePath: String
         get() = tempDir.resolve("local_content.db").toString()
 
-    private fun openStore(): WpLocalContentStore {
+    private fun openService(): LocalContentService {
         val store = WpLocalContentStore(databasePath)
         store.performMigrations()
-        return store
+        return LocalContentService(store)
     }
+
+    private fun common(title: String) = WorkingCopyCommon(
+        title = title,
+        content = "<!-- wp:paragraph --><p>$title</p><!-- /wp:paragraph -->",
+        excerpt = "",
+        slug = null,
+        status = StatusSetting.DRAFT,
+        visibility = Visibility.Public,
+        publishDate = PublishDate.Immediately,
+        author = null,
+        featuredImage = FeaturedImage.None
+    )
+
+    private fun post(title: String) = PostWorkingCopy(
+        common = common(title),
+        categories = emptyList(),
+        tags = emptyList(),
+        format = PostFormat.Standard,
+        sticky = false
+    )
+
+    private val newPostTarget = WorkingCopyTarget(
+        site = SiteIdentity.SelfHosted(url = "https://example.com"),
+        remotePost = null
+    )
 
     @Test
     fun `opening an in-memory database throws`() {
@@ -30,46 +66,60 @@ class LocalContentTest {
     }
 
     @Test
-    fun `create then read returns the created post working copy`() {
-        val service = LocalContentService(openStore())
-        val created = PostWorkingCopy(title = "Draft title", content = "Draft content")
+    fun `saved post working copy survives reopening the database`() {
+        val target = WorkingCopyTarget(
+            site = SiteIdentity.WordPressCom(siteId = 123_456_789uL),
+            remotePost = RemotePostReference(postId = 99L, baseModifiedGmt = Date(1_700_000_000_000L))
+        )
+        val edited = PostWorkingCopy(
+            common = common("Edited").copy(
+                status = StatusSetting.PUBLISH,
+                visibility = Visibility.PasswordProtected(password = "secret"),
+                publishDate = PublishDate.At(date = Date(1_900_000_000_000L)),
+                author = 7L,
+                featuredImage = FeaturedImage.Remote(mediaId = 42L)
+            ),
+            categories = listOf(1L, 5L),
+            tags = listOf("existing", "not on the site yet"),
+            format = PostFormat.Aside,
+            sticky = true
+        )
 
-        val id = service.createPostWorkingCopy(created)
-        val read = assertNotNull(service.readPostWorkingCopy(id))
+        val service = openService()
+        val id = service.createPostWorkingCopy(post("Original"), target)
+        service.savePostWorkingCopy(id, edited)
+        val read = assertNotNull(openService().readPostWorkingCopy(id))
 
-        assertEquals(id, read.id)
-        assertEquals(created, read.workingCopy)
+        assertEquals(edited, read.workingCopy)
+        assertEquals(target, read.target)
     }
 
     @Test
-    fun `save then read returns the saved post working copy`() {
-        val service = LocalContentService(openStore())
-        val id = service.createPostWorkingCopy(PostWorkingCopy(title = "First", content = "first"))
+    fun `saved page working copy survives reopening the database`() {
+        val edited = PageWorkingCopy(common = common("Edited page"), parent = 3L)
 
-        val saved = PostWorkingCopy(title = "Second", content = "second")
-        service.savePostWorkingCopy(id, saved)
-        val read = assertNotNull(service.readPostWorkingCopy(id))
+        val service = openService()
+        val id = service.createPageWorkingCopy(
+            PageWorkingCopy(common = common("Original page"), parent = null),
+            newPostTarget
+        )
+        service.savePageWorkingCopy(id, edited)
+        val read = assertNotNull(openService().readPageWorkingCopy(id))
 
-        assertEquals(saved, read.workingCopy)
+        assertEquals(edited, read.workingCopy)
+        assertEquals(newPostTarget, read.target)
     }
 
     @Test
-    fun `saving an unknown post working copy throws`() {
-        val service = LocalContentService(openStore())
-        val unknownId = "00000000-0000-4000-8000-000000000000"
+    fun `saving a page as a post throws`() {
+        val service = openService()
+        val pageId = service.createPageWorkingCopy(
+            PageWorkingCopy(common = common("A page"), parent = null),
+            newPostTarget
+        )
 
-        assertThrows<LocalContentException.PostWorkingCopyNotFound> {
-            service.savePostWorkingCopy(unknownId, PostWorkingCopy(title = "Title", content = "content"))
+        assertThrows<LocalContentException.WorkingCopyNotFound> {
+            service.savePostWorkingCopy(pageId, post("Title"))
         }
-    }
-
-    @Test
-    fun `post working copy survives reopening the database`() {
-        val created = PostWorkingCopy(title = "Kept", content = "kept content")
-
-        val id = LocalContentService(openStore()).createPostWorkingCopy(created)
-        val read = assertNotNull(LocalContentService(openStore()).readPostWorkingCopy(id))
-
-        assertEquals(created, read.workingCopy)
     }
 }

@@ -7,7 +7,7 @@
 use rusqlite::Connection;
 use wp_mobile_sqlite::{ConnectionError, DbConnection, MigrationManager};
 
-use crate::db_types::post_working_copy::PostWorkingCopyId;
+use crate::db_types::working_copy::WorkingCopyId;
 
 pub mod db_types;
 pub mod repository;
@@ -18,8 +18,8 @@ pub enum LocalContentError {
     Sqlite { err_message: String },
     #[error("Foreign key enforcement could not be enabled on the connection")]
     ForeignKeysUnavailable,
-    #[error("No post working copy with id {}", id.0)]
-    PostWorkingCopyNotFound { id: PostWorkingCopyId },
+    #[error("No working copy with id {}", id.0)]
+    WorkingCopyNotFound { id: WorkingCopyId },
     #[error("The local content database needs an absolute file path, got {path:?}")]
     InvalidDatabasePath { path: String },
 }
@@ -90,7 +90,7 @@ impl WpLocalContentStore {
 
 /// The local content migrations, in the order [`MigrationManager`] applies them.
 pub static MIGRATIONS: [&str; 1] = [include_str!(
-    "../migrations/0001-create-post-working-copies-table.sql"
+    "../migrations/0001-create-working-copies-tables.sql"
 )];
 
 uniffi::setup_scaffolding!();
