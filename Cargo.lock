@@ -5713,11 +5713,14 @@ dependencies = [
 name = "wp_mobile_local_content"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "rusqlite",
+ "serde_json",
  "tempfile",
  "thiserror 2.0.21",
  "uniffi",
  "uuid",
+ "wp_api",
  "wp_mobile_sqlite",
 ]
 
