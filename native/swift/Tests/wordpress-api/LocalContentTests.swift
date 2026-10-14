@@ -9,6 +9,11 @@ final class LocalContentTests {
         directory.appendingPathComponent("local_content.db").path
     }
 
+    private let newPostTarget = WorkingCopyTarget(
+        site: .selfHosted(url: "https://example.com"),
+        remotePost: nil
+    )
+
     init() throws {
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("LocalContentTests-\(UUID().uuidString)")
@@ -19,10 +24,35 @@ final class LocalContentTests {
         try? FileManager.default.removeItem(at: directory)
     }
 
-    private func openStore() throws -> WpLocalContentStore {
+    private func openService() throws -> LocalContentService {
         let store = try WpLocalContentStore(path: databasePath)
         _ = try store.performMigrations()
-        return store
+        return LocalContentService(store: store)
+    }
+
+    private func common(
+        title: String,
+        status: StatusSetting = .draft,
+        visibility: Visibility = .public,
+        publishDate: PublishDate = .immediately,
+        author: UserId? = nil,
+        featuredImage: FeaturedImage = .none
+    ) -> WorkingCopyCommon {
+        WorkingCopyCommon(
+            title: title,
+            content: "<!-- wp:paragraph --><p>\(title)</p><!-- /wp:paragraph -->",
+            excerpt: "",
+            slug: nil,
+            status: status,
+            visibility: visibility,
+            publishDate: publishDate,
+            author: author,
+            featuredImage: featuredImage
+        )
+    }
+
+    private func post(title: String) -> PostWorkingCopy {
+        PostWorkingCopy(common: common(title: title), categories: [], tags: [], format: .standard, sticky: false)
     }
 
     @Test func openingAnInMemoryDatabaseThrows() {
@@ -31,44 +61,60 @@ final class LocalContentTests {
         }
     }
 
-    @Test func createThenReadReturnsTheCreatedPostWorkingCopy() throws {
-        let service = LocalContentService(store: try openStore())
-        let created = PostWorkingCopy(title: "Draft title", content: "Draft content")
+    @Test func savedPostWorkingCopySurvivesReopeningTheDatabase() throws {
+        let target = WorkingCopyTarget(
+            site: .wordPressCom(siteId: 123_456_789),
+            remotePost: RemotePostReference(postId: 99, baseModifiedGmt: Date(timeIntervalSince1970: 1_700_000_000))
+        )
+        let edited = PostWorkingCopy(
+            common: common(
+                title: "Edited",
+                status: .publish,
+                visibility: .passwordProtected(password: "secret"),
+                publishDate: .at(date: Date(timeIntervalSince1970: 1_900_000_000)),
+                author: 7,
+                featuredImage: .remote(mediaId: 42)
+            ),
+            categories: [1, 5],
+            tags: ["existing", "not on the site yet"],
+            format: .aside,
+            sticky: true
+        )
 
-        let id = try service.createPostWorkingCopy(workingCopy: created)
-        let read = try #require(try service.readPostWorkingCopy(id: id))
+        let service = try openService()
+        let id = try service.createPostWorkingCopy(workingCopy: post(title: "Original"), target: target)
+        try service.savePostWorkingCopy(id: id, workingCopy: edited)
+        let read = try #require(try openService().readPostWorkingCopy(id: id))
 
-        #expect(read.id == id)
-        #expect(read.workingCopy == created)
+        #expect(read.workingCopy == edited)
+        #expect(read.target == target)
     }
 
-    @Test func saveThenReadReturnsTheSavedPostWorkingCopy() throws {
-        let service = LocalContentService(store: try openStore())
-        let id = try service.createPostWorkingCopy(workingCopy: PostWorkingCopy(title: "First", content: "first"))
+    @Test func savedPageWorkingCopySurvivesReopeningTheDatabase() throws {
+        let edited = PageWorkingCopy(common: common(title: "Edited page"), parent: 3)
 
-        let saved = PostWorkingCopy(title: "Second", content: "second")
-        try service.savePostWorkingCopy(id: id, workingCopy: saved)
-        let read = try #require(try service.readPostWorkingCopy(id: id))
+        let service = try openService()
+        let id = try service.createPageWorkingCopy(
+            workingCopy: PageWorkingCopy(common: common(title: "Original page"), parent: nil),
+            target: newPostTarget
+        )
+        try service.savePageWorkingCopy(id: id, workingCopy: edited)
+        let read = try #require(try openService().readPageWorkingCopy(id: id))
 
-        #expect(read.workingCopy == saved)
+        #expect(read.workingCopy == edited)
+        #expect(read.target == newPostTarget)
     }
 
-    @Test func savingAnUnknownPostWorkingCopyThrows() throws {
-        let service = LocalContentService(store: try openStore())
-        let unknownId = "00000000-0000-4000-8000-000000000000"
-        let workingCopy = PostWorkingCopy(title: "Title", content: "content")
+    @Test func savingAPageAsAPostThrows() throws {
+        let service = try openService()
+        let pageId = try service.createPageWorkingCopy(
+            workingCopy: PageWorkingCopy(common: common(title: "A page"), parent: nil),
+            target: newPostTarget
+        )
+        let post = post(title: "Title")
 
         #expect(throws: LocalContentError.self) {
-            try service.savePostWorkingCopy(id: unknownId, workingCopy: workingCopy)
+            try service.savePostWorkingCopy(id: pageId, workingCopy: post)
         }
-    }
-
-    @Test func postWorkingCopySurvivesReopeningTheDatabase() throws {
-        let created = PostWorkingCopy(title: "Kept", content: "kept content")
-
-        let id = try LocalContentService(store: try openStore()).createPostWorkingCopy(workingCopy: created)
-        let read = try #require(try LocalContentService(store: try openStore()).readPostWorkingCopy(id: id))
-
-        #expect(read.workingCopy == created)
     }
 }

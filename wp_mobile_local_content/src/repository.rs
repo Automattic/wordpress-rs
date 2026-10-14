@@ -1,7 +1,7 @@
 use crate::LocalContentError;
 use rusqlite::Connection;
 
-pub mod post_working_copies;
+pub mod working_copies;
 
 /// Abstraction over database query execution.
 ///

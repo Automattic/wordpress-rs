@@ -41,9 +41,19 @@ public typealias WpApiCache = WordPressAPIInternal.WpApiCache
 public typealias WpLocalContentStore = WordPressAPIInternal.WpLocalContentStore
 public typealias LocalContentService = WordPressAPIInternal.LocalContentService
 public typealias LocalContentError = WordPressAPIInternal.LocalContentError
+public typealias WorkingCopyId = WordPressAPIInternal.WorkingCopyId
+public typealias WorkingCopyCommon = WordPressAPIInternal.WorkingCopyCommon
 public typealias PostWorkingCopy = WordPressAPIInternal.PostWorkingCopy
-public typealias PostWorkingCopyId = WordPressAPIInternal.PostWorkingCopyId
+public typealias PageWorkingCopy = WordPressAPIInternal.PageWorkingCopy
 public typealias DbPostWorkingCopy = WordPressAPIInternal.DbPostWorkingCopy
+public typealias DbPageWorkingCopy = WordPressAPIInternal.DbPageWorkingCopy
+public typealias StatusSetting = WordPressAPIInternal.StatusSetting
+public typealias Visibility = WordPressAPIInternal.Visibility
+public typealias PublishDate = WordPressAPIInternal.PublishDate
+public typealias FeaturedImage = WordPressAPIInternal.FeaturedImage
+public typealias WorkingCopyTarget = WordPressAPIInternal.WorkingCopyTarget
+public typealias SiteIdentity = WordPressAPIInternal.SiteIdentity
+public typealias RemotePostReference = WordPressAPIInternal.RemotePostReference
 
 // MARK: - Login
 
