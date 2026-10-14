@@ -62,6 +62,9 @@ export PATH="$BIN_DIR:$MARIADB_PREFIX/bin:$PATH"
 export WP_TEST_SITE_PATH="$SITE_DIR"
 export WP_TEST_DB_HOST="127.0.0.1"
 export WP_TEST_DB_PORT="$DB_PORT"
+# `Package.swift` leaves the Swift integration tests out on macOS CI unless it's told that there's a
+# test server to run them against.
+export WP_TEST_SERVER="native"
 
 install_deps() {
 	brew install "$PHP_FORMULA" "$MARIADB_FORMULA" httpd jo
