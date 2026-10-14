@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- List requests now return `next_page_params`/`prev_page_params` when the WP.com REST proxy omits the `Link` pagination header (Atomic and Jetpack sites), using `X-WP-TotalPages` instead.
 - **BREAKING:** `GET /me/sites` no longer fails to parse when the list includes deleted or VIP sites:
   - Several `WPComSite` fields are now optional
   - `WPComPlan.product_id` is now a `WpComPlanProductId`, with a `Vip` variant
