@@ -1,0 +1,444 @@
+//! Making a working copy from a remote post.
+//!
+//! Every value a working copy holds is converted without loss, so a working
+//! copy made from a remote post starts out holding what the server holds.
+//! Fields the working copy doesn't model, such as the template, menu order and
+//! meta, are not part of it; they stay as they are on the server provided that
+//! pushing a working copy sends only the fields the user changed.
+
+use wp_api::{
+    date::WpDateString,
+    media::MediaId,
+    posts::{AnyPostWithEditContext, PostFormat, PostId, PostStatus},
+    users::UserId,
+};
+
+use crate::db_types::{
+    working_copy::{
+        FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting, Tag,
+        WorkingCopyCommon,
+    },
+    working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
+};
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum RemotePostConversionError {
+    #[error("The post's {field} is missing; it must be fetched with the edit context")]
+    MissingField { field: &'static str },
+    #[error("A post with status {status} can't be edited")]
+    UneditableStatus { status: String },
+    #[error("Expected post type {expected}, got {actual}")]
+    WrongPostType {
+        expected: &'static str,
+        actual: String,
+    },
+}
+
+impl PostWorkingCopy {
+    /// Make a working copy from a post fetched with the edit context.
+    pub fn from_remote(post: &AnyPostWithEditContext) -> Result<Self, RemotePostConversionError> {
+        expect_post_type(post, "post")?;
+        Ok(Self {
+            common: common_from_remote(post)?,
+            categories: post.categories.clone().unwrap_or_default(),
+            tags: post
+                .tags
+                .iter()
+                .flatten()
+                .map(|id| Tag::Existing { id: *id })
+                .collect(),
+            format: post.format.clone().unwrap_or(PostFormat::Standard),
+            sticky: post.sticky.unwrap_or(false),
+        })
+    }
+}
+
+impl PageWorkingCopy {
+    /// Make a working copy from a page fetched with the edit context.
+    pub fn from_remote(post: &AnyPostWithEditContext) -> Result<Self, RemotePostConversionError> {
+        expect_post_type(post, "page")?;
+        Ok(Self {
+            common: common_from_remote(post)?,
+            // WordPress uses 0 for a top-level page.
+            parent: post.parent.filter(|parent| *parent != PostId(0)),
+        })
+    }
+}
+
+impl WorkingCopyTarget {
+    /// The target for a working copy made from `post`, which lives on `site`.
+    pub fn for_remote_post(site: SiteIdentity, post: &AnyPostWithEditContext) -> Self {
+        Self {
+            site,
+            remote_post: Some(RemotePostReference {
+                post_id: post.id,
+                base_modified_gmt: post.modified_gmt,
+            }),
+        }
+    }
+}
+
+fn expect_post_type(
+    post: &AnyPostWithEditContext,
+    expected: &'static str,
+) -> Result<(), RemotePostConversionError> {
+    if post.post_type == expected {
+        Ok(())
+    } else {
+        Err(RemotePostConversionError::WrongPostType {
+            expected,
+            actual: post.post_type.clone(),
+        })
+    }
+}
+
+fn common_from_remote(
+    post: &AnyPostWithEditContext,
+) -> Result<WorkingCopyCommon, RemotePostConversionError> {
+    let content = post
+        .content
+        .raw
+        .clone()
+        .ok_or(RemotePostConversionError::MissingField {
+            field: "content.raw",
+        })?;
+    // A post type without title or excerpt support has no such object; one
+    // that has it but lacks `raw` wasn't fetched with the edit context.
+    let title = match &post.title {
+        Some(title) => title
+            .raw
+            .clone()
+            .ok_or(RemotePostConversionError::MissingField { field: "title.raw" })?,
+        None => String::new(),
+    };
+    let excerpt = match &post.excerpt {
+        Some(excerpt) => excerpt
+            .raw
+            .clone()
+            .ok_or(RemotePostConversionError::MissingField {
+                field: "excerpt.raw",
+            })?,
+        None => String::new(),
+    };
+
+    Ok(WorkingCopyCommon {
+        title,
+        content,
+        excerpt,
+        slug: Some(post.slug.clone()).filter(|slug| !slug.is_empty()),
+        status: status_from_remote(&post.status)?,
+        // WordPress stores "no password" as an empty string.
+        password: post
+            .password
+            .clone()
+            .filter(|password| !password.is_empty()),
+        publish_date: if is_date_floating(&post.status, &post.date, &post.modified) {
+            PublishDate::Immediately
+        } else {
+            PublishDate::At {
+                date: post.date_gmt,
+            }
+        },
+        // WordPress uses 0 for "none" in both fields.
+        author: post.author.filter(|author| *author != UserId(0)),
+        featured_image: match post.featured_media {
+            Some(media_id) if media_id != MediaId(0) => FeaturedImage::Remote { media_id },
+            _ => FeaturedImage::None,
+        },
+        comment_status: post.comment_status.clone(),
+        ping_status: post.ping_status.clone(),
+    })
+}
+
+fn status_from_remote(status: &PostStatus) -> Result<StatusSetting, RemotePostConversionError> {
+    match status {
+        PostStatus::Draft => Ok(StatusSetting::Draft),
+        PostStatus::Pending => Ok(StatusSetting::PendingReview),
+        // WordPress stores a scheduled post as `future` and turns it back into
+        // `publish` once its date passes, so the date alone carries the schedule.
+        PostStatus::Publish | PostStatus::Future => Ok(StatusSetting::Publish),
+        PostStatus::Private => Ok(StatusSetting::Private),
+        PostStatus::Custom(status) => Ok(StatusSetting::Custom {
+            status: status.clone(),
+        }),
+        PostStatus::Trash | PostStatus::Any => Err(RemotePostConversionError::UneditableStatus {
+            status: status.to_string(),
+        }),
+    }
+}
+
+/// Whether the post's date floats, meaning WordPress sets it when the post is
+/// published and the editor shows "Immediately".
+///
+/// The REST API doesn't report this. This is the block editor's rule from
+/// `isEditedPostDateFloating`: an unpublished post whose date equals its
+/// modified date.
+fn is_date_floating(status: &PostStatus, date: &WpDateString, modified: &WpDateString) -> bool {
+    let unpublished = match status {
+        PostStatus::Draft | PostStatus::Pending => true,
+        PostStatus::Custom(status) => status == "auto-draft",
+        _ => false,
+    };
+    unpublished && date == modified
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wp_api::{
+        date::WpGmtDateTime,
+        posts::{
+            PostCommentStatus, PostContentWithEditContext, PostGuidWithEditContext,
+            PostTitleWithEditContext, SparsePostExcerpt,
+        },
+        terms::TermId,
+        wp_com::WpComSiteId,
+    };
+
+    fn gmt(value: &str) -> WpGmtDateTime {
+        value.parse().expect("Date should parse")
+    }
+
+    /// A published post as the REST API returns it with the edit context.
+    fn remote_post() -> AnyPostWithEditContext {
+        AnyPostWithEditContext {
+            id: PostId(42),
+            date: WpDateString::new("2024-01-15T10:30:00".to_string()),
+            date_gmt: gmt("2024-01-15T10:30:00Z"),
+            guid: PostGuidWithEditContext {
+                raw: Some("https://example.com/?p=42".to_string()),
+                rendered: "https://example.com/?p=42".to_string(),
+            },
+            link: "https://example.com/a-post".to_string(),
+            modified: WpDateString::new("2024-01-16T14:20:00".to_string()),
+            modified_gmt: gmt("2024-01-16T14:20:00Z"),
+            slug: "a-post".to_string(),
+            status: PostStatus::Publish,
+            post_type: "post".to_string(),
+            password: Some(String::new()),
+            permalink_template: None,
+            generated_slug: None,
+            title: Some(PostTitleWithEditContext {
+                raw: Some("A post".to_string()),
+                rendered: "A post".to_string(),
+            }),
+            content: PostContentWithEditContext {
+                raw: Some("<!-- wp:paragraph --><p>Content</p><!-- /wp:paragraph -->".to_string()),
+                rendered: "<p>Content</p>".to_string(),
+                protected: Some(false),
+                block_version: Some(1),
+            },
+            author: Some(UserId(10)),
+            excerpt: Some(SparsePostExcerpt {
+                raw: Some("An excerpt".to_string()),
+                rendered: Some("<p>An excerpt</p>".to_string()),
+                protected: Some(false),
+            }),
+            featured_media: Some(MediaId(0)),
+            comment_status: Some(PostCommentStatus::Open),
+            ping_status: None,
+            format: Some(PostFormat::Aside),
+            meta: None,
+            sticky: Some(false),
+            template: String::new(),
+            categories: Some(vec![TermId(1)]),
+            tags: Some(vec![TermId(7), TermId(8)]),
+            parent: None,
+            menu_order: None,
+            additional_fields: None,
+        }
+    }
+
+    #[test]
+    fn test_published_post_converts_every_field() {
+        let working_copy =
+            PostWorkingCopy::from_remote(&remote_post()).expect("Conversion should succeed");
+
+        assert_eq!(
+            working_copy,
+            PostWorkingCopy {
+                common: WorkingCopyCommon {
+                    title: "A post".to_string(),
+                    content: "<!-- wp:paragraph --><p>Content</p><!-- /wp:paragraph -->"
+                        .to_string(),
+                    excerpt: "An excerpt".to_string(),
+                    slug: Some("a-post".to_string()),
+                    status: StatusSetting::Publish,
+                    password: None,
+                    publish_date: PublishDate::At {
+                        date: gmt("2024-01-15T10:30:00Z"),
+                    },
+                    author: Some(UserId(10)),
+                    featured_image: FeaturedImage::None,
+                    comment_status: Some(PostCommentStatus::Open),
+                    ping_status: None,
+                },
+                categories: vec![TermId(1)],
+                tags: vec![
+                    Tag::Existing { id: TermId(7) },
+                    Tag::Existing { id: TermId(8) },
+                ],
+                format: PostFormat::Aside,
+                sticky: false,
+            }
+        );
+    }
+
+    /// Statuses and passwords combine on the server in ways the editors
+    /// don't offer. Each one has to survive conversion.
+    #[test]
+    fn test_status_and_password_combinations_are_kept() {
+        for (status, password, expected_status) in [
+            (PostStatus::Private, "secret", StatusSetting::Private),
+            (PostStatus::Draft, "secret", StatusSetting::Draft),
+            (PostStatus::Future, "", StatusSetting::Publish),
+            (
+                PostStatus::Custom("in-review".to_string()),
+                "",
+                StatusSetting::Custom {
+                    status: "in-review".to_string(),
+                },
+            ),
+        ] {
+            let post = AnyPostWithEditContext {
+                status: status.clone(),
+                password: Some(password.to_string()),
+                ..remote_post()
+            };
+
+            let common = PostWorkingCopy::from_remote(&post)
+                .expect("Conversion should succeed")
+                .common;
+
+            assert_eq!(common.status, expected_status, "status {status:?}");
+            assert_eq!(
+                common.password,
+                Some(password.to_string()).filter(|p| !p.is_empty()),
+                "password for status {status:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_publish_date_follows_the_block_editor_floating_rule() {
+        let same_as_modified = WpDateString::new("2024-01-16T14:20:00".to_string());
+        for (status, date, expected) in [
+            // An unpublished post whose date equals its modified date floats.
+            (
+                PostStatus::Draft,
+                same_as_modified.clone(),
+                PublishDate::Immediately,
+            ),
+            (
+                PostStatus::Pending,
+                same_as_modified.clone(),
+                PublishDate::Immediately,
+            ),
+            // A draft with a date the user picked keeps it.
+            (
+                PostStatus::Draft,
+                WpDateString::new("2024-01-15T10:30:00".to_string()),
+                PublishDate::At {
+                    date: gmt("2024-01-15T10:30:00Z"),
+                },
+            ),
+            // A published post's date never floats, even when it equals modified.
+            (
+                PostStatus::Publish,
+                same_as_modified,
+                PublishDate::At {
+                    date: gmt("2024-01-15T10:30:00Z"),
+                },
+            ),
+        ] {
+            let post = AnyPostWithEditContext {
+                status: status.clone(),
+                date,
+                ..remote_post()
+            };
+
+            let common = PostWorkingCopy::from_remote(&post)
+                .expect("Conversion should succeed")
+                .common;
+
+            assert_eq!(common.publish_date, expected, "status {status:?}");
+        }
+    }
+
+    #[test]
+    fn test_page_converts_parent_with_zero_as_top_level() {
+        for (parent, expected) in [(Some(PostId(0)), None), (Some(PostId(5)), Some(PostId(5)))] {
+            let page = AnyPostWithEditContext {
+                post_type: "page".to_string(),
+                parent,
+                ..remote_post()
+            };
+
+            let working_copy =
+                PageWorkingCopy::from_remote(&page).expect("Conversion should succeed");
+
+            assert_eq!(working_copy.parent, expected);
+        }
+    }
+
+    #[test]
+    fn test_conversion_refuses_what_it_cannot_represent() {
+        let cases = [
+            (
+                AnyPostWithEditContext {
+                    status: PostStatus::Trash,
+                    ..remote_post()
+                },
+                RemotePostConversionError::UneditableStatus {
+                    status: "trash".to_string(),
+                },
+            ),
+            (
+                AnyPostWithEditContext {
+                    content: PostContentWithEditContext {
+                        raw: None,
+                        ..remote_post().content
+                    },
+                    ..remote_post()
+                },
+                RemotePostConversionError::MissingField {
+                    field: "content.raw",
+                },
+            ),
+            (
+                AnyPostWithEditContext {
+                    post_type: "page".to_string(),
+                    ..remote_post()
+                },
+                RemotePostConversionError::WrongPostType {
+                    expected: "post",
+                    actual: "page".to_string(),
+                },
+            ),
+        ];
+
+        for (post, expected) in cases {
+            assert_eq!(PostWorkingCopy::from_remote(&post), Err(expected));
+        }
+    }
+
+    #[test]
+    fn test_target_records_the_remote_post_and_its_modified_date() {
+        let site = SiteIdentity::WordPressCom {
+            site_id: WpComSiteId(1),
+        };
+
+        let target = WorkingCopyTarget::for_remote_post(site.clone(), &remote_post());
+
+        assert_eq!(
+            target,
+            WorkingCopyTarget {
+                site,
+                remote_post: Some(RemotePostReference {
+                    post_id: PostId(42),
+                    base_modified_gmt: gmt("2024-01-16T14:20:00Z"),
+                }),
+            }
+        );
+    }
+}
