@@ -3,7 +3,7 @@ use tempfile::TempDir;
 use wp_api::{
     date::WpGmtDateTime,
     media::MediaId,
-    posts::{PostFormat, PostId},
+    posts::{PostCommentStatus, PostFormat, PostId},
     terms::TermId,
     users::UserId,
     wp_com::WpComSiteId,
@@ -13,8 +13,8 @@ use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
         working_copy::{
-            FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting,
-            Visibility, WorkingCopyCommon, WorkingCopyId,
+            FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting, Tag,
+            WorkingCopyCommon, WorkingCopyId,
         },
         working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
     },
@@ -49,10 +49,12 @@ fn common(title: &str) -> WorkingCopyCommon {
         excerpt: String::new(),
         slug: None,
         status: StatusSetting::Draft,
-        visibility: Visibility::Public,
+        password: None,
         publish_date: PublishDate::Immediately,
         author: None,
         featured_image: FeaturedImage::None,
+        comment_status: None,
+        ping_status: None,
     }
 }
 
@@ -89,10 +91,8 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
     };
     let edited = PostWorkingCopy {
         common: WorkingCopyCommon {
-            status: StatusSetting::Publish,
-            visibility: Visibility::PasswordProtected {
-                password: "secret".to_string(),
-            },
+            status: StatusSetting::Private,
+            password: Some("secret".to_string()),
             publish_date: PublishDate::At {
                 date: date("2030-03-17T17:46:40Z"),
             },
@@ -100,10 +100,16 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
             featured_image: FeaturedImage::Remote {
                 media_id: MediaId(42),
             },
+            comment_status: Some(PostCommentStatus::Closed),
             ..common("Edited")
         },
         categories: vec![TermId(1)],
-        tags: vec!["new tag".to_string()],
+        tags: vec![
+            Tag::Existing { id: TermId(3) },
+            Tag::New {
+                name: "new tag".to_string(),
+            },
+        ],
         format: PostFormat::Aside,
         sticky: true,
     };

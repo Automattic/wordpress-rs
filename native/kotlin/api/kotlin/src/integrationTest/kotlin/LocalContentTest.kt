@@ -1,6 +1,7 @@
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
+import uniffi.wp_api.PostCommentStatus
 import uniffi.wp_api.PostFormat
 import uniffi.wp_mobile.LocalContentService
 import uniffi.wp_mobile_local_content.FeaturedImage
@@ -11,7 +12,7 @@ import uniffi.wp_mobile_local_content.PublishDate
 import uniffi.wp_mobile_local_content.RemotePostReference
 import uniffi.wp_mobile_local_content.SiteIdentity
 import uniffi.wp_mobile_local_content.StatusSetting
-import uniffi.wp_mobile_local_content.Visibility
+import uniffi.wp_mobile_local_content.Tag
 import uniffi.wp_mobile_local_content.WorkingCopyCommon
 import uniffi.wp_mobile_local_content.WorkingCopyTarget
 import uniffi.wp_mobile_local_content.WpLocalContentStore
@@ -38,11 +39,13 @@ class LocalContentTest {
         content = "<!-- wp:paragraph --><p>$title</p><!-- /wp:paragraph -->",
         excerpt = "",
         slug = null,
-        status = StatusSetting.DRAFT,
-        visibility = Visibility.Public,
+        status = StatusSetting.Draft,
+        password = null,
         publishDate = PublishDate.Immediately,
         author = null,
-        featuredImage = FeaturedImage.None
+        featuredImage = FeaturedImage.None,
+        commentStatus = null,
+        pingStatus = null
     )
 
     private fun post(title: String) = PostWorkingCopy(
@@ -73,14 +76,15 @@ class LocalContentTest {
         )
         val edited = PostWorkingCopy(
             common = common("Edited").copy(
-                status = StatusSetting.PUBLISH,
-                visibility = Visibility.PasswordProtected(password = "secret"),
+                status = StatusSetting.Custom(status = "in-review"),
+                password = "secret",
                 publishDate = PublishDate.At(date = Date(1_900_000_000_000L)),
                 author = 7L,
-                featuredImage = FeaturedImage.Remote(mediaId = 42L)
+                featuredImage = FeaturedImage.Remote(mediaId = 42L),
+                commentStatus = PostCommentStatus.Closed
             ),
             categories = listOf(1L, 5L),
-            tags = listOf("existing", "not on the site yet"),
+            tags = listOf(Tag.Existing(id = 3L), Tag.New(name = "not on the site yet")),
             format = PostFormat.Aside,
             sticky = true
         )

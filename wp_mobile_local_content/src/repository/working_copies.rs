@@ -1,7 +1,7 @@
 use rusqlite::types::{FromSqlError, Type};
 use rusqlite::{OptionalExtension, Row};
 use wp_api::{
-    posts::{PostFormat, PostId},
+    posts::{PostCommentStatus, PostFormat, PostId, PostPingStatus},
     terms::TermId,
     users::UserId,
 };
@@ -12,7 +12,7 @@ use crate::{
     db_types::{
         working_copy::{
             DbPageWorkingCopy, DbPostWorkingCopy, FeaturedImage, PageFieldsColumn, PageWorkingCopy,
-            PostFieldsColumn, PostWorkingCopy, PublishDate, Visibility, WorkingCopyColumn,
+            PostFieldsColumn, PostWorkingCopy, PublishDate, Tag, WorkingCopyColumn,
             WorkingCopyCommon, WorkingCopyId, WorkingCopyKind, date_from_timestamp,
         },
         working_copy_target::{
@@ -46,7 +46,7 @@ impl WorkingCopyRepository {
         let (id, rowid) = insert_common(transaction, WorkingCopyKind::Post, &working_copy.common)?;
         transaction.execute(
             &format!(
-                "INSERT INTO {POST_FIELDS} (working_copy_rowid, category_ids, tag_names, format, sticky)
+                "INSERT INTO {POST_FIELDS} (working_copy_rowid, category_ids, tags, format, sticky)
                  VALUES (?, ?, ?, ?, ?)"
             ),
             rusqlite::params![
@@ -94,7 +94,7 @@ impl WorkingCopyRepository {
         };
         transaction.execute(
             &format!(
-                "UPDATE {POST_FIELDS} SET category_ids = ?, tag_names = ?, format = ?, sticky = ?
+                "UPDATE {POST_FIELDS} SET category_ids = ?, tags = ?, format = ?, sticky = ?
                  WHERE working_copy_rowid = ?"
             ),
             rusqlite::params![
@@ -148,12 +148,12 @@ impl WorkingCopyRepository {
         let (categories, tags, format, sticky) = stmt.query_row([common_row.rowid], |row| {
             use PostFieldsColumn::*;
             let categories_json: String = row.get_column(CategoryIds)?;
-            let tags_json: String = row.get_column(TagNames)?;
+            let tags_json: String = row.get_column(Tags)?;
             let format: String = row.get_column(Format)?;
             Ok((
                 categories_from_json(&categories_json)
                     .map_err(|e| conversion_error(CategoryIds, e))?,
-                tags_from_json(&tags_json).map_err(|e| conversion_error(TagNames, e))?,
+                tags_from_json(&tags_json).map_err(|e| conversion_error(Tags, e))?,
                 format,
                 row.get_column::<bool, _>(Sticky)?,
             ))
@@ -227,12 +227,11 @@ fn insert_common(
     common: &WorkingCopyCommon,
 ) -> Result<(WorkingCopyId, i64), LocalContentError> {
     let id = WorkingCopyId::generate();
-    let (visibility, password) = common.visibility.to_columns();
     let mut stmt = transaction.prepare(&format!(
         "INSERT INTO {WORKING_COPIES} (
-             uuid, kind, title, content, excerpt, slug, status_setting, visibility, password,
-             publish_date, author_id, featured_media_id
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             uuid, kind, title, content, excerpt, slug, status, password, publish_date,
+             author_id, featured_media_id, comment_status, ping_status
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING rowid"
     ))?;
     let rowid = stmt.query_row(
@@ -244,11 +243,12 @@ fn insert_common(
             common.excerpt,
             common.slug,
             common.status,
-            visibility,
-            password,
+            common.password,
             common.publish_date.to_column(),
             common.author.map(|author| author.0),
             common.featured_image.to_column(),
+            common.comment_status.as_ref().map(comment_status_str),
+            common.ping_status.as_ref().map(ping_status_str),
         ],
         |row| row.get(0),
     )?;
@@ -262,12 +262,11 @@ fn update_common(
     id: &WorkingCopyId,
     common: &WorkingCopyCommon,
 ) -> Result<Option<i64>, LocalContentError> {
-    let (visibility, password) = common.visibility.to_columns();
     let mut stmt = transaction.prepare(&format!(
         "UPDATE {WORKING_COPIES} SET
-             title = ?, content = ?, excerpt = ?, slug = ?, status_setting = ?, visibility = ?,
-             password = ?, publish_date = ?, author_id = ?, featured_media_id = ?,
-             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+             title = ?, content = ?, excerpt = ?, slug = ?, status = ?, password = ?,
+             publish_date = ?, author_id = ?, featured_media_id = ?, comment_status = ?,
+             ping_status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
          WHERE uuid = ? AND kind = ?
          RETURNING rowid"
     ))?;
@@ -279,11 +278,12 @@ fn update_common(
                 common.excerpt,
                 common.slug,
                 common.status,
-                visibility,
-                password,
+                common.password,
                 common.publish_date.to_column(),
                 common.author.map(|author| author.0),
                 common.featured_image.to_column(),
+                common.comment_status.as_ref().map(comment_status_str),
+                common.ping_status.as_ref().map(ping_status_str),
                 id,
                 kind.as_str(),
             ],
@@ -310,11 +310,11 @@ fn select_common(
 fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
     use WorkingCopyColumn as C;
 
-    let visibility: String = row.get_column(C::Visibility)?;
-    let password: Option<String> = row.get_column(C::Password)?;
     let publish_date: Option<i64> = row.get_column(C::PublishDate)?;
     let author: Option<i64> = row.get_column(C::AuthorId)?;
     let featured_media_id: Option<i64> = row.get_column(C::FeaturedMediaId)?;
+    let comment_status: Option<String> = row.get_column(C::CommentStatus)?;
+    let ping_status: Option<String> = row.get_column(C::PingStatus)?;
 
     Ok(CommonRow {
         rowid: row.get_column(C::Rowid)?,
@@ -324,13 +324,14 @@ fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
             content: row.get_column(C::Content)?,
             excerpt: row.get_column(C::Excerpt)?,
             slug: row.get_column(C::Slug)?,
-            status: row.get_column(C::StatusSetting)?,
-            visibility: Visibility::from_columns(&visibility, password)
-                .map_err(|e| conversion_error(C::Visibility, e))?,
+            status: row.get_column(C::Status)?,
+            password: row.get_column(C::Password)?,
             publish_date: PublishDate::from_column(publish_date)
                 .map_err(|e| conversion_error(C::PublishDate, e))?,
             author: author.map(UserId),
             featured_image: FeaturedImage::from_column(featured_media_id),
+            comment_status: comment_status.as_deref().map(comment_status_from_str),
+            ping_status: ping_status.as_deref().map(ping_status_from_str),
         },
         created_at: row.get_column(C::CreatedAt)?,
         updated_at: row.get_column(C::UpdatedAt)?,
@@ -417,12 +418,44 @@ fn categories_from_json(json: &str) -> Result<Vec<TermId>, FromSqlError> {
     Ok(ids.into_iter().map(TermId).collect())
 }
 
-fn tags_to_json(tags: &[String]) -> Result<String, LocalContentError> {
+fn tags_to_json(tags: &[Tag]) -> Result<String, LocalContentError> {
     serde_json::to_string(tags).map_err(json_error)
 }
 
-fn tags_from_json(json: &str) -> Result<Vec<String>, FromSqlError> {
+fn tags_from_json(json: &str) -> Result<Vec<Tag>, FromSqlError> {
     serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))
+}
+
+fn comment_status_str(status: &PostCommentStatus) -> &str {
+    match status {
+        PostCommentStatus::Open => "open",
+        PostCommentStatus::Closed => "closed",
+        PostCommentStatus::Custom(status) => status,
+    }
+}
+
+fn comment_status_from_str(status: &str) -> PostCommentStatus {
+    match status {
+        "open" => PostCommentStatus::Open,
+        "closed" => PostCommentStatus::Closed,
+        status => PostCommentStatus::Custom(status.to_string()),
+    }
+}
+
+fn ping_status_str(status: &PostPingStatus) -> &str {
+    match status {
+        PostPingStatus::Open => "open",
+        PostPingStatus::Closed => "closed",
+        PostPingStatus::Custom(status) => status,
+    }
+}
+
+fn ping_status_from_str(status: &str) -> PostPingStatus {
+    match status {
+        "open" => PostPingStatus::Open,
+        "closed" => PostPingStatus::Closed,
+        status => PostPingStatus::Custom(status.to_string()),
+    }
 }
 
 fn json_error(err: serde_json::Error) -> LocalContentError {
@@ -443,7 +476,12 @@ mod tests {
         db_types::working_copy::{StatusSetting, WorkingCopyId},
     };
     use rusqlite::Connection;
-    use wp_api::{date::WpGmtDateTime, media::MediaId, wp_com::WpComSiteId};
+    use wp_api::{
+        date::WpGmtDateTime,
+        media::MediaId,
+        posts::{PostCommentStatus, PostPingStatus},
+        wp_com::WpComSiteId,
+    };
     use wp_mobile_sqlite::MigrationManager;
 
     fn migrated_connection() -> Connection {
@@ -466,10 +504,12 @@ mod tests {
             excerpt: String::new(),
             slug: None,
             status: StatusSetting::Draft,
-            visibility: Visibility::Public,
+            password: None,
             publish_date: PublishDate::Immediately,
             author: None,
             featured_image: FeaturedImage::None,
+            comment_status: None,
+            ping_status: None,
         }
     }
 
@@ -479,10 +519,10 @@ mod tests {
             common: WorkingCopyCommon {
                 excerpt: "An excerpt".to_string(),
                 slug: Some("a-slug".to_string()),
-                status: StatusSetting::Publish,
-                visibility: Visibility::PasswordProtected {
-                    password: "secret".to_string(),
+                status: StatusSetting::Custom {
+                    status: "in-review".to_string(),
                 },
+                password: Some("secret".to_string()),
                 publish_date: PublishDate::At {
                     date: date(1_900_000_000),
                 },
@@ -490,10 +530,17 @@ mod tests {
                 featured_image: FeaturedImage::Remote {
                     media_id: MediaId(42),
                 },
+                comment_status: Some(PostCommentStatus::Closed),
+                ping_status: Some(PostPingStatus::Custom("moderated".to_string())),
                 ..common("Detailed post")
             },
             categories: vec![TermId(1), TermId(5)],
-            tags: vec!["existing".to_string(), "not on the site yet".to_string()],
+            tags: vec![
+                Tag::Existing { id: TermId(3) },
+                Tag::New {
+                    name: "not on the site yet".to_string(),
+                },
+            ],
             format: PostFormat::Custom("theme-specific".to_string()),
             sticky: true,
         }
@@ -586,24 +633,25 @@ mod tests {
             (WorkingCopyColumn::Content, "content"),
             (WorkingCopyColumn::Excerpt, "excerpt"),
             (WorkingCopyColumn::Slug, "slug"),
-            (WorkingCopyColumn::StatusSetting, "status_setting"),
-            (WorkingCopyColumn::Visibility, "visibility"),
+            (WorkingCopyColumn::Status, "status"),
             (WorkingCopyColumn::Password, "password"),
             (WorkingCopyColumn::PublishDate, "publish_date"),
             (WorkingCopyColumn::AuthorId, "author_id"),
             (WorkingCopyColumn::FeaturedMediaId, "featured_media_id"),
+            (WorkingCopyColumn::CommentStatus, "comment_status"),
+            (WorkingCopyColumn::PingStatus, "ping_status"),
             (WorkingCopyColumn::CreatedAt, "created_at"),
             (WorkingCopyColumn::UpdatedAt, "updated_at"),
         ] {
             assert_eq!(columns[column.as_index()], name);
         }
         assert_eq!(columns[2], "kind");
-        assert_eq!(columns.len(), 15);
+        assert_eq!(columns.len(), 16);
 
         let columns = column_names(&conn, POST_FIELDS);
         for (column, name) in [
             (PostFieldsColumn::CategoryIds, "category_ids"),
-            (PostFieldsColumn::TagNames, "tag_names"),
+            (PostFieldsColumn::Tags, "tags"),
             (PostFieldsColumn::Format, "format"),
             (PostFieldsColumn::Sticky, "sticky"),
         ] {
@@ -704,7 +752,7 @@ mod tests {
             .expect("Select should succeed")
             .expect("Inserted post should exist");
 
-        // Leaving password protection must clear the stored password.
+        // Removing the password must clear the stored one.
         let edited = simple_post("Edited");
         let tx = conn.transaction().expect("Failed to begin transaction");
         let updated = WorkingCopyRepository
@@ -755,15 +803,13 @@ mod tests {
             &self_hosted_new_post_target(),
         );
 
-        let password_without_protection = conn.execute(
-            &format!("UPDATE {WORKING_COPIES} SET password = 'secret' WHERE uuid = ?"),
+        let empty_status = conn.execute(
+            &format!("UPDATE {WORKING_COPIES} SET status = '' WHERE uuid = ?"),
             [&id],
         );
-        let protection_without_password = conn.execute(
-            &format!(
-                "UPDATE {WORKING_COPIES} SET visibility = 'password_protected' WHERE uuid = ?"
-            ),
-            [&id],
+        let tags_not_an_array = conn.execute(
+            &format!("UPDATE {POST_FIELDS} SET tags = '{{\"new\": {{\"name\": \"a\"}}}}'"),
+            [],
         );
         let remote_post_without_base =
             conn.execute(&format!("UPDATE {TARGETS} SET remote_post_id = 5"), []);
@@ -773,8 +819,8 @@ mod tests {
         );
 
         for (case, result) in [
-            ("password without protection", password_without_protection),
-            ("protection without password", protection_without_password),
+            ("an empty status", empty_status),
+            ("tags that aren't an array", tags_not_an_array),
             ("remote post without base", remote_post_without_base),
             ("site kind without its ID", site_kind_without_its_id),
         ] {

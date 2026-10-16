@@ -1,15 +1,17 @@
 //! Working copy types.
 //!
-//! Each field holds what the editor or its settings show the user, not what
-//! the server stores; mapping to server fields is a separate step. See
-//! `Documentation/local-content-principles.md`.
+//! Fields hold what the editor and its settings work with. Where a server state
+//! can't be expressed as a single editor choice, as with status and password,
+//! the fields follow the server so that converting a remote post loses nothing.
+//! See `Documentation/local-content-principles.md`.
 
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use wp_api::{
     date::WpGmtDateTime,
     media::MediaId,
-    posts::{PostFormat, PostId},
+    posts::{PostCommentStatus, PostFormat, PostId, PostPingStatus},
     terms::TermId,
     users::UserId,
 };
@@ -43,20 +45,20 @@ impl FromSql for WorkingCopyId {
     }
 }
 
-/// What the user wants to happen to the post when it's pushed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+/// The post's status.
+///
+/// A scheduled post is `Publish` with a future `PublishDate`, as WordPress
+/// itself treats it.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum StatusSetting {
     Draft,
     PendingReview,
     Publish,
-}
-
-/// Who can see the post once it's published.
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum Visibility {
-    Public,
     Private,
-    PasswordProtected { password: String },
+    /// A status registered by a plugin.
+    Custom {
+        status: String,
+    },
 }
 
 /// When the post is published.
@@ -73,6 +75,20 @@ pub enum FeaturedImage {
     Remote { media_id: MediaId },
 }
 
+/// A tag on a post.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum Tag {
+    /// A tag that exists on the site.
+    Existing {
+        #[serde(with = "term_id")]
+        id: TermId,
+    },
+    /// A tag the user entered that the site doesn't have yet, or that hasn't
+    /// been matched to an existing tag.
+    New { name: String },
+}
+
 /// Fields shared by post and page working copies.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct WorkingCopyCommon {
@@ -82,11 +98,16 @@ pub struct WorkingCopyCommon {
     /// `None` when the user hasn't set a slug.
     pub slug: Option<String>,
     pub status: StatusSetting,
-    pub visibility: Visibility,
+    /// `None` when the post has no password.
+    pub password: Option<String>,
     pub publish_date: PublishDate,
     /// `None` when the user hasn't chosen an author.
     pub author: Option<UserId>,
     pub featured_image: FeaturedImage,
+    /// `None` when the user hasn't chosen whether comments are open.
+    pub comment_status: Option<PostCommentStatus>,
+    /// `None` when the user hasn't chosen whether pings are open.
+    pub ping_status: Option<PostPingStatus>,
 }
 
 /// A post as the user edits it on the device.
@@ -94,9 +115,7 @@ pub struct WorkingCopyCommon {
 pub struct PostWorkingCopy {
     pub common: WorkingCopyCommon,
     pub categories: Vec<TermId>,
-    /// Tag names as the user entered them, including tags that don't exist
-    /// on the site yet.
-    pub tags: Vec<String>,
+    pub tags: Vec<Tag>,
     pub format: PostFormat,
     pub sticky: bool,
 }
@@ -150,60 +169,53 @@ impl WorkingCopyKind {
 }
 
 impl StatusSetting {
-    pub(crate) fn as_str(&self) -> &'static str {
+    /// The status as WordPress names it, which is also how it's stored.
+    pub(crate) fn as_wordpress_status(&self) -> &str {
         match self {
             Self::Draft => "draft",
-            Self::PendingReview => "pending_review",
+            Self::PendingReview => "pending",
             Self::Publish => "publish",
+            Self::Private => "private",
+            Self::Custom { status } => status,
+        }
+    }
+
+    pub(crate) fn from_wordpress_status(status: &str) -> Self {
+        match status {
+            "draft" => Self::Draft,
+            "pending" => Self::PendingReview,
+            "publish" => Self::Publish,
+            "private" => Self::Private,
+            status => Self::Custom {
+                status: status.to_string(),
+            },
         }
     }
 }
 
 impl ToSql for StatusSetting {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(self.as_str()))
+        Ok(ToSqlOutput::from(self.as_wordpress_status()))
     }
 }
 
 impl FromSql for StatusSetting {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        match value.as_str()? {
-            "draft" => Ok(Self::Draft),
-            "pending_review" => Ok(Self::PendingReview),
-            "publish" => Ok(Self::Publish),
-            other => Err(FromSqlError::Other(
-                format!("Unknown status_setting: {other}").into(),
-            )),
-        }
+        value.as_str().map(Self::from_wordpress_status)
     }
 }
 
-impl Visibility {
-    /// The `visibility` and `password` column values.
-    pub(crate) fn to_columns(&self) -> (&'static str, Option<&str>) {
-        match self {
-            Self::Public => ("public", None),
-            Self::Private => ("private", None),
-            Self::PasswordProtected { password } => ("password_protected", Some(password)),
-        }
+/// Serializes a `TermId` as its bare number in the stored tags JSON.
+mod term_id {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use wp_api::terms::TermId;
+
+    pub fn serialize<S: Serializer>(id: &TermId, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_i64(id.0)
     }
 
-    pub(crate) fn from_columns(
-        visibility: &str,
-        password: Option<String>,
-    ) -> Result<Self, FromSqlError> {
-        match (visibility, password) {
-            ("public", None) => Ok(Self::Public),
-            ("private", None) => Ok(Self::Private),
-            ("password_protected", Some(password)) => Ok(Self::PasswordProtected { password }),
-            (visibility, password) => Err(FromSqlError::Other(
-                format!(
-                    "Inconsistent visibility columns: visibility={visibility}, has_password={}",
-                    password.is_some()
-                )
-                .into(),
-            )),
-        }
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TermId, D::Error> {
+        i64::deserialize(deserializer).map(TermId)
     }
 }
 
@@ -257,14 +269,15 @@ pub(crate) enum WorkingCopyColumn {
     Content = 4,
     Excerpt = 5,
     Slug = 6,
-    StatusSetting = 7,
-    Visibility = 8,
-    Password = 9,
-    PublishDate = 10,
-    AuthorId = 11,
-    FeaturedMediaId = 12,
-    CreatedAt = 13,
-    UpdatedAt = 14,
+    Status = 7,
+    Password = 8,
+    PublishDate = 9,
+    AuthorId = 10,
+    FeaturedMediaId = 11,
+    CommentStatus = 12,
+    PingStatus = 13,
+    CreatedAt = 14,
+    UpdatedAt = 15,
 }
 
 impl ColumnIndex for WorkingCopyColumn {
@@ -280,7 +293,7 @@ impl ColumnIndex for WorkingCopyColumn {
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PostFieldsColumn {
     CategoryIds = 1,
-    TagNames = 2,
+    Tags = 2,
     Format = 3,
     Sticky = 4,
 }
