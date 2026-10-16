@@ -17,10 +17,10 @@ CREATE TABLE `working_copies` (
   -- NULL: the user hasn't set a slug
   `slug` TEXT,
 
-  `status_setting` TEXT NOT NULL CHECK (`status_setting` IN ('draft', 'pending_review', 'publish')),
+  -- The status as WordPress names it, including statuses registered by plugins
+  `status` TEXT NOT NULL CHECK (`status` <> ''),
 
-  `visibility` TEXT NOT NULL CHECK (`visibility` IN ('public', 'private', 'password_protected')),
-  -- Set exactly when `visibility` is 'password_protected'
+  -- NULL: the post has no password
   `password` TEXT,
 
   -- Unix timestamp in seconds. NULL: publish immediately
@@ -32,10 +32,12 @@ CREATE TABLE `working_copies` (
   -- NULL: no featured image
   `featured_media_id` INTEGER,
 
-  `created_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  `updated_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  -- NULL: the user hasn't chosen whether comments and pings are open
+  `comment_status` TEXT,
+  `ping_status` TEXT,
 
-  CHECK ((`visibility` = 'password_protected') = (`password` IS NOT NULL))
+  `created_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  `updated_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 ) STRICT;
 
 CREATE TABLE `post_working_copy_fields` (
@@ -43,8 +45,8 @@ CREATE TABLE `post_working_copy_fields` (
 
   -- JSON array of term IDs
   `category_ids` TEXT NOT NULL CHECK (json_valid(`category_ids`) AND json_type(`category_ids`) = 'array'),
-  -- JSON array of tag names
-  `tag_names` TEXT NOT NULL CHECK (json_valid(`tag_names`) AND json_type(`tag_names`) = 'array'),
+  -- JSON array of tags, each {"existing": {"id": <term ID>}} or {"new": {"name": <name>}}
+  `tags` TEXT NOT NULL CHECK (json_valid(`tags`) AND json_type(`tags`) = 'array'),
   `format` TEXT NOT NULL,
   `sticky` INTEGER NOT NULL CHECK (`sticky` IN (0, 1))
 ) STRICT;
