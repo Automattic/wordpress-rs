@@ -33,10 +33,11 @@ final class LocalContentTests {
     private func common(
         title: String,
         status: StatusSetting = .draft,
-        visibility: Visibility = .public,
+        password: String? = nil,
         publishDate: PublishDate = .immediately,
         author: UserId? = nil,
-        featuredImage: FeaturedImage = .none
+        featuredImage: FeaturedImage = .none,
+        commentStatus: PostCommentStatus? = nil
     ) -> WorkingCopyCommon {
         WorkingCopyCommon(
             title: title,
@@ -44,10 +45,12 @@ final class LocalContentTests {
             excerpt: "",
             slug: nil,
             status: status,
-            visibility: visibility,
+            password: password,
             publishDate: publishDate,
             author: author,
-            featuredImage: featuredImage
+            featuredImage: featuredImage,
+            commentStatus: commentStatus,
+            pingStatus: nil
         )
     }
 
@@ -69,14 +72,15 @@ final class LocalContentTests {
         let edited = PostWorkingCopy(
             common: common(
                 title: "Edited",
-                status: .publish,
-                visibility: .passwordProtected(password: "secret"),
+                status: .custom(status: "in-review"),
+                password: "secret",
                 publishDate: .at(date: Date(timeIntervalSince1970: 1_900_000_000)),
                 author: 7,
-                featuredImage: .remote(mediaId: 42)
+                featuredImage: .remote(mediaId: 42),
+                commentStatus: .closed
             ),
             categories: [1, 5],
-            tags: ["existing", "not on the site yet"],
+            tags: [.existing(id: 3), .new(name: "not on the site yet")],
             format: .aside,
             sticky: true
         )
