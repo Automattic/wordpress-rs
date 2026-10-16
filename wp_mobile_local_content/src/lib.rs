@@ -10,6 +10,7 @@ use wp_mobile_sqlite::{ConnectionError, DbConnection, MigrationManager};
 use crate::db_types::working_copy::WorkingCopyId;
 
 pub mod db_types;
+pub mod remote;
 pub mod repository;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
