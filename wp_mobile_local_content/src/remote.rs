@@ -21,17 +21,14 @@ use crate::db_types::{
     working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Enum)]
 pub enum RemotePostConversionError {
     #[error("The post's {field} is missing; it must be fetched with the edit context")]
-    MissingField { field: &'static str },
+    MissingField { field: String },
     #[error("A post with status {status} can't be edited")]
     UneditableStatus { status: String },
     #[error("Expected post type {expected}, got {actual}")]
-    WrongPostType {
-        expected: &'static str,
-        actual: String,
-    },
+    WrongPostType { expected: String, actual: String },
 }
 
 impl PostWorkingCopy {
@@ -86,7 +83,7 @@ fn expect_post_type(
         Ok(())
     } else {
         Err(RemotePostConversionError::WrongPostType {
-            expected,
+            expected: expected.to_string(),
             actual: post.post_type.clone(),
         })
     }
@@ -95,29 +92,35 @@ fn expect_post_type(
 fn common_from_remote(
     post: &AnyPostWithEditContext,
 ) -> Result<WorkingCopyCommon, RemotePostConversionError> {
-    let content = post
-        .content
-        .raw
-        .clone()
-        .ok_or(RemotePostConversionError::MissingField {
-            field: "content.raw",
-        })?;
+    let content =
+        post.content
+            .raw
+            .clone()
+            .ok_or_else(|| RemotePostConversionError::MissingField {
+                field: "content.raw".to_string(),
+            })?;
     // A post type without title or excerpt support has no such object; one
     // that has it but lacks `raw` wasn't fetched with the edit context.
     let title = match &post.title {
-        Some(title) => title
-            .raw
-            .clone()
-            .ok_or(RemotePostConversionError::MissingField { field: "title.raw" })?,
+        Some(title) => {
+            title
+                .raw
+                .clone()
+                .ok_or_else(|| RemotePostConversionError::MissingField {
+                    field: "title.raw".to_string(),
+                })?
+        }
         None => String::new(),
     };
     let excerpt = match &post.excerpt {
-        Some(excerpt) => excerpt
-            .raw
-            .clone()
-            .ok_or(RemotePostConversionError::MissingField {
-                field: "excerpt.raw",
-            })?,
+        Some(excerpt) => {
+            excerpt
+                .raw
+                .clone()
+                .ok_or_else(|| RemotePostConversionError::MissingField {
+                    field: "excerpt.raw".to_string(),
+                })?
+        }
         None => String::new(),
     };
 
@@ -402,7 +405,7 @@ mod tests {
                     ..remote_post()
                 },
                 RemotePostConversionError::MissingField {
-                    field: "content.raw",
+                    field: "content.raw".to_string(),
                 },
             ),
             (
@@ -411,7 +414,7 @@ mod tests {
                     ..remote_post()
                 },
                 RemotePostConversionError::WrongPostType {
-                    expected: "post",
+                    expected: "post".to_string(),
                     actual: "page".to_string(),
                 },
             ),
