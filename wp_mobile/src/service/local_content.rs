@@ -1,11 +1,12 @@
 use std::sync::Arc;
+use wp_api::posts::AnyPostWithEditContext;
 use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
         working_copy::{
             DbPageWorkingCopy, DbPostWorkingCopy, PageWorkingCopy, PostWorkingCopy, WorkingCopyId,
         },
-        working_copy_target::WorkingCopyTarget,
+        working_copy_target::{SiteIdentity, WorkingCopyTarget},
     },
     repository::working_copies::WorkingCopyRepository,
 };
@@ -38,6 +39,22 @@ impl LocalContentService {
             transaction.commit()?;
             Ok(id)
         })
+    }
+
+    /// Store a new working copy made from `post`, a post on `site` fetched with
+    /// the edit context, and return its ID. Pushing the working copy updates
+    /// that post.
+    ///
+    /// Fails with `RemotePostConversion` if the post can't be converted, for
+    /// example because it's trashed.
+    pub fn create_post_working_copy_from_remote(
+        &self,
+        site: SiteIdentity,
+        post: AnyPostWithEditContext,
+    ) -> Result<WorkingCopyId, LocalContentError> {
+        let working_copy = PostWorkingCopy::from_remote(&post)?;
+        let target = WorkingCopyTarget::for_remote_post(site, &post);
+        self.create_post_working_copy(working_copy, target)
     }
 
     /// Save new fields for an existing post working copy. Its target is unchanged.
@@ -84,6 +101,22 @@ impl LocalContentService {
             transaction.commit()?;
             Ok(id)
         })
+    }
+
+    /// Store a new working copy made from `page`, a page on `site` fetched with
+    /// the edit context, and return its ID. Pushing the working copy updates
+    /// that page.
+    ///
+    /// Fails with `RemotePostConversion` if the page can't be converted, for
+    /// example because it's trashed.
+    pub fn create_page_working_copy_from_remote(
+        &self,
+        site: SiteIdentity,
+        page: AnyPostWithEditContext,
+    ) -> Result<WorkingCopyId, LocalContentError> {
+        let working_copy = PageWorkingCopy::from_remote(&page)?;
+        let target = WorkingCopyTarget::for_remote_post(site, &page);
+        self.create_page_working_copy(working_copy, target)
     }
 
     /// Save new fields for an existing page working copy. Its target is unchanged.
