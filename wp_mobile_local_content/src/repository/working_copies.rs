@@ -12,7 +12,7 @@ use crate::{
     db_types::{
         working_copy::{
             DbPageWorkingCopy, DbPostWorkingCopy, FeaturedImage, PageFieldsColumn, PageWorkingCopy,
-            PostFieldsColumn, PostWorkingCopy, PublishDate, Tag, WorkingCopyColumn,
+            PostFieldsColumn, PostWorkingCopy, PublishDate, StatusSetting, Tag, WorkingCopyColumn,
             WorkingCopyCommon, WorkingCopyId, WorkingCopyKind, date_from_timestamp,
         },
         working_copy_target::{
@@ -227,6 +227,7 @@ fn insert_common(
     common: &WorkingCopyCommon,
 ) -> Result<(WorkingCopyId, i64), LocalContentError> {
     let id = WorkingCopyId::generate();
+    let (status, password) = common.status.to_columns();
     let mut stmt = transaction.prepare(&format!(
         "INSERT INTO {WORKING_COPIES} (
              uuid, kind, title, content, excerpt, slug, status, password, publish_date,
@@ -242,8 +243,8 @@ fn insert_common(
             common.content,
             common.excerpt,
             common.slug,
-            common.status,
-            common.password,
+            status,
+            password,
             common.publish_date.to_column(),
             common.author.map(|author| author.0),
             common.featured_image.to_column(),
@@ -262,6 +263,7 @@ fn update_common(
     id: &WorkingCopyId,
     common: &WorkingCopyCommon,
 ) -> Result<Option<i64>, LocalContentError> {
+    let (status, password) = common.status.to_columns();
     let mut stmt = transaction.prepare(&format!(
         "UPDATE {WORKING_COPIES} SET
              title = ?, content = ?, excerpt = ?, slug = ?, status = ?, password = ?,
@@ -277,8 +279,8 @@ fn update_common(
                 common.content,
                 common.excerpt,
                 common.slug,
-                common.status,
-                common.password,
+                status,
+                password,
                 common.publish_date.to_column(),
                 common.author.map(|author| author.0),
                 common.featured_image.to_column(),
@@ -310,6 +312,8 @@ fn select_common(
 fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
     use WorkingCopyColumn as C;
 
+    let status: String = row.get_column(C::Status)?;
+    let password: Option<String> = row.get_column(C::Password)?;
     let publish_date: Option<i64> = row.get_column(C::PublishDate)?;
     let author: Option<i64> = row.get_column(C::AuthorId)?;
     let featured_media_id: Option<i64> = row.get_column(C::FeaturedMediaId)?;
@@ -324,8 +328,8 @@ fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
             content: row.get_column(C::Content)?,
             excerpt: row.get_column(C::Excerpt)?,
             slug: row.get_column(C::Slug)?,
-            status: row.get_column(C::Status)?,
-            password: row.get_column(C::Password)?,
+            status: StatusSetting::from_columns(&status, password)
+                .map_err(|e| conversion_error(C::Status, e))?,
             publish_date: PublishDate::from_column(publish_date)
                 .map_err(|e| conversion_error(C::PublishDate, e))?,
             author: author.map(UserId),
@@ -503,8 +507,7 @@ mod tests {
             content: format!("<!-- wp:paragraph --><p>{title}</p><!-- /wp:paragraph -->"),
             excerpt: String::new(),
             slug: None,
-            status: StatusSetting::Draft,
-            password: None,
+            status: StatusSetting::Draft { password: None },
             publish_date: PublishDate::Immediately,
             author: None,
             featured_image: FeaturedImage::None,
@@ -521,8 +524,8 @@ mod tests {
                 slug: Some("a-slug".to_string()),
                 status: StatusSetting::Custom {
                     status: "in-review".to_string(),
+                    password: Some("secret".to_string()),
                 },
-                password: Some("secret".to_string()),
                 publish_date: PublishDate::At {
                     date: date(1_900_000_000),
                 },
@@ -807,6 +810,12 @@ mod tests {
             &format!("UPDATE {WORKING_COPIES} SET status = '' WHERE uuid = ?"),
             [&id],
         );
+        let private_with_password = conn.execute(
+            &format!(
+                "UPDATE {WORKING_COPIES} SET status = 'private', password = 'secret' WHERE uuid = ?"
+            ),
+            [&id],
+        );
         let tags_not_an_array = conn.execute(
             &format!("UPDATE {POST_FIELDS} SET tags = '{{\"new\": {{\"name\": \"a\"}}}}'"),
             [],
@@ -820,6 +829,7 @@ mod tests {
 
         for (case, result) in [
             ("an empty status", empty_status),
+            ("a private post with a password", private_with_password),
             ("tags that aren't an array", tags_not_an_array),
             ("remote post without base", remote_post_without_base),
             ("site kind without its ID", site_kind_without_its_id),

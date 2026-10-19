@@ -20,8 +20,9 @@ CREATE TABLE `working_copies` (
   -- The status as WordPress names it, including statuses registered by plugins
   `status` TEXT NOT NULL CHECK (`status` <> ''),
 
-  -- NULL: the post has no password
-  `password` TEXT,
+  -- NULL: the post has no password. Never set for a private post, matching
+  -- WordPress, which clears the password when saving a private post.
+  `password` TEXT CHECK (`status` <> 'private' OR `password` IS NULL),
 
   -- Unix timestamp in seconds. NULL: publish immediately
   `publish_date` INTEGER,

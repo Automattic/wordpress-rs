@@ -32,8 +32,7 @@ final class LocalContentTests {
 
     private func common(
         title: String,
-        status: StatusSetting = .draft,
-        password: String? = nil,
+        status: StatusSetting = .draft(password: nil),
         publishDate: PublishDate = .immediately,
         author: UserId? = nil,
         featuredImage: FeaturedImage = .none,
@@ -45,7 +44,6 @@ final class LocalContentTests {
             excerpt: "",
             slug: nil,
             status: status,
-            password: password,
             publishDate: publishDate,
             author: author,
             featuredImage: featuredImage,
@@ -72,8 +70,7 @@ final class LocalContentTests {
         let edited = PostWorkingCopy(
             common: common(
                 title: "Edited",
-                status: .custom(status: "in-review"),
-                password: "secret",
+                status: .custom(status: "in-review", password: "secret"),
                 publishDate: .at(date: Date(timeIntervalSince1970: 1_900_000_000)),
                 author: 7,
                 featuredImage: .remote(mediaId: 42),

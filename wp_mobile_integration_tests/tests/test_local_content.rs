@@ -48,8 +48,7 @@ fn common(title: &str) -> WorkingCopyCommon {
         content: format!("<!-- wp:paragraph --><p>{title}</p><!-- /wp:paragraph -->"),
         excerpt: String::new(),
         slug: None,
-        status: StatusSetting::Draft,
-        password: None,
+        status: StatusSetting::Draft { password: None },
         publish_date: PublishDate::Immediately,
         author: None,
         featured_image: FeaturedImage::None,
@@ -91,8 +90,9 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
     };
     let edited = PostWorkingCopy {
         common: WorkingCopyCommon {
-            status: StatusSetting::Private,
-            password: Some("secret".to_string()),
+            status: StatusSetting::Publish {
+                password: Some("secret".to_string()),
+            },
             publish_date: PublishDate::At {
                 date: date("2030-03-17T17:46:40Z"),
             },
