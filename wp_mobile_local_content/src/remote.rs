@@ -27,6 +27,8 @@ pub enum RemotePostConversionError {
     MissingField { field: String },
     #[error("A post with status {status} can't be edited")]
     UneditableStatus { status: String },
+    #[error("A private post can't have a password")]
+    PrivatePostWithPassword,
     #[error("Expected post type {expected}, got {actual}")]
     WrongPostType { expected: String, actual: String },
 }
@@ -129,12 +131,7 @@ fn common_from_remote(
         content,
         excerpt,
         slug: Some(post.slug.clone()).filter(|slug| !slug.is_empty()),
-        status: status_from_remote(&post.status)?,
-        // WordPress stores "no password" as an empty string.
-        password: post
-            .password
-            .clone()
-            .filter(|password| !password.is_empty()),
+        status: status_from_remote(&post.status, post.password.as_deref())?,
         publish_date: if is_date_floating(&post.status, &post.date, &post.modified) {
             PublishDate::Immediately
         } else {
@@ -153,16 +150,27 @@ fn common_from_remote(
     })
 }
 
-fn status_from_remote(status: &PostStatus) -> Result<StatusSetting, RemotePostConversionError> {
+fn status_from_remote(
+    status: &PostStatus,
+    password: Option<&str>,
+) -> Result<StatusSetting, RemotePostConversionError> {
+    // WordPress stores "no password" as an empty string.
+    let password = password
+        .filter(|password| !password.is_empty())
+        .map(str::to_string);
     match status {
-        PostStatus::Draft => Ok(StatusSetting::Draft),
-        PostStatus::Pending => Ok(StatusSetting::PendingReview),
+        PostStatus::Draft => Ok(StatusSetting::Draft { password }),
+        PostStatus::Pending => Ok(StatusSetting::PendingReview { password }),
         // WordPress stores a scheduled post as `future` and turns it back into
         // `publish` once its date passes, so the date alone carries the schedule.
-        PostStatus::Publish | PostStatus::Future => Ok(StatusSetting::Publish),
-        PostStatus::Private => Ok(StatusSetting::Private),
+        PostStatus::Publish | PostStatus::Future => Ok(StatusSetting::Publish { password }),
+        // WordPress clears the password when saving a private post, so one
+        // never comes back. If it did, there'd be nowhere to keep it.
+        PostStatus::Private if password.is_none() => Ok(StatusSetting::Private),
+        PostStatus::Private => Err(RemotePostConversionError::PrivatePostWithPassword),
         PostStatus::Custom(status) => Ok(StatusSetting::Custom {
             status: status.clone(),
+            password,
         }),
         PostStatus::Trash | PostStatus::Any => Err(RemotePostConversionError::UneditableStatus {
             status: status.to_string(),
@@ -266,8 +274,7 @@ mod tests {
                         .to_string(),
                     excerpt: "An excerpt".to_string(),
                     slug: Some("a-post".to_string()),
-                    status: StatusSetting::Publish,
-                    password: None,
+                    status: StatusSetting::Publish { password: None },
                     publish_date: PublishDate::At {
                         date: gmt("2024-01-15T10:30:00Z"),
                     },
@@ -287,19 +294,40 @@ mod tests {
         );
     }
 
-    /// Statuses and passwords combine on the server in ways the editors
-    /// don't offer. Each one has to survive conversion.
+    /// Every status WordPress can store converts with its password, where
+    /// the status allows one.
     #[test]
-    fn test_status_and_password_combinations_are_kept() {
-        for (status, password, expected_status) in [
-            (PostStatus::Private, "secret", StatusSetting::Private),
-            (PostStatus::Draft, "secret", StatusSetting::Draft),
-            (PostStatus::Future, "", StatusSetting::Publish),
+    fn test_status_converts_with_its_password() {
+        let secret = || Some("secret".to_string());
+        for (status, password, expected) in [
+            (
+                PostStatus::Draft,
+                "secret",
+                StatusSetting::Draft { password: secret() },
+            ),
+            (
+                PostStatus::Pending,
+                "secret",
+                StatusSetting::PendingReview { password: secret() },
+            ),
+            (
+                PostStatus::Publish,
+                "secret",
+                StatusSetting::Publish { password: secret() },
+            ),
+            // A scheduled post is `publish` with a future date.
+            (
+                PostStatus::Future,
+                "",
+                StatusSetting::Publish { password: None },
+            ),
+            (PostStatus::Private, "", StatusSetting::Private),
             (
                 PostStatus::Custom("in-review".to_string()),
-                "",
+                "secret",
                 StatusSetting::Custom {
                     status: "in-review".to_string(),
+                    password: secret(),
                 },
             ),
         ] {
@@ -313,12 +341,7 @@ mod tests {
                 .expect("Conversion should succeed")
                 .common;
 
-            assert_eq!(common.status, expected_status, "status {status:?}");
-            assert_eq!(
-                common.password,
-                Some(password.to_string()).filter(|p| !p.is_empty()),
-                "password for status {status:?}"
-            );
+            assert_eq!(common.status, expected, "status {status:?}");
         }
     }
 
@@ -407,6 +430,14 @@ mod tests {
                 RemotePostConversionError::MissingField {
                     field: "content.raw".to_string(),
                 },
+            ),
+            (
+                AnyPostWithEditContext {
+                    status: PostStatus::Private,
+                    password: Some("secret".to_string()),
+                    ..remote_post()
+                },
+                RemotePostConversionError::PrivatePostWithPassword,
             ),
             (
                 AnyPostWithEditContext {

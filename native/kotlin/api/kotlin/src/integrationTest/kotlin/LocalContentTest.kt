@@ -39,8 +39,7 @@ class LocalContentTest {
         content = "<!-- wp:paragraph --><p>$title</p><!-- /wp:paragraph -->",
         excerpt = "",
         slug = null,
-        status = StatusSetting.Draft,
-        password = null,
+        status = StatusSetting.Draft(password = null),
         publishDate = PublishDate.Immediately,
         author = null,
         featuredImage = FeaturedImage.None,
@@ -76,8 +75,7 @@ class LocalContentTest {
         )
         val edited = PostWorkingCopy(
             common = common("Edited").copy(
-                status = StatusSetting.Custom(status = "in-review"),
-                password = "secret",
+                status = StatusSetting.Custom(status = "in-review", password = "secret"),
                 publishDate = PublishDate.At(date = Date(1_900_000_000_000L)),
                 author = 7L,
                 featuredImage = FeaturedImage.Remote(mediaId = 42L),
