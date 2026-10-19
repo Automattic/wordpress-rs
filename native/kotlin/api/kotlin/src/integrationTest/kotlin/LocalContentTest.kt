@@ -1,14 +1,23 @@
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
+import rs.wordpress.api.kotlin.TestCredentials
+import rs.wordpress.api.kotlin.assertSuccessAndRetrieveData
+import rs.wordpress.api.kotlin.defaultApiClient
+import uniffi.wp_api.AnyPostWithEditContext
 import uniffi.wp_api.PostCommentStatus
+import uniffi.wp_api.PostEndpointType
 import uniffi.wp_api.PostFormat
+import uniffi.wp_api.PostListParams
+import uniffi.wp_api.PostRetrieveParams
 import uniffi.wp_mobile.LocalContentService
 import uniffi.wp_mobile_local_content.FeaturedImage
 import uniffi.wp_mobile_local_content.LocalContentException
 import uniffi.wp_mobile_local_content.PageWorkingCopy
 import uniffi.wp_mobile_local_content.PostWorkingCopy
 import uniffi.wp_mobile_local_content.PublishDate
+import uniffi.wp_mobile_local_content.RemotePostConversionError
 import uniffi.wp_mobile_local_content.RemotePostReference
 import uniffi.wp_mobile_local_content.SiteIdentity
 import uniffi.wp_mobile_local_content.StatusSetting
@@ -54,6 +63,18 @@ class LocalContentTest {
         format = PostFormat.Standard,
         sticky = false
     )
+
+    private val client = defaultApiClient()
+    private val site = SiteIdentity.SelfHosted(url = TestCredentials.INSTANCE.siteUrl)
+
+    private suspend fun fetchFirst(endpoint: PostEndpointType): AnyPostWithEditContext {
+        val first = client.request { requestBuilder ->
+            requestBuilder.posts().listWithEditContext(endpoint, PostListParams())
+        }.assertSuccessAndRetrieveData().data.first()
+        return client.request { requestBuilder ->
+            requestBuilder.posts().retrieveWithEditContext(endpoint, first.id, PostRetrieveParams())
+        }.assertSuccessAndRetrieveData().data
+    }
 
     private val newPostTarget = WorkingCopyTarget(
         site = SiteIdentity.SelfHosted(url = "https://example.com"),
@@ -123,5 +144,32 @@ class LocalContentTest {
         assertThrows<LocalContentException.WorkingCopyNotFound> {
             service.savePostWorkingCopy(pageId, post("Title"))
         }
+    }
+
+    @Test
+    fun `working copy from a fetched post points at it`() = runTest {
+        val post = fetchFirst(PostEndpointType.Posts)
+        val service = openService()
+
+        val id = service.createPostWorkingCopyFromRemote(site, post)
+        val read = assertNotNull(service.readPostWorkingCopy(id))
+
+        assertEquals(post.title?.raw, read.workingCopy.common.title)
+        assertEquals(post.content.raw, read.workingCopy.common.content)
+        assertEquals(
+            RemotePostReference(postId = post.id, baseModifiedGmt = post.modifiedGmt),
+            read.target.remotePost
+        )
+    }
+
+    @Test
+    fun `working copy from a page fetched as a post throws`() = runTest {
+        val page = fetchFirst(PostEndpointType.Pages)
+        val service = openService()
+
+        val error = assertThrows<LocalContentException.RemotePostConversion> {
+            service.createPostWorkingCopyFromRemote(site, page)
+        }
+        assertEquals(RemotePostConversionError.WrongPostType(expected = "post", actual = "page"), error.error)
     }
 }
