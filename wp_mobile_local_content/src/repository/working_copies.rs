@@ -138,6 +138,28 @@ impl WorkingCopyRepository {
         Ok(true)
     }
 
+    /// Delete a post working copy. Its fields and target are deleted with it.
+    ///
+    /// Returns `false` if no post working copy has the given ID.
+    pub fn delete_post(
+        &self,
+        executor: &impl QueryExecutor,
+        id: &WorkingCopyId,
+    ) -> Result<bool, LocalContentError> {
+        delete_working_copy(executor, WorkingCopyKind::Post, id)
+    }
+
+    /// Delete a page working copy. Its fields and target are deleted with it.
+    ///
+    /// Returns `false` if no page working copy has the given ID.
+    pub fn delete_page(
+        &self,
+        executor: &impl QueryExecutor,
+        id: &WorkingCopyId,
+    ) -> Result<bool, LocalContentError> {
+        delete_working_copy(executor, WorkingCopyKind::Page, id)
+    }
+
     /// Select a post working copy and its target by ID.
     ///
     /// Returns `Ok(None)` if no post working copy has the given ID, including
@@ -355,6 +377,19 @@ fn update_common(
         )
         .optional()?;
     Ok(rowid)
+}
+
+/// The fields and target rows go with the working copy through `ON DELETE CASCADE`.
+fn delete_working_copy(
+    executor: &impl QueryExecutor,
+    kind: WorkingCopyKind,
+    id: &WorkingCopyId,
+) -> Result<bool, LocalContentError> {
+    let deleted = executor.execute(
+        &format!("DELETE FROM {WORKING_COPIES} WHERE uuid = ? AND kind = ?"),
+        rusqlite::params![id, kind.as_str()],
+    )?;
+    Ok(deleted > 0)
 }
 
 fn select_id_by_remote_post(

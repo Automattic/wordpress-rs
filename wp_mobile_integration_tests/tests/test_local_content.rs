@@ -194,3 +194,42 @@ fn test_saving_a_missing_post_working_copy_fails() {
         );
     }
 }
+
+#[test]
+fn test_deleting_a_post_working_copy_deletes_only_that_post() {
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let service = open_service(&dir);
+    let post_id = service
+        .create_post_working_copy(post("To delete"), self_hosted_site())
+        .expect("Create should succeed");
+    let page_id = service
+        .create_page_working_copy(
+            PageWorkingCopy {
+                common: common("A page"),
+                parent: None,
+            },
+            self_hosted_site(),
+        )
+        .expect("Create should succeed");
+
+    service
+        .delete_post_working_copy(post_id.clone())
+        .expect("Delete should succeed");
+
+    assert_eq!(
+        service.read_post_working_copy(post_id.clone()),
+        Ok(None),
+        "The deleted post should be gone"
+    );
+    for id in [post_id, page_id.clone()] {
+        assert_eq!(
+            service.delete_post_working_copy(id.clone()),
+            Err(LocalContentError::WorkingCopyNotFound { id }),
+            "Deleting as a post should fail for a deleted post and for a page's ID"
+        );
+    }
+    assert!(
+        matches!(service.read_page_working_copy(page_id), Ok(Some(_))),
+        "The page should survive being deleted as a post"
+    );
+}
