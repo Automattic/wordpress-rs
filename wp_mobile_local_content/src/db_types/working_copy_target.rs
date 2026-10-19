@@ -2,7 +2,8 @@
 //!
 //! The target is a relationship, not something the user edits, so it lives in
 //! its own table. Its rows depend on their working copy and are deleted with
-//! it, never the other way around.
+//! it, never the other way around. Sites live in a table of their own, which
+//! targets reference.
 
 use std::sync::Arc;
 
@@ -70,17 +71,32 @@ impl SiteIdentity {
     }
 }
 
+/// Column indexes for the sites table.
+///
+/// `rowid` (index 0) is matched in the WHERE clause and never read.
+#[repr(usize)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum SiteColumn {
+    SiteKind = 1,
+    WordPressComSiteId = 2,
+    SelfHostedUrl = 3,
+}
+
+impl ColumnIndex for SiteColumn {
+    fn as_index(&self) -> usize {
+        *self as usize
+    }
+}
+
 /// Column indexes for the working_copy_targets table.
 ///
 /// `working_copy_rowid` (index 0) is matched in the WHERE clause and never read.
 #[repr(usize)]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum WorkingCopyTargetColumn {
-    SiteKind = 1,
-    WordPressComSiteId = 2,
-    SelfHostedUrl = 3,
-    RemotePostId = 4,
-    BaseModifiedGmt = 5,
+    SiteRowid = 1,
+    RemotePostId = 2,
+    BaseModifiedGmt = 3,
 }
 
 impl ColumnIndex for WorkingCopyTargetColumn {
