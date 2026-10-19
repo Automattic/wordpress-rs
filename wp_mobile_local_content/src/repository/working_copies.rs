@@ -246,6 +246,30 @@ impl WorkingCopyRepository {
             None => Ok(None),
         }
     }
+
+    /// Select every post working copy targeting `site`, most recently updated first.
+    pub fn select_posts_by_site(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &SiteIdentity,
+    ) -> Result<Vec<DbPostWorkingCopy>, LocalContentError> {
+        select_ids_by_site(executor, WorkingCopyKind::Post, site)?
+            .iter()
+            .filter_map(|id| self.select_post(executor, id).transpose())
+            .collect()
+    }
+
+    /// Select every page working copy targeting `site`, most recently updated first.
+    pub fn select_pages_by_site(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &SiteIdentity,
+    ) -> Result<Vec<DbPageWorkingCopy>, LocalContentError> {
+        select_ids_by_site(executor, WorkingCopyKind::Page, site)?
+            .iter()
+            .filter_map(|id| self.select_page(executor, id).transpose())
+            .collect()
+    }
 }
 
 // Internal helpers
@@ -360,6 +384,34 @@ fn select_id_by_remote_post(
         )
         .optional()?;
     Ok(id)
+}
+
+fn select_ids_by_site(
+    executor: &impl QueryExecutor,
+    kind: WorkingCopyKind,
+    site: &SiteIdentity,
+) -> Result<Vec<WorkingCopyId>, LocalContentError> {
+    let (site_kind, wordpress_com_site_id, self_hosted_url) = site.to_columns();
+    let mut stmt = executor.prepare(&format!(
+        "SELECT w.uuid FROM {WORKING_COPIES} w
+         JOIN {TARGETS} t ON t.working_copy_rowid = w.rowid
+         JOIN {SITES} s ON s.rowid = t.site_rowid
+         WHERE w.kind = ?
+           AND s.site_kind = ? AND s.wordpress_com_site_id IS ? AND s.self_hosted_url IS ?
+         ORDER BY w.updated_at DESC, w.rowid DESC"
+    ))?;
+    let ids = stmt
+        .query_map(
+            rusqlite::params![
+                kind.as_str(),
+                site_kind,
+                wordpress_com_site_id,
+                self_hosted_url
+            ],
+            |row| row.get(0),
+        )?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(ids)
 }
 
 fn select_common(
@@ -993,6 +1045,47 @@ mod tests {
         );
         assert_eq!(count_rows(&conn, POST_FIELDS), 0);
         assert_eq!(count_rows(&conn, TARGETS), 0);
+    }
+
+    #[test]
+    fn test_working_copies_by_site_are_that_sites_posts_most_recently_updated_first() {
+        let mut conn = migrated_connection();
+        let site = self_hosted_new_post_target();
+        // Created first and updated last, so creation order and update order disagree.
+        let edited_last = insert_post(&mut conn, &simple_post("Edited last"), &site);
+        let oldest = insert_post(&mut conn, &simple_post("Oldest"), &site);
+        let newer = insert_post(&mut conn, &simple_post("Newer"), &site);
+        insert_post(
+            &mut conn,
+            &simple_post("Another site's"),
+            &wordpress_com_target_editing(99),
+        );
+        insert_page(
+            &mut conn,
+            &PageWorkingCopy {
+                common: common("A page"),
+                parent: None,
+            },
+            &site,
+        );
+        for (id, updated_at) in [
+            (&oldest, "2026-01-01T00:00:00.000Z"),
+            (&newer, "2026-02-01T00:00:00.000Z"),
+            (&edited_last, "2026-03-01T00:00:00.000Z"),
+        ] {
+            conn.execute(
+                &format!("UPDATE {WORKING_COPIES} SET updated_at = ? WHERE uuid = ?"),
+                rusqlite::params![updated_at, id],
+            )
+            .expect("Update should succeed");
+        }
+
+        let posts = WorkingCopyRepository
+            .select_posts_by_site(&conn, &site.site)
+            .expect("Select should succeed");
+
+        let ids: Vec<_> = posts.into_iter().map(|post| post.id).collect();
+        assert_eq!(ids, vec![edited_last, newer, oldest]);
     }
 
     #[test]
