@@ -56,6 +56,7 @@ public typealias FeaturedImage = WordPressAPIInternal.FeaturedImage
 public typealias WorkingCopyTarget = WordPressAPIInternal.WorkingCopyTarget
 public typealias SiteIdentity = WordPressAPIInternal.SiteIdentity
 public typealias RemotePostReference = WordPressAPIInternal.RemotePostReference
+public typealias RemotePostConversionError = WordPressAPIInternal.RemotePostConversionError
 
 // MARK: - Login
 
