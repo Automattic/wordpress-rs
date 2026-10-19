@@ -41,11 +41,12 @@ fn open_service(dir: &TempDir) -> LocalContentService {
 }
 
 fn site() -> SiteIdentity {
-    SiteIdentity::SelfHosted {
+    SiteIdentity {
         url: Arc::new(
             ParsedUrl::parse(TestCredentials::instance().site_url)
                 .expect("Test site URL should parse"),
         ),
+        wordpress_com_site_id: None,
     }
 }
 

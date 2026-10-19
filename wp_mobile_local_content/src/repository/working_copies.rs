@@ -398,23 +398,17 @@ fn select_id_by_remote_post(
     site: &SiteIdentity,
     post_id: PostId,
 ) -> Result<Option<WorkingCopyId>, LocalContentError> {
-    let (site_kind, wordpress_com_site_id, self_hosted_url) = site.to_columns();
+    let Some(site_rowid) = select_site_rowid(executor, site)? else {
+        return Ok(None);
+    };
     let mut stmt = executor.prepare(&format!(
         "SELECT w.uuid FROM {WORKING_COPIES} w
          JOIN {TARGETS} t ON t.working_copy_rowid = w.rowid
-         JOIN {SITES} s ON s.rowid = t.site_rowid
-         WHERE w.kind = ? AND t.remote_post_id = ?
-           AND s.site_kind = ? AND s.wordpress_com_site_id IS ? AND s.self_hosted_url IS ?"
+         WHERE w.kind = ? AND t.site_rowid = ? AND t.remote_post_id = ?"
     ))?;
     let id = stmt
         .query_row(
-            rusqlite::params![
-                kind.as_str(),
-                post_id.0,
-                site_kind,
-                wordpress_com_site_id,
-                self_hosted_url
-            ],
+            rusqlite::params![kind.as_str(), site_rowid, post_id.0],
             |row| row.get(0),
         )
         .optional()?;
@@ -426,25 +420,19 @@ fn select_ids_by_site(
     kind: WorkingCopyKind,
     site: &SiteIdentity,
 ) -> Result<Vec<WorkingCopyId>, LocalContentError> {
-    let (site_kind, wordpress_com_site_id, self_hosted_url) = site.to_columns();
+    let Some(site_rowid) = select_site_rowid(executor, site)? else {
+        return Ok(vec![]);
+    };
     let mut stmt = executor.prepare(&format!(
         "SELECT w.uuid FROM {WORKING_COPIES} w
          JOIN {TARGETS} t ON t.working_copy_rowid = w.rowid
-         JOIN {SITES} s ON s.rowid = t.site_rowid
-         WHERE w.kind = ?
-           AND s.site_kind = ? AND s.wordpress_com_site_id IS ? AND s.self_hosted_url IS ?
+         WHERE w.kind = ? AND t.site_rowid = ?
          ORDER BY w.updated_at DESC, w.rowid DESC"
     ))?;
     let ids = stmt
-        .query_map(
-            rusqlite::params![
-                kind.as_str(),
-                site_kind,
-                wordpress_com_site_id,
-                self_hosted_url
-            ],
-            |row| row.get(0),
-        )?
+        .query_map(rusqlite::params![kind.as_str(), site_rowid], |row| {
+            row.get(0)
+        })?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(ids)
 }
@@ -532,28 +520,54 @@ fn insert_target(
     }
 }
 
-/// Returns the `sites` row for `site`, inserting one if there isn't one yet.
+/// Returns the `sites` row `site` identifies, if there is one: the row with
+/// its WordPress.com site ID, or else the row with its URL and no site ID.
+fn select_site_rowid(
+    executor: &impl QueryExecutor,
+    site: &SiteIdentity,
+) -> Result<Option<i64>, LocalContentError> {
+    let (wordpress_com_site_id, url) = site.to_columns();
+    let mut stmt = executor.prepare(&format!(
+        "SELECT rowid FROM {SITES}
+         WHERE wordpress_com_site_id = ?1 OR (wordpress_com_site_id IS NULL AND url = ?2)
+         ORDER BY wordpress_com_site_id IS NULL
+         LIMIT 1"
+    ))?;
+    let rowid = stmt
+        .query_row(rusqlite::params![wordpress_com_site_id, url], |row| {
+            row.get(0)
+        })
+        .optional()?;
+    Ok(rowid)
+}
+
+/// Returns the `sites` row `site` identifies, inserting one if there isn't one
+/// yet. An existing row takes `site`'s URL, and its site ID if it had none.
 fn select_or_insert_site(
     transaction: &impl InTransaction,
     site: &SiteIdentity,
 ) -> Result<i64, LocalContentError> {
-    let (site_kind, wordpress_com_site_id, self_hosted_url) = site.to_columns();
-    let params = rusqlite::params![site_kind, wordpress_com_site_id, self_hosted_url];
-
-    let mut select = transaction.prepare(&format!(
-        "SELECT rowid FROM {SITES}
-         WHERE site_kind = ? AND wordpress_com_site_id IS ? AND self_hosted_url IS ?"
-    ))?;
-    if let Some(rowid) = select.query_row(params, |row| row.get(0)).optional()? {
+    let (wordpress_com_site_id, url) = site.to_columns();
+    if let Some(rowid) = select_site_rowid(transaction, site)? {
+        transaction.execute(
+            &format!(
+                "UPDATE {SITES}
+                 SET wordpress_com_site_id = COALESCE(?, wordpress_com_site_id), url = ?
+                 WHERE rowid = ?"
+            ),
+            rusqlite::params![wordpress_com_site_id, url, rowid],
+        )?;
         return Ok(rowid);
     }
 
     let mut insert = transaction.prepare(&format!(
-        "INSERT INTO {SITES} (site_kind, wordpress_com_site_id, self_hosted_url)
-         VALUES (?, ?, ?)
-         RETURNING rowid"
+        "INSERT INTO {SITES} (wordpress_com_site_id, url) VALUES (?, ?) RETURNING rowid"
     ))?;
-    Ok(insert.query_row(params, |row| row.get(0))?)
+    Ok(
+        insert.query_row(rusqlite::params![wordpress_com_site_id, url], |row| {
+            row.get(0)
+        })?,
+    )
 }
 
 fn select_target(
@@ -601,13 +615,9 @@ fn select_site(
     let site = stmt.query_row([site_rowid], |row| {
         use SiteColumn::*;
 
-        let site_kind: String = row.get_column(SiteKind)?;
-        SiteIdentity::from_columns(
-            &site_kind,
-            row.get_column(WordPressComSiteId)?,
-            row.get_column(SelfHostedUrl)?,
-        )
-        .map_err(|e| conversion_error(SiteKind, e))
+        let url: String = row.get_column(Url)?;
+        SiteIdentity::from_columns(row.get_column(WordPressComSiteId)?, &url)
+            .map_err(|e| conversion_error(Url, e))
     })?;
     Ok(site)
 }
@@ -761,11 +771,23 @@ mod tests {
         }
     }
 
+    fn site(url: &str, wordpress_com_site_id: Option<u64>) -> SiteIdentity {
+        SiteIdentity {
+            url: Arc::new(ParsedUrl::parse(url).expect("URL should parse")),
+            wordpress_com_site_id: wordpress_com_site_id.map(WpComSiteId),
+        }
+    }
+
+    fn new_post_on(site: &SiteIdentity) -> WorkingCopyTarget {
+        WorkingCopyTarget {
+            site: site.clone(),
+            remote_post: None,
+        }
+    }
+
     fn wordpress_com_target_editing(post_id: i64) -> WorkingCopyTarget {
         WorkingCopyTarget {
-            site: SiteIdentity::WordPressCom {
-                site_id: WpComSiteId(123_456_789),
-            },
+            site: site("https://example.wordpress.com", Some(123_456_789)),
             remote_post: Some(RemotePostReference {
                 post_id: PostId(post_id),
                 base_modified_gmt: date(1_700_000_000),
@@ -774,12 +796,7 @@ mod tests {
     }
 
     fn self_hosted_new_post_target() -> WorkingCopyTarget {
-        WorkingCopyTarget {
-            site: SiteIdentity::SelfHosted {
-                url: Arc::new(ParsedUrl::parse("https://example.com").expect("URL should parse")),
-            },
-            remote_post: None,
-        }
+        new_post_on(&site("https://example.com", None))
     }
 
     fn insert_post(
@@ -883,13 +900,12 @@ mod tests {
 
         let columns = column_names(&conn, SITES);
         for (column, name) in [
-            (SiteColumn::SiteKind, "site_kind"),
             (SiteColumn::WordPressComSiteId, "wordpress_com_site_id"),
-            (SiteColumn::SelfHostedUrl, "self_hosted_url"),
+            (SiteColumn::Url, "url"),
         ] {
             assert_eq!(columns[column.as_index()], name);
         }
-        assert_eq!(columns.len(), 4);
+        assert_eq!(columns.len(), 3);
     }
 
     #[test]
@@ -1029,8 +1045,8 @@ mod tests {
         );
         let remote_post_without_base =
             conn.execute(&format!("UPDATE {TARGETS} SET remote_post_id = 5"), []);
-        let site_kind_without_its_id = conn.execute(
-            &format!("UPDATE {SITES} SET site_kind = 'wordpress_com'"),
+        let two_sites_without_a_site_id_at_one_url = conn.execute(
+            &format!("INSERT INTO {SITES} (url) SELECT url FROM {SITES}"),
             [],
         );
 
@@ -1039,7 +1055,10 @@ mod tests {
             ("a private post with a password", private_with_password),
             ("tags that aren't an array", tags_not_an_array),
             ("remote post without base", remote_post_without_base),
-            ("site kind without its ID", site_kind_without_its_id),
+            (
+                "two sites without a site ID at one URL",
+                two_sites_without_a_site_id_at_one_url,
+            ),
         ] {
             assert!(result.is_err(), "Schema should reject {case}");
         }
@@ -1127,9 +1146,7 @@ mod tests {
     fn test_a_remote_post_has_at_most_one_working_copy() {
         let mut conn = migrated_connection();
         let self_hosted = |url: &str, remote_post: Option<RemotePostReference>| WorkingCopyTarget {
-            site: SiteIdentity::SelfHosted {
-                url: Arc::new(ParsedUrl::parse(url).expect("URL should parse")),
-            },
+            site: site(url, None),
             remote_post,
         };
         let editing_post_5 = Some(RemotePostReference {
@@ -1177,5 +1194,55 @@ mod tests {
             "Another site's post with the same ID is a different post: {same_post_id_on_another_site:?}"
         );
         assert_eq!(count_rows(&conn, SITES), 2);
+    }
+
+    /// A site is identified by its WordPress.com site ID once one is given, so
+    /// its working copies stay with it when a self-hosted site gets a site ID
+    /// (connecting it through Jetpack) and when its URL changes.
+    #[test]
+    fn test_a_site_keeps_its_working_copies_when_it_gains_a_site_id_or_changes_url() {
+        let mut conn = migrated_connection();
+        let url_only = site("https://example.com", None);
+        let connected = site("https://example.com", Some(5));
+        let moved = site("https://new-domain.example", Some(5));
+        let ids_for = |conn: &Connection, site: &SiteIdentity| -> Vec<WorkingCopyId> {
+            WorkingCopyRepository
+                .select_posts_by_site(conn, site)
+                .expect("Select should succeed")
+                .into_iter()
+                .map(|post| post.id)
+                .collect()
+        };
+
+        let draft = insert_post(&mut conn, &simple_post("Draft"), &new_post_on(&url_only));
+        let found_once_connected = ids_for(&conn, &connected);
+        insert_post(
+            &mut conn,
+            &simple_post("After connecting"),
+            &new_post_on(&connected),
+        );
+        insert_post(
+            &mut conn,
+            &simple_post("After moving"),
+            &new_post_on(&moved),
+        );
+        let stored_site = WorkingCopyRepository
+            .select_post(&conn, &draft)
+            .expect("Select should succeed")
+            .expect("The draft should exist")
+            .target
+            .site;
+
+        assert_eq!(found_once_connected, vec![draft.clone()]);
+        assert_eq!(ids_for(&conn, &moved).len(), 3);
+        assert_eq!(stored_site, moved, "The site should have its latest URL");
+        assert_eq!(count_rows(&conn, SITES), 1);
+        // Once the site has a site ID, its old URL alone identifies a site
+        // without one, and a different site ID at the URL is a different site.
+        assert_eq!(ids_for(&conn, &url_only), vec![]);
+        assert_eq!(
+            ids_for(&conn, &site("https://example.com", Some(7))),
+            vec![]
+        );
     }
 }

@@ -196,8 +196,10 @@ fn is_date_floating(status: &PostStatus, date: &WpDateString, modified: &WpDateS
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
     use wp_api::{
         date::WpGmtDateTime,
+        parsed_url::ParsedUrl,
         posts::{
             PostCommentStatus, PostContentWithEditContext, PostGuidWithEditContext,
             PostTitleWithEditContext, SparsePostExcerpt,
@@ -458,8 +460,11 @@ mod tests {
 
     #[test]
     fn test_target_records_the_remote_post_and_its_modified_date() {
-        let site = SiteIdentity::WordPressCom {
-            site_id: WpComSiteId(1),
+        let site = SiteIdentity {
+            url: Arc::new(
+                ParsedUrl::parse("https://example.wordpress.com").expect("URL should parse"),
+            ),
+            wordpress_com_site_id: Some(WpComSiteId(1)),
         };
 
         let target = WorkingCopyTarget::for_remote_post(site.clone(), &remote_post());

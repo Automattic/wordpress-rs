@@ -66,7 +66,7 @@ class LocalContentTest {
     )
 
     private val client = defaultApiClient()
-    private val site = SiteIdentity.SelfHosted(url = ParsedUrl.parse(TestCredentials.INSTANCE.siteUrl))
+    private val site = SiteIdentity(url = ParsedUrl.parse(TestCredentials.INSTANCE.siteUrl), wordpressComSiteId = null)
 
     private suspend fun fetchFirst(endpoint: PostEndpointType): AnyPostWithEditContext {
         val first = client.request { requestBuilder ->
@@ -77,7 +77,7 @@ class LocalContentTest {
         }.assertSuccessAndRetrieveData().data
     }
 
-    private val newPostSite = SiteIdentity.SelfHosted(url = ParsedUrl.parse("https://example.com"))
+    private val newPostSite = SiteIdentity(url = ParsedUrl.parse("https://example.com"), wordpressComSiteId = null)
 
     @Test
     fun `opening an in-memory database throws`() {
@@ -88,7 +88,10 @@ class LocalContentTest {
 
     @Test
     fun `saved post working copy survives reopening the database`() {
-        val wordPressComSite = SiteIdentity.WordPressCom(siteId = 123_456_789uL)
+        val wordPressComSite = SiteIdentity(
+            url = ParsedUrl.parse("https://example.wordpress.com"),
+            wordpressComSiteId = 123_456_789uL
+        )
         val edited = PostWorkingCopy(
             common = common("Edited").copy(
                 status = StatusSetting.Custom(status = "in-review", password = "secret"),
