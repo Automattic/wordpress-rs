@@ -169,13 +169,9 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
         }
         let (post_id, date_gmt) = (post.id, post.date_gmt);
 
-        let id = service
-            .create_post_working_copy_from_remote(site(), post)
-            .unwrap_or_else(|e| panic!("{case}: creating the working copy should succeed: {e}"));
         let stored = service
-            .read_post_working_copy(id)
-            .unwrap_or_else(|e| panic!("{case}: reading should succeed: {e}"))
-            .unwrap_or_else(|| panic!("{case}: the working copy should exist"));
+            .read_or_create_post_working_copy_from_remote(site(), post)
+            .unwrap_or_else(|e| panic!("{case}: creating the working copy should succeed: {e}"));
 
         let common = &stored.working_copy.common;
         assert_eq!(
@@ -230,18 +226,51 @@ async fn test_working_copy_from_server_page_keeps_its_parent() {
     .await;
 
     let parent_page = service
-        .create_page_working_copy_from_remote(site(), parent)
-        .and_then(|id| service.read_page_working_copy(id))
-        .expect("Creating and reading should succeed")
-        .expect("The working copy should exist");
+        .read_or_create_page_working_copy_from_remote(site(), parent)
+        .expect("Creating the working copy should succeed");
     let child_page = service
-        .create_page_working_copy_from_remote(site(), child)
-        .and_then(|id| service.read_page_working_copy(id))
-        .expect("Creating and reading should succeed")
-        .expect("The working copy should exist");
+        .read_or_create_page_working_copy_from_remote(site(), child)
+        .expect("Creating the working copy should succeed");
 
     assert_eq!(parent_page.working_copy.parent, None);
     assert_eq!(child_page.working_copy.parent, Some(parent_id));
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_a_server_post_with_a_working_copy_gets_it_back() {
+    let ctx = create_test_context();
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let service = open_service(&dir);
+    let post = create_and_fetch(
+        &ctx.api,
+        &PostEndpointType::Posts,
+        PostCreateParams {
+            title: Some("On the server".to_string()),
+            ..Default::default()
+        },
+    )
+    .await;
+
+    let post_id = post.id;
+
+    let created = service
+        .read_or_create_post_working_copy_from_remote(site(), post)
+        .expect("Creating the working copy should succeed");
+    let mut edited = created.working_copy.clone();
+    edited.common.title = "Edited on the device".to_string();
+    service
+        .save_post_working_copy(created.id.clone(), edited.clone())
+        .expect("Saving should succeed");
+    let fetched_again = fetch(&ctx.api, &PostEndpointType::Posts, post_id).await;
+    let read_again = service
+        .read_or_create_post_working_copy_from_remote(site(), fetched_again)
+        .expect("Reading the working copy should succeed");
+
+    assert_eq!(read_again.id, created.id);
+    assert_eq!(read_again.working_copy, edited);
 
     RestoreServer::db().await;
 }
@@ -279,7 +308,7 @@ async fn test_trashed_server_post_is_refused() {
         .expect("Fetching the trashed post should succeed")
         .data;
 
-    let result = service.create_post_working_copy_from_remote(site(), trashed);
+    let result = service.read_or_create_post_working_copy_from_remote(site(), trashed);
 
     assert_eq!(
         result,
