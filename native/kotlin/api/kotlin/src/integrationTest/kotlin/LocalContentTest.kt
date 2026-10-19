@@ -77,10 +77,7 @@ class LocalContentTest {
         }.assertSuccessAndRetrieveData().data
     }
 
-    private val newPostTarget = WorkingCopyTarget(
-        site = SiteIdentity.SelfHosted(url = ParsedUrl.parse("https://example.com")),
-        remotePost = null
-    )
+    private val newPostSite = SiteIdentity.SelfHosted(url = ParsedUrl.parse("https://example.com"))
 
     @Test
     fun `opening an in-memory database throws`() {
@@ -91,10 +88,7 @@ class LocalContentTest {
 
     @Test
     fun `saved post working copy survives reopening the database`() {
-        val target = WorkingCopyTarget(
-            site = SiteIdentity.WordPressCom(siteId = 123_456_789uL),
-            remotePost = RemotePostReference(postId = 99L, baseModifiedGmt = Date(1_700_000_000_000L))
-        )
+        val wordPressComSite = SiteIdentity.WordPressCom(siteId = 123_456_789uL)
         val edited = PostWorkingCopy(
             common = common("Edited").copy(
                 status = StatusSetting.Custom(status = "in-review", password = "secret"),
@@ -110,12 +104,12 @@ class LocalContentTest {
         )
 
         val service = openService()
-        val id = service.createPostWorkingCopy(post("Original"), target)
+        val id = service.createPostWorkingCopy(post("Original"), wordPressComSite)
         service.savePostWorkingCopy(id, edited)
         val read = assertNotNull(openService().readPostWorkingCopy(id))
 
         assertEquals(edited, read.workingCopy)
-        assertEquals(target, read.target)
+        assertEquals(WorkingCopyTarget(site = wordPressComSite, remotePost = null), read.target)
     }
 
     @Test
@@ -125,13 +119,13 @@ class LocalContentTest {
         val service = openService()
         val id = service.createPageWorkingCopy(
             PageWorkingCopy(common = common("Original page"), parent = null),
-            newPostTarget
+            newPostSite
         )
         service.savePageWorkingCopy(id, edited)
         val read = assertNotNull(openService().readPageWorkingCopy(id))
 
         assertEquals(edited, read.workingCopy)
-        assertEquals(newPostTarget, read.target)
+        assertEquals(WorkingCopyTarget(site = newPostSite, remotePost = null), read.target)
     }
 
     @Test
@@ -139,7 +133,7 @@ class LocalContentTest {
         val service = openService()
         val pageId = service.createPageWorkingCopy(
             PageWorkingCopy(common = common("A page"), parent = null),
-            newPostTarget
+            newPostSite
         )
 
         assertThrows<LocalContentException.WorkingCopyNotFound> {
@@ -152,8 +146,7 @@ class LocalContentTest {
         val post = fetchFirst(PostEndpointType.Posts)
         val service = openService()
 
-        val id = service.createPostWorkingCopyFromRemote(site, post)
-        val read = assertNotNull(service.readPostWorkingCopy(id))
+        val read = service.readOrCreatePostWorkingCopyFromRemote(site, post)
 
         assertEquals(post.title?.raw, read.workingCopy.common.title)
         assertEquals(post.content.raw, read.workingCopy.common.content)
@@ -169,7 +162,7 @@ class LocalContentTest {
         val service = openService()
 
         val error = assertThrows<LocalContentException.RemotePostConversion> {
-            service.createPostWorkingCopyFromRemote(site, page)
+            service.readOrCreatePostWorkingCopyFromRemote(site, page)
         }
         assertEquals(RemotePostConversionError.WrongPostType(expected = "post", actual = "page"), error.error)
     }

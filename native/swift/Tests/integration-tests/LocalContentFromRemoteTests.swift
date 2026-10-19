@@ -33,8 +33,7 @@ final class LocalContentFromRemoteTests {
         let post = try await fetchFirst(.posts)
         let service = try openService()
 
-        let id = try service.createPostWorkingCopyFromRemote(site: site, post: post)
-        let read = try #require(try service.readPostWorkingCopy(id: id))
+        let read = try service.readOrCreatePostWorkingCopyFromRemote(site: site, post: post)
 
         #expect(read.workingCopy.common.title == post.title?.raw)
         #expect(read.workingCopy.common.content == post.content.raw)
@@ -46,7 +45,7 @@ final class LocalContentFromRemoteTests {
         let service = try openService()
 
         do {
-            _ = try service.createPostWorkingCopyFromRemote(site: site, post: page)
+            _ = try service.readOrCreatePostWorkingCopyFromRemote(site: site, post: page)
             Issue.record("Creating a post working copy from a page should throw")
         } catch LocalContentError.RemotePostConversion(let error) {
             #expect(error == .wrongPostType(expected: "post", actual: "page"))
