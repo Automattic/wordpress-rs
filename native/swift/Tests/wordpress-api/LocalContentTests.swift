@@ -10,11 +10,9 @@ final class LocalContentTests {
     }
 
     private let siteUrl: ParsedUrl
-    private let newPostTarget: WorkingCopyTarget
 
     init() throws {
         siteUrl = try ParsedUrl.parse(input: "https://example.com")
-        newPostTarget = WorkingCopyTarget(site: .selfHosted(url: siteUrl), remotePost: nil)
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("LocalContentTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -63,10 +61,6 @@ final class LocalContentTests {
     }
 
     @Test func savedPostWorkingCopySurvivesReopeningTheDatabase() throws {
-        let target = WorkingCopyTarget(
-            site: .wordPressCom(siteId: 123_456_789),
-            remotePost: RemotePostReference(postId: 99, baseModifiedGmt: Date(timeIntervalSince1970: 1_700_000_000))
-        )
         let edited = PostWorkingCopy(
             common: common(
                 title: "Edited",
@@ -83,13 +77,16 @@ final class LocalContentTests {
         )
 
         let service = try openService()
-        let id = try service.createPostWorkingCopy(workingCopy: post(title: "Original"), target: target)
+        let id = try service.createPostWorkingCopy(
+            workingCopy: post(title: "Original"),
+            site: .wordPressCom(siteId: 123_456_789)
+        )
         try service.savePostWorkingCopy(id: id, workingCopy: edited)
         let read = try #require(try openService().readPostWorkingCopy(id: id))
 
         // `WorkingCopyTarget` isn't `Equatable` in Swift, so compare its parts.
         #expect(read.workingCopy == edited)
-        #expect(read.target.remotePost == target.remotePost)
+        #expect(read.target.remotePost == nil)
         guard case .wordPressCom(let siteId) = read.target.site else {
             Issue.record("Expected a WordPress.com site, got \(read.target.site)")
             return
@@ -103,7 +100,7 @@ final class LocalContentTests {
         let service = try openService()
         let id = try service.createPageWorkingCopy(
             workingCopy: PageWorkingCopy(common: common(title: "Original page"), parent: nil),
-            target: newPostTarget
+            site: .selfHosted(url: siteUrl)
         )
         try service.savePageWorkingCopy(id: id, workingCopy: edited)
         let read = try #require(try openService().readPageWorkingCopy(id: id))
@@ -121,7 +118,7 @@ final class LocalContentTests {
         let service = try openService()
         let pageId = try service.createPageWorkingCopy(
             workingCopy: PageWorkingCopy(common: common(title: "A page"), parent: nil),
-            target: newPostTarget
+            site: .selfHosted(url: siteUrl)
         )
         let post = post(title: "Title")
 

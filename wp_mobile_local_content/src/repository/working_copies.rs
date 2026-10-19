@@ -216,6 +216,36 @@ impl WorkingCopyRepository {
             updated_at: common_row.updated_at,
         }))
     }
+
+    /// Select the post working copy that edits remote post `post_id` on `site`.
+    ///
+    /// Returns `Ok(None)` if no post working copy edits it.
+    pub fn select_post_by_remote_post(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &SiteIdentity,
+        post_id: PostId,
+    ) -> Result<Option<DbPostWorkingCopy>, LocalContentError> {
+        match select_id_by_remote_post(executor, WorkingCopyKind::Post, site, post_id)? {
+            Some(id) => self.select_post(executor, &id),
+            None => Ok(None),
+        }
+    }
+
+    /// Select the page working copy that edits remote page `post_id` on `site`.
+    ///
+    /// Returns `Ok(None)` if no page working copy edits it.
+    pub fn select_page_by_remote_post(
+        &self,
+        executor: &impl QueryExecutor,
+        site: &SiteIdentity,
+        post_id: PostId,
+    ) -> Result<Option<DbPageWorkingCopy>, LocalContentError> {
+        match select_id_by_remote_post(executor, WorkingCopyKind::Page, site, post_id)? {
+            Some(id) => self.select_page(executor, &id),
+            None => Ok(None),
+        }
+    }
 }
 
 // Internal helpers
@@ -301,6 +331,35 @@ fn update_common(
         )
         .optional()?;
     Ok(rowid)
+}
+
+fn select_id_by_remote_post(
+    executor: &impl QueryExecutor,
+    kind: WorkingCopyKind,
+    site: &SiteIdentity,
+    post_id: PostId,
+) -> Result<Option<WorkingCopyId>, LocalContentError> {
+    let (site_kind, wordpress_com_site_id, self_hosted_url) = site.to_columns();
+    let mut stmt = executor.prepare(&format!(
+        "SELECT w.uuid FROM {WORKING_COPIES} w
+         JOIN {TARGETS} t ON t.working_copy_rowid = w.rowid
+         JOIN {SITES} s ON s.rowid = t.site_rowid
+         WHERE w.kind = ? AND t.remote_post_id = ?
+           AND s.site_kind = ? AND s.wordpress_com_site_id IS ? AND s.self_hosted_url IS ?"
+    ))?;
+    let id = stmt
+        .query_row(
+            rusqlite::params![
+                kind.as_str(),
+                post_id.0,
+                site_kind,
+                wordpress_com_site_id,
+                self_hosted_url
+            ],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(id)
 }
 
 fn select_common(
