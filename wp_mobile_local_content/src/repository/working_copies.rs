@@ -292,6 +292,30 @@ impl WorkingCopyRepository {
             .filter_map(|id| self.select_page(executor, id).transpose())
             .collect()
     }
+
+    /// Select every post working copy, whatever site it targets, most recently
+    /// updated first.
+    pub fn select_all_posts(
+        &self,
+        executor: &impl QueryExecutor,
+    ) -> Result<Vec<DbPostWorkingCopy>, LocalContentError> {
+        select_all_ids(executor, WorkingCopyKind::Post)?
+            .iter()
+            .filter_map(|id| self.select_post(executor, id).transpose())
+            .collect()
+    }
+
+    /// Select every page working copy, whatever site it targets, most recently
+    /// updated first.
+    pub fn select_all_pages(
+        &self,
+        executor: &impl QueryExecutor,
+    ) -> Result<Vec<DbPageWorkingCopy>, LocalContentError> {
+        select_all_ids(executor, WorkingCopyKind::Page)?
+            .iter()
+            .filter_map(|id| self.select_page(executor, id).transpose())
+            .collect()
+    }
 }
 
 // Internal helpers
@@ -433,6 +457,20 @@ fn select_ids_by_site(
         .query_map(rusqlite::params![kind.as_str(), site_rowid], |row| {
             row.get(0)
         })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(ids)
+}
+
+fn select_all_ids(
+    executor: &impl QueryExecutor,
+    kind: WorkingCopyKind,
+) -> Result<Vec<WorkingCopyId>, LocalContentError> {
+    let mut stmt = executor.prepare(&format!(
+        "SELECT uuid FROM {WORKING_COPIES} WHERE kind = ?
+         ORDER BY updated_at DESC, rowid DESC"
+    ))?;
+    let ids = stmt
+        .query_map([kind.as_str()], |row| row.get(0))?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(ids)
 }
@@ -1102,14 +1140,14 @@ mod tests {
     }
 
     #[test]
-    fn test_working_copies_by_site_are_that_sites_posts_most_recently_updated_first() {
+    fn test_working_copies_are_listed_most_recently_updated_first() {
         let mut conn = migrated_connection();
         let site = self_hosted_new_post_target();
         // Created first and updated last, so creation order and update order disagree.
         let edited_last = insert_post(&mut conn, &simple_post("Edited last"), &site);
         let oldest = insert_post(&mut conn, &simple_post("Oldest"), &site);
         let newer = insert_post(&mut conn, &simple_post("Newer"), &site);
-        insert_post(
+        let another_sites = insert_post(
             &mut conn,
             &simple_post("Another site's"),
             &wordpress_com_target_editing(99),
@@ -1125,6 +1163,7 @@ mod tests {
         for (id, updated_at) in [
             (&oldest, "2026-01-01T00:00:00.000Z"),
             (&newer, "2026-02-01T00:00:00.000Z"),
+            (&another_sites, "2026-02-15T00:00:00.000Z"),
             (&edited_last, "2026-03-01T00:00:00.000Z"),
         ] {
             conn.execute(
@@ -1134,12 +1173,21 @@ mod tests {
             .expect("Update should succeed");
         }
 
-        let posts = WorkingCopyRepository
+        let ids = |posts: Vec<DbPostWorkingCopy>| -> Vec<WorkingCopyId> {
+            posts.into_iter().map(|post| post.id).collect()
+        };
+        let by_site = WorkingCopyRepository
             .select_posts_by_site(&conn, &site.site)
             .expect("Select should succeed");
+        let all = WorkingCopyRepository
+            .select_all_posts(&conn)
+            .expect("Select should succeed");
 
-        let ids: Vec<_> = posts.into_iter().map(|post| post.id).collect();
-        assert_eq!(ids, vec![edited_last, newer, oldest]);
+        assert_eq!(
+            ids(by_site),
+            vec![edited_last.clone(), newer.clone(), oldest.clone()]
+        );
+        assert_eq!(ids(all), vec![edited_last, another_sites, newer, oldest]);
     }
 
     #[test]
