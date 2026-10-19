@@ -3,6 +3,7 @@ use tempfile::TempDir;
 use wp_api::{
     date::WpGmtDateTime,
     media::MediaId,
+    parsed_url::ParsedUrl,
     posts::{PostCommentStatus, PostFormat, PostId},
     terms::TermId,
     users::UserId,
@@ -70,7 +71,7 @@ fn post(title: &str) -> PostWorkingCopy {
 fn new_post_target() -> WorkingCopyTarget {
     WorkingCopyTarget {
         site: SiteIdentity::SelfHosted {
-            url: "https://example.com".to_string(),
+            url: Arc::new(ParsedUrl::parse("https://example.com").expect("URL should parse")),
         },
         remote_post: None,
     }

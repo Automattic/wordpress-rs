@@ -480,9 +480,11 @@ mod tests {
         db_types::working_copy::{StatusSetting, WorkingCopyId},
     };
     use rusqlite::Connection;
+    use std::sync::Arc;
     use wp_api::{
         date::WpGmtDateTime,
         media::MediaId,
+        parsed_url::ParsedUrl,
         posts::{PostCommentStatus, PostPingStatus},
         wp_com::WpComSiteId,
     };
@@ -574,7 +576,7 @@ mod tests {
     fn self_hosted_new_post_target() -> WorkingCopyTarget {
         WorkingCopyTarget {
             site: SiteIdentity::SelfHosted {
-                url: "https://example.com".to_string(),
+                url: Arc::new(ParsedUrl::parse("https://example.com").expect("URL should parse")),
             },
             remote_post: None,
         }
