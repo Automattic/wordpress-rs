@@ -4,15 +4,23 @@
 //! its own table. Its rows depend on their working copy and are deleted with
 //! it, never the other way around.
 
+use std::sync::Arc;
+
 use rusqlite::types::FromSqlError;
-use wp_api::{date::WpGmtDateTime, posts::PostId, wp_com::WpComSiteId};
+use wp_api::{date::WpGmtDateTime, parsed_url::ParsedUrl, posts::PostId, wp_com::WpComSiteId};
 use wp_mobile_sqlite::ColumnIndex;
 
 /// Identifies a site by something that survives the cache being cleared.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum SiteIdentity {
-    WordPressCom { site_id: WpComSiteId },
-    SelfHosted { url: String },
+    WordPressCom {
+        site_id: WpComSiteId,
+    },
+    /// Stored in the serialized form `ParsedUrl` produces, so URLs that parse
+    /// to the same `ParsedUrl` are stored the same way.
+    SelfHosted {
+        url: Arc<ParsedUrl>,
+    },
 }
 
 /// The remote post a working copy edits.
@@ -39,7 +47,7 @@ impl SiteIdentity {
         match self {
             // SQLite stores integers as i64; WordPress.com site IDs fit.
             Self::WordPressCom { site_id } => ("wordpress_com", Some(site_id.0 as i64), None),
-            Self::SelfHosted { url } => ("self_hosted", None, Some(url)),
+            Self::SelfHosted { url } => ("self_hosted", None, Some(url.as_str())),
         }
     }
 
@@ -52,7 +60,9 @@ impl SiteIdentity {
             ("wordpress_com", Some(site_id), None) => Ok(Self::WordPressCom {
                 site_id: WpComSiteId(site_id as u64),
             }),
-            ("self_hosted", None, Some(url)) => Ok(Self::SelfHosted { url }),
+            ("self_hosted", None, Some(url)) => Ok(Self::SelfHosted {
+                url: Arc::new(ParsedUrl::parse(&url).map_err(|e| FromSqlError::Other(e.into()))?),
+            }),
             (site_kind, _, _) => Err(FromSqlError::Other(
                 format!("Inconsistent site columns for site_kind={site_kind}").into(),
             )),

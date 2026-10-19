@@ -6,6 +6,7 @@ import rs.wordpress.api.kotlin.TestCredentials
 import rs.wordpress.api.kotlin.assertSuccessAndRetrieveData
 import rs.wordpress.api.kotlin.defaultApiClient
 import uniffi.wp_api.AnyPostWithEditContext
+import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.PostCommentStatus
 import uniffi.wp_api.PostEndpointType
 import uniffi.wp_api.PostFormat
@@ -65,7 +66,7 @@ class LocalContentTest {
     )
 
     private val client = defaultApiClient()
-    private val site = SiteIdentity.SelfHosted(url = TestCredentials.INSTANCE.siteUrl)
+    private val site = SiteIdentity.SelfHosted(url = ParsedUrl.parse(TestCredentials.INSTANCE.siteUrl))
 
     private suspend fun fetchFirst(endpoint: PostEndpointType): AnyPostWithEditContext {
         val first = client.request { requestBuilder ->
@@ -77,7 +78,7 @@ class LocalContentTest {
     }
 
     private val newPostTarget = WorkingCopyTarget(
-        site = SiteIdentity.SelfHosted(url = "https://example.com"),
+        site = SiteIdentity.SelfHosted(url = ParsedUrl.parse("https://example.com")),
         remotePost = null
     )
 
