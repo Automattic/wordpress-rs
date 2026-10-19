@@ -42,7 +42,10 @@ fn open_service(dir: &TempDir) -> LocalContentService {
 
 fn site() -> SiteIdentity {
     SiteIdentity::SelfHosted {
-        url: TestCredentials::instance().site_url.to_string(),
+        url: Arc::new(
+            ParsedUrl::parse(TestCredentials::instance().site_url)
+                .expect("Test site URL should parse"),
+        ),
     }
 }
 

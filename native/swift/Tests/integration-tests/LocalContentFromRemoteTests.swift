@@ -4,7 +4,7 @@ import WordPressAPI
 
 final class LocalContentFromRemoteTests {
     private let directory: URL
-    private let site = SiteIdentity.selfHosted(url: TestCredentials.instance().siteUrl)
+    private let site = SiteIdentity.selfHosted(url: TestCredentials.instance().siteURL)
 
     init() throws {
         directory = FileManager.default.temporaryDirectory

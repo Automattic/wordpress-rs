@@ -9,12 +9,12 @@ final class LocalContentTests {
         directory.appendingPathComponent("local_content.db").path
     }
 
-    private let newPostTarget = WorkingCopyTarget(
-        site: .selfHosted(url: "https://example.com"),
-        remotePost: nil
-    )
+    private let siteUrl: ParsedUrl
+    private let newPostTarget: WorkingCopyTarget
 
     init() throws {
+        siteUrl = try ParsedUrl.parse(input: "https://example.com")
+        newPostTarget = WorkingCopyTarget(site: .selfHosted(url: siteUrl), remotePost: nil)
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("LocalContentTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -87,8 +87,14 @@ final class LocalContentTests {
         try service.savePostWorkingCopy(id: id, workingCopy: edited)
         let read = try #require(try openService().readPostWorkingCopy(id: id))
 
+        // `WorkingCopyTarget` isn't `Equatable` in Swift, so compare its parts.
         #expect(read.workingCopy == edited)
-        #expect(read.target == target)
+        #expect(read.target.remotePost == target.remotePost)
+        guard case .wordPressCom(let siteId) = read.target.site else {
+            Issue.record("Expected a WordPress.com site, got \(read.target.site)")
+            return
+        }
+        #expect(siteId == 123_456_789)
     }
 
     @Test func savedPageWorkingCopySurvivesReopeningTheDatabase() throws {
@@ -103,7 +109,12 @@ final class LocalContentTests {
         let read = try #require(try openService().readPageWorkingCopy(id: id))
 
         #expect(read.workingCopy == edited)
-        #expect(read.target == newPostTarget)
+        #expect(read.target.remotePost == nil)
+        guard case .selfHosted(let url) = read.target.site else {
+            Issue.record("Expected a self-hosted site, got \(read.target.site)")
+            return
+        }
+        #expect(url == siteUrl)
     }
 
     @Test func savingAPageAsAPostThrows() throws {
