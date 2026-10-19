@@ -17,7 +17,7 @@ use wp_mobile_local_content::{
             FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting, Tag,
             WorkingCopyCommon, WorkingCopyId,
         },
-        working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
+        working_copy_target::{SiteIdentity, WorkingCopyTarget},
     },
 };
 
@@ -68,26 +68,17 @@ fn post(title: &str) -> PostWorkingCopy {
     }
 }
 
-fn new_post_target() -> WorkingCopyTarget {
-    WorkingCopyTarget {
-        site: SiteIdentity::SelfHosted {
-            url: Arc::new(ParsedUrl::parse("https://example.com").expect("URL should parse")),
-        },
-        remote_post: None,
+fn self_hosted_site() -> SiteIdentity {
+    SiteIdentity::SelfHosted {
+        url: Arc::new(ParsedUrl::parse("https://example.com").expect("URL should parse")),
     }
 }
 
 #[test]
 fn test_saved_post_working_copy_survives_reopening_the_database() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
-    let target = WorkingCopyTarget {
-        site: SiteIdentity::WordPressCom {
-            site_id: WpComSiteId(123_456_789),
-        },
-        remote_post: Some(RemotePostReference {
-            post_id: PostId(99),
-            base_modified_gmt: date("2023-11-14T22:13:20Z"),
-        }),
+    let site = SiteIdentity::WordPressCom {
+        site_id: WpComSiteId(123_456_789),
     };
     let edited = PostWorkingCopy {
         common: WorkingCopyCommon {
@@ -118,7 +109,7 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
     let id = {
         let service = open_service(&dir);
         let id = service
-            .create_post_working_copy(post("Original"), target.clone())
+            .create_post_working_copy(post("Original"), site.clone())
             .expect("Create should succeed");
         service
             .save_post_working_copy(id.clone(), edited.clone())
@@ -131,7 +122,13 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
         .expect("Working copy should exist after reopening");
 
     assert_eq!(read.working_copy, edited);
-    assert_eq!(read.target, target);
+    assert_eq!(
+        read.target,
+        WorkingCopyTarget {
+            site,
+            remote_post: None
+        }
+    );
 }
 
 #[test]
@@ -150,7 +147,7 @@ fn test_saved_page_working_copy_survives_reopening_the_database() {
                     common: common("Original page"),
                     parent: None,
                 },
-                new_post_target(),
+                self_hosted_site(),
             )
             .expect("Create should succeed");
         service
@@ -164,7 +161,13 @@ fn test_saved_page_working_copy_survives_reopening_the_database() {
         .expect("Working copy should exist after reopening");
 
     assert_eq!(read.working_copy, edited);
-    assert_eq!(read.target, new_post_target());
+    assert_eq!(
+        read.target,
+        WorkingCopyTarget {
+            site: self_hosted_site(),
+            remote_post: None
+        }
+    );
 }
 
 #[test]
@@ -177,7 +180,7 @@ fn test_saving_a_missing_post_working_copy_fails() {
                 common: common("A page"),
                 parent: None,
             },
-            new_post_target(),
+            self_hosted_site(),
         )
         .expect("Create should succeed");
     let unknown_id = WorkingCopyId("00000000-0000-4000-8000-000000000000".to_string());
