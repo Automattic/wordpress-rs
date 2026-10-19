@@ -342,7 +342,7 @@ investigate the relevant code before making decisions based on this document.
 
 ## Stats — Time-Based
 
-- [ ] `GET /rest/v1.1/sites/$site/stats/archives` — archive stats
+- [x] `GET /rest/v1.1/sites/$site/stats/archives` — archive stats
 - [x] `GET /rest/v1.1/sites/$site/stats/clicks` — outbound click stats
 - [x] `GET /rest/v1.1/sites/$site/stats/devices/browser` — device stats by browser
 - [x] `GET /rest/v1.1/sites/$site/stats/devices/platform` — device stats by platform
