@@ -5,6 +5,7 @@
 //! `Documentation/local-content-principles.md`.
 
 use rusqlite::Connection;
+use wp_api::posts::PostId;
 use wp_mobile_sqlite::{ConnectionError, DbConnection, MigrationManager};
 
 use crate::db_types::working_copy::WorkingCopyId;
@@ -26,6 +27,8 @@ pub enum LocalContentError {
     InvalidDatabasePath { path: String },
     #[error("Can't make a working copy from the remote post: {error}")]
     RemotePostConversion { error: RemotePostConversionError },
+    #[error("Remote post {} already has a working copy", post_id.0)]
+    RemotePostAlreadyHasWorkingCopy { post_id: PostId },
 }
 
 impl From<RemotePostConversionError> for LocalContentError {
