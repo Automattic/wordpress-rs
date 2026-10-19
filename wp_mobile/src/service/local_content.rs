@@ -108,6 +108,15 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_post(conn, &id))
     }
 
+    /// Read every post working copy targeting `site`, most recently updated first.
+    pub fn read_post_working_copies(
+        &self,
+        site: SiteIdentity,
+    ) -> Result<Vec<DbPostWorkingCopy>, LocalContentError> {
+        self.store
+            .execute(|conn| WorkingCopyRepository.select_posts_by_site(conn, &site))
+    }
+
     /// Store a working copy of a new page for `site` and return its ID.
     /// Pushing the working copy creates the page.
     pub fn create_page_working_copy(
@@ -187,5 +196,14 @@ impl LocalContentService {
     ) -> Result<Option<DbPageWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_page(conn, &id))
+    }
+
+    /// Read every page working copy targeting `site`, most recently updated first.
+    pub fn read_page_working_copies(
+        &self,
+        site: SiteIdentity,
+    ) -> Result<Vec<DbPageWorkingCopy>, LocalContentError> {
+        self.store
+            .execute(|conn| WorkingCopyRepository.select_pages_by_site(conn, &site))
     }
 }
