@@ -108,6 +108,21 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_post(conn, &id))
     }
 
+    /// Delete a post working copy, discarding the user's changes in it. Call it
+    /// only when the user asks to: user content is never lost otherwise.
+    ///
+    /// Fails with `WorkingCopyNotFound` if no post working copy has the given ID.
+    pub fn delete_post_working_copy(&self, id: WorkingCopyId) -> Result<(), LocalContentError> {
+        let deleted = self
+            .store
+            .execute(|conn| WorkingCopyRepository.delete_post(conn, &id))?;
+        if deleted {
+            Ok(())
+        } else {
+            Err(LocalContentError::WorkingCopyNotFound { id })
+        }
+    }
+
     /// Read every post working copy targeting `site`, most recently updated first.
     pub fn read_post_working_copies(
         &self,
@@ -196,6 +211,21 @@ impl LocalContentService {
     ) -> Result<Option<DbPageWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_page(conn, &id))
+    }
+
+    /// Delete a page working copy, discarding the user's changes in it. Call it
+    /// only when the user asks to: user content is never lost otherwise.
+    ///
+    /// Fails with `WorkingCopyNotFound` if no page working copy has the given ID.
+    pub fn delete_page_working_copy(&self, id: WorkingCopyId) -> Result<(), LocalContentError> {
+        let deleted = self
+            .store
+            .execute(|conn| WorkingCopyRepository.delete_page(conn, &id))?;
+        if deleted {
+            Ok(())
+        } else {
+            Err(LocalContentError::WorkingCopyNotFound { id })
+        }
     }
 
     /// Read every page working copy targeting `site`, most recently updated first.
