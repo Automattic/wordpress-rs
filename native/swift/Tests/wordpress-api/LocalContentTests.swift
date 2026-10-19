@@ -79,7 +79,7 @@ final class LocalContentTests {
         let service = try openService()
         let id = try service.createPostWorkingCopy(
             workingCopy: post(title: "Original"),
-            site: .wordPressCom(siteId: 123_456_789)
+            site: SiteIdentity(url: siteUrl, wordpressComSiteId: 123_456_789)
         )
         try service.savePostWorkingCopy(id: id, workingCopy: edited)
         let read = try #require(try openService().readPostWorkingCopy(id: id))
@@ -87,11 +87,8 @@ final class LocalContentTests {
         // `WorkingCopyTarget` isn't `Equatable` in Swift, so compare its parts.
         #expect(read.workingCopy == edited)
         #expect(read.target.remotePost == nil)
-        guard case .wordPressCom(let siteId) = read.target.site else {
-            Issue.record("Expected a WordPress.com site, got \(read.target.site)")
-            return
-        }
-        #expect(siteId == 123_456_789)
+        #expect(read.target.site.url == siteUrl)
+        #expect(read.target.site.wordpressComSiteId == 123_456_789)
     }
 
     @Test func savedPageWorkingCopySurvivesReopeningTheDatabase() throws {
@@ -100,25 +97,22 @@ final class LocalContentTests {
         let service = try openService()
         let id = try service.createPageWorkingCopy(
             workingCopy: PageWorkingCopy(common: common(title: "Original page"), parent: nil),
-            site: .selfHosted(url: siteUrl)
+            site: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)
         )
         try service.savePageWorkingCopy(id: id, workingCopy: edited)
         let read = try #require(try openService().readPageWorkingCopy(id: id))
 
         #expect(read.workingCopy == edited)
         #expect(read.target.remotePost == nil)
-        guard case .selfHosted(let url) = read.target.site else {
-            Issue.record("Expected a self-hosted site, got \(read.target.site)")
-            return
-        }
-        #expect(url == siteUrl)
+        #expect(read.target.site.url == siteUrl)
+        #expect(read.target.site.wordpressComSiteId == nil)
     }
 
     @Test func savingAPageAsAPostThrows() throws {
         let service = try openService()
         let pageId = try service.createPageWorkingCopy(
             workingCopy: PageWorkingCopy(common: common(title: "A page"), parent: nil),
-            site: .selfHosted(url: siteUrl)
+            site: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)
         )
         let post = post(title: "Title")
 
