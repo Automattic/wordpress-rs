@@ -1,8 +1,7 @@
 //! Working copy types.
 //!
-//! Fields hold what the editor and its settings work with. Where a server state
-//! can't be expressed as a single editor choice, as with status and password,
-//! the fields follow the server so that converting a remote post loses nothing.
+//! Fields hold what the editor and its settings work with, shaped so that every
+//! state the server can store fits and converting a remote post loses nothing.
 //! See `Documentation/local-content-principles.md`.
 
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
@@ -45,19 +44,27 @@ impl FromSql for WorkingCopyId {
     }
 }
 
-/// The post's status.
+/// The post's status, with its password where the status allows one.
 ///
 /// A scheduled post is `Publish` with a future `PublishDate`, as WordPress
-/// itself treats it.
+/// itself treats it. A private post has no password: WordPress clears it when
+/// saving one. A `password` of `None` means the post has no password.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum StatusSetting {
-    Draft,
-    PendingReview,
-    Publish,
+    Draft {
+        password: Option<String>,
+    },
+    PendingReview {
+        password: Option<String>,
+    },
+    Publish {
+        password: Option<String>,
+    },
     Private,
     /// A status registered by a plugin.
     Custom {
         status: String,
+        password: Option<String>,
     },
 }
 
@@ -98,8 +105,6 @@ pub struct WorkingCopyCommon {
     /// `None` when the user hasn't set a slug.
     pub slug: Option<String>,
     pub status: StatusSetting,
-    /// `None` when the post has no password.
-    pub password: Option<String>,
     pub publish_date: PublishDate,
     /// `None` when the user hasn't chosen an author.
     pub author: Option<UserId>,
@@ -169,39 +174,35 @@ impl WorkingCopyKind {
 }
 
 impl StatusSetting {
-    /// The status as WordPress names it, which is also how it's stored.
-    pub(crate) fn as_wordpress_status(&self) -> &str {
+    /// The `status` and `password` column values. The status is stored as
+    /// WordPress names it.
+    pub(crate) fn to_columns(&self) -> (&str, Option<&str>) {
         match self {
-            Self::Draft => "draft",
-            Self::PendingReview => "pending",
-            Self::Publish => "publish",
-            Self::Private => "private",
-            Self::Custom { status } => status,
+            Self::Draft { password } => ("draft", password.as_deref()),
+            Self::PendingReview { password } => ("pending", password.as_deref()),
+            Self::Publish { password } => ("publish", password.as_deref()),
+            Self::Private => ("private", None),
+            Self::Custom { status, password } => (status, password.as_deref()),
         }
     }
 
-    pub(crate) fn from_wordpress_status(status: &str) -> Self {
+    pub(crate) fn from_columns(
+        status: &str,
+        password: Option<String>,
+    ) -> Result<Self, FromSqlError> {
         match status {
-            "draft" => Self::Draft,
-            "pending" => Self::PendingReview,
-            "publish" => Self::Publish,
-            "private" => Self::Private,
-            status => Self::Custom {
+            "draft" => Ok(Self::Draft { password }),
+            "pending" => Ok(Self::PendingReview { password }),
+            "publish" => Ok(Self::Publish { password }),
+            "private" if password.is_none() => Ok(Self::Private),
+            "private" => Err(FromSqlError::Other(
+                "A private working copy has a password".into(),
+            )),
+            status => Ok(Self::Custom {
                 status: status.to_string(),
-            },
+                password,
+            }),
         }
-    }
-}
-
-impl ToSql for StatusSetting {
-    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(self.as_wordpress_status()))
-    }
-}
-
-impl FromSql for StatusSetting {
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        value.as_str().map(Self::from_wordpress_status)
     }
 }
 

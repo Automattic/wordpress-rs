@@ -110,7 +110,6 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
             },
             StatusSetting::Private,
             None,
-            None,
         ),
         (
             "draft with a password",
@@ -120,8 +119,9 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
                 password: Some("secret".to_string()),
                 ..Default::default()
             },
-            StatusSetting::Draft,
-            Some("secret"),
+            StatusSetting::Draft {
+                password: Some("secret".to_string()),
+            },
             Some(PublishDate::Immediately),
         ),
         (
@@ -131,8 +131,7 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
                 status: Some(PostStatus::Draft),
                 ..Default::default()
             },
-            StatusSetting::Draft,
-            None,
+            StatusSetting::Draft { password: None },
             Some(PublishDate::Immediately),
         ),
         (
@@ -143,8 +142,7 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
                 date: Some(WpDateString::new("2030-06-01T10:00:00".to_string())),
                 ..Default::default()
             },
-            StatusSetting::Draft,
-            None,
+            StatusSetting::Draft { password: None },
             None,
         ),
         (
@@ -155,13 +153,12 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
                 date: Some(WpDateString::new("2050-01-01T12:00:00".to_string())),
                 ..Default::default()
             },
-            StatusSetting::Publish,
-            None,
+            StatusSetting::Publish { password: None },
             None,
         ),
     ];
 
-    for (case, params, expected_status, expected_password, expected_publish_date) in cases {
+    for (case, params, expected_status, expected_publish_date) in cases {
         let mut post = create_and_fetch(&ctx.api, &PostEndpointType::Posts, params).await;
         if case.ends_with("saved again") {
             save_again(&ctx.api, &PostEndpointType::Posts, post.id).await;
@@ -178,11 +175,9 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
             .unwrap_or_else(|| panic!("{case}: the working copy should exist"));
 
         let common = &stored.working_copy.common;
-        assert_eq!(common.status, expected_status, "{case}: status");
         assert_eq!(
-            common.password.as_deref(),
-            expected_password,
-            "{case}: password"
+            common.status, expected_status,
+            "{case}: status and password"
         );
         // A post whose date doesn't float keeps the server's date.
         let expected_publish_date =
