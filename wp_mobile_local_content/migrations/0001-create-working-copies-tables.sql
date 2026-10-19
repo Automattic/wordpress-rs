@@ -59,15 +59,29 @@ CREATE TABLE `page_working_copy_fields` (
   `parent_id` INTEGER
 ) STRICT;
 
+-- Sites working copies are pushed to, one row per site, identified by
+-- something that survives the cache being cleared.
+CREATE TABLE `sites` (
+  -- Internal DB field (auto-incrementing)
+  `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
+
+  `site_kind` TEXT NOT NULL CHECK (`site_kind` IN ('wordpress_com', 'self_hosted')),
+  `wordpress_com_site_id` INTEGER UNIQUE,
+  -- As `ParsedUrl` serializes it
+  `self_hosted_url` TEXT UNIQUE,
+
+  CHECK ((`site_kind` = 'wordpress_com') = (`wordpress_com_site_id` IS NOT NULL)),
+  CHECK ((`site_kind` = 'self_hosted') = (`self_hosted_url` IS NOT NULL))
+) STRICT;
+
 -- Where a working copy is pushed: the site, and the remote post it edits.
 -- A row depends on its working copy and is deleted with it, never the other
 -- way around.
 CREATE TABLE `working_copy_targets` (
   `working_copy_rowid` INTEGER PRIMARY KEY REFERENCES `working_copies`(`rowid`) ON DELETE CASCADE,
 
-  `site_kind` TEXT NOT NULL CHECK (`site_kind` IN ('wordpress_com', 'self_hosted')),
-  `wordpress_com_site_id` INTEGER,
-  `self_hosted_url` TEXT,
+  -- No ON DELETE action: a site can't be deleted while a working copy targets it
+  `site_rowid` INTEGER NOT NULL REFERENCES `sites`(`rowid`),
 
   -- NULL: the working copy is a new post
   `remote_post_id` INTEGER,
@@ -75,7 +89,10 @@ CREATE TABLE `working_copy_targets` (
   -- as a Unix timestamp in seconds. Set exactly when `remote_post_id` is.
   `base_modified_gmt` INTEGER,
 
-  CHECK ((`site_kind` = 'wordpress_com') = (`wordpress_com_site_id` IS NOT NULL)),
-  CHECK ((`site_kind` = 'self_hosted') = (`self_hosted_url` IS NOT NULL)),
-  CHECK ((`remote_post_id` IS NULL) = (`base_modified_gmt` IS NULL))
+  CHECK ((`remote_post_id` IS NULL) = (`base_modified_gmt` IS NULL)),
+
+  -- At most one working copy per remote post. New posts have a NULL
+  -- `remote_post_id`, and SQLite treats NULLs as distinct, so a site can have
+  -- any number of them.
+  UNIQUE (`site_rowid`, `remote_post_id`)
 ) STRICT;

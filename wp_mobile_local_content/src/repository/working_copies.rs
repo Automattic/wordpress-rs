@@ -1,5 +1,5 @@
 use rusqlite::types::{FromSqlError, Type};
-use rusqlite::{OptionalExtension, Row};
+use rusqlite::{ErrorCode, OptionalExtension, Row, ffi};
 use wp_api::{
     posts::{PostCommentStatus, PostFormat, PostId, PostPingStatus},
     terms::TermId,
@@ -16,7 +16,8 @@ use crate::{
             WorkingCopyCommon, WorkingCopyId, WorkingCopyKind, date_from_timestamp,
         },
         working_copy_target::{
-            RemotePostReference, SiteIdentity, WorkingCopyTarget, WorkingCopyTargetColumn,
+            RemotePostReference, SiteColumn, SiteIdentity, WorkingCopyTarget,
+            WorkingCopyTargetColumn,
         },
     },
     repository::{InTransaction, QueryExecutor},
@@ -26,17 +27,21 @@ const WORKING_COPIES: &str = "working_copies";
 const POST_FIELDS: &str = "post_working_copy_fields";
 const PAGE_FIELDS: &str = "page_working_copy_fields";
 const TARGETS: &str = "working_copy_targets";
+const SITES: &str = "sites";
 
 /// Repository for working copies and their targets.
 ///
 /// A working copy spans its row in `working_copies`, the fields table for its
-/// kind, and its row in `working_copy_targets`. Writes that touch more than one
-/// of them require a transaction, so a working copy is never stored without
-/// its fields or its target.
+/// kind, and its row in `working_copy_targets`, which references a row in
+/// `sites`. Writes that touch more than one of them require a transaction, so a
+/// working copy is never stored without its fields or its target.
 pub struct WorkingCopyRepository;
 
 impl WorkingCopyRepository {
     /// Insert a post working copy and its target under a newly generated ID.
+    ///
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the target's remote post
+    /// already has a working copy.
     pub fn insert_post(
         &self,
         transaction: &impl InTransaction,
@@ -62,6 +67,9 @@ impl WorkingCopyRepository {
     }
 
     /// Insert a page working copy and its target under a newly generated ID.
+    ///
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the target's remote post
+    /// already has a working copy.
     pub fn insert_page(
         &self,
         transaction: &impl InTransaction,
@@ -347,26 +355,59 @@ fn insert_target(
     rowid: i64,
     target: &WorkingCopyTarget,
 ) -> Result<(), LocalContentError> {
-    let (site_kind, wordpress_com_site_id, self_hosted_url) = target.site.to_columns();
-    transaction.execute(
-        &format!(
-            "INSERT INTO {TARGETS} (
-                 working_copy_rowid, site_kind, wordpress_com_site_id, self_hosted_url,
-                 remote_post_id, base_modified_gmt
-             ) VALUES (?, ?, ?, ?, ?, ?)"
-        ),
-        rusqlite::params![
-            rowid,
-            site_kind,
-            wordpress_com_site_id,
-            self_hosted_url,
-            target.remote_post.map(|remote| remote.post_id.0),
-            target
-                .remote_post
-                .map(|remote| remote.base_modified_gmt.0.timestamp()),
-        ],
-    )?;
-    Ok(())
+    let site_rowid = select_or_insert_site(transaction, &target.site)?;
+    let mut stmt = transaction.prepare(&format!(
+        "INSERT INTO {TARGETS} (working_copy_rowid, site_rowid, remote_post_id, base_modified_gmt)
+         VALUES (?, ?, ?, ?)"
+    ))?;
+    let result = stmt.execute(rusqlite::params![
+        rowid,
+        site_rowid,
+        target.remote_post.map(|remote| remote.post_id.0),
+        target
+            .remote_post
+            .map(|remote| remote.base_modified_gmt.0.timestamp()),
+    ]);
+    match (result, target.remote_post) {
+        // The only unique constraint a new target can break is the one on
+        // `(site_rowid, remote_post_id)`.
+        (Err(rusqlite::Error::SqliteFailure(err, _)), Some(remote_post))
+            if err.code == ErrorCode::ConstraintViolation
+                && err.extended_code == ffi::SQLITE_CONSTRAINT_UNIQUE =>
+        {
+            Err(LocalContentError::RemotePostAlreadyHasWorkingCopy {
+                post_id: remote_post.post_id,
+            })
+        }
+        (result, _) => {
+            result?;
+            Ok(())
+        }
+    }
+}
+
+/// Returns the `sites` row for `site`, inserting one if there isn't one yet.
+fn select_or_insert_site(
+    transaction: &impl InTransaction,
+    site: &SiteIdentity,
+) -> Result<i64, LocalContentError> {
+    let (site_kind, wordpress_com_site_id, self_hosted_url) = site.to_columns();
+    let params = rusqlite::params![site_kind, wordpress_com_site_id, self_hosted_url];
+
+    let mut select = transaction.prepare(&format!(
+        "SELECT rowid FROM {SITES}
+         WHERE site_kind = ? AND wordpress_com_site_id IS ? AND self_hosted_url IS ?"
+    ))?;
+    if let Some(rowid) = select.query_row(params, |row| row.get(0)).optional()? {
+        return Ok(rowid);
+    }
+
+    let mut insert = transaction.prepare(&format!(
+        "INSERT INTO {SITES} (site_kind, wordpress_com_site_id, self_hosted_url)
+         VALUES (?, ?, ?)
+         RETURNING rowid"
+    ))?;
+    Ok(insert.query_row(params, |row| row.get(0))?)
 }
 
 fn select_target(
@@ -376,17 +417,10 @@ fn select_target(
     let mut stmt = executor.prepare(&format!(
         "SELECT * FROM {TARGETS} WHERE working_copy_rowid = ?"
     ))?;
-    let target = stmt.query_row([rowid], |row| {
+    let (site_rowid, remote_post) = stmt.query_row([rowid], |row| {
         use WorkingCopyTargetColumn::*;
 
-        let site_kind: String = row.get_column(SiteKind)?;
-        let site = SiteIdentity::from_columns(
-            &site_kind,
-            row.get_column(WordPressComSiteId)?,
-            row.get_column(SelfHostedUrl)?,
-        )
-        .map_err(|e| conversion_error(SiteKind, e))?;
-
+        let site_rowid: i64 = row.get_column(SiteRowid)?;
         let remote_post_id: Option<i64> = row.get_column(RemotePostId)?;
         let base_modified_gmt: Option<i64> = row.get_column(BaseModifiedGmt)?;
         let remote_post = match (remote_post_id, base_modified_gmt) {
@@ -406,10 +440,30 @@ fn select_target(
                 ));
             }
         };
-
-        Ok(WorkingCopyTarget { site, remote_post })
+        Ok((site_rowid, remote_post))
     })?;
-    Ok(target)
+    let site = select_site(executor, site_rowid)?;
+
+    Ok(WorkingCopyTarget { site, remote_post })
+}
+
+fn select_site(
+    executor: &impl QueryExecutor,
+    site_rowid: i64,
+) -> Result<SiteIdentity, LocalContentError> {
+    let mut stmt = executor.prepare(&format!("SELECT * FROM {SITES} WHERE rowid = ?"))?;
+    let site = stmt.query_row([site_rowid], |row| {
+        use SiteColumn::*;
+
+        let site_kind: String = row.get_column(SiteKind)?;
+        SiteIdentity::from_columns(
+            &site_kind,
+            row.get_column(WordPressComSiteId)?,
+            row.get_column(SelfHostedUrl)?,
+        )
+        .map_err(|e| conversion_error(SiteKind, e))
+    })?;
+    Ok(site)
 }
 
 fn categories_to_json(categories: &[TermId]) -> Result<String, LocalContentError> {
@@ -670,12 +724,7 @@ mod tests {
 
         let columns = column_names(&conn, TARGETS);
         for (column, name) in [
-            (WorkingCopyTargetColumn::SiteKind, "site_kind"),
-            (
-                WorkingCopyTargetColumn::WordPressComSiteId,
-                "wordpress_com_site_id",
-            ),
-            (WorkingCopyTargetColumn::SelfHostedUrl, "self_hosted_url"),
+            (WorkingCopyTargetColumn::SiteRowid, "site_rowid"),
             (WorkingCopyTargetColumn::RemotePostId, "remote_post_id"),
             (
                 WorkingCopyTargetColumn::BaseModifiedGmt,
@@ -684,7 +733,17 @@ mod tests {
         ] {
             assert_eq!(columns[column.as_index()], name);
         }
-        assert_eq!(columns.len(), 6);
+        assert_eq!(columns.len(), 4);
+
+        let columns = column_names(&conn, SITES);
+        for (column, name) in [
+            (SiteColumn::SiteKind, "site_kind"),
+            (SiteColumn::WordPressComSiteId, "wordpress_com_site_id"),
+            (SiteColumn::SelfHostedUrl, "self_hosted_url"),
+        ] {
+            assert_eq!(columns[column.as_index()], name);
+        }
+        assert_eq!(columns.len(), 4);
     }
 
     #[test]
@@ -825,7 +884,7 @@ mod tests {
         let remote_post_without_base =
             conn.execute(&format!("UPDATE {TARGETS} SET remote_post_id = 5"), []);
         let site_kind_without_its_id = conn.execute(
-            &format!("UPDATE {TARGETS} SET site_kind = 'wordpress_com'"),
+            &format!("UPDATE {SITES} SET site_kind = 'wordpress_com'"),
             [],
         );
 
@@ -840,7 +899,8 @@ mod tests {
         }
     }
 
-    /// Relationships depend on their working copy, never the other way around.
+    /// Relationships depend on their working copy, never the other way around,
+    /// and deleting a site never takes a working copy with it.
     #[test]
     fn test_relationships_are_deleted_with_their_working_copy_and_not_without_one() {
         let mut conn = migrated_connection();
@@ -852,11 +912,12 @@ mod tests {
 
         let orphan_target = conn.execute(
             &format!(
-                "INSERT INTO {TARGETS} (working_copy_rowid, site_kind, self_hosted_url)
-                 VALUES (12345, 'self_hosted', 'https://example.com')"
+                "INSERT INTO {TARGETS} (working_copy_rowid, site_rowid)
+                 SELECT 12345, rowid FROM {SITES}"
             ),
             [],
         );
+        let delete_targeted_site = conn.execute(&format!("DELETE FROM {SITES}"), []);
         conn.execute(
             &format!("DELETE FROM {WORKING_COPIES} WHERE uuid = ?"),
             [&id],
@@ -867,7 +928,67 @@ mod tests {
             orphan_target.is_err(),
             "A target must not exist without a working copy"
         );
+        assert!(
+            delete_targeted_site.is_err(),
+            "A site must not be deleted while a working copy targets it"
+        );
         assert_eq!(count_rows(&conn, POST_FIELDS), 0);
         assert_eq!(count_rows(&conn, TARGETS), 0);
+    }
+
+    #[test]
+    fn test_a_remote_post_has_at_most_one_working_copy() {
+        let mut conn = migrated_connection();
+        let self_hosted = |url: &str, remote_post: Option<RemotePostReference>| WorkingCopyTarget {
+            site: SiteIdentity::SelfHosted {
+                url: Arc::new(ParsedUrl::parse(url).expect("URL should parse")),
+            },
+            remote_post,
+        };
+        let editing_post_5 = Some(RemotePostReference {
+            post_id: PostId(5),
+            base_modified_gmt: date(1_700_000_000),
+        });
+        insert_post(
+            &mut conn,
+            &simple_post("First"),
+            &self_hosted("https://example.com", editing_post_5),
+        );
+
+        let insert = |conn: &mut Connection, target: &WorkingCopyTarget| {
+            let tx = conn.transaction().expect("Failed to begin transaction");
+            let result = WorkingCopyRepository.insert_post(&tx, &simple_post("Another"), target);
+            tx.commit().expect("Commit should succeed");
+            result
+        };
+        let same_post = insert(
+            &mut conn,
+            &self_hosted("https://example.com", editing_post_5),
+        );
+        let same_post_differently_written_url = insert(
+            &mut conn,
+            &self_hosted("HTTPS://EXAMPLE.COM/", editing_post_5),
+        );
+        let new_posts = [
+            insert(&mut conn, &self_hosted("https://example.com", None)),
+            insert(&mut conn, &self_hosted("https://example.com", None)),
+        ];
+        let same_post_id_on_another_site = insert(
+            &mut conn,
+            &self_hosted("https://other.example.com", editing_post_5),
+        );
+
+        let duplicate =
+            Err(LocalContentError::RemotePostAlreadyHasWorkingCopy { post_id: PostId(5) });
+        assert_eq!(same_post, duplicate);
+        assert_eq!(same_post_differently_written_url, duplicate);
+        for result in new_posts {
+            assert!(result.is_ok(), "New posts must not collide: {result:?}");
+        }
+        assert!(
+            same_post_id_on_another_site.is_ok(),
+            "Another site's post with the same ID is a different post: {same_post_id_on_another_site:?}"
+        );
+        assert_eq!(count_rows(&conn, SITES), 2);
     }
 }
