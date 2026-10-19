@@ -60,19 +60,21 @@ CREATE TABLE `page_working_copy_fields` (
 ) STRICT;
 
 -- Sites working copies are pushed to, one row per site, identified by
--- something that survives the cache being cleared.
+-- something that survives the cache being cleared. A site with a WordPress.com
+-- site ID is identified by it, whatever its URL. A site without one is
+-- identified by its URL.
 CREATE TABLE `sites` (
   -- Internal DB field (auto-incrementing)
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
 
-  `site_kind` TEXT NOT NULL CHECK (`site_kind` IN ('wordpress_com', 'self_hosted')),
+  -- NULL: no WordPress.com site ID is known for the site
   `wordpress_com_site_id` INTEGER UNIQUE,
-  -- As `ParsedUrl` serializes it
-  `self_hosted_url` TEXT UNIQUE,
-
-  CHECK ((`site_kind` = 'wordpress_com') = (`wordpress_com_site_id` IS NOT NULL)),
-  CHECK ((`site_kind` = 'self_hosted') = (`self_hosted_url` IS NOT NULL))
+  -- The URL last given for the site, as `ParsedUrl` serializes it
+  `url` TEXT NOT NULL
 ) STRICT;
+
+CREATE UNIQUE INDEX `idx_sites_url_without_wordpress_com_site_id`
+  ON `sites`(`url`) WHERE `wordpress_com_site_id` IS NULL;
 
 -- Where a working copy is pushed: the site, and the remote post it edits.
 -- A row depends on its working copy and is deleted with it, never the other

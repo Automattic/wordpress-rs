@@ -12,16 +12,16 @@ use wp_api::{date::WpGmtDateTime, parsed_url::ParsedUrl, posts::PostId, wp_com::
 use wp_mobile_sqlite::ColumnIndex;
 
 /// Identifies a site by something that survives the cache being cleared.
-#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
-pub enum SiteIdentity {
-    WordPressCom {
-        site_id: WpComSiteId,
-    },
+///
+/// A site with a WordPress.com site ID is identified by it, whatever its URL,
+/// so a working copy stays with its site when the site's URL changes. A site
+/// without one is identified by its URL, until a site ID is given for that URL.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct SiteIdentity {
     /// Stored in the serialized form `ParsedUrl` produces, so URLs that parse
     /// to the same `ParsedUrl` are stored the same way.
-    SelfHosted {
-        url: Arc<ParsedUrl>,
-    },
+    pub url: Arc<ParsedUrl>,
+    pub wordpress_com_site_id: Option<WpComSiteId>,
 }
 
 /// The remote post a working copy edits.
@@ -43,31 +43,23 @@ pub struct WorkingCopyTarget {
 }
 
 impl SiteIdentity {
-    /// The `site_kind`, `wordpress_com_site_id` and `self_hosted_url` column values.
-    pub(crate) fn to_columns(&self) -> (&'static str, Option<i64>, Option<&str>) {
-        match self {
+    /// The `wordpress_com_site_id` and `url` column values.
+    pub(crate) fn to_columns(&self) -> (Option<i64>, &str) {
+        (
             // SQLite stores integers as i64; WordPress.com site IDs fit.
-            Self::WordPressCom { site_id } => ("wordpress_com", Some(site_id.0 as i64), None),
-            Self::SelfHosted { url } => ("self_hosted", None, Some(url.as_str())),
-        }
+            self.wordpress_com_site_id.map(|site_id| site_id.0 as i64),
+            self.url.as_str(),
+        )
     }
 
     pub(crate) fn from_columns(
-        site_kind: &str,
         wordpress_com_site_id: Option<i64>,
-        self_hosted_url: Option<String>,
+        url: &str,
     ) -> Result<Self, FromSqlError> {
-        match (site_kind, wordpress_com_site_id, self_hosted_url) {
-            ("wordpress_com", Some(site_id), None) => Ok(Self::WordPressCom {
-                site_id: WpComSiteId(site_id as u64),
-            }),
-            ("self_hosted", None, Some(url)) => Ok(Self::SelfHosted {
-                url: Arc::new(ParsedUrl::parse(&url).map_err(|e| FromSqlError::Other(e.into()))?),
-            }),
-            (site_kind, _, _) => Err(FromSqlError::Other(
-                format!("Inconsistent site columns for site_kind={site_kind}").into(),
-            )),
-        }
+        Ok(Self {
+            url: Arc::new(ParsedUrl::parse(url).map_err(|e| FromSqlError::Other(e.into()))?),
+            wordpress_com_site_id: wordpress_com_site_id.map(|site_id| WpComSiteId(site_id as u64)),
+        })
     }
 }
 
@@ -77,9 +69,8 @@ impl SiteIdentity {
 #[repr(usize)]
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum SiteColumn {
-    SiteKind = 1,
-    WordPressComSiteId = 2,
-    SelfHostedUrl = 3,
+    WordPressComSiteId = 1,
+    Url = 2,
 }
 
 impl ColumnIndex for SiteColumn {

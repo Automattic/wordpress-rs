@@ -69,16 +69,18 @@ fn post(title: &str) -> PostWorkingCopy {
 }
 
 fn self_hosted_site() -> SiteIdentity {
-    SiteIdentity::SelfHosted {
+    SiteIdentity {
         url: Arc::new(ParsedUrl::parse("https://example.com").expect("URL should parse")),
+        wordpress_com_site_id: None,
     }
 }
 
 #[test]
 fn test_saved_post_working_copy_survives_reopening_the_database() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
-    let site = SiteIdentity::WordPressCom {
-        site_id: WpComSiteId(123_456_789),
+    let site = SiteIdentity {
+        url: Arc::new(ParsedUrl::parse("https://example.wordpress.com").expect("URL should parse")),
+        wordpress_com_site_id: Some(WpComSiteId(123_456_789)),
     };
     let edited = PostWorkingCopy {
         common: WorkingCopyCommon {
