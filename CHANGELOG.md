@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-20
+
 ### Added
 
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
@@ -20,9 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Several `WPComSite` fields are now optional
   - `WPComPlan.product_id` is now a `WpComPlanProductId`, with a `Vip` variant
   - `WPComLaunchStatus::Pending` is replaced by `Unlaunched`, and `false` reads as `None`
-
-### Fixed
-
 - **BREAKING:** Comments' `author_avatar_urls` is now optional in every context, so Swift and Kotlin see a nullable map. WordPress omits the field when a site turns off "Show Avatars", which previously failed every comment response from that site.
 
 ### Changed
