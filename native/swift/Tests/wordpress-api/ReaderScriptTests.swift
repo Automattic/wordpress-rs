@@ -282,6 +282,9 @@ struct ReaderScriptTests {
 
         window.addEventListener('load', async () => {
           await wait(400);
+          // The embed is sized when its page answers, which makes the page 80px taller. On CI's
+          // simulators that can be seconds after `load`, in the middle of the height checks.
+          await until(() => style('embed').height === '345px', 10000);
 
           // Images
           const plain = byId('plain');
