@@ -138,6 +138,40 @@ impl WorkingCopyRepository {
         Ok(true)
     }
 
+    /// Record that a post working copy was pushed to `remote_post`: from now
+    /// on it edits that post, based on the given `modified_gmt`. Its fields and
+    /// `updated_at` are left unchanged.
+    ///
+    /// Returns `false` if no post working copy has the given ID. Fails with
+    /// `RemotePostAlreadyHasWorkingCopy` if another working copy edits that
+    /// post, and with `PushedToAnotherRemotePost` if this one edits a
+    /// different post.
+    pub fn record_post_push(
+        &self,
+        transaction: &impl InTransaction,
+        id: &WorkingCopyId,
+        remote_post: RemotePostReference,
+    ) -> Result<bool, LocalContentError> {
+        record_push(transaction, WorkingCopyKind::Post, id, remote_post)
+    }
+
+    /// Record that a page working copy was pushed to `remote_post`: from now
+    /// on it edits that page, based on the given `modified_gmt`. Its fields and
+    /// `updated_at` are left unchanged.
+    ///
+    /// Returns `false` if no page working copy has the given ID. Fails with
+    /// `RemotePostAlreadyHasWorkingCopy` if another working copy edits that
+    /// page, and with `PushedToAnotherRemotePost` if this one edits a
+    /// different page.
+    pub fn record_page_push(
+        &self,
+        transaction: &impl InTransaction,
+        id: &WorkingCopyId,
+        remote_post: RemotePostReference,
+    ) -> Result<bool, LocalContentError> {
+        record_push(transaction, WorkingCopyKind::Page, id, remote_post)
+    }
+
     /// Delete a post working copy. Its fields and target are deleted with it.
     ///
     /// Returns `false` if no post working copy has the given ID.
@@ -416,6 +450,47 @@ fn delete_working_copy(
     Ok(deleted > 0)
 }
 
+fn record_push(
+    transaction: &impl InTransaction,
+    kind: WorkingCopyKind,
+    id: &WorkingCopyId,
+    remote_post: RemotePostReference,
+) -> Result<bool, LocalContentError> {
+    let mut stmt = transaction.prepare(&format!(
+        "SELECT w.rowid, t.remote_post_id FROM {WORKING_COPIES} w
+         JOIN {TARGETS} t ON t.working_copy_rowid = w.rowid
+         WHERE w.uuid = ? AND w.kind = ?"
+    ))?;
+    let Some((rowid, edited_post_id)) = stmt
+        .query_row(rusqlite::params![id, kind.as_str()], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, Option<i64>>(1)?))
+        })
+        .optional()?
+    else {
+        return Ok(false);
+    };
+    if let Some(edited_post_id) = edited_post_id.map(PostId)
+        && edited_post_id != remote_post.post_id
+    {
+        return Err(LocalContentError::PushedToAnotherRemotePost {
+            edited_post_id,
+            pushed_post_id: remote_post.post_id,
+        });
+    }
+
+    let mut update = transaction.prepare(&format!(
+        "UPDATE {TARGETS} SET remote_post_id = ?, base_modified_gmt = ?
+         WHERE working_copy_rowid = ?"
+    ))?;
+    let result = update.execute(rusqlite::params![
+        remote_post.post_id.0,
+        remote_post.base_modified_gmt.0.timestamp(),
+        rowid,
+    ]);
+    remote_post_conflict(result, remote_post.post_id)?;
+    Ok(true)
+}
+
 fn select_id_by_remote_post(
     executor: &impl QueryExecutor,
     kind: WorkingCopyKind,
@@ -540,18 +615,31 @@ fn insert_target(
             .remote_post
             .map(|remote| remote.base_modified_gmt.0.timestamp()),
     ]);
-    match (result, target.remote_post) {
-        // The only unique constraint a new target can break is the one on
-        // `(site_rowid, remote_post_id)`.
-        (Err(rusqlite::Error::SqliteFailure(err, _)), Some(remote_post))
+    match target.remote_post {
+        Some(remote_post) => remote_post_conflict(result, remote_post.post_id),
+        None => {
+            result?;
+            Ok(())
+        }
+    }
+}
+
+/// Maps the result of writing a target that edits remote post `post_id`.
+///
+/// The only unique constraint a target write can break is the one on
+/// `(site_rowid, remote_post_id)`, meaning another working copy edits the post.
+fn remote_post_conflict(
+    result: rusqlite::Result<usize>,
+    post_id: PostId,
+) -> Result<(), LocalContentError> {
+    match result {
+        Err(rusqlite::Error::SqliteFailure(err, _))
             if err.code == ErrorCode::ConstraintViolation
                 && err.extended_code == ffi::SQLITE_CONSTRAINT_UNIQUE =>
         {
-            Err(LocalContentError::RemotePostAlreadyHasWorkingCopy {
-                post_id: remote_post.post_id,
-            })
+            Err(LocalContentError::RemotePostAlreadyHasWorkingCopy { post_id })
         }
-        (result, _) => {
+        result => {
             result?;
             Ok(())
         }
@@ -1292,5 +1380,113 @@ mod tests {
             ids_for(&conn, &site("https://example.com", Some(7))),
             vec![]
         );
+    }
+
+    #[test]
+    fn test_recording_a_push_points_the_working_copy_at_the_pushed_post() {
+        let mut conn = migrated_connection();
+        let new_post = insert_post(
+            &mut conn,
+            &simple_post("New"),
+            &self_hosted_new_post_target(),
+        );
+        let editing_99 = insert_post(
+            &mut conn,
+            &simple_post("Editing 99"),
+            &wordpress_com_target_editing(99),
+        );
+        let before = WorkingCopyRepository
+            .select_post(&conn, &new_post)
+            .expect("Select should succeed")
+            .expect("The new post should exist");
+        let pushed_as_7 = RemotePostReference {
+            post_id: PostId(7),
+            base_modified_gmt: date(1_800_000_000),
+        };
+        let pushed_99_again = RemotePostReference {
+            post_id: PostId(99),
+            base_modified_gmt: date(1_800_000_000),
+        };
+
+        let tx = conn.transaction().expect("Failed to begin transaction");
+        let recorded_new_post = WorkingCopyRepository
+            .record_post_push(&tx, &new_post, pushed_as_7)
+            .expect("Recording should succeed");
+        let recorded_99 = WorkingCopyRepository
+            .record_post_push(&tx, &editing_99, pushed_99_again)
+            .expect("Recording should succeed");
+        tx.commit().expect("Commit should succeed");
+        let after = WorkingCopyRepository
+            .select_post(&conn, &new_post)
+            .expect("Select should succeed")
+            .expect("The new post should exist");
+        let editing_99_target = WorkingCopyRepository
+            .select_post(&conn, &editing_99)
+            .expect("Select should succeed")
+            .expect("The post should exist")
+            .target;
+
+        assert!(recorded_new_post && recorded_99);
+        assert_eq!(after.target.remote_post, Some(pushed_as_7));
+        assert_eq!(after.target.site, before.target.site);
+        assert_eq!(after.working_copy, before.working_copy);
+        assert_eq!(after.updated_at, before.updated_at);
+        assert_eq!(editing_99_target.remote_post, Some(pushed_99_again));
+    }
+
+    #[test]
+    fn test_recording_a_push_refuses_what_would_break_the_target() {
+        let mut conn = migrated_connection();
+        let editing_99 = insert_post(
+            &mut conn,
+            &simple_post("Editing 99"),
+            &wordpress_com_target_editing(99),
+        );
+        let new_post = insert_post(
+            &mut conn,
+            &simple_post("New"),
+            &new_post_on(&wordpress_com_target_editing(99).site),
+        );
+        let page = insert_page(
+            &mut conn,
+            &PageWorkingCopy {
+                common: common("A page"),
+                parent: None,
+            },
+            &self_hosted_new_post_target(),
+        );
+        let pushed_as = |post_id: i64| RemotePostReference {
+            post_id: PostId(post_id),
+            base_modified_gmt: date(1_800_000_000),
+        };
+
+        let tx = conn.transaction().expect("Failed to begin transaction");
+        let to_another_post =
+            WorkingCopyRepository.record_post_push(&tx, &editing_99, pushed_as(5));
+        let to_a_post_with_a_working_copy =
+            WorkingCopyRepository.record_post_push(&tx, &new_post, pushed_as(99));
+        let page_as_a_post = WorkingCopyRepository.record_post_push(&tx, &page, pushed_as(5));
+        tx.commit().expect("Commit should succeed");
+        let new_post_target = WorkingCopyRepository
+            .select_post(&conn, &new_post)
+            .expect("Select should succeed")
+            .expect("The new post should exist")
+            .target;
+
+        assert_eq!(
+            to_another_post,
+            Err(LocalContentError::PushedToAnotherRemotePost {
+                edited_post_id: PostId(99),
+                pushed_post_id: PostId(5),
+            })
+        );
+        assert_eq!(
+            to_a_post_with_a_working_copy,
+            Err(LocalContentError::RemotePostAlreadyHasWorkingCopy {
+                post_id: PostId(99)
+            })
+        );
+        assert_eq!(new_post_target.remote_post, None);
+        assert_eq!(page_as_a_post, Ok(false));
     }
 }

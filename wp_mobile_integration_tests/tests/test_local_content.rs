@@ -278,3 +278,38 @@ fn test_a_remote_post_gets_its_working_copy_back_and_a_new_post_never_does() {
     assert_eq!(read.target, remote_target);
     assert_ne!(first_new.id, second_new.id);
 }
+
+#[test]
+fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let service = open_service(&dir);
+    let created = service
+        .read_or_create_post_working_copy(new_post_on(self_hosted_site()), post("Draft"))
+        .expect("Create should succeed");
+    let pushed = RemotePostReference {
+        post_id: PostId(2007),
+        base_modified_gmt: date("2030-03-17T17:46:40Z"),
+    };
+    let unknown_id = WorkingCopyId("00000000-0000-4000-8000-000000000000".to_string());
+
+    service
+        .record_post_working_copy_push(created.id.clone(), pushed)
+        .expect("Recording the push should succeed");
+    let found = service
+        .read_or_create_post_working_copy(
+            WorkingCopyTarget {
+                site: self_hosted_site(),
+                remote_post: Some(pushed),
+            },
+            post("Fetched"),
+        )
+        .expect("Read should succeed");
+
+    assert_eq!(found.id, created.id);
+    assert_eq!(found.working_copy, post("Draft"));
+    assert_eq!(found.target.remote_post, Some(pushed));
+    assert_eq!(
+        service.record_post_working_copy_push(unknown_id.clone(), pushed),
+        Err(LocalContentError::WorkingCopyNotFound { id: unknown_id })
+    );
+}
