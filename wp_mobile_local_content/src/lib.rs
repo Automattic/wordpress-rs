@@ -9,7 +9,6 @@ use wp_api::posts::PostId;
 use wp_mobile_sqlite::{ConnectionError, DbConnection, MigrationManager};
 
 use crate::db_types::working_copy::WorkingCopyId;
-use crate::remote::RemotePostConversionError;
 
 pub mod db_types;
 pub mod remote;
@@ -25,16 +24,8 @@ pub enum LocalContentError {
     WorkingCopyNotFound { id: WorkingCopyId },
     #[error("The local content database needs an absolute file path, got {path:?}")]
     InvalidDatabasePath { path: String },
-    #[error("Can't make a working copy from the remote post: {error}")]
-    RemotePostConversion { error: RemotePostConversionError },
     #[error("Remote post {} already has a working copy", post_id.0)]
     RemotePostAlreadyHasWorkingCopy { post_id: PostId },
-}
-
-impl From<RemotePostConversionError> for LocalContentError {
-    fn from(error: RemotePostConversionError) -> Self {
-        LocalContentError::RemotePostConversion { error }
-    }
 }
 
 impl From<rusqlite::Error> for LocalContentError {

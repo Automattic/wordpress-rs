@@ -33,22 +33,19 @@ final class LocalContentFromRemoteTests {
         let post = try await fetchFirst(.posts)
         let service = try openService()
 
-        let read = try service.readOrCreatePostWorkingCopyFromRemote(site: site, post: post)
+        let target = WorkingCopyTarget(site: site, remotePost: RemotePostReference(remote: post))
+        let read = try service.readOrCreatePostWorkingCopy(target: target, workingCopy: PostWorkingCopy(remote: post))
 
         #expect(read.workingCopy.common.title == post.title?.raw)
         #expect(read.workingCopy.common.content == post.content.raw)
         #expect(read.target.remotePost == RemotePostReference(postId: post.id, baseModifiedGmt: post.modifiedGmt))
     }
 
-    @Test func workingCopyFromAPageFetchedAsAPostThrows() async throws {
+    @Test func postWorkingCopyFromAFetchedPageThrows() async throws {
         let page = try await fetchFirst(.pages)
-        let service = try openService()
 
-        do {
-            _ = try service.readOrCreatePostWorkingCopyFromRemote(site: site, post: page)
-            Issue.record("Creating a post working copy from a page should throw")
-        } catch LocalContentError.RemotePostConversion(let error) {
-            #expect(error == .wrongPostType(expected: "post", actual: "page"))
+        #expect(throws: RemotePostConversionError.WrongPostType(expected: "post", actual: "page")) {
+            try PostWorkingCopy(remote: page)
         }
     }
 }

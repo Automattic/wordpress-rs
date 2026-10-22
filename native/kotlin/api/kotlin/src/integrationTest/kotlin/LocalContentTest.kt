@@ -18,7 +18,7 @@ import uniffi.wp_mobile_local_content.LocalContentException
 import uniffi.wp_mobile_local_content.PageWorkingCopy
 import uniffi.wp_mobile_local_content.PostWorkingCopy
 import uniffi.wp_mobile_local_content.PublishDate
-import uniffi.wp_mobile_local_content.RemotePostConversionError
+import uniffi.wp_mobile_local_content.RemotePostConversionException
 import uniffi.wp_mobile_local_content.RemotePostReference
 import uniffi.wp_mobile_local_content.SiteIdentity
 import uniffi.wp_mobile_local_content.StatusSetting
@@ -26,6 +26,8 @@ import uniffi.wp_mobile_local_content.Tag
 import uniffi.wp_mobile_local_content.WorkingCopyCommon
 import uniffi.wp_mobile_local_content.WorkingCopyTarget
 import uniffi.wp_mobile_local_content.WpLocalContentStore
+import uniffi.wp_mobile_local_content.postWorkingCopyFromRemote
+import uniffi.wp_mobile_local_content.remotePostReferenceFromRemote
 import java.nio.file.Path
 import java.util.Date
 import kotlin.test.assertEquals
@@ -79,6 +81,8 @@ class LocalContentTest {
 
     private val newPostSite = SiteIdentity(url = ParsedUrl.parse("https://example.com"), wordpressComSiteId = null)
 
+    private fun newPostOn(site: SiteIdentity) = WorkingCopyTarget(site = site, remotePost = null)
+
     @Test
     fun `opening an in-memory database throws`() {
         assertThrows<LocalContentException.InvalidDatabasePath> {
@@ -107,7 +111,7 @@ class LocalContentTest {
         )
 
         val service = openService()
-        val id = service.createPostWorkingCopy(post("Original"), wordPressComSite)
+        val id = service.readOrCreatePostWorkingCopy(newPostOn(wordPressComSite), post("Original")).id
         service.savePostWorkingCopy(id, edited)
         val read = assertNotNull(openService().readPostWorkingCopy(id))
 
@@ -120,10 +124,10 @@ class LocalContentTest {
         val edited = PageWorkingCopy(common = common("Edited page"), parent = 3L)
 
         val service = openService()
-        val id = service.createPageWorkingCopy(
-            PageWorkingCopy(common = common("Original page"), parent = null),
-            newPostSite
-        )
+        val id = service.readOrCreatePageWorkingCopy(
+            newPostOn(newPostSite),
+            PageWorkingCopy(common = common("Original page"), parent = null)
+        ).id
         service.savePageWorkingCopy(id, edited)
         val read = assertNotNull(openService().readPageWorkingCopy(id))
 
@@ -134,10 +138,10 @@ class LocalContentTest {
     @Test
     fun `saving a page as a post throws`() {
         val service = openService()
-        val pageId = service.createPageWorkingCopy(
-            PageWorkingCopy(common = common("A page"), parent = null),
-            newPostSite
-        )
+        val pageId = service.readOrCreatePageWorkingCopy(
+            newPostOn(newPostSite),
+            PageWorkingCopy(common = common("A page"), parent = null)
+        ).id
 
         assertThrows<LocalContentException.WorkingCopyNotFound> {
             service.savePostWorkingCopy(pageId, post("Title"))
@@ -149,7 +153,8 @@ class LocalContentTest {
         val post = fetchFirst(PostEndpointType.Posts)
         val service = openService()
 
-        val read = service.readOrCreatePostWorkingCopyFromRemote(site, post)
+        val target = WorkingCopyTarget(site = site, remotePost = remotePostReferenceFromRemote(post))
+        val read = service.readOrCreatePostWorkingCopy(target, postWorkingCopyFromRemote(post))
 
         assertEquals(post.title?.raw, read.workingCopy.common.title)
         assertEquals(post.content.raw, read.workingCopy.common.content)
@@ -160,13 +165,13 @@ class LocalContentTest {
     }
 
     @Test
-    fun `working copy from a page fetched as a post throws`() = runTest {
+    fun `post working copy from a fetched page throws`() = runTest {
         val page = fetchFirst(PostEndpointType.Pages)
-        val service = openService()
 
-        val error = assertThrows<LocalContentException.RemotePostConversion> {
-            service.readOrCreatePostWorkingCopyFromRemote(site, page)
+        val error = assertThrows<RemotePostConversionException.WrongPostType> {
+            postWorkingCopyFromRemote(page)
         }
-        assertEquals(RemotePostConversionError.WrongPostType(expected = "post", actual = "page"), error.error)
+        assertEquals("post", error.expected)
+        assertEquals("page", error.actual)
     }
 }

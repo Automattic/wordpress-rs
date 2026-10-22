@@ -18,10 +18,13 @@ use wp_api::{
 use wp_mobile::service::local_content::LocalContentService;
 use wp_mobile_integration_tests::*;
 use wp_mobile_local_content::{
-    LocalContentError, WpLocalContentStore,
+    WpLocalContentStore,
     db_types::{
-        working_copy::{PublishDate, StatusSetting},
-        working_copy_target::SiteIdentity,
+        working_copy::{
+            DbPageWorkingCopy, DbPostWorkingCopy, PageWorkingCopy, PostWorkingCopy, PublishDate,
+            StatusSetting,
+        },
+        working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
     },
     remote::RemotePostConversionError,
 };
@@ -48,6 +51,37 @@ fn site() -> SiteIdentity {
         ),
         wordpress_com_site_id: None,
     }
+}
+
+fn target_for(post: &AnyPostWithEditContext) -> WorkingCopyTarget {
+    WorkingCopyTarget {
+        site: site(),
+        remote_post: Some(RemotePostReference::from_remote(post)),
+    }
+}
+
+/// Read or create the working copy of `post` the way an app would: convert the
+/// fetched post, then hand the service the result.
+fn read_or_create_post(
+    service: &LocalContentService,
+    post: &AnyPostWithEditContext,
+) -> DbPostWorkingCopy {
+    let working_copy =
+        PostWorkingCopy::from_remote(post).expect("Converting the post should succeed");
+    service
+        .read_or_create_post_working_copy(target_for(post), working_copy)
+        .expect("Reading or creating the working copy should succeed")
+}
+
+fn read_or_create_page(
+    service: &LocalContentService,
+    page: &AnyPostWithEditContext,
+) -> DbPageWorkingCopy {
+    let working_copy =
+        PageWorkingCopy::from_remote(page).expect("Converting the page should succeed");
+    service
+        .read_or_create_page_working_copy(target_for(page), working_copy)
+        .expect("Reading or creating the working copy should succeed")
 }
 
 /// Create a post on the server, then fetch it with the edit context the way
@@ -168,11 +202,8 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
             save_again(&ctx.api, &PostEndpointType::Posts, post.id).await;
             post = fetch(&ctx.api, &PostEndpointType::Posts, post.id).await;
         }
-        let (post_id, date_gmt) = (post.id, post.date_gmt);
 
-        let stored = service
-            .read_or_create_post_working_copy_from_remote(site(), post)
-            .unwrap_or_else(|e| panic!("{case}: creating the working copy should succeed: {e}"));
+        let stored = read_or_create_post(&service, &post);
 
         let common = &stored.working_copy.common;
         assert_eq!(
@@ -180,15 +211,16 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
             "{case}: status and password"
         );
         // A post whose date doesn't float keeps the server's date.
-        let expected_publish_date =
-            expected_publish_date.unwrap_or(PublishDate::At { date: date_gmt });
+        let expected_publish_date = expected_publish_date.unwrap_or(PublishDate::At {
+            date: post.date_gmt,
+        });
         assert_eq!(
             common.publish_date, expected_publish_date,
             "{case}: publish date"
         );
         assert_eq!(
             stored.target.remote_post.map(|remote| remote.post_id),
-            Some(post_id),
+            Some(post.id),
             "{case}: the target should point at the remote post"
         );
     }
@@ -226,12 +258,8 @@ async fn test_working_copy_from_server_page_keeps_its_parent() {
     )
     .await;
 
-    let parent_page = service
-        .read_or_create_page_working_copy_from_remote(site(), parent)
-        .expect("Creating the working copy should succeed");
-    let child_page = service
-        .read_or_create_page_working_copy_from_remote(site(), child)
-        .expect("Creating the working copy should succeed");
+    let parent_page = read_or_create_page(&service, &parent);
+    let child_page = read_or_create_page(&service, &child);
 
     assert_eq!(parent_page.working_copy.parent, None);
     assert_eq!(child_page.working_copy.parent, Some(parent_id));
@@ -255,20 +283,14 @@ async fn test_a_server_post_with_a_working_copy_gets_it_back() {
     )
     .await;
 
-    let post_id = post.id;
-
-    let created = service
-        .read_or_create_post_working_copy_from_remote(site(), post)
-        .expect("Creating the working copy should succeed");
+    let created = read_or_create_post(&service, &post);
     let mut edited = created.working_copy.clone();
     edited.common.title = "Edited on the device".to_string();
     service
         .save_post_working_copy(created.id.clone(), edited.clone())
         .expect("Saving should succeed");
-    let fetched_again = fetch(&ctx.api, &PostEndpointType::Posts, post_id).await;
-    let read_again = service
-        .read_or_create_post_working_copy_from_remote(site(), fetched_again)
-        .expect("Reading the working copy should succeed");
+    let fetched_again = fetch(&ctx.api, &PostEndpointType::Posts, post.id).await;
+    let read_again = read_or_create_post(&service, &fetched_again);
 
     assert_eq!(read_again.id, created.id);
     assert_eq!(read_again.working_copy, edited);
@@ -280,8 +302,6 @@ async fn test_a_server_post_with_a_working_copy_gets_it_back() {
 #[serial]
 async fn test_trashed_server_post_is_refused() {
     let ctx = create_test_context();
-    let dir = tempfile::tempdir().expect("Failed to create temp dir");
-    let service = open_service(&dir);
 
     let post = create_and_fetch(
         &ctx.api,
@@ -309,14 +329,10 @@ async fn test_trashed_server_post_is_refused() {
         .expect("Fetching the trashed post should succeed")
         .data;
 
-    let result = service.read_or_create_post_working_copy_from_remote(site(), trashed);
-
     assert_eq!(
-        result,
-        Err(LocalContentError::RemotePostConversion {
-            error: RemotePostConversionError::UneditableStatus {
-                status: "trash".to_string(),
-            },
+        PostWorkingCopy::from_remote(&trashed),
+        Err(RemotePostConversionError::UneditableStatus {
+            status: "trash".to_string(),
         })
     );
 
