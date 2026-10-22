@@ -196,9 +196,8 @@ fn lets_the_page_load_gists_from_github() {
 
     let page = |offline| {
         content.page_html(super::ReaderPageOptions {
-            colors: super::ReaderPageColors::Fixed {
-                theme: super::ReaderFixedTheme::Sepia,
-            },
+            theme: super::ReaderTheme::Sepia,
+            app_colors: super::theme::test_app_colors(),
             language: None,
             offline,
             font: None,

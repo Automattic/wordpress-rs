@@ -14,10 +14,8 @@ use std::{fs, path::Path};
 use scraper::{ElementRef, Html, Selector};
 use serde_json::Value;
 
-use super::{
-    ReaderFixedTheme, ReaderPageColors, ReaderPageOptions, ReaderPostContent, embeds, gists,
-    reader_script,
-};
+use super::theme::test_app_colors;
+use super::{ReaderPageOptions, ReaderPostContent, ReaderTheme, embeds, gists, reader_script};
 
 /// A post's address, so the cases also go through resolving relative URLs.
 const POST_URL: &str = "https://example.com/2026/10/post/";
@@ -148,9 +146,8 @@ fn page_problems(content: &ReaderPostContent) -> Vec<String> {
     let mut problems = Vec::new();
     for offline in [false, true] {
         let page = content.page_html(ReaderPageOptions {
-            colors: ReaderPageColors::Fixed {
-                theme: ReaderFixedTheme::Sepia,
-            },
+            theme: ReaderTheme::Sepia,
+            app_colors: test_app_colors(),
             language: None,
             offline,
             font: None,

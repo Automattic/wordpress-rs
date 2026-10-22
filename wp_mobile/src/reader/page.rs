@@ -6,14 +6,18 @@ use sha2::{Digest, Sha256};
 use super::assets::{reader_script, reader_stylesheet};
 use super::embeds::policy_hosts;
 use super::theme::{
-    ReaderFont, ReaderPageColors, reader_page_colors_css, reader_page_typography_css,
+    ReaderAppColors, ReaderFont, ReaderTheme, reader_page_colors_css, reader_page_theme_css,
+    reader_page_typography_css,
 };
 
 /// What a Reader post page needs besides the post: see
 /// [`ReaderPostContent::page_html`](super::ReaderPostContent::page_html).
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct ReaderPageOptions {
-    pub colors: ReaderPageColors,
+    /// The reader's theme.
+    pub theme: ReaderTheme,
+    /// The app's own colours, which the System and Reader themes use.
+    pub app_colors: ReaderAppColors,
     /// The site's language, like `fa` or `pt-br`, so the page's text runs in the direction it does
     /// on the site. The Reader API has it in `meta.data.site.locale`, for signed-in requests.
     /// Without it, the page runs in the direction most of the post's letters do. Parts of the post
@@ -79,8 +83,9 @@ pub(super) fn page_html(
     let typography = reader_page_typography_css(
         options.font.unwrap_or(ReaderFont::Sans),
         options.text_scale,
-        options.colors,
+        options.theme,
     );
+    let theme_css = style(Some(reader_page_theme_css(options.theme)).filter(|css| !css.is_empty()));
     let server_css = style(options.server_css);
     let app_css = style(options.css);
     let scripts: &[String] = if options.offline { &[] } else { scripts };
@@ -105,6 +110,7 @@ pub(super) fn page_html(
          <style>{colors}</style>\n\
          <style>{typography}</style>\n\
          <style>{stylesheet}</style>\n\
+         {theme_css}\
          {server_css}\
          {app_css}\
          <script>{script}</script>\n\
@@ -114,7 +120,7 @@ pub(super) fn page_html(
          {scripts}\
          </body>\n\
          </html>\n",
-        colors = reader_page_colors_css(options.colors),
+        colors = reader_page_colors_css(options.theme, options.app_colors),
         stylesheet = reader_stylesheet(),
         script = reader_script(),
     )
@@ -208,8 +214,9 @@ fn attribute(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{BASE64, ReaderPageOptions};
+    use crate::reader::theme::test_app_colors;
     use crate::reader::{
-        ReaderFixedTheme, ReaderFont, ReaderPageColors, ReaderPostContent, reader_page_colors_css,
+        ReaderFont, ReaderPostContent, ReaderTheme, reader_page_colors_css, reader_page_theme_css,
         reader_page_typography_css, reader_script, reader_stylesheet,
     };
     use base64::Engine;
@@ -218,9 +225,8 @@ mod tests {
 
     fn options() -> ReaderPageOptions {
         ReaderPageOptions {
-            colors: ReaderPageColors::Fixed {
-                theme: ReaderFixedTheme::Sepia,
-            },
+            theme: ReaderTheme::Sepia,
+            app_colors: test_app_colors(),
             language: None,
             offline: false,
             font: None,
@@ -236,7 +242,7 @@ mod tests {
         let page = content.page_html(options());
 
         assert!(page.starts_with("<!DOCTYPE html>\n<html dir=\"ltr\">\n<head>\n"));
-        let colors = reader_page_colors_css(options().colors);
+        let colors = reader_page_colors_css(options().theme, options().app_colors);
         let head_end = page.find("</head>").expect("the page has a head");
         for part in [colors.as_str(), &reader_stylesheet(), &reader_script()] {
             let position = page.find(part).expect("the page has every part");
@@ -248,6 +254,22 @@ mod tests {
         // The theme's colours come first, so the stylesheet can use them.
         assert!(page.find(colors.as_str()) < page.find(&reader_stylesheet()));
         assert!(page.contains("<body>\n<p>Hi</p>\n</body>"));
+    }
+
+    #[test]
+    fn adds_the_reader_themes_text_after_the_stylesheet() {
+        let content = ReaderPostContent::new("<p>Hi</p>", None);
+        let page = content.page_html(ReaderPageOptions {
+            theme: ReaderTheme::Reader,
+            ..options()
+        });
+        let text = reader_page_theme_css(ReaderTheme::Reader);
+        let position = page.find(&text).expect("the page has the theme's text");
+        // After the stylesheet, whose text size and line height it replaces.
+        assert!(page.find(&reader_stylesheet()) < Some(position));
+
+        // The other themes have nothing to add.
+        assert_eq!(content.page_html(options()).matches("<style>").count(), 3);
     }
 
     #[test]
@@ -357,7 +379,7 @@ mod tests {
             text_scale: 1.25,
             ..options()
         });
-        let typography = reader_page_typography_css(ReaderFont::Serif, 1.25, options().colors);
+        let typography = reader_page_typography_css(ReaderFont::Serif, 1.25, options().theme);
         let position = page
             .find(&typography)
             .expect("the page sets the typography");
