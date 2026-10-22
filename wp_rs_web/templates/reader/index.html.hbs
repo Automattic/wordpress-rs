@@ -1,0 +1,41 @@
+{{#*inline "page"}}
+
+  <div class="min-h-screen bg-gray-900 py-16 sm:py-24">
+    <div class="mx-auto max-w-3xl px-6">
+      <h2 class="text-center text-4xl font-semibold tracking-tight text-white sm:text-5xl">Reader Preview</h2>
+      <p class="mx-auto mt-6 max-w-xl text-center text-lg text-gray-300">See a post from the WordPress.com Reader the way the apps show it, in any theme. Paste a post's URL, a site's address, or a site ID.</p>
+
+      <form method="GET" action="/reader" class="mx-auto mt-10 flex max-w-xl gap-x-4">
+        <label for="reader-url" class="sr-only">A post or site</label>
+        <input id="reader-url" name="url" type="text" value="{{url}}" required class="min-w-0 flex-auto rounded-md bg-white/5 px-3.5 py-2 text-base text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-white sm:text-sm/6" placeholder="https://example.com/2026/10/a-post/">
+        <button type="submit" class="flex-none rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-xs hover:bg-gray-100">Preview</button>
+      </form>
+
+      {{#if error}}
+        <div class="mx-auto mt-6 max-w-xl rounded-md bg-yellow-50 p-4">
+          <h3 class="text-sm font-medium text-yellow-800">Couldn't load it</h3>
+          <p class="mt-2 text-sm text-yellow-700">{{error}}</p>
+        </div>
+      {{/if}}
+
+      <div class="mx-auto mt-12 max-w-xl">
+        <h3 class="text-sm font-semibold text-white">Test posts</h3>
+        <p class="mt-1 text-sm text-gray-400">Posts on jetpack.wpmt.co that each cover something the apps have to handle.</p>
+        <ul class="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <li><a class="text-indigo-300 hover:text-white" href="/reader/jetpack.wpmt.co/164">Every core block</a></li>
+          <li><a class="text-indigo-300 hover:text-white" href="/reader/jetpack.wpmt.co/165">Jetpack blocks</a></li>
+          <li><a class="text-indigo-300 hover:text-white" href="/reader/jetpack.wpmt.co/163">Embeds</a></li>
+          <li><a class="text-indigo-300 hover:text-white" href="/reader/jetpack.wpmt.co/172">Jetpack shortcode embeds</a></li>
+          <li><a class="text-indigo-300 hover:text-white" href="/reader/jetpack.wpmt.co/166">Images</a></li>
+          <li><a class="text-indigo-300 hover:text-white" href="/reader/jetpack.wpmt.co/167">Markup the cleanup changes</a></li>
+          <li><a class="text-indigo-300 hover:text-white" href="/reader/jetpack.wpmt.co/168">Languages and anchors</a></li>
+          <li><a class="text-indigo-300 hover:text-white" href="/reader/jetpack.wpmt.co/154">Plugin shortcodes</a></li>
+          <li><a class="text-indigo-300 hover:text-white" href="/reader/jetpack.wpmt.co/155">Brackets that aren't shortcodes</a></li>
+          <li><a class="text-indigo-300 hover:text-white" href="/reader/wpthemetestdata.wordpress.com">The Theme Unit Test site</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+{{/inline}}
+{{> layout}}

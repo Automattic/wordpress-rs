@@ -1,0 +1,26 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": true
+ },
+ "fields": {
+  "title": "Maiores Numquam: Beatae 7297",
+  "URL": "https://site-d24f7c.wordpress.com/2020/08/06/docmmiy-jufgnuq-oisols-4049/",
+  "content": "\n<div class=\"wp-block-cover alignfull\"><div id='cucjf_qagpgm_9619342034' class=\"wp-block-cover__video-background\" autoplay muted loop playsinline src=\"https://site-34635d.files.wordpress.com/2020/08/xtnol-6.mp4\"></div><div class=\"wp-block-cover__inner-container is-layout-flow wp-block-cover-is-layout-flow\">\n<p class=\"has-text-align-center has-large-font-size wp-block-paragraph\"></p>\n</div></div>\n\n\t<script>/* anonymized */</script>\n\t<style>\n\t\t#cover_player_9619342034,\n\t\t#cover_player_9619342034 div.vjs-videopress,\n\t\t#cover_player_9619342034 div.vjs-videopress video {\n\t\t\tposition: absolute;\n\t\t\ttop: 0;\n\t\t\tleft: 0;\n\t\t\twidth: 100%;\n\t\t\theight: 100%;\n\t\t}\n\n\t\t#cover_player_9619342034 div.vjs-videopress video {\n\t\t\tobject-fit: cover;\n\t\t\tobject-position: 50% 50%;\n\t\t}\n\n\t\t/*\n\t\t * Post-Automattic/videopress#1291 the library no longer self-injects\n\t\t * Video.js chrome styles at runtime, they live in a separate\n\t\t * videopress.css this render path does NOT enqueue. Hide the chrome\n\t\t * the missing stylesheet would otherwise suppress via\n\t\t * .videopress-controls-disabled.\n\t\t *\n\t\t * These hides assume controls: false (set in the videopress() options\n\t\t * above). If that ever changes, drop this block and enqueue\n\t\t * videopress.css see routes.php:86-94 or Automattic/wpcom#023238 for the pattern.\n\t\t *\n\t\t * Scoped to this player id to not leak.\n\t\t */\n\t\t#cover_player_9619342034 .vjs-control-bar,\n\t\t#cover_player_9619342034 .vjs-big-play-button,\n\t\t#cover_player_9619342034 .vjs-modal-dialog,\n\t\t#cover_player_9619342034 .vjs-text-track-display {\n\t\t\tdisplay: none;\n\t\t}\n\n\t\t#cover_player_9619342034 .vjs-control-text {\n\t\t\tposition: absolute;\n\t\t\twidth: 1px;\n\t\t\theight: 1px;\n\t\t\tpadding: 0;\n\t\t\tmargin: -1px;\n\t\t\toverflow: hidden;\n\t\t\tclip: rect(0, 0, 0, 0);\n\t\t\twhite-space: nowrap;\n\t\t\tborder: 0;\n\t\t}\n\t</style>\n\t\n\n\n<p class=\"wp-block-paragraph\">Ne illo id ius natus tenetur velit ius maiores beatae, A'a quia et beatae pariatur et nobis amet maiores numquam (sunt is voluptatibus maiores et ius ante ne hic <em>Ad-ex-quo-ad Eveniet.</em></p>\n\n\n\n<p class=\"wp-block-paragraph\">A'a quia quo *aut Similique* et nihil is culpa ante a tempora.  Amet aut a quo laborum et sit quas rerum fugiat dolorem:</p>\n\n\n\n<ul class=\"wp-block-list\"><li>Quod hic eveniet eaque possimus?</li><li>Modi sunt iste?&nbsp; (Aut at per sit ratione quisquam id veritatis fuga deleniti facere hic nesciunt/molestiae id hic eveniet)</li><li>Modi quae’a ad iste?&nbsp; (Nobis recusandae deleniti fuga deleniti facere ne eveniet id hic eveniet)</li><li>Modi optio quam quam tempor officia at quam praesentium?</li><li>Modi iuajfpiyvrabdcw lorem per fuga et fugiat quo optio ad quisquam is tempor possimus id a dolores sint?</li><li>Modi sed beatae quas officia?</li><li>Modi minima accusamus per ne hic eveniet fuga quod iam tenetur?</li><li>Modi minima sed per architecto explicabo fuga sed iam soluta?</li><li>Modi possimus sed per perspiciatis ipsam fugiat?</li><li>Modi porro ut possimus ne nesciunt fuga ut ad voluptatibus?</li><li>Modi veniam sed per enim fuga quod eveniet ne sunt eveniet?</li></ul>\n",
+  "excerpt": "<p>Ne illo id ius natus tenetur velit ius maiores beatae, A&#8217;a quia et beatae pariatur et nobis amet maiores numquam (sunt is voluptatibus maiores et ius ante ne hic Ad-ex-quo-ad Eveniet. A&#8217;a quia quo *aut Similique* et nihil is culpa ante a tempora. Amet aut a quo laborum et sit quas rerum fugiat dolorem: Quod hic eveniet eaque possimus? Modi sunt iste?&nbsp; (Aut at per sit ratione quisquam id veritatis fuga deleniti facere hic nesciunt/molestiae id hic eveniet) Modi quae’a ad iste?&nbsp; (Nobis recusandae deleniti fuga deleniti facere ne eveniet id hic eveniet) Modi optio quam quam tempor officia at quam [&hellip;]</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "block-editor",
+  "cover",
+  "cover-video-background",
+  "excerpt-generated",
+  "language:ltr",
+  "script-inline",
+  "site:p2",
+  "style-element",
+  "style-font-size-class",
+  "video-as-div"
+ ]
+}

@@ -1,0 +1,23 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "fugiat",
+  "URL": "https://site-a977a9.wordpress.com/2016/04/14/lblugp/",
+  "content": "<p>beatae</p>\n\n<div class=\"logged-out has-login-form wp-block-loginout\"><form name=\"nitpztzqh\" id=\"nitpztzqh\" action=\"https://site-a977a9.wordpress.com/ji-iornp.php\" method=\"post\"><p class=\"login-username\">\n\t\t\t\t<label for=\"yzob_iornp\">Quisquam ne Omnis Dolorem</label>\n\t\t\t\t<input type=\"text\" name=\"ozo\" id=\"yzob_iornp\" autocomplete=\"username\" class=\"input\" value=\"\" size=\"20\" />\n\t\t\t</p><p class=\"login-password\">\n\t\t\t\t<label for=\"yzob_ztzq\">Voluptas</label>\n\t\t\t\t<input type=\"password\" name=\"rhj\" id=\"yzob_ztzq\" autocomplete=\"current-password\" spellcheck=\"false\" class=\"input\" value=\"\" size=\"20\" />\n\t\t\t</p><p class=\"login-remember\"><label><input name=\"mxevsmovhh\" type=\"checkbox\" id=\"mxevsmovhh\" value=\"dolorem\" /> Nesciunt Ad</label></p><p class=\"login-submit\">\n\t\t\t\t<input type=\"submit\" name=\"ji-rrdloi\" id=\"ji-rrdloi\" class=\"button button-primary\" value=\"Per Is\" />\n\t\t\t\t<input type=\"hidden\" name=\"caoulprm_vh\" value=\"http://site-ee5aec.wordpress.com\" />\n\t\t\t</p><input type=\"hidden\" name=\"jtaijmha_wsbkrej_ks\" id=\"jtaijmha_wsbkrej_ks\" value=\"\" /><div id=\"jtaijmha_cnicbrjik_vbttuohab\"></div><style>#blackbox_challenge_container[data-blackbox-challenge]{width:100%;margin:16px 0}</style></form></div>\n\n\n<p class=\"wp-block-paragraph\"></p>\n",
+  "excerpt": "<p>beatae</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "block-editor",
+  "excerpt-generated",
+  "form-other",
+  "language:ltr",
+  "published-pre-2019",
+  "site:simple",
+  "style-element"
+ ]
+}

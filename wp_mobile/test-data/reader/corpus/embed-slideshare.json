@@ -1,0 +1,27 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "Praesentium hic Dignissimos",
+  "URL": "https://site-0e6668.wordpress.com/2011/10/13/bocwiuawygb-cpc-borghlqptuk/",
+  "content": "<div class=\"posterous_bookmarklet_entry\">\n<div> <strong style=\"display:block;margin:12px 0 4px;\"><a href=\"http://www.slideshare.net/fmyfzujtr/bocwiuawygb-cpc-borghlqptuk-7630491\" title=\"Praesentium hic Dignissimos\" target=\"_blank\">Praesentium hic Dignissimos</a></strong> <iframe src='https://www.slideshare.net/mybiujudk/nsmig_pajq/7630491' width='425' height='348' scrolling='no' sandbox=\"allow-popups allow-scripts allow-same-origin allow-presentation\" allowfullscreen webkitallowfullscreen mozallowfullscreen></iframe> </p>\n<p /></div>\n</div>\n",
+  "excerpt": "<p>Praesentium hic Dignissimos</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "classic-editor",
+  "embed",
+  "embed:slideshare",
+  "excerpt-authored",
+  "iframe",
+  "iframe-size-numeric",
+  "language:ltr",
+  "malformed-html",
+  "published-pre-2019",
+  "site:simple",
+  "style-inline"
+ ]
+}

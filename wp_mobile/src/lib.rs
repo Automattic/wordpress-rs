@@ -7,6 +7,7 @@ pub mod collection;
 pub mod entity;
 pub mod filters;
 pub mod persistence;
+pub mod reader;
 pub mod service;
 pub mod sync;
 

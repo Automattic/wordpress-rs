@@ -356,6 +356,29 @@ public typealias PublicizeRequestDeleteConnectionResponse = WordPressAPIInternal
 public typealias MeConnectionsRequestListResponse = WordPressAPIInternal.MeConnectionsRequestListResponse
 public typealias MeConnectionsResponse = WordPressAPIInternal.MeConnectionsResponse
 
+// MARK: - Reader
+//
+// The Reader's functions are in `ReaderExports.swift`.
+
+public typealias ReaderAppColors = WordPressAPIInternal.ReaderAppColors
+public typealias ReaderBrand = WordPressAPIInternal.ReaderBrand
+public typealias ReaderColor = WordPressAPIInternal.ReaderColor
+public typealias ReaderFont = WordPressAPIInternal.ReaderFont
+public typealias ReaderImageSize = WordPressAPIInternal.ReaderImageSize
+public typealias ReaderLink = WordPressAPIInternal.ReaderLink
+public typealias ReaderPageOptions = WordPressAPIInternal.ReaderPageOptions
+public typealias ReaderPostAnchor = WordPressAPIInternal.ReaderPostAnchor
+public typealias ReaderPostAnchorKind = WordPressAPIInternal.ReaderPostAnchorKind
+public typealias ReaderPostContent = WordPressAPIInternal.ReaderPostContent
+public typealias ReaderPostContentProtocol = WordPressAPIInternal.ReaderPostContentProtocol
+public typealias ReaderPostGallery = WordPressAPIInternal.ReaderPostGallery
+public typealias ReaderPostGalleryPosition = WordPressAPIInternal.ReaderPostGalleryPosition
+public typealias ReaderPostImage = WordPressAPIInternal.ReaderPostImage
+public typealias ReaderPostMention = WordPressAPIInternal.ReaderPostMention
+public typealias ReaderTheme = WordPressAPIInternal.ReaderTheme
+public typealias ReaderThemeAppearance = WordPressAPIInternal.ReaderThemeAppearance
+public typealias ReaderThemeColors = WordPressAPIInternal.ReaderThemeColors
+
 // MARK: - JSON helpers
 
 public typealias WpAdditionalFields = WordPressAPIInternal.WpAdditionalFields

@@ -1,0 +1,23 @@
+{{#*inline "page"}}
+
+  <div class="min-h-screen bg-gray-900 py-12">
+    <div class="mx-auto max-w-3xl px-6">
+      <a href="/reader" class="text-sm text-gray-400 hover:text-white">← Reader Preview</a>
+      <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white">{{site}}</h2>
+      <p class="mt-2 text-gray-400">Its most recent posts in the Reader.</p>
+
+      <ul class="mt-8 divide-y divide-white/10">
+        {{#each posts}}
+          <li class="py-4">
+            <a href="/reader/{{../site}}/{{id}}" class="font-medium text-white hover:text-indigo-300">{{#if title}}{{title}}{{else}}(No title){{/if}}</a>
+            <p class="mt-1 text-sm text-gray-400">{{date}} · <a href="{{url}}" class="hover:text-white">{{url}}</a></p>
+          </li>
+        {{else}}
+          <li class="py-4 text-gray-400">The Reader has no posts for this site.</li>
+        {{/each}}
+      </ul>
+    </div>
+  </div>
+
+{{/inline}}
+{{> layout}}

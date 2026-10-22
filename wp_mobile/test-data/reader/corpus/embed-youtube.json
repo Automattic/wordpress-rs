@@ -1,0 +1,24 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "external",
+  "p2": false
+ },
+ "fields": {
+  "title": "Dolores &#0715; Ex Dicta",
+  "URL": "http://site-9c0afa.example/2026/06/22/tnwnhwe-vx-vqehn/",
+  "content": "\n<p class=\"wp-block-paragraph\"><span class=\"embed-youtube\" style=\"text-align:center; display: block;\"><iframe loading=\"lazy\" data-wpcom-embed-url=\"https://youtube.com/watch?v=jmhpswkkumf\" class=\"youtube-player\" width=\"640\" height=\"360\" src=\"https://www.youtube.com/embed/jmhpswkkumf?version=3&amp;rel=1&amp;showsearch=0&amp;showinfo=1&amp;iv_load_policy=1&amp;fs=1&amp;hl=ef&amp;autohide=2&amp;wmode=dadrtyzcxzi\" allowfullscreen=\"true\" style=\"border:0;\" sandbox=\"allow-scripts allow-same-origin allow-popups allow-presentation allow-popups-to-escape-sandbox\"></iframe></span></p>\n",
+  "excerpt": "",
+  "featured_image": ""
+ },
+ "features": [
+  "block-editor",
+  "embed",
+  "embed:youtube",
+  "iframe",
+  "iframe-size-numeric",
+  "language:ltr",
+  "site:external",
+  "style-inline"
+ ]
+}

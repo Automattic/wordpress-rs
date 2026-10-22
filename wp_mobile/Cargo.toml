@@ -5,7 +5,7 @@ edition = "2024"
 
 [features]
 default = ["aes-gcm-encryption"]
-aes-gcm-encryption = ["dep:aes-gcm", "dep:hkdf", "dep:sha2", "dep:base64"]
+aes-gcm-encryption = ["dep:aes-gcm", "dep:hkdf"]
 reqwest-request-executor = ["wp_api/reqwest-request-executor"]
 export-uncancellable-endpoints = ["wp_api/export-uncancellable-endpoints"]
 
@@ -15,15 +15,21 @@ name = "wp_mobile"
 
 [dependencies]
 aes-gcm = { workspace = true, optional = true }
-base64 = { workspace = true, optional = true }
+base64 = { workspace = true }
 hkdf = { workspace = true, optional = true }
+# `scraper` stores attribute names as `html5ever` types, and doesn't re-export them. Adding an
+# attribute needs the same `html5ever` version `scraper` uses, so bump the two together.
+html5ever = { workspace = true }
 log = { workspace = true }
-sha2 = { workspace = true, optional = true }
+sha2 = { workspace = true }
 zeroize = { workspace = true, features = ["derive"] }
 paste = { workspace = true }
 rand = { workspace = true }
+scraper = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 uniffi = { workspace = true }
@@ -36,6 +42,7 @@ wp_mobile_cache = { path = "../wp_mobile_cache" }
 [dev-dependencies]
 async-trait = { workspace = true }
 futures = { workspace = true }
+indoc = { workspace = true }
 rstest = { workspace = true }
 rusqlite = { workspace = true }
 tempfile = { workspace = true }

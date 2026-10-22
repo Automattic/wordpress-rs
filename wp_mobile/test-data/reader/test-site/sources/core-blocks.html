@@ -1,0 +1,235 @@
+<!-- wp:paragraph -->
+<p>Every core block that can go in a post, so the shared stylesheet can be checked against all of them on one page.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading {"level":1} -->
+<h1 class="wp-block-heading" id="heading-1">Heading 1</h1>
+<!-- /wp:heading -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading" id="heading-2">Heading 2</h2>
+<!-- /wp:heading -->
+
+<!-- wp:heading {"level":3} -->
+<h3 class="wp-block-heading" id="heading-3">Heading 3</h3>
+<!-- /wp:heading -->
+
+<!-- wp:heading {"level":4} -->
+<h4 class="wp-block-heading" id="heading-4">Heading 4</h4>
+<!-- /wp:heading -->
+
+<!-- wp:heading {"level":5} -->
+<h5 class="wp-block-heading">Heading 5</h5>
+<!-- /wp:heading -->
+
+<!-- wp:heading {"level":6} -->
+<h6 class="wp-block-heading">Heading 6</h6>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Formatting: <strong>bold</strong>, <em>italic</em>, <a href="https://wordpress.org">a link</a>, <code>inline code</code>, <s>strikethrough</s>, <kbd>Ctrl</kbd>, x<sup>2</sup>, H<sub>2</sub>O, <mark style="background-color:#fcb900" class="has-inline-color">highlighted</mark>, <span class="has-inline-color has-vivid-red-color">red text</span>, and a link to <a href="#heading-3">the third heading</a>. A footnote follows this sentence.<sup data-fn="8d4a0f6e-6c47-4d8a-9a3e-0c5f1b2e7a10" class="fn"><a href="#8d4a0f6e-6c47-4d8a-9a3e-0c5f1b2e7a10" id="8d4a0f6e-6c47-4d8a-9a3e-0c5f1b2e7a10-link">1</a></sup> And another.<sup data-fn="3b9e2c71-1f5d-4b0a-8e6c-2d7f9a4b5c33" class="fn"><a href="#3b9e2c71-1f5d-4b0a-8e6c-2d7f9a4b5c33" id="3b9e2c71-1f5d-4b0a-8e6c-2d7f9a4b5c33-link">2</a></sup></p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph {"dropCap":true} -->
+<p class="has-drop-cap">A paragraph with a drop cap. It needs to be long enough to wrap around the large first letter, so here are a few more words to make it wrap onto a second and third line on a phone.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph {"align":"center","fontSize":"large"} -->
+<p class="has-text-align-center has-large-font-size">Centred, large text.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li>An unordered list</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>With a nested list<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li>Nested item</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list --></li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:list {"ordered":true,"start":3} -->
+<ol start="3" class="wp-block-list"><!-- wp:list-item -->
+<li>An ordered list that starts at three</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Four</li>
+<!-- /wp:list-item --></ol>
+<!-- /wp:list -->
+
+<!-- wp:quote -->
+<blockquote class="wp-block-quote"><!-- wp:paragraph -->
+<p>A quote, with a citation.</p>
+<!-- /wp:paragraph --><cite>Someone</cite></blockquote>
+<!-- /wp:quote -->
+
+<!-- wp:pullquote -->
+<figure class="wp-block-pullquote"><blockquote><p>A pullquote.</p><cite>Someone else</cite></blockquote></figure>
+<!-- /wp:pullquote -->
+
+<!-- wp:verse -->
+<pre class="wp-block-verse">A verse,
+    with its own line breaks
+        and indents.</pre>
+<!-- /wp:verse -->
+
+<!-- wp:preformatted -->
+<pre class="wp-block-preformatted">Preformatted text, which keeps     its spaces.</pre>
+<!-- /wp:preformatted -->
+
+<!-- wp:code -->
+<pre class="wp-block-code"><code>fn main() {
+    println!("A code block, with a line long enough that it has to scroll sideways on a phone screen.");
+}</code></pre>
+<!-- /wp:code -->
+
+<!-- wp:table {"className":"is-style-stripes"} -->
+<figure class="wp-block-table is-style-stripes"><table class="has-fixed-layout"><thead><tr><th>Header</th><th>Another header</th></tr></thead><tbody><tr><td>A striped</td><td>table</td></tr><tr><td>Second</td><td>row</td></tr><tr><td>Third</td><td>row</td></tr></tbody><tfoot><tr><td>Footer</td><td>row</td></tr></tfoot></table><figcaption class="wp-element-caption">A table caption</figcaption></figure>
+<!-- /wp:table -->
+
+<!-- wp:table -->
+<figure class="wp-block-table"><table><tbody><tr><td>A wide table with many columns</td><td>Two</td><td>Three</td><td>Four</td><td>Five</td><td>Six</td><td>Seven</td><td>Eight</td></tr></tbody></table></figure>
+<!-- /wp:table -->
+
+<!-- wp:separator -->
+<hr class="wp-block-separator has-alpha-channel-opacity"/>
+<!-- /wp:separator -->
+
+<!-- wp:separator {"className":"is-style-dots"} -->
+<hr class="wp-block-separator has-alpha-channel-opacity is-style-dots"/>
+<!-- /wp:separator -->
+
+<!-- wp:spacer {"height":"40px"} -->
+<div style="height:40px" aria-hidden="true" class="wp-block-spacer"></div>
+<!-- /wp:spacer -->
+
+<!-- wp:buttons -->
+<div class="wp-block-buttons"><!-- wp:button -->
+<div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="https://wordpress.org">A button</a></div>
+<!-- /wp:button -->
+
+<!-- wp:button {"className":"is-style-outline"} -->
+<div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button" href="https://wordpress.org">An outline button</a></div>
+<!-- /wp:button --></div>
+<!-- /wp:buttons -->
+
+<!-- wp:columns -->
+<div class="wp-block-columns"><!-- wp:column -->
+<div class="wp-block-column"><!-- wp:paragraph -->
+<p>The first of two columns.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:column -->
+
+<!-- wp:column -->
+<div class="wp-block-column"><!-- wp:paragraph -->
+<p>The second of two columns.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:column --></div>
+<!-- /wp:columns -->
+
+<!-- wp:group {"style":{"color":{"background":"#f0f0f0"},"spacing":{"padding":{"top":"20px","bottom":"20px","left":"20px","right":"20px"}}},"layout":{"type":"constrained"}} -->
+<div class="wp-block-group has-background" style="background-color:#f0f0f0;padding-top:20px;padding-right:20px;padding-bottom:20px;padding-left:20px"><!-- wp:paragraph -->
+<p>A group with a background colour and padding.</p>
+<!-- /wp:paragraph --></div>
+<!-- /wp:group -->
+
+<!-- wp:media-text {"mediaId":143,"mediaLink":"https://jetpack.wpmt.co/cmm2548-49/","mediaType":"image"} -->
+<div class="wp-block-media-text is-stacked-on-mobile"><figure class="wp-block-media-text__media"><img src="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-49.jpg" alt="" class="wp-image-143 size-full"/></figure><div class="wp-block-media-text__content"><!-- wp:paragraph -->
+<p>Media and text.</p>
+<!-- /wp:paragraph --></div></div>
+<!-- /wp:media-text -->
+
+<!-- wp:cover {"url":"https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-50.jpg","id":144,"dimRatio":50,"layout":{"type":"constrained"}} -->
+<div class="wp-block-cover"><span aria-hidden="true" class="wp-block-cover__background has-background-dim"></span><img class="wp-block-cover__image-background wp-image-144" alt="" src="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-50.jpg" data-object-fit="cover"/><div class="wp-block-cover__inner-container"><!-- wp:paragraph {"align":"center","fontSize":"large"} -->
+<p class="has-text-align-center has-large-font-size">A cover with an image</p>
+<!-- /wp:paragraph --></div></div>
+<!-- /wp:cover -->
+
+<!-- wp:image {"id":142,"sizeSlug":"large","linkDestination":"media"} -->
+<figure class="wp-block-image size-large"><a href="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-48.jpg"><img src="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-48.jpg" alt="An image linked to its file" class="wp-image-142"/></a><figcaption class="wp-element-caption">An image, linked to its file, with a caption</figcaption></figure>
+<!-- /wp:image -->
+
+<!-- wp:image {"id":143,"sizeSlug":"medium","linkDestination":"none","align":"right"} -->
+<figure class="wp-block-image alignright size-medium"><img src="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-49.jpg" alt="A right-aligned image" class="wp-image-143"/></figure>
+<!-- /wp:image -->
+
+<!-- wp:paragraph -->
+<p>Text that wraps around the right-aligned image, long enough to show whether it wraps on a phone or the image takes the whole width.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:image {"id":144,"sizeSlug":"full","linkDestination":"none","align":"wide"} -->
+<figure class="wp-block-image alignwide size-full"><img src="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-50.jpg" alt="A wide image" class="wp-image-144"/></figure>
+<!-- /wp:image -->
+
+<!-- wp:gallery {"columns":3,"linkTo":"media"} -->
+<figure class="wp-block-gallery has-nested-images columns-3 is-cropped"><!-- wp:image {"id":142,"sizeSlug":"large","linkDestination":"media"} -->
+<figure class="wp-block-image size-large"><a href="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-48.jpg"><img src="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-48.jpg" alt="" class="wp-image-142"/></a><figcaption class="wp-element-caption">First</figcaption></figure>
+<!-- /wp:image -->
+
+<!-- wp:image {"id":143,"sizeSlug":"large","linkDestination":"media"} -->
+<figure class="wp-block-image size-large"><a href="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-49.jpg"><img src="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-49.jpg" alt="" class="wp-image-143"/></a><figcaption class="wp-element-caption">Second</figcaption></figure>
+<!-- /wp:image -->
+
+<!-- wp:image {"id":144,"sizeSlug":"large","linkDestination":"media"} -->
+<figure class="wp-block-image size-large"><a href="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-50.jpg"><img src="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-50.jpg" alt="" class="wp-image-144"/></a><figcaption class="wp-element-caption">Third</figcaption></figure>
+<!-- /wp:image --><figcaption class="blocks-gallery-caption wp-element-caption">A gallery caption</figcaption></figure>
+<!-- /wp:gallery -->
+
+<!-- wp:audio {"id":161} -->
+<figure class="wp-block-audio"><audio controls src="https://jetpack.wpmt.co/wp-content/uploads/2026/10/reader-test-audio.m4a"></audio><figcaption class="wp-element-caption">An audio block</figcaption></figure>
+<!-- /wp:audio -->
+
+<!-- wp:video -->
+<figure class="wp-block-video"><video controls poster="https://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-48.jpg" preload="metadata" src="https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4"></video><figcaption class="wp-element-caption">A video block, with a poster</figcaption></figure>
+<!-- /wp:video -->
+
+<!-- wp:file {"id":162,"href":"https://jetpack.wpmt.co/wp-content/uploads/2026/10/reader-test-file.pdf"} -->
+<div class="wp-block-file"><a id="wp-block-file--media-reader-test" href="https://jetpack.wpmt.co/wp-content/uploads/2026/10/reader-test-file.pdf">reader-test-file</a><a href="https://jetpack.wpmt.co/wp-content/uploads/2026/10/reader-test-file.pdf" class="wp-block-file__button wp-element-button" download aria-describedby="wp-block-file--media-reader-test">Download</a></div>
+<!-- /wp:file -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>Details, closed until tapped</summary><!-- wp:paragraph -->
+<p>The details.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->
+
+<!-- wp:social-links -->
+<ul class="wp-block-social-links"><!-- wp:social-link {"url":"https://wordpress.org","service":"wordpress"} /-->
+
+<!-- wp:social-link {"url":"https://github.com/wordpress","service":"github"} /-->
+
+<!-- wp:social-link {"url":"https://bsky.app/profile/wordpress.org","service":"bluesky"} /-->
+
+<!-- wp:social-link {"url":"https://www.instagram.com/wordpress","service":"instagram"} /--></ul>
+<!-- /wp:social-links -->
+
+<!-- wp:html -->
+<p>A Custom HTML block: <abbr title="HyperText Markup Language">HTML</abbr>.</p>
+<!-- /wp:html -->
+
+<!-- wp:more -->
+<!--more-->
+<!-- /wp:more -->
+
+<!-- wp:paragraph -->
+<p>Text after a More block.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:latest-posts {"postsToShow":3,"displayPostDate":true} /-->
+
+<!-- wp:search {"label":"Search","buttonText":"Search"} /-->
+
+<!-- wp:archives /-->
+
+<!-- wp:categories /-->
+
+<!-- wp:tag-cloud /-->
+
+<!-- wp:calendar /-->
+
+<!-- wp:footnotes /-->

@@ -1,0 +1,23 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": true
+ },
+ "fields": {
+  "title": "@facere &#0715; ut enim et&#7314;",
+  "URL": "https://site-b5936c.wordpress.com/2016/09/28/bjwksf-yb-llbu-vh/",
+  "content": "<p><a href='https://site-b5936c.wordpress.com/xfhnarcy/bjwksf/' class='__p2-hovercard mention' data-type='fragment-mention' data-username='bjwksf'><span class='mentions-prefix'>@</span>facere</a> &#8211; ut enim et ad quibusdam dolorem-sed ante hic nesciunt ne <code>oqgscwq4.voluptas.eum.architecto.per</code>.  Ex&#8217;a corporis et dicta ipsum irure (soluta sunt nesciunt, sed).</p>\n",
+  "excerpt": "<p>@facere &#8211; ut enim et ad quibusdam dolorem-sed ante hic nesciunt ne oqgscwq4.voluptas.eum.architecto.per. Ex&#8217;a corporis et dicta ipsum irure (soluta sunt nesciunt, sed).</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "classic-editor",
+  "code-inline",
+  "excerpt-generated",
+  "language:ltr",
+  "mention",
+  "published-pre-2019",
+  "site:p2"
+ ]
+}

@@ -57,6 +57,7 @@ fluent-templates = "0.13"
 futures = "0.3"
 h2 = "0.4"
 hkdf = "0.13"
+html5ever = "0.39" # Use the same version as `scraper`: https://github.com/rust-scraper/scraper/blob/v0.27.0/Cargo.toml
 http = "1.4"
 hyper = "1.1" # Use the same version as `reqwest`: https://github.com/seanmonstar/reqwest/blob/v0.13.4/Cargo.toml
 hyper-util = "0.1.20"

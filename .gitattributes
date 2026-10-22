@@ -4,3 +4,12 @@
 # driver takes both. Note it does not deduplicate, so a reworded line can
 # leave a duplicate to tidy by hand.
 CHANGELOG.md merge=union
+
+# The Reader's test data is captured, generated or imported, so GitHub
+# collapses it in diffs. The scripts that make it, and the test posts we
+# published (`test-site/sources`), still show.
+wp_mobile/test-data/reader/posts/** linguist-generated
+wp_mobile/test-data/reader/corpus/** linguist-generated
+wp_mobile/test-data/reader/snapshots/** linguist-generated
+wp_mobile/test-data/reader/test-site/*.json linguist-generated
+wp_mobile/test-data/reader/sanitizer/*.json linguist-generated

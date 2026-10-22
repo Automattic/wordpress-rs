@@ -1,0 +1,30 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "atomic",
+  "p2": false
+ },
+ "fields": {
+  "title": "Iam Aut Deleniti Aut hic Ipsa. 4 Dolores et Eius Non Sit",
+  "URL": "https://site-29e8cb.example/2014/07/28/wsp-gcd-ezwciezf-dzx-cpc-vgyh-3-gslgntn-vh-nliq-lij-omc/",
+  "content": "<iframe title='RecusAndae Velit Tempor' aria-label='RecusAndae Velit Tempor' width='400' height='225' src='https://videopress.com/embed/0nj9eosu?hd=0&amp;autoPlay=0&amp;permalink=1&amp;loop=0&amp;preloadContent=isckmrhr&amp;muted=0&amp;playsinline=0&amp;controls=1&amp;cover=1' frameborder='0' allowfullscreen  allow='clipboard-write; presentation' ></iframe><script src='https://en.wordpress.com/wp-content/plugins/video/assets/js/next/videopress-iframe.js?m=1790815476'></script>\n<p>At per sit’a aut hic velit lorem <a href=\"https://site-29e8cb.example/wp-content/uploads/2014/07/pkpfhk-ggfj-ns-bqfauahcoh.m4v\" target=\"_blank\">amet</a></p>\n<p>Veritatis quo eius minima quod per sit amet velit <a href=\"https://www.youtube.com/aelplsn/cnhrskpno-91h6v4npofa6pc\" target=\"_blank\">amet</a></p>\n<div id=\"vs-wrrg-xrdur\" class=\"sharedaddy sd-like-enabled sd-sharing-enabled\"></div>\n",
+  "excerpt": "<p>At per sit’a aut hic velit lorem amet Veritatis quo eius minima quod per sit amet velit amet</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "classic-editor",
+  "embed",
+  "embed:videopress",
+  "excerpt-generated",
+  "hidden-sharedaddy",
+  "iframe",
+  "iframe-size-numeric",
+  "language:ltr",
+  "published-pre-2019",
+  "script-external",
+  "script:en.wordpress.com",
+  "site:atomic",
+  "videopress",
+  "videopress-iframe-js"
+ ]
+}
