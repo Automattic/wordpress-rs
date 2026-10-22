@@ -22,9 +22,9 @@ const SCRIPT: &str = include_str!("reader.js");
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::reader::theme::test_app_colors;
     use crate::reader::{
-        ReaderFont, ReaderTheme, reader_page_colors_css, reader_page_typography_css,
+        ReaderBrand, ReaderFont, ReaderTheme, reader_default_app_colors, reader_page_colors_css,
+        reader_page_typography_css,
     };
     use std::collections::BTreeSet;
 
@@ -54,7 +54,10 @@ mod tests {
 
     #[test]
     fn reads_only_the_variables_the_page_sets() {
-        let page = reader_page_colors_css(ReaderTheme::Sepia, test_app_colors());
+        let page = reader_page_colors_css(
+            ReaderTheme::Sepia,
+            reader_default_app_colors(ReaderBrand::Wordpress),
+        );
         let typography = reader_page_typography_css(ReaderFont::Serif, 1.0, ReaderTheme::Sepia);
         // The stylesheet sets some of its own, like the space between blocks.
         let set = variable_names(&(page + &typography + &stylesheet_rules()), "\n  --");

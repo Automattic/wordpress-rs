@@ -160,6 +160,102 @@ pub struct ReaderAppColors {
     pub dark: ReaderThemeColors,
 }
 
+/// The apps' brands. The System and Reader themes take their links' colour from the app's brand.
+/// [`reader_brands`] lists them.
+///
+/// Its `Display` is the brand's name, like `Jetpack`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum, strum_macros::EnumIter)]
+#[uniffi::export(Display)]
+pub enum ReaderBrand {
+    // Not `WordPress`, which would be `.wordPress` in Swift and `WORD_PRESS` in Kotlin.
+    Wordpress,
+    Jetpack,
+}
+
+impl ReaderBrand {
+    fn id_str(self) -> &'static str {
+        match self {
+            Self::Wordpress => "wordpress",
+            Self::Jetpack => "jetpack",
+        }
+    }
+
+    /// The brand's colour for links. Pick shades that read as text on the background, at a
+    /// contrast of 4.5:1 or more.
+    fn link_color(self, dark: bool) -> ReaderColor {
+        ReaderColor::rgb(match (self, dark) {
+            // The WordPress app's blue.
+            (Self::Wordpress, false) => 0x0675c4,
+            (Self::Wordpress, true) => 0x399ce3,
+            // Jetpack Green 50, as in Calypso's Jetpack colour scheme, and Green 30. The Green 40
+            // the app uses elsewhere is too faint for text on white.
+            (Self::Jetpack, false) => 0x008710,
+            (Self::Jetpack, true) => 0x2fb41f,
+        })
+    }
+}
+
+impl fmt::Display for ReaderBrand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Wordpress => "WordPress",
+            Self::Jetpack => "Jetpack",
+        })
+    }
+}
+
+#[uniffi::export]
+impl ReaderBrand {
+    /// A name for the brand that stays the same between releases, like `jetpack`.
+    /// [`reader_brand_from_id`] reads it back.
+    pub fn id(&self) -> String {
+        self.id_str().to_owned()
+    }
+}
+
+/// The apps' brands.
+#[uniffi::export]
+pub fn reader_brands() -> Vec<ReaderBrand> {
+    ReaderBrand::iter().collect()
+}
+
+/// The brand whose [`id`](ReaderBrand::id) is `id`, if there is one.
+#[uniffi::export]
+pub fn reader_brand_from_id(id: &str) -> Option<ReaderBrand> {
+    ReaderBrand::iter().find(|brand| brand.id_str() == id)
+}
+
+/// The app's colours for somewhere without the platform's own, like the Reader Preview or a test:
+/// UIKit's system colours, with `brand`'s colour for links. The apps read theirs off the platform
+/// instead, so the page matches the rest of the app.
+#[uniffi::export]
+pub fn reader_default_app_colors(brand: ReaderBrand) -> ReaderAppColors {
+    let color = ReaderColor::rgb;
+    ReaderAppColors {
+        light: ReaderThemeColors {
+            // `label`, `secondaryLabel` and `tertiaryLabel`.
+            text: color(0x000000),
+            secondary_text: color(0x3c3c43).with_opacity(0.6),
+            tertiary_text: color(0x3c3c43).with_opacity(0.3),
+            // `systemBackground` and `secondarySystemBackground`.
+            background: color(0xffffff),
+            secondary_background: color(0xf2f2f7),
+            // `separator`.
+            border: color(0x3c3c43).with_opacity(0.29),
+            link: brand.link_color(false),
+        },
+        dark: ReaderThemeColors {
+            text: color(0xffffff),
+            secondary_text: color(0xebebf5).with_opacity(0.6),
+            tertiary_text: color(0xebebf5).with_opacity(0.3),
+            background: color(0x000000),
+            secondary_background: color(0x1c1c1e),
+            border: color(0x545458).with_opacity(0.6),
+            link: brand.link_color(true),
+        },
+    }
+}
+
 /// The Reader's themes, in the order to show them in. [`reader_themes`] lists them, so the apps
 /// don't keep a list of their own.
 ///
@@ -481,27 +577,6 @@ fn variables(colors: &ReaderThemeColors, indent: &str) -> String {
     .collect()
 }
 
-/// Colours for tests that need the app's: black on white and white on black, with blue links.
-#[cfg(test)]
-pub(crate) fn test_app_colors() -> ReaderAppColors {
-    let colors = |text, background, link| {
-        let text = ReaderColor::rgb(text);
-        ReaderThemeColors {
-            text,
-            secondary_text: text.with_opacity(0.6),
-            tertiary_text: text.with_opacity(0.33),
-            background: ReaderColor::rgb(background),
-            secondary_background: text.with_opacity(0.1),
-            border: text.with_opacity(0.3),
-            link: ReaderColor::rgb(link),
-        }
-    };
-    ReaderAppColors {
-        light: colors(0x000000, 0xffffff, 0x0675c4),
-        dark: colors(0xffffff, 0x000000, 0x399ce3),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -577,6 +652,33 @@ mod tests {
         assert_eq!((color.red, color.green, color.blue, color.alpha), expected);
     }
 
+    #[rstest]
+    #[case::wordpress(ReaderBrand::Wordpress, "wordpress", "WordPress", "#0675c4", "#399ce3")]
+    #[case::jetpack(ReaderBrand::Jetpack, "jetpack", "Jetpack", "#008710", "#2fb41f")]
+    fn each_brand_has_an_id_a_name_and_links(
+        #[case] brand: ReaderBrand,
+        #[case] id: &str,
+        #[case] name: &str,
+        #[case] light_link: &str,
+        #[case] dark_link: &str,
+    ) {
+        assert_eq!(brand.id(), id);
+        assert_eq!(reader_brand_from_id(id), Some(brand));
+        assert_eq!(brand.to_string(), name);
+        let colors = reader_default_app_colors(brand);
+        assert_eq!(colors.light.link.hex(), light_link);
+        assert_eq!(colors.dark.link.hex(), dark_link);
+    }
+
+    #[test]
+    fn lists_the_brands() {
+        assert_eq!(
+            reader_brands(),
+            [ReaderBrand::Wordpress, ReaderBrand::Jetpack]
+        );
+        assert_eq!(reader_brand_from_id("WordPress"), None);
+    }
+
     #[test]
     fn lists_the_themes_in_order() {
         assert_eq!(
@@ -633,11 +735,22 @@ mod tests {
         #[case] text: &str,
         #[case] background: &str,
     ) {
-        let colors = reader_theme_colors(theme, test_app_colors(), false);
+        let colors = reader_theme_colors(
+            theme,
+            reader_default_app_colors(ReaderBrand::Wordpress),
+            false,
+        );
         assert_eq!(colors.text.hex(), text);
         assert_eq!(colors.background.hex(), background);
         assert_eq!(colors.link, colors.text);
-        assert_eq!(reader_theme_colors(theme, test_app_colors(), true), colors);
+        assert_eq!(
+            reader_theme_colors(
+                theme,
+                reader_default_app_colors(ReaderBrand::Wordpress),
+                true
+            ),
+            colors
+        );
     }
 
     #[rstest]
@@ -656,7 +769,11 @@ mod tests {
         #[case] secondary_background: &str,
         #[case] border: &str,
     ) {
-        let colors = reader_theme_colors(theme, test_app_colors(), false);
+        let colors = reader_theme_colors(
+            theme,
+            reader_default_app_colors(ReaderBrand::Wordpress),
+            false,
+        );
         assert_eq!(colors.secondary_text.hex(), secondary_text);
         assert_eq!(colors.tertiary_text.hex(), tertiary_text);
         assert_eq!(colors.secondary_background.hex(), secondary_background);
@@ -665,7 +782,7 @@ mod tests {
 
     #[test]
     fn the_system_theme_uses_the_apps_colors() {
-        let app = test_app_colors();
+        let app = reader_default_app_colors(ReaderBrand::Wordpress);
         assert_eq!(
             reader_theme_colors(ReaderTheme::System, app, false),
             app.light
@@ -684,7 +801,7 @@ mod tests {
         #[case] text: &str,
         #[case] background: &str,
     ) {
-        let app = test_app_colors();
+        let app = reader_default_app_colors(ReaderBrand::Wordpress);
         let colors = reader_theme_colors(ReaderTheme::Reader, app, dark);
         assert_eq!(colors.text.hex(), text);
         assert_eq!(colors.background.hex(), background);
@@ -694,7 +811,10 @@ mod tests {
 
     #[test]
     fn fixed_theme_css() {
-        let css = reader_page_colors_css(ReaderTheme::Evening, test_app_colors());
+        let css = reader_page_colors_css(
+            ReaderTheme::Evening,
+            reader_default_app_colors(ReaderBrand::Wordpress),
+        );
         assert_eq!(
             css,
             indoc! {"
@@ -816,28 +936,31 @@ mod tests {
 
     #[test]
     fn system_css() {
-        let css = reader_page_colors_css(ReaderTheme::System, test_app_colors());
+        let css = reader_page_colors_css(
+            ReaderTheme::System,
+            reader_default_app_colors(ReaderBrand::Wordpress),
+        );
         assert_eq!(
             css,
             indoc! {"
                 :root {
                   color-scheme: light dark;
                   --reader-text: #000000;
-                  --reader-secondary-text: #00000099;
-                  --reader-tertiary-text: #00000054;
+                  --reader-secondary-text: #3c3c4399;
+                  --reader-tertiary-text: #3c3c434d;
                   --reader-background: #ffffff;
-                  --reader-secondary-background: #0000001a;
-                  --reader-border: #0000004d;
+                  --reader-secondary-background: #f2f2f7;
+                  --reader-border: #3c3c434a;
                   --reader-link: #0675c4;
                 }
                 @media (prefers-color-scheme: dark) {
                   :root {
                     --reader-text: #ffffff;
-                    --reader-secondary-text: #ffffff99;
-                    --reader-tertiary-text: #ffffff54;
+                    --reader-secondary-text: #ebebf599;
+                    --reader-tertiary-text: #ebebf54d;
                     --reader-background: #000000;
-                    --reader-secondary-background: #ffffff1a;
-                    --reader-border: #ffffff4d;
+                    --reader-secondary-background: #1c1c1e;
+                    --reader-border: #54545899;
                     --reader-link: #399ce3;
                   }
                 }
@@ -856,14 +979,17 @@ mod tests {
         #[case] theme: ReaderTheme,
         #[case] scheme: &str,
     ) {
-        let css = reader_page_colors_css(theme, test_app_colors());
+        let css = reader_page_colors_css(theme, reader_default_app_colors(ReaderBrand::Wordpress));
         assert!(!css.contains("prefers-color-scheme"), "{css}");
         assert!(css.contains(&format!("color-scheme: {scheme};")), "{css}");
     }
 
     #[test]
     fn the_reader_theme_follows_the_system() {
-        let css = reader_page_colors_css(ReaderTheme::Reader, test_app_colors());
+        let css = reader_page_colors_css(
+            ReaderTheme::Reader,
+            reader_default_app_colors(ReaderBrand::Wordpress),
+        );
         assert!(css.contains("color-scheme: light dark;"), "{css}");
         assert!(css.contains("--reader-background: #1e1e1e;"), "{css}");
     }

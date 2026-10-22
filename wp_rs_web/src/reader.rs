@@ -14,9 +14,9 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 use url::Url;
 use wp_mobile::reader::{
-    ReaderAppColors, ReaderColor, ReaderFont, ReaderPageOptions, ReaderPostAnchorKind,
-    ReaderPostContent, ReaderTheme, ReaderThemeAppearance, ReaderThemeColors, reader_theme_from_id,
-    reader_themes,
+    ReaderBrand, ReaderFont, ReaderPageOptions, ReaderPostAnchorKind, ReaderPostContent,
+    ReaderTheme, ReaderThemeAppearance, reader_brand_from_id, reader_brands,
+    reader_default_app_colors, reader_theme_from_id, reader_themes,
 };
 
 const API: &str = "https://public-api.wordpress.com/rest";
@@ -25,6 +25,12 @@ const API: &str = "https://public-api.wordpress.com/rest";
 /// Reader, for comparing with it.
 fn theme_named(id: &str) -> ReaderTheme {
     reader_theme_from_id(id).unwrap_or(ReaderTheme::Reader)
+}
+
+/// The brand a tool URL names, or WordPress.
+fn brand_named(id: Option<&str>) -> ReaderBrand {
+    id.and_then(reader_brand_from_id)
+        .unwrap_or(ReaderBrand::Wordpress)
 }
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -88,10 +94,6 @@ const SIZES: &[f64] = &[0.75, 0.9, 1.0, 1.15, 1.25, 1.4, 1.6];
 /// `auto` follows this computer's.
 const APPEARANCES: &[(&str, &str)] = &[("auto", "Auto"), ("light", "Light"), ("dark", "Dark")];
 
-/// The apps' brands. The Reader and System themes take their link colour from the app's brand, and
-/// the themes with fixed colours don't.
-const BRANDS: &[(&str, &str)] = &[("wordpress", "WordPress"), ("jetpack", "Jetpack")];
-
 /// A post, in one theme or all of them, with what the shared code found in it.
 #[get(
     "/reader/<site>/<post>?<theme>&<brand>&<appearance>&<font>&<size>&<width>&<offline>&<photon>&<lang>"
@@ -112,11 +114,7 @@ async fn post(
     client: &State<reqwest::Client>,
 ) -> Template {
     let theme = theme.unwrap_or("reader");
-    let brand = BRANDS
-        .iter()
-        .map(|(id, _)| *id)
-        .find(|id| Some(*id) == brand)
-        .unwrap_or("wordpress");
+    let brand = brand_named(brand).id();
     let font = FONTS
         .iter()
         .map(|(id, _)| *id)
@@ -144,7 +142,7 @@ async fn post(
     let frame = |theme: &str| {
         let query = url::form_urlencoded::Serializer::new(String::new())
             .append_pair("theme", theme)
-            .append_pair("brand", brand)
+            .append_pair("brand", &brand)
             .append_pair("offline", &offline.to_string())
             .append_pair("photon", &photon.to_string())
             .append_pair("lang", lang)
@@ -166,7 +164,7 @@ async fn post(
         let mut query = url::form_urlencoded::Serializer::new(String::new());
         let current = [
             ("theme", theme.to_owned()),
-            ("brand", brand.to_owned()),
+            ("brand", brand.clone()),
             ("appearance", appearance.to_owned()),
             ("width", width.to_string()),
             ("offline", offline.to_string()),
@@ -204,10 +202,10 @@ async fn post(
             json!({ "name": format!("{scale}×"), "href": link(&[("size", scale.to_string())]), "selected": *scale == size })
         })
         .collect();
-    let brands: Vec<Value> = BRANDS
-        .iter()
-        .map(|(id, name)| {
-            json!({ "name": name, "href": link(&[("brand", id.to_string())]), "selected": *id == brand })
+    let brands: Vec<Value> = reader_brands()
+        .into_iter()
+        .map(|choice| {
+            json!({ "name": choice.to_string(), "href": link(&[("brand", choice.id())]), "selected": choice.id() == brand })
         })
         .collect();
     let appearances: Vec<Value> = APPEARANCES
@@ -272,7 +270,7 @@ async fn post(
             theme,
             all_themes: theme == "all",
             themes,
-            brand,
+            brand: &brand,
             brands,
             appearance,
             appearances,
@@ -379,7 +377,7 @@ async fn page(
     };
     let html = content.page_html(ReaderPageOptions {
         theme: theme_named(theme.unwrap_or_default()),
-        app_colors: app_colors(brand.unwrap_or("wordpress")),
+        app_colors: reader_default_app_colors(brand_named(brand)),
         language: lang.filter(|lang| !lang.is_empty()).map(str::to_owned),
         offline: offline.unwrap_or(false),
         font: Some(match font {
@@ -498,69 +496,6 @@ async fn get_json(client: &reqwest::Client, url: &str) -> Result<Value, String> 
         return Err(format!("The Reader API answered {status}: {message}"));
     }
     Ok(json)
-}
-
-/// The colours an app supplies: the platform's, with the app's brand colour for links.
-fn app_colors(brand: &str) -> ReaderAppColors {
-    let colors = |dark| match brand {
-        "jetpack" => ReaderThemeColors {
-            link: jetpack_link(dark),
-            ..system_colors(dark)
-        },
-        _ => system_colors(dark),
-    };
-    ReaderAppColors {
-        light: colors(false),
-        dark: colors(true),
-    }
-}
-
-/// Jetpack's link colour: Jetpack Green 50 in light mode, as in Calypso's Jetpack colour scheme, and
-/// Green 30 in dark mode. The Green 40 the app uses elsewhere is too faint for text on white.
-fn jetpack_link(dark: bool) -> ReaderColor {
-    let (red, green, blue) = if dark {
-        (0x2f, 0xb4, 0x1f)
-    } else {
-        (0x00, 0x87, 0x10)
-    };
-    ReaderColor {
-        red,
-        green,
-        blue,
-        alpha: 255,
-    }
-}
-
-/// The platform's colours, which each app supplies. These are close to iOS's, with the WordPress
-/// app's blue for links.
-fn system_colors(dark: bool) -> ReaderThemeColors {
-    let color = |red, green, blue, alpha| ReaderColor {
-        red,
-        green,
-        blue,
-        alpha,
-    };
-    if dark {
-        ReaderThemeColors {
-            text: color(255, 255, 255, 255),
-            secondary_text: color(235, 235, 245, 153),
-            tertiary_text: color(235, 235, 245, 77),
-            background: color(0, 0, 0, 255),
-            secondary_background: color(28, 28, 30, 255),
-            border: color(84, 84, 88, 153),
-            link: color(57, 156, 227, 255),
-        }
-    } else {
-        ReaderThemeColors {
-            text: color(0, 0, 0, 255),
-            secondary_text: color(60, 60, 67, 153),
-            tertiary_text: color(60, 60, 67, 77),
-            background: color(255, 255, 255, 255),
-            secondary_background: color(242, 242, 247, 255),
-            border: color(60, 60, 67, 74),
-            link: color(6, 117, 196, 255),
-        }
-    }
 }
 
 /// Text from the Reader API's HTML, like a title with `&#8217;` in it.

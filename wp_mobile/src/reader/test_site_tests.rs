@@ -197,7 +197,7 @@ fn lets_the_page_load_gists_from_github() {
     let page = |offline| {
         content.page_html(super::ReaderPageOptions {
             theme: super::ReaderTheme::Sepia,
-            app_colors: super::theme::test_app_colors(),
+            app_colors: super::reader_default_app_colors(super::ReaderBrand::Wordpress),
             language: None,
             offline,
             font: None,
