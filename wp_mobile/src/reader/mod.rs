@@ -45,8 +45,9 @@ pub use images::{ReaderImageSize, ReaderPostImage};
 pub use links::{ReaderLink, reader_link};
 pub use page::{ReaderPageOptions, reader_page_base_url};
 pub use theme::{
-    ReaderAppColors, ReaderColor, ReaderFont, ReaderTheme, ReaderThemeAppearance,
-    ReaderThemeColors, reader_color_from_argb, reader_color_from_components, reader_color_from_hex,
+    ReaderAppColors, ReaderBrand, ReaderColor, ReaderFont, ReaderTheme, ReaderThemeAppearance,
+    ReaderThemeColors, reader_brand_from_id, reader_brands, reader_color_from_argb,
+    reader_color_from_components, reader_color_from_hex, reader_default_app_colors,
     reader_page_colors_css, reader_page_theme_css, reader_page_typography_css, reader_theme_colors,
     reader_theme_from_id, reader_themes,
 };

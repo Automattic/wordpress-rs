@@ -52,14 +52,14 @@ struct ReaderTests {
 
     @Test
     func fixedThemeCss() {
-        let css = readerPageColorsCss(theme: .evening, appColors: testAppColors())
+        let css = readerPageColorsCss(theme: .evening, appColors: readerDefaultAppColors(brand: .wordpress))
         #expect(css.contains("color-scheme: dark;"))
         #expect(css.contains("--reader-background: #3a3a3c;"))
     }
 
     @Test
     func systemThemeCss() {
-        let css = readerPageColorsCss(theme: .system, appColors: testAppColors())
+        let css = readerPageColorsCss(theme: .system, appColors: readerDefaultAppColors(brand: .wordpress))
         #expect(css.contains("--reader-background: #ffffff;"))
         #expect(css.contains("@media (prefers-color-scheme: dark)"))
         #expect(css.contains("--reader-background: #000000;"))
@@ -67,7 +67,7 @@ struct ReaderTests {
 
     @Test
     func readerThemeTakesTheAppsLinkColor() {
-        let appColors = testAppColors()
+        let appColors = readerDefaultAppColors(brand: .wordpress)
         let light = readerThemeColors(theme: .reader, appColors: appColors, dark: false)
         #expect(light.link == appColors.light.link)
         #expect(light.text != appColors.light.text)
@@ -77,25 +77,25 @@ struct ReaderTests {
     @Test
     func assemblesThePage() {
         let content = ReaderPostContent(html: #"<p>Hi</p><div class="fb-post"></div>"#)
-        let options = ReaderPageOptions(theme: .sepia, appColors: testAppColors(), language: "fa")
+        let appColors = readerDefaultAppColors(brand: .wordpress)
+        let options = ReaderPageOptions(theme: .sepia, appColors: appColors, language: "fa")
         let page = content.pageHtml(options: options)
         #expect(page.hasPrefix("<!DOCTYPE html>\n<html lang=\"fa\" dir=\"rtl\">"))
         #expect(page.contains(readerScript()))
         #expect(page.contains("<script async src=\"https://connect.facebook.net/"))
 
-        let offline = content.pageHtml(
-            options: ReaderPageOptions(theme: .sepia, appColors: testAppColors(), offline: true)
-        )
+        let offline = content.pageHtml(options: ReaderPageOptions(theme: .sepia, appColors: appColors, offline: true))
         #expect(!offline.contains("<script async"))
 
-        let reader = content.pageHtml(options: ReaderPageOptions(theme: .reader, appColors: testAppColors()))
+        let reader = content.pageHtml(options: ReaderPageOptions(theme: .reader, appColors: appColors))
         #expect(reader.contains(readerPageThemeCss(theme: .reader)))
     }
 
     @Test
     func setsTheReadersFontAndTextSize() {
         let content = ReaderPostContent(html: "<p>Hi</p>")
-        let options = ReaderPageOptions(theme: .sepia, appColors: testAppColors(), font: .serif, textScale: 1.25)
+        let appColors = readerDefaultAppColors(brand: .wordpress)
+        let options = ReaderPageOptions(theme: .sepia, appColors: appColors, font: .serif, textScale: 1.25)
         let page = content.pageHtml(options: options)
         #expect(page.contains(readerPageTypographyCss(font: .serif, textScale: 1.25, theme: .sepia)))
         #expect(readerPageBaseUrl() == "https://wordpress.com/reader")
@@ -166,22 +166,4 @@ struct ReaderTests {
     func scriptTalksToTheReaderPostHandler() {
         #expect(readerScript().contains("messageHandlers?.readerPost"))
     }
-}
-
-/// The app's colours, for tests: black on white and white on black, with blue links.
-func testAppColors() -> ReaderAppColors {
-    func colors(text: ReaderColor, background: ReaderColor) -> ReaderThemeColors {
-        ReaderThemeColors(
-            text: text,
-            secondaryText: text,
-            tertiaryText: text,
-            background: background,
-            secondaryBackground: background,
-            border: text,
-            link: ReaderColor(red: 6, green: 117, blue: 196, alpha: 255)
-        )
-    }
-    let white = ReaderColor(red: 255, green: 255, blue: 255, alpha: 255)
-    let black = ReaderColor(red: 0, green: 0, blue: 0, alpha: 255)
-    return ReaderAppColors(light: colors(text: black, background: white), dark: colors(text: white, background: black))
 }

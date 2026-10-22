@@ -380,8 +380,9 @@ fn text(text: &str) -> Node {
 mod tests {
     use super::*;
     use crate::reader::safety_tests::safety_problems;
-    use crate::reader::theme::test_app_colors;
-    use crate::reader::{ReaderPageOptions, ReaderPostContent, ReaderTheme};
+    use crate::reader::{
+        ReaderBrand, ReaderPageOptions, ReaderPostContent, ReaderTheme, reader_default_app_colors,
+    };
     use rstest::rstest;
 
     /// GitHub's embed HTML for a gist with one file, cut down to what the cleanup reads, plus the
@@ -399,7 +400,7 @@ hosted with ❤ by <a href="https://github.com/">GitHub</a></div></div></div>"#;
     fn options(offline: bool) -> ReaderPageOptions {
         ReaderPageOptions {
             theme: ReaderTheme::Sepia,
-            app_colors: test_app_colors(),
+            app_colors: reader_default_app_colors(ReaderBrand::Wordpress),
             language: None,
             offline,
             font: None,

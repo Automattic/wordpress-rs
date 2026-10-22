@@ -214,10 +214,10 @@ fn attribute(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{BASE64, ReaderPageOptions};
-    use crate::reader::theme::test_app_colors;
     use crate::reader::{
-        ReaderFont, ReaderPostContent, ReaderTheme, reader_page_colors_css, reader_page_theme_css,
-        reader_page_typography_css, reader_script, reader_stylesheet,
+        ReaderBrand, ReaderFont, ReaderPostContent, ReaderTheme, reader_default_app_colors,
+        reader_page_colors_css, reader_page_theme_css, reader_page_typography_css, reader_script,
+        reader_stylesheet,
     };
     use base64::Engine;
     use rstest::rstest;
@@ -226,7 +226,7 @@ mod tests {
     fn options() -> ReaderPageOptions {
         ReaderPageOptions {
             theme: ReaderTheme::Sepia,
-            app_colors: test_app_colors(),
+            app_colors: reader_default_app_colors(ReaderBrand::Wordpress),
             language: None,
             offline: false,
             font: None,
