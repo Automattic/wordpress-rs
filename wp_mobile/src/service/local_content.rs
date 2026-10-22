@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use wp_api::posts::AnyPostWithEditContext;
 use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
@@ -27,46 +26,29 @@ impl LocalContentService {
         Self { store }
     }
 
-    /// Store a working copy of a new post for `site` and return its ID.
-    /// Pushing the working copy creates the post.
-    pub fn create_post_working_copy(
-        &self,
-        working_copy: PostWorkingCopy,
-        site: SiteIdentity,
-    ) -> Result<WorkingCopyId, LocalContentError> {
-        let target = WorkingCopyTarget {
-            site,
-            remote_post: None,
-        };
-        self.store.execute(|conn| {
-            let transaction = conn.transaction()?;
-            let id = WorkingCopyRepository.insert_post(&transaction, &working_copy, &target)?;
-            transaction.commit()?;
-            Ok(id)
-        })
-    }
-
-    /// Read the working copy of `post`, a post on `site` fetched with the edit
-    /// context, storing a new one made from `post` if it has none yet. Pushing
-    /// the working copy updates that post.
+    /// Read the working copy for `target`, storing `working_copy` as a new one
+    /// if there's none yet.
     ///
-    /// An existing working copy is returned as stored, whatever `post` holds.
-    /// Making a new one fails with `RemotePostConversion` if the post can't be
-    /// converted, for example because it's trashed.
-    pub fn read_or_create_post_working_copy_from_remote(
+    /// With a remote post in `target`, an existing working copy of that post
+    /// is returned as stored, whatever `working_copy` holds, and pushing the
+    /// working copy updates that post. Without one, `working_copy` is always
+    /// stored as a new post, which pushing the working copy creates.
+    pub fn read_or_create_post_working_copy(
         &self,
-        site: SiteIdentity,
-        post: AnyPostWithEditContext,
+        target: WorkingCopyTarget,
+        working_copy: PostWorkingCopy,
     ) -> Result<DbPostWorkingCopy, LocalContentError> {
         self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            if let Some(existing) =
-                WorkingCopyRepository.select_post_by_remote_post(&transaction, &site, post.id)?
+            if let Some(remote_post) = target.remote_post
+                && let Some(existing) = WorkingCopyRepository.select_post_by_remote_post(
+                    &transaction,
+                    &target.site,
+                    remote_post.post_id,
+                )?
             {
                 return Ok(existing);
             }
-            let working_copy = PostWorkingCopy::from_remote(&post)?;
-            let target = WorkingCopyTarget::for_remote_post(site, &post);
             let id = WorkingCopyRepository.insert_post(&transaction, &working_copy, &target)?;
             let created = WorkingCopyRepository
                 .select_post(&transaction, &id)?
@@ -141,46 +123,29 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_all_posts(conn))
     }
 
-    /// Store a working copy of a new page for `site` and return its ID.
-    /// Pushing the working copy creates the page.
-    pub fn create_page_working_copy(
-        &self,
-        working_copy: PageWorkingCopy,
-        site: SiteIdentity,
-    ) -> Result<WorkingCopyId, LocalContentError> {
-        let target = WorkingCopyTarget {
-            site,
-            remote_post: None,
-        };
-        self.store.execute(|conn| {
-            let transaction = conn.transaction()?;
-            let id = WorkingCopyRepository.insert_page(&transaction, &working_copy, &target)?;
-            transaction.commit()?;
-            Ok(id)
-        })
-    }
-
-    /// Read the working copy of `page`, a page on `site` fetched with the edit
-    /// context, storing a new one made from `page` if it has none yet. Pushing
-    /// the working copy updates that page.
+    /// Read the working copy for `target`, storing `working_copy` as a new one
+    /// if there's none yet.
     ///
-    /// An existing working copy is returned as stored, whatever `page` holds.
-    /// Making a new one fails with `RemotePostConversion` if the page can't be
-    /// converted, for example because it's trashed.
-    pub fn read_or_create_page_working_copy_from_remote(
+    /// With a remote page in `target`, an existing working copy of that page
+    /// is returned as stored, whatever `working_copy` holds, and pushing the
+    /// working copy updates that page. Without one, `working_copy` is always
+    /// stored as a new page, which pushing the working copy creates.
+    pub fn read_or_create_page_working_copy(
         &self,
-        site: SiteIdentity,
-        page: AnyPostWithEditContext,
+        target: WorkingCopyTarget,
+        working_copy: PageWorkingCopy,
     ) -> Result<DbPageWorkingCopy, LocalContentError> {
         self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            if let Some(existing) =
-                WorkingCopyRepository.select_page_by_remote_post(&transaction, &site, page.id)?
+            if let Some(remote_post) = target.remote_post
+                && let Some(existing) = WorkingCopyRepository.select_page_by_remote_post(
+                    &transaction,
+                    &target.site,
+                    remote_post.post_id,
+                )?
             {
                 return Ok(existing);
             }
-            let working_copy = PageWorkingCopy::from_remote(&page)?;
-            let target = WorkingCopyTarget::for_remote_post(site, &page);
             let id = WorkingCopyRepository.insert_page(&transaction, &working_copy, &target)?;
             let created = WorkingCopyRepository
                 .select_page(&transaction, &id)?
