@@ -13,6 +13,8 @@ use wp_api::{
 #[macro_use]
 extern crate rocket;
 
+mod reader;
+
 #[get("/")]
 fn index() -> Template {
     Template::render("index", context! {})
@@ -110,6 +112,8 @@ fn escape(text: &str, dest: &mut Vec<u8>) {
 fn rocket() -> _ {
     rocket::build()
         .mount("/", routes![index, test])
+        .mount("/", reader::routes())
+        .manage(reader::client())
         .mount("/assets", FileServer::from(relative!("assets")))
         .attach(Template::fairing())
 }

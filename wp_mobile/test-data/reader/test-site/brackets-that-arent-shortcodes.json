@@ -1,0 +1,15 @@
+{
+ "source": {
+  "site": "jetpack.wpmt.co",
+  "site_type": "jetpack",
+  "post": 155
+ },
+ "fields": {
+  "title": "Reader shortcodes: brackets that aren&#8217;t shortcodes",
+  "URL": "https://jetpack.wpmt.co/reader-shortcodes-brackets-that-arent-shortcodes/",
+  "content": "<p>None of these brackets are shortcodes, so all of them should still show.</p>\n<p>Prose: it was a good idea [sic]. Everyone laughed. [Laughter] The media [emphasis mine] said so. A claim.[1] I’ve taken on [REDACTED] duties. We posted in the [Facebook group]. The page had [crossed out letters] on it. [TL;DR] It’s short. Re: [MCN-Announce] A subject. Some [is being] quoted. Let [x = 5] and [a, b].</p>\n<p>Shortcodes written out in code, escaped so WordPress doesn’t run them: <code>[gallery ids=\"1,2\"]</code> and <code>[[time]Oct 21 2026[/time]]</code>.</p>\n<pre>[[vc_row]][[vc_column]]Text[[/vc_column]][[/vc_row]]\n[caption id=\"attachment_1\"]A caption[/caption]</pre>\n<p>Escaped shortcodes in prose, which WordPress shows as text: [gallery ids=\"1,2\"] and [caption]A caption[/caption].</p>\n<p>The end.</p>",
+  "excerpt": "None of these brackets are shortcodes, so all of them should still show. Prose: it was a good idea [sic]. Everyone laughed. [Laughter] The media [emphasis mine] said so. A claim.[1] I’ve taken on [REDACTED] duties. We posted in the [Facebook group]. The page had [crossed out letters] on it. [TL;DR] It’s short. Re: [MCN-Announce]&hellip;",
+  "featured_image": ""
+ },
+ "features": []
+}

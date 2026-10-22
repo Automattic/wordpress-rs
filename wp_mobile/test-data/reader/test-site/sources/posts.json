@@ -1,0 +1,114 @@
+[
+  {
+    "id": 152,
+    "fixture": "shortcodes-left-for-wordpress-com",
+    "title": "Reader shortcodes: core shortcodes Jetpack leaves for WordPress.com",
+    "content": "shortcodes-left-for-wordpress-com.html"
+  },
+  {
+    "id": 153,
+    "fixture": "shortcodes-run-by-the-site-without-shortcode-embeds",
+    "title": "Reader shortcodes: core and Jetpack shortcodes the site runs",
+    "content": "shortcodes-run-by-the-site.html"
+  },
+  {
+    "id": 154,
+    "fixture": "shortcodes-from-plugins",
+    "title": "Reader shortcodes: plugin shortcodes WordPress.com can't run",
+    "content": "shortcodes-from-plugins.html"
+  },
+  {
+    "id": 155,
+    "fixture": "brackets-that-arent-shortcodes",
+    "title": "Reader shortcodes: brackets that aren't shortcodes",
+    "content": "brackets-that-arent-shortcodes.html"
+  },
+  {
+    "id": 156,
+    "fixture": "shortcodes-in-blocks",
+    "title": "Reader shortcodes: in blocks",
+    "content": "shortcodes-in-blocks.html"
+  },
+  {
+    "id": 163,
+    "fixture": "embeds",
+    "title": "Reader test: embeds",
+    "content": "embeds.html"
+  },
+  {
+    "id": 164,
+    "fixture": "core-blocks",
+    "title": "Reader test: core blocks",
+    "content": "core-blocks.html",
+    "meta": {
+      "footnotes": "[{\"id\": \"8d4a0f6e-6c47-4d8a-9a3e-0c5f1b2e7a10\", \"content\": \"The first footnote, with <a href=\\\"https://wordpress.org\\\">a link</a>.\"}, {\"id\": \"3b9e2c71-1f5d-4b0a-8e6c-2d7f9a4b5c33\", \"content\": \"The second footnote.\"}]"
+    }
+  },
+  {
+    "id": 165,
+    "fixture": "jetpack-blocks",
+    "title": "Reader test: Jetpack blocks",
+    "content": "jetpack-blocks.html"
+  },
+  {
+    "id": 166,
+    "fixture": "images",
+    "title": "Reader test: images",
+    "content": "images.html",
+    "featured_media": 143
+  },
+  {
+    "id": 167,
+    "fixture": "cleanup",
+    "title": "Reader test: markup the cleanup changes",
+    "content": "cleanup.html"
+  },
+  {
+    "id": 168,
+    "fixture": "languages-and-anchors",
+    "title": "Reader test: languages and anchors",
+    "content": "languages-and-anchors.html",
+    "excerpt": "A manual excerpt, which the author wrote, and which isn't the start of the post.",
+    "featured_media": 145
+  },
+  {
+    "id": 169,
+    "fixture": "password-protected",
+    "title": "Reader test: password-protected",
+    "content": "password-protected.html",
+    "password": "reader-test"
+  },
+  {
+    "id": 172,
+    "fixture": "jetpack-shortcode-embeds",
+    "title": "Reader test: Jetpack shortcode embeds",
+    "content": "jetpack-shortcode-embeds.html"
+  },
+  {
+    "id": 175,
+    "fixture": "shortcodes-run-by-the-site",
+    "title": "Reader shortcodes: core and Jetpack shortcodes the site runs, with Shortcode Embeds on",
+    "content": "shortcodes-run-by-the-site.html"
+  },
+  {
+    "id": 43,
+    "site": "wpmt.co",
+    "fixture": "getty-block",
+    "title": "Reader embed scripts: Getty Images, embed block",
+    "content": "getty-block.html"
+  },
+  {
+    "id": 44,
+    "site": "wpmt.co",
+    "fixture": "getty-code",
+    "title": "Reader embed scripts: Getty Images, embed code",
+    "content": "getty-code.html"
+  },
+  {
+    "id": 45,
+    "site": "wpmt.co",
+    "fixture": "getty-url",
+    "title": "Reader embed scripts: Getty Images, bare URL",
+    "content": "getty-url.html"
+  }
+]

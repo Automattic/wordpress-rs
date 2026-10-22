@@ -1,0 +1,26 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "Laborum et Molestiae Modi Beatae Minima // Laborum Iste",
+  "URL": "https://site-dbfd13.wordpress.com/2012/05/02/hrtiyjp-vh-bkqiakdxi-qcwv-wtfgyk-wcnueq-golejvq-kigm/",
+  "content": "<div class=\"embed-speakerdeck\"><iframe loading=\"lazy\" data-wpcom-embed-url=\"http://speakerdeck.com/b/cnmnai/p/hrtiyjp-vh-bkqiakdxi-qcwv-wtfgyk-wcnueq\" title=\"Laborum et Molestiae Modi Beatae Minima\" id=\"xzgw_mfghv_27354\" class=\"speakerdeck-iframe\" src=\"https://speakerdeck.com/player/8rmu6y5eam4jl4671y973970\" width=\"500\" height=\"384\" style=\"aspect-ratio:500/384; border:0; padding:0; margin:0; background:transparent;\" frameborder=\"0\" allowtransparency=\"true\" allowfullscreen=\"allowfullscreen\"></iframe></div>\n",
+  "excerpt": "",
+  "featured_image": ""
+ },
+ "features": [
+  "classic-editor",
+  "embed",
+  "embed:speakerdeck",
+  "excerpt-generated",
+  "iframe",
+  "iframe-size-numeric",
+  "language:ltr",
+  "published-pre-2019",
+  "site:simple",
+  "style-inline"
+ ]
+}

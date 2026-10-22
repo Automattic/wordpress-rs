@@ -1,0 +1,15 @@
+{
+ "source": {
+  "site": "wpmt.co",
+  "site_type": "simple",
+  "post": 45
+ },
+ "fields": {
+  "title": "Reader embed scripts: Getty Images, bare URL",
+  "URL": "http://wpmt.co/2026/10/21/reader-embed-scripts-getty-url/",
+  "content": "<p>Test post for which hosts Reader embed scripts load scripts from. Provider: Getty Images. Form: bare URL. An image from Getty Images&#8217; embed program.</p>\n<p><a id='MmMneLiGTelAFs08YTfPuQ' class='gie-single' href='https://www.gettyimages.com/detail/1234567' target='_blank' style='color:#a7a7a7;text-decoration:none;font-weight:normal !important;border:none;display:inline-block;'>Embed from Getty Images</a><script>window.gie=window.gie||function(c){(gie.q=gie.q||[]).push(c)};gie(function(){gie.widgets.load({id:'MmMneLiGTelAFs08YTfPuQ',sig:'mDoYv7y3av-oRbZPxi0flJZpb9x3OC8K_y_RoEwh4GM=',w:'394px',h:'594px',items:'1234567',caption: false ,tld:'com',is360: false })});</script><script src='//embed-cdn.gettyimages.com/widgets.js' charset='utf-8' async></script></p>\n<p>The end.</p>\n",
+  "excerpt": "<p>Test post for which hosts Reader embed scripts load scripts from. Provider: Getty Images. Form: bare URL. An image from Getty Images&#8217; embed program. Embed from Getty Images The end.</p>\n",
+  "featured_image": ""
+ },
+ "features": []
+}

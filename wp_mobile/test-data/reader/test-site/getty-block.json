@@ -1,0 +1,15 @@
+{
+ "source": {
+  "site": "wpmt.co",
+  "site_type": "simple",
+  "post": 43
+ },
+ "fields": {
+  "title": "Reader embed scripts: Getty Images, embed block",
+  "URL": "http://wpmt.co/2026/10/21/reader-embed-scripts-getty-block/",
+  "content": "<div class=\"is-reader\">\n<p class=\"wp-block-paragraph\">Test post for which hosts Reader embed scripts load scripts from. Provider: Getty Images. Form: embed block. An image from Getty Images’ embed program.</p>\n\n\n\n<figure class=\"wp-block-embed is-type-rich\" style=\"overflow-wrap: break-word; margin: 0 0 1em;\"><div class=\"wp-block-embed__wrapper\" style=\"position: relative;\">\n<a id=\"yNaVs19KQ95aE6ZcVEOd3w\" class=\"gie-single\" href=\"https://www.gettyimages.com/detail/1234567\" target=\"_blank\" style=\"color: #a7a7a7; text-decoration: none; border: none; display: inline-block; font-weight: normal;\">Embed from Getty Images</a><script>window.gie=window.gie||function(c){(gie.q=gie.q||[]).push(c)};gie(function(){gie.widgets.load({id:'yNaVs19KQ95aE6ZcVEOd3w',sig:'xV_BqjAQa74xXBZzcrXz3WojtIYzj87f2soAO9PXJQo=',w:'394px',h:'594px',items:'1234567',caption: false ,tld:'com',is360: false })});</script><script src=\"//embed-cdn.gettyimages.com/widgets.js\" charset=\"utf-8\" async></script>\n</div></figure>\n\n\n\n<p class=\"wp-block-paragraph\">The end.</p>\n </div>",
+  "excerpt": "<p>Test post for which hosts Reader embed scripts load scripts from. Provider: Getty Images. Form: embed block. An image from Getty Images’ embed program. The end.</p>\n",
+  "featured_image": ""
+ },
+ "features": []
+}

@@ -1,0 +1,27 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "LoRem Facere Impedit Vitae",
+  "URL": "https://site-995e85.wordpress.com/2013/12/15/hamnl-xttvds-wljtwiy-jxmbr/",
+  "content": "<p><img class=\"size-full aligncenter\" alt=\"LoRem Facere Impedit Vitae\" src=\"http://site-33ad8e.files.wordpress.com/2013/12/gyrlgkbq-eezh-9.png\" /></p>\n<p>A minima sunt id hic quisquam A impedit modi hic LoRem Facere Vitae Impedit. Per sit enim ne ipsa et ne Beatae id hic odio culpa et aut hic labore quisquam!</p>\n<div class=\"embed-flickr\"><a data-flickr-embed='true' href='https://www.flickr.com/photos/gueqb-upoj-kqujf/sets/34895016609192729/' title='LoRem Facere Impedit Vitae ex Eius Dolores, ne Beatae'><img src='https://live.staticflickr.com/5497/44640734721_0653040iq0.jpg' width='800' height='600' alt='Eaque Vitae Sunt #4'></a><script async src='https://embedr.flickr.com/assets/gvlspg-pajq.js' charset='utf-8'></script></div>\n",
+  "excerpt": "<p>A minima sunt id hic quisquam A impedit modi hic LoRem Facere Vitae Impedit. Per sit enim ne ipsa et ne Beatae id hic odio culpa et aut hic labore quisquam!</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "classic-editor",
+  "excerpt-generated",
+  "img",
+  "img-http",
+  "img-no-dimensions",
+  "img-no-srcset",
+  "language:ltr",
+  "published-pre-2019",
+  "script-external",
+  "script:embedr.flickr.com",
+  "site:simple"
+ ]
+}
