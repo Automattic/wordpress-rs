@@ -139,9 +139,12 @@ extension Array where Element == Target {
         var enabled = false
 
         if Context.environment["BUILDKITE"] != nil {
-            // When running on CI, only enable integration tests on Linux, since macOS CI agent does not have docker.
+            // When running on CI, the Linux agents run the test server in docker. The macOS agents can't, so they
+            // only have a test server in the step that starts one using `scripts/native-test-server.sh`.
             #if os(Linux)
             enabled = true
+            #else
+            enabled = Context.environment["WP_TEST_SERVER"] == "native"
             #endif
         } else {
             // Enable integration tests during local development, since we can easily install docker env on our macOS.
