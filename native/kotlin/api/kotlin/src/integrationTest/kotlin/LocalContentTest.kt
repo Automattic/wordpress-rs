@@ -149,6 +149,23 @@ class LocalContentTest {
     }
 
     @Test
+    fun `a new post recorded as pushed is found by its remote post`() {
+        val service = openService()
+        val created = service.readOrCreatePostWorkingCopy(newPostOn(newPostSite), post("Draft"))
+        val pushed = RemotePostReference(postId = 2007L, baseModifiedGmt = Date(1_900_000_000_000L))
+
+        service.recordPostWorkingCopyPush(created.id, pushed)
+        val found = service.readOrCreatePostWorkingCopy(
+            WorkingCopyTarget(site = newPostSite, remotePost = pushed),
+            post("Fetched")
+        )
+
+        assertEquals(created.id, found.id)
+        assertEquals(post("Draft"), found.workingCopy)
+        assertEquals(pushed, found.target.remotePost)
+    }
+
+    @Test
     fun `working copy from a fetched post points at it`() = runTest {
         val post = fetchFirst(PostEndpointType.Posts)
         val service = openService()
