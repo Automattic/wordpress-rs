@@ -3,6 +3,10 @@ use std::fmt;
 use strum::IntoEnumIterator;
 
 /// An sRGB colour.
+///
+/// To read one from the platform, use [`reader_color_from_argb`] for an Android colour int, or
+/// [`reader_color_from_components`] for components between 0 and 1, like UIKit's. Both apps' native
+/// wrappers have extensions for their own colour types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Record)]
 pub struct ReaderColor {
     pub red: u8,
@@ -28,20 +32,93 @@ impl ReaderColor {
             ..self
         }
     }
+}
 
-    /// The colour as a CSS hex colour: `#rrggbb`, or `#rrggbbaa` if it isn't opaque.
-    fn css(self) -> String {
+#[uniffi::export]
+impl ReaderColor {
+    /// The colour in CSS hex: `#rrggbb`, or `#rrggbbaa` if it isn't opaque. As in CSS, the opacity
+    /// comes last. Android's hex strings put it first, so use [`argb`](Self::argb) there.
+    pub fn hex(&self) -> String {
         let Self {
             red,
             green,
             blue,
             alpha,
-        } = self;
+        } = *self;
         if alpha == u8::MAX {
             format!("#{red:02x}{green:02x}{blue:02x}")
         } else {
             format!("#{red:02x}{green:02x}{blue:02x}{alpha:02x}")
         }
+    }
+
+    /// The colour as an Android colour int (a `@ColorInt`): `0xAARRGGBB`, in a signed 32-bit
+    /// integer, as Android stores it.
+    pub fn argb(&self) -> i32 {
+        i32::from_be_bytes([self.alpha, self.red, self.green, self.blue])
+    }
+}
+
+/// A colour from CSS hex: `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`, with or without the `#`. As in
+/// CSS, the opacity comes last. Anything else, like a colour's name, gives `None`.
+#[uniffi::export]
+pub fn reader_color_from_hex(hex: &str) -> Option<ReaderColor> {
+    let digits = hex.strip_prefix('#').unwrap_or(hex);
+    if !digits.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let channels: Vec<u8> = match digits.len() {
+        // Each digit stands for two: `#f80` is `#ff8800`.
+        3 | 4 => digits
+            .chars()
+            .map(|digit| digit.to_digit(16).map(|value| value as u8 * 17))
+            .collect::<Option<_>>()?,
+        6 | 8 => (0..digits.len())
+            .step_by(2)
+            .map(|start| u8::from_str_radix(&digits[start..start + 2], 16).ok())
+            .collect::<Option<_>>()?,
+        _ => return None,
+    };
+    Some(ReaderColor {
+        red: channels[0],
+        green: channels[1],
+        blue: channels[2],
+        alpha: channels.get(3).copied().unwrap_or(u8::MAX),
+    })
+}
+
+/// A colour from an Android colour int (a `@ColorInt`), like `ContextCompat.getColor` gives:
+/// `0xAARRGGBB`.
+#[uniffi::export]
+pub fn reader_color_from_argb(argb: i32) -> ReaderColor {
+    let [alpha, red, green, blue] = argb.to_be_bytes();
+    ReaderColor {
+        red,
+        green,
+        blue,
+        alpha,
+    }
+}
+
+/// A colour from sRGB components between 0 and 1, like UIKit's `getRed(_:green:blue:alpha:)` gives.
+/// Convert a colour from another colour space, like Display P3, to sRGB first.
+///
+/// Each component becomes the nearest of 256 steps. Ones outside 0 to 1, which an extended sRGB
+/// colour can have, are clamped, and `NaN` is 0.
+#[uniffi::export]
+pub fn reader_color_from_components(red: f64, green: f64, blue: f64, alpha: f64) -> ReaderColor {
+    let channel = |value: f64| {
+        if value.is_nan() {
+            0
+        } else {
+            (value.clamp(0.0, 1.0) * f64::from(u8::MAX)).round() as u8
+        }
+    };
+    ReaderColor {
+        red: channel(red),
+        green: channel(green),
+        blue: channel(blue),
+        alpha: channel(alpha),
     }
 }
 
@@ -400,7 +477,7 @@ fn variables(colors: &ReaderThemeColors, indent: &str) -> String {
         ("link", link),
     ]
     .into_iter()
-    .map(|(name, color)| format!("{indent}--reader-{name}: {};\n", color.css()))
+    .map(|(name, color)| format!("{indent}--reader-{name}: {};\n", color.hex()))
     .collect()
 }
 
@@ -430,6 +507,75 @@ mod tests {
     use super::*;
     use indoc::indoc;
     use rstest::rstest;
+
+    #[rstest]
+    #[case::short("#f80", (0xff, 0x88, 0x00, 0xff))]
+    #[case::short_with_opacity("#f808", (0xff, 0x88, 0x00, 0x88))]
+    #[case::long("#3858e9", (0x38, 0x58, 0xe9, 0xff))]
+    #[case::long_with_opacity("#3858e980", (0x38, 0x58, 0xe9, 0x80))]
+    #[case::upper_case("#3858E9", (0x38, 0x58, 0xe9, 0xff))]
+    #[case::without_the_hash("3858e9", (0x38, 0x58, 0xe9, 0xff))]
+    fn reads_css_hex(#[case] hex: &str, #[case] (red, green, blue, alpha): (u8, u8, u8, u8)) {
+        assert_eq!(
+            reader_color_from_hex(hex),
+            Some(ReaderColor {
+                red,
+                green,
+                blue,
+                alpha
+            })
+        );
+    }
+
+    #[rstest]
+    #[case::a_name("red")]
+    #[case::too_short("#12")]
+    #[case::five_digits("#12345")]
+    #[case::too_long("#123456789")]
+    #[case::not_hex("#gggggg")]
+    #[case::not_ascii("#ééé")]
+    #[case::empty("")]
+    #[case::only_the_hash("#")]
+    fn reads_nothing_from_other_text(#[case] hex: &str) {
+        assert_eq!(reader_color_from_hex(hex), None);
+    }
+
+    #[rstest]
+    #[case::opaque("#3858e9")]
+    #[case::translucent("#3858e980")]
+    fn hex_reads_back(#[case] hex: &str) {
+        let color = reader_color_from_hex(hex).expect("the hex is valid");
+        assert_eq!(color.hex(), hex);
+    }
+
+    #[test]
+    fn reads_and_writes_android_color_ints() {
+        let color = reader_color_from_hex("#3858e980").expect("the hex is valid");
+        // Android's colour ints are signed, so a colour with its top bit set is negative.
+        assert_eq!(color.argb(), 0x803858e9_u32 as i32);
+        assert!(color.argb() < 0);
+        assert_eq!(reader_color_from_argb(color.argb()), color);
+        assert_eq!(
+            reader_color_from_argb(0xff008710_u32 as i32).hex(),
+            "#008710"
+        );
+    }
+
+    #[rstest]
+    #[case::exact(0.0, 1.0, 0.2, 1.0, (0, 255, 51, 255))]
+    #[case::rounded(0.5, 0.502, 0.498, 0.6, (128, 128, 127, 153))]
+    #[case::extended_srgb(-0.25, 1.1, 0.5, 2.0, (0, 255, 128, 255))]
+    #[case::not_a_number(f64::NAN, 0.0, 0.0, 1.0, (0, 0, 0, 255))]
+    fn reads_components_between_0_and_1(
+        #[case] red: f64,
+        #[case] green: f64,
+        #[case] blue: f64,
+        #[case] alpha: f64,
+        #[case] expected: (u8, u8, u8, u8),
+    ) {
+        let color = reader_color_from_components(red, green, blue, alpha);
+        assert_eq!((color.red, color.green, color.blue, color.alpha), expected);
+    }
 
     #[test]
     fn lists_the_themes_in_order() {
@@ -488,8 +634,8 @@ mod tests {
         #[case] background: &str,
     ) {
         let colors = reader_theme_colors(theme, test_app_colors(), false);
-        assert_eq!(colors.text.css(), text);
-        assert_eq!(colors.background.css(), background);
+        assert_eq!(colors.text.hex(), text);
+        assert_eq!(colors.background.hex(), background);
         assert_eq!(colors.link, colors.text);
         assert_eq!(reader_theme_colors(theme, test_app_colors(), true), colors);
     }
@@ -511,10 +657,10 @@ mod tests {
         #[case] border: &str,
     ) {
         let colors = reader_theme_colors(theme, test_app_colors(), false);
-        assert_eq!(colors.secondary_text.css(), secondary_text);
-        assert_eq!(colors.tertiary_text.css(), tertiary_text);
-        assert_eq!(colors.secondary_background.css(), secondary_background);
-        assert_eq!(colors.border.css(), border);
+        assert_eq!(colors.secondary_text.hex(), secondary_text);
+        assert_eq!(colors.tertiary_text.hex(), tertiary_text);
+        assert_eq!(colors.secondary_background.hex(), secondary_background);
+        assert_eq!(colors.border.hex(), border);
     }
 
     #[test]
@@ -540,8 +686,8 @@ mod tests {
     ) {
         let app = test_app_colors();
         let colors = reader_theme_colors(ReaderTheme::Reader, app, dark);
-        assert_eq!(colors.text.css(), text);
-        assert_eq!(colors.background.css(), background);
+        assert_eq!(colors.text.hex(), text);
+        assert_eq!(colors.background.hex(), background);
         let app_link = if dark { app.dark.link } else { app.light.link };
         assert_eq!(colors.link, app_link);
     }
