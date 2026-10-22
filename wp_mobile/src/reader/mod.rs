@@ -56,4 +56,8 @@ mod safety_tests;
 #[cfg(test)]
 mod snapshot_tests;
 #[cfg(test)]
+mod structure;
+#[cfg(test)]
+mod structure_tests;
+#[cfg(test)]
 mod test_site_tests;

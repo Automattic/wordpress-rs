@@ -41,6 +41,8 @@ wp_mobile_cache = { path = "../wp_mobile_cache" }
 async-trait = { workspace = true }
 futures = { workspace = true }
 indoc = { workspace = true }
+postcard = { workspace = true }
+regex = { workspace = true }
 rstest = { workspace = true }
 rusqlite = { workspace = true }
 tempfile = { workspace = true }
