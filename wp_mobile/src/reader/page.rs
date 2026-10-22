@@ -156,7 +156,8 @@ fn language_tag(language: &str) -> Option<String> {
     is_tag.then_some(tag)
 }
 
-/// Whether a language is written right to left, from its tag's primary language.
+/// Whether a language is written right to left, from its tag's primary language. Every language
+/// WordPress has a right-to-left locale for is here.
 fn is_right_to_left(language: &str) -> bool {
     let primary = language
         .split('-')
@@ -165,7 +166,26 @@ fn is_right_to_left(language: &str) -> bool {
         .to_ascii_lowercase();
     matches!(
         primary.as_str(),
-        "ar" | "arc" | "ckb" | "dv" | "fa" | "he" | "iw" | "ps" | "sd" | "ug" | "ur" | "yi"
+        "ar" | "arc"
+            | "arq"
+            | "ary"
+            | "azb"
+            | "bcc"
+            | "bgn"
+            | "ckb"
+            | "dv"
+            | "fa"
+            | "haz"
+            | "he"
+            | "iw"
+            | "nqo"
+            | "ps"
+            | "sd"
+            | "skr"
+            | "snd"
+            | "ug"
+            | "ur"
+            | "yi"
     )
 }
 
@@ -324,7 +344,19 @@ mod tests {
         "<p>Hi</p>",
         r#"<html lang="ar-EG" dir="rtl">"#
     )]
+    // WordPress's right-to-left locales with a three-letter language.
+    #[case::algerian_arabic(Some("arq"), "<p>Hi</p>", r#"<html lang="arq" dir="rtl">"#)]
+    #[case::moroccan_arabic(Some("ary"), "<p>Hi</p>", r#"<html lang="ary" dir="rtl">"#)]
+    #[case::south_azerbaijani(Some("azb"), "<p>Hi</p>", r#"<html lang="azb" dir="rtl">"#)]
+    #[case::southern_balochi(Some("bcc"), "<p>Hi</p>", r#"<html lang="bcc" dir="rtl">"#)]
+    #[case::western_balochi(Some("bgn"), "<p>Hi</p>", r#"<html lang="bgn" dir="rtl">"#)]
+    #[case::hazaragi(Some("haz"), "<p>Hi</p>", r#"<html lang="haz" dir="rtl">"#)]
+    #[case::nko(Some("nqo"), "<p>Hi</p>", r#"<html lang="nqo" dir="rtl">"#)]
+    #[case::saraiki(Some("skr"), "<p>Hi</p>", r#"<html lang="skr" dir="rtl">"#)]
+    #[case::sindhi(Some("snd"), "<p>Hi</p>", r#"<html lang="snd" dir="rtl">"#)]
     #[case::left_to_right(Some("pt_BR"), "<p>Hi</p>", r#"<html lang="pt-BR" dir="ltr">"#)]
+    // Azerbaijani is written in Latin letters; only South Azerbaijani is right to left.
+    #[case::azerbaijani(Some("az"), "<p>Hi</p>", r#"<html lang="az" dir="ltr">"#)]
     // WordPress themes take the direction from the site's language, so the page does too.
     #[case::the_sites_language_over_the_posts(
         Some("en"),
