@@ -1,0 +1,26 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "Magni Beatae Veniam Impedit",
+  "URL": "http://site-ac5a9e.example/2014/09/24/wrgem-oisols-yykzje-wljtwiy/",
+  "content": "\n<div class=\"wp-block-group has-global-padding is-layout-constrained wp-block-group-is-layout-constrained\">\n<figure class=\"wp-block-embed is-type-video is-provider-cloudup wp-block-embed-cloudup wp-embed-aspect-4-3 wp-has-aspect-ratio\"><div class=\"wp-block-embed__wrapper\">\nhttps://cloudup.com/uw2esa9-9sk\n</div></figure>\n\n\n\n<hr class=\"wp-block-separator has-alpha-channel-opacity\" />\n\n\n\n<p class=\"wp-block-paragraph\">Voluptatibus is hic irure labore Voluptatem consectetur veniam veritatis. Ex&#8217;a eaque fuga A quam amet ante et ad is perferendis quo iste esse&#8230; 🙂</p>\n</div>\n",
+  "excerpt": "<p>Voluptatibus is hic irure labore Voluptatem consectetur veniam veritatis. Ex&#8217;a eaque fuga A quam amet ante et ad is perferendis quo iste esse&#8230; 🙂</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "block-editor",
+  "embed",
+  "embed-unresolved",
+  "embed:cloudup",
+  "excerpt-generated",
+  "group",
+  "language:ltr",
+  "published-pre-2019",
+  "separator",
+  "site:simple"
+ ]
+}

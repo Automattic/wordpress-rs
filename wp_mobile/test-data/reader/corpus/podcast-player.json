@@ -1,0 +1,21 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "8. Ipsam",
+  "URL": "https://site-ea36f5.wordpress.com/2021/08/01/6-xfeix/",
+  "content": "\n<a class=\"wp-block-jetpack-podcast-player jetpack-podcast-player__direct-link\" href=\"https://site-59cb9b.example/s/44280775/rymkypm/kvx\">https://site-59cb9b.example/s/44280775/rymkypm/kvx</a>\n\n\n\n<h3 class=\"wp-block-heading\">Dolores</h3>\n\n\n\n<p class=\"wp-block-paragraph\">Iste-iste ipsam eveniet non hic quod magni eveniet facere. Impedit tempor?</p>\n\n",
+  "excerpt": "<p>Dolores Iste-iste ipsam eveniet non hic quod magni eveniet facere. Impedit tempor?</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "block-editor",
+  "excerpt-generated",
+  "language:ltr",
+  "podcast-player",
+  "site:simple"
+ ]
+}

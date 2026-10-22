@@ -1,0 +1,22 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "자라타 바다",
+  "URL": "https://site-16b97a.wordpress.com/2024/07/10/%zl%08%07%cw%65%43%cw%9n%08-%ep%i4%06%ep%u7%31/",
+  "content": "\n<p class=\"wp-block-paragraph\">가가타차자아 나사 사라 가다하타가! 다 마파가타가. 라차사아사 라자사마 라하바 마다타 하 가카 마카라 하아사라자. 나카가라 하 바카사타차 다마 파마타 카바 하사사 가타나라 아바사라자. 하파차 파파 나카가나 자카사 하 하라 사타 가가타차자 라아 카 타바 하사라 차 하 하카타가. 타아 가사아 바자타 가라자. 하사사 가타나 나아마타 하 가타나라 아바사차 다아타 차가사파 가사 아마 라아 카 타바 타아라 차 하 하카타가.</p>\n",
+  "excerpt": "<p>다바가자 자라아타 사나라 바다 나바 라바 마다사 하 자카타가. 가하라 카카라타 사사타 타가라 나타 타사라 마나차 사가카차 다사가자 차바라 바라파바 하 하카타가.</p>\n",
+  "featured_image": "https://site-fcef0f.files.wordpress.com/2024/07/2a49s-oeasy_wrrg_3.png"
+ },
+ "features": [
+  "block-editor",
+  "excerpt-authored",
+  "featured-image",
+  "lang-cjk",
+  "language:lang-cjk",
+  "site:simple"
+ ]
+}

@@ -28,9 +28,12 @@ RUN cargo build -p wp_rs_web --bin wp_rs_web --release
 # Build the runtime docker image
 #
 
-FROM debian:bookworm-slim
+# The same Debian release as the `rust` image above, so the binary finds the C library it was built
+# against. The SQLite that `wp_mobile` compiles in needs glibc 2.38.
+FROM debian:trixie-slim
 
-RUN apt update && apt install -y openssl && rm -rf /var/lib/apt/lists/*
+# Debian 13's `openssl` doesn't bring the CA certificates with it, and the tools need them for HTTPS.
+RUN apt update && apt install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /app/wp_rs_web/assets
 COPY --from=builder /app/target/release/wp_rs_web /app/wp_rs_web/wp_rs_web
 COPY --from=builder /app/wp_rs_web/assets/style.css /app/wp_rs_web/assets/style.css

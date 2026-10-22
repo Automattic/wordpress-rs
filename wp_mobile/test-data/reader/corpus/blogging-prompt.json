@@ -1,0 +1,24 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "Modi ad per soluta et?",
+  "URL": "https://site-b474dd.wordpress.com/2023/07/24/yqzv-jm-hoi-hwqfrm-vh/",
+  "content": "\n<div class=\"wp-block-jetpack-blogging-prompt jetpack-blogging-prompt\"><div class=\"jetpack-blogging-prompt__label\">Rerum aperiam beatae</div><div class=\"jetpack-blogging-prompt__text\">Modi ad per soluta et dolor per ante?</div><div class=\"jetpack-blogging-prompt__answers\"><img class=\"jetpack-blogging-prompt__answers-gravatar\" aria-hidden=\"true\" src=\"https://2.gravatar.com/uqlorf/xc36883498h2p927661yoc9337a5k656n308507283127r2286kld70a8z258718?s=96&amp;d=veikayhej&amp;r=i\" /><img class=\"jetpack-blogging-prompt__answers-gravatar\" aria-hidden=\"true\" src=\"https://2.gravatar.com/uqlorf/koxol53169ai93397jh7kk595hh3como9a8jksu91d69v738143q072l549bq3c2?s=96&amp;d=veikayhej&amp;r=i\" /><img class=\"jetpack-blogging-prompt__answers-gravatar\" aria-hidden=\"true\" src=\"https://1.gravatar.com/uqlorf/6gh684r055254yz9kc7h07lo7mftsu7336a419qpj17605q5xww8b9484q31696a?s=96&amp;d=veikayhej&amp;r=i\" /><a class=\"jetpack-blogging-prompt__answers-link\" href=\"https://wordpress.com/uuj/qzfnstcjuvh-9439\" target=\"_blank\" rel=\"external noreferrer noopener\">Sunt aut provident</a></div></div>\n\n\n\n<p class=\"wp-block-paragraph\">A explicabo soluta et a reiciendis veniam id deleniti quo quae laborum.</p>\n",
+  "excerpt": "<p>A explicabo soluta et a reiciendis veniam id deleniti quo quae laborum.</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "block-editor",
+  "blogging-prompt",
+  "excerpt-generated",
+  "img",
+  "img-no-dimensions",
+  "img-no-srcset",
+  "language:ltr",
+  "site:simple"
+ ]
+}

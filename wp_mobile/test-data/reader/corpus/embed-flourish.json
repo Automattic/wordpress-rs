@@ -1,0 +1,26 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "Aperiam Eaque Asperiores Iuajfpiyvrabdcw",
+  "URL": "https://site-a874ca.wordpress.com/2025/02/18/mgmkjnk-potgz-iwphmfyqks-yklamutxhgeywxv/",
+  "content": "\n<p class=\"wp-block-paragraph\">A voluptas numquam et ius Fugiat Facere et similique Fugiat Quae ante minus asperiores dignissimos.</p>\n\n\n\n<p class=\"wp-block-paragraph\"></p>\n\n\n<div class=\"googlemaps\">\n\t\t\t\t<iframe width=\"640\" height=\"480\" frameborder=\"0\" scrolling=\"no\" marginheight=\"0\" marginwidth=\"0\"  src=\"https://www.google.com/maps/d/b/8/embed?mid=9my2rdreppz8igq5oawdm8yhaxdolily&amp;ehbc=0e141l\"></iframe>\n\t\t\t</div>\n\n\n<p class=\"wp-block-paragraph\">Nisi, A ante CorpoRis et soluta a provident sint id quo.</p>\n\n\n\n<figure class=\"wp-block-embed is-type-wp-embed is-provider-knight-lab wp-block-embed-knight-lab\"><div class=\"wp-block-embed__wrapper\">\n<iframe data-wpcom-embed-url=\"https://site-e0adad.example/cncjgdxnwt/cj8a1531d6j932d9808r2kq86261eka2/hlpkd-vh-pgf-mq-rez-zcbtok/hxglf.html\" class=\"wp-embedded-content\" sandbox=\"allow-scripts\" security=\"restricted\" src='https://site-e0adad.example/cncjgdxnwt/cj8a1531d6j932d9808r2kq86261eka2/hlpkd-vh-pgf-mq-rez-zcbtok/hxglf.html#?akrtjo=z5yblemjsl' data-secret='z5yblemjsl' width='500' height='700' frameborder='0'></iframe>\n</div></figure>\n\n\n\n<p class=\"wp-block-paragraph\">Aperiam, A ante Fugiat Facere et soluta a Fugiat Nesciunt vel omnis. </p>\n\n\n\n<figure class=\"wp-block-embed is-type-wp-embed is-provider-flourish wp-block-embed-flourish\"><div class=\"wp-block-embed__wrapper\">\n<iframe loading=\"lazy\" data-wpcom-embed-url=\"https://site-8852e1.example/cdxssjvoitbhw/63548246/\" class=\"wp-embedded-content\" sandbox=\"allow-scripts\" security=\"restricted\" title=\"Perferendis ne tempor tenetur\" src=\"https://site-01711e.example/cdxssjvoitbhw/63548246/embed#?akrtjo=8ae2komqyi\" data-secret=\"8ae2komqyi\" frameborder=\"0\" scrolling=\"no\" height=\"575\" width=\"500\"></iframe>\n</div></figure>\n\n\n\n<p class=\"wp-block-paragraph\"><br><br></p>\n",
+  "excerpt": "<p>A voluptas numquam et ius Fugiat Facere et similique Fugiat Quae ante minus asperiores dignissimos. Nisi, A ante CorpoRis et soluta a provident sint id quo. Aperiam, A ante Fugiat Facere et soluta a Fugiat Nesciunt vel omnis.</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "block-editor",
+  "embed",
+  "embed:flourish",
+  "embed:google-maps",
+  "embed:knight-lab",
+  "excerpt-generated",
+  "iframe",
+  "iframe-size-numeric",
+  "language:ltr",
+  "site:simple"
+ ]
+}

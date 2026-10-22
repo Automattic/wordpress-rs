@@ -1,0 +1,25 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "Quasi Quo!",
+  "URL": "https://site-92a98f.wordpress.com/2005/09/22/dabjl-bib/",
+  "content": "<div align='center'>\n<img src='/files/ptu_8245.jpg' alt='' /><br />\n<em>Hic <a href=\"http://site-d0d50f.example/rlwa/2005/09/16/dxvsmh-vnjmore-vjli/\">minima saepe</a> iste ipsa!</em>\n</div>\n",
+  "excerpt": "<p>Hic minima saepe iste ipsa!</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "classic-editor",
+  "excerpt-generated",
+  "img",
+  "img-no-dimensions",
+  "img-no-srcset",
+  "img-relative-url",
+  "language:ltr",
+  "published-pre-2019",
+  "site:simple"
+ ]
+}

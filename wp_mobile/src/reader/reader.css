@@ -1,0 +1,1768 @@
+/*
+ * The stylesheet for the Reader's post page, shared by the iOS and Android apps.
+ *
+ * - Colours come from the `--reader-*` variables that `reader_page_colors_css` sets, so they follow
+ *   the reader's theme. The only fixed colours set the text and what's behind it together, so they
+ *   look the same in every theme: gallery captions over their image, and the author's colours.
+ * - Nothing here checks `prefers-color-scheme`: a theme with fixed colours has to look the same in
+ *   light and dark mode.
+ * - The post HTML has been through `ReaderPostContent`'s cleanup, so it has no inline styles to fight.
+ *
+ * Most of this comes from the rules in Calypso's `reader-mobile.css` that posts use, and the rest
+ * from the apps' own stylesheets.
+ */
+
+/*
+ * The reset. A web view's own stylesheet is written for desktop pages, so these rules replace the
+ * defaults that don't suit a post on a phone. Unlike Calypso's reset, they keep what elements mean:
+ * bold stays bold, and lists keep their bullets. WebKit's and Chromium's defaults already agree, so
+ * this isn't about making the two apps match.
+ */
+
+/* Widths include padding and borders, as in most WordPress themes. */
+*,
+::before,
+::after {
+  box-sizing: border-box;
+}
+
+/* Something the author hid stays hidden, even if a rule below gives it a `display`. */
+[hidden] {
+  display: none !important;
+}
+
+/* Embeds turn off the web view's inset border with an inline style, which the cleanup removes. */
+iframe {
+  border: 0;
+}
+
+/* `monospace` on its own is Courier on iOS. `ui-monospace` is SF Mono there, and Android skips it. */
+code,
+kbd,
+pre,
+samp,
+tt {
+  font-family: ui-monospace, monospace;
+}
+
+/* Lists, with room for two-digit numbers, rather than the web view's 40px. */
+ul,
+ol {
+  padding-inline-start: 2em;
+}
+
+/* A list inside a list item stays close to the item's text. */
+li > ul,
+li > ol {
+  margin-block: 0;
+}
+
+dt {
+  font-weight: 700;
+}
+
+dd {
+  margin: 0;
+  margin-inline-start: 2em;
+}
+
+/*
+ * WordPress's text colour format, which is a `mark`. The cleanup removes the colour, and web views
+ * give a `mark` a yellow background.
+ */
+mark.has-inline-color {
+  background: none;
+  color: inherit;
+}
+
+/* The page */
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* The reader's text size, times the system's, so everything sized in `rem` follows it. */
+html {
+  font-size: calc(16px * var(--reader-text-scale, 1));
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  color: var(--reader-text);
+  /* The app draws the background behind the web view. */
+  background-color: transparent;
+  font-family: var(--reader-font-family, system-ui, -apple-system, Roboto, sans-serif);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+
+/*
+ * The space between blocks. The post is a stack of blocks, and so is each block that lays its own
+ * blocks out one after another, like a group, a column or a quote: each block starts the same
+ * distance after the one before it ends, and there's no space before the first or after the last.
+ * A heading starts a section, so it's further from what's before it.
+ *
+ * This is the only space between blocks. Blocks don't set margins above or below themselves, and
+ * the cleanup puts loose text in paragraphs and removes empty ones, so nothing else adds to it.
+ *
+ * WordPress marks the blocks that stack theirs `is-layout-flow` or `is-layout-constrained`. Older
+ * blocks don't, so they're named. A group always stacks here, even one its site lays out in a row.
+ * A plain `<div>` stacks, but one with a class may be a block that lays its contents out another
+ * way, like a gallery, so it doesn't.
+ */
+:root {
+  --reader-block-gap: 1.25rem;
+}
+
+:where(
+    body,
+    .is-layout-flow,
+    .is-layout-constrained,
+    .wp-block-group,
+    .wp-block-group__inner-container,
+    .wp-block-column,
+    .wp-block-cover__inner-container,
+    .wp-block-media-text__content,
+    blockquote,
+    details,
+    div:not([class]),
+    :is(ul, ol):is(.wp-block-list, :not([class])) > li,
+    td,
+    th
+  )
+  > * {
+  margin-block: 0;
+}
+
+:where(
+    body,
+    .is-layout-flow,
+    .is-layout-constrained,
+    .wp-block-group,
+    .wp-block-group__inner-container,
+    .wp-block-column,
+    .wp-block-cover__inner-container,
+    .wp-block-media-text__content,
+    blockquote,
+    details,
+    div:not([class]),
+    :is(ul, ol):is(.wp-block-list, :not([class])) > li,
+    td,
+    th
+  )
+  > * + * {
+  margin-block-start: var(--reader-block-gap);
+}
+
+:where(
+    body,
+    .is-layout-flow,
+    .is-layout-constrained,
+    .wp-block-group,
+    .wp-block-group__inner-container,
+    .wp-block-column,
+    .wp-block-cover__inner-container,
+    .wp-block-media-text__content,
+    blockquote,
+    details,
+    div:not([class])
+  )
+  > :is(h1, h2, h3, h4, h5, h6):not(:first-child) {
+  margin-block-start: calc(var(--reader-block-gap) * 1.75);
+}
+
+/* Text */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 700;
+  /* Tighter than body text. */
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 2rem;
+}
+
+h2 {
+  font-size: 1.5rem;
+}
+
+h3,
+h4 {
+  font-size: 1.25rem;
+}
+
+/* The web view makes these 13 and 11 pixels, well below the text's size. */
+h5 {
+  font-size: 1rem;
+}
+
+h6 {
+  font-size: 0.875rem;
+}
+
+a {
+  color: var(--reader-link);
+  text-decoration: underline;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-block: 0;
+  padding-inline: 32px 24px;
+  /* On the side the text starts, which is the right in a right-to-left post. */
+  border-inline-start: 3px solid var(--reader-secondary-text);
+  color: var(--reader-text);
+  background: transparent;
+}
+
+/* A quote's citation, which the cleanup puts in a paragraph of its own after the quote's. */
+blockquote cite {
+  color: var(--reader-secondary-text);
+  font-size: 0.875rem;
+  font-style: normal;
+}
+
+aside {
+  border: none;
+  background: none;
+  font-size: 0.875rem;
+}
+
+/*
+ * Each line of code takes its direction from its own text, so code reads left to right in a
+ * right-to-left post, while Arabic or Hebrew in a preformatted block or a verse still reads right
+ * to left.
+ */
+pre,
+code,
+kbd,
+samp {
+  unicode-bidi: plaintext;
+}
+
+pre {
+  overflow-x: auto;
+  padding: 1em;
+  background-color: var(--reader-secondary-background);
+}
+
+hr {
+  margin-inline: 0;
+  border: 0;
+  border-top: 1px solid var(--reader-border);
+}
+
+sup,
+sub {
+  position: relative;
+  vertical-align: baseline;
+  font-size: 0.875rem;
+}
+
+sup {
+  top: -0.4em;
+}
+
+sub {
+  bottom: -0.2em;
+}
+
+/* Text only for screen readers, hidden the way WordPress hides it. */
+.screen-reader-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+  overflow-wrap: normal;
+}
+
+/* Text formatting the author chose in the editor */
+
+.has-text-align-left {
+  text-align: left;
+}
+
+.has-text-align-center {
+  text-align: center;
+}
+
+.has-text-align-right {
+  text-align: right;
+}
+
+.has-text-align-justify {
+  text-align: justify;
+}
+
+/* A drop cap, as WordPress draws it. */
+.has-drop-cap::first-letter {
+  /* `inline-start` puts it on the right in a right-to-left post. Older web views take `left`. */
+  float: left;
+  float: inline-start;
+  margin-block: 0.05em 0;
+  margin-inline: 0 0.1em;
+  font-size: 8.4em;
+  font-weight: 100;
+  font-style: normal;
+  line-height: 0.68;
+  text-transform: uppercase;
+}
+
+/*
+ * WordPress's preset font sizes, relative to the page's, so the reader's text size setting still
+ * applies. At the default size they match WordPress's: 13, 20, 36 and 42 pixels.
+ */
+.has-small-font-size {
+  font-size: 0.8125em;
+}
+
+.has-normal-font-size,
+.has-regular-font-size {
+  font-size: 1em;
+}
+
+.has-medium-font-size {
+  font-size: 1.25em;
+}
+
+.has-large-font-size {
+  font-size: 2.25em;
+}
+
+.has-x-large-font-size,
+.has-larger-font-size,
+.has-huge-font-size {
+  font-size: 2.625em;
+}
+
+/*
+ * The author's colours, from WordPress's palette, but only on something that sets both its text and
+ * its background colour, like a group with white text on dark red. That looks the same in every
+ * theme. Text the author coloured for their site's background could be unreadable on the theme's,
+ * so it keeps the theme's colour.
+ */
+.has-background.has-text-color.has-black-color {
+  color: #000;
+}
+
+.has-background.has-text-color.has-cyan-bluish-gray-color {
+  color: #abb8c3;
+}
+
+.has-background.has-text-color.has-white-color {
+  color: #fff;
+}
+
+.has-background.has-text-color.has-pale-pink-color {
+  color: #f78da7;
+}
+
+.has-background.has-text-color.has-vivid-red-color {
+  color: #cf2e2e;
+}
+
+.has-background.has-text-color.has-luminous-vivid-orange-color {
+  color: #ff6900;
+}
+
+.has-background.has-text-color.has-luminous-vivid-amber-color {
+  color: #fcb900;
+}
+
+.has-background.has-text-color.has-light-green-cyan-color {
+  color: #7bdcb5;
+}
+
+.has-background.has-text-color.has-vivid-green-cyan-color {
+  color: #00d084;
+}
+
+.has-background.has-text-color.has-pale-cyan-blue-color {
+  color: #8ed1fc;
+}
+
+.has-background.has-text-color.has-vivid-cyan-blue-color {
+  color: #0693e3;
+}
+
+.has-background.has-text-color.has-vivid-purple-color {
+  color: #9b51e0;
+}
+
+.has-background.has-text-color.has-black-background-color {
+  background-color: #000;
+}
+
+.has-background.has-text-color.has-cyan-bluish-gray-background-color {
+  background-color: #abb8c3;
+}
+
+.has-background.has-text-color.has-white-background-color {
+  background-color: #fff;
+}
+
+.has-background.has-text-color.has-pale-pink-background-color {
+  background-color: #f78da7;
+}
+
+.has-background.has-text-color.has-vivid-red-background-color {
+  background-color: #cf2e2e;
+}
+
+.has-background.has-text-color.has-luminous-vivid-orange-background-color {
+  background-color: #ff6900;
+}
+
+.has-background.has-text-color.has-luminous-vivid-amber-background-color {
+  background-color: #fcb900;
+}
+
+.has-background.has-text-color.has-light-green-cyan-background-color {
+  background-color: #7bdcb5;
+}
+
+.has-background.has-text-color.has-vivid-green-cyan-background-color {
+  background-color: #00d084;
+}
+
+.has-background.has-text-color.has-pale-cyan-blue-background-color {
+  background-color: #8ed1fc;
+}
+
+.has-background.has-text-color.has-vivid-cyan-blue-background-color {
+  background-color: #0693e3;
+}
+
+.has-background.has-text-color.has-vivid-purple-background-color {
+  background-color: #9b51e0;
+}
+
+/*
+ * Tables. Table blocks come in WordPress's two styles: lines between the cells, or every other row
+ * shaded. Older table blocks put the block's classes on the table, not on a figure around it.
+ */
+
+table {
+  width: 100%;
+}
+
+table th,
+table td {
+  padding: 10px;
+}
+
+/* Header cells line up with the cells below them, rather than in the middle. */
+th {
+  text-align: start;
+}
+
+/* A wide table scrolls sideways, rather than widening the page. */
+.wp-block-table {
+  overflow-x: auto;
+}
+
+.wp-block-table > table,
+table.wp-block-table {
+  border-collapse: collapse;
+}
+
+.wp-block-table :is(th, td) {
+  padding: 0.5em;
+  border: 1px solid var(--reader-border);
+}
+
+/* A heavier line under the header row, and over the footer row. */
+.wp-block-table thead {
+  border-bottom: 2px solid var(--reader-secondary-text);
+}
+
+.wp-block-table tfoot {
+  border-top: 2px solid var(--reader-secondary-text);
+}
+
+/*
+ * Columns of equal width, when the author chose them, but not on a phone. There, equal columns
+ * break words in the middle, so the columns fit their content and the table scrolls if it must.
+ */
+@media (min-width: 600px) {
+  table.has-fixed-layout {
+    table-layout: fixed;
+  }
+
+  table.has-fixed-layout :is(th, td) {
+    word-break: break-word;
+  }
+}
+
+/* An aligned table is as wide as its content. */
+.wp-block-table:is(.alignleft, .aligncenter, .alignright) {
+  display: table;
+  width: auto;
+}
+
+.wp-block-table:is(.alignleft, .aligncenter, .alignright) :is(th, td) {
+  word-break: break-word;
+}
+
+/* `.aligncenter` centres text, which the cells shouldn't take. */
+.wp-block-table.aligncenter {
+  margin-inline: auto;
+  text-align: start;
+}
+
+/*
+ * Stripes. Only the rows are shaded, so the header row stands apart by its line, not its colour.
+ * The author's colour for the stripes would need the matching text colour, so it isn't used.
+ */
+.wp-block-table.is-style-stripes :is(th, td) {
+  border-color: transparent;
+}
+
+/* A line closes the table when its last row isn't shaded, unless a footer row has one already. */
+.wp-block-table.is-style-stripes tbody:last-child > tr:last-child > :is(th, td) {
+  border-bottom-color: var(--reader-secondary-background);
+}
+
+.wp-block-table.is-style-stripes tbody tr:nth-child(odd) {
+  background-color: var(--reader-secondary-background);
+}
+
+/*
+ * Columns. As on the post's site, they stack on a phone unless the author chose otherwise, and sit
+ * side by side from WordPress's breakpoint up. The cleanup removes the widths the author set, so
+ * columns share the row equally.
+ */
+
+.wp-block-columns {
+  display: flex;
+  flex-wrap: wrap;
+  /* Stacked columns are as far apart as blocks. Side by side, they're WordPress's distance apart. */
+  gap: var(--reader-block-gap) 2em;
+  box-sizing: border-box;
+}
+
+.wp-block-columns > .wp-block-column {
+  flex-basis: 100%;
+}
+
+.wp-block-columns.is-not-stacked-on-mobile {
+  flex-wrap: nowrap;
+}
+
+.wp-block-columns.is-not-stacked-on-mobile > .wp-block-column {
+  flex-basis: 0;
+}
+
+@media (min-width: 782px) {
+  .wp-block-columns {
+    flex-wrap: nowrap;
+  }
+
+  .wp-block-columns > .wp-block-column {
+    flex-basis: 0;
+  }
+}
+
+.wp-block-column {
+  flex-grow: 1;
+  /* Long words wrap, rather than widening their column. */
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.wp-block-columns.are-vertically-aligned-top {
+  align-items: flex-start;
+}
+
+.wp-block-columns.are-vertically-aligned-center {
+  align-items: center;
+}
+
+.wp-block-columns.are-vertically-aligned-bottom {
+  align-items: flex-end;
+}
+
+.wp-block-column.is-vertically-aligned-top {
+  align-self: flex-start;
+}
+
+.wp-block-column.is-vertically-aligned-center {
+  align-self: center;
+}
+
+.wp-block-column.is-vertically-aligned-bottom {
+  align-self: flex-end;
+}
+
+.wp-block-column.is-vertically-aligned-stretch {
+  align-self: stretch;
+}
+
+/* Images, captions and alignment */
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: inline;
+  margin-inline: auto;
+}
+
+/*
+ * `reader.js` fades each image in once it has loaded. It adds `reader-fades-images` to the page, so
+ * images still show if the script doesn't run.
+ */
+.reader-fades-images img {
+  opacity: 0;
+  transition: opacity 0.2s ease-in;
+}
+
+.reader-fades-images img.reader-loaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-fades-images img {
+    transition: none;
+  }
+}
+
+/* Emoji images get their size from inline styles, which the cleanup removes. */
+img.wp-smiley,
+img.emoji {
+  display: inline;
+  width: 1em;
+  height: 1em;
+  margin: 0 0.07em;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  vertical-align: -0.1em;
+}
+
+figure {
+  margin-inline: 0;
+}
+
+.wp-caption-text,
+figure figcaption,
+figure .caption,
+.wp-caption .wp-media-credit {
+  margin: 0;
+  padding: 12px;
+  font-size: 0.875rem;
+  text-align: center;
+  color: var(--reader-secondary-text);
+}
+
+.aligncenter {
+  clear: both;
+  display: block;
+  text-align: center;
+}
+
+/*
+ * An aligned image inside a paragraph, with text around it, isn't a block of its own, so it gets a
+ * block's space above and below. Alone in its paragraph, that space overlaps the paragraph's own.
+ */
+img.aligncenter {
+  margin-block: var(--reader-block-gap);
+}
+
+.wp-caption {
+  position: relative;
+  max-width: 100%;
+}
+
+.wp-caption.alignnone {
+  clear: both;
+  display: block;
+}
+
+.wp-caption.alignleft {
+  float: left;
+}
+
+.wp-caption.alignright {
+  float: right;
+}
+
+.wp-caption.alignleft,
+.wp-caption.alignright {
+  max-width: 100%;
+}
+
+.wp-caption.alignleft img.alignleft,
+.wp-caption.alignleft img.alignright,
+.wp-caption.alignright img.alignleft,
+.wp-caption.alignright img.alignright {
+  float: none;
+}
+
+.wp-caption img {
+  display: block;
+  margin: 0 auto;
+}
+
+@media (max-width: 660px) {
+  .alignleft,
+  .alignright {
+    clear: both;
+  }
+
+  /* On a phone, text doesn't wrap beside an aligned image, so it's centred on a line of its own. */
+  img:is(.alignleft, .alignright) {
+    display: block;
+    margin: var(--reader-block-gap) auto;
+  }
+
+  .wp-caption:is(.alignleft, .alignright) {
+    float: none;
+    margin-inline: auto;
+  }
+
+  .alignleft img,
+  .alignright img {
+    display: block;
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 661px) {
+  /* Text wraps beside a floated image, and starts below it a block's distance away. */
+  .alignleft {
+    max-width: 100%;
+    float: left;
+    margin-right: 32px;
+    margin-bottom: var(--reader-block-gap);
+  }
+
+  .alignright {
+    max-width: 100%;
+    float: right;
+    margin-bottom: var(--reader-block-gap);
+    margin-left: 32px;
+  }
+
+  .wp-caption.alignleft,
+  .wp-caption.alignright {
+    max-width: 50%;
+  }
+
+  /* The figure can be the image block, or sit inside it. */
+  figure.wp-block-image:is(.alignleft, .alignright):has(+ p),
+  .wp-block-image:has(figure.alignleft, figure.alignright):has(+ p) {
+    max-width: 40%;
+  }
+}
+
+/* Audio, video and embeds */
+
+audio,
+video {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+
+iframe {
+  max-width: 100%;
+  /* Keep an iframe's border inside its width, so a full-width iframe doesn't overflow. */
+  box-sizing: border-box;
+}
+
+/* The embed scripts set margins on these inline, which would add to the space between blocks. */
+iframe[class^="twitter-"],
+iframe[class^="instagram-"],
+.fb_iframe_widget {
+  display: block;
+  margin: 0 auto !important;
+}
+
+:where(body, .is-layout-flow, .is-layout-constrained, blockquote, div:not([class]))
+  > :is(iframe[class^="twitter-"], iframe[class^="instagram-"], .fb_iframe_widget):not(:first-child) {
+  margin-top: var(--reader-block-gap) !important;
+}
+
+/*
+ * WebKit and Chromium paint an iframe white when its colour scheme differs from the page's, as it
+ * does for a video or Spotify player in a dark theme. Both are transparent around their own
+ * colours: a video's letterbox showed as white bars, and Spotify's rounded corners and the space
+ * below its player as white. Other embeds keep the white, which keeps their dark text readable on
+ * a dark page.
+ */
+.wp-block-embed.is-type-video iframe,
+.embed-youtube iframe,
+.embed-vimeo iframe,
+iframe[src^="https://open.spotify.com/"],
+iframe[src^="https://embed.spotify.com/"] {
+  color-scheme: light;
+}
+
+/* Keep the right border of video embeds on screen. */
+figure.wp-block-embed.is-type-video {
+  max-width: 99vw;
+}
+
+/* YouTube and Vimeo embeds, at 16:9 */
+.embed-youtube,
+.embed-vimeo {
+  position: relative;
+  display: block;
+  padding: 25px 0 56.25%;
+}
+
+.embed-youtube iframe,
+.embed-vimeo iframe {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.wp-block-embed .embed-vimeo {
+  padding-top: 0;
+}
+
+.is-type-wp-embed iframe {
+  width: 100%;
+}
+
+/* iCloud embeds are slender without a minimum height. */
+.wp-block-embed__wrapper iframe[src*="icloud.com"] {
+  min-height: 300px;
+}
+
+/*
+ * The code block the cleanup makes of a GitHub gist. The page's script puts the gist in its place,
+ * with GitHub's own stylesheet, so this only shows offline, or when GitHub doesn't answer.
+ */
+.reader-gist pre {
+  margin: 0;
+}
+
+.reader-gist pre + pre {
+  margin-top: var(--reader-block-gap);
+}
+
+/*
+ * GitHub's gist, in the theme's colours. GitHub's stylesheet only has a light theme, so a gist is a
+ * white box on a dark page. The frame takes the theme's colours, and the code takes GitHub's light
+ * or dark syntax colours, whichever matches the theme's `color-scheme`. Where `light-dark()` isn't
+ * supported, the code keeps GitHub's light colours.
+ *
+ * GitHub's stylesheet loads after this one, so `body` makes these rules outrank its own.
+ */
+body .gist .gist-file {
+  --bgColor-default: var(--reader-secondary-background);
+  --fgColor-default: var(--reader-text);
+  --fgColor-muted: var(--reader-tertiary-text);
+  border-color: var(--reader-border);
+}
+
+body .gist .gist-data {
+  border-bottom-color: var(--reader-border);
+}
+
+body .gist .gist-meta,
+body .gist .gist-meta a {
+  color: var(--reader-secondary-text);
+  background-color: var(--reader-background);
+}
+
+/* GitHub's syntax colours, light and dark. */
+body .gist .pl-c {
+  color: light-dark(#6a737d, #8b949e);
+}
+
+body .gist .pl-ba {
+  color: light-dark(#586069, #8b949e);
+}
+
+body .gist :is(.pl-c1, .pl-s .pl-v) {
+  color: light-dark(#005cc5, #79c0ff);
+}
+
+body .gist :is(.pl-e, .pl-en, .pl-mdr) {
+  color: light-dark(#6f42c1, #d2a8ff);
+}
+
+body .gist :is(.pl-smi, .pl-s .pl-s1, .pl-mi, .pl-mb) {
+  color: var(--reader-text);
+}
+
+body .gist :is(.pl-ent, .pl-sr .pl-cce) {
+  color: light-dark(#22863a, #7ee787);
+}
+
+body .gist .pl-k {
+  color: light-dark(#d73a49, #ff7b72);
+}
+
+body .gist :is(.pl-s, .pl-pds, .pl-s .pl-pse .pl-s1, .pl-sr, .pl-sr .pl-sre, .pl-sr .pl-sra, .pl-corl) {
+  color: light-dark(#032f62, #a5d6ff);
+}
+
+body .gist :is(.pl-v, .pl-smw) {
+  color: light-dark(#e36209, #ffa657);
+}
+
+body .gist .pl-bu {
+  color: light-dark(#b31d28, #f85149);
+}
+
+body .gist .pl-ml {
+  color: light-dark(#735c0f, #f2cc60);
+}
+
+body .gist :is(.pl-mh, .pl-mh .pl-en, .pl-ms) {
+  color: light-dark(#005cc5, #1f6feb);
+}
+
+body .gist .pl-sg {
+  color: light-dark(#959da5, #484f58);
+}
+
+body .gist .pl-ii {
+  color: light-dark(#fafbfc, #f0f6fc);
+  background-color: light-dark(#b31d28, #8e1519);
+}
+
+body .gist .pl-c2 {
+  color: light-dark(#fafbfc, #f0f6fc);
+  background-color: light-dark(#d73a49, #b62324);
+}
+
+body .gist .pl-md {
+  color: light-dark(#b31d28, #ffdcd7);
+  background-color: light-dark(#ffeef0, #67060c);
+}
+
+body .gist .pl-mi1 {
+  color: light-dark(#22863a, #aff5b4);
+  background-color: light-dark(#f0fff4, #033a16);
+}
+
+body .gist .pl-mc {
+  color: light-dark(#e36209, #ffdfb6);
+  background-color: light-dark(#ffebda, #5a1e02);
+}
+
+body .gist .pl-mi2 {
+  color: light-dark(#f6f8fa, #c9d1d9);
+  background-color: light-dark(#005cc5, #1158c7);
+}
+
+/* Buttons */
+
+/* A row of buttons, which wraps, with space between them but none around the row. */
+.wp-block-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em 0.5em;
+}
+
+.wp-block-buttons.is-content-justification-center {
+  justify-content: center;
+}
+
+.wp-block-buttons.is-content-justification-right {
+  justify-content: flex-end;
+}
+
+.wp-block-buttons.is-content-justification-space-between {
+  justify-content: space-between;
+}
+
+.wp-block-buttons.is-vertical {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* A button can stand on its own, without a row around it, in older posts. */
+.wp-block-button {
+  display: inline-block;
+  overflow: hidden;
+  padding: 8px 14px;
+  border: 1px solid var(--reader-border);
+  border-radius: 8px;
+  vertical-align: top;
+  font-family: var(--reader-font-family, system-ui, -apple-system, Roboto, sans-serif);
+  line-height: 22px;
+}
+
+.wp-block-button a {
+  color: var(--reader-text);
+  font-size: 1rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+/*
+ * Social icons, as WordPress draws them, in the theme's colours rather than each brand's: the icon is
+ * cut out of a circle in the link colour. A brand's colour could be unreadable on the theme's
+ * background, and the icons are links.
+ */
+
+.wp-block-social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+  /* The icons' size. */
+  font-size: 1.5rem;
+}
+
+.wp-block-social-links.has-small-icon-size {
+  font-size: 1rem;
+}
+
+.wp-block-social-links.has-large-icon-size {
+  font-size: 2.25rem;
+}
+
+.wp-block-social-links.has-huge-icon-size {
+  font-size: 3rem;
+}
+
+.wp-block-social-links.aligncenter,
+.wp-block-social-links.is-content-justification-center {
+  display: flex;
+  justify-content: center;
+}
+
+.wp-block-social-links.alignright,
+.wp-block-social-links.is-content-justification-right {
+  justify-content: flex-end;
+}
+
+.wp-block-social-links.is-content-justification-space-between {
+  justify-content: space-between;
+}
+
+.wp-block-social-links.is-vertical {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.wp-social-link {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border-radius: 9999px;
+  background-color: var(--reader-link);
+  color: var(--reader-background);
+}
+
+.wp-social-link a {
+  display: flex;
+  align-items: center;
+  padding: 0.25em;
+  color: inherit;
+  line-height: 0;
+  text-decoration: none;
+}
+
+.wp-social-link svg {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+}
+
+/* A label the author chose to show. */
+.wp-social-link span:not(.screen-reader-text) {
+  margin-inline: 0.5em;
+  font-size: 0.65em;
+}
+
+.wp-block-social-links.is-style-pill-shape .wp-social-link a {
+  padding-inline: calc(2em / 3);
+}
+
+.wp-block-social-links.is-style-logos-only .wp-social-link {
+  background: none;
+  color: var(--reader-link);
+}
+
+.wp-block-social-links.is-style-logos-only .wp-social-link a {
+  padding: 0;
+}
+
+.wp-block-social-links.is-style-logos-only .wp-social-link svg {
+  width: 1.25em;
+  height: 1.25em;
+}
+
+/*
+ * Latest Posts, Latest Comments and RSS: lists of links, each with its date and author on a line of
+ * their own, as WordPress lays them out. There's no space before the date in their markup, so it
+ * would run into the title.
+ */
+
+.wp-block-latest-posts.wp-block-latest-posts__list,
+ul.wp-block-rss,
+ol.wp-block-latest-comments {
+  padding-inline-start: 0;
+  list-style: none;
+}
+
+.wp-block-latest-posts li,
+ul.wp-block-rss li {
+  overflow-wrap: break-word;
+}
+
+.wp-block-latest-posts li + li,
+ul.wp-block-rss li + li {
+  margin-top: 0.5em;
+}
+
+.wp-block-latest-posts__post-date,
+.wp-block-latest-posts__post-author,
+.wp-block-rss__item-publish-date,
+.wp-block-rss__item-author,
+.wp-block-latest-comments__comment-date {
+  display: block;
+  color: var(--reader-secondary-text);
+  font-size: 0.8125em;
+}
+
+.wp-block-latest-posts__post-excerpt,
+.wp-block-latest-posts__post-full-content {
+  margin: 0.5em 0 0;
+}
+
+/* A grid has one column on a phone, and the author's number of columns from 600px. */
+:is(.wp-block-latest-posts, ul.wp-block-rss).is-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25em;
+}
+
+:is(.wp-block-latest-posts, ul.wp-block-rss).is-grid li {
+  width: 100%;
+  margin: 0;
+}
+
+@media (min-width: 600px) {
+  :is(.wp-block-latest-posts, ul.wp-block-rss).is-grid.columns-2 li {
+    width: calc((100% - 1 * 1.25em) / 2);
+  }
+
+  :is(.wp-block-latest-posts, ul.wp-block-rss).is-grid.columns-3 li {
+    width: calc((100% - 2 * 1.25em) / 3);
+  }
+
+  :is(.wp-block-latest-posts, ul.wp-block-rss).is-grid.columns-4 li {
+    width: calc((100% - 3 * 1.25em) / 4);
+  }
+
+  :is(.wp-block-latest-posts, ul.wp-block-rss).is-grid.columns-5 li {
+    width: calc((100% - 4 * 1.25em) / 5);
+  }
+
+  :is(.wp-block-latest-posts, ul.wp-block-rss).is-grid.columns-6 li {
+    width: calc((100% - 5 * 1.25em) / 6);
+  }
+}
+
+/* Each comment holds its avatar, which sits beside it at the side the text starts. */
+.wp-block-latest-comments__comment {
+  display: flow-root;
+  line-height: 1.5;
+}
+
+.wp-block-latest-comments__comment + .wp-block-latest-comments__comment {
+  margin-top: 1em;
+}
+
+.wp-block-latest-comments .avatar,
+.wp-block-latest-comments__comment-avatar {
+  display: block;
+  /* `inline-start` puts it on the right in a right-to-left post. Older web views take `left`. */
+  float: left;
+  float: inline-start;
+  width: 2.5em;
+  height: 2.5em;
+  margin: 0;
+  margin-inline-end: 0.75em;
+  border-radius: 50%;
+}
+
+.has-avatars .wp-block-latest-comments__comment :is(
+  .wp-block-latest-comments__comment-meta,
+  .wp-block-latest-comments__comment-excerpt
+) {
+  margin-inline-start: 3.25em;
+}
+
+.wp-block-latest-comments__comment-excerpt p {
+  margin: 0.36em 0 0;
+  font-size: 0.875em;
+}
+
+/* Galleries, before the gallery block held image blocks */
+
+/* Images are a gap apart, which leaves no space around the gallery's edges. */
+.wp-block-gallery,
+.blocks-gallery-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+  list-style-type: none;
+  margin-inline: 0;
+  padding: 0;
+}
+
+/* The list inside a gallery's figure. */
+.blocks-gallery-grid {
+  margin: 0;
+}
+
+.wp-block-gallery .blocks-gallery-image,
+.wp-block-gallery .blocks-gallery-item,
+.blocks-gallery-grid .blocks-gallery-image,
+.blocks-gallery-grid .blocks-gallery-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  justify-content: center;
+  /* Two columns at most on a phone. */
+  width: calc(50% - 0.5em);
+  margin: 0;
+}
+
+.wp-block-gallery .blocks-gallery-image figure,
+.wp-block-gallery .blocks-gallery-item figure,
+.blocks-gallery-grid .blocks-gallery-image figure,
+.blocks-gallery-grid .blocks-gallery-item figure {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  height: 100%;
+  margin: 0;
+}
+
+.wp-block-gallery .blocks-gallery-image img,
+.wp-block-gallery .blocks-gallery-item img,
+.blocks-gallery-grid .blocks-gallery-image img,
+.blocks-gallery-grid .blocks-gallery-item img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.tiled-gallery .tiled-gallery-caption,
+.wp-block-gallery .blocks-gallery-image figcaption,
+.wp-block-gallery .blocks-gallery-item figcaption,
+.blocks-gallery-grid .blocks-gallery-image figcaption,
+.blocks-gallery-grid .blocks-gallery-item figcaption {
+  position: absolute;
+  bottom: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  margin: 0;
+  padding: 3em 0.77em 0.7em;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.7) 0, rgba(0, 0, 0, 0.3) 70%, transparent);
+  color: #fff;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.wp-block-gallery .blocks-gallery-item .blocks-gallery-item__caption {
+  box-sizing: border-box;
+}
+
+.wp-block-gallery .blocks-gallery-image figcaption img,
+.wp-block-gallery .blocks-gallery-item figcaption img,
+.blocks-gallery-grid .blocks-gallery-image figcaption img,
+.blocks-gallery-grid .blocks-gallery-item figcaption img {
+  display: inline;
+}
+
+.wp-block-gallery figcaption,
+.blocks-gallery-grid figcaption {
+  flex-grow: 1;
+}
+
+.wp-block-gallery:not(.is-cropped) .blocks-gallery-item {
+  align-self: flex-start;
+}
+
+.wp-block-gallery.is-cropped .blocks-gallery-image a,
+.wp-block-gallery.is-cropped .blocks-gallery-image img,
+.wp-block-gallery.is-cropped .blocks-gallery-item a,
+.wp-block-gallery.is-cropped .blocks-gallery-item img,
+.blocks-gallery-grid.is-cropped .blocks-gallery-image a,
+.blocks-gallery-grid.is-cropped .blocks-gallery-image img,
+.blocks-gallery-grid.is-cropped .blocks-gallery-item a,
+.blocks-gallery-grid.is-cropped .blocks-gallery-item img {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wp-block-gallery.columns-1 .blocks-gallery-image,
+.wp-block-gallery.columns-1 .blocks-gallery-item,
+.blocks-gallery-grid.columns-1 .blocks-gallery-image,
+.blocks-gallery-grid.columns-1 .blocks-gallery-item {
+  width: 100%;
+}
+
+/* Up to 8 columns beyond a phone's width. */
+@media (min-width: 600px) {
+  .wp-block-gallery.columns-3 .blocks-gallery-image,
+  .wp-block-gallery.columns-3 .blocks-gallery-item,
+  .blocks-gallery-grid.columns-3 .blocks-gallery-image,
+  .blocks-gallery-grid.columns-3 .blocks-gallery-item {
+    width: calc(33.3333% - 0.6667em);
+  }
+
+  .wp-block-gallery.columns-4 .blocks-gallery-image,
+  .wp-block-gallery.columns-4 .blocks-gallery-item,
+  .blocks-gallery-grid.columns-4 .blocks-gallery-image,
+  .blocks-gallery-grid.columns-4 .blocks-gallery-item {
+    width: calc(25% - 0.75em);
+  }
+
+  .wp-block-gallery.columns-5 .blocks-gallery-image,
+  .wp-block-gallery.columns-5 .blocks-gallery-item,
+  .blocks-gallery-grid.columns-5 .blocks-gallery-image,
+  .blocks-gallery-grid.columns-5 .blocks-gallery-item {
+    width: calc(20% - 0.8em);
+  }
+
+  .wp-block-gallery.columns-6 .blocks-gallery-image,
+  .wp-block-gallery.columns-6 .blocks-gallery-item,
+  .blocks-gallery-grid.columns-6 .blocks-gallery-image,
+  .blocks-gallery-grid.columns-6 .blocks-gallery-item {
+    width: calc(16.6667% - 0.8333em);
+  }
+
+  .wp-block-gallery.columns-7 .blocks-gallery-image,
+  .wp-block-gallery.columns-7 .blocks-gallery-item,
+  .blocks-gallery-grid.columns-7 .blocks-gallery-image,
+  .blocks-gallery-grid.columns-7 .blocks-gallery-item {
+    width: calc(14.2857% - 0.8571em);
+  }
+
+  .wp-block-gallery.columns-8 .blocks-gallery-image,
+  .wp-block-gallery.columns-8 .blocks-gallery-item,
+  .blocks-gallery-grid.columns-8 .blocks-gallery-image,
+  .blocks-gallery-grid.columns-8 .blocks-gallery-item {
+    width: calc(12.5% - 0.875em);
+  }
+
+}
+
+.wp-block-gallery.alignleft,
+.wp-block-gallery.alignright,
+.blocks-gallery-grid.alignleft,
+.blocks-gallery-grid.alignright {
+  width: 100%;
+  max-width: 305px;
+}
+
+.wp-block-gallery.aligncenter .blocks-gallery-item figure,
+.blocks-gallery-grid.aligncenter .blocks-gallery-item figure {
+  justify-content: center;
+}
+
+.blocks-gallery-caption {
+  margin: auto;
+}
+
+/*
+ * Galleries of image blocks. The `:not(.wp-gallery-individual-image)` comes from the block's own
+ * stylesheet, where it outweighs the image block's styles.
+ */
+
+.wp-block-gallery.has-nested-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.wp-block-gallery.has-nested-images figure.wp-block-image:not(.wp-gallery-individual-image) {
+  width: calc(50% - 8px);
+  margin: 0;
+}
+
+.wp-block-gallery.has-nested-images figure.wp-block-image {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  justify-content: center;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.wp-block-gallery.has-nested-images figure.wp-block-image > div,
+.wp-block-gallery.has-nested-images figure.wp-block-image > a {
+  flex-direction: column;
+  flex-grow: 1;
+  margin: 0;
+}
+
+.wp-block-gallery.has-nested-images figure.wp-block-image img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.wp-block-gallery.has-nested-images figure.wp-block-image figcaption {
+  position: absolute;
+  bottom: 0;
+  inset-inline-start: 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 60%;
+  overflow: auto;
+  margin-bottom: 0;
+  padding: 0 8px 8px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.7) 0, rgba(0, 0, 0, 0.3) 70%, transparent);
+  color: #fff;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.wp-block-gallery.has-nested-images figure.wp-block-image figcaption img {
+  display: inline;
+}
+
+.wp-block-gallery.has-nested-images figure.wp-block-image.is-style-rounded > div,
+.wp-block-gallery.has-nested-images figure.wp-block-image.is-style-rounded > a {
+  flex: 1 1 auto;
+}
+
+/* Rounded images put their caption below the image, on the page. */
+.wp-block-gallery.has-nested-images figure.wp-block-image.is-style-rounded figcaption {
+  position: relative;
+  flex: initial;
+  margin: 0;
+  padding: 10px 10px 9px;
+  background: none;
+  color: inherit;
+}
+
+.wp-block-gallery.has-nested-images figcaption {
+  flex-basis: 100%;
+  flex-grow: 1;
+  text-align: center;
+}
+
+.wp-block-gallery.has-nested-images:not(.is-cropped) figure.wp-block-image:not(.wp-gallery-individual-image) {
+  margin-top: 0;
+  margin-bottom: auto;
+}
+
+.wp-block-gallery.has-nested-images.is-cropped figure.wp-block-image:not(.wp-gallery-individual-image) {
+  align-self: inherit;
+}
+
+.wp-block-gallery.has-nested-images.is-cropped figure.wp-block-image:not(.wp-gallery-individual-image) > div,
+.wp-block-gallery.has-nested-images.is-cropped figure.wp-block-image:not(.wp-gallery-individual-image) > a {
+  display: flex;
+}
+
+.wp-block-gallery.has-nested-images.is-cropped figure.wp-block-image:not(.wp-gallery-individual-image) a,
+.wp-block-gallery.has-nested-images.is-cropped figure.wp-block-image:not(.wp-gallery-individual-image) img {
+  flex: 1 0 0%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wp-block-gallery.has-nested-images.columns-1 figure.wp-block-image:not(.wp-gallery-individual-image) {
+  width: 100%;
+}
+
+/* Up to 8 columns beyond a phone's width, or 3 if the author didn't choose. */
+@media (min-width: 600px) {
+  .wp-block-gallery.has-nested-images.columns-3 figure.wp-block-image:not(.wp-gallery-individual-image) {
+    width: calc(33.3333% - 10.6667px);
+  }
+
+  .wp-block-gallery.has-nested-images.columns-4 figure.wp-block-image:not(.wp-gallery-individual-image) {
+    width: calc(25% - 12px);
+  }
+
+  .wp-block-gallery.has-nested-images.columns-5 figure.wp-block-image:not(.wp-gallery-individual-image) {
+    width: calc(20% - 12.8px);
+  }
+
+  .wp-block-gallery.has-nested-images.columns-6 figure.wp-block-image:not(.wp-gallery-individual-image) {
+    width: calc(16.6667% - 13.3333px);
+  }
+
+  .wp-block-gallery.has-nested-images.columns-7 figure.wp-block-image:not(.wp-gallery-individual-image) {
+    width: calc(14.2857% - 13.7143px);
+  }
+
+  .wp-block-gallery.has-nested-images.columns-8 figure.wp-block-image:not(.wp-gallery-individual-image) {
+    width: calc(12.5% - 14px);
+  }
+
+  .wp-block-gallery.has-nested-images.columns-default figure.wp-block-image:not(.wp-gallery-individual-image) {
+    width: calc(33.33% - 10.6667px);
+  }
+
+  /* Two images get two columns. */
+  .wp-block-gallery.has-nested-images.columns-default figure.wp-block-image:not(.wp-gallery-individual-image):first-child:nth-last-child(2),
+  .wp-block-gallery.has-nested-images.columns-default figure.wp-block-image:not(.wp-gallery-individual-image):first-child:nth-last-child(2) ~ figure.wp-block-image:not(.wp-gallery-individual-image) {
+    width: calc(50% - 8px);
+  }
+
+  /* One image gets the full width. */
+  .wp-block-gallery.has-nested-images.columns-default figure.wp-block-image:not(.wp-gallery-individual-image):first-child:nth-last-child(1) {
+    width: 100%;
+  }
+}
+
+.wp-block-gallery.has-nested-images.alignleft,
+.wp-block-gallery.has-nested-images.alignright {
+  width: 100%;
+  max-width: 305px;
+}
+
+.wp-block-gallery.has-nested-images.aligncenter {
+  justify-content: center;
+}
+
+/*
+ * Jetpack tiled galleries: the block, and the older shortcode gallery. The cleanup gives each column
+ * its share of the row as `flex-grow`, in place of the width Jetpack sets inline.
+ */
+
+.wp-block-jetpack-tiled-gallery,
+.tiled-gallery {
+  margin-inline: auto;
+}
+
+.wp-block-jetpack-tiled-gallery .tiled-gallery__row,
+.tiled-gallery .gallery-row {
+  display: flex;
+  gap: 4px;
+}
+
+.wp-block-jetpack-tiled-gallery .tiled-gallery__row + .tiled-gallery__row,
+.tiled-gallery .gallery-row + .gallery-row {
+  margin-top: 4px;
+}
+
+.wp-block-jetpack-tiled-gallery .tiled-gallery__col,
+.tiled-gallery .gallery-group {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wp-block-jetpack-tiled-gallery .tiled-gallery__item,
+.tiled-gallery .tiled-gallery-item {
+  position: relative;
+  margin: 0;
+  padding: 0;
+}
+
+.wp-block-jetpack-tiled-gallery .tiled-gallery__item img,
+.tiled-gallery .tiled-gallery-item img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  background-color: var(--reader-secondary-background);
+}
+
+.wp-block-jetpack-tiled-gallery.is-style-circle .tiled-gallery__item img,
+.tiled-gallery.type-circle .tiled-gallery-item img {
+  border-radius: 50%;
+}
+
+/*
+ * Jetpack's Slideshow block. Without its script, it isn't a slideshow, so its slides show one after
+ * another.
+ */
+
+.wp-block-jetpack-slideshow ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wp-block-jetpack-slideshow figure {
+  margin: 0;
+}
+
+.wp-block-jetpack-slideshow li + li {
+  margin-top: var(--reader-block-gap);
+}
+
+.wp-block-jetpack-slideshow_button-prev,
+.wp-block-jetpack-slideshow_button-next,
+.wp-block-jetpack-slideshow_button-pause,
+.wp-block-jetpack-slideshow_pagination {
+  display: none;
+}
+
+/*
+ * Jetpack's Rating block, in the text colour. Each star is two copies of the image, each cropped to
+ * a half, so a rating can end on half a star. For places without its stylesheet, like email, Jetpack
+ * adds emoji stars and hides the real ones with inline styles. The cleanup removes inline styles, so
+ * only the emoji stars need hiding.
+ */
+
+.wp-block-jetpack-rating-star {
+  line-height: 0;
+  stroke-width: 0;
+}
+
+.wp-block-jetpack-rating-star > p {
+  display: none;
+}
+
+.wp-block-jetpack-rating-star > span:not(.screen-reader-text) {
+  display: inline-flex;
+  margin-inline-end: 0.3em;
+}
+
+.wp-block-jetpack-rating-star > span span {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 0.75rem;
+  overflow: hidden;
+}
+
+.wp-block-jetpack-rating-star > span span:nth-child(even) {
+  justify-content: flex-end;
+}
+
+.wp-block-jetpack-rating-star svg {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 1.5rem;
+  max-width: none;
+  height: 1.5rem;
+}
+
+.wp-block-jetpack-rating-star .is-rating-unfilled {
+  fill-opacity: 0.33;
+}
+
+.wp-block-jetpack-rating-star.is-style-outlined {
+  stroke-width: 2px;
+}
+
+.wp-block-jetpack-rating-star.is-style-outlined .is-rating-unfilled {
+  fill: transparent;
+}
+
+/* Jetpack's Business Hours block: each day, with its hours beside it on a wider screen. */
+
+.jetpack-business-hours dt {
+  min-width: 30%;
+  margin-inline-end: 0.5em;
+  font-weight: 700;
+  vertical-align: top;
+}
+
+.jetpack-business-hours dd {
+  margin: 0;
+}
+
+.jetpack-business-hours__item + .jetpack-business-hours__item {
+  margin-top: 0.5em;
+}
+
+@media (min-width: 480px) {
+  .jetpack-business-hours dt,
+  .jetpack-business-hours dd {
+    display: inline-block;
+  }
+
+  .jetpack-business-hours dd {
+    max-width: calc(70% - 0.5em);
+  }
+}
+
+/* Things the Reader doesn't show */
+
+/*
+ * Forms and buttons can't work from the Reader. Forms would submit from the wrong page, and buttons
+ * need scripts from the post's site, like the image lightbox's. The apps have their own image viewers.
+ */
+form,
+input,
+select,
+button,
+textarea {
+  display: none;
+}
+
+/* Sharing buttons, related posts, ads and feed leftovers. */
+div.feedflare,
+.sharedaddy,
+.jp-relatedposts,
+.jp-relatedposts-headline,
+.mc4wp-form,
+.wpcnt,
+.OUTBRAIN,
+.adsbygoogle {
+  display: none;
+}
+
+/* Cover images from before the cover block. Their image was an inline style, so they'd be empty. */
+.wp-block-cover-image {
+  display: none;
+}
+
+/*
+ * The search block, which is a form. For a Jetpack site, the Reader API removes the form and its
+ * text box, but leaves the label and the button, so they're hidden by their own classes.
+ */
+.wp-block-search,
+.wp-block-search__label,
+.wp-block-search__inside-wrapper {
+  display: none;
+}
+
+/* Archives and Categories as dropdowns, which are a `<select>`. Only their label would show. */
+.wp-block-archives-dropdown,
+.wp-block-categories-dropdown {
+  display: none;
+}
+
+/*
+ * Jetpack's contact form, around the form itself, which is hidden. It also holds the message the
+ * form shows once it's sent, which is empty until then.
+ */
+.jetpack-contact-form-container {
+  display: none;
+}

@@ -1,0 +1,27 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "Nesciunt id quae",
+  "URL": "http://site-c85296.example/2011/03/20/melalfxg-de-gvnv/",
+  "content": "\n\t\t<style>\n\t\t\t#gallery-26-62 {\n\t\t\t\tmargin: auto;\n\t\t\t}\n\t\t\t#gallery-26-62 .gallery-item {\n\t\t\t\tfloat: left;\n\t\t\t\tmargin-top: 10px;\n\t\t\t\ttext-align: center;\n\t\t\t\twidth: 100%;\n\t\t\t}\n\t\t\t#gallery-26-62 img {\n\t\t\t\tborder: 2px solid #cfcfcf;\n\t\t\t}\n\t\t\t#gallery-26-62 .gallery-caption {\n\t\t\t\tmargin-left: 0;\n\t\t\t}\n\t\t\t/* see gallery_shortcode() in wp-includes/media.php */\n\t\t</style>\n\t\t<div id='lbdoltq-05-22' class='gallery galleryid-26 gallery-columns-1 gallery-size-thumbnail'><dl class='gallery-item'>\n\t\t\t<dt class='gallery-icon portrait'>\n\t\t\t\t<a href='https://site-b54ec1.files.wordpress.com/2011/04/ptu_4634.jpg'><img width=\"333\" height=\"500\" src=\"https://site-b54ec1.files.wordpress.com/2011/04/ptu_4634.jpg?w=333\" class=\"attachment-thumbnail size-thumbnail\" alt=\"\" srcset=\"https://site-b54ec1.files.wordpress.com/2011/04/ptu_4634.jpg?w=333 333w, https://site-b54ec1.files.wordpress.com/2011/04/ptu_4634.jpg?w=666 666w\" sizes=\"(max-width: 333px) 100vw, 333px\" /></a>\n\t\t\t</dt></dl><br style=\"clear: both\" /><dl class='gallery-item'>\n\t\t\t<dt class='gallery-icon landscape'>\n\t\t\t\t<a href='https://site-b54ec1.files.wordpress.com/2011/04/ptu_8497.jpg'><img width=\"500\" height=\"333\" src=\"https://site-b54ec1.files.wordpress.com/2011/04/ptu_8497.jpg?w=500\" class=\"attachment-thumbnail size-thumbnail\" alt=\"\" srcset=\"https://site-b54ec1.files.wordpress.com/2011/04/ptu_8497.jpg?w=500 500w, https://site-b54ec1.files.wordpress.com/2011/04/ptu_8497.jpg?w=1000 1000w, https://site-b54ec1.files.wordpress.com/2011/04/ptu_8497.jpg?w=768 768w\" sizes=\"(max-width: 500px) 100vw, 500px\" /></a>\n\t\t\t</dt></dl><br style=\"clear: both\" />\n\t\t</div>\n\n",
+  "excerpt": "",
+  "featured_image": "https://site-b54ec1.files.wordpress.com/2011/04/ptu_8497.jpg"
+ },
+ "features": [
+  "classic-editor",
+  "excerpt-generated",
+  "featured-image",
+  "gallery-shortcode",
+  "img",
+  "img-srcset",
+  "language:ltr",
+  "published-pre-2019",
+  "site:simple",
+  "style-element",
+  "style-inline"
+ ]
+}

@@ -1,0 +1,132 @@
+{{#*inline "page"}}
+
+  <div class="min-h-screen bg-gray-900 pb-16">
+    <header class="border-b border-white/10 px-6 py-4">
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <a href="/reader" class="text-sm text-gray-400 hover:text-white">← Reader Preview</a>
+        <a href="/reader/{{site}}" class="text-sm text-gray-400 hover:text-white">{{site}}</a>
+        <form method="GET" action="/reader" class="ml-auto flex gap-x-2">
+          <label for="reader-url" class="sr-only">Another post or site</label>
+          <input id="reader-url" name="url" type="text" class="w-72 rounded-md bg-white/5 px-3 py-1.5 text-sm text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500" placeholder="Another post or site">
+          <button type="submit" class="rounded-md bg-white/10 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/20">Preview</button>
+        </form>
+      </div>
+      <h1 class="mt-3 text-2xl font-semibold text-white">{{#if title}}{{title}}{{else}}(No title){{/if}}</h1>
+      <div class="flex flex-wrap gap-x-4 text-sm">
+        <a href="{{url}}" class="text-indigo-300 hover:text-white">{{url}}</a>
+        {{#if reader_url}}<a href="{{reader_url}}" target="_blank" rel="noopener" title="Calypso asks you to log in to WordPress.com first" class="text-indigo-300 hover:text-white">In the WordPress.com Reader ↗</a>{{/if}}
+      </div>
+
+      <nav class="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        {{#each themes}}
+          {{#if selected}}
+            <span class="rounded-full bg-white px-3 py-1 font-semibold text-gray-900">{{name}}</span>
+          {{else}}
+            <a href="{{href}}" class="rounded-full bg-white/10 px-3 py-1 text-white hover:bg-white/20">{{name}}</a>
+          {{/if}}
+        {{/each}}
+      </nav>
+      <nav class="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-300">
+        <span title="The Reader and System themes take their link colour from the app's brand">Brand</span>
+        {{#each brands}}
+          <a href="{{href}}" class="rounded-md px-2 py-1 {{#if selected}}bg-white/20 text-white{{else}}hover:bg-white/10{{/if}}">{{name}}</a>
+        {{/each}}
+        <span class="text-white/20">|</span>
+        <span>Appearance</span>
+        {{#if always}}
+          <span class="px-2 py-1 text-gray-400">{{always}}</span>
+        {{else}}
+          {{#each appearances}}
+            <a href="{{href}}" class="rounded-md px-2 py-1 {{#if selected}}bg-white/20 text-white{{else}}hover:bg-white/10{{/if}}">{{name}}</a>
+          {{/each}}
+        {{/if}}
+        <span class="text-white/20">|</span>
+        <span>Font</span>
+        {{#each fonts}}
+          <a href="{{href}}" class="rounded-md px-2 py-1 {{#if selected}}bg-white/20 text-white{{else}}hover:bg-white/10{{/if}}">{{name}}</a>
+        {{/each}}
+        <span class="text-white/20">|</span>
+        <span>Size</span>
+        {{#each sizes}}
+          <a href="{{href}}" class="rounded-md px-2 py-1 {{#if selected}}bg-white/20 text-white{{else}}hover:bg-white/10{{/if}}">{{name}}</a>
+        {{/each}}
+        <span class="text-white/20">|</span>
+        <a href="{{phone_href}}" class="rounded-md px-2 py-1 {{#if (eq width 390)}}bg-white/20 text-white{{else}}hover:bg-white/10{{/if}}">Phone</a>
+        <a href="{{tablet_href}}" class="rounded-md px-2 py-1 {{#if (eq width 768)}}bg-white/20 text-white{{else}}hover:bg-white/10{{/if}}">Tablet</a>
+        <span class="text-white/20">|</span>
+        <a href="{{photon_href}}" class="rounded-md px-2 py-1 hover:bg-white/10">Photon sizes: {{#if photon}}on{{else}}off{{/if}}</a>
+        <a href="{{offline_href}}" class="rounded-md px-2 py-1 hover:bg-white/10">Offline: {{#if offline}}on{{else}}off{{/if}}</a>
+        {{#if site_is_private}}<span class="text-yellow-300">A private site: Photon can't fetch its images.</span>{{/if}}
+        <span class="text-white/20">|</span>
+        <form method="GET" action="/reader/{{site}}/{{post}}" class="flex items-center gap-x-2">
+          <input type="hidden" name="theme" value="{{theme}}">
+          <input type="hidden" name="brand" value="{{brand}}">
+          <input type="hidden" name="appearance" value="{{appearance}}">
+          <input type="hidden" name="font" value="{{font}}">
+          <input type="hidden" name="size" value="{{size}}">
+          <input type="hidden" name="width" value="{{width}}">
+          <input type="hidden" name="offline" value="{{offline}}">
+          <input type="hidden" name="photon" value="{{photon}}">
+          <label for="reader-lang">Site language</label>
+          <input id="reader-lang" name="lang" value="{{lang}}" class="w-20 rounded-md bg-white/5 px-2 py-1 text-white outline-1 -outline-offset-1 outline-white/10 placeholder:text-gray-500" placeholder="like fa">
+        </form>
+      </nav>
+    </header>
+
+    <main class="px-6 pt-6">
+      <div class="flex flex-wrap gap-6">
+        {{#each frames}}
+          <figure>
+            {{#if ../all_themes}}<figcaption class="mb-2 text-sm text-gray-300">{{name}}</figcaption>{{/if}}
+            <iframe src="{{src}}" title="{{name}}" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation" style="width: {{../width}}px;{{#if ../color_scheme}} color-scheme: {{../color_scheme}};{{/if}}" class="h-[80vh] rounded-lg ring-1 ring-white/10"></iframe>
+          </figure>
+        {{/each}}
+      </div>
+
+      <section class="mt-10 grid gap-6 text-sm text-gray-300 lg:grid-cols-2">
+        <div class="rounded-lg bg-white/5 p-4">
+          <h2 class="font-semibold text-white">What the shared code found</h2>
+          <dl class="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
+            <dt class="text-gray-400">Excerpt</dt><dd>{{#if excerpt}}{{excerpt}}{{else}}None{{/if}}</dd>
+            <dt class="text-gray-400">Featured image in the post</dt><dd>{{#if featured_image_in_post}}Yes{{else}}No, or none{{/if}}</dd>
+            <dt class="text-gray-400">Images</dt><dd>{{len images}}</dd>
+            <dt class="text-gray-400">Galleries</dt><dd>{{#each galleries}}{{this}} images{{#unless @last}}, {{/unless}}{{else}}None{{/each}}</dd>
+            <dt class="text-gray-400">Mentions</dt><dd>{{#each mentions}}{{this}} {{else}}None{{/each}}</dd>
+          </dl>
+
+          <h3 class="mt-4 font-semibold text-white">Scripts the page loads</h3>
+          <ul class="mt-1 list-disc pl-5">{{#each scripts}}<li class="break-all">{{this}}</li>{{else}}<li>None</li>{{/each}}</ul>
+
+          <h3 class="mt-4 font-semibold text-white">Anchors</h3>
+          <ul class="mt-1 list-disc pl-5">{{#each anchors}}<li><code>#{{id}}</code> · {{kind}}{{#if text}} · “{{text}}”{{/if}}</li>{{else}}<li>None</li>{{/each}}</ul>
+        </div>
+
+        <div class="rounded-lg bg-white/5 p-4">
+          <h2 class="font-semibold text-white">Images</h2>
+          <ul class="mt-2 space-y-1">
+            {{#each images}}
+              <li class="break-all"><a href="{{url}}" class="text-indigo-300 hover:text-white">{{url}}</a>{{#if size}} · {{size}}{{/if}}{{#if sizes}} · {{sizes}} sizes{{/if}}{{#if caption}} · “{{caption}}”{{/if}}</li>
+            {{else}}
+              <li>None</li>
+            {{/each}}
+          </ul>
+        </div>
+
+        <details class="rounded-lg bg-white/5 p-4 lg:col-span-2">
+          <summary class="cursor-pointer font-semibold text-white">Text</summary>
+          <pre class="mt-3 max-h-96 overflow-auto whitespace-pre-wrap">{{plain_text}}</pre>
+        </details>
+        <details class="rounded-lg bg-white/5 p-4">
+          <summary class="cursor-pointer font-semibold text-white">HTML from the Reader API</summary>
+          <pre class="mt-3 max-h-[32rem] overflow-auto whitespace-pre-wrap break-all text-xs">{{raw_html}}</pre>
+        </details>
+        <details class="rounded-lg bg-white/5 p-4">
+          <summary class="cursor-pointer font-semibold text-white">HTML after the cleanup</summary>
+          <pre class="mt-3 max-h-[32rem] overflow-auto whitespace-pre-wrap break-all text-xs">{{cleaned_html}}</pre>
+        </details>
+      </section>
+    </main>
+  </div>
+
+{{/inline}}
+{{> layout}}
