@@ -207,6 +207,15 @@ mod tests {
     #[rstest]
     #[case::linked_element(r##"<a href="#map">Map</a><div id="map"></div>"##, &["map"])]
     #[case::named_link(r##"<a href="#top">Top</a><a name="top"></a>"##, &["top"])]
+    // The cleanup removes empty paragraphs, and empty elements between blocks, unless they're anchors.
+    #[case::named_link_in_a_paragraph(
+        r##"<p><a name="top"></a></p><p>Hi <a href="#top">Top</a></p>"##,
+        &["top"]
+    )]
+    #[case::named_link_between_paragraphs(
+        r##"<p>Hi</p><a name="top"></a><p><a href="#top">Top</a></p>"##,
+        &["top"]
+    )]
     #[case::percent_encoded(r##"<a href="#caf%C3%A9">Café</a><div id="café"></div>"##, &["café"])]
     #[case::not_linked(r#"<div id="wrapper"></div><figure id="attachment_1"></figure>"#, &[])]
     #[case::link_to_another_page(r##"<a href="https://example.com/#map">Map</a><div id="map"></div>"##, &[])]

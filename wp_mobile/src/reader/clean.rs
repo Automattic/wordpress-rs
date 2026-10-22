@@ -819,19 +819,25 @@ const MEDIA: &[&str] = &[
 ];
 
 /// Whether an element shows nothing, and nothing links to it: it holds only spaces, `&nbsp;`, line
-/// breaks, comments and empty elements, like an icon font's `<i>`. One with an `id` anywhere in it
-/// stays, since a link can point at it. So does one with a known embed in it, like Pinterest's
+/// breaks, comments and empty elements, like an icon font's `<i>`. One with an anchor anywhere in
+/// it stays, since a link can point at it. So does one with a known embed in it, like Pinterest's
 /// empty link, which its script fills in.
 fn shows_nothing(element: ElementRef) -> bool {
     element.descendants().all(|node| match node.value() {
         Node::Text(text) => text.trim().is_empty(),
         Node::Element(element) => {
-            element.id().is_none()
+            !is_anchor(element)
                 && !MEDIA.contains(&element.name())
                 && !ElementRef::wrap(node).is_some_and(embeds::is_known_embed)
         }
         _ => true,
     })
+}
+
+/// Whether a link can point at an element: it has an `id`, or it's an `<a name>`, which is how
+/// anchors were made before `id`. `anchors.rs` finds anchors the same way.
+fn is_anchor(element: &Element) -> bool {
+    element.id().is_some() || (element.name() == "a" && element.attr("name").is_some())
 }
 
 /// Elements that sit in a line of text, rather than starting a block, as HTML defines them: images,
@@ -1030,6 +1036,14 @@ mod tests {
     #[case::empty_paragraph_with_an_id(
         r#"<p id="here"></p><p>Hi</p>"#,
         r#"<p id="here"></p><p>Hi</p>"#
+    )]
+    #[case::paragraph_of_a_named_anchor(
+        r#"<p>One</p><p><a name="top"></a></p><p>Two</p>"#,
+        r#"<p>One</p><p><a name="top"></a></p><p>Two</p>"#
+    )]
+    #[case::loose_named_anchor(
+        r#"<p>One</p><a name="top"></a><p>Two</p>"#,
+        r#"<p>One</p><p><a name="top"></a></p><p>Two</p>"#
     )]
     // Pinterest's embed is an empty link until its script runs.
     #[case::paragraph_of_an_embed(
