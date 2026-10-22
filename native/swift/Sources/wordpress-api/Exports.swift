@@ -52,6 +52,7 @@ public typealias FindApiRootFailure = WordPressAPIInternal.FindApiRootFailure
 public typealias FetchAndParseApiRootFailure = WordPressAPIInternal.FetchAndParseApiRootFailure
 public typealias ApplicationPasswordsNotSupportedReason = WordPressAPIInternal.ApplicationPasswordsNotSupportedReason
 public typealias RequestExecutionErrorReason = WordPressAPIInternal.RequestExecutionErrorReason
+public typealias VerifyIssuedApplicationPasswordError = WordPressAPIInternal.VerifyIssuedApplicationPasswordError
 
 // MARK: - Users
 
