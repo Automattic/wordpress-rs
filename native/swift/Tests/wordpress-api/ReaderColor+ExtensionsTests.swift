@@ -1,3 +1,4 @@
+#if canImport(CoreGraphics)
 import CoreGraphics
 import Testing
 import WordPressAPI
@@ -41,3 +42,5 @@ struct ReaderColorExtensionsTests {
     #endif
 
 }
+
+#endif

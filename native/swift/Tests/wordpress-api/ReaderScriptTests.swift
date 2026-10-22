@@ -270,6 +270,13 @@ struct ReaderScriptTests {
           results.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : ' – ' + detail}`);
         };
         const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        // Waits for `condition`, for up to `ms`, and says whether it held.
+        const until = async (condition, ms = 5000) => {
+          for (let waited = 0; !condition() && waited < ms; waited += 50) {
+            await wait(50);
+          }
+          return condition();
+        };
         const byId = (id) => document.getElementById(id);
         const style = (id) => getComputedStyle(byId(id));
 
@@ -357,14 +364,16 @@ struct ReaderScriptTests {
           check('tapping an image linked to a page follows the link', tap('linked') === '[]', JSON.stringify(messages));
           check('tapping an emoji sends nothing', tap('emoji') === '[]', JSON.stringify(messages));
 
-          // The page's height
+          // The page's height. The script hears about a change at the page's next rendering update.
+          // A web view that isn't on screen only runs one every second or two, so give it time.
           const pageHeight = () => `height:${Math.ceil(document.documentElement.getBoundingClientRect().height)}`;
-          check('the page reports its height', heights.at(-1) === pageHeight(), `${heights.at(-1)} vs ${pageHeight()}`);
+          const isReported = () => heights.at(-1) === pageHeight();
+          check('the page reports its height', await until(isReported), `${heights.at(-1)} vs ${pageHeight()}`);
           const before = heights.length;
           const spacer = document.createElement('div');
           spacer.style.height = '300px';
           document.body.append(spacer);
-          await wait(300);
+          await until(isReported);
           check(
             'the page reports its height again when it changes',
             heights.length === before + 1 && heights.at(-1) === pageHeight(),
