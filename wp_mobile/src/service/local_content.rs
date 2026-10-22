@@ -5,7 +5,7 @@ use wp_mobile_local_content::{
         working_copy::{
             DbPageWorkingCopy, DbPostWorkingCopy, PageWorkingCopy, PostWorkingCopy, WorkingCopyId,
         },
-        working_copy_target::{SiteIdentity, WorkingCopyTarget},
+        working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
     },
     repository::working_copies::WorkingCopyRepository,
 };
@@ -73,6 +73,38 @@ impl LocalContentService {
             Ok::<_, LocalContentError>(updated)
         })?;
         if updated {
+            Ok(())
+        } else {
+            Err(LocalContentError::WorkingCopyNotFound { id })
+        }
+    }
+
+    /// Record that a post working copy was pushed, with `remote_post` as the
+    /// server returned the post after the push: from now on the working copy
+    /// edits that post, based on its new `modified_gmt`. Its fields are
+    /// unchanged.
+    ///
+    /// Call it after every push of the working copy's fields, including one an
+    /// app makes itself, so the working copy stays based on the version the
+    /// push produced.
+    ///
+    /// Fails with `WorkingCopyNotFound` if no post working copy has the given
+    /// ID, with `RemotePostAlreadyHasWorkingCopy` if another working copy edits
+    /// that post, and with `PushedToAnotherRemotePost` if this one edits a
+    /// different post.
+    pub fn record_post_working_copy_push(
+        &self,
+        id: WorkingCopyId,
+        remote_post: RemotePostReference,
+    ) -> Result<(), LocalContentError> {
+        let recorded = self.store.execute(|conn| {
+            let transaction = conn.transaction()?;
+            let recorded =
+                WorkingCopyRepository.record_post_push(&transaction, &id, remote_post)?;
+            transaction.commit()?;
+            Ok::<_, LocalContentError>(recorded)
+        })?;
+        if recorded {
             Ok(())
         } else {
             Err(LocalContentError::WorkingCopyNotFound { id })
@@ -170,6 +202,38 @@ impl LocalContentService {
             Ok::<_, LocalContentError>(updated)
         })?;
         if updated {
+            Ok(())
+        } else {
+            Err(LocalContentError::WorkingCopyNotFound { id })
+        }
+    }
+
+    /// Record that a page working copy was pushed, with `remote_post` as the
+    /// server returned the page after the push: from now on the working copy
+    /// edits that page, based on its new `modified_gmt`. Its fields are
+    /// unchanged.
+    ///
+    /// Call it after every push of the working copy's fields, including one an
+    /// app makes itself, so the working copy stays based on the version the
+    /// push produced.
+    ///
+    /// Fails with `WorkingCopyNotFound` if no page working copy has the given
+    /// ID, with `RemotePostAlreadyHasWorkingCopy` if another working copy edits
+    /// that page, and with `PushedToAnotherRemotePost` if this one edits a
+    /// different page.
+    pub fn record_page_working_copy_push(
+        &self,
+        id: WorkingCopyId,
+        remote_post: RemotePostReference,
+    ) -> Result<(), LocalContentError> {
+        let recorded = self.store.execute(|conn| {
+            let transaction = conn.transaction()?;
+            let recorded =
+                WorkingCopyRepository.record_page_push(&transaction, &id, remote_post)?;
+            transaction.commit()?;
+            Ok::<_, LocalContentError>(recorded)
+        })?;
+        if recorded {
             Ok(())
         } else {
             Err(LocalContentError::WorkingCopyNotFound { id })
