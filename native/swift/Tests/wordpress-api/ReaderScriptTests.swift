@@ -33,7 +33,7 @@ struct ReaderScriptTests {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.add(recorder, name: "readerPost")
         let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 800), configuration: configuration)
-        let options = ReaderPageOptions(colors: .fixed(theme: .sepia))
+        let options = ReaderPageOptions(theme: .sepia, appColors: testAppColors())
         let page = ReaderPostContent(html: "<p>Hi</p>").pageHtml(options: options)
         webView.loadHTMLString(page, baseURL: URL(string: "https://wordpress.com/reader"))
 

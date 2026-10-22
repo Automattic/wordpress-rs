@@ -12,9 +12,10 @@
 //!   takes to read, whether it's cut off, and what to download ahead of time.
 //! - [`reader_link`], which says what a link in a post goes to, so the app can open it the right
 //!   way: in the post, in the Reader, in an image viewer or player, or in a browser.
-//! - The theme colours: [`ReaderThemeColors`] is every colour the page uses, and
-//!   [`reader_page_colors_css`] turns them into the page's CSS variables. The themes with fixed
-//!   colours are defined here; the default theme's colours come from the app.
+//! - The themes: [`reader_themes`] lists every [`ReaderTheme`], with an ID to save and an English
+//!   name. [`ReaderThemeColors`] is every colour the page uses, and [`reader_page_colors_css`] turns
+//!   a theme's into the page's CSS variables. The themes are defined here; the platform's colours
+//!   and the app's brand colour come from the app, in [`ReaderAppColors`].
 //! - [`reader_stylesheet`], which styles the post with those variables, and [`reader_script`], which
 //!   fades images in and passes taps and text selection to the app.
 //! - [`ReaderPostContent::page_html`], which puts all of them together into the page for the web
@@ -44,9 +45,9 @@ pub use images::{ReaderImageSize, ReaderPostImage};
 pub use links::{ReaderLink, reader_link};
 pub use page::{ReaderPageOptions, reader_page_base_url};
 pub use theme::{
-    ReaderColor, ReaderFixedTheme, ReaderFont, ReaderPageColors, ReaderThemeAppearance,
-    ReaderThemeColors, reader_fixed_theme_colors, reader_fixed_theme_from_id, reader_fixed_themes,
-    reader_page_colors_css, reader_page_typography_css,
+    ReaderAppColors, ReaderColor, ReaderFont, ReaderTheme, ReaderThemeAppearance,
+    ReaderThemeColors, reader_page_colors_css, reader_page_theme_css, reader_page_typography_css,
+    reader_theme_colors, reader_theme_from_id, reader_themes,
 };
 
 #[cfg(test)]

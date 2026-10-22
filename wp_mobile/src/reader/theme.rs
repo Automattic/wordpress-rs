@@ -1,3 +1,7 @@
+use std::fmt;
+
+use strum::IntoEnumIterator;
+
 /// An sRGB colour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Record)]
 pub struct ReaderColor {
@@ -61,20 +65,37 @@ pub struct ReaderThemeColors {
     pub border: ReaderColor,
     /// Links, and the social icons, which are links too.
     ///
-    /// In the colours an app supplies for [`ReaderPageColors::System`], this is the app's brand
-    /// colour: green for Jetpack, blue for WordPress. Pick shades that read as text on the
-    /// background, at a contrast of 4.5:1 or more. The themes with fixed colours use their text
-    /// colour for links instead, whatever the app.
+    /// In [`ReaderAppColors`], this is the app's brand colour: green for Jetpack, blue for
+    /// WordPress. Pick shades that read as text on the background, at a contrast of 4.5:1 or more.
+    /// The System and Reader themes use it. The other themes use their text colour for links
+    /// instead, whatever the app.
     pub link: ReaderColor,
 }
 
-/// The Reader themes with fixed colours. [`reader_fixed_themes`] lists them, so the apps don't keep
-/// a list of their own.
+/// The colours only the app knows: the platform's own, in the system's light and dark
+/// appearance, with the app's brand colour for links.
 ///
-/// The default theme isn't here: it uses the platform's own colours, which only the app knows, so
-/// the app supplies them in [`ReaderPageColors::System`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
-pub enum ReaderFixedTheme {
+/// The System theme uses all of them, and the Reader theme takes its links' colour from them. The
+/// other themes don't use them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Record)]
+pub struct ReaderAppColors {
+    pub light: ReaderThemeColors,
+    pub dark: ReaderThemeColors,
+}
+
+/// The Reader's themes, in the order to show them in. [`reader_themes`] lists them, so the apps
+/// don't keep a list of their own.
+///
+/// Its `Display` is the theme's name in English, like `OLED`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum, strum_macros::EnumIter)]
+#[uniffi::export(Display)]
+pub enum ReaderTheme {
+    /// The default: the platform's own colours, from [`ReaderAppColors`], which follow the
+    /// system's light or dark appearance.
+    System,
+    /// The WordPress.com Reader on the web: Calypso's colours, which follow the system's light or
+    /// dark appearance, and its post text, with the app's colour for links.
+    Reader,
     Soft,
     Sepia,
     Evening,
@@ -83,19 +104,11 @@ pub enum ReaderFixedTheme {
     Candy,
 }
 
-impl ReaderFixedTheme {
-    /// Every theme, in the order to show them in. A new theme goes here too.
-    const ALL: [Self; 6] = [
-        Self::Soft,
-        Self::Sepia,
-        Self::Evening,
-        Self::Oled,
-        Self::Hacker,
-        Self::Candy,
-    ];
-
+impl ReaderTheme {
     fn id_str(self) -> &'static str {
         match self {
+            Self::System => "system",
+            Self::Reader => "reader",
             Self::Soft => "soft",
             Self::Sepia => "sepia",
             Self::Evening => "evening",
@@ -106,46 +119,84 @@ impl ReaderFixedTheme {
     }
 }
 
-#[uniffi::export]
-impl ReaderFixedTheme {
-    /// A name for the theme that stays the same between releases, like `sepia`, for saving the
-    /// reader's choice. [`reader_fixed_theme_from_id`] reads it back. It isn't for showing: the
-    /// apps translate each theme's name themselves.
-    pub fn id(&self) -> String {
-        self.id_str().to_owned()
+impl fmt::Display for ReaderTheme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::System => "System",
+            Self::Reader => "Reader",
+            Self::Soft => "Soft",
+            Self::Sepia => "Sepia",
+            Self::Evening => "Evening",
+            Self::Oled => "OLED",
+            Self::Hacker => "Hacker",
+            Self::Candy => "Candy",
+        })
     }
 }
 
-/// The Reader themes with fixed colours, in the order to show them in.
 #[uniffi::export]
-pub fn reader_fixed_themes() -> Vec<ReaderFixedTheme> {
-    ReaderFixedTheme::ALL.to_vec()
+impl ReaderTheme {
+    /// A name for the theme that stays the same between releases, like `sepia`, for saving the
+    /// reader's choice. [`reader_theme_from_id`] reads it back. It isn't for showing: the theme's
+    /// `Display` is its name.
+    pub fn id(&self) -> String {
+        self.id_str().to_owned()
+    }
+
+    /// Whether the theme follows the system's light or dark appearance, or always looks the same.
+    ///
+    /// A theme that always looks the same ignores a forced appearance. Whether it's light or dark
+    /// tells the app how to draw its own controls around the post.
+    pub fn appearance(&self) -> ReaderThemeAppearance {
+        match self {
+            Self::System | Self::Reader => ReaderThemeAppearance::FollowsSystem,
+            Self::Soft | Self::Sepia | Self::Candy => ReaderThemeAppearance::AlwaysLight,
+            Self::Evening | Self::Oled | Self::Hacker => ReaderThemeAppearance::AlwaysDark,
+        }
+    }
 }
 
-/// The theme with fixed colours whose [`id`](ReaderFixedTheme::id) is `id`, if there is one.
+/// The Reader's themes, in the order to show them in.
 #[uniffi::export]
-pub fn reader_fixed_theme_from_id(id: &str) -> Option<ReaderFixedTheme> {
-    ReaderFixedTheme::ALL
-        .into_iter()
-        .find(|theme| theme.id_str() == id)
+pub fn reader_themes() -> Vec<ReaderTheme> {
+    ReaderTheme::iter().collect()
 }
 
-/// The colours for a theme with fixed colours.
+/// The theme whose [`id`](ReaderTheme::id) is `id`, if there is one.
+#[uniffi::export]
+pub fn reader_theme_from_id(id: &str) -> Option<ReaderTheme> {
+    ReaderTheme::iter().find(|theme| theme.id_str() == id)
+}
+
+/// The colours `theme` draws the page with, in the system's light or dark appearance. The app draws
+/// the background behind the web view, so it needs them too.
 ///
-/// Every colour comes from the theme's text colour, except the background.
+/// A theme that always looks the same has the same colours in both. Every one of its colours comes
+/// from its text colour, except the background.
 #[uniffi::export]
-pub fn reader_fixed_theme_colors(theme: ReaderFixedTheme) -> ReaderThemeColors {
+pub fn reader_theme_colors(
+    theme: ReaderTheme,
+    app_colors: ReaderAppColors,
+    dark: bool,
+) -> ReaderThemeColors {
+    let app = if dark {
+        app_colors.dark
+    } else {
+        app_colors.light
+    };
     let (text, background) = match theme {
-        ReaderFixedTheme::Soft => (0x2d2e2e, 0xf2f2f2),
-        ReaderFixedTheme::Sepia => (0x27201b, 0xeae0cd),
-        ReaderFixedTheme::Evening => (0xabaab2, 0x3a3a3c),
-        ReaderFixedTheme::Oled => (0xffffff, 0x000000),
-        ReaderFixedTheme::Hacker => (0x00ff00, 0x000000),
-        ReaderFixedTheme::Candy => (0x0066ff, 0xffe8fd),
+        ReaderTheme::System => return app,
+        ReaderTheme::Reader => return calypso_colors(dark, app.link),
+        ReaderTheme::Soft => (0x2d2e2e, 0xf2f2f2),
+        ReaderTheme::Sepia => (0x27201b, 0xeae0cd),
+        ReaderTheme::Evening => (0xabaab2, 0x3a3a3c),
+        ReaderTheme::Oled => (0xffffff, 0x000000),
+        ReaderTheme::Hacker => (0x00ff00, 0x000000),
+        ReaderTheme::Candy => (0x0066ff, 0xffe8fd),
     };
     let text = ReaderColor::rgb(text);
     // Faint colours need a little more opacity to show up on a dark background.
-    let is_dark = is_dark(theme);
+    let is_dark = theme.appearance() == ReaderThemeAppearance::AlwaysDark;
 
     ReaderThemeColors {
         text,
@@ -158,24 +209,41 @@ pub fn reader_fixed_theme_colors(theme: ReaderFixedTheme) -> ReaderThemeColors {
     }
 }
 
-fn is_dark(theme: ReaderFixedTheme) -> bool {
-    match theme {
-        ReaderFixedTheme::Evening | ReaderFixedTheme::Oled | ReaderFixedTheme::Hacker => true,
-        ReaderFixedTheme::Soft | ReaderFixedTheme::Sepia | ReaderFixedTheme::Candy => false,
+/// The WordPress.com Reader's colours, from Calypso: its default colour scheme, with Color Studio's
+/// grays, and its dark mode. Links are the app's colour.
+fn calypso_colors(dark: bool, link: ReaderColor) -> ReaderThemeColors {
+    let color = ReaderColor::rgb;
+    if dark {
+        // Calypso's dark mode, which maps these to the Dashboard's dark colours.
+        return ReaderThemeColors {
+            // `--dashboard__text-color`.
+            text: color(0xe0e0e0),
+            // `--dashboard__text-muted-color`.
+            secondary_text: color(0xbdbdbd),
+            // Calypso has no third text colour, so this is between the muted text and the page.
+            tertiary_text: color(0x8a8a8a),
+            // `--dashboard__background-color`.
+            background: color(0x1e1e1e),
+            // `--dashboard-surface__background-color`.
+            secondary_background: color(0x2a2a2a),
+            // `--dashboard-surface__border-color`.
+            border: color(0x4a4a4a),
+            link,
+        };
     }
-}
-
-/// The colours to draw the Reader's post page with.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
-pub enum ReaderPageColors {
-    /// The default theme: the platform's colours, which follow the system's light or dark
-    /// appearance, with the app's brand colour for links.
-    System {
-        light: ReaderThemeColors,
-        dark: ReaderThemeColors,
-    },
-    /// A theme with fixed colours, whatever the system appearance.
-    Fixed { theme: ReaderFixedTheme },
+    ReaderThemeColors {
+        // `--color-neutral-70`, which the post's text uses.
+        text: color(0x3c434a),
+        // `--color-text-subtle`.
+        secondary_text: color(0x646970),
+        tertiary_text: color(0x8c8f94),
+        background: color(0xffffff),
+        // `--color-neutral-0`.
+        secondary_background: color(0xf6f7f7),
+        // `--color-border-subtle`.
+        border: color(0xdcdcde),
+        link,
+    }
 }
 
 /// Whether a theme's colours follow the system's light or dark appearance.
@@ -188,23 +256,6 @@ pub enum ReaderThemeAppearance {
     AlwaysLight,
     /// The theme's colours are dark, whatever the system's appearance.
     AlwaysDark,
-}
-
-#[uniffi::export]
-impl ReaderPageColors {
-    /// Whether the theme follows the system's light or dark appearance, or always looks the same.
-    ///
-    /// A theme that always looks the same ignores a forced appearance. Whether it's light or dark
-    /// tells the app how to draw its own controls around the post.
-    pub fn appearance(&self) -> ReaderThemeAppearance {
-        match self {
-            ReaderPageColors::System { .. } => ReaderThemeAppearance::FollowsSystem,
-            ReaderPageColors::Fixed { theme } if is_dark(*theme) => {
-                ReaderThemeAppearance::AlwaysDark
-            }
-            ReaderPageColors::Fixed { .. } => ReaderThemeAppearance::AlwaysLight,
-        }
-    }
 }
 
 /// The typeface for the post's text, from the reader's settings.
@@ -244,14 +295,10 @@ impl ReaderFont {
 /// scale on Android, so the post follows both without zooming the page. iOS's body text is 17pt,
 /// so to match it, iOS's normal is `17.0 / 16.0`.
 ///
-/// `colors` is the page's theme, since a theme that follows the system only uses the platform's
+/// `theme` is the page's theme, since a theme that follows the system only uses the platform's
 /// fonts.
 #[uniffi::export]
-pub fn reader_page_typography_css(
-    font: ReaderFont,
-    text_scale: f64,
-    colors: ReaderPageColors,
-) -> String {
+pub fn reader_page_typography_css(font: ReaderFont, text_scale: f64, theme: ReaderTheme) -> String {
     let scale = if text_scale.is_finite() && text_scale > 0.0 {
         text_scale.clamp(0.5, 4.0)
     } else {
@@ -259,34 +306,76 @@ pub fn reader_page_typography_css(
     };
     format!(
         ":root {{\n  --reader-font-family: {};\n  --reader-text-scale: {scale};\n}}\n",
-        font.family(matches!(colors, ReaderPageColors::System { .. }))
+        font.family(theme.appearance() == ReaderThemeAppearance::FollowsSystem)
     )
+}
+
+/// The WordPress.com Reader's post text, from Calypso's `.reader-full-post__story-content`.
+const CALYPSO_TEXT_CSS: &str = r#"html {
+  font-size: calc(17px * var(--reader-text-scale, 1));
+}
+body {
+  max-width: 720px;
+  margin: 0 auto;
+  /* Calypso's 28px, as a ratio, so larger text, like a large paragraph, gets room too. */
+  line-height: 1.647;
+}
+@media (max-width: 480px) {
+  html {
+    font-size: calc(16px * var(--reader-text-scale, 1));
+  }
+  body {
+    line-height: 1.5;
+  }
+}
+p {
+  margin-bottom: 16px;
+}
+"#;
+
+/// The CSS for the theme's text, besides its typeface and size, for a `<style>` after the shared
+/// stylesheet. Only the Reader theme has any: the WordPress.com Reader's text size, line height and
+/// width.
+#[uniffi::export]
+pub fn reader_page_theme_css(theme: ReaderTheme) -> String {
+    match theme {
+        ReaderTheme::Reader => CALYPSO_TEXT_CSS.to_owned(),
+        ReaderTheme::System
+        | ReaderTheme::Soft
+        | ReaderTheme::Sepia
+        | ReaderTheme::Evening
+        | ReaderTheme::Oled
+        | ReaderTheme::Hacker
+        | ReaderTheme::Candy => String::new(),
+    }
 }
 
 /// The CSS that sets the page's colour variables, for a `<style>` in the page's `<head>`.
 ///
-/// For a theme with fixed colours, the CSS is the same in light and dark mode, so the web view's
-/// appearance doesn't matter. That holds as long as the page's other styles take their colours from
-/// these variables, and don't check `prefers-color-scheme` themselves.
+/// For a theme that always looks the same, the CSS is the same in light and dark mode, so the web
+/// view's appearance doesn't matter. That holds as long as the page's other styles take their
+/// colours from these variables, and don't check `prefers-color-scheme` themselves.
 #[uniffi::export]
-pub fn reader_page_colors_css(colors: ReaderPageColors) -> String {
-    match colors {
-        ReaderPageColors::System { light, dark } => format!(
-            ":root {{\n  color-scheme: light dark;\n{}}}\n\
-             @media (prefers-color-scheme: dark) {{\n  :root {{\n{}  }}\n}}\n",
-            variables(&light, "  "),
-            variables(&dark, "    ")
-        ),
-        ReaderPageColors::Fixed { theme } => {
-            // `color-scheme` makes the web view's own styling, like scrollbars and form controls,
-            // match the theme rather than the system appearance.
-            let scheme = if is_dark(theme) { "dark" } else { "light" };
-            format!(
-                ":root {{\n  color-scheme: {scheme};\n{}}}\n",
-                variables(&reader_fixed_theme_colors(theme), "  ")
-            )
+pub fn reader_page_colors_css(theme: ReaderTheme, app_colors: ReaderAppColors) -> String {
+    let colors = |dark| reader_theme_colors(theme, app_colors, dark);
+    // `color-scheme` makes the web view's own styling, like scrollbars and form controls, match
+    // the theme rather than the system appearance.
+    let scheme = match theme.appearance() {
+        ReaderThemeAppearance::FollowsSystem => {
+            return format!(
+                ":root {{\n  color-scheme: light dark;\n{}}}\n\
+                 @media (prefers-color-scheme: dark) {{\n  :root {{\n{}  }}\n}}\n",
+                variables(&colors(false), "  "),
+                variables(&colors(true), "    ")
+            );
         }
-    }
+        ReaderThemeAppearance::AlwaysLight => "light",
+        ReaderThemeAppearance::AlwaysDark => "dark",
+    };
+    format!(
+        ":root {{\n  color-scheme: {scheme};\n{}}}\n",
+        variables(&colors(scheme == "dark"), "  ")
+    )
 }
 
 fn variables(colors: &ReaderThemeColors, indent: &str) -> String {
@@ -315,80 +404,113 @@ fn variables(colors: &ReaderThemeColors, indent: &str) -> String {
     .collect()
 }
 
+/// Colours for tests that need the app's: black on white and white on black, with blue links.
+#[cfg(test)]
+pub(crate) fn test_app_colors() -> ReaderAppColors {
+    let colors = |text, background, link| {
+        let text = ReaderColor::rgb(text);
+        ReaderThemeColors {
+            text,
+            secondary_text: text.with_opacity(0.6),
+            tertiary_text: text.with_opacity(0.33),
+            background: ReaderColor::rgb(background),
+            secondary_background: text.with_opacity(0.1),
+            border: text.with_opacity(0.3),
+            link: ReaderColor::rgb(link),
+        }
+    };
+    ReaderAppColors {
+        light: colors(0x000000, 0xffffff, 0x0675c4),
+        dark: colors(0xffffff, 0x000000, 0x399ce3),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use indoc::indoc;
     use rstest::rstest;
 
+    #[test]
+    fn lists_the_themes_in_order() {
+        assert_eq!(
+            reader_themes(),
+            [
+                ReaderTheme::System,
+                ReaderTheme::Reader,
+                ReaderTheme::Soft,
+                ReaderTheme::Sepia,
+                ReaderTheme::Evening,
+                ReaderTheme::Oled,
+                ReaderTheme::Hacker,
+                ReaderTheme::Candy,
+            ]
+        );
+    }
+
     #[rstest]
-    #[case::soft(ReaderFixedTheme::Soft, "#2d2e2e", "#f2f2f2")]
-    #[case::sepia(ReaderFixedTheme::Sepia, "#27201b", "#eae0cd")]
-    #[case::evening(ReaderFixedTheme::Evening, "#abaab2", "#3a3a3c")]
-    #[case::oled(ReaderFixedTheme::Oled, "#ffffff", "#000000")]
-    #[case::hacker(ReaderFixedTheme::Hacker, "#00ff00", "#000000")]
-    #[case::candy(ReaderFixedTheme::Candy, "#0066ff", "#ffe8fd")]
+    #[case::system(ReaderTheme::System, "system", "System")]
+    #[case::reader(ReaderTheme::Reader, "reader", "Reader")]
+    #[case::soft(ReaderTheme::Soft, "soft", "Soft")]
+    #[case::sepia(ReaderTheme::Sepia, "sepia", "Sepia")]
+    #[case::evening(ReaderTheme::Evening, "evening", "Evening")]
+    #[case::oled(ReaderTheme::Oled, "oled", "OLED")]
+    #[case::hacker(ReaderTheme::Hacker, "hacker", "Hacker")]
+    #[case::candy(ReaderTheme::Candy, "candy", "Candy")]
+    fn each_theme_has_an_id_and_a_name(
+        #[case] theme: ReaderTheme,
+        #[case] id: &str,
+        #[case] name: &str,
+    ) {
+        assert_eq!(theme.id(), id);
+        assert_eq!(reader_theme_from_id(id), Some(theme));
+        assert_eq!(theme.to_string(), name);
+    }
+
+    #[rstest]
+    #[case::another_case("Sepia")]
+    #[case::a_name("OLED")]
+    #[case::empty("")]
+    fn finds_no_theme_for_other_ids(#[case] id: &str) {
+        assert_eq!(reader_theme_from_id(id), None);
+    }
+
+    #[rstest]
+    #[case::soft(ReaderTheme::Soft, "#2d2e2e", "#f2f2f2")]
+    #[case::sepia(ReaderTheme::Sepia, "#27201b", "#eae0cd")]
+    #[case::evening(ReaderTheme::Evening, "#abaab2", "#3a3a3c")]
+    #[case::oled(ReaderTheme::Oled, "#ffffff", "#000000")]
+    #[case::hacker(ReaderTheme::Hacker, "#00ff00", "#000000")]
+    #[case::candy(ReaderTheme::Candy, "#0066ff", "#ffe8fd")]
     fn fixed_themes_use_the_ios_colors(
-        #[case] theme: ReaderFixedTheme,
+        #[case] theme: ReaderTheme,
         #[case] text: &str,
         #[case] background: &str,
     ) {
-        let colors = reader_fixed_theme_colors(theme);
+        let colors = reader_theme_colors(theme, test_app_colors(), false);
         assert_eq!(colors.text.css(), text);
         assert_eq!(colors.background.css(), background);
         assert_eq!(colors.link, colors.text);
+        assert_eq!(reader_theme_colors(theme, test_app_colors(), true), colors);
     }
 
     #[rstest]
-    #[case::soft(ReaderFixedTheme::Soft, "soft")]
-    #[case::sepia(ReaderFixedTheme::Sepia, "sepia")]
-    #[case::evening(ReaderFixedTheme::Evening, "evening")]
-    #[case::oled(ReaderFixedTheme::Oled, "oled")]
-    #[case::hacker(ReaderFixedTheme::Hacker, "hacker")]
-    #[case::candy(ReaderFixedTheme::Candy, "candy")]
-    fn lists_each_fixed_theme_with_its_id(#[case] theme: ReaderFixedTheme, #[case] id: &str) {
-        assert_eq!(
-            reader_fixed_themes()
-                .iter()
-                .filter(|listed| **listed == theme)
-                .count(),
-            1
-        );
-        assert_eq!(theme.id(), id);
-        assert_eq!(reader_fixed_theme_from_id(id), Some(theme));
-    }
-
-    #[rstest]
-    #[case::the_default_theme("system")]
-    #[case::another_case("Sepia")]
-    #[case::empty("")]
-    fn finds_no_fixed_theme_for_other_ids(#[case] id: &str) {
-        assert_eq!(reader_fixed_theme_from_id(id), None);
-    }
-
-    #[rstest]
-    #[case::light(
-        ReaderFixedTheme::Sepia,
-        "#27201b99",
-        "#27201b54",
-        "#27201b1a",
-        "#27201b4d"
-    )]
+    #[case::light(ReaderTheme::Sepia, "#27201b99", "#27201b54", "#27201b1a", "#27201b4d")]
     #[case::dark(
-        ReaderFixedTheme::Evening,
+        ReaderTheme::Evening,
         "#abaab299",
         "#abaab273",
         "#abaab226",
         "#abaab24d"
     )]
     fn fixed_themes_derive_colors_from_the_text(
-        #[case] theme: ReaderFixedTheme,
+        #[case] theme: ReaderTheme,
         #[case] secondary_text: &str,
         #[case] tertiary_text: &str,
         #[case] secondary_background: &str,
         #[case] border: &str,
     ) {
-        let colors = reader_fixed_theme_colors(theme);
+        let colors = reader_theme_colors(theme, test_app_colors(), false);
         assert_eq!(colors.secondary_text.css(), secondary_text);
         assert_eq!(colors.tertiary_text.css(), tertiary_text);
         assert_eq!(colors.secondary_background.css(), secondary_background);
@@ -396,10 +518,37 @@ mod tests {
     }
 
     #[test]
+    fn the_system_theme_uses_the_apps_colors() {
+        let app = test_app_colors();
+        assert_eq!(
+            reader_theme_colors(ReaderTheme::System, app, false),
+            app.light
+        );
+        assert_eq!(
+            reader_theme_colors(ReaderTheme::System, app, true),
+            app.dark
+        );
+    }
+
+    #[rstest]
+    #[case::light(false, "#3c434a", "#ffffff")]
+    #[case::dark(true, "#e0e0e0", "#1e1e1e")]
+    fn the_reader_theme_uses_calypsos_colors_with_the_apps_links(
+        #[case] dark: bool,
+        #[case] text: &str,
+        #[case] background: &str,
+    ) {
+        let app = test_app_colors();
+        let colors = reader_theme_colors(ReaderTheme::Reader, app, dark);
+        assert_eq!(colors.text.css(), text);
+        assert_eq!(colors.background.css(), background);
+        let app_link = if dark { app.dark.link } else { app.light.link };
+        assert_eq!(colors.link, app_link);
+    }
+
+    #[test]
     fn fixed_theme_css() {
-        let css = reader_page_colors_css(ReaderPageColors::Fixed {
-            theme: ReaderFixedTheme::Evening,
-        });
+        let css = reader_page_colors_css(ReaderTheme::Evening, test_app_colors());
         assert_eq!(
             css,
             indoc! {"
@@ -418,67 +567,47 @@ mod tests {
     }
 
     #[rstest]
-    #[case::soft(ReaderFixedTheme::Soft, ReaderThemeAppearance::AlwaysLight)]
-    #[case::sepia(ReaderFixedTheme::Sepia, ReaderThemeAppearance::AlwaysLight)]
-    #[case::evening(ReaderFixedTheme::Evening, ReaderThemeAppearance::AlwaysDark)]
-    #[case::oled(ReaderFixedTheme::Oled, ReaderThemeAppearance::AlwaysDark)]
-    #[case::hacker(ReaderFixedTheme::Hacker, ReaderThemeAppearance::AlwaysDark)]
-    #[case::candy(ReaderFixedTheme::Candy, ReaderThemeAppearance::AlwaysLight)]
-    fn fixed_themes_always_look_the_same(
-        #[case] theme: ReaderFixedTheme,
+    #[case::system(ReaderTheme::System, ReaderThemeAppearance::FollowsSystem)]
+    #[case::reader(ReaderTheme::Reader, ReaderThemeAppearance::FollowsSystem)]
+    #[case::soft(ReaderTheme::Soft, ReaderThemeAppearance::AlwaysLight)]
+    #[case::sepia(ReaderTheme::Sepia, ReaderThemeAppearance::AlwaysLight)]
+    #[case::evening(ReaderTheme::Evening, ReaderThemeAppearance::AlwaysDark)]
+    #[case::oled(ReaderTheme::Oled, ReaderThemeAppearance::AlwaysDark)]
+    #[case::hacker(ReaderTheme::Hacker, ReaderThemeAppearance::AlwaysDark)]
+    #[case::candy(ReaderTheme::Candy, ReaderThemeAppearance::AlwaysLight)]
+    fn each_theme_says_whether_it_follows_the_system(
+        #[case] theme: ReaderTheme,
         #[case] appearance: ReaderThemeAppearance,
     ) {
-        assert_eq!(ReaderPageColors::Fixed { theme }.appearance(), appearance);
-    }
-
-    #[test]
-    fn the_system_theme_follows_the_system() {
-        let colors = ReaderPageColors::System {
-            light: reader_fixed_theme_colors(ReaderFixedTheme::Soft),
-            dark: reader_fixed_theme_colors(ReaderFixedTheme::Oled),
-        };
-        assert_eq!(colors.appearance(), ReaderThemeAppearance::FollowsSystem);
-    }
-
-    fn system_colors() -> ReaderPageColors {
-        ReaderPageColors::System {
-            light: reader_fixed_theme_colors(ReaderFixedTheme::Soft),
-            dark: reader_fixed_theme_colors(ReaderFixedTheme::Oled),
-        }
-    }
-
-    fn sepia() -> ReaderPageColors {
-        ReaderPageColors::Fixed {
-            theme: ReaderFixedTheme::Sepia,
-        }
+        assert_eq!(theme.appearance(), appearance);
     }
 
     #[rstest]
     #[case::sans(
         ReaderFont::Sans,
         1.0,
-        sepia(),
+        ReaderTheme::Sepia,
         "system-ui, -apple-system, Roboto, sans-serif",
         "1"
     )]
     #[case::serif(
         ReaderFont::Serif,
         1.25,
-        sepia(),
+        ReaderTheme::Sepia,
         r#""Noto Serif", Georgia, serif"#,
         "1.25"
     )]
     #[case::too_small(
         ReaderFont::Mono,
         0.1,
-        sepia(),
+        ReaderTheme::Sepia,
         r#"ui-monospace, "SF Mono", SFMono-Regular, "Roboto Mono", monospace"#,
         "0.5"
     )]
     #[case::not_a_number(
         ReaderFont::Sans,
         f64::NAN,
-        sepia(),
+        ReaderTheme::Sepia,
         "system-ui, -apple-system, Roboto, sans-serif",
         "1"
     )]
@@ -486,33 +615,40 @@ mod tests {
     #[case::sans_following_the_system(
         ReaderFont::Sans,
         1.0,
-        system_colors(),
+        ReaderTheme::System,
         "system-ui, -apple-system, Roboto, sans-serif",
         "1"
     )]
     #[case::serif_following_the_system(
         ReaderFont::Serif,
         1.0,
-        system_colors(),
+        ReaderTheme::System,
         "ui-serif, serif",
         "1"
     )]
     #[case::mono_following_the_system(
         ReaderFont::Mono,
         1.0,
-        system_colors(),
+        ReaderTheme::System,
         "ui-monospace, monospace",
+        "1"
+    )]
+    #[case::serif_in_the_reader_theme(
+        ReaderFont::Serif,
+        1.0,
+        ReaderTheme::Reader,
+        "ui-serif, serif",
         "1"
     )]
     fn typography_css(
         #[case] font: ReaderFont,
         #[case] text_scale: f64,
-        #[case] colors: ReaderPageColors,
+        #[case] theme: ReaderTheme,
         #[case] family: &str,
         #[case] scale: &str,
     ) {
         assert_eq!(
-            reader_page_typography_css(font, text_scale, colors),
+            reader_page_typography_css(font, text_scale, theme),
             format!(
                 ":root {{\n  --reader-font-family: {family};\n  --reader-text-scale: {scale};\n}}\n"
             )
@@ -520,32 +656,43 @@ mod tests {
     }
 
     #[test]
+    fn only_the_reader_theme_has_text_css() {
+        for theme in reader_themes() {
+            let css = reader_page_theme_css(theme);
+            assert_eq!(
+                css.contains("font-size: calc(17px"),
+                theme == ReaderTheme::Reader,
+                "{theme}: {css}"
+            );
+            assert_eq!(css.is_empty(), theme != ReaderTheme::Reader, "{theme}");
+        }
+    }
+
+    #[test]
     fn system_css() {
-        let light = reader_fixed_theme_colors(ReaderFixedTheme::Soft);
-        let dark = reader_fixed_theme_colors(ReaderFixedTheme::Oled);
-        let css = reader_page_colors_css(ReaderPageColors::System { light, dark });
+        let css = reader_page_colors_css(ReaderTheme::System, test_app_colors());
         assert_eq!(
             css,
             indoc! {"
                 :root {
                   color-scheme: light dark;
-                  --reader-text: #2d2e2e;
-                  --reader-secondary-text: #2d2e2e99;
-                  --reader-tertiary-text: #2d2e2e54;
-                  --reader-background: #f2f2f2;
-                  --reader-secondary-background: #2d2e2e1a;
-                  --reader-border: #2d2e2e4d;
-                  --reader-link: #2d2e2e;
+                  --reader-text: #000000;
+                  --reader-secondary-text: #00000099;
+                  --reader-tertiary-text: #00000054;
+                  --reader-background: #ffffff;
+                  --reader-secondary-background: #0000001a;
+                  --reader-border: #0000004d;
+                  --reader-link: #0675c4;
                 }
                 @media (prefers-color-scheme: dark) {
                   :root {
                     --reader-text: #ffffff;
                     --reader-secondary-text: #ffffff99;
-                    --reader-tertiary-text: #ffffff73;
+                    --reader-tertiary-text: #ffffff54;
                     --reader-background: #000000;
-                    --reader-secondary-background: #ffffff26;
+                    --reader-secondary-background: #ffffff1a;
                     --reader-border: #ffffff4d;
-                    --reader-link: #ffffff;
+                    --reader-link: #399ce3;
                   }
                 }
             "}
@@ -553,18 +700,25 @@ mod tests {
     }
 
     #[rstest]
-    #[case::soft(ReaderFixedTheme::Soft, "light")]
-    #[case::sepia(ReaderFixedTheme::Sepia, "light")]
-    #[case::evening(ReaderFixedTheme::Evening, "dark")]
-    #[case::oled(ReaderFixedTheme::Oled, "dark")]
-    #[case::hacker(ReaderFixedTheme::Hacker, "dark")]
-    #[case::candy(ReaderFixedTheme::Candy, "light")]
+    #[case::soft(ReaderTheme::Soft, "light")]
+    #[case::sepia(ReaderTheme::Sepia, "light")]
+    #[case::evening(ReaderTheme::Evening, "dark")]
+    #[case::oled(ReaderTheme::Oled, "dark")]
+    #[case::hacker(ReaderTheme::Hacker, "dark")]
+    #[case::candy(ReaderTheme::Candy, "light")]
     fn fixed_theme_css_ignores_the_system_appearance(
-        #[case] theme: ReaderFixedTheme,
+        #[case] theme: ReaderTheme,
         #[case] scheme: &str,
     ) {
-        let css = reader_page_colors_css(ReaderPageColors::Fixed { theme });
+        let css = reader_page_colors_css(theme, test_app_colors());
         assert!(!css.contains("prefers-color-scheme"), "{css}");
         assert!(css.contains(&format!("color-scheme: {scheme};")), "{css}");
+    }
+
+    #[test]
+    fn the_reader_theme_follows_the_system() {
+        let css = reader_page_colors_css(ReaderTheme::Reader, test_app_colors());
+        assert!(css.contains("color-scheme: light dark;"), "{css}");
+        assert!(css.contains("--reader-background: #1e1e1e;"), "{css}");
     }
 }

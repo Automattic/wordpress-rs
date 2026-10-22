@@ -52,66 +52,75 @@ struct ReaderTests {
 
     @Test
     func fixedThemeCss() {
-        let css = readerPageColorsCss(colors: .fixed(theme: .evening))
+        let css = readerPageColorsCss(theme: .evening, appColors: testAppColors())
         #expect(css.contains("color-scheme: dark;"))
         #expect(css.contains("--reader-background: #3a3a3c;"))
     }
 
     @Test
     func systemThemeCss() {
-        let white = ReaderColor(red: 255, green: 255, blue: 255, alpha: 255)
-        let black = ReaderColor(red: 0, green: 0, blue: 0, alpha: 255)
-        let light = ReaderThemeColors(
-            text: black,
-            secondaryText: black,
-            tertiaryText: black,
-            background: white,
-            secondaryBackground: white,
-            border: black,
-            link: black
-        )
-        let dark = readerFixedThemeColors(theme: .oled)
-        let css = readerPageColorsCss(colors: .system(light: light, dark: dark))
+        let css = readerPageColorsCss(theme: .system, appColors: testAppColors())
         #expect(css.contains("--reader-background: #ffffff;"))
         #expect(css.contains("@media (prefers-color-scheme: dark)"))
+        #expect(css.contains("--reader-background: #000000;"))
+    }
+
+    @Test
+    func readerThemeTakesTheAppsLinkColor() {
+        let appColors = testAppColors()
+        let light = readerThemeColors(theme: .reader, appColors: appColors, dark: false)
+        #expect(light.link == appColors.light.link)
+        #expect(light.text != appColors.light.text)
+        #expect(readerThemeColors(theme: .system, appColors: appColors, dark: true) == appColors.dark)
     }
 
     @Test
     func assemblesThePage() {
         let content = ReaderPostContent(html: #"<p>Hi</p><div class="fb-post"></div>"#)
-        let page = content.pageHtml(options: ReaderPageOptions(colors: .fixed(theme: .sepia), language: "fa"))
+        let options = ReaderPageOptions(theme: .sepia, appColors: testAppColors(), language: "fa")
+        let page = content.pageHtml(options: options)
         #expect(page.hasPrefix("<!DOCTYPE html>\n<html lang=\"fa\" dir=\"rtl\">"))
         #expect(page.contains(readerScript()))
         #expect(page.contains("<script async src=\"https://connect.facebook.net/"))
 
-        let offline = content.pageHtml(options: ReaderPageOptions(colors: .fixed(theme: .sepia), offline: true))
+        let offline = content.pageHtml(
+            options: ReaderPageOptions(theme: .sepia, appColors: testAppColors(), offline: true)
+        )
         #expect(!offline.contains("<script async"))
+
+        let reader = content.pageHtml(options: ReaderPageOptions(theme: .reader, appColors: testAppColors()))
+        #expect(reader.contains(readerPageThemeCss(theme: .reader)))
     }
 
     @Test
     func setsTheReadersFontAndTextSize() {
         let content = ReaderPostContent(html: "<p>Hi</p>")
-        let options = ReaderPageOptions(colors: .fixed(theme: .sepia), font: .serif, textScale: 1.25)
+        let options = ReaderPageOptions(theme: .sepia, appColors: testAppColors(), font: .serif, textScale: 1.25)
         let page = content.pageHtml(options: options)
-        #expect(page.contains(readerPageTypographyCss(font: .serif, textScale: 1.25, colors: .fixed(theme: .sepia))))
+        #expect(page.contains(readerPageTypographyCss(font: .serif, textScale: 1.25, theme: .sepia)))
         #expect(readerPageBaseUrl() == "https://wordpress.com/reader")
     }
 
     @Test
     func themesSayWhetherTheyFollowTheSystem() {
-        #expect(ReaderPageColors.fixed(theme: .evening).appearance() == .alwaysDark)
-        #expect(ReaderPageColors.fixed(theme: .sepia).appearance() == .alwaysLight)
-        let oled = readerFixedThemeColors(theme: .oled)
-        #expect(ReaderPageColors.system(light: oled, dark: oled).appearance() == .followsSystem)
+        #expect(ReaderTheme.evening.appearance() == .alwaysDark)
+        #expect(ReaderTheme.sepia.appearance() == .alwaysLight)
+        #expect(ReaderTheme.system.appearance() == .followsSystem)
+        #expect(ReaderTheme.reader.appearance() == .followsSystem)
     }
 
     @Test
-    func listsTheFixedThemes() {
-        let themes = readerFixedThemes()
-        #expect(themes == [.soft, .sepia, .evening, .oled, .hacker, .candy])
-        #expect(themes.map { $0.id() } == ["soft", "sepia", "evening", "oled", "hacker", "candy"])
-        #expect(readerFixedThemeFromId(id: "oled") == .oled)
-        #expect(readerFixedThemeFromId(id: "system") == nil)
+    func listsTheThemes() {
+        let themes = readerThemes()
+        #expect(themes == [.system, .reader, .soft, .sepia, .evening, .oled, .hacker, .candy])
+        #expect(
+            themes.map { $0.id() } == ["system", "reader", "soft", "sepia", "evening", "oled", "hacker", "candy"]
+        )
+        #expect(
+            themes.map(\.description) == ["System", "Reader", "Soft", "Sepia", "Evening", "OLED", "Hacker", "Candy"]
+        )
+        #expect(readerThemeFromId(id: "oled") == .oled)
+        #expect(readerThemeFromId(id: "OLED") == nil)
     }
 
     @Test
@@ -157,4 +166,22 @@ struct ReaderTests {
     func scriptTalksToTheReaderPostHandler() {
         #expect(readerScript().contains("messageHandlers?.readerPost"))
     }
+}
+
+/// The app's colours, for tests: black on white and white on black, with blue links.
+func testAppColors() -> ReaderAppColors {
+    func colors(text: ReaderColor, background: ReaderColor) -> ReaderThemeColors {
+        ReaderThemeColors(
+            text: text,
+            secondaryText: text,
+            tertiaryText: text,
+            background: background,
+            secondaryBackground: background,
+            border: text,
+            link: ReaderColor(red: 6, green: 117, blue: 196, alpha: 255)
+        )
+    }
+    let white = ReaderColor(red: 255, green: 255, blue: 255, alpha: 255)
+    let black = ReaderColor(red: 0, green: 0, blue: 0, alpha: 255)
+    return ReaderAppColors(light: colors(text: black, background: white), dark: colors(text: white, background: black))
 }

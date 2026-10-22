@@ -14,39 +14,17 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 use url::Url;
 use wp_mobile::reader::{
-    ReaderColor, ReaderFixedTheme, ReaderFont, ReaderPageColors, ReaderPageOptions,
-    ReaderPostAnchorKind, ReaderPostContent, ReaderThemeAppearance, ReaderThemeColors,
-    reader_fixed_theme_from_id, reader_fixed_themes,
+    ReaderAppColors, ReaderColor, ReaderFont, ReaderPageOptions, ReaderPostAnchorKind,
+    ReaderPostContent, ReaderTheme, ReaderThemeAppearance, ReaderThemeColors, reader_theme_from_id,
+    reader_themes,
 };
 
 const API: &str = "https://public-api.wordpress.com/rest";
 
-/// The themes the reader can pick, by the name the tool's URLs use, and their names: the tool's
-/// Reader theme, the System theme, and the themes with fixed colours that `wp_mobile` lists.
-fn themes() -> Vec<(String, &'static str)> {
-    [
-        ("reader".to_owned(), "Reader"),
-        ("system".to_owned(), "System"),
-    ]
-    .into_iter()
-    .chain(
-        reader_fixed_themes()
-            .into_iter()
-            .map(|theme| (theme.id(), fixed_theme_name(theme))),
-    )
-    .collect()
-}
-
-/// A fixed theme's name. `wp_mobile` has none, since the apps translate their own.
-fn fixed_theme_name(theme: ReaderFixedTheme) -> &'static str {
-    match theme {
-        ReaderFixedTheme::Soft => "Soft",
-        ReaderFixedTheme::Sepia => "Sepia",
-        ReaderFixedTheme::Evening => "Evening",
-        ReaderFixedTheme::Oled => "OLED",
-        ReaderFixedTheme::Hacker => "Hacker",
-        ReaderFixedTheme::Candy => "Candy",
-    }
+/// The theme a tool URL names. The default is the Reader theme, which matches the WordPress.com
+/// Reader, for comparing with it.
+fn theme_named(id: &str) -> ReaderTheme {
+    reader_theme_from_id(id).unwrap_or(ReaderTheme::Reader)
 }
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -162,7 +140,6 @@ async fn post(
         }
     };
     let content = &reader_post.content;
-    let known_themes = themes();
 
     let frame = |theme: &str| {
         let query = url::form_urlencoded::Serializer::new(String::new())
@@ -174,14 +151,14 @@ async fn post(
             .append_pair("font", font)
             .append_pair("size", &size.to_string())
             .finish();
-        let name = known_themes
-            .iter()
-            .find(|(id, _)| id == theme)
-            .map_or(theme, |(_, name)| *name);
+        let name = reader_theme_from_id(theme).map_or(theme.to_owned(), |theme| theme.to_string());
         json!({ "name": name, "src": format!("/reader/{site}/{post}/page?{query}") })
     };
     let frames: Vec<Value> = if theme == "all" {
-        known_themes.iter().map(|(id, _)| frame(id)).collect()
+        reader_themes()
+            .into_iter()
+            .map(|theme| frame(&theme.id()))
+            .collect()
     } else {
         vec![frame(theme)]
     };
@@ -207,12 +184,12 @@ async fn post(
         }
         format!("/reader/{site}/{post}?{}", query.finish())
     };
-    let themes: Vec<Value> = known_themes
-        .iter()
-        .map(|(id, name)| (id.as_str(), *name))
-        .chain([("all", "All themes")])
+    let themes: Vec<Value> = reader_themes()
+        .into_iter()
+        .map(|theme| (theme.id(), theme.to_string()))
+        .chain([("all".to_owned(), "All themes".to_owned())])
         .map(|(id, name)| {
-            json!({ "name": name, "href": link(&[("theme", id.to_string())]), "selected": id == theme })
+            json!({ "name": name, "href": link(&[("theme", id.clone())]), "selected": id == theme })
         })
         .collect();
     let fonts: Vec<Value> = FONTS
@@ -308,7 +285,7 @@ async fn post(
             color_scheme: (appearance != "auto").then_some(appearance),
             // A theme that always looks the same ignores a forced appearance, so the switch only
             // shows for one that follows the system, and for all of them side by side.
-            always: match page_colors(theme, brand).appearance() {
+            always: match theme_named(theme).appearance() {
                 _ if theme == "all" => None,
                 ReaderThemeAppearance::FollowsSystem => None,
                 ReaderThemeAppearance::AlwaysLight => Some("Always light"),
@@ -376,36 +353,6 @@ impl PreviewPage {
 const APP_CSS: &str =
     "html { background-color: var(--reader-background); } body { padding: 16px; }";
 
-/// The WordPress.com Reader's post text, from Calypso's `.reader-full-post__story-content`.
-const READER_CSS: &str = r#"
-html {
-  font-size: calc(17px * var(--reader-text-scale, 1));
-}
-body {
-  max-width: 720px;
-  margin: 0 auto;
-  /* Calypso's 28px, as a ratio, so larger text, like a large paragraph, gets room too. */
-  line-height: 1.647;
-}
-@media (max-width: 480px) {
-  html {
-    font-size: calc(16px * var(--reader-text-scale, 1));
-  }
-  body {
-    line-height: 1.5;
-  }
-}
-p {
-  margin-bottom: 16px;
-}
-"#;
-
-/// The CSS for a theme, besides its colours.
-fn theme_css(theme: &str) -> String {
-    let reader = if theme == "reader" { READER_CSS } else { "" };
-    format!("{APP_CSS}\n{reader}")
-}
-
 #[get("/reader/<site>/<post>/page?<theme>&<brand>&<font>&<size>&<offline>&<photon>&<lang>")]
 #[allow(clippy::too_many_arguments)]
 async fn page(
@@ -431,7 +378,8 @@ async fn page(
         reader_post.content
     };
     let html = content.page_html(ReaderPageOptions {
-        colors: page_colors(theme.unwrap_or("reader"), brand.unwrap_or("wordpress")),
+        theme: theme_named(theme.unwrap_or_default()),
+        app_colors: app_colors(brand.unwrap_or("wordpress")),
         language: lang.filter(|lang| !lang.is_empty()).map(str::to_owned),
         offline: offline.unwrap_or(false),
         font: Some(match font {
@@ -441,7 +389,7 @@ async fn page(
         }),
         text_scale: size.unwrap_or(1.0),
         server_css: None,
-        css: Some(theme_css(theme.unwrap_or("reader"))),
+        css: Some(APP_CSS.to_owned()),
     });
     PreviewPage::new(html)
 }
@@ -552,29 +500,18 @@ async fn get_json(client: &reqwest::Client, url: &str) -> Result<Value, String> 
     Ok(json)
 }
 
-fn page_colors(theme: &str, brand: &str) -> ReaderPageColors {
-    if let Some(theme) = reader_fixed_theme_from_id(theme) {
-        return ReaderPageColors::Fixed { theme };
-    }
-    // The themes that follow the system take their link colour from the app's brand.
-    let branded = |theme_colors: fn(bool) -> ReaderThemeColors| {
-        let colors = |dark| match brand {
-            "jetpack" => ReaderThemeColors {
-                link: jetpack_link(dark),
-                ..theme_colors(dark)
-            },
-            _ => theme_colors(dark),
-        };
-        ReaderPageColors::System {
-            light: colors(false),
-            dark: colors(true),
-        }
+/// The colours an app supplies: the platform's, with the app's brand colour for links.
+fn app_colors(brand: &str) -> ReaderAppColors {
+    let colors = |dark| match brand {
+        "jetpack" => ReaderThemeColors {
+            link: jetpack_link(dark),
+            ..system_colors(dark)
+        },
+        _ => system_colors(dark),
     };
-    match theme {
-        "system" => branded(system_colors),
-        // The Reader theme, which is the default. Like the WordPress.com Reader, it follows the
-        // system's appearance.
-        _ => branded(reader_colors),
+    ReaderAppColors {
+        light: colors(false),
+        dark: colors(true),
     }
 }
 
@@ -594,8 +531,8 @@ fn jetpack_link(dark: bool) -> ReaderColor {
     }
 }
 
-/// The System theme's colours. They come from each app, so these are close to iOS's, with the
-/// WordPress app's blue for links.
+/// The platform's colours, which each app supplies. These are close to iOS's, with the WordPress
+/// app's blue for links.
 fn system_colors(dark: bool) -> ReaderThemeColors {
     let color = |red, green, blue, alpha| ReaderColor {
         red,
@@ -623,50 +560,6 @@ fn system_colors(dark: bool) -> ReaderThemeColors {
             border: color(60, 60, 67, 74),
             link: color(6, 117, 196, 255),
         }
-    }
-}
-
-/// The WordPress.com Reader's colours, from Calypso: its default colour scheme, with Color Studio's
-/// grays and WordPress blue, and its dark mode.
-fn reader_colors(dark: bool) -> ReaderThemeColors {
-    let color = |hex: u32| ReaderColor {
-        red: (hex >> 16) as u8,
-        green: (hex >> 8) as u8,
-        blue: hex as u8,
-        alpha: 255,
-    };
-    if dark {
-        // Calypso's dark mode, which maps these to the Dashboard's dark colours.
-        return ReaderThemeColors {
-            // `--dashboard__text-color`.
-            text: color(0xe0e0e0),
-            // `--dashboard__text-muted-color`.
-            secondary_text: color(0xbdbdbd),
-            // Calypso has no third text colour, so this is between the muted text and the page.
-            tertiary_text: color(0x8a8a8a),
-            // `--dashboard__background-color`.
-            background: color(0x1e1e1e),
-            // `--dashboard-surface__background-color`.
-            secondary_background: color(0x2a2a2a),
-            // `--dashboard-surface__border-color`.
-            border: color(0x4a4a4a),
-            // `--wp-admin-theme-color-darker-20`.
-            link: color(0x9bbcfb),
-        };
-    }
-    ReaderThemeColors {
-        // `--color-neutral-70`, which the post's text uses.
-        text: color(0x3c434a),
-        // `--color-text-subtle`.
-        secondary_text: color(0x646970),
-        tertiary_text: color(0x8c8f94),
-        background: color(0xffffff),
-        // `--color-neutral-0`.
-        secondary_background: color(0xf6f7f7),
-        // `--color-border-subtle`.
-        border: color(0xdcdcde),
-        // `--color-link`.
-        link: color(0x3858e9),
     }
 }
 
