@@ -106,6 +106,15 @@ struct ReaderTests {
     }
 
     @Test
+    func listsTheFixedThemes() {
+        let themes = readerFixedThemes()
+        #expect(themes == [.soft, .sepia, .evening, .oled, .hacker, .candy])
+        #expect(themes.map { $0.id() } == ["soft", "sepia", "evening", "oled", "hacker", "candy"])
+        #expect(readerFixedThemeFromId(id: "oled") == .oled)
+        #expect(readerFixedThemeFromId(id: "system") == nil)
+    }
+
+    @Test
     func classifiesLinks() {
         let post = "https://example.com/2026/10/21/post/"
         #expect(readerLink(url: "https://example.com/2026/10/21/post/#fn-1", postUrl: post) == .anchor(id: "fn-1"))

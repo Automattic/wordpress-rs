@@ -45,8 +45,8 @@ pub use links::{ReaderLink, reader_link};
 pub use page::{ReaderPageOptions, reader_page_base_url};
 pub use theme::{
     ReaderColor, ReaderFixedTheme, ReaderFont, ReaderPageColors, ReaderThemeAppearance,
-    ReaderThemeColors, reader_fixed_theme_colors, reader_page_colors_css,
-    reader_page_typography_css,
+    ReaderThemeColors, reader_fixed_theme_colors, reader_fixed_theme_from_id, reader_fixed_themes,
+    reader_page_colors_css, reader_page_typography_css,
 };
 
 #[cfg(test)]

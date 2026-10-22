@@ -16,21 +16,38 @@ use url::Url;
 use wp_mobile::reader::{
     ReaderColor, ReaderFixedTheme, ReaderFont, ReaderPageColors, ReaderPageOptions,
     ReaderPostAnchorKind, ReaderPostContent, ReaderThemeAppearance, ReaderThemeColors,
+    reader_fixed_theme_from_id, reader_fixed_themes,
 };
 
 const API: &str = "https://public-api.wordpress.com/rest";
 
-/// The themes the reader can pick, by the name the tool's URLs use.
-const THEMES: &[(&str, &str)] = &[
-    ("reader", "Reader"),
-    ("system", "System"),
-    ("soft", "Soft"),
-    ("sepia", "Sepia"),
-    ("evening", "Evening"),
-    ("oled", "OLED"),
-    ("hacker", "Hacker"),
-    ("candy", "Candy"),
-];
+/// The themes the reader can pick, by the name the tool's URLs use, and their names: the tool's
+/// Reader theme, the System theme, and the themes with fixed colours that `wp_mobile` lists.
+fn themes() -> Vec<(String, &'static str)> {
+    [
+        ("reader".to_owned(), "Reader"),
+        ("system".to_owned(), "System"),
+    ]
+    .into_iter()
+    .chain(
+        reader_fixed_themes()
+            .into_iter()
+            .map(|theme| (theme.id(), fixed_theme_name(theme))),
+    )
+    .collect()
+}
+
+/// A fixed theme's name. `wp_mobile` has none, since the apps translate their own.
+fn fixed_theme_name(theme: ReaderFixedTheme) -> &'static str {
+    match theme {
+        ReaderFixedTheme::Soft => "Soft",
+        ReaderFixedTheme::Sepia => "Sepia",
+        ReaderFixedTheme::Evening => "Evening",
+        ReaderFixedTheme::Oled => "OLED",
+        ReaderFixedTheme::Hacker => "Hacker",
+        ReaderFixedTheme::Candy => "Candy",
+    }
+}
 
 pub fn routes() -> Vec<rocket::Route> {
     routes![index, site, post, page]
@@ -145,6 +162,7 @@ async fn post(
         }
     };
     let content = &reader_post.content;
+    let known_themes = themes();
 
     let frame = |theme: &str| {
         let query = url::form_urlencoded::Serializer::new(String::new())
@@ -156,14 +174,14 @@ async fn post(
             .append_pair("font", font)
             .append_pair("size", &size.to_string())
             .finish();
-        let name = THEMES
+        let name = known_themes
             .iter()
-            .find(|(id, _)| *id == theme)
-            .map_or(theme, |(_, name)| name);
+            .find(|(id, _)| id == theme)
+            .map_or(theme, |(_, name)| *name);
         json!({ "name": name, "src": format!("/reader/{site}/{post}/page?{query}") })
     };
     let frames: Vec<Value> = if theme == "all" {
-        THEMES.iter().map(|(id, _)| frame(id)).collect()
+        known_themes.iter().map(|(id, _)| frame(id)).collect()
     } else {
         vec![frame(theme)]
     };
@@ -189,11 +207,12 @@ async fn post(
         }
         format!("/reader/{site}/{post}?{}", query.finish())
     };
-    let themes: Vec<Value> = THEMES
+    let themes: Vec<Value> = known_themes
         .iter()
-        .chain([("all", "All themes")].iter())
+        .map(|(id, name)| (id.as_str(), *name))
+        .chain([("all", "All themes")])
         .map(|(id, name)| {
-            json!({ "name": name, "href": link(&[("theme", id.to_string())]), "selected": *id == theme })
+            json!({ "name": name, "href": link(&[("theme", id.to_string())]), "selected": id == theme })
         })
         .collect();
     let fonts: Vec<Value> = FONTS
@@ -534,7 +553,9 @@ async fn get_json(client: &reqwest::Client, url: &str) -> Result<Value, String> 
 }
 
 fn page_colors(theme: &str, brand: &str) -> ReaderPageColors {
-    let fixed = |theme| ReaderPageColors::Fixed { theme };
+    if let Some(theme) = reader_fixed_theme_from_id(theme) {
+        return ReaderPageColors::Fixed { theme };
+    }
     // The themes that follow the system take their link colour from the app's brand.
     let branded = |theme_colors: fn(bool) -> ReaderThemeColors| {
         let colors = |dark| match brand {
@@ -550,12 +571,6 @@ fn page_colors(theme: &str, brand: &str) -> ReaderPageColors {
         }
     };
     match theme {
-        "soft" => fixed(ReaderFixedTheme::Soft),
-        "sepia" => fixed(ReaderFixedTheme::Sepia),
-        "evening" => fixed(ReaderFixedTheme::Evening),
-        "oled" => fixed(ReaderFixedTheme::Oled),
-        "hacker" => fixed(ReaderFixedTheme::Hacker),
-        "candy" => fixed(ReaderFixedTheme::Candy),
         "system" => branded(system_colors),
         // The Reader theme, which is the default. Like the WordPress.com Reader, it follows the
         // system's appearance.
