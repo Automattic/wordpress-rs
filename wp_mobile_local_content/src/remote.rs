@@ -18,7 +18,7 @@ use crate::db_types::{
         FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting, Tag,
         WorkingCopyCommon,
     },
-    working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
+    working_copy_target::RemotePostReference,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Enum)]
@@ -64,17 +64,36 @@ impl PageWorkingCopy {
     }
 }
 
-impl WorkingCopyTarget {
-    /// The target for a working copy made from `post`, which lives on `site`.
-    pub fn for_remote_post(site: SiteIdentity, post: &AnyPostWithEditContext) -> Self {
+impl RemotePostReference {
+    /// The reference for a working copy made from `post`, as it was fetched.
+    pub fn from_remote(post: &AnyPostWithEditContext) -> Self {
         Self {
-            site,
-            remote_post: Some(RemotePostReference {
-                post_id: post.id,
-                base_modified_gmt: post.modified_gmt,
-            }),
+            post_id: post.id,
+            base_modified_gmt: post.modified_gmt,
         }
     }
+}
+
+/// Make a post working copy from a post fetched with the edit context.
+#[uniffi::export]
+pub fn post_working_copy_from_remote(
+    post: AnyPostWithEditContext,
+) -> Result<PostWorkingCopy, RemotePostConversionError> {
+    PostWorkingCopy::from_remote(&post)
+}
+
+/// Make a page working copy from a page fetched with the edit context.
+#[uniffi::export]
+pub fn page_working_copy_from_remote(
+    page: AnyPostWithEditContext,
+) -> Result<PageWorkingCopy, RemotePostConversionError> {
+    PageWorkingCopy::from_remote(&page)
+}
+
+/// The reference to `post` for a working copy made from it, as it was fetched.
+#[uniffi::export]
+pub fn remote_post_reference_from_remote(post: AnyPostWithEditContext) -> RemotePostReference {
+    RemotePostReference::from_remote(&post)
 }
 
 fn expect_post_type(
@@ -196,16 +215,13 @@ fn is_date_floating(status: &PostStatus, date: &WpDateString, modified: &WpDateS
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
     use wp_api::{
         date::WpGmtDateTime,
-        parsed_url::ParsedUrl,
         posts::{
             PostCommentStatus, PostContentWithEditContext, PostGuidWithEditContext,
             PostTitleWithEditContext, SparsePostExcerpt,
         },
         terms::TermId,
-        wp_com::WpComSiteId,
     };
 
     fn gmt(value: &str) -> WpGmtDateTime {
@@ -459,24 +475,12 @@ mod tests {
     }
 
     #[test]
-    fn test_target_records_the_remote_post_and_its_modified_date() {
-        let site = SiteIdentity {
-            url: Arc::new(
-                ParsedUrl::parse("https://example.wordpress.com").expect("URL should parse"),
-            ),
-            wordpress_com_site_id: Some(WpComSiteId(1)),
-        };
-
-        let target = WorkingCopyTarget::for_remote_post(site.clone(), &remote_post());
-
+    fn test_reference_records_the_remote_post_and_its_modified_date() {
         assert_eq!(
-            target,
-            WorkingCopyTarget {
-                site,
-                remote_post: Some(RemotePostReference {
-                    post_id: PostId(42),
-                    base_modified_gmt: gmt("2024-01-16T14:20:00Z"),
-                }),
+            RemotePostReference::from_remote(&remote_post()),
+            RemotePostReference {
+                post_id: PostId(42),
+                base_modified_gmt: gmt("2024-01-16T14:20:00Z"),
             }
         );
     }
