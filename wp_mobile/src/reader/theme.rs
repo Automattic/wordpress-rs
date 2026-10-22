@@ -68,7 +68,8 @@ pub struct ReaderThemeColors {
     pub link: ReaderColor,
 }
 
-/// The Reader themes with fixed colours.
+/// The Reader themes with fixed colours. [`reader_fixed_themes`] lists them, so the apps don't keep
+/// a list of their own.
 ///
 /// The default theme isn't here: it uses the platform's own colours, which only the app knows, so
 /// the app supplies them in [`ReaderPageColors::System`].
@@ -80,6 +81,53 @@ pub enum ReaderFixedTheme {
     Oled,
     Hacker,
     Candy,
+}
+
+impl ReaderFixedTheme {
+    /// Every theme, in the order to show them in. A new theme goes here too.
+    const ALL: [Self; 6] = [
+        Self::Soft,
+        Self::Sepia,
+        Self::Evening,
+        Self::Oled,
+        Self::Hacker,
+        Self::Candy,
+    ];
+
+    fn id_str(self) -> &'static str {
+        match self {
+            Self::Soft => "soft",
+            Self::Sepia => "sepia",
+            Self::Evening => "evening",
+            Self::Oled => "oled",
+            Self::Hacker => "hacker",
+            Self::Candy => "candy",
+        }
+    }
+}
+
+#[uniffi::export]
+impl ReaderFixedTheme {
+    /// A name for the theme that stays the same between releases, like `sepia`, for saving the
+    /// reader's choice. [`reader_fixed_theme_from_id`] reads it back. It isn't for showing: the
+    /// apps translate each theme's name themselves.
+    pub fn id(&self) -> String {
+        self.id_str().to_owned()
+    }
+}
+
+/// The Reader themes with fixed colours, in the order to show them in.
+#[uniffi::export]
+pub fn reader_fixed_themes() -> Vec<ReaderFixedTheme> {
+    ReaderFixedTheme::ALL.to_vec()
+}
+
+/// The theme with fixed colours whose [`id`](ReaderFixedTheme::id) is `id`, if there is one.
+#[uniffi::export]
+pub fn reader_fixed_theme_from_id(id: &str) -> Option<ReaderFixedTheme> {
+    ReaderFixedTheme::ALL
+        .into_iter()
+        .find(|theme| theme.id_str() == id)
 }
 
 /// The colours for a theme with fixed colours.
@@ -289,6 +337,33 @@ mod tests {
         assert_eq!(colors.text.css(), text);
         assert_eq!(colors.background.css(), background);
         assert_eq!(colors.link, colors.text);
+    }
+
+    #[rstest]
+    #[case::soft(ReaderFixedTheme::Soft, "soft")]
+    #[case::sepia(ReaderFixedTheme::Sepia, "sepia")]
+    #[case::evening(ReaderFixedTheme::Evening, "evening")]
+    #[case::oled(ReaderFixedTheme::Oled, "oled")]
+    #[case::hacker(ReaderFixedTheme::Hacker, "hacker")]
+    #[case::candy(ReaderFixedTheme::Candy, "candy")]
+    fn lists_each_fixed_theme_with_its_id(#[case] theme: ReaderFixedTheme, #[case] id: &str) {
+        assert_eq!(
+            reader_fixed_themes()
+                .iter()
+                .filter(|listed| **listed == theme)
+                .count(),
+            1
+        );
+        assert_eq!(theme.id(), id);
+        assert_eq!(reader_fixed_theme_from_id(id), Some(theme));
+    }
+
+    #[rstest]
+    #[case::the_default_theme("system")]
+    #[case::another_case("Sepia")]
+    #[case::empty("")]
+    fn finds_no_fixed_theme_for_other_ids(#[case] id: &str) {
+        assert_eq!(reader_fixed_theme_from_id(id), None);
     }
 
     #[rstest]
