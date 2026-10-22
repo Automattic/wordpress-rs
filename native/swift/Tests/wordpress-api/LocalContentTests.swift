@@ -50,6 +50,10 @@ final class LocalContentTests {
         )
     }
 
+    private func newPost(on site: SiteIdentity) -> WorkingCopyTarget {
+        WorkingCopyTarget(site: site, remotePost: nil)
+    }
+
     private func post(title: String) -> PostWorkingCopy {
         PostWorkingCopy(common: common(title: title), categories: [], tags: [], format: .standard, sticky: false)
     }
@@ -77,10 +81,11 @@ final class LocalContentTests {
         )
 
         let service = try openService()
-        let id = try service.createPostWorkingCopy(
-            workingCopy: post(title: "Original"),
-            site: SiteIdentity(url: siteUrl, wordpressComSiteId: 123_456_789)
+        let created = try service.readOrCreatePostWorkingCopy(
+            target: newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: 123_456_789)),
+            workingCopy: post(title: "Original")
         )
+        let id = created.id
         try service.savePostWorkingCopy(id: id, workingCopy: edited)
         let read = try #require(try openService().readPostWorkingCopy(id: id))
 
@@ -95,10 +100,11 @@ final class LocalContentTests {
         let edited = PageWorkingCopy(common: common(title: "Edited page"), parent: 3)
 
         let service = try openService()
-        let id = try service.createPageWorkingCopy(
-            workingCopy: PageWorkingCopy(common: common(title: "Original page"), parent: nil),
-            site: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)
+        let created = try service.readOrCreatePageWorkingCopy(
+            target: newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)),
+            workingCopy: PageWorkingCopy(common: common(title: "Original page"), parent: nil)
         )
+        let id = created.id
         try service.savePageWorkingCopy(id: id, workingCopy: edited)
         let read = try #require(try openService().readPageWorkingCopy(id: id))
 
@@ -110,14 +116,14 @@ final class LocalContentTests {
 
     @Test func savingAPageAsAPostThrows() throws {
         let service = try openService()
-        let pageId = try service.createPageWorkingCopy(
-            workingCopy: PageWorkingCopy(common: common(title: "A page"), parent: nil),
-            site: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)
+        let page = try service.readOrCreatePageWorkingCopy(
+            target: newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)),
+            workingCopy: PageWorkingCopy(common: common(title: "A page"), parent: nil)
         )
         let post = post(title: "Title")
 
         #expect(throws: LocalContentError.self) {
-            try service.savePostWorkingCopy(id: pageId, workingCopy: post)
+            try service.savePostWorkingCopy(id: page.id, workingCopy: post)
         }
     }
 }

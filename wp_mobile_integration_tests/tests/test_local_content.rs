@@ -17,7 +17,7 @@ use wp_mobile_local_content::{
             FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting, Tag,
             WorkingCopyCommon, WorkingCopyId,
         },
-        working_copy_target::{SiteIdentity, WorkingCopyTarget},
+        working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
     },
 };
 
@@ -75,6 +75,13 @@ fn self_hosted_site() -> SiteIdentity {
     }
 }
 
+fn new_post_on(site: SiteIdentity) -> WorkingCopyTarget {
+    WorkingCopyTarget {
+        site,
+        remote_post: None,
+    }
+}
+
 #[test]
 fn test_saved_post_working_copy_survives_reopening_the_database() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
@@ -111,8 +118,9 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
     let id = {
         let service = open_service(&dir);
         let id = service
-            .create_post_working_copy(post("Original"), site.clone())
-            .expect("Create should succeed");
+            .read_or_create_post_working_copy(new_post_on(site.clone()), post("Original"))
+            .expect("Create should succeed")
+            .id;
         service
             .save_post_working_copy(id.clone(), edited.clone())
             .expect("Save should succeed");
@@ -144,14 +152,15 @@ fn test_saved_page_working_copy_survives_reopening_the_database() {
     let id = {
         let service = open_service(&dir);
         let id = service
-            .create_page_working_copy(
+            .read_or_create_page_working_copy(
+                new_post_on(self_hosted_site()),
                 PageWorkingCopy {
                     common: common("Original page"),
                     parent: None,
                 },
-                self_hosted_site(),
             )
-            .expect("Create should succeed");
+            .expect("Create should succeed")
+            .id;
         service
             .save_page_working_copy(id.clone(), edited.clone())
             .expect("Save should succeed");
@@ -177,14 +186,15 @@ fn test_saving_a_missing_post_working_copy_fails() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let service = open_service(&dir);
     let page_id = service
-        .create_page_working_copy(
+        .read_or_create_page_working_copy(
+            new_post_on(self_hosted_site()),
             PageWorkingCopy {
                 common: common("A page"),
                 parent: None,
             },
-            self_hosted_site(),
         )
-        .expect("Create should succeed");
+        .expect("Create should succeed")
+        .id;
     let unknown_id = WorkingCopyId("00000000-0000-4000-8000-000000000000".to_string());
 
     for id in [unknown_id, page_id] {
@@ -202,17 +212,19 @@ fn test_deleting_a_post_working_copy_deletes_only_that_post() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let service = open_service(&dir);
     let post_id = service
-        .create_post_working_copy(post("To delete"), self_hosted_site())
-        .expect("Create should succeed");
+        .read_or_create_post_working_copy(new_post_on(self_hosted_site()), post("To delete"))
+        .expect("Create should succeed")
+        .id;
     let page_id = service
-        .create_page_working_copy(
+        .read_or_create_page_working_copy(
+            new_post_on(self_hosted_site()),
             PageWorkingCopy {
                 common: common("A page"),
                 parent: None,
             },
-            self_hosted_site(),
         )
-        .expect("Create should succeed");
+        .expect("Create should succeed")
+        .id;
 
     service
         .delete_post_working_copy(post_id.clone())
@@ -234,4 +246,35 @@ fn test_deleting_a_post_working_copy_deletes_only_that_post() {
         matches!(service.read_page_working_copy(page_id), Ok(Some(_))),
         "The page should survive being deleted as a post"
     );
+}
+
+#[test]
+fn test_a_remote_post_gets_its_working_copy_back_and_a_new_post_never_does() {
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let service = open_service(&dir);
+    let remote_target = WorkingCopyTarget {
+        site: self_hosted_site(),
+        remote_post: Some(RemotePostReference {
+            post_id: PostId(42),
+            base_modified_gmt: date("2030-03-17T17:46:40Z"),
+        }),
+    };
+
+    let created = service
+        .read_or_create_post_working_copy(remote_target.clone(), post("As fetched"))
+        .expect("Create should succeed");
+    let read = service
+        .read_or_create_post_working_copy(remote_target.clone(), post("Fetched again"))
+        .expect("Read should succeed");
+    let first_new = service
+        .read_or_create_post_working_copy(new_post_on(self_hosted_site()), post("New"))
+        .expect("Create should succeed");
+    let second_new = service
+        .read_or_create_post_working_copy(new_post_on(self_hosted_site()), post("New"))
+        .expect("Create should succeed");
+
+    assert_eq!(read.id, created.id);
+    assert_eq!(read.working_copy, post("As fetched"));
+    assert_eq!(read.target, remote_target);
+    assert_ne!(first_new.id, second_new.id);
 }
