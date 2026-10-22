@@ -356,6 +356,10 @@ public typealias PublicizeRequestDeleteConnectionResponse = WordPressAPIInternal
 public typealias MeConnectionsRequestListResponse = WordPressAPIInternal.MeConnectionsRequestListResponse
 public typealias MeConnectionsResponse = WordPressAPIInternal.MeConnectionsResponse
 
+// MARK: - Reader
+
+public typealias ReaderColor = WordPressAPIInternal.ReaderColor
+
 // MARK: - JSON helpers
 
 public typealias WpAdditionalFields = WordPressAPIInternal.WpAdditionalFields
