@@ -7,3 +7,11 @@ CHANGELOG.md merge=union
 
 # Recorded HTTP responses: keep their CRLF line endings byte for byte.
 test-data/cloudflare-responses/*.http -text
+# The Reader's test data is captured, generated or imported, so GitHub
+# collapses it in diffs. The scripts that make it, and the test posts we
+# published (`test-site/sources`), still show.
+wp_mobile/test-data/reader/posts/** linguist-generated
+wp_mobile/test-data/reader/corpus/** linguist-generated
+wp_mobile/test-data/reader/snapshots/** linguist-generated
+wp_mobile/test-data/reader/test-site/*.json linguist-generated
+wp_mobile/test-data/reader/sanitizer/*.json linguist-generated
