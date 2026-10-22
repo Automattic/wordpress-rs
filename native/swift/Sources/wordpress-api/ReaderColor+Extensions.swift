@@ -1,3 +1,4 @@
+#if canImport(CoreGraphics)
 import CoreGraphics
 import WordPressAPIInternal
 
@@ -57,4 +58,6 @@ public extension ReaderColor {
     }
 
 }
+#endif
+
 #endif
