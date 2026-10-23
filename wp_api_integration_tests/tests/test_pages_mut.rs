@@ -341,10 +341,22 @@ generate_update_test!(
 generate_update_test!(
     update_menu_order,
     menu_order,
-    5u32,
+    5i64,
     |updated_page, updated_page_from_wp_cli| {
         assert_eq!(updated_page.menu_order, Some(5));
         assert_eq!(updated_page_from_wp_cli.menu_order, 5);
+    }
+);
+
+// WordPress allows a negative `menu_order` to force a page to the top of a list,
+// so it has to round-trip as a signed value.
+generate_update_test!(
+    update_negative_menu_order,
+    menu_order,
+    -1000i64,
+    |updated_page, updated_page_from_wp_cli| {
+        assert_eq!(updated_page.menu_order, Some(-1000));
+        assert_eq!(updated_page_from_wp_cli.menu_order, -1000);
     }
 );
 

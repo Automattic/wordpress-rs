@@ -266,7 +266,7 @@ pub struct PostCreateParams {
     // The order of the post in relation to other posts.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub menu_order: Option<u32>,
+    pub menu_order: Option<i64>,
     // Additional fields not explicitly modeled above
     // (e.g., custom taxonomy term IDs keyed by rest_base).
     #[uniffi(default = None)]
@@ -360,7 +360,7 @@ pub struct PostUpdateParams {
     // The order of the post in relation to other posts.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub menu_order: Option<u32>,
+    pub menu_order: Option<i64>,
     // Additional fields not explicitly modeled above
     // (e.g., custom taxonomy term IDs keyed by rest_base).
     #[uniffi(default = None)]
@@ -447,7 +447,7 @@ pub struct SparseAnyPost {
     pub parent: Option<PostId>,
     #[WpContext(edit, view)]
     #[WpContextualOption]
-    pub menu_order: Option<u32>,
+    pub menu_order: Option<i64>,
     // Captures any additional JSON fields not explicitly modeled above
     // (e.g., custom taxonomy term ID arrays keyed by rest_base).
     #[serde(flatten)]
@@ -1285,5 +1285,30 @@ mod tests {
         // With no unknown fields, additional_fields is Some with an empty object
         let additional = post.additional_fields.unwrap();
         assert_eq!(additional.term_ids_for_key("genres"), vec![]);
+    }
+
+    // WordPress allows a negative `menu_order`, which is commonly used to pin a
+    // page to the top of a list. Deserialization must not reject it.
+    #[test]
+    fn test_deserialize_page_with_negative_menu_order() {
+        let json = serde_json::json!({
+            "id": 42,
+            "date": "2025-01-01T00:00:00",
+            "date_gmt": "2025-01-01T00:00:00",
+            "guid": {"rendered": "https://example.com/?p=42"},
+            "link": "https://example.com/page",
+            "modified": "2025-01-01T00:00:00",
+            "modified_gmt": "2025-01-01T00:00:00",
+            "slug": "test-page",
+            "status": "publish",
+            "type": "page",
+            "title": {"rendered": "Test Page"},
+            "content": {"rendered": "<p>Hello</p>"},
+            "template": "",
+            "parent": 0,
+            "menu_order": -1000
+        });
+        let page: AnyPostWithViewContext = serde_json::from_value(json).unwrap();
+        assert_eq!(page.menu_order, Some(-1000));
     }
 }

@@ -479,7 +479,7 @@ impl PostMetadataCollectionWithEditContext {
             entity_id: post.id.0,
             modified_gmt: Some(post.modified_gmt),
             parent: post.parent.map(|p| p.0),
-            menu_order: post.menu_order.map(|m| m as i64),
+            menu_order: post.menu_order,
         }
     }
 
