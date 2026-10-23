@@ -194,6 +194,32 @@ impl WorkingCopyRepository {
         delete_working_copy(executor, WorkingCopyKind::Page, id)
     }
 
+    /// Delete every working copy targeting `site`, posts and pages, and the
+    /// site's row. Their fields and targets are deleted with them.
+    ///
+    /// Returns the number of working copies deleted, 0 if no row matches `site`.
+    pub fn delete_by_site(
+        &self,
+        transaction: &impl InTransaction,
+        site: &SiteIdentity,
+    ) -> Result<usize, LocalContentError> {
+        let Some(site_rowid) = select_site_rowid(transaction, site)? else {
+            return Ok(0);
+        };
+        let deleted = transaction.execute(
+            &format!(
+                "DELETE FROM {WORKING_COPIES}
+                 WHERE rowid IN (SELECT working_copy_rowid FROM {TARGETS} WHERE site_rowid = ?)"
+            ),
+            [site_rowid],
+        )?;
+        transaction.execute(
+            &format!("DELETE FROM {SITES} WHERE rowid = ?"),
+            [site_rowid],
+        )?;
+        Ok(deleted)
+    }
+
     /// Select a post working copy and its target by ID.
     ///
     /// Returns `Ok(None)` if no post working copy has the given ID, including
@@ -1488,5 +1514,49 @@ mod tests {
         );
         assert_eq!(new_post_target.remote_post, None);
         assert_eq!(page_as_a_post, Ok(false));
+    }
+
+    #[test]
+    fn test_deleting_a_site_deletes_its_working_copies_and_nothing_else() {
+        let mut conn = migrated_connection();
+        let removed = site("https://removed.example", Some(5));
+        let kept = site("https://kept.example", None);
+        insert_post(
+            &mut conn,
+            &simple_post("Removed post"),
+            &new_post_on(&removed),
+        );
+        insert_page(
+            &mut conn,
+            &PageWorkingCopy {
+                common: common("Removed page"),
+                parent: None,
+            },
+            &new_post_on(&removed),
+        );
+        let kept_post = insert_post(&mut conn, &simple_post("Kept"), &new_post_on(&kept));
+
+        let tx = conn.transaction().expect("Failed to begin transaction");
+        let deleted = WorkingCopyRepository
+            .delete_by_site(&tx, &removed)
+            .expect("Delete should succeed");
+        let deleted_again = WorkingCopyRepository
+            .delete_by_site(&tx, &removed)
+            .expect("Delete should succeed");
+        tx.commit().expect("Commit should succeed");
+        let remaining = WorkingCopyRepository
+            .select_all_posts(&conn)
+            .expect("Select should succeed");
+
+        assert_eq!((deleted, deleted_again), (2, 0));
+        assert_eq!(
+            remaining
+                .into_iter()
+                .map(|post| post.id)
+                .collect::<Vec<_>>(),
+            vec![kept_post]
+        );
+        assert_eq!(count_rows(&conn, PAGE_FIELDS), 0);
+        assert_eq!(count_rows(&conn, SITES), 1);
     }
 }
