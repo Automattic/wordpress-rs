@@ -196,7 +196,7 @@ impl PostService {
                     sparse.id?.0,
                     sparse.modified_gmt,
                     sparse.parent.map(|p| p.0),
-                    sparse.menu_order.map(|m| m as i64),
+                    sparse.menu_order,
                 ))
             })
             .collect();
