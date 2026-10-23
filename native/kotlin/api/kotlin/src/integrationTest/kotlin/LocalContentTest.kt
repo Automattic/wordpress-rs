@@ -166,6 +166,20 @@ class LocalContentTest {
     }
 
     @Test
+    fun `deleting a site's working copies leaves other sites' alone`() {
+        val otherSite = SiteIdentity(url = ParsedUrl.parse("https://other.example.com"), wordpressComSiteId = null)
+        val service = openService()
+        service.readOrCreatePostWorkingCopy(newPostOn(newPostSite), post("Removed"))
+        val kept = service.readOrCreatePostWorkingCopy(newPostOn(otherSite), post("Kept"))
+
+        val deleted = service.deleteWorkingCopiesForSite(newPostSite)
+
+        assertEquals(1uL, deleted)
+        assertEquals(emptyList(), service.readPostWorkingCopies(newPostSite))
+        assertEquals(listOf(kept.id), service.readAllPostWorkingCopies().map { it.id })
+    }
+
+    @Test
     fun `working copy from a fetched post points at it`() = runTest {
         val post = fetchFirst(PostEndpointType.Posts)
         val service = openService()

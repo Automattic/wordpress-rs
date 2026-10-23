@@ -137,6 +137,25 @@ impl LocalContentService {
         }
     }
 
+    /// Delete every post and page working copy targeting `site`, discarding
+    /// the user's changes in them. Call it only when the user removes the site
+    /// from the app, for example by removing a self-hosted site or by signing
+    /// out of the WordPress.com account the site was reached through: user
+    /// content is never lost otherwise.
+    ///
+    /// Returns the number of working copies deleted.
+    pub fn delete_working_copies_for_site(
+        &self,
+        site: SiteIdentity,
+    ) -> Result<u64, LocalContentError> {
+        self.store.execute(|conn| {
+            let transaction = conn.transaction()?;
+            let deleted = WorkingCopyRepository.delete_by_site(&transaction, &site)?;
+            transaction.commit()?;
+            Ok(deleted as u64)
+        })
+    }
+
     /// Read every post working copy targeting `site`, most recently updated first.
     pub fn read_post_working_copies(
         &self,
