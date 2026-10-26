@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** Posts' and pages' `menu_order` is now a signed `Option<i64>` instead of `Option<u32>`, in `SparseAnyPost`, `PostCreateParams` and `PostUpdateParams`. WordPress stores `menu_order` as a signed integer, and negative values are commonly used to pin a page to the top of a list. Listing pages on such a site previously failed to parse the whole response (`invalid value: integer -1000, expected u32`), so the entire page list came back as an error. Swift and Kotlin now see `Int64?` where they saw `UInt32?`.
 
+### Fixed
+
+- Swift: `WpRequestExecutor.cancel(context:)` now cancels every request made for the context, including ones started after the call. Cancelling during a `RetryAfterMiddleware` backoff (or anywhere no request was in flight for a second) previously cancelled nothing, so the retry went out and the call succeeded. Cancellation also now works on Linux, where it was compiled out.
+- Swift: a request started from an already-cancelled `Task` now fails with `CancellationError` instead of running to completion.
+
 ### Changed
 
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.99.0` to `1.99.1`.
