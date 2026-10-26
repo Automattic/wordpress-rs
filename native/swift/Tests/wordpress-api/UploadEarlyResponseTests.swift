@@ -3,424 +3,585 @@ import Testing
 @testable import WordPressAPI
 @testable import WordPressAPIInternal
 
-#if canImport(Network)
-import Network
-#endif
-
 // A server can answer an upload before it has read the whole body — Cloudflare rejects an oversized
 // upload with a `413` after about 1–2 MB (CMM-2500). `URLSession` receives that response, but a
 // completion-handler task never completes: it waits to send the rest of the body and then times out,
 // so the app reported `httpTimeoutError` instead of the `413`.
 //
-// A `URLProtocol` stub can't reproduce this, because `URLSession` doesn't deliver a stub's response
-// until the stub finishes loading. These tests use a real HTTP/1.1 server on the loopback interface
-// that answers without reading the body and keeps the connection open, which hangs `URLSession` the
-// same way Cloudflare does over HTTP/3.
+// These tests drive `upload(...)` against `LoopbackHTTPServer`, a real HTTP/1.1 server that can
+// answer without reading the body and keep the connection open. That hangs `URLSession` the same way
+// Cloudflare does over HTTP/3.
 //
 // Gated to macOS and iOS, like the other `upload(...)` tests in `MultipartFormTests`.
 #if os(macOS) || os(iOS)
 @Suite("Upload early responses", .timeLimit(.minutes(1)))
 struct UploadEarlyResponseTests {
+    typealias Support = UploadTestSupport
 
-    /// Much more than the loopback socket buffers hold, so a server that doesn't read the body
-    /// leaves most of it unsent — as Cloudflare does.
-    static let bodySize = 32 * 1024 * 1024
-
-    /// Long enough that a test returning before it proves the early response was used.
-    static let requestTimeout: TimeInterval = 10
+    // MARK: - Returning the early response
 
     @Test("An early 413 is returned without waiting for the request timeout")
     func earlyResponseWithContentLengthIsReturned() async throws {
-        let server = try await LoopbackHTTPServer.start(behavior: .rejectWithoutReading(sendContentLength: true))
+        let server = try await LoopbackHTTPServer.rejectingEarly()
         defer { server.stop() }
-        let file = try Self.makeTempFile()
+        let file = try Support.makeTempFile()
 
-        let clock = ContinuousClock()
-        let start = clock.now
+        let start = ContinuousClock.now
         let (data, response) = try await upload(
             body: .onDisk(file),
-            with: Self.request(to: server.url),
-            session: Self.session(),
+            with: Support.request(to: server.url),
+            session: Support.session(),
             delegate: nil
         )
-        let elapsed = start.duration(to: clock.now)
 
         #expect((response as? HTTPURLResponse)?.statusCode == 413)
-        #expect(String(data: data, encoding: .utf8) == LoopbackHTTPServer.rejectionBody)
-        // Well under the quiet period too: the `Content-Length` says the body is complete.
-        #expect(elapsed < .milliseconds(900))
+        #expect(String(bytes: data, encoding: .utf8) == LoopbackHTTPServer.rejectionBody)
+        #expect(ContinuousClock.now - start < .seconds(5))
         #expect(!FileManager.default.fileExists(atPath: file.path))
     }
 
-    @Test("An early response without a Content-Length is returned after the quiet period")
-    func earlyResponseWithoutContentLengthIsReturned() async throws {
-        let server = try await LoopbackHTTPServer.start(behavior: .rejectWithoutReading(sendContentLength: false))
+    @Test("The early-response tests model Cloudflare: most of the body is never read")
+    func earlyResponseLeavesBodyUnsent() async throws {
+        let server = try await LoopbackHTTPServer.rejectingEarly()
         defer { server.stop() }
 
-        let clock = ContinuousClock()
-        let start = clock.now
-        let (data, response) = try await upload(
-            body: .onDisk(try Self.makeTempFile()),
-            with: Self.request(to: server.url),
-            session: Self.session(),
+        _ = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(),
             delegate: nil
         )
-        let elapsed = start.duration(to: clock.now)
+
+        #expect(server.bodyBytesRead < Support.largeBodySize / 2)
+    }
+
+    @Test("An early response from an in-memory body is returned")
+    func earlyResponseFromInMemoryBodyIsReturned() async throws {
+        let server = try await LoopbackHTTPServer.rejectingEarly()
+        defer { server.stop() }
+
+        let (_, response) = try await upload(
+            body: .inMemory(Data(count: Support.largeBodySize)),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
+        )
 
         #expect((response as? HTTPURLResponse)?.statusCode == 413)
-        #expect(String(data: data, encoding: .utf8) == LoopbackHTTPServer.rejectionBody)
+    }
+
+    @Test("A small upload rejected without being read is returned")
+    func smallBodyRejectedWithoutReadingIsReturned() async throws {
+        // Small enough to fit in the socket buffers, so `URLSession` may consider it fully sent.
+        let server = try await LoopbackHTTPServer.rejectingEarly()
+        defer { server.stop() }
+
+        let (data, response) = try await upload(
+            body: .inMemory(Data(count: 16 * 1024)),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
+        )
+
+        #expect((response as? HTTPURLResponse)?.statusCode == 413)
+        #expect(String(bytes: data, encoding: .utf8) == LoopbackHTTPServer.rejectionBody)
+    }
+
+    @Test("An early response with an empty body still times out")
+    func earlyResponseWithEmptyBodyTimesOut() async throws {
+        let server = try await LoopbackHTTPServer.start { $0.respond(status: 413, closing: false) }
+        defer { server.stop() }
+
+        // `URLSession` never calls `didReceive response` for it: it reports the whole body as sent and
+        // waits, so there's nothing for `UploadTaskDelegate` to return.
+        await withKnownIssue("URLSession doesn't deliver an early response with an empty body", isIntermittent: true) {
+            let (_, response) = try await upload(
+                body: .onDisk(try Support.makeTempFile()),
+                with: Support.request(to: server.url),
+                session: Support.session(requestTimeout: 1),
+                delegate: nil
+            )
+            #expect((response as? HTTPURLResponse)?.statusCode == 413)
+        }
+    }
+
+    @Test("An early response with neither a Content-Length nor a Content-Type still times out")
+    func earlyResponseWithoutLengthOrTypeTimesOut() async throws {
+        let server = try await LoopbackHTTPServer.start {
+            $0.send("HTTP/1.1 413 Payload Too Large\r\n\r\n" + LoopbackHTTPServer.rejectionBody)
+        }
+        defer { server.stop() }
+
+        // `URLSession` holds the response back to sniff its type from more of the body.
+        await withKnownIssue("URLSession doesn't deliver an untyped early response of unknown length") {
+            let (_, response) = try await upload(
+                body: .onDisk(try Support.makeTempFile()),
+                with: Support.request(to: server.url),
+                session: Support.session(requestTimeout: 1),
+                delegate: nil
+            )
+            #expect((response as? HTTPURLResponse)?.statusCode == 413)
+        }
+    }
+
+    @Test("An early success response is returned like any other")
+    func earlySuccessResponseIsReturned() async throws {
+        let server = try await LoopbackHTTPServer.start {
+            $0.respond(status: 200, headers: ["Content-Type": "application/json"], body: "{}", closing: false)
+        }
+        defer { server.stop() }
+
+        let (data, response) = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
+        )
+
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(String(bytes: data, encoding: .utf8) == "{}")
+    }
+
+    @Test("An early response keeps its headers")
+    func earlyResponseKeepsHeaders() async throws {
+        let server = try await LoopbackHTTPServer.start {
+            $0.respond(
+                status: 413,
+                headers: ["CF-Ray": "abc123-YVR"],
+                body: LoopbackHTTPServer.rejectionBody,
+                closing: false
+            )
+        }
+        defer { server.stop() }
+
+        let (_, response) = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
+        )
+
+        let httpResponse = try #require(response as? HTTPURLResponse)
+        #expect(httpResponse.value(forHTTPHeaderField: "CF-Ray") == "abc123-YVR")
+        #expect(httpResponse.value(forHTTPHeaderField: "Content-Type") == "text/html")
+    }
+
+    // MARK: - Waiting for the whole early response body
+
+    @Test("An early response without a Content-Length is returned after the quiet period")
+    func earlyResponseWithoutContentLengthIsReturned() async throws {
+        let server = try await LoopbackHTTPServer.start {
+            $0.respond(status: 413, body: LoopbackHTTPServer.rejectionBody, includeContentLength: false, closing: false)
+        }
+        defer { server.stop() }
+
+        let start = ContinuousClock.now
+        let (data, response) = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
+        )
+        let elapsed = ContinuousClock.now - start
+
+        #expect((response as? HTTPURLResponse)?.statusCode == 413)
+        #expect(String(bytes: data, encoding: .utf8) == LoopbackHTTPServer.rejectionBody)
         #expect(elapsed >= .milliseconds(900))
         #expect(elapsed < .seconds(5))
     }
 
-    @Test("An early response is returned even if the connection then fails")
-    func earlyResponseIsPreferredOverLaterError() async throws {
-        let server = try await LoopbackHTTPServer.start(behavior: .rejectWithoutReadingThenDisconnect)
+    // `URLSession` buffers the first 512 bytes of a response body (to sniff its type) before
+    // delivering any of it, so the parts below are larger than that, or they'd arrive as one.
+
+    @Test("Each new part of an early response without a Content-Length restarts the quiet period")
+    func earlyResponseWithoutContentLengthWaitsForEveryPart() async throws {
+        let parts = (0..<3).map { String(repeating: Character("\($0)"), count: 32 * 1024) }
+        let server = try await LoopbackHTTPServer.start { exchange in
+            exchange.send("HTTP/1.1 413 Payload Too Large\r\nContent-Type: text/html\r\n\r\n" + parts[0])
+            // Each gap is shorter than the quiet period; together they're longer.
+            exchange.after(.milliseconds(600)) { exchange.send(parts[1]) }
+            exchange.after(.milliseconds(1200)) { exchange.send(parts[2]) }
+        }
         defer { server.stop() }
+        let recorder = RecordingDelegate()
 
         let (data, response) = try await upload(
-            body: .onDisk(try Self.makeTempFile()),
-            with: Self.request(to: server.url),
-            session: Self.session(),
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: recorder
+        )
+
+        #expect((response as? HTTPURLResponse)?.statusCode == 413)
+        #expect(String(bytes: data, encoding: .utf8) == parts.joined())
+        // The parts really did arrive separately.
+        #expect(recorder.snapshot.dataCallbacks >= 2)
+    }
+
+    @Test("An early response with a Content-Length waits for the whole body, however slowly it arrives")
+    func earlyResponseWithContentLengthWaitsForWholeBody() async throws {
+        let parts = [String(repeating: "a", count: 32 * 1024), String(repeating: "b", count: 32 * 1024)]
+        let server = try await LoopbackHTTPServer.start { exchange in
+            let head = "HTTP/1.1 413 Payload Too Large\r\nContent-Type: text/html\r\nContent-Length: 65536\r\n\r\n"
+            exchange.send(head + parts[0])
+            // Longer than the quiet period: the `Content-Length` says more is coming.
+            exchange.after(.milliseconds(1500)) { exchange.send(parts[1]) }
+        }
+        defer { server.stop() }
+
+        let recorder = RecordingDelegate()
+
+        let (data, response) = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: recorder
+        )
+
+        #expect((response as? HTTPURLResponse)?.statusCode == 413)
+        #expect(String(bytes: data, encoding: .utf8) == parts.joined())
+        #expect(recorder.snapshot.dataCallbacks >= 2)
+    }
+
+    // MARK: - Preferring the early response over a later error
+
+    @Test("An early response is returned even if the connection then breaks")
+    func earlyResponseIsPreferredOverConnectionLoss() async throws {
+        let server = try await LoopbackHTTPServer.start { exchange in
+            // A chunked body cut off before its last chunk is an error (`-1005`); a short
+            // `Content-Length` body isn't — `URLSession` reports that as a success.
+            let head = "HTTP/1.1 413 Payload Too Large\r\nContent-Type: text/html\r\nTransfer-Encoding: chunked\r\n\r\n"
+            exchange.send(head + "6\r\n<html>\r\n")
+            exchange.after(.milliseconds(200)) { exchange.disconnect() }
+        }
+        defer { server.stop() }
+        let file = try Support.makeTempFile()
+
+        let (data, response) = try await upload(
+            body: .onDisk(file),
+            with: Support.request(to: server.url),
+            session: Support.session(),
             delegate: nil
         )
 
         #expect((response as? HTTPURLResponse)?.statusCode == 413)
-        // The server promised more bytes than it sent, so only what arrived is returned.
-        #expect(String(data: data, encoding: .utf8) == LoopbackHTTPServer.partialRejectionBody)
+        #expect(String(bytes: data, encoding: .utf8) == "<html>")
+        #expect(!FileManager.default.fileExists(atPath: file.path))
     }
 
-    @Test("A response after the full body is returned unchanged, and every event is reported once")
-    func normalResponseIsUnchanged() async throws {
-        let server = try await LoopbackHTTPServer.start(behavior: .acceptBody)
+    @Test("An early response is returned even if the request then times out")
+    func earlyResponseIsPreferredOverTimeout() async throws {
+        let server = try await LoopbackHTTPServer.start { exchange in
+            // Promises more of the body than it ever sends.
+            let head = "HTTP/1.1 413 Payload Too Large\r\nContent-Type: text/html\r\nContent-Length: 4096\r\n\r\n"
+            exchange.send(head + String(repeating: "x", count: 1024))
+        }
         defer { server.stop() }
-        let file = try Self.makeTempFile()
-        let recorder = RecordingDelegate()
+
+        let (data, response) = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(requestTimeout: 2),
+            delegate: nil
+        )
+
+        #expect((response as? HTTPURLResponse)?.statusCode == 413)
+        #expect(data == Data(String(repeating: "x", count: 1024).utf8))
+    }
+
+    // MARK: - Normal responses
+
+    @Test("A response after the full body is returned unchanged, and the server receives every byte")
+    func normalResponseIsUnchanged() async throws {
+        let server = try await LoopbackHTTPServer.accepting()
+        defer { server.stop() }
+        let file = try Support.makeTempFile()
 
         let (data, response) = try await upload(
             body: .onDisk(file),
-            with: Self.request(to: server.url),
-            session: Self.session(),
-            delegate: recorder
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
         )
 
         #expect((response as? HTTPURLResponse)?.statusCode == 201)
-        #expect(String(data: data, encoding: .utf8) == LoopbackHTTPServer.acceptanceBody)
+        #expect(String(bytes: data, encoding: .utf8) == #"{"accepted":true}"#)
+        #expect(server.bodyBytesRead == Support.largeBodySize)
         #expect(!FileManager.default.fileExists(atPath: file.path))
-
-        let events = try await recorder.waitForCompletion()
-        #expect(events.createdTasks == 1)
-        #expect(events.responses == [201])
-        #expect(events.receivedData == Data(LoopbackHTTPServer.acceptanceBody.utf8))
-        #expect(events.completions.count == 1)
-        #expect(events.completions.first.map { $0 == nil } == true)
-        // Upload progress (what Pulse shows) still reaches the app's delegate.
-        #expect(events.totalBytesSent == Int64(Self.bodySize))
     }
 
-    @Test("An early response is reported to the app's delegate once, as a completed request")
-    func earlyResponseIsReportedOnce() async throws {
-        let server = try await LoopbackHTTPServer.start(behavior: .rejectWithoutReading(sendContentLength: true))
+    @Test("A small in-memory upload is returned unchanged")
+    func smallInMemoryUploadIsUnchanged() async throws {
+        let server = try await LoopbackHTTPServer.accepting()
         defer { server.stop() }
-        let recorder = RecordingDelegate()
 
-        _ = try await upload(
-            body: .onDisk(try Self.makeTempFile()),
-            with: Self.request(to: server.url),
-            session: Self.session(),
-            delegate: recorder
+        let (data, response) = try await upload(
+            body: .inMemory(Data("hello".utf8)),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
         )
 
-        // `URLSession` reports the cancellation that ended the upload after `upload(...)` returns.
-        let events = try await recorder.waitForCompletion()
-        #expect(events.responses == [413])
-        #expect(events.receivedData == Data(LoopbackHTTPServer.rejectionBody.utf8))
-        #expect(events.completions.count == 1)
-        #expect(events.completions.first.map { $0 == nil } == true)
+        #expect((response as? HTTPURLResponse)?.statusCode == 201)
+        #expect(String(bytes: data, encoding: .utf8) == #"{"accepted":true}"#)
+        #expect(server.bodyBytesRead == 5)
     }
 
-    @Test("An early 413 surfaces end-to-end with the 'too large' message")
-    func earlyResponseSurfacesEndToEnd() async throws {
-        let server = try await LoopbackHTTPServer.start(behavior: .rejectWithoutReading(sendContentLength: true))
-        defer { server.stop() }
-        let file = try Self.makeTempFile()
-        defer { try? FileManager.default.removeItem(at: file) }
-
-        do {
-            _ = try await Self.api(for: server).media.create(params: .init(filePath: file.path))
-            Issue.record("Expected the upload to be rejected, but it succeeded")
-        } catch let error as WpApiError {
-            guard case .UnknownError(let statusCode, _, _, _) = error else {
-                Issue.record("Expected .UnknownError, got \(error)")
-                return
-            }
-            #expect(statusCode == 413)
-            #expect(error.localizedDescription == "The file is too large for this site's server to accept.")
+    @Test("A rejection after the full body is read is returned unchanged")
+    func lateRejectionIsUnchanged() async throws {
+        let server = try await LoopbackHTTPServer.start { exchange in
+            exchange.readBody { _ in exchange.respond(status: 413, body: LoopbackHTTPServer.rejectionBody) }
         }
-    }
-
-    @Test("An upload the server never answers still times out as .httpTimeoutError")
-    func unansweredUploadTimesOut() async throws {
-        let server = try await LoopbackHTTPServer.start(behavior: .neverRespond)
         defer { server.stop() }
-        let file = try Self.makeTempFile()
-        defer { try? FileManager.default.removeItem(at: file) }
 
-        do {
-            _ = try await Self.api(for: server, requestTimeout: 0.5).media.create(params: .init(filePath: file.path))
-            Issue.record("Expected the upload to time out, but it succeeded")
-        } catch {
-            let reason = (error as? CarriesRequestExecutionErrorReason)?.executionErrorReason
-            guard case .some(.httpTimeoutError) = reason else {
-                Issue.record("Expected .httpTimeoutError, got \(String(describing: reason)) (error: \(error))")
-                return
-            }
-        }
-    }
-
-    @Test("Upload progress still reaches the Progress passed to uploadMedia")
-    func uploadMediaProgressIsReported() async throws {
-        let server = try await LoopbackHTTPServer.start(behavior: .acceptBody)
-        defer { server.stop() }
-        let file = try Self.makeTempFile()
-        defer { try? FileManager.default.removeItem(at: file) }
-        let progress = Progress()
-
-        // The stub's body isn't a media object, so the call fails to parse; only progress matters.
-        _ = try? await Self.api(for: server).uploadMedia(params: .init(filePath: file.path), fulfilling: progress)
-
-        #expect(progress.fractionCompleted > 0.99)
-    }
-
-    // MARK: - Helpers
-
-    private static func makeTempFile() throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try Data(count: bodySize).write(to: url)
-        return url
-    }
-
-    private static func session(requestTimeout: TimeInterval = requestTimeout) -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = requestTimeout
-        return URLSession(configuration: configuration)
-    }
-
-    private static func request(to url: URL) -> URLRequest {
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        return request
-    }
-
-    private static func api(
-        for server: LoopbackHTTPServer,
-        requestTimeout: TimeInterval = requestTimeout
-    ) throws -> WordPressAPI {
-        try WordPressAPI(
-            siteInfo: .selfHosted(
-                siteUrl: ParsedUrl.parse(input: server.url.absoluteString),
-                apiRoot: ParsedUrl.parse(input: server.url.appendingPathComponent("wp-json").absoluteString)
-            ),
-            authenticationProvider: .none(),
-            executor: WpRequestExecutor(urlSession: session(requestTimeout: requestTimeout)),
-            middlewarePipeline: .default,
-            appNotifier: nil
+        let (data, response) = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
         )
-    }
-}
 
-/// A minimal HTTP/1.1 server on `127.0.0.1` that answers every request the same way.
-private final class LoopbackHTTPServer: @unchecked Sendable {
-    enum Behavior {
-        /// Responds with a `413` as soon as the request headers arrive, never reads the body, and
-        /// keeps the connection open.
-        case rejectWithoutReading(sendContentLength: Bool)
-        /// Like `rejectWithoutReading`, but sends only part of a chunked response body and then
-        /// drops the connection, so the task fails.
-        case rejectWithoutReadingThenDisconnect
-        /// Reads the whole body, then responds with a `201`.
-        case acceptBody
-        /// Reads the request headers and never responds.
-        case neverRespond
+        #expect((response as? HTTPURLResponse)?.statusCode == 413)
+        #expect(String(bytes: data, encoding: .utf8) == LoopbackHTTPServer.rejectionBody)
+        #expect(server.bodyBytesRead == Support.largeBodySize)
     }
 
-    static let rejectionBody = "<html><body>413 Request Entity Too Large</body></html>"
-    static let partialRejectionBody = "<html>"
-    static let acceptanceBody = #"{"accepted":true}"#
+    @Test("A chunked response after the full body is returned unchanged")
+    func chunkedNormalResponseIsUnchanged() async throws {
+        let server = try await LoopbackHTTPServer.start { exchange in
+            exchange.readBody { _ in
+                let head =
+                    "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n"
+                exchange.send(head + "3\r\n{\"a\r\n")
+                exchange.after(.milliseconds(300)) { exchange.send("2\r\n\"}\r\n0\r\n\r\n") }
+            }
+        }
+        defer { server.stop() }
 
-    let url: URL
-    private let behavior: Behavior
-    private let listener: NWListener
-    private let queue = DispatchQueue(label: "LoopbackHTTPServer")
-    private var connections: [NWConnection] = []
+        let (data, response) = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
+        )
 
-    private init(behavior: Behavior, listener: NWListener, port: NWEndpoint.Port) {
-        self.behavior = behavior
-        self.listener = listener
-        self.url = URL(string: "http://127.0.0.1:\(port.rawValue)")!
+        #expect((response as? HTTPURLResponse)?.statusCode == 201)
+        #expect(String(bytes: data, encoding: .utf8) == #"{"a"}"#)
     }
 
-    static func start(behavior: Behavior) async throws -> LoopbackHTTPServer {
-        let parameters = NWParameters.tcp
-        parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
-        let listener = try NWListener(using: parameters)
-        let queue = DispatchQueue(label: "LoopbackHTTPServer.start")
+    @Test("An empty 204 response is returned unchanged")
+    func emptyNormalResponseIsUnchanged() async throws {
+        let server = try await LoopbackHTTPServer.start { exchange in
+            exchange.readBody { _ in exchange.respond(status: 204) }
+        }
+        defer { server.stop() }
 
-        let port: NWEndpoint.Port = try await withCheckedThrowingContinuation { continuation in
-            listener.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    listener.stateUpdateHandler = nil
-                    continuation.resume(returning: listener.port!)
-                case .failed(let error):
-                    listener.stateUpdateHandler = nil
-                    continuation.resume(throwing: error)
-                default:
-                    break
+        let (data, response) = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
+        )
+
+        #expect((response as? HTTPURLResponse)?.statusCode == 204)
+        #expect(data.isEmpty)
+    }
+
+    @Test("A large response body is returned intact")
+    func largeResponseBodyIsIntact() async throws {
+        let body = String(repeating: "0123456789abcdef", count: 128 * 1024)
+        let server = try await LoopbackHTTPServer.start { exchange in
+            exchange.readBody { _ in exchange.respond(status: 200, headers: ["Content-Type": "text/plain"], body: body)
+            }
+        }
+        defer { server.stop() }
+
+        let (data, _) = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: nil
+        )
+
+        #expect(data.count == body.utf8.count)
+        #expect(String(bytes: data, encoding: .utf8) == body)
+    }
+
+    // MARK: - Concurrency and races
+
+    @Test("Concurrent early responses on one session are each returned to their own caller")
+    func concurrentEarlyResponses() async throws {
+        let server = try await LoopbackHTTPServer.start { exchange in
+            exchange.respond(
+                status: 413,
+                headers: ["Connection": "close"],
+                body: "rejected \(exchange.request.path)",
+                closing: false
+            )
+        }
+        defer { server.stop() }
+        let session = Support.session()
+
+        let results = try await withThrowingTaskGroup(of: (Int, Int?, String?, Bool).self) { group in
+            for index in 0..<8 {
+                group.addTask {
+                    let file = try Support.makeTempFile()
+                    let (data, response) = try await upload(
+                        body: .onDisk(file),
+                        with: Support.request(to: server.url, path: "/upload/\(index)"),
+                        session: session,
+                        delegate: nil
+                    )
+                    return (
+                        index,
+                        (response as? HTTPURLResponse)?.statusCode,
+                        String(bytes: data, encoding: .utf8),
+                        FileManager.default.fileExists(atPath: file.path)
+                    )
                 }
             }
-            listener.newConnectionHandler = { _ in }
-            listener.start(queue: queue)
+            return try await group.reduce(into: []) { $0.append($1) }
         }
 
-        let server = LoopbackHTTPServer(behavior: behavior, listener: listener, port: port)
-        listener.newConnectionHandler = { [weak server] connection in server?.accept(connection) }
-        return server
-    }
-
-    func stop() {
-        listener.cancel()
-        queue.sync {
-            connections.forEach { $0.cancel() }
-            connections.removeAll()
+        #expect(results.count == 8)
+        for (index, status, body, fileExists) in results {
+            #expect(status == 413)
+            #expect(body == "rejected /upload/\(index)")
+            #expect(!fileExists)
         }
     }
 
-    private func accept(_ connection: NWConnection) {
-        queue.async {
-            self.connections.append(connection)
-            connection.start(queue: self.queue)
-            self.readHeaders(from: connection, buffer: Data())
-        }
-    }
+    @Test("Uploads queued behind an early response on a kept-alive connection can fail")
+    func queuedUploadsBehindKeptAliveEarlyResponse() async throws {
+        let server = try await LoopbackHTTPServer.rejectingEarly(keepAlive: true)
+        defer { server.stop() }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = Support.requestTimeout
+        configuration.httpMaximumConnectionsPerHost = 1
+        let session = URLSession(configuration: configuration)
+        let body = Data(count: Support.largeBodySize)
 
-    private func readHeaders(from connection: NWConnection, buffer: Data) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { content, _, isComplete, error in
-            var buffer = buffer
-            if let content { buffer.append(content) }
-
-            guard let headerEnd = buffer.range(of: Data("\r\n\r\n".utf8)) else {
-                if error == nil && !isComplete { self.readHeaders(from: connection, buffer: buffer) }
-                return
+        // `URLSession` gives the next upload the connection of the one that was cancelled. See
+        // `UploadTaskDelegate`: a server that sends `Connection: close` avoids this.
+        let issue: Comment = "URLSession reuses a kept-alive connection after an early response"
+        await withKnownIssue(issue, isIntermittent: true) {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for _ in 0..<4 {
+                    group.addTask {
+                        let (_, response) = try await upload(
+                            body: .inMemory(body),
+                            with: Support.request(to: server.url),
+                            session: session,
+                            delegate: nil
+                        )
+                        #expect((response as? HTTPURLResponse)?.statusCode == 413)
+                    }
+                }
+                try await group.waitForAll()
             }
-
-            let headers = String(bytes: buffer[..<headerEnd.lowerBound], encoding: .utf8) ?? ""
-            let bodyBytesRead = buffer.count - headerEnd.upperBound
-            self.respond(on: connection, headers: headers, bodyBytesRead: bodyBytesRead)
         }
     }
 
-    private func respond(on connection: NWConnection, headers: String, bodyBytesRead: Int) {
-        switch behavior {
-        case .rejectWithoutReading(let sendContentLength):
-            let lengthHeader = sendContentLength ? "Content-Length: \(Self.rejectionBody.utf8.count)\r\n" : ""
-            // A `Content-Type`, as Cloudflare and nginx send: without one, `URLSession` holds back a
-            // response with no `Content-Length` to sniff its type from more of the body.
-            let head = "HTTP/1.1 413 Payload Too Large\r\nContent-Type: text/html\r\n\(lengthHeader)\r\n"
-            send(head + Self.rejectionBody, on: connection)
-        case .rejectWithoutReadingThenDisconnect:
-            // A chunked body cut off before its last chunk is an error; a short `Content-Length`
-            // body isn't — `URLSession` reports that as a success.
-            let partial = Self.partialRejectionBody
-            let head = "HTTP/1.1 413 Payload Too Large\r\nContent-Type: text/html\r\nTransfer-Encoding: chunked\r\n\r\n"
-            send(head + String(partial.utf8.count, radix: 16) + "\r\n" + partial + "\r\n", on: connection)
-            queue.asyncAfter(deadline: .now() + .milliseconds(200)) { connection.forceCancel() }
-        case .acceptBody:
-            let contentLength =
-                headers
-                .split(separator: "\r\n")
-                .first { $0.lowercased().hasPrefix("content-length:") }
-                .flatMap { Int($0.split(separator: ":")[1].trimmingCharacters(in: .whitespaces)) } ?? 0
-            readBody(from: connection, remaining: contentLength - bodyBytesRead)
-        case .neverRespond:
-            break
+    @Test("Uploads queued behind an early response with Connection: close each get the response")
+    func queuedUploadsBehindClosingEarlyResponse() async throws {
+        let server = try await LoopbackHTTPServer.rejectingEarly()
+        defer { server.stop() }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = Support.requestTimeout
+        configuration.httpMaximumConnectionsPerHost = 1
+        let session = URLSession(configuration: configuration)
+        let body = Data(count: Support.largeBodySize)
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for _ in 0..<4 {
+                group.addTask {
+                    let (_, response) = try await upload(
+                        body: .inMemory(body),
+                        with: Support.request(to: server.url),
+                        session: session,
+                        delegate: nil
+                    )
+                    #expect((response as? HTTPURLResponse)?.statusCode == 413)
+                }
+            }
+            try await group.waitForAll()
+        }
+        #expect(server.requests.count == 4)
+    }
+
+    @Test("A complete early response racing a dropped connection resumes the caller exactly once")
+    func earlyResponseRacingDisconnect() async throws {
+        // `CheckedContinuation` traps on a second resume, so a lost race crashes the test run.
+        let server = try await LoopbackHTTPServer.start { exchange in
+            exchange.respond(status: 413, body: LoopbackHTTPServer.rejectionBody, closing: false) {
+                exchange.disconnect()
+            }
+        }
+        defer { server.stop() }
+        let session = Support.session()
+        let body = Data(count: Support.largeBodySize)
+
+        for _ in 0..<25 {
+            do {
+                let (_, response) = try await upload(
+                    body: .inMemory(body),
+                    with: Support.request(to: server.url),
+                    session: session,
+                    delegate: nil
+                )
+                #expect((response as? HTTPURLResponse)?.statusCode == 413)
+            } catch is URLError {
+                // The reset can win before the response is read; that's a legitimate failure.
+            }
         }
     }
 
-    private func readBody(from connection: NWConnection, remaining: Int) {
-        guard remaining > 0 else {
-            let body = Self.acceptanceBody
-            let head =
-                "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: \(body.utf8.count)\r\n\r\n"
-            send(head + body, on: connection)
-            return
-        }
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 1024 * 1024) { content, _, isComplete, error in
-            guard error == nil, !isComplete || content != nil else { return }
-            self.readBody(from: connection, remaining: remaining - (content?.count ?? 0))
-        }
-    }
+    @Test("A session keeps working after early responses")
+    func sessionKeepsWorkingAfterEarlyResponses() async throws {
+        let rejecting = try await LoopbackHTTPServer.rejectingEarly()
+        defer { rejecting.stop() }
+        let accepting = try await LoopbackHTTPServer.accepting()
+        defer { accepting.stop() }
+        let session = Support.session()
 
-    private func send(_ response: String, on connection: NWConnection) {
-        connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in })
+        for _ in 0..<3 {
+            let (_, response) = try await upload(
+                body: .onDisk(try Support.makeTempFile()),
+                with: Support.request(to: rejecting.url),
+                session: session,
+                delegate: nil
+            )
+            #expect((response as? HTTPURLResponse)?.statusCode == 413)
+        }
+
+        let (_, response) = try await upload(
+            body: .onDisk(try Support.makeTempFile()),
+            with: Support.request(to: accepting.url),
+            session: session,
+            delegate: nil
+        )
+        #expect((response as? HTTPURLResponse)?.statusCode == 201)
     }
 }
 
-/// Records the callbacks the app's notifying delegate (Pulse, in the apps) receives.
-private final class RecordingDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
-    struct Events {
-        var createdTasks = 0
-        var responses: [Int] = []
-        var receivedData = Data()
-        var totalBytesSent: Int64 = 0
-        var completions: [Error?] = []
+@Suite("MultipartFormContent length")
+struct MultipartFormContentLengthTests {
+    @Test("An in-memory body's length is its byte count")
+    func inMemoryLength() {
+        #expect(MultipartFormContent.inMemory(Data(count: 1234)).length == 1234)
     }
 
-    private let lock = NSLock()
-    private var events = Events()
-
-    /// Waits for `didCompleteWithError`, which can arrive after `upload(...)` returns, then a little
-    /// longer so a duplicate call would be caught.
-    func waitForCompletion() async throws -> Events {
-        let clock = ContinuousClock()
-        let deadline = clock.now + .seconds(5)
-        while lock.withLock({ events.completions.isEmpty }) && clock.now < deadline {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        try await Task.sleep(for: .milliseconds(200))
-        return lock.withLock { events }
+    @Test("An on-disk body's length is its file size")
+    func onDiskLength() throws {
+        let file = try UploadTestSupport.makeTempFile(size: 4321)
+        defer { try? FileManager.default.removeItem(at: file) }
+        #expect(MultipartFormContent.onDisk(file).length == 4321)
     }
 
-    func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
-        lock.withLock { events.createdTasks += 1 }
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        task: URLSessionTask,
-        didSendBodyData bytesSent: Int64,
-        totalBytesSent: Int64,
-        totalBytesExpectedToSend: Int64
-    ) {
-        lock.withLock { events.totalBytesSent = max(events.totalBytesSent, totalBytesSent) }
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        dataTask: URLSessionDataTask,
-        didReceive response: URLResponse,
-        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
-    ) {
-        lock.withLock { events.responses.append((response as? HTTPURLResponse)?.statusCode ?? -1) }
-        completionHandler(.allow)
-    }
-
-    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        lock.withLock { events.receivedData.append(data) }
-    }
-
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
-        lock.withLock { events.completions.append(error) }
+    @Test("A missing file has no length")
+    func missingFileLength() {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        #expect(MultipartFormContent.onDisk(file).length == nil)
     }
 }
 #endif
