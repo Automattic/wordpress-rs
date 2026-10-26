@@ -134,6 +134,12 @@ impl WpSupportsLocalization for WpApiError {
                 WpMessages::response_parsing_error(reason)
             }
             WpApiError::SiteUrlParsingError { .. } => WpMessages::url_parsing_error(),
+            // A 413 that isn't a `WpError` comes from the web server or a proxy in front of the
+            // site (nginx, Cloudflare), not from WordPress, so its HTML body has nothing useful to
+            // show. It's almost always a media upload over the server's request size limit.
+            WpApiError::UnknownError {
+                status_code: 413, ..
+            } => WpMessages::request_body_too_large_error(),
             WpApiError::UnknownError { .. } => WpMessages::wp_api_error_generic_error(),
             WpApiError::WpError { error_message, .. } => {
                 WpMessages::site_error_message(error_message)
@@ -1124,5 +1130,66 @@ mod tests {
         assert!(!request_execution_error_reason_is_device_offline(
             &connection_error()
         ));
+    }
+
+    /// A 413 from the web server or a proxy in front of the site (Cloudflare, nginx) has an HTML
+    /// body, so it can't parse as a `WpError`. It still has to tell the user why the upload failed.
+    #[test]
+    fn test_html_413_is_unknown_error_with_too_large_message() {
+        use wp_localization::{WpLocale, WpLocalizable};
+        let response = crate::unit_test_common::wp_network_response_from_json(
+            "<html><head><title>413 Request Entity Too Large</title></head></html>",
+            413,
+        );
+        let error = WpApiError::try_parse(&response).expect("a 413 is an error");
+
+        assert!(matches!(
+            error,
+            WpApiError::UnknownError {
+                status_code: 413,
+                ..
+            }
+        ));
+        assert_eq!(error.status_code(), Some(413));
+        assert_eq!(
+            error.localize(Some(WpLocale::from("en-US"))),
+            "The file is too large for this site's server to accept."
+        );
+    }
+
+    /// WordPress's own JSON rejection of an oversized file keeps its own message.
+    #[test]
+    fn test_wp_error_413_keeps_site_message() {
+        use wp_localization::{WpLocale, WpLocalizable};
+        let response = crate::unit_test_common::wp_network_response_from_json(
+            r#"{"code":"rest_upload_file_too_big","message":"This file is too big."}"#,
+            413,
+        );
+        let error = WpApiError::try_parse(&response).expect("a 413 is an error");
+
+        assert!(matches!(
+            error,
+            WpApiError::WpError {
+                status_code: 413,
+                ..
+            }
+        ));
+        assert_eq!(
+            error.localize(Some(WpLocale::from("en-US"))),
+            "This file is too big."
+        );
+    }
+
+    /// Other unparsed errors keep the generic message.
+    #[test]
+    fn test_html_500_keeps_generic_message() {
+        use wp_localization::{WpLocale, WpLocalizable};
+        let response = crate::unit_test_common::wp_network_response_from_json("<html></html>", 500);
+        let error = WpApiError::try_parse(&response).expect("a 500 is an error");
+
+        assert_eq!(
+            error.localize(Some(WpLocale::from("en-US"))),
+            "Something went wrong."
+        );
     }
 }
