@@ -843,6 +843,10 @@ extension MultipartFormContent {
 /// told about the response, so this delegate keeps it, cancels the task, and returns the response as
 /// a success. The Rust layer then classifies its status code as it would any other response.
 ///
+/// Only a rejection — a status outside `2xx` — is returned early. A server can't accept an upload it
+/// hasn't read, so an early-looking `2xx` is one whose sent-byte counts lagged the socket, and the
+/// task completes it normally.
+///
 /// Every callback is forwarded to `forwarding` (the executor's `RequestExecutorDelegate`), which
 /// handles TLS trust, records redirects and notifies the app's delegate. Because `URLSession`
 /// delivers `didReceive response`, `didReceive data` and `didCompleteWithError` itself, the manual
@@ -912,8 +916,9 @@ private final class UploadTaskDelegate: NSObject, URLSessionDataDelegate, @unche
     /// when the response arrives, so compare against the body's own length where it's known.
     ///
     /// The sent-byte counts can lag the socket, so a server that did read the whole body can still
-    /// look like it answered early. That's harmless: the response is only returned once it's
-    /// complete, and it's the same response the task would have completed with.
+    /// look like it answered early. That's why a `2xx` is never treated as early: returning it
+    /// early would trust the quiet period to judge when its body is complete, and a success body
+    /// that pauses for longer than that would be cut short.
     private func isBodyFullySent(_ task: URLSessionTask) -> Bool {
         let sent = max(task.countOfBytesSent, lock.withLock { totalBytesSent })
         let expected = bodyLength ?? task.countOfBytesExpectedToSend
@@ -1034,7 +1039,8 @@ private final class UploadTaskDelegate: NSObject, URLSessionDataDelegate, @unche
         didReceive response: URLResponse,
         completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
     ) {
-        let isEarlyResponse = !isBodyFullySent(dataTask)
+        let isRejection = (response as? HTTPURLResponse).map { !(200..<300).contains($0.statusCode) } ?? false
+        let isEarlyResponse = isRejection && !isBodyFullySent(dataTask)
         lock.withLock {
             self.response = response
             self.isEarlyResponse = isEarlyResponse

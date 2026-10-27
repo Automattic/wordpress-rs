@@ -124,10 +124,39 @@ struct UploadEarlyResponseTests {
         }
     }
 
-    @Test("An early success response is returned like any other")
-    func earlySuccessResponseIsReturned() async throws {
+    @Test("An early success response is left to the task, not returned early")
+    func earlySuccessResponseIsNotReturnedEarly() async throws {
+        // A server can't accept an upload it hasn't read, so an early-looking `2xx` is treated as a
+        // normal response. This server never reads the body, so the task times out.
         let server = try await LoopbackHTTPServer.start {
             $0.respond(status: 200, headers: ["Content-Type": "application/json"], body: "{}", closing: false)
+        }
+        defer { server.stop() }
+
+        await #expect(throws: URLError.self) {
+            try await upload(
+                body: .onDisk(try Support.makeTempFile()),
+                with: Support.request(to: server.url),
+                session: Support.session(requestTimeout: 1),
+                delegate: nil
+            )
+        }
+    }
+
+    @Test("A success response that looks early keeps all of a slow body")
+    func earlyLookingSuccessResponseKeepsSlowBody() async throws {
+        // The sent-byte counts can lag the socket, so a `201` from a server that read the whole body
+        // can look early. Here it really is sent early, which makes that deterministic. Its chunked
+        // body pauses for longer than the quiet period, and must not be cut short.
+        let parts = [String(repeating: "a", count: 4096), String(repeating: "b", count: 4096)]
+        let server = try await LoopbackHTTPServer.start { exchange in
+            let head = "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n"
+            exchange.send(head + "1000\r\n" + parts[0] + "\r\n")
+            exchange.readBody { _ in
+                exchange.after(.milliseconds(1500)) {
+                    exchange.send("1000\r\n" + parts[1] + "\r\n0\r\n\r\n")
+                }
+            }
         }
         defer { server.stop() }
 
@@ -138,8 +167,8 @@ struct UploadEarlyResponseTests {
             delegate: nil
         )
 
-        #expect((response as? HTTPURLResponse)?.statusCode == 200)
-        #expect(String(bytes: data, encoding: .utf8) == "{}")
+        #expect((response as? HTTPURLResponse)?.statusCode == 201)
+        #expect(String(bytes: data, encoding: .utf8) == parts.joined())
     }
 
     @Test("An early response keeps its headers")
