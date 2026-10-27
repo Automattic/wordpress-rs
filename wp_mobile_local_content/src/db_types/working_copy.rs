@@ -1,8 +1,8 @@
 //! Working copy types.
 //!
 //! Fields hold what the editor and its settings work with, shaped so that every
-//! state the server can store fits and converting a remote post loses nothing.
-//! See `Documentation/local-content-principles.md`.
+//! value the server stores in them fits and converting a remote post loses none
+//! of them. See `Documentation/local-content-principles.md`.
 
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};

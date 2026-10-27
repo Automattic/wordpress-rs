@@ -16,8 +16,8 @@ pub enum ConnectionError {
 
 /// A SQLite connection guarded by a mutex.
 ///
-/// Every connection it holds has foreign key enforcement on and the custom SQL
-/// functions from [`crate::functions`] registered.
+/// Every connection it holds has foreign key enforcement on and the `urls_eq`
+/// SQL function registered.
 pub struct DbConnection {
     connection: Mutex<Connection>,
 }
