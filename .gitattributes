@@ -15,3 +15,4 @@ wp_mobile/test-data/reader/corpus/** linguist-generated
 wp_mobile/test-data/reader/snapshots/** linguist-generated
 wp_mobile/test-data/reader/test-site/*.json linguist-generated
 wp_mobile/test-data/reader/sanitizer/*.json linguist-generated
+wp_mobile/test-data/reader/gallery-links/*.json linguist-generated

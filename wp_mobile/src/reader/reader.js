@@ -14,9 +14,9 @@
  *   or when the text size changes. The app's web view is as tall as the post, so the app sizes it
  *   to this.
  * - `image:<x>:<y>:<width>:<height>:<url>`: the reader tapped an image that opens in the app's image
- *   viewer: one that isn't a link, or that links to an image file. The numbers are where the image
- *   is on the page, in CSS pixels, so the viewer can open from it. `url` is the image's `src`, as
- *   in `ReaderPostContent.images`.
+ *   viewer: one that isn't a link, that links to an image file, or that's in a gallery and links to
+ *   its attachment page. The numbers are where the image is on the page, in CSS pixels, so the
+ *   viewer can open from it. `url` is the image's `src`, as in `ReaderPostContent.images`.
  * - `blocked:<directive>:<what>`: the page's Content Security Policy blocked something, for the app
  *   to log. `what` is a URL, `inline` or `eval`. An embed that stops working shows up here first.
  *   Each is sent once.
@@ -206,8 +206,9 @@
     }
   });
 
-  // Taps on images that open in the app's image viewer: the ones this script made links, and ones the
-  // post links to an image file. Their links go nowhere; the app opens the viewer.
+  // Taps on images that open in the app's image viewer: the ones this script made links, gallery
+  // images linked to their attachment page, which `ReaderPostContent` marks the same way, and ones
+  // the post links to an image file. Their links go nowhere; the app opens the viewer.
   const imageFile = /\.(jpe?g|jpe|png|gif|webp|avif|heic|heif|bmp|tiff?)$/i;
   function linksToAnImage(link) {
     try {

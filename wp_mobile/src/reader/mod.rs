@@ -27,6 +27,7 @@ mod assets;
 mod clean;
 mod content;
 mod embeds;
+mod gallery_links;
 mod getty;
 mod gists;
 mod images;

@@ -5,6 +5,7 @@ use url::Url;
 
 use super::anchors::{ReaderPostAnchor, anchors};
 use super::clean;
+use super::gallery_links::mark_gallery_image_links;
 use super::gists::{gist_data_urls, remove_gist_data};
 use super::images::{
     ReaderPostImage, image_key, image_urls_to_preload, parse_dimension, parse_size, parse_srcset,
@@ -118,12 +119,13 @@ impl ReaderPostContent {
         // so the excerpt check needs them.
         let excerpt_source_text = excerpt_source_text(document.root_element());
         hide_shortcodes(&mut document);
-        let document = clean::reparse(
+        let mut document = clean::reparse(
             document,
             &mut scripts,
             post_url.as_ref(),
             clean::REPARSE_ROUNDS,
         );
+        mark_gallery_image_links(&mut document, post_url.as_ref());
         Self::from_cleaned(document, scripts, excerpt_source_text)
     }
 
@@ -377,7 +379,7 @@ static ALL_IMAGES: LazyLock<Selector> = LazyLock::new(|| selector("img"));
 
 // Gallery blocks have been `<figure>`, `<div>` and `<ul>` over the years. `div.gallery` is the
 // classic editor's `[gallery]`.
-static GALLERIES: LazyLock<Selector> = LazyLock::new(|| {
+pub(super) static GALLERIES: LazyLock<Selector> = LazyLock::new(|| {
     selector(
         ".wp-block-gallery, .blocks-gallery-grid, .wp-block-jetpack-tiled-gallery, .tiled-gallery, \
          div.gallery, .wp-block-jetpack-slideshow",
@@ -791,6 +793,10 @@ mod tests {
     #[case::linked_original("https://example.com/b.jpg", Some((1, 1)))]
     #[case::photon_copy("https://i0.wp.com/example.com/c.jpg?w=800", Some((1, 2)))]
     #[case::first_gallery("https://example.com/a.jpg", Some((0, 0)))]
+    #[case::linked_to_its_attachment_page(
+        "https://example.files.wordpress.com/d.jpg?w=341",
+        Some((2, 0))
+    )]
     #[case::outside_a_gallery("https://example.com/single.jpg", None)]
     #[case::not_in_the_post("https://example.com/other.jpg", None)]
     fn finds_where_an_image_is_in_a_gallery(
@@ -804,7 +810,10 @@ mod tests {
               <figure class="wp-block-image"><img src="https://example.com/z.jpg"></figure>
               <figure class="wp-block-image"><a href="https://example.com/b.jpg"><img src="https://example.com/b-1024x768.jpg"></a></figure>
               <figure class="wp-block-image"><img src="https://example.com/c.jpg"></figure>
-            </figure>"#,
+            </figure>
+            <div class="tiled-gallery"><div class="tiled-gallery-item">
+              <a href="https://example.com/2012/10/04/post/d/"><img src="https://example.files.wordpress.com/d.jpg?w=341" data-orig-file="https://example.files.wordpress.com/d.jpg"></a>
+            </div></div>"#,
             None,
         );
         let position = content.gallery_position(url);

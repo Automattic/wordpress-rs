@@ -231,6 +231,8 @@ struct ReaderScriptTests {
         <p><img id="broken" src="file:///nonexistent/missing.png" width="20" height="20"></p>
         <p><a href="https://example.com/post"><img id="linked" src="\(png)"></a></p>
         <p><a href="https://example.com/full.jpg"><img id="file-linked" src="\(png)"></a></p>
+        <div class="tiled-gallery"><a href="https://example.com/post/attachment/" data-reader-image>\
+        <img id="gallery-linked" src="\(png)"></a></div>
         <p>An emoji <img id="emoji" class="emoji" src="\(png)"></p>
         <p><picture><source srcset="\(png)"><img id="pictured" src="\(png)"></picture></p>
         <p>
@@ -362,6 +364,11 @@ struct ReaderScriptTests {
           check(
             'tapping an image linked to an image file does too',
             tap('file-linked') === JSON.stringify([imageMessage('file-linked')]),
+            JSON.stringify(messages)
+          );
+          check(
+            'tapping an image whose link the cleanup marked does too',
+            tap('gallery-linked') === JSON.stringify([imageMessage('gallery-linked')]),
             JSON.stringify(messages)
           );
           check('tapping an image linked to a page follows the link', tap('linked') === '[]', JSON.stringify(messages));
