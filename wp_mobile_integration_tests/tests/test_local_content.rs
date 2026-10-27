@@ -279,6 +279,46 @@ fn test_a_remote_post_gets_its_working_copy_back_and_a_new_post_never_does() {
     assert_ne!(first_new.id, second_new.id);
 }
 
+/// Posts and pages share one ID space on the server, so a remote page with a
+/// working copy can't get another one as a post. The refused insert has to
+/// leave nothing behind: a working copy stored without its target makes every
+/// listing fail.
+#[test]
+fn test_a_remote_page_with_a_working_copy_cant_get_one_as_a_post() {
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let service = open_service(&dir);
+    let target = WorkingCopyTarget {
+        site: self_hosted_site(),
+        remote_post: Some(RemotePostReference {
+            post_id: PostId(42),
+            base_modified_gmt: date("2030-03-17T17:46:40Z"),
+        }),
+    };
+    service
+        .read_or_create_page_working_copy(
+            target.clone(),
+            PageWorkingCopy {
+                common: common("A page"),
+                parent: None,
+            },
+        )
+        .expect("Create should succeed");
+
+    let as_post = service.read_or_create_post_working_copy(target, post("The page as a post"));
+
+    assert_eq!(
+        as_post,
+        Err(LocalContentError::RemotePostAlreadyHasWorkingCopy {
+            post_id: PostId(42)
+        })
+    );
+    assert_eq!(
+        service.read_all_post_working_copies(),
+        Ok(vec![]),
+        "The refused post should leave nothing behind"
+    );
+}
+
 #[test]
 fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");

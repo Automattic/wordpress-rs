@@ -1324,7 +1324,11 @@ mod tests {
         let insert = |conn: &mut Connection, target: &WorkingCopyTarget| {
             let tx = conn.transaction().expect("Failed to begin transaction");
             let result = WorkingCopyRepository.insert_post(&tx, &simple_post("Another"), target);
-            tx.commit().expect("Commit should succeed");
+            // A failed insert has already written the working copy's row, so
+            // it's rolled back by dropping the transaction rather than committed.
+            if result.is_ok() {
+                tx.commit().expect("Commit should succeed");
+            }
             result
         };
         let same_post = insert(
