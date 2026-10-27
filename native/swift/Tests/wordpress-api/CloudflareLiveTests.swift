@@ -3,13 +3,17 @@ import Testing
 @testable import WordPressAPI
 @testable import WordPressAPIInternal
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 private let cloudflareTestZone = ProcessInfo.processInfo.environment["WPRS_CLOUDFLARE_TEST_ZONE"]
 
 /// Sends real requests through `URLSession` to a Cloudflare zone set up to produce each error.
 /// See `test-data/cloudflare-responses/README.md`.
 ///
 /// `WPRS_CLOUDFLARE_TEST_ZONE=wpmtcf.co swift test --filter CloudflareLiveTests`
-@Suite(.enabled(if: cloudflareTestZone != nil, "Needs WPRS_CLOUDFLARE_TEST_ZONE"))
+@Suite(.enabled(if: cloudflareTestZone != nil && !isLinux(), "Needs WPRS_CLOUDFLARE_TEST_ZONE, on Apple platforms"))
 struct CloudflareLiveTests {
     private func api(host: String, apiRoot: String = "/wp-json") throws -> WordPressAPI {
         let base = "https://\(host).\(cloudflareTestZone!)"
@@ -112,8 +116,8 @@ struct CloudflareLiveTests {
     /// whole body. Either way it's Cloudflare's own page.
     @Test
     func uploadTooLarge() async throws {
-        let file = FileManager.default.temporaryDirectory.appending(path: "wprs-cloudflare-150mb.mp4")
-        FileManager.default.createFile(atPath: file.path(), contents: nil)
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("wprs-cloudflare-150mb.mp4")
+        FileManager.default.createFile(atPath: file.path, contents: nil)
         let handle = try FileHandle(forWritingTo: file)
         try handle.truncate(atOffset: 150 * 1024 * 1024)
         try handle.close()
@@ -121,7 +125,7 @@ struct CloudflareLiveTests {
 
         let api = try api(host: "testing")
         let error = try await cloudflareError {
-            _ = try await api.media.create(params: MediaCreateParams(filePath: file.path()))
+            _ = try await api.media.create(params: MediaCreateParams(filePath: file.path))
         }
         #expect(error.code == nil)
         #expect([.requestTooLarge, .originError].contains(error.kind))
