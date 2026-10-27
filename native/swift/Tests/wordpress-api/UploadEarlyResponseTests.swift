@@ -596,21 +596,57 @@ struct UploadEarlyResponseTests {
 @Suite("MultipartFormContent length")
 struct MultipartFormContentLengthTests {
     @Test("An in-memory body's length is its byte count")
-    func inMemoryLength() {
-        #expect(MultipartFormContent.inMemory(Data(count: 1234)).length == 1234)
+    func inMemoryLength() throws {
+        #expect(try MultipartFormContent.inMemory(Data(count: 1234)).length() == 1234)
     }
 
     @Test("An on-disk body's length is its file size")
     func onDiskLength() throws {
         let file = try UploadTestSupport.makeTempFile(size: 4321)
         defer { try? FileManager.default.removeItem(at: file) }
-        #expect(MultipartFormContent.onDisk(file).length == 4321)
+        #expect(try MultipartFormContent.onDisk(file).length() == 4321)
     }
 
-    @Test("A missing file has no length")
+    @Test("A missing file's length throws Foundation's error")
     func missingFileLength() {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        #expect(MultipartFormContent.onDisk(file).length == nil)
+        #expect(throws: CocoaError.self) { try MultipartFormContent.onDisk(file).length() }
+    }
+
+    @Test("A missing file's length is reported against the media file")
+    func missingFileLengthReportsMediaFile() {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        #expect {
+            try MultipartFormContent.onDisk(file).length(reportingFailureAgainst: "/media/IMG_0042.MOV")
+        } throws: { error in
+            guard case let .MediaFileUnreadable(filePath) = error as? RequestExecutionError else { return false }
+            return filePath == "/media/IMG_0042.MOV"
+        }
+    }
+
+    @Test("Without a media file, a missing file's length throws Foundation's error")
+    func missingFileLengthWithoutMediaFile() {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        #expect(throws: CocoaError.self) {
+            try MultipartFormContent.onDisk(file).length(reportingFailureAgainst: nil)
+        }
+    }
+
+    @Test("An upload whose body can't be measured throws before sending anything")
+    func uploadWithUnmeasurableBodyThrows() async throws {
+        let server = try await LoopbackHTTPServer.accepting()
+        defer { server.stop() }
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+
+        await #expect(throws: CocoaError.self) {
+            try await upload(
+                body: .onDisk(file),
+                with: UploadTestSupport.request(to: server.url),
+                session: UploadTestSupport.session(),
+                delegate: nil
+            )
+        }
+        #expect(server.requests.isEmpty)
     }
 }
 #endif

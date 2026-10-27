@@ -742,7 +742,21 @@ extension WpMultipartFormRequest: NetworkRequestContent {
         // leak. Idempotent with upload's own `defer`: a second `removeItem` on an already-deleted
         // file is a harmless no-op.
         defer { body.removeTemporaryFileIfNeeded() }
-        return try await upload(body: body, with: request, session: session, delegate: delegate)
+
+        let mediaFilePath = self.form().lazy
+            .compactMap { field -> String? in
+                if case let .file(_, file) = field { file.filePath } else { nil }
+            }
+            .first
+        let bodyLength = try body.length(reportingFailureAgainst: mediaFilePath)
+
+        return try await upload(
+            body: body,
+            bodyLength: bodyLength,
+            with: request,
+            session: session,
+            delegate: delegate
+        )
     }
 }
 
@@ -759,15 +773,23 @@ extension WpMultipartFormRequest: NetworkRequestContent {
 /// server that answers before the body is fully sent (for example, a proxy rejecting a large upload
 /// with a `413`) is returned to the caller instead of timing out. See `UploadTaskDelegate`.
 ///
+/// `bodyLength` is the size of `body` in bytes. If it's `nil`, it's read here, and a failure to read
+/// it is thrown.
+///
 /// This is a free function rather than a method because it needs no state from the request, which
 /// also lets tests drive it directly against a stubbed `URLSession`.
 func upload(
     body: MultipartFormContent,
+    bodyLength: Int64? = nil,
     with request: URLRequest,
     session: URLSession,
     delegate: URLSessionTaskDelegate?
 ) async throws -> (Data, URLResponse) {
     defer { body.removeTemporaryFileIfNeeded() }
+
+    #if !os(Linux)
+    let bodyLength = try bodyLength ?? body.length()
+    #endif
 
     let cancellation = TaskCancellation()
     return try await withTaskCancellationHandler {
@@ -795,7 +817,7 @@ func upload(
                 }
             task.delegate = UploadTaskDelegate(
                 forwardingTo: delegate,
-                bodyLength: body.length,
+                bodyLength: bodyLength,
                 continuation: continuation
             )
             // After the delegate is set: this cancels the task at once if the caller already has.
@@ -819,14 +841,31 @@ func upload(
 }
 
 extension MultipartFormContent {
-    /// The size of the body in bytes, or `nil` if the temp file's size can't be read.
-    var length: Int64? {
+    /// The size of the body in bytes. Throws if the temp file's size can't be read.
+    func length() throws -> Int64 {
         switch self {
         case let .inMemory(data):
             return Int64(data.count)
         case let .onDisk(url):
-            let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber
-            return size?.int64Value
+            guard let size = try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber else {
+                throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: url.path])
+            }
+            return size.int64Value
+        }
+    }
+
+    /// `length()`, with a failure reported as `.MediaFileUnreadable` for `mediaFilePath`, the media
+    /// file the body was serialized from.
+    ///
+    /// The temp file was written a moment ago, so this failing is unlikely. If it does, Foundation's
+    /// own error names the temp file, which means nothing to the user. With no `mediaFilePath`, that
+    /// error is thrown as it is.
+    func length(reportingFailureAgainst mediaFilePath: String?) throws -> Int64 {
+        do {
+            return try length()
+        } catch {
+            guard let mediaFilePath else { throw error }
+            throw RequestExecutionError.MediaFileUnreadable(filePath: mediaFilePath)
         }
     }
 }
@@ -878,7 +917,7 @@ private final class UploadTaskDelegate: NSObject, URLSessionDataDelegate, @unche
     static let earlyResponseQuietPeriod: DispatchTimeInterval = .seconds(1)
 
     private let forwarding: URLSessionTaskDelegate?
-    private let bodyLength: Int64?
+    private let bodyLength: Int64
 
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Result<(Data, URLResponse), Error>, Never>?
@@ -891,7 +930,7 @@ private final class UploadTaskDelegate: NSObject, URLSessionDataDelegate, @unche
 
     init(
         forwardingTo forwarding: URLSessionTaskDelegate?,
-        bodyLength: Int64?,
+        bodyLength: Int64,
         continuation: CheckedContinuation<Result<(Data, URLResponse), Error>, Never>
     ) {
         self.forwarding = forwarding
@@ -913,7 +952,7 @@ private final class UploadTaskDelegate: NSObject, URLSessionDataDelegate, @unche
     }
 
     /// Whether the request body has been fully sent. `countOfBytesExpectedToSend` can still be `0`
-    /// when the response arrives, so compare against the body's own length where it's known.
+    /// when the response arrives, so compare against the body's own length.
     ///
     /// The sent-byte counts can lag the socket, so a server that did read the whole body can still
     /// look like it answered early. That's why a `2xx` is never treated as early: returning it
@@ -921,8 +960,7 @@ private final class UploadTaskDelegate: NSObject, URLSessionDataDelegate, @unche
     /// that pauses for longer than that would be cut short.
     private func isBodyFullySent(_ task: URLSessionTask) -> Bool {
         let sent = max(task.countOfBytesSent, lock.withLock { totalBytesSent })
-        let expected = bodyLength ?? task.countOfBytesExpectedToSend
-        return expected <= 0 || sent >= expected
+        return sent >= bodyLength
     }
 
     /// If the server answered before the body was fully sent, returns its response once its body is
