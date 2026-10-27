@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **BREAKING:** Errors that Cloudflare generates itself, in front of a site, now surface as `RequestExecutionErrorReason::CloudflareError` instead of `UnknownError` ("Something went wrong") or `HttpForbiddenError`. It carries a `CloudflareErrorKind` (request too large, site's server down or timing out, SSL problem, rate limited, blocked by a security rule, bot challenge, …), Cloudflare's error code when the response has one, the ray ID and any `Retry-After`, and its localized message says what happened and that the site owner or host can fix it. Responses the site's own server wrote are unchanged, even though they also pass through Cloudflare. Exhaustive `switch`/`when` statements over `RequestExecutionErrorReason` need a case for it.
+- **BREAKING:** Errors that Cloudflare generates itself, in front of a site, now surface as `RequestExecutionErrorReason::CloudflareError` instead of `UnknownError` ("Something went wrong") or `HttpForbiddenError`. It carries a `CloudflareErrorKind` (request too large, site's server down or timing out, SSL problem, rate limited, blocked by a security rule, bot challenge, …), Cloudflare's error code when the response has one, the ray ID and any `Retry-After`, and its localized message says what happened and that the site owner or host can fix it. Login site discovery reports them too, where it previously said the site "does not appear to be a WordPress site" or that its server denied access. Responses the site's own server wrote are unchanged, even though they also pass through Cloudflare. Exhaustive `switch`/`when` statements over `RequestExecutionErrorReason` need a case for it.
 
 ### Fixed
 

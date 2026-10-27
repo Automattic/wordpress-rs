@@ -78,6 +78,34 @@ struct CloudflareLiveTests {
         try await expectSecurityRule(path: "/cf-test/challenge", kind: .challenge)
     }
 
+    /// What the login screen shows. Discovery sends `Accept: */*`, so Cloudflare answers with its
+    /// branded HTML page rather than JSON.
+    private func expectLoginMessage(host: String, _ expected: String) async {
+        let client = WordPressLoginClient(urlSession: URLSession(configuration: .ephemeral))
+        do {
+            _ = try await client.details(ofSite: "https://\(host).\(cloudflareTestZone!)")
+            Issue.record("Login was expected to fail")
+        } catch {
+            #expect(error.localizedDescription == expected)
+        }
+    }
+
+    @Test func loginBehindChallenge() async {
+        await expectLoginMessage(host: "cf-challenge-all", "Your site's Cloudflare bot protection is blocking the app.")
+    }
+
+    @Test func loginBehindWafBlock() async {
+        await expectLoginMessage(host: "cf-block-all", "A Cloudflare security rule on your site blocked this request.")
+    }
+
+    @Test func loginWithOriginDnsError() async {
+        await expectLoginMessage(host: "cf-1016", "Cloudflare can't reach your site's server.")
+    }
+
+    @Test func loginWithOriginDown() async {
+        await expectLoginMessage(host: "cf-521", "Cloudflare reports that your site's server is down.")
+    }
+
     /// The CMM-2500 case: a 150 MB upload to a Free-plan zone, whose limit is 100 MB.
     ///
     /// Cloudflare usually answers 413, but sometimes 502 with no code, after the client has sent the

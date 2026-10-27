@@ -8,9 +8,11 @@ import uniffi.wp_api.CloudflareErrorKind
 import uniffi.wp_api.MediaCreateParams
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.WpAuthenticationProvider
+import uniffi.wp_api.localizedDescription
 import java.io.File
 import java.io.RandomAccessFile
 import java.net.URI
+import java.util.Locale
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -75,6 +77,36 @@ class CloudflareLiveTest {
 
     @Test
     fun `managed challenge`() = runTest { assertSecurityRule("/cf-test/challenge", CloudflareErrorKind.CHALLENGE) }
+
+    /**
+     * What the login screen shows. Discovery sends no `Accept` header, so Cloudflare's answer here
+     * isn't JSON.
+     */
+    private suspend fun assertLoginMessage(host: String, expected: String) {
+        val result = WpLoginClient(emptyList(), { true }).apiDiscovery("https://$host.$zone")
+        assertIs<ApiDiscoveryResult.Failure>(result)
+        assertEquals(expected, result.failure.localizedDescription(listOf(Locale.US)))
+    }
+
+    @Test
+    fun `login to a site behind a challenge`() = runTest {
+        assertLoginMessage("cf-challenge-all", "Your site's Cloudflare bot protection is blocking the app.")
+    }
+
+    @Test
+    fun `login to a site behind a WAF block`() = runTest {
+        assertLoginMessage("cf-block-all", "A Cloudflare security rule on your site blocked this request.")
+    }
+
+    @Test
+    fun `login to a site with an origin DNS error`() = runTest {
+        assertLoginMessage("cf-1016", "Cloudflare can't reach your site's server.")
+    }
+
+    @Test
+    fun `login to a site whose server is down`() = runTest {
+        assertLoginMessage("cf-521", "Cloudflare reports that your site's server is down.")
+    }
 
     /**
      * The CMM-2500 case: a 150 MB upload to a Free-plan zone, whose limit is 100 MB.

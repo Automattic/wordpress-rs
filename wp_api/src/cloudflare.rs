@@ -12,11 +12,14 @@
 //!   errors when the request asks for JSON. Cloudflare only sends it when the
 //!   request also carries an `Accept-Encoding` header, which every platform
 //!   executor does.
-//! - A plain-text `error code: NNNN` body, otherwise.
+//! - A plain-text `error code: NNNN` body, when the request asks for JSON
+//!   without `Accept-Encoding`.
+//! - Its branded HTML error page, when the request accepts HTML or sends no
+//!   `Accept` header (as the login flow does). 5xx pages say `Error code 522`;
+//!   1xxx pages carry `errorCode: 1016` in a script. A WAF block page ("Sorry,
+//!   you have been blocked") has no code.
 //! - An nginx-style HTML page signed `<center>cloudflare</center>`, which
-//!   carries no code. Seen for 413 and 502.
-//! - Its branded HTML block page ("Sorry, you have been blocked"), also
-//!   without a code.
+//!   carries no code, whatever the request asks for. Seen for 413 and 502.
 //! - A bot-protection challenge page, marked by `cf-mitigated: challenge`.
 //!
 //! Recorded examples of each live in `test-data/cloudflare-responses`.
@@ -124,7 +127,9 @@ impl CloudflareErrorResponse {
         let body = String::from_utf8_lossy(&response.body);
         let cloudflare_code = if let Some(code) = parse_plain_text_error_code(&body) {
             Some(code)
-        } else if is_cloudflare_html_page(&body) {
+        } else if is_branded_error_page(&body) {
+            parse_branded_error_page_code(&body)
+        } else if is_nginx_style_page(&body) {
             None
         } else {
             return None;
@@ -173,11 +178,27 @@ fn parse_plain_text_error_code(body: &str) -> Option<u32> {
     code.parse().ok()
 }
 
-fn is_cloudflare_html_page(body: &str) -> bool {
-    // The nginx-style page Cloudflare's edge serves for e.g. 413 and 502.
+/// The page Cloudflare's edge serves for e.g. 413 and 502.
+fn is_nginx_style_page(body: &str) -> bool {
     body.contains("<center>cloudflare</center>")
-        // Cloudflare's branded error page, e.g. a WAF block.
-        || body.contains("id=\"cf-error-details\"")
+}
+
+/// Cloudflare's branded error page, for 5xx and 1xxx errors and WAF blocks.
+fn is_branded_error_page(body: &str) -> bool {
+    body.contains("id=\"cf-error-details\"")
+}
+
+/// The code on a branded error page: `Error code 522` on 5xx pages, and
+/// `errorCode: 1016` in a script on 1xxx pages. WAF block pages have none.
+fn parse_branded_error_page_code(body: &str) -> Option<u32> {
+    ["Error code ", "errorCode:"].iter().find_map(|marker| {
+        let after = &body[body.find(marker)? + marker.len()..];
+        let digits = after.trim_start();
+        let end = digits
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(digits.len());
+        digits[..end].parse().ok()
+    })
 }
 
 fn kind_for(code: Option<u32>, status_code: u32, category: Option<&str>) -> CloudflareErrorKind {
@@ -187,7 +208,8 @@ fn kind_for(code: Option<u32>, status_code: u32, category: Option<&str>) -> Clou
         502 | 504 | 520 => OriginError,
         521 => OriginDown,
         522 | 524 => OriginTimeout,
-        523 | 1016 => OriginUnreachable,
+        // 1002 and 1016 also arrive as HTML pages, which have no `error_category`.
+        523 | 1002 | 1016 => OriginUnreachable,
         525 | 526 => OriginSsl,
         500 => CloudflareInternal,
         1015 => RateLimited,
@@ -354,6 +376,33 @@ pub(crate) mod tests {
         let parsed = parse("cf-502-html.http").expect("This is Cloudflare's own error");
         assert_eq!(parsed.cloudflare_code, None);
         assert_eq!(parsed.kind, CloudflareErrorKind::OriginError);
+    }
+
+    /// What the login flow gets: it sends no `Accept` header, so Cloudflare
+    /// answers with its branded HTML page rather than JSON.
+    #[rstest]
+    #[case::origin_timeout("cf-522-html.http", 522, CloudflareErrorKind::OriginTimeout)]
+    #[case::origin_dns("cf-1016-html.http", 1016, CloudflareErrorKind::OriginUnreachable)]
+    #[case::disallowed_origin_ip("cf-1002-html.http", 1002, CloudflareErrorKind::OriginUnreachable)]
+    fn recognises_cloudflare_branded_error_pages(
+        #[case] file_name: &str,
+        #[case] code: u32,
+        #[case] kind: CloudflareErrorKind,
+    ) {
+        let parsed = parse(file_name).expect("This is Cloudflare's own error");
+        assert_eq!(parsed.cloudflare_code, Some(code));
+        assert_eq!(parsed.kind, kind);
+        assert!(parsed.ray_id.is_some());
+    }
+
+    #[rstest]
+    #[case("<p>Error code 522</p>", Some(522))]
+    #[case("properties:{errorCode: 1016 },", Some(1016))]
+    #[case("properties:{errorCode:1002},", Some(1002))]
+    #[case("Error code ", None)]
+    #[case("Sorry, you have been blocked", None)]
+    fn branded_error_page_code(#[case] body: &str, #[case] expected: Option<u32>) {
+        assert_eq!(parse_branded_error_page_code(body), expected);
     }
 
     #[test]

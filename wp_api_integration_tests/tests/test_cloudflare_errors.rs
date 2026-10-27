@@ -615,3 +615,40 @@ async fn live_zone_upload_too_large() {
     );
     assert!(ray_id.is_some());
 }
+
+/// What the login screen shows. Discovery sends no `Accept` header, so reqwest
+/// sends `*/*` and Cloudflare answers with its branded HTML page, not JSON.
+#[rstest]
+#[case::challenge(
+    "cf-challenge-all",
+    "Your site's Cloudflare bot protection is blocking the app."
+)]
+#[case::waf_block(
+    "cf-block-all",
+    "A Cloudflare security rule on your site blocked this request."
+)]
+#[case::origin_down("cf-521", "Cloudflare reports that your site's server is down.")]
+#[case::origin_timeout(
+    "cf-522",
+    "Cloudflare reports that your site's server isn't responding."
+)]
+#[case::origin_dns("cf-1016", "Cloudflare can't reach your site's server.")]
+#[case::disallowed_origin_ip("cf-523", "Cloudflare can't reach your site's server.")]
+#[tokio::test]
+#[ignore = "Needs the Cloudflare test zone"]
+async fn live_zone_login(#[case] host: &str, #[case] expected: &str) {
+    use wp_api::login::login_client::WpLoginClient;
+    use wp_localization::{WpLocale, WpLocalizable};
+
+    let client = WpLoginClient::new_with_default_middleware_pipeline(Arc::new(
+        ReqwestRequestExecutor::new(false, std::time::Duration::from_secs(60)),
+    ));
+    let failure = client
+        .api_discovery(format!("https://{host}.{}", test_zone()), None)
+        .await
+        .combined_result()
+        .expect_err("Login was expected to fail")
+        .clone();
+
+    assert_eq!(failure.localize(Some(WpLocale::from("en-US"))), expected);
+}
