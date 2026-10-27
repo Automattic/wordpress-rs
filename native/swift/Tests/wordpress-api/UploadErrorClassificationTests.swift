@@ -129,6 +129,34 @@ struct UploadErrorClassificationTests {
         }
     }
 
+    @Test("An upload's redirect is recorded by the executor")
+    func uploadRedirectIsRecorded() async throws {
+        // `UploadTaskDelegate` forwards redirects to `RequestExecutorDelegate` through Objective-C
+        // message forwarding. Redirecting to a closed port makes the upload fail with an error that
+        // carries the redirects the executor recorded.
+        let closed = try await LoopbackHTTPServer.neverResponding()
+        closed.stop()
+        let destination = closed.url.appendingPathComponent("elsewhere").absoluteString
+        let server = try await LoopbackHTTPServer.start { exchange in
+            exchange.readBody { _ in exchange.respond(status: 307, headers: ["Location": destination]) }
+        }
+        defer { server.stop() }
+        let file = try Support.makeTempFile(size: 256 * 1024)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        do {
+            _ = try await Support.api(for: server).media.create(params: .init(filePath: file.path))
+            Issue.record("Expected a connection error")
+        } catch let error as WpApiError {
+            guard case .RequestExecutionFailed(_, let redirects, let reason, _, _) = error else {
+                Issue.record("Expected .RequestExecutionFailed, got \(error)")
+                return
+            }
+            #expect(reason.caseName == "connectionError")
+            #expect(redirects?.map(\.destination) == [destination])
+        }
+    }
+
     @Test("Through WpRequestExecutor, the app's delegate sees an early rejection once")
     func executorNotifiesOnceForEarlyRejection() async throws {
         let server = try await LoopbackHTTPServer.rejectingEarly()

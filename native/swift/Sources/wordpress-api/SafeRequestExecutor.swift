@@ -1000,38 +1000,19 @@ private final class UploadTaskDelegate: NSObject, URLSessionDataDelegate, @unche
         task?.cancel()
     }
 
-    // The challenge and redirect callbacks use their completion-handler forms: forwarding the
-    // `async` forms through an optional protocol requirement crashes the Swift 6.4 compiler in SILGen.
-    func urlSession(
-        _ session: URLSession,
-        task: URLSessionTask,
-        didReceive challenge: URLAuthenticationChallenge,
-        completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
-    ) {
-        guard let forward = forwarding?.urlSession(_:task:didReceive:completionHandler:) else {
-            completionHandler(.performDefaultHandling, nil)
-            return
-        }
-        forward(session, task, challenge, completionHandler)
+    // Callbacks this class doesn't implement — challenges, redirects, connectivity, metrics,
+    // informational responses — go straight to `forwarding`, which implements them. `URLSession`
+    // asks `responds(to:)` about each callback once per task, so a callback `forwarding` doesn't
+    // implement goes to the session's delegate, or gets `URLSession`'s default handling.
+    override func responds(to aSelector: Selector!) -> Bool {
+        super.responds(to: aSelector) || forwarding?.responds(to: aSelector) == true
     }
 
-    func urlSession(
-        _ session: URLSession,
-        task: URLSessionTask,
-        willPerformHTTPRedirection response: HTTPURLResponse,
-        newRequest request: URLRequest,
-        completionHandler: @escaping @Sendable (URLRequest?) -> Void
-    ) {
-        guard let forward = forwarding?.urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)
-        else {
-            completionHandler(request)
-            return
+    override func forwardingTarget(for aSelector: Selector!) -> Any? {
+        if let forwarding, forwarding.responds(to: aSelector) {
+            return forwarding
         }
-        forward(session, task, response, request, completionHandler)
-    }
-
-    func urlSession(_ session: URLSession, taskIsWaitingForConnectivity task: URLSessionTask) {
-        forwarding?.urlSession?(session, taskIsWaitingForConnectivity: task)
+        return super.forwardingTarget(for: aSelector)
     }
 
     func urlSession(
@@ -1049,26 +1030,6 @@ private final class UploadTaskDelegate: NSObject, URLSessionDataDelegate, @unche
             totalBytesSent: totalBytesSent,
             totalBytesExpectedToSend: totalBytesExpectedToSend
         )
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        task: URLSessionTask,
-        didReceiveInformationalResponse response: HTTPURLResponse
-    ) {
-        #if os(macOS)
-        if #available(macOS 14.0, *) {
-            forwarding?.urlSession?(session, task: task, didReceiveInformationalResponse: response)
-        }
-        #elseif os(iOS)
-        if #available(iOS 17.0, *) {
-            forwarding?.urlSession?(session, task: task, didReceiveInformationalResponse: response)
-        }
-        #endif
-    }
-
-    func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
-        forwarding?.urlSession?(session, task: task, didFinishCollecting: metrics)
     }
 
     func urlSession(
