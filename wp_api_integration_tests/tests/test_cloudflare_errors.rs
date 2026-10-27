@@ -472,18 +472,23 @@ fn live_api_client(url: &str) -> WpApiClient {
     )
 }
 
-/// Against live Cloudflare: its error preview path, which answers like a real
-/// error. Checks that the real client gets, and recognises, the JSON body.
+/// Against the test zone: Cloudflare's error preview path, which answers like a
+/// real error. Checks that the real client gets, and recognises, the JSON body.
 ///
-/// `cargo test -p wp_api_integration_tests --test test_cloudflare_errors -- --ignored`
+/// Like every live test here, it only runs with `--ignored` and
+/// `WPRS_CLOUDFLARE_TEST_ZONE` set:
+///
+/// `WPRS_CLOUDFLARE_TEST_ZONE=wpmtcf.co cargo test -p wp_api_integration_tests
+/// --test test_cloudflare_errors -- --ignored`
 #[rstest]
 #[case::origin_timeout(522, CloudflareErrorKind::OriginTimeout)]
 #[case::firewall_rule(1020, CloudflareErrorKind::AccessDenied)]
 #[tokio::test]
-#[ignore = "Sends requests to developers.cloudflare.com"]
+#[ignore = "Needs the Cloudflare test zone"]
 async fn live_cloudflare_error(#[case] code: u32, #[case] kind: CloudflareErrorKind) {
     let error = live_api_client(&format!(
-        "https://developers.cloudflare.com/cdn-cgi/error/{code}"
+        "https://testing.{}/cdn-cgi/error/{code}",
+        test_zone()
     ))
     .users()
     .retrieve_me_with_edit_context()
@@ -509,10 +514,12 @@ async fn live_cloudflare_error(#[case] code: u32, #[case] kind: CloudflareErrorK
 }
 
 /// Against live Cloudflare: requesting one of its IP addresses directly (1003),
-/// which has no zone and so is always plain text.
+/// which has no zone and so is always plain text. It doesn't use the test zone,
+/// but needs it set like the other live tests, so it never runs by accident.
 #[tokio::test]
-#[ignore = "Sends a request to a Cloudflare IP address"]
+#[ignore = "Needs the Cloudflare test zone"]
 async fn live_cloudflare_direct_ip_access() {
+    test_zone();
     let error = live_api_client("http://104.21.20.53/wp-json/wp/v2/users/me")
         .users()
         .retrieve_me_with_edit_context()
