@@ -101,6 +101,58 @@ async fn trash_comment() {
     RestoreServer::db().await;
 }
 
+#[tokio::test]
+#[serial]
+async fn unspam_comment_restores_previous_status() {
+    // FIRST_COMMENT_ID is approved in the seed data. Mark it as spam first.
+    let spammed_comment = api_client()
+        .comments()
+        .update(
+            &FIRST_COMMENT_ID,
+            &CommentUpdateParams {
+                status: Some(CommentStatus::Spam),
+                ..Default::default()
+            },
+        )
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(spammed_comment.status, CommentStatus::Spam);
+
+    // Unspam must restore the saved pre-spam status (approved), not `hold`.
+    let unspammed_comment = api_client()
+        .comments()
+        .unspam(&FIRST_COMMENT_ID)
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(unspammed_comment.status, CommentStatus::Approved);
+
+    RestoreServer::db().await;
+}
+
+#[tokio::test]
+#[serial]
+async fn untrash_comment_restores_previous_status() {
+    // FIRST_COMMENT_ID is approved in the seed data. Trash it first.
+    api_client()
+        .comments()
+        .trash(&FIRST_COMMENT_ID, &CommentDeleteParams::default())
+        .await
+        .assert_response();
+
+    // Untrash must restore the saved pre-trash status (approved), not `hold`.
+    let untrashed_comment = api_client()
+        .comments()
+        .untrash(&FIRST_COMMENT_ID)
+        .await
+        .assert_response()
+        .data;
+    assert_eq!(untrashed_comment.status, CommentStatus::Approved);
+
+    RestoreServer::db().await;
+}
+
 generate_update_test!(
     update_author,
     author,
