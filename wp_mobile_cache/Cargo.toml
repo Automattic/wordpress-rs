@@ -22,10 +22,8 @@ rusqlite = { workspace = true, features = ["bundled"] }
 
 [dev-dependencies]
 chrono = { workspace = true }
-futures = { workspace = true }
 integration_test_credentials = { path = "../integration_test_credentials" }
 rstest = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 # Optional dependencies (enabled via test-helpers feature)
 [dependencies.chrono]

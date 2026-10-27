@@ -5677,7 +5677,6 @@ name = "wp_mobile_cache"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "futures",
  "integration_test_credentials",
  "log",
  "rstest",
@@ -5685,7 +5684,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
- "tokio",
  "uniffi",
  "wp_api",
  "wp_mobile_sqlite",
