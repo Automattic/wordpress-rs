@@ -528,6 +528,7 @@ async fn live_zone_origin_failure(
 #[case::waf_block("/cf-test/block", CloudflareErrorKind::AccessDenied)]
 #[case::managed_challenge("/cf-test/challenge", CloudflareErrorKind::Challenge)]
 #[case::js_challenge("/cf-test/js-challenge", CloudflareErrorKind::Challenge)]
+#[case::interactive_challenge("/cf-test/interactive", CloudflareErrorKind::Challenge)]
 #[tokio::test]
 #[ignore = "Needs the Cloudflare test zone"]
 async fn live_zone_security_rule(#[case] path: &str, #[case] kind: CloudflareErrorKind) {
