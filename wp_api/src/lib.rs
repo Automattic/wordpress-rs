@@ -21,6 +21,7 @@ pub mod block_renderer;
 pub mod block_revisions;
 pub mod block_types;
 pub mod blocks;
+pub mod cloudflare;
 pub mod comments;
 pub mod date;
 pub mod decimal2;
