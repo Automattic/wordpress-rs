@@ -8,6 +8,10 @@ use crate::connection::{ConnectionError, prepare_connection};
 /// `migrations` holds one entry per migration, each a `;`-separated list of
 /// SQL statements. A migration's ID is its 1-based position in the list, so
 /// entries can only ever be appended.
+///
+/// Every pending migration runs in a single `BEGIN EXCLUSIVE` transaction with
+/// foreign key enforcement on, and a `PRAGMA foreign_keys` in a migration has
+/// no effect inside it.
 pub struct MigrationManager<'a> {
     connection: &'a Connection,
     migrations: &'static [&'static str],

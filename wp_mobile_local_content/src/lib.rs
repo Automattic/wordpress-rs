@@ -102,6 +102,11 @@ impl WpLocalContentStore {
 }
 
 /// The local content migrations, in the order [`MigrationManager`] applies them.
+///
+/// Foreign keys are enforced while they run, so dropping a table that other
+/// tables reference with `ON DELETE CASCADE` deletes the referencing rows. A
+/// migration can't rebuild `working_copies` by copying it to a new table and
+/// dropping the original: every working copy would lose its fields and target.
 pub static MIGRATIONS: [&str; 1] = [include_str!(
     "../migrations/0001-create-working-copies-tables.sql"
 )];
