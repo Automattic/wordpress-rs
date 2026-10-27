@@ -14,6 +14,7 @@ use wp_api::{
     media::MediaCreateParams,
     middleware::{RetryAfterMiddleware, WpApiMiddleware},
     parsed_url::ParsedUrl,
+    request::endpoint::WpEndpointUrl,
 };
 use wp_api_integration_tests::prelude::*;
 
@@ -40,8 +41,9 @@ impl ReplayServer {
                 let Ok((stream, _)) = listener.accept().await else {
                     return;
                 };
-                let request_head = respond(stream, &head, &body).await;
-                heads.lock().unwrap().push(request_head);
+                if let Some(request_head) = respond(stream, &head, &body).await {
+                    heads.lock().unwrap().push(request_head);
+                }
             }
         });
         Self { url, request_heads }
@@ -92,12 +94,20 @@ fn recorded_response(file_name: &str) -> (String, Vec<u8>) {
 
 /// Reads the whole request before answering, as Cloudflare's edge does, then
 /// sends the recorded response and closes the connection.
-async fn respond(mut stream: TcpStream, head: &str, body: &[u8]) -> String {
+///
+/// Login also tries the site over `https://`, which this plain-HTTP server
+/// can't answer. It closes those connections at once, so that attempt fails
+/// fast instead of waiting for the client to time out.
+async fn respond(mut stream: TcpStream, head: &str, body: &[u8]) -> Option<String> {
     let mut request = Vec::new();
     let mut buffer = [0u8; 64 * 1024];
     let head_end = loop {
         let n = stream.read(&mut buffer).await.unwrap();
         assert!(n > 0, "The client closed the connection mid-request");
+        // Every TLS handshake starts with a handshake record, type 0x16.
+        if request.is_empty() && buffer[0] == 0x16 {
+            return None;
+        }
         request.extend_from_slice(&buffer[..n]);
         if let Some(i) = request.windows(4).position(|w| w == b"\r\n\r\n") {
             break i + 4;
@@ -131,7 +141,7 @@ async fn respond(mut stream: TcpStream, head: &str, body: &[u8]) -> String {
     response.extend_from_slice(body);
     stream.write_all(&response).await.unwrap();
     stream.shutdown().await.unwrap();
-    request_head
+    Some(request_head)
 }
 
 fn cloudflare_error(error: WpApiError) -> (Option<u32>, CloudflareErrorKind, Option<String>) {
@@ -234,6 +244,54 @@ async fn upload_rejected_by_cloudflare_as_too_large() {
     assert_eq!(code, None);
     assert_eq!(kind, CloudflareErrorKind::RequestTooLarge);
     assert_eq!(ray_id.as_deref(), Some("a51300505b32e411"));
+}
+
+/// What the login screen shows when Cloudflare answers with its HTML page.
+/// Discovery sends no `Accept` header, so reqwest sends `*/*`. Each code's page
+/// comes from one of several templates.
+#[rstest]
+#[case::waf_block_page(
+    "cf-waf-block-page.http",
+    "A Cloudflare security rule on your site blocked this request."
+)]
+#[case::firewall_rule(
+    "cf-1020-html.http",
+    "A Cloudflare security rule on your site blocked this request."
+)]
+#[case::origin_timeout(
+    "cf-522-html.http",
+    "Cloudflare reports that your site's server isn't responding."
+)]
+#[case::origin_dns("cf-1016-html.http", "Cloudflare can't reach your site's server.")]
+#[case::rate_limited(
+    "cf-1025-html.http",
+    "Cloudflare is limiting requests to your site. Try again shortly."
+)]
+#[case::worker_exception(
+    "cf-1101-html.http",
+    // Fluent wraps placeables in bidi isolation marks.
+    "Cloudflare returned an error (code \u{2068}1101\u{2069})."
+)]
+#[tokio::test]
+async fn login_answered_by_cloudflare(#[case] file_name: &str, #[case] expected: &str) {
+    use wp_api::login::login_client::WpLoginClient;
+    use wp_localization::{WpLocale, WpLocalizable};
+
+    let server = ReplayServer::start(file_name).await;
+    let site_url = server.url.url().trim_end_matches("/wp-json").to_string();
+    let result = WpLoginClient::new_with_default_middleware_pipeline(Arc::new(
+        ReqwestRequestExecutor::default(),
+    ))
+    .api_discovery(site_url, None)
+    .await;
+
+    // Login also tries `https://`, which the replay server can't answer.
+    let failure = result
+        .user_input_attempt()
+        .api_discovery_result
+        .as_ref()
+        .expect_err("Login was expected to fail");
+    assert_eq!(failure.localize(Some(WpLocale::from("en-US"))), expected);
 }
 
 /// A Cloudflare 1015 with `Retry-After` is still retried by
@@ -614,6 +672,109 @@ async fn live_zone_upload_too_large() {
         "{kind:?}"
     );
     assert!(ray_id.is_some());
+}
+
+/// Against the test zone: each code's error classifies the same whichever way
+/// it's asked for. Plain-text and HTML bodies carry no `error_category`, and
+/// each code's HTML page comes from one of several templates, so this keeps
+/// both in line with the JSON. Uses Cloudflare's preview of each error.
+#[tokio::test]
+#[ignore = "Needs the Cloudflare test zone"]
+async fn live_zone_error_formats_agree() {
+    const CODES: [u32; 43] = [
+        500, 502, 504, 520, 521, 522, 523, 524, 525, 526, 1000, 1001, 1002, 1003, 1004, 1005, 1006,
+        1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1018, 1019, 1020, 1023, 1025,
+        1033, 1034, 1035, 1036, 1037, 1040, 1041, 1101, 1102, 1104, 1200,
+    ];
+    // Cloudflare answers a request without a `User-Agent` in plain text, whatever
+    // it asks for, so send the executor's. reqwest sends `Accept-Encoding` unless
+    // every decoder is turned off.
+    let user_agent =
+        wp_api::request::user_agent::reqwest::user_agent_for_reqwest_request_executor();
+    let client = reqwest::Client::builder()
+        .user_agent(user_agent.clone())
+        .build()
+        .unwrap();
+    let client_without_accept_encoding = reqwest::Client::builder()
+        .user_agent(user_agent)
+        .no_gzip()
+        .no_brotli()
+        .no_zstd()
+        .no_deflate()
+        .build()
+        .unwrap();
+
+    let mut mismatches = vec![];
+    for code in CODES {
+        let url = format!("https://testing.{}/cdn-cgi/error/{code}", test_zone());
+        let json =
+            classify_live_response(&client, &url, "application/json", "application/json").await;
+        let plain_text = classify_live_response(
+            &client_without_accept_encoding,
+            &url,
+            "application/json",
+            "text/plain",
+        )
+        .await;
+        // What login asks for.
+        let html = classify_live_response(&client, &url, "*/*", "text/html").await;
+
+        assert!(
+            matches!(json, Some((Some(c), _)) if c == code),
+            "{code}: {json:?}"
+        );
+        if plain_text != json || html != json {
+            mismatches.push(format!(
+                "{code}: JSON {json:?}, plain text {plain_text:?}, HTML {html:?}"
+            ));
+        }
+    }
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
+}
+
+/// Asks for `url` with `accept`, checks Cloudflare answered with
+/// `expected_content_type`, and classifies the response.
+async fn classify_live_response(
+    client: &reqwest::Client,
+    url: &str,
+    accept: &str,
+    expected_content_type: &str,
+) -> Option<(Option<u32>, CloudflareErrorKind)> {
+    let response = client
+        .get(url)
+        .header(http::header::ACCEPT, accept)
+        .send()
+        .await
+        .unwrap();
+    let content_type = response
+        .headers()
+        .get(http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    assert!(
+        content_type.starts_with(expected_content_type),
+        "{url} with `Accept: {accept}` came back as {content_type:?}"
+    );
+    let response = WpNetworkResponse {
+        status_code: response.status().as_u16().into(),
+        response_header_map: Arc::new(WpNetworkHeaderMap::new(response.headers().clone())),
+        body: response.bytes().await.unwrap().to_vec(),
+        request_url: WpEndpointUrl(url.to_string()),
+        request_method: RequestMethod::GET,
+        request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+    };
+    match WpApiError::try_parse(&response) {
+        Some(WpApiError::RequestExecutionFailed {
+            reason:
+                RequestExecutionErrorReason::CloudflareError {
+                    cloudflare_code,
+                    kind,
+                    ..
+                },
+            ..
+        }) => Some((cloudflare_code, kind)),
+        _ => None,
+    }
 }
 
 /// What the login screen shows. Discovery sends no `Accept` header, so reqwest

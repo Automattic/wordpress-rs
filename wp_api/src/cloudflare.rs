@@ -15,9 +15,9 @@
 //! - A plain-text `error code: NNNN` body, when the request asks for JSON
 //!   without `Accept-Encoding`.
 //! - Its branded HTML error page, when the request accepts HTML or sends no
-//!   `Accept` header (as the login flow does). 5xx pages say `Error code 522`;
-//!   1xxx pages carry `errorCode: 1016` in a script. A WAF block page ("Sorry,
-//!   you have been blocked") has no code.
+//!   `Accept` header (as the login flow does). Its templates show the code in
+//!   different places, depending on the code; a WAF block page ("Sorry, you
+//!   have been blocked") has none.
 //! - An nginx-style HTML page signed `<center>cloudflare</center>`, which
 //!   carries no code, whatever the request asks for. Seen for 413 and 502.
 //! - A bot-protection challenge page, marked by `cf-mitigated: challenge`.
@@ -38,12 +38,11 @@ const HEADER_CF_MITIGATED: &str = "cf-mitigated";
 pub enum CloudflareErrorKind {
     /// The request body is larger than the site's Cloudflare plan allows (413).
     RequestTooLarge,
-    /// The site's server sent Cloudflare an invalid response, or none in time
-    /// (502, 504, 520).
+    /// The site's server sent Cloudflare an invalid response (502, 520).
     OriginError,
     /// The site's server refused Cloudflare's connection (521).
     OriginDown,
-    /// The site's server didn't respond in time (522, 524).
+    /// The site's server didn't respond in time (504, 522, 524).
     OriginTimeout,
     /// Cloudflare couldn't reach the site's server at all (523), or the site's
     /// DNS doesn't lead to one it can use (1000, 1001, 1002, 1016, 1034).
@@ -184,14 +183,31 @@ fn is_nginx_style_page(body: &str) -> bool {
 }
 
 /// Cloudflare's branded error page, for 5xx and 1xxx errors and WAF blocks.
+/// Most templates wrap their details in `id="cf-error-details"`; the one for
+/// 1020 labels its code with `class="cf-code-label"` instead.
 fn is_branded_error_page(body: &str) -> bool {
-    body.contains("id=\"cf-error-details\"")
+    body.contains("id=\"cf-error-details\"") || body.contains("class=\"cf-code-label\"")
 }
 
-/// The code on a branded error page: `Error code 522` on 5xx pages, and
-/// `errorCode: 1016` in a script on 1xxx pages. WAF block pages have none.
+/// The code on a branded error page. Each template shows it in its own way:
+///
+/// - `Error code 522` on 5xx pages
+/// - `Error code <span>1020</span>` on the 1020 page
+/// - `<span class="cf-error-code">1101</span>` on Workers' 1101, 1102 and 1104 pages
+/// - `<h2 class="cf-subheadline">Error 1025</h2>` on the 1025 page
+/// - `errorCode: 1016` in a script on most other 1xxx pages
+///
+/// WAF block pages have none.
 fn parse_branded_error_page_code(body: &str) -> Option<u32> {
-    ["Error code ", "errorCode:"].iter().find_map(|marker| {
+    [
+        "Error code ",
+        "Error code <span>",
+        "class=\"cf-error-code\">",
+        "class=\"cf-subheadline\">Error ",
+        "errorCode:",
+    ]
+    .iter()
+    .find_map(|marker| {
         let after = &body[body.find(marker)? + marker.len()..];
         let digits = after.trim_start();
         let end = digits
@@ -205,9 +221,9 @@ fn kind_for(code: Option<u32>, status_code: u32, category: Option<&str>) -> Clou
     use CloudflareErrorKind::*;
     match code.unwrap_or(status_code) {
         413 => RequestTooLarge,
-        502 | 504 | 520 => OriginError,
+        502 | 520 => OriginError,
         521 => OriginDown,
-        522 | 524 => OriginTimeout,
+        504 | 522 | 524 => OriginTimeout,
         525 | 526 => OriginSsl,
         500 => CloudflareInternal,
         // Plain-text and HTML bodies have no `error_category`, so the 1xxx codes
@@ -303,7 +319,7 @@ pub(crate) mod tests {
         Some(30)
     )]
     #[case::bad_gateway("cf-502-json.http", 502, CloudflareErrorKind::OriginError, Some(60))]
-    #[case::gateway_timeout("cf-504-json.http", 504, CloudflareErrorKind::OriginError, Some(120))]
+    #[case::gateway_timeout("cf-504-json.http", 504, CloudflareErrorKind::OriginTimeout, Some(120))]
     #[case::unknown_error("cf-520-json.http", 520, CloudflareErrorKind::OriginError, Some(60))]
     #[case::origin_down("cf-521-json.http", 521, CloudflareErrorKind::OriginDown, Some(120))]
     #[case::connect_timeout("cf-522-json.http", 522, CloudflareErrorKind::OriginTimeout, Some(120))]
@@ -393,6 +409,9 @@ pub(crate) mod tests {
     #[case::origin_timeout("cf-522-html.http", 522, CloudflareErrorKind::OriginTimeout)]
     #[case::origin_dns("cf-1016-html.http", 1016, CloudflareErrorKind::OriginUnreachable)]
     #[case::disallowed_origin_ip("cf-1002-html.http", 1002, CloudflareErrorKind::OriginUnreachable)]
+    #[case::firewall_rule("cf-1020-html.http", 1020, CloudflareErrorKind::AccessDenied)]
+    #[case::rate_limited("cf-1025-html.http", 1025, CloudflareErrorKind::RateLimited)]
+    #[case::worker_exception("cf-1101-html.http", 1101, CloudflareErrorKind::Other)]
     fn recognises_cloudflare_branded_error_pages(
         #[case] file_name: &str,
         #[case] code: u32,
@@ -408,6 +427,12 @@ pub(crate) mod tests {
     #[case("<p>Error code 522</p>", Some(522))]
     #[case("properties:{errorCode: 1016 },", Some(1016))]
     #[case("properties:{errorCode:1002},", Some(1002))]
+    #[case(
+        r#"<span class="cf-code-label">Error code <span>1020</span></span>"#,
+        Some(1020)
+    )]
+    #[case(r#"<span class="cf-error-code">1101</span>"#, Some(1101))]
+    #[case(r#"<h2 class="cf-subheadline">Error 1025</h2>"#, Some(1025))]
     #[case("Error code ", None)]
     #[case::falls_through_to_the_script_marker("Error code <b>x</b> errorCode: 1016", Some(1016))]
     #[case("Sorry, you have been blocked", None)]

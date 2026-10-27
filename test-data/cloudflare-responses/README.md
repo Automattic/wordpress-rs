@@ -29,6 +29,8 @@ Recorded on 2026-10-26 and 2026-10-27 with `Accept: application/json`, like the 
 
 **Cloudflare's preview of a response**, `https://developers.cloudflare.com/cdn-cgi/error/<code>`, for codes the zone can't easily produce: `cf-500-json.http`, `cf-502-json.http`, `cf-504-json.http`, `cf-523-json.http`, `cf-524-json.http`, `cf-1020-json.http`, `cf-1020-plain-text.http` and `cf-1010-plain-text.http` (from the test zone's own `/cdn-cgi/error/1010`). The real 520–526 responses match their previews' shape.
 
+The HTML pages `cf-1020-html.http`, `cf-1025-html.http` and `cf-1101-html.http` are previews from the test zone's own `/cdn-cgi/error/<code>`, requested with `Accept: text/html,*/*` on 2026-10-27. Each code's page comes from one of several templates, which show the code in different places; these three cover the templates the other HTML fixtures don't. `live_zone_error_formats_agree` checks every code's page against its JSON.
+
 **Elsewhere:**
 
 - `cf-1003-plain-text.http`: `http://104.21.20.53/` (direct IP access).
