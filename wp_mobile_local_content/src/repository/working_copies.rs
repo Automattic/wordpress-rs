@@ -242,8 +242,8 @@ impl WorkingCopyRepository {
             let format: String = row.get_column(Format)?;
             Ok((
                 categories_from_json(&categories_json)
-                    .map_err(|e| conversion_error(CategoryIds, e))?,
-                tags_from_json(&tags_json).map_err(|e| conversion_error(Tags, e))?,
+                    .map_err(|e| conversion_error(CategoryIds, Type::Text, e))?,
+                tags_from_json(&tags_json).map_err(|e| conversion_error(Tags, Type::Text, e))?,
                 format,
                 row.get_column::<bool, _>(Sticky)?,
             ))
@@ -610,9 +610,9 @@ fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
             excerpt: row.get_column(C::Excerpt)?,
             slug: row.get_column(C::Slug)?,
             status: StatusSetting::from_columns(&status, password)
-                .map_err(|e| conversion_error(C::Status, e))?,
+                .map_err(|e| conversion_error(C::Status, Type::Text, e))?,
             publish_date: PublishDate::from_column(publish_date)
-                .map_err(|e| conversion_error(C::PublishDate, e))?,
+                .map_err(|e| conversion_error(C::PublishDate, Type::Integer, e))?,
             author: author.map(UserId),
             featured_image: FeaturedImage::from_column(featured_media_id),
             comment_status: comment_status.as_deref().map(comment_status_from_str),
@@ -739,12 +739,13 @@ fn select_target(
             (Some(post_id), Some(seconds)) => Some(RemotePostReference {
                 post_id: PostId(post_id),
                 base_modified_gmt: date_from_timestamp(seconds)
-                    .map_err(|e| conversion_error(BaseModifiedGmt, e))?,
+                    .map_err(|e| conversion_error(BaseModifiedGmt, Type::Integer, e))?,
             }),
             (None, None) => None,
             _ => {
                 return Err(conversion_error(
                     RemotePostId,
+                    Type::Integer,
                     FromSqlError::Other(
                         "remote_post_id and base_modified_gmt must both be set or both be NULL"
                             .into(),
@@ -769,7 +770,7 @@ fn select_site(
 
         let url: String = row.get_column(Url)?;
         SiteIdentity::from_columns(row.get_column(WordPressComSiteId)?, &url)
-            .map_err(|e| conversion_error(Url, e))
+            .map_err(|e| conversion_error(Url, Type::Text, e))
     })?;
     Ok(site)
 }
@@ -830,8 +831,12 @@ fn json_error(err: serde_json::Error) -> LocalContentError {
     }
 }
 
-fn conversion_error(column: impl ColumnIndex, err: FromSqlError) -> rusqlite::Error {
-    rusqlite::Error::FromSqlConversionFailure(column.as_index(), Type::Text, Box::new(err))
+fn conversion_error(
+    column: impl ColumnIndex,
+    column_type: Type,
+    err: FromSqlError,
+) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(column.as_index(), column_type, Box::new(err))
 }
 
 #[cfg(test)]
