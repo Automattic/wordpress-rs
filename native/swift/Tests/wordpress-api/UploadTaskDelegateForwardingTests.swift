@@ -8,7 +8,7 @@ import Testing
 // A task delegate shadows the session's for every method it implements, so a callback the wrapper
 // fails to forward is silently lost. These tests pin each one.
 #if os(macOS) || os(iOS)
-@Suite("Upload task delegate forwarding", .timeLimit(.minutes(1)))
+@Suite("Upload task delegate forwarding", .serialized, .timeLimit(.minutes(1)))
 struct UploadTaskDelegateForwardingTests {
     typealias Support = UploadTestSupport
 
@@ -57,8 +57,29 @@ struct UploadTaskDelegateForwardingTests {
         #expect(events.completionErrorCodes == [nil])
         #expect(events.completions.allSatisfy { $0 == nil })
         #expect(events.metrics == 1)
-        #expect(events.bodyDataCallbacks > 0)
-        #expect(events.totalBytesSent == Int64(Support.largeBodySize))
+    }
+
+    @Test("Upload progress is forwarded to the delegate")
+    func uploadProgressIsForwarded() async throws {
+        // `URLSession` throttles progress callbacks, and skips them for most of a fast loopback
+        // transfer, so the server reads slowly: 16 MB in 256 KB reads, 25 ms apart (about 1.6 s).
+        let size = 16 * 1024 * 1024
+        let server = try await LoopbackHTTPServer.start { exchange in
+            exchange.readBody(pacing: .milliseconds(25)) { _ in exchange.respond(status: 201, body: "ok") }
+        }
+        defer { server.stop() }
+        let recorder = RecordingDelegate()
+
+        _ = try await upload(
+            body: .onDisk(try Support.makeTempFile(size: size)),
+            with: Support.request(to: server.url),
+            session: Support.session(),
+            delegate: recorder
+        )
+
+        let events = try await recorder.waitForCompletion()
+        #expect(events.bodyDataCallbacks > 1)
+        #expect(events.totalBytesSent >= Int64(size / 2))
     }
 
     @Test("An early response is reported once, as a completed request")

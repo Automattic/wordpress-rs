@@ -43,16 +43,24 @@ final class LoopbackHTTPServer: @unchecked Sendable {
         }
 
         /// Reads the rest of the request body, then calls `completion` with the number of body bytes read.
-        func readBody(then completion: @escaping @Sendable (Int) -> Void) {
+        ///
+        /// With `pacing`, reads at most 256 KB at a time and waits that long between reads, to make
+        /// an upload take a while.
+        func readBody(pacing: DispatchTimeInterval? = nil, then completion: @escaping @Sendable (Int) -> Void) {
             guard pendingBody > 0 else {
                 completion(request.contentLength)
                 return
             }
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 1024 * 1024) { content, _, _, error in
+            let maximumLength = pacing == nil ? 1024 * 1024 : 256 * 1024
+            connection.receive(minimumIncompleteLength: 1, maximumLength: maximumLength) { content, _, _, error in
                 guard error == nil, let content, !content.isEmpty else { return }
                 self.pendingBody -= content.count
                 self.onBodyRead(content.count)
-                self.readBody(then: completion)
+                if let pacing {
+                    self.after(pacing) { self.readBody(pacing: pacing, then: completion) }
+                } else {
+                    self.readBody(then: completion)
+                }
             }
         }
 
@@ -260,6 +268,9 @@ class RecordingDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
         var redirects: [(from: String, to: String)] = []
         var challenges: [String] = []
         var informationalResponses: [Int] = []
+        /// `networkProtocolName` of each transaction, e.g. `h3`.
+        var protocols: [String?] = []
+        var bytesSentAtCompletion: Int64?
 
         var completionErrorCodes: [URLError.Code?] { completions.map { ($0 as? URLError)?.code } }
     }
@@ -322,7 +333,10 @@ class RecordingDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
-        lock.withLock { events.metrics += 1 }
+        lock.withLock {
+            events.metrics += 1
+            events.protocols.append(contentsOf: metrics.transactionMetrics.map(\.networkProtocolName))
+        }
     }
 
     func urlSession(
@@ -334,7 +348,10 @@ class RecordingDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
-        lock.withLock { events.completions.append(error) }
+        lock.withLock {
+            events.completions.append(error)
+            events.bytesSentAtCompletion = task.countOfBytesSent
+        }
     }
 
     func recordRedirect(_ response: HTTPURLResponse, to request: URLRequest) -> URLRequest? {
@@ -411,9 +428,15 @@ enum UploadTestSupport {
     /// Long enough that a test returning before it proves the early response was used.
     static let requestTimeout: TimeInterval = 10
 
+    /// A file of `size` zero bytes. It's sparse — sized without writing anything — because dozens
+    /// of tests making 32 MB files at once tie up Swift's concurrency threads, which delays every
+    /// other test that sleeps or awaits.
     static func makeTempFile(size: Int = largeBodySize) throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try Data(count: size).write(to: url)
+        try Data().write(to: url)
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.truncate(atOffset: UInt64(size))
         return url
     }
 

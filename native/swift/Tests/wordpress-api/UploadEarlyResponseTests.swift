@@ -14,7 +14,7 @@ import Testing
 //
 // Gated to macOS and iOS, like the other `upload(...)` tests in `MultipartFormTests`.
 #if os(macOS) || os(iOS)
-@Suite("Upload early responses", .timeLimit(.minutes(1)))
+@Suite("Upload early responses", .serialized, .timeLimit(.minutes(1)))
 struct UploadEarlyResponseTests {
     typealias Support = UploadTestSupport
 

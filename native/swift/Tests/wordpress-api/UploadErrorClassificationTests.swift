@@ -7,7 +7,7 @@ import Testing
 // returns must reach the Rust layer and be classified exactly as it would be had the server read the
 // whole body first.
 #if os(macOS) || os(iOS)
-@Suite("Upload error classification", .timeLimit(.minutes(1)))
+@Suite("Upload error classification", .serialized, .timeLimit(.minutes(1)))
 struct UploadErrorClassificationTests {
     typealias Support = UploadTestSupport
 
