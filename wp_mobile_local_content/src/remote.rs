@@ -21,7 +21,7 @@ use crate::db_types::{
     working_copy_target::RemotePostReference,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum RemotePostConversionError {
     #[error("The post's {field} is missing; it must be fetched with the edit context")]
     MissingField { field: String },
