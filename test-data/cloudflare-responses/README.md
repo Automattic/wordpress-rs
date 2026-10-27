@@ -27,7 +27,7 @@ Recorded on 2026-10-26 and 2026-10-27 with `Accept: application/json`, like the 
 | `cf-522-html.http`, `cf-1016-html.http`, `cf-1002-html.http` | The branded HTML pages for `cf-522.`, `cf-1016.` and `cf-523.`, requested with `Accept: */*` as the login flow does |
 | `origin-wp-error-behind-cloudflare.http` | WordPress's own 401 from `testing.`, through Cloudflare |
 
-**Cloudflare's preview of a response**, `https://developers.cloudflare.com/cdn-cgi/error/<code>`, for codes the zone can't easily produce: `cf-500-json.http`, `cf-502-json.http`, `cf-504-json.http`, `cf-523-json.http`, `cf-524-json.http`, `cf-1020-json.http` and `cf-1020-plain-text.http`. The real 520–526 responses match their previews' shape.
+**Cloudflare's preview of a response**, `https://developers.cloudflare.com/cdn-cgi/error/<code>`, for codes the zone can't easily produce: `cf-500-json.http`, `cf-502-json.http`, `cf-504-json.http`, `cf-523-json.http`, `cf-524-json.http`, `cf-1020-json.http`, `cf-1020-plain-text.http` and `cf-1010-plain-text.http` (from the test zone's own `/cdn-cgi/error/1010`). The real 520–526 responses match their previews' shape.
 
 **Elsewhere:**
 

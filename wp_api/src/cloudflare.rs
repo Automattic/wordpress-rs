@@ -46,16 +46,16 @@ pub enum CloudflareErrorKind {
     /// The site's server didn't respond in time (522, 524).
     OriginTimeout,
     /// Cloudflare couldn't reach the site's server at all (523), or the site's
-    /// DNS doesn't lead to one it can use (1016, 1002).
+    /// DNS doesn't lead to one it can use (1000, 1001, 1002, 1016, 1034).
     OriginUnreachable,
     /// The site's server has an SSL problem (525, 526).
     OriginSsl,
     /// Cloudflare itself failed (500).
     CloudflareInternal,
-    /// Cloudflare is rate-limiting requests to the site (1015).
+    /// Cloudflare is rate-limiting requests to the site (1015, 1025, 1200).
     RateLimited,
-    /// A Cloudflare security rule on the site blocked the request (1020, or a
-    /// WAF block page).
+    /// A Cloudflare security rule on the site blocked the request (1005–1012,
+    /// 1020, or a WAF block page).
     AccessDenied,
     /// A bot-protection challenge that an app can never pass.
     Challenge,
@@ -164,9 +164,9 @@ fn ray_id_without_data_center(header_value: &str) -> String {
 
 fn parse_problem_details(body: &[u8]) -> Option<CloudflareProblemDetails> {
     let details: CloudflareProblemDetails = serde_json::from_slice(body).ok()?;
-    let is_cloudflare = details.cloudflare_error == Some(true)
-        || (details.error_code.is_some() && details.ray_id.is_some());
-    is_cloudflare.then_some(details)
+    // Every Cloudflare error body sets the flag. Similar-looking JSON without it
+    // could be the site's own.
+    (details.cloudflare_error == Some(true)).then_some(details)
 }
 
 /// Cloudflare's plain-text error body is exactly `error code: NNNN`.
@@ -208,16 +208,19 @@ fn kind_for(code: Option<u32>, status_code: u32, category: Option<&str>) -> Clou
         502 | 504 | 520 => OriginError,
         521 => OriginDown,
         522 | 524 => OriginTimeout,
-        // 1002 and 1016 also arrive as HTML pages, which have no `error_category`.
-        523 | 1002 | 1016 => OriginUnreachable,
         525 | 526 => OriginSsl,
         500 => CloudflareInternal,
-        1015 => RateLimited,
-        1020 => AccessDenied,
+        // Plain-text and HTML bodies have no `error_category`, so the 1xxx codes
+        // are listed by the category Cloudflare's JSON gives each of them.
+        // `access_denied`:
+        1005..=1012 | 1020 => AccessDenied,
+        // `rate_limit`:
+        1015 | 1025 | 1200 => RateLimited,
+        // `dns`: the site's DNS doesn't lead Cloudflare to a server it can use.
+        523 | 1000 | 1001 | 1002 | 1016 | 1034 => OriginUnreachable,
         _ => match category {
             Some("access_denied") => AccessDenied,
             Some("rate_limit") => RateLimited,
-            // The site's DNS doesn't lead Cloudflare to a server it can use, e.g. 1002.
             Some("dns") => OriginUnreachable,
             // A page without a code is reported by its HTTP status alone.
             _ if code.is_none() && status_code == 403 => AccessDenied,
@@ -338,14 +341,20 @@ pub(crate) mod tests {
         assert_eq!(parsed.kind, kind);
         assert_eq!(parsed.retry_after, retry_after);
         // The JSON's ray ID matches the header's, minus the data center.
-        let ray_id = parsed.ray_id.expect("Every Cloudflare error has a ray ID");
-        assert_eq!(ray_id.len(), 16, "{ray_id}");
+        let response = recorded_response(file_name, "https://example.com");
+        let header = response.response_header_map.get_str(HEADER_CF_RAY).unwrap();
+        assert_eq!(parsed.ray_id, Some(ray_id_without_data_center(header)));
     }
 
     #[rstest]
     #[case::origin_timeout("cf-522-plain-text.http", 522, CloudflareErrorKind::OriginTimeout)]
     #[case::firewall_rule("cf-1020-plain-text.http", 1020, CloudflareErrorKind::AccessDenied)]
     #[case::direct_ip_access("cf-1003-plain-text.http", 1003, CloudflareErrorKind::Other)]
+    #[case::browser_signature_banned(
+        "cf-1010-plain-text.http",
+        1010,
+        CloudflareErrorKind::AccessDenied
+    )]
     fn recognises_cloudflare_plain_text_errors(
         #[case] file_name: &str,
         #[case] code: u32,
@@ -400,6 +409,7 @@ pub(crate) mod tests {
     #[case("properties:{errorCode: 1016 },", Some(1016))]
     #[case("properties:{errorCode:1002},", Some(1002))]
     #[case("Error code ", None)]
+    #[case::falls_through_to_the_script_marker("Error code <b>x</b> errorCode: 1016", Some(1016))]
     #[case("Sorry, you have been blocked", None)]
     fn branded_error_page_code(#[case] body: &str, #[case] expected: Option<u32>) {
         assert_eq!(parse_branded_error_page_code(body), expected);
@@ -438,6 +448,17 @@ pub(crate) mod tests {
     fn ignores_cloudflare_bodies_without_cloudflare_headers() {
         let mut response = recorded_response("cf-1020-plain-text.http", "https://example.com");
         response.response_header_map = Arc::new(WpNetworkHeaderMap::default());
+        assert_eq!(CloudflareErrorResponse::try_from_response(&response), None);
+    }
+
+    /// JSON that looks like Cloudflare's but doesn't set its flag could be the
+    /// site's own, e.g. from a plugin or a Worker.
+    #[rstest]
+    #[case::flag_false(r#"{"cloudflare_error":false,"error_code":42,"ray_id":"a50c80a41cb4ff4c"}"#)]
+    #[case::flag_missing(r#"{"error_code":42,"ray_id":"a50c80a41cb4ff4c"}"#)]
+    fn ignores_json_without_cloudflares_flag(#[case] body: &str) {
+        let mut response = recorded_response("cf-1020-json.http", "https://example.com");
+        response.body = body.as_bytes().to_vec();
         assert_eq!(CloudflareErrorResponse::try_from_response(&response), None);
     }
 
