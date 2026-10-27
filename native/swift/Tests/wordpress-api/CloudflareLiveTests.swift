@@ -114,6 +114,10 @@ struct CloudflareLiveTests {
     ///
     /// Cloudflare usually answers 413, but sometimes 502 with no code, after the client has sent the
     /// whole body. Either way it's Cloudflare's own page.
+    ///
+    /// Over HTTP/3, which `URLSession` picks from the zone's DNS `HTTPS` record, the upload never
+    /// sees that answer: it times out after 60 seconds or fails to parse the response. That's the
+    /// separate early-response bug in CMM-2500, recorded here as a known issue so it's visible.
     @Test
     func uploadTooLarge() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("wprs-cloudflare-150mb.mp4")
@@ -124,11 +128,22 @@ struct CloudflareLiveTests {
         defer { try? FileManager.default.removeItem(at: file) }
 
         let api = try api(host: "testing")
-        let error = try await cloudflareError {
+        do {
             _ = try await api.media.create(params: MediaCreateParams(filePath: file.path))
+            Issue.record("The upload was expected to fail")
+        } catch let WpApiError.RequestExecutionFailed(_, _, reason, _, _) {
+            switch reason {
+            case let .cloudflareError(_, code, kind, rayId, _):
+                #expect(code == nil)
+                #expect([.requestTooLarge, .originError].contains(kind))
+                #expect(rayId != nil)
+            case .httpTimeoutError, .genericError:
+                withKnownIssue("Over HTTP/3, URLSession doesn't see Cloudflare's early 413 (CMM-2500)") {
+                    Issue.record("The upload ended with \(reason) instead of Cloudflare's 413")
+                }
+            default:
+                Issue.record("Expected a Cloudflare error, got \(reason)")
+            }
         }
-        #expect(error.code == nil)
-        #expect([.requestTooLarge, .originError].contains(error.kind))
-        #expect(error.rayId != nil)
     }
 }
