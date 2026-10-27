@@ -17,15 +17,6 @@ pub trait QueryExecutor {
     -> Result<usize, LocalContentError>;
 }
 
-/// Trait for types that can manage database transactions.
-///
-/// This is separate from QueryExecutor because not all query executors can create transactions
-/// (e.g., a Transaction itself cannot create nested transactions in our design).
-pub trait TransactionManager: QueryExecutor {
-    /// Begin a database transaction (requires mutable access).
-    fn transaction(&mut self) -> Result<rusqlite::Transaction<'_>, LocalContentError>;
-}
-
 /// Marker trait indicating operations are executing within a transaction context.
 ///
 /// This trait is only implemented by Transaction types, so an operation that takes
@@ -45,12 +36,6 @@ impl QueryExecutor for Connection {
         params: impl rusqlite::Params,
     ) -> Result<usize, LocalContentError> {
         self.execute(sql, params).map_err(LocalContentError::from)
-    }
-}
-
-impl TransactionManager for Connection {
-    fn transaction(&mut self) -> Result<rusqlite::Transaction<'_>, LocalContentError> {
-        rusqlite::Connection::transaction(self).map_err(LocalContentError::from)
     }
 }
 
