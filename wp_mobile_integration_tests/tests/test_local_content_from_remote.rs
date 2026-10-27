@@ -317,17 +317,7 @@ async fn test_trashed_server_post_is_refused() {
         .trash(&PostEndpointType::Posts, &post.id)
         .await
         .expect("Trashing the post should succeed");
-    let trashed = ctx
-        .api
-        .posts()
-        .retrieve_with_edit_context(
-            &PostEndpointType::Posts,
-            &PostId(post.id.0),
-            &PostRetrieveParams::default(),
-        )
-        .await
-        .expect("Fetching the trashed post should succeed")
-        .data;
+    let trashed = fetch(&ctx.api, &PostEndpointType::Posts, post.id).await;
 
     assert_eq!(
         PostWorkingCopy::from_remote(&trashed),
