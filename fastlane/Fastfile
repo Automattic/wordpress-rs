@@ -738,7 +738,7 @@ def set_up_certificate_in_keychain(type:, readonly:)
   # This will fetch the certificate for the given type from remote storage
   # and set it up in the local keychain, where 'codesign' looks for identities.
   #
-  # Given XCFrameworks can signed be with Developer ID distribution and
+  # Given XCFrameworks can be signed with Developer ID distribution and
   # this framework has no entitlement requirement, we don't need a provisioning
   # profile and therefore don't need an app identifier to match it with either.
   sync_code_signing(
