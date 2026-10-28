@@ -395,7 +395,7 @@ fn insert_common(
     common: &WorkingCopyCommon,
 ) -> Result<(WorkingCopyId, i64), LocalContentError> {
     let id = WorkingCopyId::generate();
-    let (status, password) = common.status.to_columns()?;
+    let (status, password) = common.status.to_columns();
     let mut stmt = transaction.prepare(&format!(
         "INSERT INTO {WORKING_COPIES} (
              uuid, kind, title, content, excerpt, slug, status, password, publish_date,
@@ -431,7 +431,7 @@ fn update_common(
     id: &WorkingCopyId,
     common: &WorkingCopyCommon,
 ) -> Result<Option<i64>, LocalContentError> {
-    let (status, password) = common.status.to_columns()?;
+    let (status, password) = common.status.to_columns();
     let mut stmt = transaction.prepare(&format!(
         "UPDATE {WORKING_COPIES} SET
              title = ?, content = ?, excerpt = ?, slug = ?, status = ?, password = ?,
@@ -1175,40 +1175,64 @@ mod tests {
         assert!(!updated);
     }
 
-    /// A custom status another variant stands for would read back as that
-    /// variant, or be a second way to store the same status, and an empty one
-    /// is no status at all.
+    /// A custom status another variant stands for is saved as that variant, so
+    /// each status reads back one way. A status no other variant stands for
+    /// stays custom.
     #[test]
-    fn test_saving_a_custom_status_another_variant_stands_for_fails() {
+    fn test_custom_status_another_variant_stands_for_is_saved_as_that_variant() {
         let mut conn = migrated_connection();
         let target = self_hosted_new_post_target();
-        let id = insert_post(&mut conn, &simple_post("Saved"), &target);
+        let saved = insert_post(&mut conn, &simple_post("Saved"), &target);
+        let secret = || Some("secret".to_string());
 
-        for status in ["", "draft", "pending", "publish", "private", "future"] {
+        for (status, expected) in [
+            ("draft", StatusSetting::Draft { password: secret() }),
+            (
+                "pending",
+                StatusSetting::PendingReview { password: secret() },
+            ),
+            ("publish", StatusSetting::Publish { password: secret() }),
+            // A scheduled post is `Publish` with a future publish date.
+            ("future", StatusSetting::Publish { password: secret() }),
+            // WordPress clears the password when saving a private post.
+            ("private", StatusSetting::Private),
+            ("", StatusSetting::Draft { password: secret() }),
+            (
+                "in-review",
+                StatusSetting::Custom {
+                    status: "in-review".to_string(),
+                    password: secret(),
+                },
+            ),
+        ] {
             let post = PostWorkingCopy {
                 common: WorkingCopyCommon {
                     status: StatusSetting::Custom {
                         status: status.to_string(),
-                        password: None,
+                        password: secret(),
                     },
                     ..common("Custom")
                 },
                 ..simple_post("Custom")
             };
+            let inserted = insert_post(&mut conn, &post, &target);
             let tx = conn.transaction().expect("Failed to begin transaction");
-            let inserted = WorkingCopyRepository.insert_post(&tx, &post, &target);
-            let updated = WorkingCopyRepository.update_post(&tx, &id, &post);
-            let expected = LocalContentError::InvalidCustomStatus {
-                status: status.to_string(),
+            WorkingCopyRepository
+                .update_post(&tx, &saved, &post)
+                .expect("Update should succeed");
+            tx.commit().expect("Commit should succeed");
+            let status_of = |id: &WorkingCopyId| {
+                WorkingCopyRepository
+                    .select_post(&conn, id)
+                    .expect("Select should succeed")
+                    .expect("The post should exist")
+                    .working_copy
+                    .common
+                    .status
             };
 
-            assert_eq!(
-                inserted.err(),
-                Some(expected.clone()),
-                "inserting {status:?}"
-            );
-            assert_eq!(updated.err(), Some(expected), "updating {status:?}");
-            assert_eq!(count_rows(&tx, WORKING_COPIES), 1, "inserting {status:?}");
+            assert_eq!(status_of(&inserted), expected, "inserting {status:?}");
+            assert_eq!(status_of(&saved), expected, "updating {status:?}");
         }
     }
 
