@@ -10,6 +10,9 @@ buildkite-agent artifact download 'native/swift/Sources/wordpress-api-wrapper/*.
 echo "--- :swift: Assembling XCFramework"
 make xcframework-assemble
 
+echo "--- :lock: Signing XCFramework"
+make xcframework-sign
+
 echo "--- :package: Packaging XCFramework"
 rm -rf target/libwordpressFFI.xcframework.zip
 ditto -c -k --sequesterRsrc --keepParent target/libwordpressFFI.xcframework/ target/libwordpressFFI.xcframework.zip
