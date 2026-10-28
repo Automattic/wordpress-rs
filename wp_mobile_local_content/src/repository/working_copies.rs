@@ -12,8 +12,8 @@ use crate::{
     db_types::{
         working_copy::{
             DbPageWorkingCopy, DbPostWorkingCopy, FeaturedImage, PageFieldsColumn, PageWorkingCopy,
-            PostFieldsColumn, PostWorkingCopy, PublishDate, StatusSetting, Tag, WorkingCopyColumn,
-            WorkingCopyCommon, WorkingCopyId, WorkingCopyKind, date_from_timestamp,
+            PostFieldsColumn, PostWorkingCopy, PublishDate, StatusSetting, WorkingCopyColumn,
+            WorkingCopyCommon, WorkingCopyId, WorkingCopyKind, WorkingCopyTag, date_from_timestamp,
         },
         working_copy_target::{
             RemotePostReference, SiteColumn, SiteIdentity, WorkingCopyTarget,
@@ -785,11 +785,11 @@ fn categories_from_json(json: &str) -> Result<Vec<TermId>, FromSqlError> {
     Ok(ids.into_iter().map(TermId).collect())
 }
 
-fn tags_to_json(tags: &[Tag]) -> Result<String, LocalContentError> {
+fn tags_to_json(tags: &[WorkingCopyTag]) -> Result<String, LocalContentError> {
     serde_json::to_string(tags).map_err(json_error)
 }
 
-fn tags_from_json(json: &str) -> Result<Vec<Tag>, FromSqlError> {
+fn tags_from_json(json: &str) -> Result<Vec<WorkingCopyTag>, FromSqlError> {
     serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))
 }
 
@@ -908,8 +908,8 @@ mod tests {
             },
             categories: vec![TermId(1), TermId(5)],
             tags: vec![
-                Tag::Existing { id: TermId(3) },
-                Tag::New {
+                WorkingCopyTag::Existing { id: TermId(3) },
+                WorkingCopyTag::New {
                     name: "not on the site yet".to_string(),
                 },
             ],
