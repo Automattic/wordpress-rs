@@ -22,8 +22,8 @@ import uniffi.wp_mobile_local_content.RemotePostConversionException
 import uniffi.wp_mobile_local_content.RemotePostReference
 import uniffi.wp_mobile_local_content.SiteIdentity
 import uniffi.wp_mobile_local_content.StatusSetting
-import uniffi.wp_mobile_local_content.Tag
 import uniffi.wp_mobile_local_content.WorkingCopyCommon
+import uniffi.wp_mobile_local_content.WorkingCopyTag
 import uniffi.wp_mobile_local_content.WorkingCopyTarget
 import uniffi.wp_mobile_local_content.WpLocalContentStore
 import uniffi.wp_mobile_local_content.postWorkingCopyFromRemote
@@ -105,7 +105,7 @@ class LocalContentTest {
                 commentStatus = PostCommentStatus.Closed
             ),
             categories = listOf(1L, 5L),
-            tags = listOf(Tag.Existing(id = 3L), Tag.New(name = "not on the site yet")),
+            tags = listOf(WorkingCopyTag.Existing(id = 3L), WorkingCopyTag.New(name = "not on the site yet")),
             format = PostFormat.Aside,
             sticky = true
         )
