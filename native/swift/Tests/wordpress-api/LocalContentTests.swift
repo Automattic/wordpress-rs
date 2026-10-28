@@ -80,38 +80,34 @@ final class LocalContentTests {
             sticky: true
         )
 
+        let target = newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: 123_456_789))
+
         let service = try openService()
-        let created = try service.readOrCreatePostWorkingCopy(
-            target: newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: 123_456_789)),
-            workingCopy: post(title: "Original")
-        )
+        let created = try service.readOrCreatePostWorkingCopy(target: target, workingCopy: post(title: "Original"))
         let id = created.id
         try service.savePostWorkingCopy(id: id, workingCopy: edited)
         let read = try #require(try openService().readPostWorkingCopy(id: id))
 
-        // `WorkingCopyTarget` isn't `Equatable` in Swift, so compare its parts.
         #expect(read.workingCopy == edited)
-        #expect(read.target.remotePost == nil)
-        #expect(read.target.site.url == siteUrl)
-        #expect(read.target.site.wordpressComSiteId == 123_456_789)
+        #expect(read.target == target)
     }
 
     @Test func savedPageWorkingCopySurvivesReopeningTheDatabase() throws {
-        let edited = PageWorkingCopy(common: common(title: "Edited page"), parent: 3)
+        let target = newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: nil))
 
         let service = try openService()
         let created = try service.readOrCreatePageWorkingCopy(
-            target: newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)),
+            target: target,
             workingCopy: PageWorkingCopy(common: common(title: "Original page"), parent: nil)
         )
-        let id = created.id
-        try service.savePageWorkingCopy(id: id, workingCopy: edited)
-        let read = try #require(try openService().readPageWorkingCopy(id: id))
+        var edited = created.workingCopy
+        edited.common.title = "Edited page"
+        edited.parent = 3
+        try service.savePageWorkingCopy(id: created.id, workingCopy: edited)
+        let read = try #require(try openService().readPageWorkingCopy(id: created.id))
 
         #expect(read.workingCopy == edited)
-        #expect(read.target.remotePost == nil)
-        #expect(read.target.site.url == siteUrl)
-        #expect(read.target.site.wordpressComSiteId == nil)
+        #expect(read.target == target)
     }
 
     @Test func savingAPageAsAPostThrows() throws {

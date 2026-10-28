@@ -88,6 +88,22 @@ function patch_wp_mobile {
     generate_localized_error_extension wp_mobile "$1"
 }
 
+function patch_wp_mobile_local_content {
+    local swift_binding=$1
+    # An editor changes a working copy one field at a time.
+    enable_mutability "$swift_binding" WorkingCopyCommon PostWorkingCopy PageWorkingCopy
+
+    cat >> "$swift_binding" <<'PATCH'
+
+// These types contain `ParsedUrl` (a reference type) which prevents automatic
+// Hashable synthesis. `ParsedUrl` is Hashable, so add the conformance manually.
+extension SiteIdentity: Hashable {}
+extension WorkingCopyTarget: Hashable {}
+extension DbPostWorkingCopy: Hashable {}
+extension DbPageWorkingCopy: Hashable {}
+PATCH
+}
+
 for swift_binding in "$output_dir"/*.swift; do
     basename=$(basename "$swift_binding" .swift)
     if [ "$(type -t "patch_$basename")" = "function" ]; then
