@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** Posts' and pages' `menu_order` is now a signed `Option<i64>` instead of `Option<u32>`, in `SparseAnyPost`, `PostCreateParams` and `PostUpdateParams`. WordPress stores `menu_order` as a signed integer, and negative values are commonly used to pin a page to the top of a list. Listing pages on such a site previously failed to parse the whole response (`invalid value: integer -1000, expected u32`), so the entire page list came back as an error. Swift and Kotlin now see `Int64?` where they saw `UInt32?`.
 
+### Fixed
+
+- A media upload file that exists but can't be read is now reported as `MediaFileUnreadable` on both platforms, and `MediaFileNotFound` is reserved for a path with nothing at it. Swift reported every field-construction failure (including permission and sandbox denials) as `MediaFileNotFound`, and Kotlin did the same for a directory or a file without read permission, while the other platform reported `MediaFileUnreadable` for the same input. The rustdoc for both variants now describes this split, which is by what's at the path rather than by when the read failed.
+
 ### Changed
 
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.99.0` to `1.99.1`.

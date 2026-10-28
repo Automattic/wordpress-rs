@@ -39,11 +39,13 @@ pub enum WpApiError {
         request_url: String,
         request_method: RequestMethod,
     },
+    /// Nothing exists at the media file's path. See
+    /// [`RequestExecutionError::MediaFileNotFound`].
     MediaFileNotFound {
         file_path: String,
     },
-    /// A media file that exists but could not be read while its multipart body was
-    /// being serialized. See [`RequestExecutionError::MediaFileUnreadable`].
+    /// Something exists at the media file's path but it could not be read. See
+    /// [`RequestExecutionError::MediaFileUnreadable`].
     MediaFileUnreadable {
         file_path: String,
     },
@@ -620,17 +622,16 @@ pub enum RequestExecutionError {
         request_url: String,
         request_method: RequestMethod,
     },
-    MediaFileNotFound {
-        file_path: String,
-    },
-    /// A media file that exists but could not be read while its multipart body was
-    /// being serialized (e.g. deleted mid-upload, or a storage read error).
+    /// Nothing exists at the media file's path, checked before the upload starts.
+    MediaFileNotFound { file_path: String },
+    /// Something exists at the media file's path but it could not be read: a
+    /// directory, a file without read permission, a storage read error, or a file
+    /// that disappeared after the upload started.
     ///
-    /// Distinct from [`RequestExecutionError::MediaFileNotFound`], raised when the
-    /// file can't be opened at all: here it opened and then failed partway through.
-    MediaFileUnreadable {
-        file_path: String,
-    },
+    /// Distinct from [`RequestExecutionError::MediaFileNotFound`], where nothing
+    /// is at the path at all. The split is by what's at the path, not by when the
+    /// read failed, so both executors classify the same input the same way.
+    MediaFileUnreadable { file_path: String },
 }
 
 impl WpSupportsLocalization for RequestExecutionError {
