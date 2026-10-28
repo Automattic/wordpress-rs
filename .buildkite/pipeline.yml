@@ -93,7 +93,6 @@ steps:
           echo "--- :swift: Assembling XCFramework"
           .buildkite/assemble-xcframework.sh
           make xcframework-package-checksum
-          make xcframework-sign
 
         artifact_paths:
           - target/libwordpressFFI.xcframework.zip
