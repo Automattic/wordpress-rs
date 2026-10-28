@@ -10,13 +10,13 @@ use uuid::Uuid;
 use wp_api::{
     date::WpGmtDateTime,
     media::MediaId,
-    posts::{PostCommentStatus, PostFormat, PostId, PostPingStatus},
+    posts::{PostCommentStatus, PostFormat, PostId, PostPingStatus, PostStatus},
     terms::TermId,
     users::UserId,
 };
 use wp_mobile_sqlite::ColumnIndex;
 
-use crate::{LocalContentError, db_types::working_copy_target::WorkingCopyTarget};
+use crate::db_types::working_copy_target::WorkingCopyTarget;
 
 uniffi::custom_newtype!(WorkingCopyId, String);
 
@@ -63,9 +63,10 @@ pub enum StatusSetting {
     Private,
     /// A status registered by a plugin.
     ///
-    /// Saving fails with `InvalidCustomStatus` if `status` is empty or one the
-    /// other variants stand for: `draft`, `pending`, `publish`, `private`, or
-    /// `future`, which is `Publish` with a future `PublishDate`.
+    /// A status another variant stands for is saved as that variant: `draft`
+    /// as `Draft`, `pending` as `PendingReview`, `publish` and `future` as
+    /// `Publish`, and `private` as `Private`, without its password. An empty
+    /// status is saved as `Draft`.
     Custom {
         status: String,
         password: Option<String>,
@@ -178,29 +179,26 @@ impl WorkingCopyKind {
 }
 
 impl StatusSetting {
-    /// The statuses the variants other than `Custom` stand for.
-    const MODELED_STATUSES: [&'static str; 5] =
-        ["draft", "pending", "publish", "private", "future"];
-
     /// The `status` and `password` column values. The status is stored as
-    /// WordPress names it.
-    ///
-    /// Fails with `InvalidCustomStatus` for a `Custom` status that's empty or
-    /// that another variant stands for.
-    pub(crate) fn to_columns(&self) -> Result<(&str, Option<&str>), LocalContentError> {
+    /// WordPress names it, and a `Custom` status another variant stands for is
+    /// stored as that variant, so it reads back as one.
+    pub(crate) fn to_columns(&self) -> (&str, Option<&str>) {
         match self {
-            Self::Draft { password } => Ok(("draft", password.as_deref())),
-            Self::PendingReview { password } => Ok(("pending", password.as_deref())),
-            Self::Publish { password } => Ok(("publish", password.as_deref())),
-            Self::Private => Ok(("private", None)),
-            Self::Custom { status, .. }
-                if status.is_empty() || Self::MODELED_STATUSES.contains(&status.as_str()) =>
-            {
-                Err(LocalContentError::InvalidCustomStatus {
-                    status: status.clone(),
-                })
+            Self::Draft { password } => ("draft", password.as_deref()),
+            Self::PendingReview { password } => ("pending", password.as_deref()),
+            Self::Publish { password } => ("publish", password.as_deref()),
+            Self::Private => ("private", None),
+            Self::Custom { status, password } => {
+                let password = password.as_deref();
+                match status.parse::<PostStatus>() {
+                    Ok(PostStatus::Draft) => ("draft", password),
+                    Ok(PostStatus::Pending) => ("pending", password),
+                    Ok(PostStatus::Publish | PostStatus::Future) => ("publish", password),
+                    Ok(PostStatus::Private) => ("private", None),
+                    _ if status.is_empty() => ("draft", password),
+                    _ => (status, password),
+                }
             }
-            Self::Custom { status, password } => Ok((status, password.as_deref())),
         }
     }
 
