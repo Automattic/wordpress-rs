@@ -81,10 +81,12 @@ impl WpLocalContentStore {
         })
     }
 
+    /// Run the migrations [`MIGRATIONS`] holds that haven't run yet, and return
+    /// how many ran.
     pub fn perform_migrations(&self) -> Result<i64, LocalContentError> {
         self.execute(|connection| {
             let mut mgr = MigrationManager::new(connection, &MIGRATIONS)?;
-            Ok(mgr.perform_migrations()?)
+            Ok(mgr.perform_migrations_with_foreign_keys_off()?)
         })
     }
 }
@@ -103,10 +105,11 @@ impl WpLocalContentStore {
 
 /// The local content migrations, in the order [`MigrationManager`] applies them.
 ///
-/// Foreign keys are enforced while they run, so dropping a table that other
-/// tables reference with `ON DELETE CASCADE` deletes the referencing rows. A
-/// migration can't rebuild `working_copies` by copying it to a new table and
-/// dropping the original: every working copy would lose its fields and target.
+/// They run with foreign key enforcement off and every foreign key is checked
+/// before they commit, so dropping a table doesn't delete the rows referencing
+/// it. A migration can rebuild a table such as `working_copies` the way SQLite
+/// documents: create the new table, copy the rows into it, drop the old one,
+/// then rename the new one to the old name.
 pub static MIGRATIONS: [&str; 1] = [include_str!(
     "../migrations/0001-create-working-copies-tables.sql"
 )];

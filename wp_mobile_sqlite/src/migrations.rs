@@ -1,6 +1,6 @@
-use rusqlite::{Connection, Result as SqliteResult, params};
+use rusqlite::{Connection, OptionalExtension, Result as SqliteResult, ffi, params};
 
-use crate::connection::{ConnectionError, prepare_connection};
+use crate::connection::{ConnectionError, enable_foreign_keys, prepare_connection};
 
 /// Runs a database's migrations in order, recording each applied migration in
 /// a `_migrations` table.
@@ -9,9 +9,9 @@ use crate::connection::{ConnectionError, prepare_connection};
 /// SQL statements. A migration's ID is its 1-based position in the list, so
 /// entries can only ever be appended.
 ///
-/// Every pending migration runs in a single `BEGIN EXCLUSIVE` transaction with
-/// foreign key enforcement on, and a `PRAGMA foreign_keys` in a migration has
-/// no effect inside it.
+/// Every pending migration runs in a single `BEGIN EXCLUSIVE` transaction, and
+/// a `PRAGMA foreign_keys` in a migration has no effect inside it. Whether
+/// foreign keys are enforced while they run depends on the method running them.
 pub struct MigrationManager<'a> {
     connection: &'a Connection,
     migrations: &'static [&'static str],
@@ -33,10 +33,41 @@ impl<'a> MigrationManager<'a> {
         })
     }
 
+    /// Run the pending migrations with foreign key enforcement on, so foreign
+    /// key actions run as the migrations change rows: dropping a table deletes
+    /// the rows that reference it with `ON DELETE CASCADE`.
     pub fn perform_migrations(&mut self) -> SqliteResult<i64> {
+        self.migrate_in_transaction(false)
+    }
+
+    /// Run the pending migrations the way SQLite documents for schema changes:
+    /// with foreign key enforcement off, checking every foreign key before
+    /// committing.
+    ///
+    /// Dropping a table leaves the rows that reference it alone, so a migration
+    /// can rebuild a referenced table: create the new table, copy the rows
+    /// into it, drop the old one, then rename the new one to the old name. If
+    /// the migrations leave a row referencing one that doesn't exist, they're
+    /// rolled back and a `FOREIGN KEY` constraint error is returned.
+    /// Enforcement is turned back on whether or not they succeed.
+    pub fn perform_migrations_with_foreign_keys_off(&mut self) -> Result<i64, ConnectionError> {
+        // Set before the migrations' transaction opens: inside one it has no effect.
+        self.connection.pragma_update(None, "foreign_keys", false)?;
+        let result = self.migrate_in_transaction(true);
+        enable_foreign_keys(self.connection)?;
+        Ok(result?)
+    }
+
+    fn migrate_in_transaction(&mut self, check_foreign_keys: bool) -> SqliteResult<i64> {
         self.connection.execute("BEGIN EXCLUSIVE", ())?;
 
-        match self.migrate() {
+        let result = self.migrate().and_then(|count| {
+            if check_foreign_keys {
+                self.check_foreign_keys()?;
+            }
+            Ok(count)
+        });
+        match result {
             Ok(count) => {
                 self.connection.execute("COMMIT", ())?;
                 Ok(count)
@@ -45,6 +76,26 @@ impl<'a> MigrationManager<'a> {
                 let _ = self.connection.execute("ROLLBACK", ());
                 Err(e)
             }
+        }
+    }
+
+    /// Fails with a `FOREIGN KEY` constraint error naming the first violation
+    /// `PRAGMA foreign_key_check` reports.
+    fn check_foreign_keys(&self) -> SqliteResult<()> {
+        let violation = self
+            .connection
+            .query_row("PRAGMA foreign_key_check", [], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(2)?))
+            })
+            .optional()?;
+        match violation {
+            None => Ok(()),
+            Some((table, parent)) => Err(rusqlite::Error::SqliteFailure(
+                ffi::Error::new(ffi::SQLITE_CONSTRAINT_FOREIGNKEY),
+                Some(format!(
+                    "Migrations left a row in {table} referencing a missing row in {parent}"
+                )),
+            )),
         }
     }
 
@@ -124,6 +175,37 @@ mod tests {
         "ALTER TABLE first ADD COLUMN name TEXT;",
     ];
 
+    /// A `parent` table and a `child` table referencing it with `ON DELETE CASCADE`.
+    const PARENT_AND_CHILD: &str = "CREATE TABLE parent (id INTEGER PRIMARY KEY);
+         CREATE TABLE child (parent_id INTEGER NOT NULL REFERENCES parent(id) ON DELETE CASCADE);";
+
+    /// Runs the first of `migrations`, adds a parent with two children, then
+    /// runs the rest with foreign keys off.
+    fn migrate_with_children(
+        migrations: &'static [&'static str],
+    ) -> (Connection, Result<i64, ConnectionError>) {
+        let conn = Connection::open_in_memory().expect("Failed to open in-memory database");
+        MigrationManager::new(&conn, &migrations[..1])
+            .expect("MigrationManager creation should succeed")
+            .perform_migrations_with_foreign_keys_off()
+            .expect("The first migration should succeed");
+        conn.execute_batch(
+            "INSERT INTO parent (id) VALUES (1); INSERT INTO child VALUES (1), (1);",
+        )
+        .expect("Inserting rows should succeed");
+        let result = MigrationManager::new(&conn, migrations)
+            .expect("MigrationManager creation should succeed")
+            .perform_migrations_with_foreign_keys_off();
+        (conn, result)
+    }
+
+    fn count_rows(conn: &Connection, table: &str) -> i64 {
+        conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+            row.get(0)
+        })
+        .expect("Counting rows should succeed")
+    }
+
     #[test]
     fn test_migration_manager_enables_foreign_keys_on_a_connection_that_had_them_off() {
         let conn = connection_without_foreign_keys();
@@ -196,6 +278,52 @@ mod tests {
             result.is_err(),
             "Expected error when migration index exceeds available migrations"
         );
+    }
+
+    #[test]
+    fn test_migrations_with_foreign_keys_off_can_rebuild_a_referenced_table() {
+        static REBUILD_PARENT: [&str; 2] = [
+            PARENT_AND_CHILD,
+            "CREATE TABLE new_parent (id INTEGER PRIMARY KEY, name TEXT);
+             INSERT INTO new_parent (id) SELECT id FROM parent;
+             DROP TABLE parent;
+             ALTER TABLE new_parent RENAME TO parent;",
+        ];
+
+        let (conn, result) = migrate_with_children(&REBUILD_PARENT);
+
+        assert_eq!(result.expect("Rebuilding the parent should succeed"), 1);
+        assert_eq!(
+            count_rows(&conn, "child"),
+            2,
+            "Rebuilding the parent must keep the rows referencing it"
+        );
+        assert!(foreign_keys_enabled(&conn), "Enforcement must be back on");
+    }
+
+    #[test]
+    fn test_migrations_with_foreign_keys_off_are_rolled_back_when_they_leave_a_reference_dangling()
+    {
+        static DELETE_PARENTS: [&str; 2] = [PARENT_AND_CHILD, "DELETE FROM parent;"];
+
+        let (conn, result) = migrate_with_children(&DELETE_PARENTS);
+        let applied: i64 = conn
+            .query_row("SELECT MAX(migration_id) FROM _migrations", [], |row| {
+                row.get(0)
+            })
+            .expect("Reading the applied migrations should succeed");
+
+        assert!(
+            matches!(
+                &result,
+                Err(ConnectionError::Sqlite(rusqlite::Error::SqliteFailure(err, _)))
+                    if err.extended_code == ffi::SQLITE_CONSTRAINT_FOREIGNKEY
+            ),
+            "Expected a foreign key error, got {result:?}"
+        );
+        assert_eq!(applied, 1, "The migration should be rolled back");
+        assert_eq!(count_rows(&conn, "parent"), 1, "The parent should be back");
+        assert!(foreign_keys_enabled(&conn), "Enforcement must be back on");
     }
 
     #[test]
