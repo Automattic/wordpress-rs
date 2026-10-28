@@ -1,10 +1,12 @@
 //! Making a working copy from a remote post.
 //!
 //! Every value a working copy holds is converted without loss, so a working
-//! copy made from a remote post starts out holding what the server holds.
-//! Fields the working copy doesn't model, such as the template, menu order and
-//! meta, are not part of it; they stay as they are on the server provided that
-//! pushing a working copy sends only the fields the user changed.
+//! copy made from a remote post starts out holding what the server holds. The
+//! one exception is a password on a private post: it's dropped, as WordPress
+//! drops it when saving a private post. Fields the working copy doesn't model,
+//! such as the template, menu order and meta, are not part of it; they stay as
+//! they are on the server provided that pushing a working copy sends only the
+//! fields the user changed.
 
 use wp_api::{
     date::WpDateString,
@@ -27,8 +29,6 @@ pub enum RemotePostConversionError {
     MissingField { field: String },
     #[error("A post with status {status} can't be edited")]
     UneditableStatus { status: String },
-    #[error("A private post can't have a password")]
-    PrivatePostWithPassword,
     #[error("Expected post type {expected}, got {actual}")]
     WrongPostType { expected: String, actual: String },
 }
@@ -183,10 +183,9 @@ fn status_from_remote(
         // WordPress stores a scheduled post as `future` and turns it back into
         // `publish` once its date passes, so the date alone carries the schedule.
         PostStatus::Publish | PostStatus::Future => Ok(StatusSetting::Publish { password }),
-        // WordPress clears the password when saving a private post, so one
-        // never comes back. If it did, there'd be nowhere to keep it.
-        PostStatus::Private if password.is_none() => Ok(StatusSetting::Private),
-        PostStatus::Private => Err(RemotePostConversionError::PrivatePostWithPassword),
+        // A private post has no password: WordPress clears it when saving one,
+        // so one that comes back anyway is dropped.
+        PostStatus::Private => Ok(StatusSetting::Private),
         PostStatus::Custom(status) => Ok(StatusSetting::Custom {
             status: status.clone(),
             password,
@@ -339,7 +338,8 @@ mod tests {
                 "",
                 StatusSetting::Publish { password: None },
             ),
-            (PostStatus::Private, "", StatusSetting::Private),
+            // A private post's password is dropped, as WordPress drops it.
+            (PostStatus::Private, "secret", StatusSetting::Private),
             (
                 PostStatus::Custom("in-review".to_string()),
                 "secret",
@@ -448,14 +448,6 @@ mod tests {
                 RemotePostConversionError::MissingField {
                     field: "content.raw".to_string(),
                 },
-            ),
-            (
-                AnyPostWithEditContext {
-                    status: PostStatus::Private,
-                    password: Some("secret".to_string()),
-                    ..remote_post()
-                },
-                RemotePostConversionError::PrivatePostWithPassword,
             ),
             (
                 AnyPostWithEditContext {
