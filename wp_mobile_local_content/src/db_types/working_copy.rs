@@ -16,7 +16,7 @@ use wp_api::{
 };
 use wp_mobile_sqlite::ColumnIndex;
 
-use crate::db_types::working_copy_target::WorkingCopyTarget;
+use crate::{LocalContentError, db_types::working_copy_target::WorkingCopyTarget};
 
 uniffi::custom_newtype!(WorkingCopyId, String);
 
@@ -62,6 +62,10 @@ pub enum StatusSetting {
     },
     Private,
     /// A status registered by a plugin.
+    ///
+    /// Saving fails with `InvalidCustomStatus` if `status` is empty or one the
+    /// other variants stand for: `draft`, `pending`, `publish`, `private`, or
+    /// `future`, which is `Publish` with a future `PublishDate`.
     Custom {
         status: String,
         password: Option<String>,
@@ -174,15 +178,29 @@ impl WorkingCopyKind {
 }
 
 impl StatusSetting {
+    /// The statuses the variants other than `Custom` stand for.
+    const MODELED_STATUSES: [&'static str; 5] =
+        ["draft", "pending", "publish", "private", "future"];
+
     /// The `status` and `password` column values. The status is stored as
     /// WordPress names it.
-    pub(crate) fn to_columns(&self) -> (&str, Option<&str>) {
+    ///
+    /// Fails with `InvalidCustomStatus` for a `Custom` status that's empty or
+    /// that another variant stands for.
+    pub(crate) fn to_columns(&self) -> Result<(&str, Option<&str>), LocalContentError> {
         match self {
-            Self::Draft { password } => ("draft", password.as_deref()),
-            Self::PendingReview { password } => ("pending", password.as_deref()),
-            Self::Publish { password } => ("publish", password.as_deref()),
-            Self::Private => ("private", None),
-            Self::Custom { status, password } => (status, password.as_deref()),
+            Self::Draft { password } => Ok(("draft", password.as_deref())),
+            Self::PendingReview { password } => Ok(("pending", password.as_deref())),
+            Self::Publish { password } => Ok(("publish", password.as_deref())),
+            Self::Private => Ok(("private", None)),
+            Self::Custom { status, .. }
+                if status.is_empty() || Self::MODELED_STATUSES.contains(&status.as_str()) =>
+            {
+                Err(LocalContentError::InvalidCustomStatus {
+                    status: status.clone(),
+                })
+            }
+            Self::Custom { status, password } => Ok((status, password.as_deref())),
         }
     }
 
