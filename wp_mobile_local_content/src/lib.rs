@@ -35,10 +35,6 @@ pub enum LocalContentError {
         edited_post_id: PostId,
         pushed_post_id: PostId,
     },
-    #[error(
-        "{status:?} can't be a custom status: it's empty or StatusSetting has another variant for it"
-    )]
-    InvalidCustomStatus { status: String },
 }
 
 impl From<rusqlite::Error> for LocalContentError {
