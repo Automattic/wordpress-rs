@@ -395,7 +395,7 @@ fn insert_common(
     common: &WorkingCopyCommon,
 ) -> Result<(WorkingCopyId, i64), LocalContentError> {
     let id = WorkingCopyId::generate();
-    let (status, password) = common.status.to_columns();
+    let (status, password) = common.status.to_columns()?;
     let mut stmt = transaction.prepare(&format!(
         "INSERT INTO {WORKING_COPIES} (
              uuid, kind, title, content, excerpt, slug, status, password, publish_date,
@@ -431,7 +431,7 @@ fn update_common(
     id: &WorkingCopyId,
     common: &WorkingCopyCommon,
 ) -> Result<Option<i64>, LocalContentError> {
-    let (status, password) = common.status.to_columns();
+    let (status, password) = common.status.to_columns()?;
     let mut stmt = transaction.prepare(&format!(
         "UPDATE {WORKING_COPIES} SET
              title = ?, content = ?, excerpt = ?, slug = ?, status = ?, password = ?,
@@ -1173,6 +1173,43 @@ mod tests {
             )
             .expect("Update should succeed");
         assert!(!updated);
+    }
+
+    /// A custom status another variant stands for would read back as that
+    /// variant, or be a second way to store the same status, and an empty one
+    /// is no status at all.
+    #[test]
+    fn test_saving_a_custom_status_another_variant_stands_for_fails() {
+        let mut conn = migrated_connection();
+        let target = self_hosted_new_post_target();
+        let id = insert_post(&mut conn, &simple_post("Saved"), &target);
+
+        for status in ["", "draft", "pending", "publish", "private", "future"] {
+            let post = PostWorkingCopy {
+                common: WorkingCopyCommon {
+                    status: StatusSetting::Custom {
+                        status: status.to_string(),
+                        password: None,
+                    },
+                    ..common("Custom")
+                },
+                ..simple_post("Custom")
+            };
+            let tx = conn.transaction().expect("Failed to begin transaction");
+            let inserted = WorkingCopyRepository.insert_post(&tx, &post, &target);
+            let updated = WorkingCopyRepository.update_post(&tx, &id, &post);
+            let expected = LocalContentError::InvalidCustomStatus {
+                status: status.to_string(),
+            };
+
+            assert_eq!(
+                inserted.err(),
+                Some(expected.clone()),
+                "inserting {status:?}"
+            );
+            assert_eq!(updated.err(), Some(expected), "updating {status:?}");
+            assert_eq!(count_rows(&tx, WORKING_COPIES), 1, "inserting {status:?}");
+        }
     }
 
     /// The repository only writes consistent rows; the schema rejects the
