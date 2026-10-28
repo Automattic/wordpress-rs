@@ -128,7 +128,7 @@ pub(crate) fn prepare_connection(conn: &Connection) -> Result<(), ConnectionErro
 ///
 /// The value is read back rather than assumed because `PRAGMA foreign_keys` is
 /// a no-op inside an open transaction and reports no error when it is ignored.
-fn enable_foreign_keys(conn: &Connection) -> Result<(), ConnectionError> {
+pub(crate) fn enable_foreign_keys(conn: &Connection) -> Result<(), ConnectionError> {
     conn.pragma_update(None, "foreign_keys", true)?;
 
     let enabled: bool = conn.query_row("PRAGMA foreign_keys", [], |row| row.get(0))?;
