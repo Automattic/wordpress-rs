@@ -138,10 +138,12 @@ impl LocalContentService {
     }
 
     /// Delete every post and page working copy targeting `site`, discarding
-    /// the user's changes in them. Call it only when the user removes the site
-    /// from the app, for example by removing a self-hosted site or by signing
-    /// out of the WordPress.com account the site was reached through: user
-    /// content is never lost otherwise.
+    /// the user's changes in them. Call it only when the user chooses to
+    /// delete the site's local content, such as by logging out with "Log out
+    /// and delete local content": user content is never lost otherwise.
+    /// Removing a site from the app or logging out doesn't touch the local
+    /// content database, so the site's working copies are still there if it's
+    /// added back.
     ///
     /// Returns the number of working copies deleted.
     pub fn delete_working_copies_for_site(
