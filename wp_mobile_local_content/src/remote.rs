@@ -15,8 +15,8 @@ use wp_api::{
 
 use crate::db_types::{
     working_copy::{
-        FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting, Tag,
-        WorkingCopyCommon,
+        FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting,
+        WorkingCopyCommon, WorkingCopyTag,
     },
     working_copy_target::RemotePostReference,
 };
@@ -44,7 +44,7 @@ impl PostWorkingCopy {
                 .tags
                 .iter()
                 .flatten()
-                .map(|id| Tag::Existing { id: *id })
+                .map(|id| WorkingCopyTag::Existing { id: *id })
                 .collect(),
             format: post.format.clone().unwrap_or(PostFormat::Standard),
             sticky: post.sticky.unwrap_or(false),
@@ -303,8 +303,8 @@ mod tests {
                 },
                 categories: vec![TermId(1)],
                 tags: vec![
-                    Tag::Existing { id: TermId(7) },
-                    Tag::Existing { id: TermId(8) },
+                    WorkingCopyTag::Existing { id: TermId(7) },
+                    WorkingCopyTag::Existing { id: TermId(8) },
                 ],
                 format: PostFormat::Aside,
                 sticky: false,

@@ -14,8 +14,8 @@ use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
         working_copy::{
-            FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting, Tag,
-            WorkingCopyCommon, WorkingCopyId,
+            FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting,
+            WorkingCopyCommon, WorkingCopyId, WorkingCopyTag,
         },
         working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
     },
@@ -106,8 +106,8 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
         },
         categories: vec![TermId(1)],
         tags: vec![
-            Tag::Existing { id: TermId(3) },
-            Tag::New {
+            WorkingCopyTag::Existing { id: TermId(3) },
+            WorkingCopyTag::New {
                 name: "new tag".to_string(),
             },
         ],

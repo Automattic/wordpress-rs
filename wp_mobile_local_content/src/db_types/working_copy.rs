@@ -85,7 +85,7 @@ pub enum FeaturedImage {
 /// A tag on a post.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
 #[serde(rename_all = "snake_case")]
-pub enum Tag {
+pub enum WorkingCopyTag {
     /// A tag that exists on the site.
     Existing {
         #[serde(with = "term_id")]
@@ -120,7 +120,7 @@ pub struct WorkingCopyCommon {
 pub struct PostWorkingCopy {
     pub common: WorkingCopyCommon,
     pub categories: Vec<TermId>,
-    pub tags: Vec<Tag>,
+    pub tags: Vec<WorkingCopyTag>,
     pub format: PostFormat,
     pub sticky: bool,
 }
