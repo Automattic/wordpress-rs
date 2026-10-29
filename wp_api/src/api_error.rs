@@ -1,3 +1,4 @@
+use crate::cloudflare::{CloudflareErrorKind, CloudflareErrorResponse};
 use crate::request::WpRedirect;
 use crate::request::{
     HttpAuthMethod, HttpAuthMethodParsingError, RequestMethod, WpNetworkResponse,
@@ -709,6 +710,23 @@ pub enum RequestExecutionErrorReason {
     GenericError {
         error_message: String,
     },
+    /// Cloudflare, in front of the site, answered with its own error instead of
+    /// passing the request to the site's server. Usually only the site owner or
+    /// host can fix it.
+    ///
+    /// Responses the site's own server wrote are never classified this way,
+    /// even though they pass through Cloudflare too.
+    CloudflareError {
+        status_code: u32,
+        /// Cloudflare's own code (`522`, `1020`, …), when the response says.
+        /// Its nginx-style 413 and 502 pages, block pages and challenges don't.
+        cloudflare_code: Option<u32>,
+        kind: CloudflareErrorKind,
+        /// Identifies the request in Cloudflare's logs, for support requests.
+        ray_id: Option<String>,
+        /// Seconds Cloudflare asks the client to wait before retrying.
+        retry_after: Option<u64>,
+    },
 }
 
 impl RequestExecutionErrorReason {
@@ -788,7 +806,7 @@ impl RequestExecutionErrorReason {
     }
 
     pub fn try_from_response(response: &WpNetworkResponse) -> Option<Self> {
-        if response.status_code != 401 && response.status_code != 403 {
+        if response.status_code < 400 {
             return None;
         }
 
@@ -796,7 +814,24 @@ impl RequestExecutionErrorReason {
         // good way to avoid it, but we are planning to rework some of the error handling once we
         // finish the login work. At that time, we'll try to remove the double parsing.
         if WpError::try_parse(&response.body).is_some() {
-            // If the response is a `WpError`, don't map it to an auth error
+            // A `WpError` is the site's own response, so it's neither an auth error nor
+            // Cloudflare's, whatever headers it came with.
+            return None;
+        }
+
+        // Before the 401/403 handling, so a Cloudflare 1020 (a 403) isn't reported as the
+        // site's server denying access.
+        if let Some(cloudflare) = CloudflareErrorResponse::try_from_response(response) {
+            return Some(Self::CloudflareError {
+                status_code: response.status_code,
+                cloudflare_code: cloudflare.cloudflare_code,
+                kind: cloudflare.kind,
+                ray_id: cloudflare.ray_id,
+                retry_after: cloudflare.retry_after,
+            });
+        }
+
+        if response.status_code != 401 && response.status_code != 403 {
             return None;
         }
 
@@ -901,6 +936,33 @@ impl WpSupportsLocalization for RequestExecutionErrorReason {
             }
             RequestExecutionErrorReason::HttpTimeoutError => WpMessages::http_timeout_error(),
             RequestExecutionErrorReason::CancellationError => WpMessages::http_cancellation_error(),
+            RequestExecutionErrorReason::CloudflareError {
+                status_code,
+                cloudflare_code,
+                kind,
+                ..
+            } => match kind {
+                CloudflareErrorKind::RequestTooLarge => {
+                    WpMessages::cloudflare_error_request_too_large()
+                }
+                CloudflareErrorKind::OriginError => WpMessages::cloudflare_error_origin_error(),
+                CloudflareErrorKind::OriginDown => WpMessages::cloudflare_error_origin_down(),
+                CloudflareErrorKind::OriginTimeout => WpMessages::cloudflare_error_origin_timeout(),
+                CloudflareErrorKind::OriginUnreachable => {
+                    WpMessages::cloudflare_error_origin_unreachable()
+                }
+                CloudflareErrorKind::OriginSsl => WpMessages::cloudflare_error_origin_ssl(),
+                CloudflareErrorKind::CloudflareInternal => {
+                    WpMessages::cloudflare_error_cloudflare_internal()
+                }
+                CloudflareErrorKind::RateLimited => WpMessages::cloudflare_error_rate_limited(),
+                CloudflareErrorKind::AccessDenied => WpMessages::cloudflare_error_access_denied(),
+                CloudflareErrorKind::Challenge => WpMessages::cloudflare_error_challenge(),
+                // A string, so the code isn't formatted as a number ("1,020").
+                CloudflareErrorKind::Other => WpMessages::cloudflare_error_other(
+                    cloudflare_code.unwrap_or(*status_code).to_string(),
+                ),
+            },
         }
     }
 }
@@ -1094,9 +1156,212 @@ mod tests {
     #[case::generic(RequestExecutionErrorReason::GenericError {
         error_message: "boom".to_string(),
     })]
+    #[case::cloudflare(cloudflare_error(CloudflareErrorKind::OriginDown))]
     fn test_neither_predicate_matches_other_reasons(#[case] reason: RequestExecutionErrorReason) {
         assert!(!reason.is_site_unreachable());
         assert!(!reason.is_device_offline());
+    }
+
+    fn cloudflare_error(kind: CloudflareErrorKind) -> RequestExecutionErrorReason {
+        RequestExecutionErrorReason::CloudflareError {
+            status_code: 530,
+            cloudflare_code: Some(1016),
+            kind,
+            ray_id: None,
+            retry_after: None,
+        }
+    }
+
+    #[rstest]
+    #[case::request_too_large(
+        CloudflareErrorKind::RequestTooLarge,
+        "This file is larger than your site's Cloudflare settings allow."
+    )]
+    #[case::origin_error(
+        CloudflareErrorKind::OriginError,
+        "Cloudflare couldn't get a valid response from your site's server."
+    )]
+    #[case::origin_down(
+        CloudflareErrorKind::OriginDown,
+        "Cloudflare reports that your site's server is down."
+    )]
+    #[case::origin_timeout(
+        CloudflareErrorKind::OriginTimeout,
+        "Cloudflare reports that your site's server isn't responding."
+    )]
+    #[case::origin_unreachable(
+        CloudflareErrorKind::OriginUnreachable,
+        "Cloudflare can't reach your site's server."
+    )]
+    #[case::origin_ssl(
+        CloudflareErrorKind::OriginSsl,
+        "Your site's server has an SSL problem, according to Cloudflare."
+    )]
+    #[case::cloudflare_internal(
+        CloudflareErrorKind::CloudflareInternal,
+        "Cloudflare had a problem handling this request. Try again shortly."
+    )]
+    #[case::rate_limited(
+        CloudflareErrorKind::RateLimited,
+        "Cloudflare is limiting requests to your site. Try again shortly."
+    )]
+    #[case::access_denied(
+        CloudflareErrorKind::AccessDenied,
+        "A Cloudflare security rule on your site blocked this request."
+    )]
+    #[case::challenge(
+        CloudflareErrorKind::Challenge,
+        "Your site's Cloudflare bot protection is blocking the app."
+    )]
+    #[case::other(
+        CloudflareErrorKind::Other,
+        // Fluent wraps placeables in bidi isolation marks.
+        "Cloudflare returned an error (code \u{2068}1016\u{2069})."
+    )]
+    fn every_cloudflare_error_kind_has_an_en_us_message(
+        #[case] kind: CloudflareErrorKind,
+        #[case] expected: &str,
+    ) {
+        use wp_localization::{WpLocale, WpLocalizable};
+        assert_eq!(
+            cloudflare_error(kind).localize(Some(WpLocale::from("en-US"))),
+            expected
+        );
+    }
+
+    /// Without a Cloudflare code, the message names the HTTP status instead.
+    #[test]
+    fn other_cloudflare_error_without_a_code_names_the_http_status() {
+        use wp_localization::{WpLocale, WpLocalizable};
+        let reason = RequestExecutionErrorReason::CloudflareError {
+            status_code: 400,
+            cloudflare_code: None,
+            kind: CloudflareErrorKind::Other,
+            ray_id: None,
+            retry_after: None,
+        };
+        assert_eq!(
+            reason.localize(Some(WpLocale::from("en-US"))),
+            "Cloudflare returned an error (code \u{2068}400\u{2069})."
+        );
+    }
+
+    mod try_parse_recorded_responses {
+        use super::*;
+        use crate::cloudflare::tests::recorded_response;
+
+        fn try_parse(file_name: &str) -> WpApiError {
+            WpApiError::try_parse(&recorded_response(
+                file_name,
+                "https://example.com/wp-json/wp/v2/users/me?password=hunter2",
+            ))
+            .expect("An error response parses as an error")
+        }
+
+        #[rstest]
+        #[case::too_large("cf-413-html.http", 413, CloudflareErrorKind::RequestTooLarge)]
+        #[case::bad_gateway("cf-502-html.http", 502, CloudflareErrorKind::OriginError)]
+        #[case::firewall_rule("cf-1020-plain-text.http", 403, CloudflareErrorKind::AccessDenied)]
+        #[case::origin_timeout("cf-522-json.http", 522, CloudflareErrorKind::OriginTimeout)]
+        #[case::challenge("cf-challenge.http", 403, CloudflareErrorKind::Challenge)]
+        fn cloudflare_errors(
+            #[case] file_name: &str,
+            #[case] status: u32,
+            #[case] expected_kind: CloudflareErrorKind,
+        ) {
+            let error = try_parse(file_name);
+            assert_eq!(error.status_code(), Some(status));
+            let WpApiError::RequestExecutionFailed {
+                reason:
+                    RequestExecutionErrorReason::CloudflareError {
+                        status_code, kind, ..
+                    },
+                ..
+            } = error
+            else {
+                panic!("Expected a Cloudflare error, got {error:#?}");
+            };
+            assert_eq!(status_code, status);
+            assert_eq!(kind, expected_kind);
+        }
+
+        #[test]
+        fn cloudflare_json_error_reads_retry_after() {
+            let WpApiError::RequestExecutionFailed {
+                reason:
+                    RequestExecutionErrorReason::CloudflareError {
+                        cloudflare_code,
+                        retry_after,
+                        ray_id,
+                        ..
+                    },
+                ..
+            } = try_parse("cf-522-json.http")
+            else {
+                panic!("Expected a Cloudflare error");
+            };
+            assert_eq!(cloudflare_code, Some(522));
+            assert_eq!(retry_after, Some(120));
+            assert!(ray_id.is_some());
+        }
+
+        #[test]
+        fn wordpress_error_behind_cloudflare() {
+            assert!(matches!(
+                try_parse("origin-wp-error-behind-cloudflare.http"),
+                WpApiError::WpError {
+                    error_code: WpErrorCode::Unauthorized,
+                    status_code: 401,
+                    ..
+                }
+            ));
+        }
+
+        #[test]
+        fn origin_502_behind_cloudflare() {
+            assert!(matches!(
+                try_parse("origin-apache-502-behind-cloudflare.http"),
+                WpApiError::UnknownError {
+                    status_code: 502,
+                    ..
+                }
+            ));
+        }
+
+        #[test]
+        fn origin_413_without_cloudflare() {
+            assert!(matches!(
+                try_parse("origin-nginx-413.http"),
+                WpApiError::UnknownError {
+                    status_code: 413,
+                    ..
+                }
+            ));
+        }
+
+        #[test]
+        fn http_authentication_behind_cloudflare() {
+            assert!(matches!(
+                try_parse("origin-basic-auth-401-behind-cloudflare.http"),
+                WpApiError::RequestExecutionFailed {
+                    reason: RequestExecutionErrorReason::HttpAuthenticationRequiredError { .. },
+                    ..
+                }
+            ));
+        }
+
+        #[rstest]
+        #[case("origin-nginx-403-behind-cloudflare.http")]
+        #[case("origin-plain-forbidden-behind-cloudflare.http")]
+        fn forbidden_from_the_site_behind_cloudflare(#[case] file_name: &str) {
+            assert!(matches!(
+                try_parse(file_name),
+                WpApiError::RequestExecutionFailed {
+                    reason: RequestExecutionErrorReason::HttpForbiddenError { .. },
+                    ..
+                }
+            ));
+        }
     }
 
     #[test]
