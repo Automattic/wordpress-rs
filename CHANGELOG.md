@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** Posts' and pages' `menu_order` is now a signed `Option<i64>` instead of `Option<u32>`, in `SparseAnyPost`, `PostCreateParams` and `PostUpdateParams`. WordPress stores `menu_order` as a signed integer, and negative values are commonly used to pin a page to the top of a list. Listing pages on such a site previously failed to parse the whole response (`invalid value: integer -1000, expected u32`), so the entire page list came back as an error. Swift and Kotlin now see `Int64?` where they saw `UInt32?`.
 
+- Media uploads on Apple platforms now return the server's response when it rejects the upload before the whole file is sent, instead of failing with `HttpTimeoutError` once the request times out. A large upload to a site behind Cloudflare failed after about 60 seconds with a timeout; it now fails within a few seconds with Cloudflare's `413` ([CMM-2500](https://linear.app/a8c/issue/CMM-2500)).
+- On Apple platforms, a request whose Swift task is cancelled before the request starts is now cancelled. Previously it was sent anyway and ran until it finished or timed out.
+- An HTTP `413` that isn't a WordPress error (for example, from Cloudflare or nginx) now says "The file is too large for this site's server to accept." instead of "Something went wrong." It is still a `WpApiError::UnknownError` with `status_code` `413`.
+
 ### Changed
 
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.99.0` to `1.99.1`.
