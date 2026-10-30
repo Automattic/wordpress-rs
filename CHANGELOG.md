@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** Posts' and pages' `menu_order` is now a signed `Option<i64>` instead of `Option<u32>`, in `SparseAnyPost`, `PostCreateParams` and `PostUpdateParams`. WordPress stores `menu_order` as a signed integer, and negative values are commonly used to pin a page to the top of a list. Listing pages on such a site previously failed to parse the whole response (`invalid value: integer -1000, expected u32`), so the entire page list came back as an error. Swift and Kotlin now see `Int64?` where they saw `UInt32?`.
 
+### Fixed
+
+- Swift: a request URL Foundation can't parse (possible with the strict parser on iOS 16 / macOS 13) now fails with `NonExistentSiteError` instead of crashing, and a non-HTTP response fails the request instead of hitting a `preconditionFailure`.
+- Swift: `URLError.unsupportedURL` is now classified as `NonExistentSiteError` (like `.badURL`), `.userAuthenticationRequired` as `HttpAuthenticationRequiredError`, and `.clientCertificateRequired` / `.clientCertificateRejected` as `InvalidSslError(GenericSslError)`. All previously fell through to `GenericError`.
+- Swift: every request failure now carries the redirects recorded for the request. The offline, timeout, cancellation, and generic branches always reported `redirects: nil`.
+
 ### Changed
 
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.99.0` to `1.99.1`.
