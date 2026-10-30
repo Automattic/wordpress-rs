@@ -266,6 +266,7 @@ enum ApplePlatform {
     MacOS,
     #[allow(clippy::upper_case_acronyms)]
     IOS,
+    MacCatalyst,
     TvOS,
     WatchOS,
 }
@@ -289,6 +290,7 @@ impl Display for ApplePlatform {
         let name = match self {
             ApplePlatform::MacOS => "macos",
             ApplePlatform::IOS => "ios",
+            ApplePlatform::MacCatalyst => "maccatalyst",
             ApplePlatform::TvOS => "tvos",
             ApplePlatform::WatchOS => "watchos",
         };
@@ -326,6 +328,14 @@ impl LibraryGroupId {
             .get("llvm-target")
             .and_then(|t| t.as_str())
             .with_context(|| "No llvm-target in command output")?;
+
+        // Mac Catalyst targets are named `<arch>-apple-ios-macabi`, but they're a separate platform
+        // from iOS. Grouping them with iOS would `lipo` two arm64 libraries together.
+        let os = if llvm_target.ends_with("-macabi") {
+            ApplePlatform::MacCatalyst
+        } else {
+            os
+        };
 
         Ok(Self {
             os,

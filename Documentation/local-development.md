@@ -8,8 +8,8 @@ dependency list, see the [README](../README.md#prerequisites).
 
 ## Choosing an xcframework build
 
-`make xcframework` builds **11 targets across 4 platforms** (macOS, iOS, tvOS,
-watchOS). It is what CI and releases need, but it is rarely what a local change
+`make xcframework` builds **12 targets across 5 platforms** (macOS, iOS, Mac
+Catalyst, tvOS, watchOS). It is what CI and releases need, but it is rarely what a local change
 needs — a full build consumes on the order of **100 GB** in `target/` and takes
 tens of minutes.
 
@@ -21,7 +21,7 @@ Pick the smallest build that verifies your change:
 | `cargo test -p wp_api --lib`  | 0       | ~1 GB                  | Running unit tests                                 |
 | `make xcframework-only-macos` | 2       | ~18 GB                 | Verifying `swift build` and generated bindings     |
 | `make xcframework-only-ios`   | 3       | ~24 GB                 | Building an iOS consumer app against a local build |
-| `make xcframework`            | 11      | ~100 GB                | Releases, or verifying every platform              |
+| `make xcframework`            | 12      | ~100 GB                | Releases, or verifying every platform              |
 
 Figures are for a cold build; incremental rebuilds are much cheaper.
 
