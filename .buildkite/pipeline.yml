@@ -71,6 +71,7 @@ steps:
         matrix:
           - "macOS"
           - "iOS"
+          - "Catalyst"
           - "tvOS"
           - "watchOS"
         plugins: [$CI_TOOLKIT]

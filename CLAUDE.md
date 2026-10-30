@@ -39,7 +39,7 @@ swift build --target WordPressAPI
 cd native/kotlin && ./gradlew :api:kotlin:compileKotlin :api:kotlin:detekt
 ```
 
-**Do not run `make xcframework` to verify a local change.** It builds all 11
+**Do not run `make xcframework` to verify a local change.** It builds all 12
 Apple targets, consumes ~100GB in `target/`, and takes tens of minutes. It is
 what CI and releases need, not what a code change needs. Note also that
 `xcframework-only-<platform>` *replaces* the xcframework rather than adding a

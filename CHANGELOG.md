@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `libwordpressFFI.xcframework` now has a Mac Catalyst slice, and the `WordPressAPI` Swift package supports Mac Catalyst 16 and later.
 - **BREAKING:** Errors that Cloudflare generates itself, in front of a site, now surface as `RequestExecutionErrorReason::CloudflareError` instead of `UnknownError` ("Something went wrong") or `HttpForbiddenError`. It carries a `CloudflareErrorKind` (request too large, site's server down or timing out, SSL problem, rate limited, blocked by a security rule, bot challenge, …), Cloudflare's error code when the response has one, the ray ID and any `Retry-After`, and its localized message says what happened and that the site owner or host can fix it. Login site discovery reports them too, where it previously said the site "does not appear to be a WordPress site" or that its server denied access. Responses the site's own server wrote are unchanged, even though they also pass through Cloudflare. Exhaustive `switch`/`when` statements over `RequestExecutionErrorReason` need a case for it.
 
 ### Fixed
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.99.0` to `1.99.1`.
 - **Internal:** Updated code signing configuration to not require a provisioning profile.
 - **Internal:** Sign the PR-build XCFramework before zipping it, so the published PR artifact is signed.
+- **Internal:** Bumped `cc` from `1.2.38` to `1.2.65`. The older version passes an invalid target triple to `clang` for Mac Catalyst with the pinned Rust toolchain.
 
 ## [0.10.0] - 2026-10-20
 
