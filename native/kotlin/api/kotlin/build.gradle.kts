@@ -179,8 +179,9 @@ val generateUniFFIBindingsTask = tasks.register<Exec>("generateUniFFIBindings") 
     inputs.file(project.buildFile)
 
     // Append the `localizedDescription` extensions after generation, for the same two
-    // crates Swift patches (`patch_wp_api` / `patch_wp_mobile`). `wp_localization` and
-    // `wp_mobile_cache` ship no localizable types, so they're skipped.
+    // crates Swift patches (`patch_wp_api` / `patch_wp_mobile`). `wp_localization`,
+    // `wp_mobile_cache` and `wp_mobile_local_content` ship no localizable types, so they're
+    // skipped.
     doLast {
         listOf("wp_api", "wp_mobile").forEach { namespace ->
             appendLocalizedErrorExtensions(

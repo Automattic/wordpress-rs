@@ -1,0 +1,208 @@
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.io.TempDir
+import rs.wordpress.api.kotlin.TestCredentials
+import rs.wordpress.api.kotlin.assertSuccessAndRetrieveData
+import rs.wordpress.api.kotlin.defaultApiClient
+import uniffi.wp_api.AnyPostWithEditContext
+import uniffi.wp_api.ParsedUrl
+import uniffi.wp_api.PostCommentStatus
+import uniffi.wp_api.PostEndpointType
+import uniffi.wp_api.PostFormat
+import uniffi.wp_api.PostListParams
+import uniffi.wp_api.PostRetrieveParams
+import uniffi.wp_mobile.LocalContentService
+import uniffi.wp_mobile_local_content.FeaturedImage
+import uniffi.wp_mobile_local_content.LocalContentException
+import uniffi.wp_mobile_local_content.PageWorkingCopy
+import uniffi.wp_mobile_local_content.PostWorkingCopy
+import uniffi.wp_mobile_local_content.PublishDate
+import uniffi.wp_mobile_local_content.RemotePostConversionException
+import uniffi.wp_mobile_local_content.RemotePostReference
+import uniffi.wp_mobile_local_content.SiteIdentity
+import uniffi.wp_mobile_local_content.StatusSetting
+import uniffi.wp_mobile_local_content.WorkingCopyCommon
+import uniffi.wp_mobile_local_content.WorkingCopyTag
+import uniffi.wp_mobile_local_content.WorkingCopyTarget
+import uniffi.wp_mobile_local_content.WpLocalContentStore
+import uniffi.wp_mobile_local_content.postWorkingCopyFromRemote
+import uniffi.wp_mobile_local_content.remotePostReferenceFromRemote
+import java.nio.file.Path
+import java.util.Date
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+
+class LocalContentTest {
+    @TempDir
+    lateinit var tempDir: Path
+
+    private val databasePath: String
+        get() = tempDir.resolve("local_content.db").toString()
+
+    private fun openService(): LocalContentService {
+        val store = WpLocalContentStore(databasePath)
+        store.performMigrations()
+        return LocalContentService(store)
+    }
+
+    private fun common(title: String) = WorkingCopyCommon(
+        title = title,
+        content = "<!-- wp:paragraph --><p>$title</p><!-- /wp:paragraph -->",
+        excerpt = "",
+        slug = null,
+        status = StatusSetting.Draft(password = null),
+        publishDate = PublishDate.Immediately,
+        author = null,
+        featuredImage = FeaturedImage.None,
+        commentStatus = null,
+        pingStatus = null
+    )
+
+    private fun post(title: String) = PostWorkingCopy(
+        common = common(title),
+        categories = emptyList(),
+        tags = emptyList(),
+        format = PostFormat.Standard,
+        sticky = false
+    )
+
+    private val client = defaultApiClient()
+    private val site = SiteIdentity(url = ParsedUrl.parse(TestCredentials.INSTANCE.siteUrl), wordpressComSiteId = null)
+
+    private suspend fun fetchFirst(endpoint: PostEndpointType): AnyPostWithEditContext {
+        val first = client.request { requestBuilder ->
+            requestBuilder.posts().listWithEditContext(endpoint, PostListParams())
+        }.assertSuccessAndRetrieveData().data.first()
+        return client.request { requestBuilder ->
+            requestBuilder.posts().retrieveWithEditContext(endpoint, first.id, PostRetrieveParams())
+        }.assertSuccessAndRetrieveData().data
+    }
+
+    private val newPostSite = SiteIdentity(url = ParsedUrl.parse("https://example.com"), wordpressComSiteId = null)
+
+    private fun newPostOn(site: SiteIdentity) = WorkingCopyTarget(site = site, remotePost = null)
+
+    @Test
+    fun `opening an in-memory database throws`() {
+        assertThrows<LocalContentException.InvalidDatabasePath> {
+            WpLocalContentStore(":memory:")
+        }
+    }
+
+    @Test
+    fun `saved post working copy survives reopening the database`() {
+        val wordPressComSite = SiteIdentity(
+            url = ParsedUrl.parse("https://example.wordpress.com"),
+            wordpressComSiteId = 123_456_789uL
+        )
+        val edited = PostWorkingCopy(
+            common = common("Edited").copy(
+                status = StatusSetting.Custom(status = "in-review", password = "secret"),
+                publishDate = PublishDate.At(date = Date(1_900_000_000_000L)),
+                author = 7L,
+                featuredImage = FeaturedImage.Remote(mediaId = 42L),
+                commentStatus = PostCommentStatus.Closed
+            ),
+            categories = listOf(1L, 5L),
+            tags = listOf(WorkingCopyTag.Existing(id = 3L), WorkingCopyTag.New(name = "not on the site yet")),
+            format = PostFormat.Aside,
+            sticky = true
+        )
+
+        val service = openService()
+        val id = service.readOrCreatePostWorkingCopy(newPostOn(wordPressComSite), post("Original")).id
+        service.savePostWorkingCopy(id, edited)
+        val read = assertNotNull(openService().readPostWorkingCopy(id))
+
+        assertEquals(edited, read.workingCopy)
+        assertEquals(WorkingCopyTarget(site = wordPressComSite, remotePost = null), read.target)
+    }
+
+    @Test
+    fun `saved page working copy survives reopening the database`() {
+        val edited = PageWorkingCopy(common = common("Edited page"), parent = 3L)
+
+        val service = openService()
+        val id = service.readOrCreatePageWorkingCopy(
+            newPostOn(newPostSite),
+            PageWorkingCopy(common = common("Original page"), parent = null)
+        ).id
+        service.savePageWorkingCopy(id, edited)
+        val read = assertNotNull(openService().readPageWorkingCopy(id))
+
+        assertEquals(edited, read.workingCopy)
+        assertEquals(WorkingCopyTarget(site = newPostSite, remotePost = null), read.target)
+    }
+
+    @Test
+    fun `saving a page as a post throws`() {
+        val service = openService()
+        val pageId = service.readOrCreatePageWorkingCopy(
+            newPostOn(newPostSite),
+            PageWorkingCopy(common = common("A page"), parent = null)
+        ).id
+
+        assertThrows<LocalContentException.WorkingCopyNotFound> {
+            service.savePostWorkingCopy(pageId, post("Title"))
+        }
+    }
+
+    @Test
+    fun `a new post recorded as pushed is found by its remote post`() {
+        val service = openService()
+        val created = service.readOrCreatePostWorkingCopy(newPostOn(newPostSite), post("Draft"))
+        val pushed = RemotePostReference(postId = 2007L, baseModifiedGmt = Date(1_900_000_000_000L))
+
+        service.recordPostWorkingCopyPush(created.id, pushed)
+        val found = service.readOrCreatePostWorkingCopy(
+            WorkingCopyTarget(site = newPostSite, remotePost = pushed),
+            post("Fetched")
+        )
+
+        assertEquals(created.id, found.id)
+        assertEquals(post("Draft"), found.workingCopy)
+        assertEquals(pushed, found.target.remotePost)
+    }
+
+    @Test
+    fun `deleting a site's working copies leaves other sites' alone`() {
+        val otherSite = SiteIdentity(url = ParsedUrl.parse("https://other.example.com"), wordpressComSiteId = null)
+        val service = openService()
+        service.readOrCreatePostWorkingCopy(newPostOn(newPostSite), post("Removed"))
+        val kept = service.readOrCreatePostWorkingCopy(newPostOn(otherSite), post("Kept"))
+
+        val deleted = service.deleteWorkingCopiesForSite(newPostSite)
+
+        assertEquals(1uL, deleted)
+        assertEquals(emptyList(), service.readPostWorkingCopies(newPostSite))
+        assertEquals(listOf(kept.id), service.readAllPostWorkingCopies().map { it.id })
+    }
+
+    @Test
+    fun `working copy from a fetched post points at it`() = runTest {
+        val post = fetchFirst(PostEndpointType.Posts)
+        val service = openService()
+
+        val target = WorkingCopyTarget(site = site, remotePost = remotePostReferenceFromRemote(post))
+        val read = service.readOrCreatePostWorkingCopy(target, postWorkingCopyFromRemote(post))
+
+        assertEquals(post.title?.raw, read.workingCopy.common.title)
+        assertEquals(post.content.raw, read.workingCopy.common.content)
+        assertEquals(
+            RemotePostReference(postId = post.id, baseModifiedGmt = post.modifiedGmt),
+            read.target.remotePost
+        )
+    }
+
+    @Test
+    fun `post working copy from a fetched page throws`() = runTest {
+        val page = fetchFirst(PostEndpointType.Pages)
+
+        val error = assertThrows<RemotePostConversionException.WrongPostType> {
+            postWorkingCopyFromRemote(page)
+        }
+        assertEquals("post", error.expected)
+        assertEquals("page", error.actual)
+    }
+}

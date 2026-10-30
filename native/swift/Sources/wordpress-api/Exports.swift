@@ -37,6 +37,27 @@ public typealias SiteInfo = WordPressAPIInternal.SiteInfo
 public typealias AnyPostFilter = WordPressAPIInternal.AnyPostFilter
 public typealias WpApiCache = WordPressAPIInternal.WpApiCache
 
+// MARK: - Local Content
+public typealias WpLocalContentStore = WordPressAPIInternal.WpLocalContentStore
+public typealias LocalContentService = WordPressAPIInternal.LocalContentService
+public typealias LocalContentError = WordPressAPIInternal.LocalContentError
+public typealias WorkingCopyId = WordPressAPIInternal.WorkingCopyId
+public typealias WorkingCopyCommon = WordPressAPIInternal.WorkingCopyCommon
+public typealias PostWorkingCopy = WordPressAPIInternal.PostWorkingCopy
+public typealias PageWorkingCopy = WordPressAPIInternal.PageWorkingCopy
+public typealias DbPostWorkingCopy = WordPressAPIInternal.DbPostWorkingCopy
+public typealias DbPageWorkingCopy = WordPressAPIInternal.DbPageWorkingCopy
+public typealias StatusSetting = WordPressAPIInternal.StatusSetting
+public typealias WorkingCopyTag = WordPressAPIInternal.WorkingCopyTag
+public typealias PostCommentStatus = WordPressAPIInternal.PostCommentStatus
+public typealias PostPingStatus = WordPressAPIInternal.PostPingStatus
+public typealias PublishDate = WordPressAPIInternal.PublishDate
+public typealias FeaturedImage = WordPressAPIInternal.FeaturedImage
+public typealias WorkingCopyTarget = WordPressAPIInternal.WorkingCopyTarget
+public typealias SiteIdentity = WordPressAPIInternal.SiteIdentity
+public typealias RemotePostReference = WordPressAPIInternal.RemotePostReference
+public typealias RemotePostConversionError = WordPressAPIInternal.RemotePostConversionError
+
 // MARK: - Login
 
 public typealias WpApiApplicationPasswordDetails = WordPressAPIInternal.WpApiApplicationPasswordDetails
