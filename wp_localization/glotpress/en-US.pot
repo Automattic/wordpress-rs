@@ -2,8 +2,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: wordpress-rs 0.3.0\n"
-"POT-Creation-Date: 2026-09-01 17:01-0700\n"
-"PO-Revision-Date: 2026-09-01 17:01-0700\n"
+"POT-Creation-Date: 2026-10-29 17:01-0700\n"
+"PO-Revision-Date: 2026-10-29 17:01-0700\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -126,6 +126,50 @@ msgid ""
 msgstr ""
 "The server is rate limiting requests in a way that will never succeed. "
 "Please check your site's rate limit configuration."
+
+msgctxt "cloudflare_error_request_too_large"
+msgid "This file is larger than your site's Cloudflare settings allow."
+msgstr "This file is larger than your site's Cloudflare settings allow."
+
+msgctxt "cloudflare_error_origin_error"
+msgid "Cloudflare couldn't get a valid response from your site's server."
+msgstr "Cloudflare couldn't get a valid response from your site's server."
+
+msgctxt "cloudflare_error_origin_down"
+msgid "Cloudflare reports that your site's server is down."
+msgstr "Cloudflare reports that your site's server is down."
+
+msgctxt "cloudflare_error_origin_timeout"
+msgid "Cloudflare reports that your site's server isn't responding."
+msgstr "Cloudflare reports that your site's server isn't responding."
+
+msgctxt "cloudflare_error_origin_unreachable"
+msgid "Cloudflare can't reach your site's server."
+msgstr "Cloudflare can't reach your site's server."
+
+msgctxt "cloudflare_error_origin_ssl"
+msgid "Your site's server has an SSL problem, according to Cloudflare."
+msgstr "Your site's server has an SSL problem, according to Cloudflare."
+
+msgctxt "cloudflare_error_cloudflare_internal"
+msgid "Cloudflare had a problem handling this request. Try again shortly."
+msgstr "Cloudflare had a problem handling this request. Try again shortly."
+
+msgctxt "cloudflare_error_rate_limited"
+msgid "Cloudflare is limiting requests to your site. Try again shortly."
+msgstr "Cloudflare is limiting requests to your site. Try again shortly."
+
+msgctxt "cloudflare_error_access_denied"
+msgid "A Cloudflare security rule on your site blocked this request."
+msgstr "A Cloudflare security rule on your site blocked this request."
+
+msgctxt "cloudflare_error_challenge"
+msgid "Your site's Cloudflare bot protection is blocking the app."
+msgstr "Your site's Cloudflare bot protection is blocking the app."
+
+msgctxt "cloudflare_error_other"
+msgid "Cloudflare returned an error (code {$code})."
+msgstr "Cloudflare returned an error (code {$code})."
 
 msgctxt "oauth_response_url_error_url_invalid"
 msgid "The site sent an invalid authentication response URL."

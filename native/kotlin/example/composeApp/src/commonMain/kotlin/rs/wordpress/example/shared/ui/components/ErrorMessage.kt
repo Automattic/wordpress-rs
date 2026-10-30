@@ -49,6 +49,7 @@ private fun RequestExecutionErrorReason.description(): String = when (this) {
     is RequestExecutionErrorReason.CancellationError -> "Request cancelled"
     is RequestExecutionErrorReason.HttpError -> "HTTP error: $reason"
     is RequestExecutionErrorReason.GenericError -> errorMessage
+    is RequestExecutionErrorReason.CloudflareError -> "Cloudflare error: $kind (ray ID ${rayId ?: "unknown"})"
 }
 
 @Composable

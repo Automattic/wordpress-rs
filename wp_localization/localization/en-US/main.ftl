@@ -38,6 +38,18 @@ misconfigured_http_authentication_error = The server is sending invalid HTTP aut
 
 misconfigured_rate_limit_error = The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.
 
+cloudflare_error_request_too_large = This file is larger than your site's Cloudflare settings allow.
+cloudflare_error_origin_error = Cloudflare couldn't get a valid response from your site's server.
+cloudflare_error_origin_down = Cloudflare reports that your site's server is down.
+cloudflare_error_origin_timeout = Cloudflare reports that your site's server isn't responding.
+cloudflare_error_origin_unreachable = Cloudflare can't reach your site's server.
+cloudflare_error_origin_ssl = Your site's server has an SSL problem, according to Cloudflare.
+cloudflare_error_cloudflare_internal = Cloudflare had a problem handling this request. Try again shortly.
+cloudflare_error_rate_limited = Cloudflare is limiting requests to your site. Try again shortly.
+cloudflare_error_access_denied = A Cloudflare security rule on your site blocked this request.
+cloudflare_error_challenge = Your site's Cloudflare bot protection is blocking the app.
+cloudflare_error_other = Cloudflare returned an error (code {$code}).
+
 oauth_response_url_error_url_invalid = The site sent an invalid authentication response URL.
 oauth_response_url_error_unsuccessful_login = Unsuccessful Login.
 

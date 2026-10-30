@@ -525,6 +525,11 @@ impl WpNetworkHeaderMap {
         self.inner.clone()
     }
 
+    /// The first value of `header_name`, if it's present and valid UTF-8.
+    pub(crate) fn get_str(&self, header_name: &str) -> Option<&str> {
+        self.inner.get(header_name).and_then(|v| v.to_str().ok())
+    }
+
     /// Does this request specify HTTP login details of some kind?
     pub fn has_http_authentication(&self) -> bool {
         self.inner.get(http::header::AUTHORIZATION).is_some()

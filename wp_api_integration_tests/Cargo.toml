@@ -29,3 +29,4 @@ wp_cli = { path = "../wp_cli" }
 chrono = { workspace = true }
 paste = { workspace = true }
 tokio-stream = { workspace = true }
+wp_localization = { path = "../wp_localization" }

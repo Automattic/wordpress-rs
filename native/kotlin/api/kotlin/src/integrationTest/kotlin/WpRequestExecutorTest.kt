@@ -13,6 +13,7 @@ import okhttp3.mockwebserver.SocketPolicy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.CloudflareErrorKind
 import uniffi.wp_api.MediaCreateParams
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.UserListParams
@@ -329,6 +330,54 @@ class WpRequestExecutorTest {
 
         assertIs<WpRequestResult.MediaFileUnreadable<*>>(result)
         assertEquals(filePath, (result as WpRequestResult.MediaFileUnreadable<*>).filePath)
+    }
+
+    /**
+     * Cloudflare only sends its JSON error body when the request carries `Accept-Encoding`
+     * alongside `Accept: application/json`. OkHttp adds `Accept-Encoding` itself; this guards
+     * against anything removing it, and checks the Kotlin path classifies the JSON body.
+     */
+    @Test
+    fun `a Cloudflare JSON error is mapped to CloudflareError`() = runTest {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(522)
+                .setHeader("Content-Type", "application/json; charset=utf-8")
+                .setHeader("Server", "cloudflare")
+                .setHeader("CF-RAY", "a50c80a41cb4ff4c-SEA")
+                .setHeader("Retry-After", "120")
+                .setBody(
+                    """{"title":"Error 522: Connection timed out","status":522,""" +
+                        """"error_code":522,"error_category":"origin",""" +
+                        """"ray_id":"a50c80a41cb4ff4c","cloudflare_error":true,"retry_after":120}"""
+                )
+        )
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        val request = mockWebServer.takeRequest()
+        assertEquals("application/json", request.getHeader("Accept"))
+        assertNotNull(request.getHeader("Accept-Encoding"))
+
+        assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+        val reason = (result as WpRequestResult.RequestExecutionFailed<*>).reason
+        assertIs<RequestExecutionErrorReason.CloudflareError>(reason)
+        assertEquals(CloudflareErrorKind.ORIGIN_TIMEOUT, reason.kind)
+        assertEquals(522u, reason.cloudflareCode)
+        assertEquals("a50c80a41cb4ff4c", reason.rayId)
+        assertEquals(120uL, reason.retryAfter)
     }
 
     /**
