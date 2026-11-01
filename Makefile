@@ -18,6 +18,7 @@ docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared
 swift_package_platform_version = $(shell swift package dump-package | jq -r '.platforms[] | select(.platformName=="$1") | .version')
 swift_package_platform_macos = $(call swift_package_platform_version,macos)
 swift_package_platform_ios = $(call swift_package_platform_version,ios)
+swift_package_platform_maccatalyst = $(call swift_package_platform_version,maccatalyst)
 swift_package_platform_watchos = $(call swift_package_platform_version,watchos)
 swift_package_platform_tvos = $(call swift_package_platform_version,tvos)
 
@@ -64,11 +65,13 @@ release-on-ci:
 
 apple-platform-targets-macos := x86_64-apple-darwin aarch64-apple-darwin
 apple-platform-targets-ios := aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+apple-platform-targets-catalyst := aarch64-apple-ios-macabi x86_64-apple-ios-macabi
 apple-platform-targets-tvos := aarch64-apple-tvos aarch64-apple-tvos-sim
 apple-platform-targets-watchos := arm64_32-apple-watchos x86_64-apple-watchos-sim aarch64-apple-watchos-sim
 apple-platform-targets := \
 	$(apple-platform-targets-macos) \
 	$(apple-platform-targets-ios) \
+	$(apple-platform-targets-catalyst) \
 	$(apple-platform-targets-tvos) \
 	$(apple-platform-targets-watchos)
 
@@ -85,6 +88,7 @@ cargo_config_library = --config profile.$(CARGO_PROFILE).debug=true --config 'pr
 # Set deployment targets for each platform
 _build-apple-%-darwin: export MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos)
 _build-apple-%-ios _build-apple-%-ios-sim: export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios)
+_build-apple-%-macabi: export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_maccatalyst)
 _build-apple-%-tvos _build-apple-%-tvos-sim: export TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos)
 _build-apple-%-watchos _build-apple-%-watchos-sim: export WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos)
 
@@ -100,12 +104,14 @@ _build-apple-%:
 # Build the library for one single platform, including real device and simulator.
 build-apple-platform-macos := $(addprefix _build-apple-,$(apple-platform-targets-macos))
 build-apple-platform-ios := $(addprefix _build-apple-,$(apple-platform-targets-ios))
+build-apple-platform-catalyst := $(addprefix _build-apple-,$(apple-platform-targets-catalyst))
 build-apple-platform-tvos := $(addprefix _build-apple-,$(apple-platform-targets-tvos))
 build-apple-platform-watchos := $(addprefix _build-apple-,$(apple-platform-targets-watchos))
 
 # Build all targets for a specific platform (without creating xcframework).
 build-apple-macOS: $(build-apple-platform-macos)
 build-apple-iOS: $(build-apple-platform-ios)
+build-apple-Catalyst: $(build-apple-platform-catalyst)
 build-apple-tvOS: $(build-apple-platform-tvos)
 build-apple-watchOS: $(build-apple-platform-watchos)
 
@@ -126,6 +132,9 @@ xcframework-only-macos: $(build-apple-platform-macos)
 xcframework-only-ios: $(build-apple-platform-ios)
 	@# Help: Build an xcframework containing only iOS (~24GB). Replaces any existing xcframework.
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-ios)
+xcframework-only-catalyst: $(build-apple-platform-catalyst)
+	@# Help: Build an xcframework containing only Mac Catalyst. Replaces any existing xcframework.
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-catalyst)
 xcframework-only-tvos: $(build-apple-platform-tvos)
 	@# Help: Build an xcframework containing only tvOS. Replaces any existing xcframework.
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-tvos)
@@ -140,10 +149,10 @@ xcframework-assemble:
 
 # Creating xcframework for all platforms.
 #
-# This builds all 11 Apple targets and consumes ~100GB in `target/`. For local
+# This builds all 12 Apple targets and consumes ~100GB in `target/`. For local
 # verification of a UniFFI change, prefer `xcframework-only-macos` — see
 # Documentation/local-development.md.
-xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
+xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-catalyst) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
 
 ifeq ($(SKIP_PACKAGE_WP_API),true)
@@ -206,6 +215,9 @@ test-swift-macOS: test-swift-darwin
 
 test-swift-iOS: xcframework
 	scripts/xcodebuild-test.sh iOS-26-5
+
+test-swift-Catalyst: xcframework
+	scripts/xcodebuild-test.sh Catalyst
 
 test-swift-tvOS: xcframework
 	scripts/xcodebuild-test.sh tvOS-26-5
@@ -340,7 +352,8 @@ setup-rust-toolchain:
 		aarch64-apple-ios \
 		aarch64-apple-darwin \
 		x86_64-apple-darwin \
-		aarch64-apple-ios-sim
+		aarch64-apple-ios-sim \
+		$(apple-platform-targets-catalyst)
 
 # Platform-specific Rust setup (only installs what each platform needs in CI)
 setup-rust-macOS:
@@ -350,6 +363,10 @@ setup-rust-macOS:
 setup-rust-iOS:
 	rustup toolchain install $(rust_stable_toolchain)
 	rustup target add --toolchain $(rust_stable_toolchain) aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+
+setup-rust-Catalyst:
+	rustup toolchain install $(rust_stable_toolchain)
+	rustup target add --toolchain $(rust_stable_toolchain) $(apple-platform-targets-catalyst)
 
 setup-rust-tvOS setup-rust-watchOS:
 	rustup toolchain install $(rust_stable_toolchain)

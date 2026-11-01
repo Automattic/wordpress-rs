@@ -18,6 +18,7 @@ var package = Package(
     name: "WordPressAPI",
     platforms: [
         .iOS(.v16),
+        .macCatalyst(.v16),
         .macOS(.v13),
         .tvOS(.v16),
         .watchOS(.v9)
@@ -45,7 +46,7 @@ var package = Package(
             path: "native/swift/Sources/wordpress-api",
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency"),
-                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
+                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macCatalyst, .macOS, .tvOS, .watchOS]))
             ]
         ),
         .target(
@@ -61,7 +62,7 @@ var package = Package(
                 .swiftLanguageMode(.v5)
             ],
             linkerSettings: [
-                .linkedLibrary("sqlite3", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
+                .linkedLibrary("sqlite3", .when(platforms: [.iOS, .macCatalyst, .macOS, .tvOS, .watchOS]))
             ]
         ),
         .target(
@@ -82,7 +83,7 @@ var package = Package(
             path: "native/swift/Tests/wordpress-api",
             resources: [.copy("../../../../test-data/integration-test-responses/")],
             swiftSettings: [
-                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
+                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macCatalyst, .macOS, .tvOS, .watchOS]))
             ]
         ),
         .testTarget(

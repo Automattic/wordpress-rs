@@ -31,7 +31,7 @@ See [Android Studio Configuration](#android-studio-configuration) for required I
 
 - **Core:** Required for all platforms.
 - **Android:** Required for Android development.
-- **Apple Platforms:** Required for iOS, macOS, watchOS, and tvOS development.
+- **Apple Platforms:** Required for iOS, Mac Catalyst, macOS, watchOS, and tvOS development.
 - **Server:** Required for server-side development.
 
 ## Development
