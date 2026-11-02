@@ -9,9 +9,10 @@ use crate::connection::{ConnectionError, enable_foreign_keys, prepare_connection
 /// SQL statements. A migration's ID is its 1-based position in the list, so
 /// entries can only ever be appended.
 ///
-/// Every pending migration runs in a single `BEGIN EXCLUSIVE` transaction, and
-/// a `PRAGMA foreign_keys` in a migration has no effect inside it. Whether
-/// foreign keys are enforced while they run depends on the method running them.
+/// All pending migrations run in one `BEGIN EXCLUSIVE` transaction, so a
+/// `PRAGMA foreign_keys` inside a migration has no effect. Pick foreign key
+/// enforcement by the method that runs them: `perform_migrations` keeps it on,
+/// and `perform_migrations_with_foreign_keys_off` turns it off.
 pub struct MigrationManager<'a> {
     connection: &'a Connection,
     migrations: &'static [&'static str],
