@@ -1,7 +1,9 @@
-//! On-device storage for content the user creates or edits.
+//! The local content database, which stores the posts and pages the user
+//! creates or edits on the device as working copies.
 //!
-//! This database is separate from the API cache: the cache can be cleared and
-//! fetched again, local content can't. See
+//! A working copy is the user's version of a post or page. Unlike the API
+//! cache, it can't be fetched again, so it stays until it's deleted on purpose.
+//! Nothing in this crate sends anything to the server. See
 //! `Documentation/local-content-principles.md`.
 
 use rusqlite::Connection;
@@ -57,7 +59,10 @@ impl From<ConnectionError> for LocalContentError {
     }
 }
 
-/// The database that holds local content.
+/// The local content database.
+///
+/// Open it with `new`, then call `perform_migrations` before reading or
+/// writing anything.
 #[derive(uniffi::Object)]
 pub struct WpLocalContentStore {
     connection: DbConnection,
@@ -67,13 +72,10 @@ pub struct WpLocalContentStore {
 impl WpLocalContentStore {
     /// Open the local content database file at `path`, creating it if it doesn't exist.
     ///
-    /// `path` must be an absolute path to a file. In-memory and temporary
-    /// databases are rejected, as are relative paths and `file:` URIs: anything
-    /// stored in them is gone when the process exits, which would break the
-    /// first local content principle, that user content is never lost. See
-    /// `Documentation/local-content-principles.md`.
-    ///
-    /// Fails with `InvalidDatabasePath` if `path` isn't absolute.
+    /// `path` must be an absolute path to a file. Fails with
+    /// `InvalidDatabasePath` for anything else, such as a relative path,
+    /// `:memory:` or a `file:` URI. In-memory and temporary databases are
+    /// rejected because their content is gone when the process exits.
     #[uniffi::constructor]
     pub fn new(path: String) -> Result<Self, LocalContentError> {
         Ok(Self {
@@ -81,8 +83,10 @@ impl WpLocalContentStore {
         })
     }
 
-    /// Run the migrations [`MIGRATIONS`] holds that haven't run yet, and return
-    /// how many ran.
+    /// Create or update the database's tables to the current schema, and
+    /// return how many migrations ran.
+    ///
+    /// Call it after opening the store, before reading or writing anything.
     pub fn perform_migrations(&self) -> Result<i64, LocalContentError> {
         self.execute(|connection| {
             let mut mgr = MigrationManager::new(connection, &MIGRATIONS)?;
@@ -105,11 +109,12 @@ impl WpLocalContentStore {
 
 /// The local content migrations, in the order [`MigrationManager`] applies them.
 ///
-/// They run with foreign key enforcement off and every foreign key is checked
-/// before they commit, so dropping a table doesn't delete the rows referencing
-/// it. A migration can rebuild a table such as `working_copies` the way SQLite
-/// documents: create the new table, copy the rows into it, drop the old one,
-/// then rename the new one to the old name.
+/// They run with foreign key enforcement off, and every foreign key is checked
+/// before they commit. Dropping a table therefore leaves the rows that
+/// reference it alone. This lets a migration rebuild a table that others
+/// reference, such as `working_copies`, the way SQLite documents: create the
+/// new table, copy the rows into it, drop the old one, then rename the new one
+/// to the old name.
 pub static MIGRATIONS: [&str; 1] = [include_str!(
     "../migrations/0001-create-working-copies-tables.sql"
 )];
