@@ -60,28 +60,40 @@ fn remote_target_for(post: &AnyPostWithEditContext) -> WorkingCopyRemoteTarget {
     }
 }
 
-/// Read or create the working copy of `post` the way an app would: convert the
-/// fetched post, then hand the service the result.
+/// Open `post` for editing the way an app would: read its working copy, and
+/// only if it has none, convert the fetched post and create one.
 fn read_or_create_post(
     service: &LocalContentService,
     post: &AnyPostWithEditContext,
 ) -> PostWorkingCopy {
+    if let Some(existing) = service
+        .read_post_working_copy_for_remote_post(site(), post.id)
+        .expect("Reading the working copy should succeed")
+    {
+        return existing;
+    }
     let fields =
         PostWorkingCopyFields::from_remote(post).expect("Converting the post should succeed");
     service
-        .read_or_create_post_working_copy(remote_target_for(post), fields)
-        .expect("Reading or creating the working copy should succeed")
+        .create_post_working_copy(remote_target_for(post), fields)
+        .expect("Creating the working copy should succeed")
 }
 
 fn read_or_create_page(
     service: &LocalContentService,
     page: &AnyPostWithEditContext,
 ) -> PageWorkingCopy {
+    if let Some(existing) = service
+        .read_page_working_copy_for_remote_post(site(), page.id)
+        .expect("Reading the working copy should succeed")
+    {
+        return existing;
+    }
     let fields =
         PageWorkingCopyFields::from_remote(page).expect("Converting the page should succeed");
     service
-        .read_or_create_page_working_copy(remote_target_for(page), fields)
-        .expect("Reading or creating the working copy should succeed")
+        .create_page_working_copy(remote_target_for(page), fields)
+        .expect("Creating the working copy should succeed")
 }
 
 /// Create a post on the server, then fetch it with the edit context the way

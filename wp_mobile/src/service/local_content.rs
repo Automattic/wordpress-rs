@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use wp_api::posts::PostId;
 use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
@@ -27,29 +28,32 @@ impl LocalContentService {
         Self { store }
     }
 
-    /// Read the working copy for `remote_target`, storing `fields` as a new one
-    /// if there's none yet.
+    /// Read the post working copy that edits remote post `post_id` on `site`.
     ///
-    /// With a remote post in `remote_target`, an existing working copy of that post
-    /// is returned as stored, whatever `fields` holds, and pushing the
-    /// working copy updates that post. Without one, `fields` is always
-    /// stored as a new post, which pushing the working copy creates.
-    pub fn read_or_create_post_working_copy(
+    /// A remote post has at most one working copy, holding the user's unpushed
+    /// changes to it. To open a remote post for editing, call this first, and
+    /// create a working copy only if it returns `None`.
+    pub fn read_post_working_copy_for_remote_post(
+        &self,
+        site: SiteIdentity,
+        post_id: PostId,
+    ) -> Result<Option<PostWorkingCopy>, LocalContentError> {
+        self.store
+            .execute(|conn| WorkingCopyRepository.select_post_by_remote_post(conn, &site, post_id))
+    }
+
+    /// Store `fields` as a new post working copy pushed to `remote_target`,
+    /// and return it.
+    ///
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's
+    /// remote post already has a working copy.
+    pub fn create_post_working_copy(
         &self,
         remote_target: WorkingCopyRemoteTarget,
         fields: PostWorkingCopyFields,
     ) -> Result<PostWorkingCopy, LocalContentError> {
         self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            if let Some(remote_post) = remote_target.remote_post
-                && let Some(existing) = WorkingCopyRepository.select_post_by_remote_post(
-                    &transaction,
-                    &remote_target.site,
-                    remote_post.post_id,
-                )?
-            {
-                return Ok(existing);
-            }
             let id = WorkingCopyRepository.insert_post(&transaction, &fields, &remote_target)?;
             let created = WorkingCopyRepository
                 .select_post(&transaction, &id)?
@@ -175,29 +179,32 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_all_posts(conn))
     }
 
-    /// Read the working copy for `remote_target`, storing `fields` as a new one
-    /// if there's none yet.
+    /// Read the page working copy that edits remote page `post_id` on `site`.
     ///
-    /// With a remote page in `remote_target`, an existing working copy of that page
-    /// is returned as stored, whatever `fields` holds, and pushing the
-    /// working copy updates that page. Without one, `fields` is always
-    /// stored as a new page, which pushing the working copy creates.
-    pub fn read_or_create_page_working_copy(
+    /// A remote page has at most one working copy, holding the user's unpushed
+    /// changes to it. To open a remote page for editing, call this first, and
+    /// create a working copy only if it returns `None`.
+    pub fn read_page_working_copy_for_remote_post(
+        &self,
+        site: SiteIdentity,
+        post_id: PostId,
+    ) -> Result<Option<PageWorkingCopy>, LocalContentError> {
+        self.store
+            .execute(|conn| WorkingCopyRepository.select_page_by_remote_post(conn, &site, post_id))
+    }
+
+    /// Store `fields` as a new page working copy pushed to `remote_target`,
+    /// and return it.
+    ///
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's
+    /// remote post already has a working copy.
+    pub fn create_page_working_copy(
         &self,
         remote_target: WorkingCopyRemoteTarget,
         fields: PageWorkingCopyFields,
     ) -> Result<PageWorkingCopy, LocalContentError> {
         self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            if let Some(remote_post) = remote_target.remote_post
-                && let Some(existing) = WorkingCopyRepository.select_page_by_remote_post(
-                    &transaction,
-                    &remote_target.site,
-                    remote_post.post_id,
-                )?
-            {
-                return Ok(existing);
-            }
             let id = WorkingCopyRepository.insert_page(&transaction, &fields, &remote_target)?;
             let created = WorkingCopyRepository
                 .select_page(&transaction, &id)?

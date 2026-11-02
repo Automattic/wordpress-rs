@@ -111,7 +111,7 @@ class LocalContentTest {
         )
 
         val service = openService()
-        val id = service.readOrCreatePostWorkingCopy(newPostOn(wordPressComSite), post("Original")).id
+        val id = service.createPostWorkingCopy(newPostOn(wordPressComSite), post("Original")).id
         service.savePostWorkingCopy(id, edited)
         val read = assertNotNull(openService().readPostWorkingCopy(id))
 
@@ -124,7 +124,7 @@ class LocalContentTest {
         val edited = PageWorkingCopyFields(common = common("Edited page"), parent = 3L)
 
         val service = openService()
-        val id = service.readOrCreatePageWorkingCopy(
+        val id = service.createPageWorkingCopy(
             newPostOn(newPostSite),
             PageWorkingCopyFields(common = common("Original page"), parent = null)
         ).id
@@ -138,7 +138,7 @@ class LocalContentTest {
     @Test
     fun `saving a page as a post throws`() {
         val service = openService()
-        val pageId = service.readOrCreatePageWorkingCopy(
+        val pageId = service.createPageWorkingCopy(
             newPostOn(newPostSite),
             PageWorkingCopyFields(common = common("A page"), parent = null)
         ).id
@@ -151,14 +151,11 @@ class LocalContentTest {
     @Test
     fun `a new post recorded as pushed is found by its remote post`() {
         val service = openService()
-        val created = service.readOrCreatePostWorkingCopy(newPostOn(newPostSite), post("Draft"))
+        val created = service.createPostWorkingCopy(newPostOn(newPostSite), post("Draft"))
         val pushed = RemotePostReference(postId = 2007L, baseModifiedGmt = Date(1_900_000_000_000L))
 
         service.recordPostWorkingCopyPush(created.id, pushed)
-        val found = service.readOrCreatePostWorkingCopy(
-            WorkingCopyRemoteTarget(site = newPostSite, remotePost = pushed),
-            post("Fetched")
-        )
+        val found = assertNotNull(service.readPostWorkingCopyForRemotePost(newPostSite, pushed.postId))
 
         assertEquals(created.id, found.id)
         assertEquals(post("Draft"), found.fields)
@@ -169,8 +166,8 @@ class LocalContentTest {
     fun `deleting a site's working copies leaves other sites' alone`() {
         val otherSite = SiteIdentity(url = ParsedUrl.parse("https://other.example.com"), wordpressComSiteId = null)
         val service = openService()
-        service.readOrCreatePostWorkingCopy(newPostOn(newPostSite), post("Removed"))
-        val kept = service.readOrCreatePostWorkingCopy(newPostOn(otherSite), post("Kept"))
+        service.createPostWorkingCopy(newPostOn(newPostSite), post("Removed"))
+        val kept = service.createPostWorkingCopy(newPostOn(otherSite), post("Kept"))
 
         val deleted = service.deleteWorkingCopiesForSite(newPostSite)
 
@@ -185,13 +182,13 @@ class LocalContentTest {
         val service = openService()
 
         val target = WorkingCopyRemoteTarget(site = site, remotePost = remotePostReferenceFromRemote(post))
-        val read = service.readOrCreatePostWorkingCopy(target, postWorkingCopyFieldsFromRemote(post))
+        val created = service.createPostWorkingCopy(target, postWorkingCopyFieldsFromRemote(post))
 
-        assertEquals(post.title?.raw, read.fields.common.title)
-        assertEquals(post.content.raw, read.fields.common.content)
+        assertEquals(post.title?.raw, created.fields.common.title)
+        assertEquals(post.content.raw, created.fields.common.content)
         assertEquals(
             RemotePostReference(postId = post.id, baseModifiedGmt = post.modifiedGmt),
-            read.remoteTarget.remotePost
+            created.remoteTarget.remotePost
         )
     }
 

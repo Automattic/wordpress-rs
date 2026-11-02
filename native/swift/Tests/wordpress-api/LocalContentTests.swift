@@ -83,7 +83,7 @@ final class LocalContentTests {
         let target = newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: 123_456_789))
 
         let service = try openService()
-        let created = try service.readOrCreatePostWorkingCopy(remoteTarget: target, fields: post(title: "Original"))
+        let created = try service.createPostWorkingCopy(remoteTarget: target, fields: post(title: "Original"))
         let id = created.id
         try service.savePostWorkingCopy(id: id, fields: edited)
         let read = try #require(try openService().readPostWorkingCopy(id: id))
@@ -96,7 +96,7 @@ final class LocalContentTests {
         let target = newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: nil))
 
         let service = try openService()
-        let created = try service.readOrCreatePageWorkingCopy(
+        let created = try service.createPageWorkingCopy(
             remoteTarget: target,
             fields: PageWorkingCopyFields(common: common(title: "Original page"), parent: nil)
         )
@@ -112,7 +112,7 @@ final class LocalContentTests {
 
     @Test func savingAPageAsAPostThrows() throws {
         let service = try openService()
-        let page = try service.readOrCreatePageWorkingCopy(
+        let page = try service.createPageWorkingCopy(
             remoteTarget: newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)),
             fields: PageWorkingCopyFields(common: common(title: "A page"), parent: nil)
         )
