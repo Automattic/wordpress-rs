@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - trunk
-  # Exercises the build job on changes to this file. Only a push to trunk deploys.
+  # Exercises the build job on changes to its setup. Only a push to trunk deploys.
   pull_request:
     paths:
       - .github/workflows/publish-docs-to-github-pages.yml
+      - rust-toolchain.toml
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   build:
@@ -18,11 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pages: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Setup Rust
         # rust-cache hashes every installed toolchain, so drop the runner image's `stable`.
         run: |
@@ -30,9 +31,6 @@ jobs:
           rustup toolchain install
       - name: Configure cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - name: Setup pages
-        id: pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - name: Clean docs folder
         run: cargo clean --doc
       - name: Build docs
