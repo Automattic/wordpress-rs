@@ -3,11 +3,11 @@ use rusqlite::Connection;
 
 pub mod working_copies;
 
-/// Abstraction over database query execution.
+/// Runs SQL statements on a connection or a transaction.
 ///
-/// Repository functions take an executor rather than a `Connection` so they can
-/// only prepare and execute statements: they can't open transactions, change
-/// pragmas, or otherwise reconfigure the connection they're handed.
+/// Repository functions take an executor instead of a `Connection`, so they
+/// get `prepare` and `execute` but none of the connection's other methods,
+/// such as `transaction`.
 pub trait QueryExecutor {
     /// Prepare a SQL statement for execution.
     fn prepare(&self, sql: &str) -> Result<rusqlite::Statement<'_>, LocalContentError>;
@@ -17,12 +17,10 @@ pub trait QueryExecutor {
     -> Result<usize, LocalContentError>;
 }
 
-/// Marker trait indicating operations are executing within a transaction context.
+/// A [`QueryExecutor`] that is a transaction.
 ///
-/// This trait is only implemented by Transaction types, so an operation that takes
-/// `&impl InTransaction` can't be called outside a transaction. This provides stronger
-/// guarantees than accepting `&impl QueryExecutor`, which allows both Connection and
-/// Transaction.
+/// Only `rusqlite::Transaction` implements it, so a repository function that
+/// takes `&impl InTransaction` can't be called on a bare `Connection`.
 pub trait InTransaction: QueryExecutor {}
 
 impl QueryExecutor for Connection {
