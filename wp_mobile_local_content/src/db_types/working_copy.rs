@@ -1,8 +1,9 @@
-//! Working copy types.
+//! The fields of a post or page as the user edits it, and the stored working
+//! copies that hold them.
 //!
-//! Fields hold what the editor and its settings work with, shaped so that every
-//! value the server stores in them fits and converting a remote post loses none
-//! of them. See `Documentation/local-content-principles.md`.
+//! Each field can hold any value WordPress returns for it, including statuses
+//! and formats that plugins register. See
+//! `Documentation/local-content-principles.md`.
 
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
@@ -20,9 +21,8 @@ use crate::db_types::working_copy_remote_target::WorkingCopyRemoteTarget;
 
 uniffi::custom_newtype!(WorkingCopyId, String);
 
-/// Identifies a working copy: a hyphenated, lowercase v4 UUID.
-///
-/// Unlike the table's `rowid`, it stays unique across databases.
+/// The ID of a working copy, assigned when it's created: a lowercase,
+/// hyphenated v4 UUID.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WorkingCopyId(pub String);
 
@@ -44,11 +44,15 @@ impl FromSql for WorkingCopyId {
     }
 }
 
-/// The post's status, with its password where the status allows one.
+/// The post's status, and its password if it has one.
 ///
-/// A scheduled post is `Publish` with a future `PublishDate`, as WordPress
-/// itself treats it. A private post has no password: WordPress clears it when
-/// saving one. A `password` of `None` means the post has no password.
+/// A `password` of `None` means the post has no password. A private post can't
+/// have one, because WordPress removes the password when it saves a private
+/// post.
+///
+/// There is no scheduled status. A scheduled post is `Publish` with a
+/// `PublishDate` in the future. WordPress reports such a post as `future` until
+/// its date passes, and as `publish` after.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum StatusSetting {
     Draft {
@@ -61,19 +65,21 @@ pub enum StatusSetting {
         password: Option<String>,
     },
     Private,
-    /// A status registered by a plugin.
+    /// A status the other variants don't cover, such as one a plugin registers.
     ///
-    /// A status another variant stands for is saved as that variant: `draft`
-    /// as `Draft`, `pending` as `PendingReview`, `publish` and `future` as
-    /// `Publish`, and `private` as `Private`, without its password. An empty
-    /// status is saved as `Draft`.
+    /// Saving a `Custom` status that another variant covers stores that
+    /// variant, so it reads back as that variant. `draft` becomes `Draft`,
+    /// `pending` becomes `PendingReview`, `publish` and `future` become
+    /// `Publish`, and `private` becomes `Private` without its password. An
+    /// empty status becomes `Draft`.
     Custom {
         status: String,
         password: Option<String>,
     },
 }
 
-/// When the post is published.
+/// When the post is published. With `Immediately`, WordPress sets the date
+/// when the post is published.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum PublishDate {
     Immediately,
@@ -120,7 +126,8 @@ pub struct WorkingCopyCommonFields {
     pub ping_status: Option<PostPingStatus>,
 }
 
-/// The fields of a post working copy: the post as the user edits it on the device.
+/// A post as the user edits it on the device, holding what the editor and its
+/// settings show.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct PostWorkingCopyFields {
     pub common: WorkingCopyCommonFields,
@@ -130,7 +137,8 @@ pub struct PostWorkingCopyFields {
     pub sticky: bool,
 }
 
-/// The fields of a page working copy: the page as the user edits it on the device.
+/// A page as the user edits it on the device, holding what the editor and its
+/// settings show.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct PageWorkingCopyFields {
     pub common: WorkingCopyCommonFields,
@@ -138,27 +146,31 @@ pub struct PageWorkingCopyFields {
     pub parent: Option<PostId>,
 }
 
-/// A post working copy as stored: its fields, ID, remote target and timestamps.
+/// A stored post working copy: the user's version of a post, and where pushing
+/// it goes.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct PostWorkingCopy {
     pub id: WorkingCopyId,
     pub fields: PostWorkingCopyFields,
     pub remote_target: WorkingCopyRemoteTarget,
-    /// ISO 8601 UTC timestamp of when the working copy was created.
+    /// When the working copy was created, as an ISO 8601 UTC timestamp.
     pub created_at: String,
-    /// ISO 8601 UTC timestamp of the last save.
+    /// When the fields were last saved, as an ISO 8601 UTC timestamp. Until
+    /// the first save, it's the same as `created_at`.
     pub updated_at: String,
 }
 
-/// A page working copy as stored: its fields, ID, remote target and timestamps.
+/// A stored page working copy: the user's version of a page, and where pushing
+/// it goes.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct PageWorkingCopy {
     pub id: WorkingCopyId,
     pub fields: PageWorkingCopyFields,
     pub remote_target: WorkingCopyRemoteTarget,
-    /// ISO 8601 UTC timestamp of when the working copy was created.
+    /// When the working copy was created, as an ISO 8601 UTC timestamp.
     pub created_at: String,
-    /// ISO 8601 UTC timestamp of the last save.
+    /// When the fields were last saved, as an ISO 8601 UTC timestamp. Until
+    /// the first save, it's the same as `created_at`.
     pub updated_at: String,
 }
 
@@ -180,8 +192,8 @@ impl WorkingCopyKind {
 
 impl StatusSetting {
     /// The `status` and `password` column values. The status is stored as
-    /// WordPress names it, and a `Custom` status another variant stands for is
-    /// stored as that variant, so it reads back as one.
+    /// WordPress names it, and a `Custom` status another variant covers is
+    /// stored as that variant, so it reads back as that variant.
     pub(crate) fn to_columns(&self) -> (&str, Option<&str>) {
         match self {
             Self::Draft { password } => ("draft", password.as_deref()),

@@ -90,7 +90,7 @@ function patch_wp_mobile {
 
 function patch_wp_mobile_local_content {
     local swift_binding=$1
-    # An editor changes a working copy one field at a time.
+    # Make the fields mutable, so an editor can change them one at a time.
     enable_mutability "$swift_binding" WorkingCopyCommonFields PostWorkingCopyFields PageWorkingCopyFields
 
     cat >> "$swift_binding" <<'PATCH'

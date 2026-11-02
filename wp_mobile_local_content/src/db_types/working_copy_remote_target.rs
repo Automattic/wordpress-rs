@@ -1,9 +1,4 @@
-//! Where a working copy is pushed.
-//!
-//! The remote target is a relationship, not something the user edits, so it
-//! lives in its own table. Its rows depend on their working copy and are
-//! deleted with it, never the other way around. Sites live in a table of their
-//! own, which remote targets reference.
+//! Remote targets, and the site identities and remote post references they hold.
 
 use std::sync::Arc;
 
@@ -11,31 +6,43 @@ use rusqlite::types::FromSqlError;
 use wp_api::{date::WpGmtDateTime, parsed_url::ParsedUrl, posts::PostId, wp_com::WpComSiteId};
 use wp_mobile_sqlite::ColumnIndex;
 
-/// Identifies a site by something that survives the cache being cleared.
+/// The site a working copy belongs to, identified by values that stay valid
+/// when the cache is cleared.
 ///
-/// A site with a WordPress.com site ID is identified by it, whatever its URL,
-/// so a working copy stays with its site when the site's URL changes. A site
-/// without one is identified by its URL, until a site ID is given for that URL.
+/// A site with a WordPress.com site ID is matched by that ID, so its working
+/// copies follow it to a new URL. Set `wordpress_com_site_id` whenever the site
+/// has one, for reads as well as writes. Once a working copy is created with a
+/// site ID, the site's URL without the ID no longer finds it.
+///
+/// A site without a WordPress.com site ID is matched by its URL.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct SiteIdentity {
-    /// Stored in the serialized form `ParsedUrl` produces, so URLs that parse
-    /// to the same `ParsedUrl` are stored the same way.
+    /// Matched after `ParsedUrl` normalizes it, so `HTTPS://EXAMPLE.COM/` and
+    /// `https://example.com` are the same site.
     pub url: Arc<ParsedUrl>,
     pub wordpress_com_site_id: Option<WpComSiteId>,
 }
 
-/// The remote post a working copy edits.
+/// A post on the server that a working copy updates when it's pushed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
 pub struct RemotePostReference {
     pub post_id: PostId,
-    /// The remote post's `modified_gmt` when the working copy was made from it.
+    /// The working copy's base version: the `modified_gmt` of the server
+    /// version its fields start from.
+    ///
+    /// It's the post's `modified_gmt` when the working copy was created from
+    /// it, and after a recorded push, the `modified_gmt` the server returned. If
+    /// the post's current `modified_gmt` is different, the post has changed on
+    /// the server since.
     pub base_modified_gmt: WpGmtDateTime,
 }
 
-/// The site a working copy is pushed to, and the remote post it edits.
+/// Where a working copy goes when it's pushed: its site, and the post on that
+/// site the push updates.
 ///
-/// With a `remote_post`, pushing updates that post; without one, it creates a
-/// new post.
+/// Without a `remote_post`, the working copy is a new post that isn't on the
+/// server yet. Recording its first push sets `remote_post` to the post that
+/// push created.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct WorkingCopyRemoteTarget {
     pub site: SiteIdentity,
