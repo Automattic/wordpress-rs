@@ -11,9 +11,10 @@ use crate::{
     LocalContentError,
     db_types::{
         working_copy::{
-            DbPageWorkingCopy, DbPostWorkingCopy, FeaturedImage, PageFieldsColumn, PageWorkingCopy,
-            PostFieldsColumn, PostWorkingCopy, PublishDate, StatusSetting, WorkingCopyColumn,
-            WorkingCopyCommon, WorkingCopyId, WorkingCopyKind, WorkingCopyTag, date_from_timestamp,
+            FeaturedImage, PageFieldsColumn, PageWorkingCopy, PageWorkingCopyFields,
+            PostFieldsColumn, PostWorkingCopy, PostWorkingCopyFields, PublishDate, StatusSetting,
+            WorkingCopyColumn, WorkingCopyCommonFields, WorkingCopyId, WorkingCopyKind,
+            WorkingCopyTag, date_from_timestamp,
         },
         working_copy_remote_target::{
             RemotePostReference, SiteColumn, SiteIdentity, WorkingCopyRemoteTarget,
@@ -45,10 +46,10 @@ impl WorkingCopyRepository {
     pub fn insert_post(
         &self,
         transaction: &impl InTransaction,
-        working_copy: &PostWorkingCopy,
+        fields: &PostWorkingCopyFields,
         remote_target: &WorkingCopyRemoteTarget,
     ) -> Result<WorkingCopyId, LocalContentError> {
-        let (id, rowid) = insert_common(transaction, WorkingCopyKind::Post, &working_copy.common)?;
+        let (id, rowid) = insert_common(transaction, WorkingCopyKind::Post, &fields.common)?;
         transaction.execute(
             &format!(
                 "INSERT INTO {POST_FIELDS} (working_copy_rowid, category_ids, tags, format, sticky)
@@ -56,10 +57,10 @@ impl WorkingCopyRepository {
             ),
             rusqlite::params![
                 rowid,
-                categories_to_json(&working_copy.categories)?,
-                tags_to_json(&working_copy.tags)?,
-                working_copy.format.as_str(),
-                working_copy.sticky,
+                categories_to_json(&fields.categories)?,
+                tags_to_json(&fields.tags)?,
+                fields.format.as_str(),
+                fields.sticky,
             ],
         )?;
         insert_remote_target(transaction, rowid, remote_target)?;
@@ -73,13 +74,13 @@ impl WorkingCopyRepository {
     pub fn insert_page(
         &self,
         transaction: &impl InTransaction,
-        working_copy: &PageWorkingCopy,
+        fields: &PageWorkingCopyFields,
         remote_target: &WorkingCopyRemoteTarget,
     ) -> Result<WorkingCopyId, LocalContentError> {
-        let (id, rowid) = insert_common(transaction, WorkingCopyKind::Page, &working_copy.common)?;
+        let (id, rowid) = insert_common(transaction, WorkingCopyKind::Page, &fields.common)?;
         transaction.execute(
             &format!("INSERT INTO {PAGE_FIELDS} (working_copy_rowid, parent_id) VALUES (?, ?)"),
-            rusqlite::params![rowid, working_copy.parent.map(|parent| parent.0)],
+            rusqlite::params![rowid, fields.parent.map(|parent| parent.0)],
         )?;
         insert_remote_target(transaction, rowid, remote_target)?;
         Ok(id)
@@ -93,10 +94,9 @@ impl WorkingCopyRepository {
         &self,
         transaction: &impl InTransaction,
         id: &WorkingCopyId,
-        working_copy: &PostWorkingCopy,
+        fields: &PostWorkingCopyFields,
     ) -> Result<bool, LocalContentError> {
-        let Some(rowid) =
-            update_common(transaction, WorkingCopyKind::Post, id, &working_copy.common)?
+        let Some(rowid) = update_common(transaction, WorkingCopyKind::Post, id, &fields.common)?
         else {
             return Ok(false);
         };
@@ -106,10 +106,10 @@ impl WorkingCopyRepository {
                  WHERE working_copy_rowid = ?"
             ),
             rusqlite::params![
-                categories_to_json(&working_copy.categories)?,
-                tags_to_json(&working_copy.tags)?,
-                working_copy.format.as_str(),
-                working_copy.sticky,
+                categories_to_json(&fields.categories)?,
+                tags_to_json(&fields.tags)?,
+                fields.format.as_str(),
+                fields.sticky,
                 rowid,
             ],
         )?;
@@ -124,16 +124,15 @@ impl WorkingCopyRepository {
         &self,
         transaction: &impl InTransaction,
         id: &WorkingCopyId,
-        working_copy: &PageWorkingCopy,
+        fields: &PageWorkingCopyFields,
     ) -> Result<bool, LocalContentError> {
-        let Some(rowid) =
-            update_common(transaction, WorkingCopyKind::Page, id, &working_copy.common)?
+        let Some(rowid) = update_common(transaction, WorkingCopyKind::Page, id, &fields.common)?
         else {
             return Ok(false);
         };
         transaction.execute(
             &format!("UPDATE {PAGE_FIELDS} SET parent_id = ? WHERE working_copy_rowid = ?"),
-            rusqlite::params![working_copy.parent.map(|parent| parent.0), rowid],
+            rusqlite::params![fields.parent.map(|parent| parent.0), rowid],
         )?;
         Ok(true)
     }
@@ -228,7 +227,7 @@ impl WorkingCopyRepository {
         &self,
         executor: &impl QueryExecutor,
         id: &WorkingCopyId,
-    ) -> Result<Option<DbPostWorkingCopy>, LocalContentError> {
+    ) -> Result<Option<PostWorkingCopy>, LocalContentError> {
         let Some(common_row) = select_common(executor, WorkingCopyKind::Post, id)? else {
             return Ok(None);
         };
@@ -250,9 +249,9 @@ impl WorkingCopyRepository {
         })?;
         let remote_target = select_remote_target(executor, common_row.rowid)?;
 
-        Ok(Some(DbPostWorkingCopy {
+        Ok(Some(PostWorkingCopy {
             id: common_row.id,
-            working_copy: PostWorkingCopy {
+            fields: PostWorkingCopyFields {
                 common: common_row.common,
                 categories,
                 tags,
@@ -275,7 +274,7 @@ impl WorkingCopyRepository {
         &self,
         executor: &impl QueryExecutor,
         id: &WorkingCopyId,
-    ) -> Result<Option<DbPageWorkingCopy>, LocalContentError> {
+    ) -> Result<Option<PageWorkingCopy>, LocalContentError> {
         let Some(common_row) = select_common(executor, WorkingCopyKind::Page, id)? else {
             return Ok(None);
         };
@@ -287,9 +286,9 @@ impl WorkingCopyRepository {
         })?;
         let remote_target = select_remote_target(executor, common_row.rowid)?;
 
-        Ok(Some(DbPageWorkingCopy {
+        Ok(Some(PageWorkingCopy {
             id: common_row.id,
-            working_copy: PageWorkingCopy {
+            fields: PageWorkingCopyFields {
                 common: common_row.common,
                 parent: parent.map(PostId),
             },
@@ -307,7 +306,7 @@ impl WorkingCopyRepository {
         executor: &impl QueryExecutor,
         site: &SiteIdentity,
         post_id: PostId,
-    ) -> Result<Option<DbPostWorkingCopy>, LocalContentError> {
+    ) -> Result<Option<PostWorkingCopy>, LocalContentError> {
         match select_id_by_remote_post(executor, WorkingCopyKind::Post, site, post_id)? {
             Some(id) => self.select_post(executor, &id),
             None => Ok(None),
@@ -322,7 +321,7 @@ impl WorkingCopyRepository {
         executor: &impl QueryExecutor,
         site: &SiteIdentity,
         post_id: PostId,
-    ) -> Result<Option<DbPageWorkingCopy>, LocalContentError> {
+    ) -> Result<Option<PageWorkingCopy>, LocalContentError> {
         match select_id_by_remote_post(executor, WorkingCopyKind::Page, site, post_id)? {
             Some(id) => self.select_page(executor, &id),
             None => Ok(None),
@@ -334,7 +333,7 @@ impl WorkingCopyRepository {
         &self,
         executor: &impl QueryExecutor,
         site: &SiteIdentity,
-    ) -> Result<Vec<DbPostWorkingCopy>, LocalContentError> {
+    ) -> Result<Vec<PostWorkingCopy>, LocalContentError> {
         select_ids_by_site(executor, WorkingCopyKind::Post, site)?
             .iter()
             .filter_map(|id| self.select_post(executor, id).transpose())
@@ -346,7 +345,7 @@ impl WorkingCopyRepository {
         &self,
         executor: &impl QueryExecutor,
         site: &SiteIdentity,
-    ) -> Result<Vec<DbPageWorkingCopy>, LocalContentError> {
+    ) -> Result<Vec<PageWorkingCopy>, LocalContentError> {
         select_ids_by_site(executor, WorkingCopyKind::Page, site)?
             .iter()
             .filter_map(|id| self.select_page(executor, id).transpose())
@@ -358,7 +357,7 @@ impl WorkingCopyRepository {
     pub fn select_all_posts(
         &self,
         executor: &impl QueryExecutor,
-    ) -> Result<Vec<DbPostWorkingCopy>, LocalContentError> {
+    ) -> Result<Vec<PostWorkingCopy>, LocalContentError> {
         select_all_ids(executor, WorkingCopyKind::Post)?
             .iter()
             .filter_map(|id| self.select_post(executor, id).transpose())
@@ -370,7 +369,7 @@ impl WorkingCopyRepository {
     pub fn select_all_pages(
         &self,
         executor: &impl QueryExecutor,
-    ) -> Result<Vec<DbPageWorkingCopy>, LocalContentError> {
+    ) -> Result<Vec<PageWorkingCopy>, LocalContentError> {
         select_all_ids(executor, WorkingCopyKind::Page)?
             .iter()
             .filter_map(|id| self.select_page(executor, id).transpose())
@@ -384,7 +383,7 @@ impl WorkingCopyRepository {
 struct CommonRow {
     rowid: i64,
     id: WorkingCopyId,
-    common: WorkingCopyCommon,
+    common: WorkingCopyCommonFields,
     created_at: String,
     updated_at: String,
 }
@@ -392,7 +391,7 @@ struct CommonRow {
 fn insert_common(
     transaction: &impl InTransaction,
     kind: WorkingCopyKind,
-    common: &WorkingCopyCommon,
+    common: &WorkingCopyCommonFields,
 ) -> Result<(WorkingCopyId, i64), LocalContentError> {
     let id = WorkingCopyId::generate();
     let (status, password) = common.status.to_columns();
@@ -429,7 +428,7 @@ fn update_common(
     transaction: &impl InTransaction,
     kind: WorkingCopyKind,
     id: &WorkingCopyId,
-    common: &WorkingCopyCommon,
+    common: &WorkingCopyCommonFields,
 ) -> Result<Option<i64>, LocalContentError> {
     let (status, password) = common.status.to_columns();
     let mut stmt = transaction.prepare(&format!(
@@ -604,7 +603,7 @@ fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
     Ok(CommonRow {
         rowid: row.get_column(C::Rowid)?,
         id: row.get_column(C::Uuid)?,
-        common: WorkingCopyCommon {
+        common: WorkingCopyCommonFields {
             title: row.get_column(C::Title)?,
             content: row.get_column(C::Content)?,
             excerpt: row.get_column(C::Excerpt)?,
@@ -870,8 +869,8 @@ mod tests {
         date_from_timestamp(seconds).expect("Timestamp should be in range")
     }
 
-    fn common(title: &str) -> WorkingCopyCommon {
-        WorkingCopyCommon {
+    fn common(title: &str) -> WorkingCopyCommonFields {
+        WorkingCopyCommonFields {
             title: title.to_string(),
             content: format!("<!-- wp:paragraph --><p>{title}</p><!-- /wp:paragraph -->"),
             excerpt: String::new(),
@@ -886,9 +885,9 @@ mod tests {
     }
 
     /// A post with every optional or enum field set away from its default.
-    fn detailed_post() -> PostWorkingCopy {
-        PostWorkingCopy {
-            common: WorkingCopyCommon {
+    fn detailed_post() -> PostWorkingCopyFields {
+        PostWorkingCopyFields {
+            common: WorkingCopyCommonFields {
                 excerpt: "An excerpt".to_string(),
                 slug: Some("a-slug".to_string()),
                 status: StatusSetting::Custom {
@@ -918,8 +917,8 @@ mod tests {
         }
     }
 
-    fn simple_post(title: &str) -> PostWorkingCopy {
-        PostWorkingCopy {
+    fn simple_post(title: &str) -> PostWorkingCopyFields {
+        PostWorkingCopyFields {
             common: common(title),
             categories: vec![],
             tags: vec![],
@@ -958,12 +957,12 @@ mod tests {
 
     fn insert_post(
         conn: &mut Connection,
-        working_copy: &PostWorkingCopy,
+        fields: &PostWorkingCopyFields,
         remote_target: &WorkingCopyRemoteTarget,
     ) -> WorkingCopyId {
         let tx = conn.transaction().expect("Failed to begin transaction");
         let id = WorkingCopyRepository
-            .insert_post(&tx, working_copy, remote_target)
+            .insert_post(&tx, fields, remote_target)
             .expect("Insert should succeed");
         tx.commit().expect("Commit should succeed");
         id
@@ -971,12 +970,12 @@ mod tests {
 
     fn insert_page(
         conn: &mut Connection,
-        working_copy: &PageWorkingCopy,
+        fields: &PageWorkingCopyFields,
         remote_target: &WorkingCopyRemoteTarget,
     ) -> WorkingCopyId {
         let tx = conn.transaction().expect("Failed to begin transaction");
         let id = WorkingCopyRepository
-            .insert_page(&tx, working_copy, remote_target)
+            .insert_page(&tx, fields, remote_target)
             .expect("Insert should succeed");
         tx.commit().expect("Commit should succeed");
         id
@@ -1081,14 +1080,14 @@ mod tests {
             .expect("Inserted post should exist");
 
         assert_eq!(stored.id, id);
-        assert_eq!(stored.working_copy, post);
+        assert_eq!(stored.fields, post);
         assert_eq!(stored.remote_target, remote_target);
     }
 
     #[test]
     fn test_page_round_trips_every_field() {
         let mut conn = migrated_connection();
-        let page = PageWorkingCopy {
+        let page = PageWorkingCopyFields {
             common: common("A page"),
             parent: Some(PostId(3)),
         };
@@ -1100,7 +1099,7 @@ mod tests {
             .expect("Select should succeed")
             .expect("Inserted page should exist");
 
-        assert_eq!(stored.working_copy, page);
+        assert_eq!(stored.fields, page);
         assert_eq!(stored.remote_target, remote_target);
     }
 
@@ -1109,7 +1108,7 @@ mod tests {
         let mut conn = migrated_connection();
         let page_id = insert_page(
             &mut conn,
-            &PageWorkingCopy {
+            &PageWorkingCopyFields {
                 common: common("A page"),
                 parent: None,
             },
@@ -1158,7 +1157,7 @@ mod tests {
             .expect("Query should succeed");
 
         assert!(updated);
-        assert_eq!(after.working_copy, edited);
+        assert_eq!(after.fields, edited);
         assert_eq!(after.remote_target, remote_target);
         assert_eq!(after.created_at, before.created_at);
         assert_eq!(stored_password, None);
@@ -1208,8 +1207,8 @@ mod tests {
                 },
             ),
         ] {
-            let post = PostWorkingCopy {
-                common: WorkingCopyCommon {
+            let post = PostWorkingCopyFields {
+                common: WorkingCopyCommonFields {
                     status: StatusSetting::Custom {
                         status: status.to_string(),
                         password: secret(),
@@ -1229,7 +1228,7 @@ mod tests {
                     .select_post(&conn, id)
                     .expect("Select should succeed")
                     .expect("The post should exist")
-                    .working_copy
+                    .fields
                     .common
                     .status
             };
@@ -1339,7 +1338,7 @@ mod tests {
         );
         insert_page(
             &mut conn,
-            &PageWorkingCopy {
+            &PageWorkingCopyFields {
                 common: common("A page"),
                 parent: None,
             },
@@ -1358,7 +1357,7 @@ mod tests {
             .expect("Update should succeed");
         }
 
-        let ids = |posts: Vec<DbPostWorkingCopy>| -> Vec<WorkingCopyId> {
+        let ids = |posts: Vec<PostWorkingCopy>| -> Vec<WorkingCopyId> {
             posts.into_iter().map(|post| post.id).collect()
         };
         let by_site = WorkingCopyRepository
@@ -1532,7 +1531,7 @@ mod tests {
         assert!(recorded_new_post && recorded_99);
         assert_eq!(after.remote_target.remote_post, Some(pushed_as_7));
         assert_eq!(after.remote_target.site, before.remote_target.site);
-        assert_eq!(after.working_copy, before.working_copy);
+        assert_eq!(after.fields, before.fields);
         assert_eq!(after.updated_at, before.updated_at);
         assert_eq!(editing_99_target.remote_post, Some(pushed_99_again));
     }
@@ -1552,7 +1551,7 @@ mod tests {
         );
         let page = insert_page(
             &mut conn,
-            &PageWorkingCopy {
+            &PageWorkingCopyFields {
                 common: common("A page"),
                 parent: None,
             },
@@ -1605,7 +1604,7 @@ mod tests {
         );
         insert_page(
             &mut conn,
-            &PageWorkingCopy {
+            &PageWorkingCopyFields {
                 common: common("Removed page"),
                 parent: None,
             },

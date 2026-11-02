@@ -1,4 +1,4 @@
-//! Making a working copy from a remote post.
+//! Making working copy fields from a remote post.
 //!
 //! Every value a working copy holds is converted without loss, so a working
 //! copy made from a remote post starts out holding what the server holds. The
@@ -17,8 +17,8 @@ use wp_api::{
 
 use crate::db_types::{
     working_copy::{
-        FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting,
-        WorkingCopyCommon, WorkingCopyTag,
+        FeaturedImage, PageWorkingCopyFields, PostWorkingCopyFields, PublishDate, StatusSetting,
+        WorkingCopyCommonFields, WorkingCopyTag,
     },
     working_copy_remote_target::RemotePostReference,
 };
@@ -33,8 +33,8 @@ pub enum RemotePostConversionError {
     WrongPostType { expected: String, actual: String },
 }
 
-impl PostWorkingCopy {
-    /// Make a working copy from a post fetched with the edit context.
+impl PostWorkingCopyFields {
+    /// Make post working copy fields from a post fetched with the edit context.
     pub fn from_remote(post: &AnyPostWithEditContext) -> Result<Self, RemotePostConversionError> {
         expect_post_type(post, "post")?;
         Ok(Self {
@@ -52,8 +52,8 @@ impl PostWorkingCopy {
     }
 }
 
-impl PageWorkingCopy {
-    /// Make a working copy from a page fetched with the edit context.
+impl PageWorkingCopyFields {
+    /// Make page working copy fields from a page fetched with the edit context.
     pub fn from_remote(post: &AnyPostWithEditContext) -> Result<Self, RemotePostConversionError> {
         expect_post_type(post, "page")?;
         Ok(Self {
@@ -74,20 +74,20 @@ impl RemotePostReference {
     }
 }
 
-/// Make a post working copy from a post fetched with the edit context.
+/// Make post working copy fields from a post fetched with the edit context.
 #[uniffi::export]
-pub fn post_working_copy_from_remote(
+pub fn post_working_copy_fields_from_remote(
     post: AnyPostWithEditContext,
-) -> Result<PostWorkingCopy, RemotePostConversionError> {
-    PostWorkingCopy::from_remote(&post)
+) -> Result<PostWorkingCopyFields, RemotePostConversionError> {
+    PostWorkingCopyFields::from_remote(&post)
 }
 
-/// Make a page working copy from a page fetched with the edit context.
+/// Make page working copy fields from a page fetched with the edit context.
 #[uniffi::export]
-pub fn page_working_copy_from_remote(
+pub fn page_working_copy_fields_from_remote(
     page: AnyPostWithEditContext,
-) -> Result<PageWorkingCopy, RemotePostConversionError> {
-    PageWorkingCopy::from_remote(&page)
+) -> Result<PageWorkingCopyFields, RemotePostConversionError> {
+    PageWorkingCopyFields::from_remote(&page)
 }
 
 /// The reference to `post` for a working copy made from it, as it was fetched.
@@ -112,7 +112,7 @@ fn expect_post_type(
 
 fn common_from_remote(
     post: &AnyPostWithEditContext,
-) -> Result<WorkingCopyCommon, RemotePostConversionError> {
+) -> Result<WorkingCopyCommonFields, RemotePostConversionError> {
     let content =
         post.content
             .raw
@@ -145,7 +145,7 @@ fn common_from_remote(
         None => String::new(),
     };
 
-    Ok(WorkingCopyCommon {
+    Ok(WorkingCopyCommonFields {
         title,
         content,
         excerpt,
@@ -279,13 +279,13 @@ mod tests {
 
     #[test]
     fn test_published_post_converts_every_field() {
-        let working_copy =
-            PostWorkingCopy::from_remote(&remote_post()).expect("Conversion should succeed");
+        let fields =
+            PostWorkingCopyFields::from_remote(&remote_post()).expect("Conversion should succeed");
 
         assert_eq!(
-            working_copy,
-            PostWorkingCopy {
-                common: WorkingCopyCommon {
+            fields,
+            PostWorkingCopyFields {
+                common: WorkingCopyCommonFields {
                     title: "A post".to_string(),
                     content: "<!-- wp:paragraph --><p>Content</p><!-- /wp:paragraph -->"
                         .to_string(),
@@ -355,7 +355,7 @@ mod tests {
                 ..remote_post()
             };
 
-            let common = PostWorkingCopy::from_remote(&post)
+            let common = PostWorkingCopyFields::from_remote(&post)
                 .expect("Conversion should succeed")
                 .common;
 
@@ -401,7 +401,7 @@ mod tests {
                 ..remote_post()
             };
 
-            let common = PostWorkingCopy::from_remote(&post)
+            let common = PostWorkingCopyFields::from_remote(&post)
                 .expect("Conversion should succeed")
                 .common;
 
@@ -418,10 +418,10 @@ mod tests {
                 ..remote_post()
             };
 
-            let working_copy =
-                PageWorkingCopy::from_remote(&page).expect("Conversion should succeed");
+            let fields =
+                PageWorkingCopyFields::from_remote(&page).expect("Conversion should succeed");
 
-            assert_eq!(working_copy.parent, expected);
+            assert_eq!(fields.parent, expected);
         }
     }
 
@@ -462,7 +462,7 @@ mod tests {
         ];
 
         for (post, expected) in cases {
-            assert_eq!(PostWorkingCopy::from_remote(&post), Err(expected));
+            assert_eq!(PostWorkingCopyFields::from_remote(&post), Err(expected));
         }
     }
 

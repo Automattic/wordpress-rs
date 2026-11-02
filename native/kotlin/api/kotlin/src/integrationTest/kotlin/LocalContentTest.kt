@@ -15,18 +15,18 @@ import uniffi.wp_api.PostRetrieveParams
 import uniffi.wp_mobile.LocalContentService
 import uniffi.wp_mobile_local_content.FeaturedImage
 import uniffi.wp_mobile_local_content.LocalContentException
-import uniffi.wp_mobile_local_content.PageWorkingCopy
-import uniffi.wp_mobile_local_content.PostWorkingCopy
+import uniffi.wp_mobile_local_content.PageWorkingCopyFields
+import uniffi.wp_mobile_local_content.PostWorkingCopyFields
 import uniffi.wp_mobile_local_content.PublishDate
 import uniffi.wp_mobile_local_content.RemotePostConversionException
 import uniffi.wp_mobile_local_content.RemotePostReference
 import uniffi.wp_mobile_local_content.SiteIdentity
 import uniffi.wp_mobile_local_content.StatusSetting
-import uniffi.wp_mobile_local_content.WorkingCopyCommon
+import uniffi.wp_mobile_local_content.WorkingCopyCommonFields
 import uniffi.wp_mobile_local_content.WorkingCopyTag
 import uniffi.wp_mobile_local_content.WorkingCopyRemoteTarget
 import uniffi.wp_mobile_local_content.WpLocalContentStore
-import uniffi.wp_mobile_local_content.postWorkingCopyFromRemote
+import uniffi.wp_mobile_local_content.postWorkingCopyFieldsFromRemote
 import uniffi.wp_mobile_local_content.remotePostReferenceFromRemote
 import java.nio.file.Path
 import java.util.Date
@@ -46,7 +46,7 @@ class LocalContentTest {
         return LocalContentService(store)
     }
 
-    private fun common(title: String) = WorkingCopyCommon(
+    private fun common(title: String) = WorkingCopyCommonFields(
         title = title,
         content = "<!-- wp:paragraph --><p>$title</p><!-- /wp:paragraph -->",
         excerpt = "",
@@ -59,7 +59,7 @@ class LocalContentTest {
         pingStatus = null
     )
 
-    private fun post(title: String) = PostWorkingCopy(
+    private fun post(title: String) = PostWorkingCopyFields(
         common = common(title),
         categories = emptyList(),
         tags = emptyList(),
@@ -96,7 +96,7 @@ class LocalContentTest {
             url = ParsedUrl.parse("https://example.wordpress.com"),
             wordpressComSiteId = 123_456_789uL
         )
-        val edited = PostWorkingCopy(
+        val edited = PostWorkingCopyFields(
             common = common("Edited").copy(
                 status = StatusSetting.Custom(status = "in-review", password = "secret"),
                 publishDate = PublishDate.At(date = Date(1_900_000_000_000L)),
@@ -115,23 +115,23 @@ class LocalContentTest {
         service.savePostWorkingCopy(id, edited)
         val read = assertNotNull(openService().readPostWorkingCopy(id))
 
-        assertEquals(edited, read.workingCopy)
+        assertEquals(edited, read.fields)
         assertEquals(WorkingCopyRemoteTarget(site = wordPressComSite, remotePost = null), read.remoteTarget)
     }
 
     @Test
     fun `saved page working copy survives reopening the database`() {
-        val edited = PageWorkingCopy(common = common("Edited page"), parent = 3L)
+        val edited = PageWorkingCopyFields(common = common("Edited page"), parent = 3L)
 
         val service = openService()
         val id = service.readOrCreatePageWorkingCopy(
             newPostOn(newPostSite),
-            PageWorkingCopy(common = common("Original page"), parent = null)
+            PageWorkingCopyFields(common = common("Original page"), parent = null)
         ).id
         service.savePageWorkingCopy(id, edited)
         val read = assertNotNull(openService().readPageWorkingCopy(id))
 
-        assertEquals(edited, read.workingCopy)
+        assertEquals(edited, read.fields)
         assertEquals(WorkingCopyRemoteTarget(site = newPostSite, remotePost = null), read.remoteTarget)
     }
 
@@ -140,7 +140,7 @@ class LocalContentTest {
         val service = openService()
         val pageId = service.readOrCreatePageWorkingCopy(
             newPostOn(newPostSite),
-            PageWorkingCopy(common = common("A page"), parent = null)
+            PageWorkingCopyFields(common = common("A page"), parent = null)
         ).id
 
         assertThrows<LocalContentException.WorkingCopyNotFound> {
@@ -161,7 +161,7 @@ class LocalContentTest {
         )
 
         assertEquals(created.id, found.id)
-        assertEquals(post("Draft"), found.workingCopy)
+        assertEquals(post("Draft"), found.fields)
         assertEquals(pushed, found.remoteTarget.remotePost)
     }
 
@@ -185,10 +185,10 @@ class LocalContentTest {
         val service = openService()
 
         val target = WorkingCopyRemoteTarget(site = site, remotePost = remotePostReferenceFromRemote(post))
-        val read = service.readOrCreatePostWorkingCopy(target, postWorkingCopyFromRemote(post))
+        val read = service.readOrCreatePostWorkingCopy(target, postWorkingCopyFieldsFromRemote(post))
 
-        assertEquals(post.title?.raw, read.workingCopy.common.title)
-        assertEquals(post.content.raw, read.workingCopy.common.content)
+        assertEquals(post.title?.raw, read.fields.common.title)
+        assertEquals(post.content.raw, read.fields.common.content)
         assertEquals(
             RemotePostReference(postId = post.id, baseModifiedGmt = post.modifiedGmt),
             read.remoteTarget.remotePost
@@ -200,7 +200,7 @@ class LocalContentTest {
         val page = fetchFirst(PostEndpointType.Pages)
 
         val error = assertThrows<RemotePostConversionException.WrongPostType> {
-            postWorkingCopyFromRemote(page)
+            postWorkingCopyFieldsFromRemote(page)
         }
         assertEquals("post", error.expected)
         assertEquals("page", error.actual)

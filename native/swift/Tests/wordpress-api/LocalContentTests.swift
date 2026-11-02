@@ -35,8 +35,8 @@ final class LocalContentTests {
         author: UserId? = nil,
         featuredImage: FeaturedImage = .none,
         commentStatus: PostCommentStatus? = nil
-    ) -> WorkingCopyCommon {
-        WorkingCopyCommon(
+    ) -> WorkingCopyCommonFields {
+        WorkingCopyCommonFields(
             title: title,
             content: "<!-- wp:paragraph --><p>\(title)</p><!-- /wp:paragraph -->",
             excerpt: "",
@@ -54,8 +54,8 @@ final class LocalContentTests {
         WorkingCopyRemoteTarget(site: site, remotePost: nil)
     }
 
-    private func post(title: String) -> PostWorkingCopy {
-        PostWorkingCopy(common: common(title: title), categories: [], tags: [], format: .standard, sticky: false)
+    private func post(title: String) -> PostWorkingCopyFields {
+        PostWorkingCopyFields(common: common(title: title), categories: [], tags: [], format: .standard, sticky: false)
     }
 
     @Test func openingAnInMemoryDatabaseThrows() {
@@ -65,7 +65,7 @@ final class LocalContentTests {
     }
 
     @Test func savedPostWorkingCopySurvivesReopeningTheDatabase() throws {
-        let edited = PostWorkingCopy(
+        let edited = PostWorkingCopyFields(
             common: common(
                 title: "Edited",
                 status: .custom(status: "in-review", password: "secret"),
@@ -83,12 +83,12 @@ final class LocalContentTests {
         let target = newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: 123_456_789))
 
         let service = try openService()
-        let created = try service.readOrCreatePostWorkingCopy(remoteTarget: target, workingCopy: post(title: "Original"))
+        let created = try service.readOrCreatePostWorkingCopy(remoteTarget: target, fields: post(title: "Original"))
         let id = created.id
-        try service.savePostWorkingCopy(id: id, workingCopy: edited)
+        try service.savePostWorkingCopy(id: id, fields: edited)
         let read = try #require(try openService().readPostWorkingCopy(id: id))
 
-        #expect(read.workingCopy == edited)
+        #expect(read.fields == edited)
         #expect(read.remoteTarget == target)
     }
 
@@ -98,15 +98,15 @@ final class LocalContentTests {
         let service = try openService()
         let created = try service.readOrCreatePageWorkingCopy(
             remoteTarget: target,
-            workingCopy: PageWorkingCopy(common: common(title: "Original page"), parent: nil)
+            fields: PageWorkingCopyFields(common: common(title: "Original page"), parent: nil)
         )
-        var edited = created.workingCopy
+        var edited = created.fields
         edited.common.title = "Edited page"
         edited.parent = 3
-        try service.savePageWorkingCopy(id: created.id, workingCopy: edited)
+        try service.savePageWorkingCopy(id: created.id, fields: edited)
         let read = try #require(try openService().readPageWorkingCopy(id: created.id))
 
-        #expect(read.workingCopy == edited)
+        #expect(read.fields == edited)
         #expect(read.remoteTarget == target)
     }
 
@@ -114,12 +114,12 @@ final class LocalContentTests {
         let service = try openService()
         let page = try service.readOrCreatePageWorkingCopy(
             remoteTarget: newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)),
-            workingCopy: PageWorkingCopy(common: common(title: "A page"), parent: nil)
+            fields: PageWorkingCopyFields(common: common(title: "A page"), parent: nil)
         )
         let post = post(title: "Title")
 
         #expect(throws: LocalContentError.self) {
-            try service.savePostWorkingCopy(id: page.id, workingCopy: post)
+            try service.savePostWorkingCopy(id: page.id, fields: post)
         }
     }
 }

@@ -3,7 +3,8 @@ use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
         working_copy::{
-            DbPageWorkingCopy, DbPostWorkingCopy, PageWorkingCopy, PostWorkingCopy, WorkingCopyId,
+            PageWorkingCopy, PageWorkingCopyFields, PostWorkingCopy, PostWorkingCopyFields,
+            WorkingCopyId,
         },
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
@@ -26,18 +27,18 @@ impl LocalContentService {
         Self { store }
     }
 
-    /// Read the working copy for `remote_target`, storing `working_copy` as a new one
+    /// Read the working copy for `remote_target`, storing `fields` as a new one
     /// if there's none yet.
     ///
     /// With a remote post in `remote_target`, an existing working copy of that post
-    /// is returned as stored, whatever `working_copy` holds, and pushing the
-    /// working copy updates that post. Without one, `working_copy` is always
+    /// is returned as stored, whatever `fields` holds, and pushing the
+    /// working copy updates that post. Without one, `fields` is always
     /// stored as a new post, which pushing the working copy creates.
     pub fn read_or_create_post_working_copy(
         &self,
         remote_target: WorkingCopyRemoteTarget,
-        working_copy: PostWorkingCopy,
-    ) -> Result<DbPostWorkingCopy, LocalContentError> {
+        fields: PostWorkingCopyFields,
+    ) -> Result<PostWorkingCopy, LocalContentError> {
         self.store.execute(|conn| {
             let transaction = conn.transaction()?;
             if let Some(remote_post) = remote_target.remote_post
@@ -49,8 +50,7 @@ impl LocalContentService {
             {
                 return Ok(existing);
             }
-            let id =
-                WorkingCopyRepository.insert_post(&transaction, &working_copy, &remote_target)?;
+            let id = WorkingCopyRepository.insert_post(&transaction, &fields, &remote_target)?;
             let created = WorkingCopyRepository
                 .select_post(&transaction, &id)?
                 .ok_or(LocalContentError::WorkingCopyNotFound { id })?;
@@ -65,11 +65,11 @@ impl LocalContentService {
     pub fn save_post_working_copy(
         &self,
         id: WorkingCopyId,
-        working_copy: PostWorkingCopy,
+        fields: PostWorkingCopyFields,
     ) -> Result<(), LocalContentError> {
         let updated = self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            let updated = WorkingCopyRepository.update_post(&transaction, &id, &working_copy)?;
+            let updated = WorkingCopyRepository.update_post(&transaction, &id, &fields)?;
             transaction.commit()?;
             Ok::<_, LocalContentError>(updated)
         })?;
@@ -118,7 +118,7 @@ impl LocalContentService {
     pub fn read_post_working_copy(
         &self,
         id: WorkingCopyId,
-    ) -> Result<Option<DbPostWorkingCopy>, LocalContentError> {
+    ) -> Result<Option<PostWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_post(conn, &id))
     }
@@ -163,32 +163,30 @@ impl LocalContentService {
     pub fn read_post_working_copies(
         &self,
         site: SiteIdentity,
-    ) -> Result<Vec<DbPostWorkingCopy>, LocalContentError> {
+    ) -> Result<Vec<PostWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_posts_by_site(conn, &site))
     }
 
     /// Read every post working copy, whatever site it targets, most recently
     /// updated first.
-    pub fn read_all_post_working_copies(
-        &self,
-    ) -> Result<Vec<DbPostWorkingCopy>, LocalContentError> {
+    pub fn read_all_post_working_copies(&self) -> Result<Vec<PostWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_all_posts(conn))
     }
 
-    /// Read the working copy for `remote_target`, storing `working_copy` as a new one
+    /// Read the working copy for `remote_target`, storing `fields` as a new one
     /// if there's none yet.
     ///
     /// With a remote page in `remote_target`, an existing working copy of that page
-    /// is returned as stored, whatever `working_copy` holds, and pushing the
-    /// working copy updates that page. Without one, `working_copy` is always
+    /// is returned as stored, whatever `fields` holds, and pushing the
+    /// working copy updates that page. Without one, `fields` is always
     /// stored as a new page, which pushing the working copy creates.
     pub fn read_or_create_page_working_copy(
         &self,
         remote_target: WorkingCopyRemoteTarget,
-        working_copy: PageWorkingCopy,
-    ) -> Result<DbPageWorkingCopy, LocalContentError> {
+        fields: PageWorkingCopyFields,
+    ) -> Result<PageWorkingCopy, LocalContentError> {
         self.store.execute(|conn| {
             let transaction = conn.transaction()?;
             if let Some(remote_post) = remote_target.remote_post
@@ -200,8 +198,7 @@ impl LocalContentService {
             {
                 return Ok(existing);
             }
-            let id =
-                WorkingCopyRepository.insert_page(&transaction, &working_copy, &remote_target)?;
+            let id = WorkingCopyRepository.insert_page(&transaction, &fields, &remote_target)?;
             let created = WorkingCopyRepository
                 .select_page(&transaction, &id)?
                 .ok_or(LocalContentError::WorkingCopyNotFound { id })?;
@@ -216,11 +213,11 @@ impl LocalContentService {
     pub fn save_page_working_copy(
         &self,
         id: WorkingCopyId,
-        working_copy: PageWorkingCopy,
+        fields: PageWorkingCopyFields,
     ) -> Result<(), LocalContentError> {
         let updated = self.store.execute(|conn| {
             let transaction = conn.transaction()?;
-            let updated = WorkingCopyRepository.update_page(&transaction, &id, &working_copy)?;
+            let updated = WorkingCopyRepository.update_page(&transaction, &id, &fields)?;
             transaction.commit()?;
             Ok::<_, LocalContentError>(updated)
         })?;
@@ -269,7 +266,7 @@ impl LocalContentService {
     pub fn read_page_working_copy(
         &self,
         id: WorkingCopyId,
-    ) -> Result<Option<DbPageWorkingCopy>, LocalContentError> {
+    ) -> Result<Option<PageWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_page(conn, &id))
     }
@@ -293,16 +290,14 @@ impl LocalContentService {
     pub fn read_page_working_copies(
         &self,
         site: SiteIdentity,
-    ) -> Result<Vec<DbPageWorkingCopy>, LocalContentError> {
+    ) -> Result<Vec<PageWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_pages_by_site(conn, &site))
     }
 
     /// Read every page working copy, whatever site it targets, most recently
     /// updated first.
-    pub fn read_all_page_working_copies(
-        &self,
-    ) -> Result<Vec<DbPageWorkingCopy>, LocalContentError> {
+    pub fn read_all_page_working_copies(&self) -> Result<Vec<PageWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_all_pages(conn))
     }

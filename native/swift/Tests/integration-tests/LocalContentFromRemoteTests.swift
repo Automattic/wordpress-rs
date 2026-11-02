@@ -34,10 +34,13 @@ final class LocalContentFromRemoteTests {
         let service = try openService()
 
         let target = WorkingCopyRemoteTarget(site: site, remotePost: RemotePostReference(remote: post))
-        let read = try service.readOrCreatePostWorkingCopy(remoteTarget: target, workingCopy: PostWorkingCopy(remote: post))
+        let read = try service.readOrCreatePostWorkingCopy(
+            remoteTarget: target,
+            fields: PostWorkingCopyFields(remote: post)
+        )
 
-        #expect(read.workingCopy.common.title == post.title?.raw)
-        #expect(read.workingCopy.common.content == post.content.raw)
+        #expect(read.fields.common.title == post.title?.raw)
+        #expect(read.fields.common.content == post.content.raw)
         #expect(read.remoteTarget.remotePost == RemotePostReference(postId: post.id, baseModifiedGmt: post.modifiedGmt))
     }
 
@@ -45,7 +48,7 @@ final class LocalContentFromRemoteTests {
         let page = try await fetchFirst(.pages)
 
         #expect(throws: RemotePostConversionError.WrongPostType(expected: "post", actual: "page")) {
-            try PostWorkingCopy(remote: page)
+            try PostWorkingCopyFields(remote: page)
         }
     }
 }
