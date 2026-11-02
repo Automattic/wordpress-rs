@@ -91,7 +91,7 @@ function patch_wp_mobile {
 function patch_wp_mobile_local_content {
     local swift_binding=$1
     # An editor changes a working copy one field at a time.
-    enable_mutability "$swift_binding" WorkingCopyCommon PostWorkingCopy PageWorkingCopy
+    enable_mutability "$swift_binding" WorkingCopyCommonFields PostWorkingCopyFields PageWorkingCopyFields
 
     cat >> "$swift_binding" <<'PATCH'
 
@@ -99,8 +99,8 @@ function patch_wp_mobile_local_content {
 // Hashable synthesis. `ParsedUrl` is Hashable, so add the conformance manually.
 extension SiteIdentity: Hashable {}
 extension WorkingCopyRemoteTarget: Hashable {}
-extension DbPostWorkingCopy: Hashable {}
-extension DbPageWorkingCopy: Hashable {}
+extension PostWorkingCopy: Hashable {}
+extension PageWorkingCopy: Hashable {}
 PATCH
 }
 

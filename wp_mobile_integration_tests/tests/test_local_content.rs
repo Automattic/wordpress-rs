@@ -14,8 +14,8 @@ use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
         working_copy::{
-            FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting,
-            WorkingCopyCommon, WorkingCopyId, WorkingCopyTag,
+            FeaturedImage, PageWorkingCopyFields, PostWorkingCopyFields, PublishDate,
+            StatusSetting, WorkingCopyCommonFields, WorkingCopyId, WorkingCopyTag,
         },
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
@@ -43,8 +43,8 @@ fn date(rfc3339: &str) -> WpGmtDateTime {
     rfc3339.parse().expect("Date should parse")
 }
 
-fn common(title: &str) -> WorkingCopyCommon {
-    WorkingCopyCommon {
+fn common(title: &str) -> WorkingCopyCommonFields {
+    WorkingCopyCommonFields {
         title: title.to_string(),
         content: format!("<!-- wp:paragraph --><p>{title}</p><!-- /wp:paragraph -->"),
         excerpt: String::new(),
@@ -58,8 +58,8 @@ fn common(title: &str) -> WorkingCopyCommon {
     }
 }
 
-fn post(title: &str) -> PostWorkingCopy {
-    PostWorkingCopy {
+fn post(title: &str) -> PostWorkingCopyFields {
+    PostWorkingCopyFields {
         common: common(title),
         categories: vec![],
         tags: vec![],
@@ -89,8 +89,8 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
         url: Arc::new(ParsedUrl::parse("https://example.wordpress.com").expect("URL should parse")),
         wordpress_com_site_id: Some(WpComSiteId(123_456_789)),
     };
-    let edited = PostWorkingCopy {
-        common: WorkingCopyCommon {
+    let edited = PostWorkingCopyFields {
+        common: WorkingCopyCommonFields {
             status: StatusSetting::Publish {
                 password: Some("secret".to_string()),
             },
@@ -131,7 +131,7 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
         .expect("Read should succeed")
         .expect("Working copy should exist after reopening");
 
-    assert_eq!(read.working_copy, edited);
+    assert_eq!(read.fields, edited);
     assert_eq!(
         read.remote_target,
         WorkingCopyRemoteTarget {
@@ -144,7 +144,7 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
 #[test]
 fn test_saved_page_working_copy_survives_reopening_the_database() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
-    let edited = PageWorkingCopy {
+    let edited = PageWorkingCopyFields {
         common: common("Edited page"),
         parent: Some(PostId(3)),
     };
@@ -154,7 +154,7 @@ fn test_saved_page_working_copy_survives_reopening_the_database() {
         let id = service
             .read_or_create_page_working_copy(
                 new_post_on(self_hosted_site()),
-                PageWorkingCopy {
+                PageWorkingCopyFields {
                     common: common("Original page"),
                     parent: None,
                 },
@@ -171,7 +171,7 @@ fn test_saved_page_working_copy_survives_reopening_the_database() {
         .expect("Read should succeed")
         .expect("Working copy should exist after reopening");
 
-    assert_eq!(read.working_copy, edited);
+    assert_eq!(read.fields, edited);
     assert_eq!(
         read.remote_target,
         WorkingCopyRemoteTarget {
@@ -188,7 +188,7 @@ fn test_saving_a_missing_post_working_copy_fails() {
     let page_id = service
         .read_or_create_page_working_copy(
             new_post_on(self_hosted_site()),
-            PageWorkingCopy {
+            PageWorkingCopyFields {
                 common: common("A page"),
                 parent: None,
             },
@@ -218,7 +218,7 @@ fn test_deleting_a_post_working_copy_deletes_only_that_post() {
     let page_id = service
         .read_or_create_page_working_copy(
             new_post_on(self_hosted_site()),
-            PageWorkingCopy {
+            PageWorkingCopyFields {
                 common: common("A page"),
                 parent: None,
             },
@@ -274,7 +274,7 @@ fn test_a_remote_post_gets_its_working_copy_back_and_a_new_post_never_does() {
         .expect("Create should succeed");
 
     assert_eq!(read.id, created.id);
-    assert_eq!(read.working_copy, post("As fetched"));
+    assert_eq!(read.fields, post("As fetched"));
     assert_eq!(read.remote_target, remote_target);
     assert_ne!(first_new.id, second_new.id);
 }
@@ -297,7 +297,7 @@ fn test_a_remote_page_with_a_working_copy_cant_get_one_as_a_post() {
     service
         .read_or_create_page_working_copy(
             target.clone(),
-            PageWorkingCopy {
+            PageWorkingCopyFields {
                 common: common("A page"),
                 parent: None,
             },
@@ -346,7 +346,7 @@ fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
         .expect("Read should succeed");
 
     assert_eq!(found.id, created.id);
-    assert_eq!(found.working_copy, post("Draft"));
+    assert_eq!(found.fields, post("Draft"));
     assert_eq!(found.remote_target.remote_post, Some(pushed));
     assert_eq!(
         service.record_post_working_copy_push(unknown_id.clone(), pushed),

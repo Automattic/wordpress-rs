@@ -1,20 +1,20 @@
 import Foundation
 import WordPressAPIInternal
 
-extension PostWorkingCopy {
+extension PostWorkingCopyFields {
 
-    /// Make a post working copy from a post fetched with the edit context.
+    /// Make post working copy fields from a post fetched with the edit context.
     public init(remote post: AnyPostWithEditContext) throws {
-        self = try postWorkingCopyFromRemote(post: post)
+        self = try postWorkingCopyFieldsFromRemote(post: post)
     }
 
 }
 
-extension PageWorkingCopy {
+extension PageWorkingCopyFields {
 
-    /// Make a page working copy from a page fetched with the edit context.
+    /// Make page working copy fields from a page fetched with the edit context.
     public init(remote page: AnyPostWithEditContext) throws {
-        self = try pageWorkingCopyFromRemote(page: page)
+        self = try pageWorkingCopyFieldsFromRemote(page: page)
     }
 
 }

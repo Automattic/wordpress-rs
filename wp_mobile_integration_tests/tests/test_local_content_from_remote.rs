@@ -21,8 +21,8 @@ use wp_mobile_local_content::{
     WpLocalContentStore,
     db_types::{
         working_copy::{
-            DbPageWorkingCopy, DbPostWorkingCopy, PageWorkingCopy, PostWorkingCopy, PublishDate,
-            StatusSetting,
+            PageWorkingCopy, PageWorkingCopyFields, PostWorkingCopy, PostWorkingCopyFields,
+            PublishDate, StatusSetting,
         },
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
@@ -65,22 +65,22 @@ fn remote_target_for(post: &AnyPostWithEditContext) -> WorkingCopyRemoteTarget {
 fn read_or_create_post(
     service: &LocalContentService,
     post: &AnyPostWithEditContext,
-) -> DbPostWorkingCopy {
-    let working_copy =
-        PostWorkingCopy::from_remote(post).expect("Converting the post should succeed");
+) -> PostWorkingCopy {
+    let fields =
+        PostWorkingCopyFields::from_remote(post).expect("Converting the post should succeed");
     service
-        .read_or_create_post_working_copy(remote_target_for(post), working_copy)
+        .read_or_create_post_working_copy(remote_target_for(post), fields)
         .expect("Reading or creating the working copy should succeed")
 }
 
 fn read_or_create_page(
     service: &LocalContentService,
     page: &AnyPostWithEditContext,
-) -> DbPageWorkingCopy {
-    let working_copy =
-        PageWorkingCopy::from_remote(page).expect("Converting the page should succeed");
+) -> PageWorkingCopy {
+    let fields =
+        PageWorkingCopyFields::from_remote(page).expect("Converting the page should succeed");
     service
-        .read_or_create_page_working_copy(remote_target_for(page), working_copy)
+        .read_or_create_page_working_copy(remote_target_for(page), fields)
         .expect("Reading or creating the working copy should succeed")
 }
 
@@ -205,7 +205,7 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
 
         let stored = read_or_create_post(&service, &post);
 
-        let common = &stored.working_copy.common;
+        let common = &stored.fields.common;
         assert_eq!(
             common.status, expected_status,
             "{case}: status and password"
@@ -264,8 +264,8 @@ async fn test_working_copy_from_server_page_keeps_its_parent() {
     let parent_page = read_or_create_page(&service, &parent);
     let child_page = read_or_create_page(&service, &child);
 
-    assert_eq!(parent_page.working_copy.parent, None);
-    assert_eq!(child_page.working_copy.parent, Some(parent_id));
+    assert_eq!(parent_page.fields.parent, None);
+    assert_eq!(child_page.fields.parent, Some(parent_id));
 
     RestoreServer::db().await;
 }
@@ -287,7 +287,7 @@ async fn test_a_server_post_with_a_working_copy_gets_it_back() {
     .await;
 
     let created = read_or_create_post(&service, &post);
-    let mut edited = created.working_copy.clone();
+    let mut edited = created.fields.clone();
     edited.common.title = "Edited on the device".to_string();
     service
         .save_post_working_copy(created.id.clone(), edited.clone())
@@ -296,7 +296,7 @@ async fn test_a_server_post_with_a_working_copy_gets_it_back() {
     let read_again = read_or_create_post(&service, &fetched_again);
 
     assert_eq!(read_again.id, created.id);
-    assert_eq!(read_again.working_copy, edited);
+    assert_eq!(read_again.fields, edited);
 
     RestoreServer::db().await;
 }
@@ -323,7 +323,7 @@ async fn test_trashed_server_post_is_refused() {
     let trashed = fetch(&ctx.api, &PostEndpointType::Posts, post.id).await;
 
     assert_eq!(
-        PostWorkingCopy::from_remote(&trashed),
+        PostWorkingCopyFields::from_remote(&trashed),
         Err(RemotePostConversionError::UneditableStatus {
             status: "trash".to_string(),
         })

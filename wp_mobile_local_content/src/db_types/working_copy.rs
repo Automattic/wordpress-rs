@@ -103,7 +103,7 @@ pub enum WorkingCopyTag {
 
 /// Fields shared by post and page working copies.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct WorkingCopyCommon {
+pub struct WorkingCopyCommonFields {
     pub title: String,
     pub content: String,
     pub excerpt: String,
@@ -120,29 +120,29 @@ pub struct WorkingCopyCommon {
     pub ping_status: Option<PostPingStatus>,
 }
 
-/// A post as the user edits it on the device.
+/// The fields of a post working copy: the post as the user edits it on the device.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct PostWorkingCopy {
-    pub common: WorkingCopyCommon,
+pub struct PostWorkingCopyFields {
+    pub common: WorkingCopyCommonFields,
     pub categories: Vec<TermId>,
     pub tags: Vec<WorkingCopyTag>,
     pub format: PostFormat,
     pub sticky: bool,
 }
 
-/// A page as the user edits it on the device.
+/// The fields of a page working copy: the page as the user edits it on the device.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct PageWorkingCopy {
-    pub common: WorkingCopyCommon,
+pub struct PageWorkingCopyFields {
+    pub common: WorkingCopyCommonFields,
     /// `None` for a top-level page.
     pub parent: Option<PostId>,
 }
 
-/// A post working copy as stored, with its ID, remote target and timestamps.
+/// A post working copy as stored: its fields, ID, remote target and timestamps.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct DbPostWorkingCopy {
+pub struct PostWorkingCopy {
     pub id: WorkingCopyId,
-    pub working_copy: PostWorkingCopy,
+    pub fields: PostWorkingCopyFields,
     pub remote_target: WorkingCopyRemoteTarget,
     /// ISO 8601 UTC timestamp of when the working copy was created.
     pub created_at: String,
@@ -150,11 +150,11 @@ pub struct DbPostWorkingCopy {
     pub updated_at: String,
 }
 
-/// A page working copy as stored, with its ID, remote target and timestamps.
+/// A page working copy as stored: its fields, ID, remote target and timestamps.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct DbPageWorkingCopy {
+pub struct PageWorkingCopy {
     pub id: WorkingCopyId,
-    pub working_copy: PageWorkingCopy,
+    pub fields: PageWorkingCopyFields,
     pub remote_target: WorkingCopyRemoteTarget,
     /// ISO 8601 UTC timestamp of when the working copy was created.
     pub created_at: String,
