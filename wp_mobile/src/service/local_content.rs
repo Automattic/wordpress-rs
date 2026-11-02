@@ -42,8 +42,8 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_post_by_remote_post(conn, &site, post_id))
     }
 
-    /// Store `fields` as a new post working copy pushed to `remote_target`,
-    /// and return it.
+    /// Store `fields` as a new post working copy targeting `remote_target`, and
+    /// return it.
     ///
     /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's
     /// remote post already has a working copy.
@@ -193,8 +193,8 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_page_by_remote_post(conn, &site, post_id))
     }
 
-    /// Store `fields` as a new page working copy pushed to `remote_target`,
-    /// and return it.
+    /// Store `fields` as a new page working copy targeting `remote_target`, and
+    /// return it.
     ///
     /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's
     /// remote post already has a working copy.
