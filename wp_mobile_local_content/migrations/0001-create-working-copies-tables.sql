@@ -59,36 +59,37 @@ CREATE TABLE `page_working_copy_fields` (
   `parent_id` INTEGER
 ) STRICT;
 
--- Sites working copies are pushed to, one row per site, identified by
--- something that survives the cache being cleared. A site with a WordPress.com
--- site ID is identified by it, whatever its URL. A site without one is
--- identified by its URL.
+-- The sites working copies belong to, one row per site. A site with a
+-- WordPress.com site ID is matched by it, whatever its URL. A site without one
+-- is matched by its URL.
 CREATE TABLE `sites` (
   -- Internal DB field (auto-incrementing)
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
 
   -- NULL: no WordPress.com site ID is known for the site
   `wordpress_com_site_id` INTEGER UNIQUE,
-  -- The URL last given for the site, as `ParsedUrl` serializes it
+  -- The URL given when a working copy for the site was last created, as
+  -- `ParsedUrl` serializes it
   `url` TEXT NOT NULL
 ) STRICT;
 
 CREATE UNIQUE INDEX `idx_sites_url_without_wordpress_com_site_id`
   ON `sites`(`url`) WHERE `wordpress_com_site_id` IS NULL;
 
--- Where a working copy is pushed: the site, and the remote post it edits.
--- A row depends on its working copy and is deleted with it, never the other
--- way around.
+-- Where a working copy goes when it's pushed: its site, and the post on that
+-- site the push updates. A row is deleted with its working copy, and can't
+-- exist without one.
 CREATE TABLE `working_copy_remote_targets` (
   `working_copy_rowid` INTEGER PRIMARY KEY REFERENCES `working_copies`(`rowid`) ON DELETE CASCADE,
 
-  -- No ON DELETE action: a site can't be deleted while a working copy targets it
+  -- No ON DELETE action: a site can't be deleted while a working copy belongs to it
   `site_rowid` INTEGER NOT NULL REFERENCES `sites`(`rowid`),
 
-  -- NULL: the working copy is a new post
+  -- NULL: the working copy is a new post that isn't on the server yet
   `remote_post_id` INTEGER,
-  -- The remote post's `modified_gmt` when the working copy was made from it,
-  -- as a Unix timestamp in seconds. Set exactly when `remote_post_id` is.
+  -- The base version: the remote post's `modified_gmt` when the working copy
+  -- was created from it, or the one its last recorded push returned. A Unix
+  -- timestamp in seconds, set exactly when `remote_post_id` is.
   `base_modified_gmt` INTEGER,
 
   CHECK ((`remote_post_id` IS NULL) = (`base_modified_gmt` IS NULL)),

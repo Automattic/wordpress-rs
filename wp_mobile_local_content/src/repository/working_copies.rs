@@ -36,13 +36,19 @@ const SITES: &str = "sites";
 /// kind, and its row in `working_copy_remote_targets`, which references a row in
 /// `sites`. Writes that touch more than one of them require a transaction, so a
 /// working copy is never stored without its fields or its remote target.
+///
+/// Inserting a working copy adds its site to `sites` if no row matches it. If
+/// a row does, the row takes the site's URL, and its WordPress.com site ID if
+/// the row had none.
 pub struct WorkingCopyRepository;
 
 impl WorkingCopyRepository {
-    /// Insert a post working copy and its remote target under a newly generated ID.
+    /// Insert a post working copy with its fields and remote target, and return
+    /// its newly generated ID.
     ///
-    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's remote post
-    /// already has a working copy.
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's
+    /// remote post already has a working copy. Roll `transaction` back after
+    /// any error, since the rows written before it stay in the transaction.
     pub fn insert_post(
         &self,
         transaction: &impl InTransaction,
@@ -67,10 +73,12 @@ impl WorkingCopyRepository {
         Ok(id)
     }
 
-    /// Insert a page working copy and its remote target under a newly generated ID.
+    /// Insert a page working copy with its fields and remote target, and return
+    /// its newly generated ID.
     ///
-    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's remote post
-    /// already has a working copy.
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's
+    /// remote post already has a working copy. Roll `transaction` back after
+    /// any error, since the rows written before it stay in the transaction.
     pub fn insert_page(
         &self,
         transaction: &impl InTransaction,
@@ -86,10 +94,10 @@ impl WorkingCopyRepository {
         Ok(id)
     }
 
-    /// Replace the fields of a post working copy and refresh its `updated_at`.
-    /// The remote target is left unchanged.
+    /// Replace the fields of a post working copy, and set its `updated_at` to
+    /// now.
     ///
-    /// Returns `false` if no post working copy has the given ID.
+    /// Returns `false` if no post working copy has the ID.
     pub fn update_post(
         &self,
         transaction: &impl InTransaction,
@@ -116,10 +124,10 @@ impl WorkingCopyRepository {
         Ok(true)
     }
 
-    /// Replace the fields of a page working copy and refresh its `updated_at`.
-    /// The remote target is left unchanged.
+    /// Replace the fields of a page working copy, and set its `updated_at` to
+    /// now.
     ///
-    /// Returns `false` if no page working copy has the given ID.
+    /// Returns `false` if no page working copy has the ID.
     pub fn update_page(
         &self,
         transaction: &impl InTransaction,
@@ -137,14 +145,13 @@ impl WorkingCopyRepository {
         Ok(true)
     }
 
-    /// Record that a post working copy was pushed to `remote_post`: from now
-    /// on it edits that post, based on the given `modified_gmt`. Its fields and
-    /// `updated_at` are left unchanged.
+    /// Record that a post working copy was pushed, by setting its remote post
+    /// to `remote_post`. Its fields and `updated_at` stay as they are.
     ///
-    /// Returns `false` if no post working copy has the given ID. Fails with
-    /// `RemotePostAlreadyHasWorkingCopy` if another working copy edits that
-    /// post, and with `PushedToAnotherRemotePost` if this one edits a
-    /// different post.
+    /// Returns `false` if no post working copy has the ID. Fails with
+    /// `RemotePostAlreadyHasWorkingCopy` if another working copy has that
+    /// remote post, and with `PushedToAnotherRemotePost` if this one already
+    /// has a different remote post.
     pub fn record_post_push(
         &self,
         transaction: &impl InTransaction,
@@ -154,14 +161,13 @@ impl WorkingCopyRepository {
         record_push(transaction, WorkingCopyKind::Post, id, remote_post)
     }
 
-    /// Record that a page working copy was pushed to `remote_post`: from now
-    /// on it edits that page, based on the given `modified_gmt`. Its fields and
-    /// `updated_at` are left unchanged.
+    /// Record that a page working copy was pushed, by setting its remote post
+    /// to `remote_post`. Its fields and `updated_at` stay as they are.
     ///
-    /// Returns `false` if no page working copy has the given ID. Fails with
-    /// `RemotePostAlreadyHasWorkingCopy` if another working copy edits that
-    /// page, and with `PushedToAnotherRemotePost` if this one edits a
-    /// different page.
+    /// Returns `false` if no page working copy has the ID. Fails with
+    /// `RemotePostAlreadyHasWorkingCopy` if another working copy has that
+    /// remote post, and with `PushedToAnotherRemotePost` if this one already
+    /// has a different remote post.
     pub fn record_page_push(
         &self,
         transaction: &impl InTransaction,
@@ -173,7 +179,7 @@ impl WorkingCopyRepository {
 
     /// Delete a post working copy. Its fields and remote target are deleted with it.
     ///
-    /// Returns `false` if no post working copy has the given ID.
+    /// Returns `false` if no post working copy has the ID.
     pub fn delete_post(
         &self,
         executor: &impl QueryExecutor,
@@ -184,7 +190,7 @@ impl WorkingCopyRepository {
 
     /// Delete a page working copy. Its fields and remote target are deleted with it.
     ///
-    /// Returns `false` if no page working copy has the given ID.
+    /// Returns `false` if no page working copy has the ID.
     pub fn delete_page(
         &self,
         executor: &impl QueryExecutor,
@@ -193,8 +199,8 @@ impl WorkingCopyRepository {
         delete_working_copy(executor, WorkingCopyKind::Page, id)
     }
 
-    /// Delete every working copy targeting `site`, posts and pages, and the
-    /// site's row. Their fields and remote targets are deleted with them.
+    /// Delete every post and page working copy for `site`, and the site's row.
+    /// Their fields and remote targets are deleted with them.
     ///
     /// Returns the number of working copies deleted, 0 if no row matches `site`.
     pub fn delete_by_site(
@@ -219,10 +225,10 @@ impl WorkingCopyRepository {
         Ok(deleted)
     }
 
-    /// Select a post working copy and its remote target by ID.
+    /// Select a post working copy by its ID.
     ///
-    /// Returns `Ok(None)` if no post working copy has the given ID, including
-    /// when the ID belongs to a page.
+    /// Returns `Ok(None)` if no post working copy has the ID, including when
+    /// the ID is a page's.
     pub fn select_post(
         &self,
         executor: &impl QueryExecutor,
@@ -266,10 +272,10 @@ impl WorkingCopyRepository {
         }))
     }
 
-    /// Select a page working copy and its remote target by ID.
+    /// Select a page working copy by its ID.
     ///
-    /// Returns `Ok(None)` if no page working copy has the given ID, including
-    /// when the ID belongs to a post.
+    /// Returns `Ok(None)` if no page working copy has the ID, including when
+    /// the ID is a post's.
     pub fn select_page(
         &self,
         executor: &impl QueryExecutor,
@@ -298,9 +304,9 @@ impl WorkingCopyRepository {
         }))
     }
 
-    /// Select the post working copy that edits remote post `post_id` on `site`.
+    /// Select the post working copy whose remote post is `post_id` on `site`.
     ///
-    /// Returns `Ok(None)` if no post working copy edits it.
+    /// Returns `Ok(None)` if there is none.
     pub fn select_post_by_remote_post(
         &self,
         executor: &impl QueryExecutor,
@@ -313,9 +319,9 @@ impl WorkingCopyRepository {
         }
     }
 
-    /// Select the page working copy that edits remote page `post_id` on `site`.
+    /// Select the page working copy whose remote post is `post_id` on `site`.
     ///
-    /// Returns `Ok(None)` if no page working copy edits it.
+    /// Returns `Ok(None)` if there is none.
     pub fn select_page_by_remote_post(
         &self,
         executor: &impl QueryExecutor,
@@ -328,7 +334,7 @@ impl WorkingCopyRepository {
         }
     }
 
-    /// Select every post working copy targeting `site`, most recently updated first.
+    /// Select every post working copy for `site`, newest `updated_at` first.
     pub fn select_posts_by_site(
         &self,
         executor: &impl QueryExecutor,
@@ -340,7 +346,7 @@ impl WorkingCopyRepository {
             .collect()
     }
 
-    /// Select every page working copy targeting `site`, most recently updated first.
+    /// Select every page working copy for `site`, newest `updated_at` first.
     pub fn select_pages_by_site(
         &self,
         executor: &impl QueryExecutor,
@@ -352,8 +358,7 @@ impl WorkingCopyRepository {
             .collect()
     }
 
-    /// Select every post working copy, whatever site it targets, most recently
-    /// updated first.
+    /// Select every post working copy on every site, newest `updated_at` first.
     pub fn select_all_posts(
         &self,
         executor: &impl QueryExecutor,
@@ -364,8 +369,7 @@ impl WorkingCopyRepository {
             .collect()
     }
 
-    /// Select every page working copy, whatever site it targets, most recently
-    /// updated first.
+    /// Select every page working copy on every site, newest `updated_at` first.
     pub fn select_all_pages(
         &self,
         executor: &impl QueryExecutor,
@@ -649,10 +653,11 @@ fn insert_remote_target(
     }
 }
 
-/// Maps the result of writing a remote target that edits remote post `post_id`.
+/// Maps the result of writing a remote target whose remote post is `post_id`.
 ///
 /// The only unique constraint a remote target write can break is the one on
-/// `(site_rowid, remote_post_id)`, meaning another working copy edits the post.
+/// `(site_rowid, remote_post_id)`, meaning another working copy already has
+/// that remote post.
 fn remote_post_conflict(
     result: rusqlite::Result<usize>,
     post_id: PostId,
@@ -1177,9 +1182,9 @@ mod tests {
         assert!(!updated);
     }
 
-    /// A custom status another variant stands for is saved as that variant, so
-    /// each status reads back one way. A status no other variant stands for
-    /// stays custom.
+    /// A `Custom` status that another variant covers is saved as that variant,
+    /// on insert and on update, so a status always reads back the same way. Any
+    /// other status stays `Custom`.
     #[test]
     fn test_custom_status_another_variant_stands_for_is_saved_as_that_variant() {
         let mut conn = migrated_connection();
@@ -1286,8 +1291,9 @@ mod tests {
         }
     }
 
-    /// Relationships depend on their working copy, never the other way around,
-    /// and deleting a site never takes a working copy with it.
+    /// A working copy's fields and remote target are deleted with it, and a
+    /// remote target can't exist without one. A site can't be deleted while a
+    /// working copy belongs to it.
     #[test]
     fn test_relationships_are_deleted_with_their_working_copy_and_not_without_one() {
         let mut conn = migrated_connection();
@@ -1434,8 +1440,8 @@ mod tests {
         assert_eq!(count_rows(&conn, SITES), 2);
     }
 
-    /// A site is identified by its WordPress.com site ID once one is given, so
-    /// its working copies stay with it when a self-hosted site gets a site ID
+    /// A site is matched by its WordPress.com site ID once it has one, so its
+    /// working copies stay with it when a self-hosted site gets a site ID
     /// (connecting it through Jetpack) and when its URL changes.
     #[test]
     fn test_a_site_keeps_its_working_copies_when_it_gains_a_site_id_or_changes_url() {
@@ -1475,8 +1481,8 @@ mod tests {
         assert_eq!(ids_for(&conn, &moved).len(), 3);
         assert_eq!(stored_site, moved, "The site should have its latest URL");
         assert_eq!(count_rows(&conn, SITES), 1);
-        // Once the site has a site ID, its old URL alone identifies a site
-        // without one, and a different site ID at the URL is a different site.
+        // Once the site has a site ID, its old URL without the ID doesn't find
+        // it, and a different site ID at that URL is a different site.
         assert_eq!(ids_for(&conn, &url_only), vec![]);
         assert_eq!(
             ids_for(&conn, &site("https://example.com", Some(7))),
