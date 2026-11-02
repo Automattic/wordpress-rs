@@ -118,7 +118,7 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
     let id = {
         let service = open_service(&dir);
         let id = service
-            .read_or_create_post_working_copy(new_post_on(site.clone()), post("Original"))
+            .create_post_working_copy(new_post_on(site.clone()), post("Original"))
             .expect("Create should succeed")
             .id;
         service
@@ -152,7 +152,7 @@ fn test_saved_page_working_copy_survives_reopening_the_database() {
     let id = {
         let service = open_service(&dir);
         let id = service
-            .read_or_create_page_working_copy(
+            .create_page_working_copy(
                 new_post_on(self_hosted_site()),
                 PageWorkingCopyFields {
                     common: common("Original page"),
@@ -186,7 +186,7 @@ fn test_saving_a_missing_post_working_copy_fails() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let service = open_service(&dir);
     let page_id = service
-        .read_or_create_page_working_copy(
+        .create_page_working_copy(
             new_post_on(self_hosted_site()),
             PageWorkingCopyFields {
                 common: common("A page"),
@@ -212,11 +212,11 @@ fn test_deleting_a_post_working_copy_deletes_only_that_post() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let service = open_service(&dir);
     let post_id = service
-        .read_or_create_post_working_copy(new_post_on(self_hosted_site()), post("To delete"))
+        .create_post_working_copy(new_post_on(self_hosted_site()), post("To delete"))
         .expect("Create should succeed")
         .id;
     let page_id = service
-        .read_or_create_page_working_copy(
+        .create_page_working_copy(
             new_post_on(self_hosted_site()),
             PageWorkingCopyFields {
                 common: common("A page"),
@@ -249,7 +249,7 @@ fn test_deleting_a_post_working_copy_deletes_only_that_post() {
 }
 
 #[test]
-fn test_a_remote_post_gets_its_working_copy_back_and_a_new_post_never_does() {
+fn test_a_remote_post_has_one_working_copy_found_by_its_post_id() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let service = open_service(&dir);
     let remote_target = WorkingCopyRemoteTarget {
@@ -259,35 +259,46 @@ fn test_a_remote_post_gets_its_working_copy_back_and_a_new_post_never_does() {
             base_modified_gmt: date("2030-03-17T17:46:40Z"),
         }),
     };
+    let read_for = |post_id: i64| {
+        service
+            .read_post_working_copy_for_remote_post(self_hosted_site(), PostId(post_id))
+            .expect("Read should succeed")
+    };
 
+    let before_creating = read_for(42);
     let created = service
-        .read_or_create_post_working_copy(remote_target.clone(), post("As fetched"))
+        .create_post_working_copy(remote_target.clone(), post("As fetched"))
         .expect("Create should succeed");
-    let read = service
-        .read_or_create_post_working_copy(remote_target.clone(), post("Fetched again"))
-        .expect("Read should succeed");
+    let created_again =
+        service.create_post_working_copy(remote_target.clone(), post("Fetched again"));
     let first_new = service
-        .read_or_create_post_working_copy(new_post_on(self_hosted_site()), post("New"))
+        .create_post_working_copy(new_post_on(self_hosted_site()), post("New"))
         .expect("Create should succeed");
     let second_new = service
-        .read_or_create_post_working_copy(new_post_on(self_hosted_site()), post("New"))
+        .create_post_working_copy(new_post_on(self_hosted_site()), post("New"))
         .expect("Create should succeed");
 
-    assert_eq!(read.id, created.id);
-    assert_eq!(read.fields, post("As fetched"));
-    assert_eq!(read.remote_target, remote_target);
+    assert_eq!(before_creating, None);
+    assert_eq!(read_for(42), Some(created));
+    assert_eq!(read_for(43), None);
+    assert_eq!(
+        created_again,
+        Err(LocalContentError::RemotePostAlreadyHasWorkingCopy {
+            post_id: PostId(42)
+        })
+    );
     assert_ne!(first_new.id, second_new.id);
 }
 
 /// Posts and pages share one ID space on the server, so a remote page with a
-/// working copy can't get another one as a post. The refused insert has to
-/// leave nothing behind: a working copy stored without its remote target makes every
-/// listing fail.
+/// working copy can't get another one as a post, though reading it as a post
+/// finds nothing. The refused insert has to leave nothing behind: a working
+/// copy stored without its remote target makes every listing fail.
 #[test]
 fn test_a_remote_page_with_a_working_copy_cant_get_one_as_a_post() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let service = open_service(&dir);
-    let target = WorkingCopyRemoteTarget {
+    let remote_target = WorkingCopyRemoteTarget {
         site: self_hosted_site(),
         remote_post: Some(RemotePostReference {
             post_id: PostId(42),
@@ -295,8 +306,8 @@ fn test_a_remote_page_with_a_working_copy_cant_get_one_as_a_post() {
         }),
     };
     service
-        .read_or_create_page_working_copy(
-            target.clone(),
+        .create_page_working_copy(
+            remote_target.clone(),
             PageWorkingCopyFields {
                 common: common("A page"),
                 parent: None,
@@ -304,8 +315,11 @@ fn test_a_remote_page_with_a_working_copy_cant_get_one_as_a_post() {
         )
         .expect("Create should succeed");
 
-    let as_post = service.read_or_create_post_working_copy(target, post("The page as a post"));
+    let read_as_post =
+        service.read_post_working_copy_for_remote_post(self_hosted_site(), PostId(42));
+    let as_post = service.create_post_working_copy(remote_target, post("The page as a post"));
 
+    assert_eq!(read_as_post, Ok(None));
     assert_eq!(
         as_post,
         Err(LocalContentError::RemotePostAlreadyHasWorkingCopy {
@@ -324,7 +338,7 @@ fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let service = open_service(&dir);
     let created = service
-        .read_or_create_post_working_copy(new_post_on(self_hosted_site()), post("Draft"))
+        .create_post_working_copy(new_post_on(self_hosted_site()), post("Draft"))
         .expect("Create should succeed");
     let pushed = RemotePostReference {
         post_id: PostId(2007),
@@ -336,14 +350,9 @@ fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
         .record_post_working_copy_push(created.id.clone(), pushed)
         .expect("Recording the push should succeed");
     let found = service
-        .read_or_create_post_working_copy(
-            WorkingCopyRemoteTarget {
-                site: self_hosted_site(),
-                remote_post: Some(pushed),
-            },
-            post("Fetched"),
-        )
-        .expect("Read should succeed");
+        .read_post_working_copy_for_remote_post(self_hosted_site(), pushed.post_id)
+        .expect("Read should succeed")
+        .expect("The pushed post should have a working copy");
 
     assert_eq!(found.id, created.id);
     assert_eq!(found.fields, post("Draft"));
