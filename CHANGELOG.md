@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WordPress.com Reader streams: `GET /rest/v1.2/read/following`, `/read/sites/{site}/posts` and `/read/feed/{feed}/posts` return `ReaderPostsResponse`, a page of `ReaderPost`s that pages by date with `before`. `ReaderPost` is the post every Reader stream shares: its save identity, content, author, site (including its locale, with `meta=site`), tags, likes, comments, seen state and cross-post, read the same way whichever of the shapes the API sends them in. Swift gets them through `WPComApiClient.readerPosts`.
 - `decode_html_entities` decodes the HTML character references in a field the API returns as HTML, such as a post title (`&#8211;` → `–`), the way a browser decodes text content. Swift gets it as `String.decodingHTMLEntities()`.
 - `site_icons` lists the icons a web page declares (`<link rel="icon">`, `apple-touch-icon`, `mask-icon`, `msapplication-TileImage`), with their sizes and types, resolved against the page's address and `<base href>` and percent-encoded so strict URL parsers accept them. `preferred_site_icon` picks the one to show at a given size, skipping SVG and mask icons and ranking an icon without `sizes` by a `-WxH` file name (as WordPress names them), and falls back to `/favicon.ico` at the origin's root (or returns nothing when the page isn't on `http` or `https`). Swift gets them as `SiteIcon.all(inHTML:pageURL:)`, `SiteIcon.preferred(inHTML:pageURL:size:)` and `SiteIcon.asURL`.
+- `WpLoginClient.verify_issued_application_password`, which detects a site whose server does not pass the `Authorization` header to WordPress. Call it only with a freshly issued application password. It reports a blocked header only when the API root and the `site_url` returned with the password share an origin.
 
 ### Fixed
 
@@ -40,7 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
 - `GET /rest/v1.1/sites/<site_id>/stats/archives` endpoint, for views of a site's search, category and other archive pages.
 - `SiteVisibility::Deleted`, for listing only the deleted sites that `GET /me/sites` includes.
-- `WpLoginClient.verify_issued_application_password`, which detects a site whose server does not pass the `Authorization` header to WordPress. Call it only with a freshly issued application password. It reports a blocked header only when the API root and the `site_url` returned with the password share an origin.
 
 ### Fixed
 
