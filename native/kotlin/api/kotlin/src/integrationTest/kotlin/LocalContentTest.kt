@@ -24,7 +24,7 @@ import uniffi.wp_mobile_local_content.SiteIdentity
 import uniffi.wp_mobile_local_content.StatusSetting
 import uniffi.wp_mobile_local_content.WorkingCopyCommon
 import uniffi.wp_mobile_local_content.WorkingCopyTag
-import uniffi.wp_mobile_local_content.WorkingCopyTarget
+import uniffi.wp_mobile_local_content.WorkingCopyRemoteTarget
 import uniffi.wp_mobile_local_content.WpLocalContentStore
 import uniffi.wp_mobile_local_content.postWorkingCopyFromRemote
 import uniffi.wp_mobile_local_content.remotePostReferenceFromRemote
@@ -81,7 +81,7 @@ class LocalContentTest {
 
     private val newPostSite = SiteIdentity(url = ParsedUrl.parse("https://example.com"), wordpressComSiteId = null)
 
-    private fun newPostOn(site: SiteIdentity) = WorkingCopyTarget(site = site, remotePost = null)
+    private fun newPostOn(site: SiteIdentity) = WorkingCopyRemoteTarget(site = site, remotePost = null)
 
     @Test
     fun `opening an in-memory database throws`() {
@@ -116,7 +116,7 @@ class LocalContentTest {
         val read = assertNotNull(openService().readPostWorkingCopy(id))
 
         assertEquals(edited, read.workingCopy)
-        assertEquals(WorkingCopyTarget(site = wordPressComSite, remotePost = null), read.target)
+        assertEquals(WorkingCopyRemoteTarget(site = wordPressComSite, remotePost = null), read.remoteTarget)
     }
 
     @Test
@@ -132,7 +132,7 @@ class LocalContentTest {
         val read = assertNotNull(openService().readPageWorkingCopy(id))
 
         assertEquals(edited, read.workingCopy)
-        assertEquals(WorkingCopyTarget(site = newPostSite, remotePost = null), read.target)
+        assertEquals(WorkingCopyRemoteTarget(site = newPostSite, remotePost = null), read.remoteTarget)
     }
 
     @Test
@@ -156,13 +156,13 @@ class LocalContentTest {
 
         service.recordPostWorkingCopyPush(created.id, pushed)
         val found = service.readOrCreatePostWorkingCopy(
-            WorkingCopyTarget(site = newPostSite, remotePost = pushed),
+            WorkingCopyRemoteTarget(site = newPostSite, remotePost = pushed),
             post("Fetched")
         )
 
         assertEquals(created.id, found.id)
         assertEquals(post("Draft"), found.workingCopy)
-        assertEquals(pushed, found.target.remotePost)
+        assertEquals(pushed, found.remoteTarget.remotePost)
     }
 
     @Test
@@ -184,14 +184,14 @@ class LocalContentTest {
         val post = fetchFirst(PostEndpointType.Posts)
         val service = openService()
 
-        val target = WorkingCopyTarget(site = site, remotePost = remotePostReferenceFromRemote(post))
+        val target = WorkingCopyRemoteTarget(site = site, remotePost = remotePostReferenceFromRemote(post))
         val read = service.readOrCreatePostWorkingCopy(target, postWorkingCopyFromRemote(post))
 
         assertEquals(post.title?.raw, read.workingCopy.common.title)
         assertEquals(post.content.raw, read.workingCopy.common.content)
         assertEquals(
             RemotePostReference(postId = post.id, baseModifiedGmt = post.modifiedGmt),
-            read.target.remotePost
+            read.remoteTarget.remotePost
         )
     }
 

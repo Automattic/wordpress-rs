@@ -17,7 +17,7 @@ use wp_mobile_local_content::{
             FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting,
             WorkingCopyCommon, WorkingCopyId, WorkingCopyTag,
         },
-        working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
+        working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
 };
 
@@ -75,8 +75,8 @@ fn self_hosted_site() -> SiteIdentity {
     }
 }
 
-fn new_post_on(site: SiteIdentity) -> WorkingCopyTarget {
-    WorkingCopyTarget {
+fn new_post_on(site: SiteIdentity) -> WorkingCopyRemoteTarget {
+    WorkingCopyRemoteTarget {
         site,
         remote_post: None,
     }
@@ -133,8 +133,8 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
 
     assert_eq!(read.working_copy, edited);
     assert_eq!(
-        read.target,
-        WorkingCopyTarget {
+        read.remote_target,
+        WorkingCopyRemoteTarget {
             site,
             remote_post: None
         }
@@ -173,8 +173,8 @@ fn test_saved_page_working_copy_survives_reopening_the_database() {
 
     assert_eq!(read.working_copy, edited);
     assert_eq!(
-        read.target,
-        WorkingCopyTarget {
+        read.remote_target,
+        WorkingCopyRemoteTarget {
             site: self_hosted_site(),
             remote_post: None
         }
@@ -252,7 +252,7 @@ fn test_deleting_a_post_working_copy_deletes_only_that_post() {
 fn test_a_remote_post_gets_its_working_copy_back_and_a_new_post_never_does() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let service = open_service(&dir);
-    let remote_target = WorkingCopyTarget {
+    let remote_target = WorkingCopyRemoteTarget {
         site: self_hosted_site(),
         remote_post: Some(RemotePostReference {
             post_id: PostId(42),
@@ -275,19 +275,19 @@ fn test_a_remote_post_gets_its_working_copy_back_and_a_new_post_never_does() {
 
     assert_eq!(read.id, created.id);
     assert_eq!(read.working_copy, post("As fetched"));
-    assert_eq!(read.target, remote_target);
+    assert_eq!(read.remote_target, remote_target);
     assert_ne!(first_new.id, second_new.id);
 }
 
 /// Posts and pages share one ID space on the server, so a remote page with a
 /// working copy can't get another one as a post. The refused insert has to
-/// leave nothing behind: a working copy stored without its target makes every
+/// leave nothing behind: a working copy stored without its remote target makes every
 /// listing fail.
 #[test]
 fn test_a_remote_page_with_a_working_copy_cant_get_one_as_a_post() {
     let dir = tempfile::tempdir().expect("Failed to create temp dir");
     let service = open_service(&dir);
-    let target = WorkingCopyTarget {
+    let target = WorkingCopyRemoteTarget {
         site: self_hosted_site(),
         remote_post: Some(RemotePostReference {
             post_id: PostId(42),
@@ -337,7 +337,7 @@ fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
         .expect("Recording the push should succeed");
     let found = service
         .read_or_create_post_working_copy(
-            WorkingCopyTarget {
+            WorkingCopyRemoteTarget {
                 site: self_hosted_site(),
                 remote_post: Some(pushed),
             },
@@ -347,7 +347,7 @@ fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
 
     assert_eq!(found.id, created.id);
     assert_eq!(found.working_copy, post("Draft"));
-    assert_eq!(found.target.remote_post, Some(pushed));
+    assert_eq!(found.remote_target.remote_post, Some(pushed));
     assert_eq!(
         service.record_post_working_copy_push(unknown_id.clone(), pushed),
         Err(LocalContentError::WorkingCopyNotFound { id: unknown_id })

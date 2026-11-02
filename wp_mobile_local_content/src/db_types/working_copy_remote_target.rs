@@ -1,9 +1,9 @@
 //! Where a working copy is pushed.
 //!
-//! The target is a relationship, not something the user edits, so it lives in
-//! its own table. Its rows depend on their working copy and are deleted with
-//! it, never the other way around. Sites live in a table of their own, which
-//! targets reference.
+//! The remote target is a relationship, not something the user edits, so it
+//! lives in its own table. Its rows depend on their working copy and are
+//! deleted with it, never the other way around. Sites live in a table of their
+//! own, which remote targets reference.
 
 use std::sync::Arc;
 
@@ -37,7 +37,7 @@ pub struct RemotePostReference {
 /// With a `remote_post`, pushing updates that post; without one, it creates a
 /// new post.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
-pub struct WorkingCopyTarget {
+pub struct WorkingCopyRemoteTarget {
     pub site: SiteIdentity,
     pub remote_post: Option<RemotePostReference>,
 }
@@ -79,18 +79,18 @@ impl ColumnIndex for SiteColumn {
     }
 }
 
-/// Column indexes for the working_copy_targets table.
+/// Column indexes for the working_copy_remote_targets table.
 ///
 /// `working_copy_rowid` (index 0) is matched in the WHERE clause and never read.
 #[repr(usize)]
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum WorkingCopyTargetColumn {
+pub(crate) enum WorkingCopyRemoteTargetColumn {
     SiteRowid = 1,
     RemotePostId = 2,
     BaseModifiedGmt = 3,
 }
 
-impl ColumnIndex for WorkingCopyTargetColumn {
+impl ColumnIndex for WorkingCopyRemoteTargetColumn {
     fn as_index(&self) -> usize {
         *self as usize
     }

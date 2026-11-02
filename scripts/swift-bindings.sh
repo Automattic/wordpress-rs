@@ -98,7 +98,7 @@ function patch_wp_mobile_local_content {
 // These types contain `ParsedUrl` (a reference type) which prevents automatic
 // Hashable synthesis. `ParsedUrl` is Hashable, so add the conformance manually.
 extension SiteIdentity: Hashable {}
-extension WorkingCopyTarget: Hashable {}
+extension WorkingCopyRemoteTarget: Hashable {}
 extension DbPostWorkingCopy: Hashable {}
 extension DbPageWorkingCopy: Hashable {}
 PATCH

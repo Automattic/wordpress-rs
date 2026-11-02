@@ -16,7 +16,7 @@ use wp_api::{
 };
 use wp_mobile_sqlite::ColumnIndex;
 
-use crate::db_types::working_copy_target::WorkingCopyTarget;
+use crate::db_types::working_copy_remote_target::WorkingCopyRemoteTarget;
 
 uniffi::custom_newtype!(WorkingCopyId, String);
 
@@ -138,24 +138,24 @@ pub struct PageWorkingCopy {
     pub parent: Option<PostId>,
 }
 
-/// A post working copy as stored, with its ID, target and timestamps.
+/// A post working copy as stored, with its ID, remote target and timestamps.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct DbPostWorkingCopy {
     pub id: WorkingCopyId,
     pub working_copy: PostWorkingCopy,
-    pub target: WorkingCopyTarget,
+    pub remote_target: WorkingCopyRemoteTarget,
     /// ISO 8601 UTC timestamp of when the working copy was created.
     pub created_at: String,
     /// ISO 8601 UTC timestamp of the last save.
     pub updated_at: String,
 }
 
-/// A page working copy as stored, with its ID, target and timestamps.
+/// A page working copy as stored, with its ID, remote target and timestamps.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct DbPageWorkingCopy {
     pub id: WorkingCopyId,
     pub working_copy: PageWorkingCopy,
-    pub target: WorkingCopyTarget,
+    pub remote_target: WorkingCopyRemoteTarget,
     /// ISO 8601 UTC timestamp of when the working copy was created.
     pub created_at: String,
     /// ISO 8601 UTC timestamp of the last save.

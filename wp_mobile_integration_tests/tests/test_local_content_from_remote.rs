@@ -24,7 +24,7 @@ use wp_mobile_local_content::{
             DbPageWorkingCopy, DbPostWorkingCopy, PageWorkingCopy, PostWorkingCopy, PublishDate,
             StatusSetting,
         },
-        working_copy_target::{RemotePostReference, SiteIdentity, WorkingCopyTarget},
+        working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
     remote::RemotePostConversionError,
 };
@@ -53,8 +53,8 @@ fn site() -> SiteIdentity {
     }
 }
 
-fn target_for(post: &AnyPostWithEditContext) -> WorkingCopyTarget {
-    WorkingCopyTarget {
+fn remote_target_for(post: &AnyPostWithEditContext) -> WorkingCopyRemoteTarget {
+    WorkingCopyRemoteTarget {
         site: site(),
         remote_post: Some(RemotePostReference::from_remote(post)),
     }
@@ -69,7 +69,7 @@ fn read_or_create_post(
     let working_copy =
         PostWorkingCopy::from_remote(post).expect("Converting the post should succeed");
     service
-        .read_or_create_post_working_copy(target_for(post), working_copy)
+        .read_or_create_post_working_copy(remote_target_for(post), working_copy)
         .expect("Reading or creating the working copy should succeed")
 }
 
@@ -80,7 +80,7 @@ fn read_or_create_page(
     let working_copy =
         PageWorkingCopy::from_remote(page).expect("Converting the page should succeed");
     service
-        .read_or_create_page_working_copy(target_for(page), working_copy)
+        .read_or_create_page_working_copy(remote_target_for(page), working_copy)
         .expect("Reading or creating the working copy should succeed")
 }
 
@@ -219,7 +219,10 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
             "{case}: publish date"
         );
         assert_eq!(
-            stored.target.remote_post.map(|remote| remote.post_id),
+            stored
+                .remote_target
+                .remote_post
+                .map(|remote| remote.post_id),
             Some(post.id),
             "{case}: the target should point at the remote post"
         );
