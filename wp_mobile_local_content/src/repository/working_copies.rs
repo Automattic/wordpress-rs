@@ -15,9 +15,9 @@ use crate::{
             PostFieldsColumn, PostWorkingCopy, PublishDate, StatusSetting, WorkingCopyColumn,
             WorkingCopyCommon, WorkingCopyId, WorkingCopyKind, WorkingCopyTag, date_from_timestamp,
         },
-        working_copy_target::{
-            RemotePostReference, SiteColumn, SiteIdentity, WorkingCopyTarget,
-            WorkingCopyTargetColumn,
+        working_copy_remote_target::{
+            RemotePostReference, SiteColumn, SiteIdentity, WorkingCopyRemoteTarget,
+            WorkingCopyRemoteTargetColumn,
         },
     },
     repository::{InTransaction, QueryExecutor},
@@ -26,27 +26,27 @@ use crate::{
 const WORKING_COPIES: &str = "working_copies";
 const POST_FIELDS: &str = "post_working_copy_fields";
 const PAGE_FIELDS: &str = "page_working_copy_fields";
-const TARGETS: &str = "working_copy_targets";
+const REMOTE_TARGETS: &str = "working_copy_remote_targets";
 const SITES: &str = "sites";
 
-/// Repository for working copies and their targets.
+/// Repository for working copies and their remote targets.
 ///
 /// A working copy spans its row in `working_copies`, the fields table for its
-/// kind, and its row in `working_copy_targets`, which references a row in
+/// kind, and its row in `working_copy_remote_targets`, which references a row in
 /// `sites`. Writes that touch more than one of them require a transaction, so a
-/// working copy is never stored without its fields or its target.
+/// working copy is never stored without its fields or its remote target.
 pub struct WorkingCopyRepository;
 
 impl WorkingCopyRepository {
-    /// Insert a post working copy and its target under a newly generated ID.
+    /// Insert a post working copy and its remote target under a newly generated ID.
     ///
-    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the target's remote post
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's remote post
     /// already has a working copy.
     pub fn insert_post(
         &self,
         transaction: &impl InTransaction,
         working_copy: &PostWorkingCopy,
-        target: &WorkingCopyTarget,
+        remote_target: &WorkingCopyRemoteTarget,
     ) -> Result<WorkingCopyId, LocalContentError> {
         let (id, rowid) = insert_common(transaction, WorkingCopyKind::Post, &working_copy.common)?;
         transaction.execute(
@@ -62,31 +62,31 @@ impl WorkingCopyRepository {
                 working_copy.sticky,
             ],
         )?;
-        insert_target(transaction, rowid, target)?;
+        insert_remote_target(transaction, rowid, remote_target)?;
         Ok(id)
     }
 
-    /// Insert a page working copy and its target under a newly generated ID.
+    /// Insert a page working copy and its remote target under a newly generated ID.
     ///
-    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the target's remote post
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's remote post
     /// already has a working copy.
     pub fn insert_page(
         &self,
         transaction: &impl InTransaction,
         working_copy: &PageWorkingCopy,
-        target: &WorkingCopyTarget,
+        remote_target: &WorkingCopyRemoteTarget,
     ) -> Result<WorkingCopyId, LocalContentError> {
         let (id, rowid) = insert_common(transaction, WorkingCopyKind::Page, &working_copy.common)?;
         transaction.execute(
             &format!("INSERT INTO {PAGE_FIELDS} (working_copy_rowid, parent_id) VALUES (?, ?)"),
             rusqlite::params![rowid, working_copy.parent.map(|parent| parent.0)],
         )?;
-        insert_target(transaction, rowid, target)?;
+        insert_remote_target(transaction, rowid, remote_target)?;
         Ok(id)
     }
 
     /// Replace the fields of a post working copy and refresh its `updated_at`.
-    /// The target is left unchanged.
+    /// The remote target is left unchanged.
     ///
     /// Returns `false` if no post working copy has the given ID.
     pub fn update_post(
@@ -117,7 +117,7 @@ impl WorkingCopyRepository {
     }
 
     /// Replace the fields of a page working copy and refresh its `updated_at`.
-    /// The target is left unchanged.
+    /// The remote target is left unchanged.
     ///
     /// Returns `false` if no page working copy has the given ID.
     pub fn update_page(
@@ -172,7 +172,7 @@ impl WorkingCopyRepository {
         record_push(transaction, WorkingCopyKind::Page, id, remote_post)
     }
 
-    /// Delete a post working copy. Its fields and target are deleted with it.
+    /// Delete a post working copy. Its fields and remote target are deleted with it.
     ///
     /// Returns `false` if no post working copy has the given ID.
     pub fn delete_post(
@@ -183,7 +183,7 @@ impl WorkingCopyRepository {
         delete_working_copy(executor, WorkingCopyKind::Post, id)
     }
 
-    /// Delete a page working copy. Its fields and target are deleted with it.
+    /// Delete a page working copy. Its fields and remote target are deleted with it.
     ///
     /// Returns `false` if no page working copy has the given ID.
     pub fn delete_page(
@@ -195,7 +195,7 @@ impl WorkingCopyRepository {
     }
 
     /// Delete every working copy targeting `site`, posts and pages, and the
-    /// site's row. Their fields and targets are deleted with them.
+    /// site's row. Their fields and remote targets are deleted with them.
     ///
     /// Returns the number of working copies deleted, 0 if no row matches `site`.
     pub fn delete_by_site(
@@ -209,7 +209,7 @@ impl WorkingCopyRepository {
         let deleted = transaction.execute(
             &format!(
                 "DELETE FROM {WORKING_COPIES}
-                 WHERE rowid IN (SELECT working_copy_rowid FROM {TARGETS} WHERE site_rowid = ?)"
+                 WHERE rowid IN (SELECT working_copy_rowid FROM {REMOTE_TARGETS} WHERE site_rowid = ?)"
             ),
             [site_rowid],
         )?;
@@ -220,7 +220,7 @@ impl WorkingCopyRepository {
         Ok(deleted)
     }
 
-    /// Select a post working copy and its target by ID.
+    /// Select a post working copy and its remote target by ID.
     ///
     /// Returns `Ok(None)` if no post working copy has the given ID, including
     /// when the ID belongs to a page.
@@ -248,7 +248,7 @@ impl WorkingCopyRepository {
                 row.get_column::<bool, _>(Sticky)?,
             ))
         })?;
-        let target = select_target(executor, common_row.rowid)?;
+        let remote_target = select_remote_target(executor, common_row.rowid)?;
 
         Ok(Some(DbPostWorkingCopy {
             id: common_row.id,
@@ -261,13 +261,13 @@ impl WorkingCopyRepository {
                     .unwrap_or(PostFormat::Custom(format)),
                 sticky,
             },
-            target,
+            remote_target,
             created_at: common_row.created_at,
             updated_at: common_row.updated_at,
         }))
     }
 
-    /// Select a page working copy and its target by ID.
+    /// Select a page working copy and its remote target by ID.
     ///
     /// Returns `Ok(None)` if no page working copy has the given ID, including
     /// when the ID belongs to a post.
@@ -285,7 +285,7 @@ impl WorkingCopyRepository {
         let parent: Option<i64> = stmt.query_row([common_row.rowid], |row| {
             row.get_column(PageFieldsColumn::ParentId)
         })?;
-        let target = select_target(executor, common_row.rowid)?;
+        let remote_target = select_remote_target(executor, common_row.rowid)?;
 
         Ok(Some(DbPageWorkingCopy {
             id: common_row.id,
@@ -293,7 +293,7 @@ impl WorkingCopyRepository {
                 common: common_row.common,
                 parent: parent.map(PostId),
             },
-            target,
+            remote_target,
             created_at: common_row.created_at,
             updated_at: common_row.updated_at,
         }))
@@ -463,7 +463,7 @@ fn update_common(
     Ok(rowid)
 }
 
-/// The fields and target rows go with the working copy through `ON DELETE CASCADE`.
+/// The fields and remote target rows go with the working copy through `ON DELETE CASCADE`.
 fn delete_working_copy(
     executor: &impl QueryExecutor,
     kind: WorkingCopyKind,
@@ -484,7 +484,7 @@ fn record_push(
 ) -> Result<bool, LocalContentError> {
     let mut stmt = transaction.prepare(&format!(
         "SELECT w.rowid, t.remote_post_id FROM {WORKING_COPIES} w
-         JOIN {TARGETS} t ON t.working_copy_rowid = w.rowid
+         JOIN {REMOTE_TARGETS} t ON t.working_copy_rowid = w.rowid
          WHERE w.uuid = ? AND w.kind = ?"
     ))?;
     let Some((rowid, edited_post_id)) = stmt
@@ -505,7 +505,7 @@ fn record_push(
     }
 
     let mut update = transaction.prepare(&format!(
-        "UPDATE {TARGETS} SET remote_post_id = ?, base_modified_gmt = ?
+        "UPDATE {REMOTE_TARGETS} SET remote_post_id = ?, base_modified_gmt = ?
          WHERE working_copy_rowid = ?"
     ))?;
     let result = update.execute(rusqlite::params![
@@ -528,7 +528,7 @@ fn select_id_by_remote_post(
     };
     let mut stmt = executor.prepare(&format!(
         "SELECT w.uuid FROM {WORKING_COPIES} w
-         JOIN {TARGETS} t ON t.working_copy_rowid = w.rowid
+         JOIN {REMOTE_TARGETS} t ON t.working_copy_rowid = w.rowid
          WHERE w.kind = ? AND t.site_rowid = ? AND t.remote_post_id = ?"
     ))?;
     let id = stmt
@@ -550,7 +550,7 @@ fn select_ids_by_site(
     };
     let mut stmt = executor.prepare(&format!(
         "SELECT w.uuid FROM {WORKING_COPIES} w
-         JOIN {TARGETS} t ON t.working_copy_rowid = w.rowid
+         JOIN {REMOTE_TARGETS} t ON t.working_copy_rowid = w.rowid
          WHERE w.kind = ? AND t.site_rowid = ?
          ORDER BY w.updated_at DESC, w.rowid DESC"
     ))?;
@@ -623,25 +623,25 @@ fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
     })
 }
 
-fn insert_target(
+fn insert_remote_target(
     transaction: &impl InTransaction,
     rowid: i64,
-    target: &WorkingCopyTarget,
+    remote_target: &WorkingCopyRemoteTarget,
 ) -> Result<(), LocalContentError> {
-    let site_rowid = select_or_insert_site(transaction, &target.site)?;
+    let site_rowid = select_or_insert_site(transaction, &remote_target.site)?;
     let mut stmt = transaction.prepare(&format!(
-        "INSERT INTO {TARGETS} (working_copy_rowid, site_rowid, remote_post_id, base_modified_gmt)
+        "INSERT INTO {REMOTE_TARGETS} (working_copy_rowid, site_rowid, remote_post_id, base_modified_gmt)
          VALUES (?, ?, ?, ?)"
     ))?;
     let result = stmt.execute(rusqlite::params![
         rowid,
         site_rowid,
-        target.remote_post.map(|remote| remote.post_id.0),
-        target
+        remote_target.remote_post.map(|remote| remote.post_id.0),
+        remote_target
             .remote_post
             .map(|remote| remote.base_modified_gmt.0.timestamp()),
     ]);
-    match target.remote_post {
+    match remote_target.remote_post {
         Some(remote_post) => remote_post_conflict(result, remote_post.post_id),
         None => {
             result?;
@@ -650,9 +650,9 @@ fn insert_target(
     }
 }
 
-/// Maps the result of writing a target that edits remote post `post_id`.
+/// Maps the result of writing a remote target that edits remote post `post_id`.
 ///
-/// The only unique constraint a target write can break is the one on
+/// The only unique constraint a remote target write can break is the one on
 /// `(site_rowid, remote_post_id)`, meaning another working copy edits the post.
 fn remote_post_conflict(
     result: rusqlite::Result<usize>,
@@ -722,15 +722,15 @@ fn select_or_insert_site(
     )
 }
 
-fn select_target(
+fn select_remote_target(
     executor: &impl QueryExecutor,
     rowid: i64,
-) -> Result<WorkingCopyTarget, LocalContentError> {
+) -> Result<WorkingCopyRemoteTarget, LocalContentError> {
     let mut stmt = executor.prepare(&format!(
-        "SELECT * FROM {TARGETS} WHERE working_copy_rowid = ?"
+        "SELECT * FROM {REMOTE_TARGETS} WHERE working_copy_rowid = ?"
     ))?;
     let (site_rowid, remote_post) = stmt.query_row([rowid], |row| {
-        use WorkingCopyTargetColumn::*;
+        use WorkingCopyRemoteTargetColumn::*;
 
         let site_rowid: i64 = row.get_column(SiteRowid)?;
         let remote_post_id: Option<i64> = row.get_column(RemotePostId)?;
@@ -757,7 +757,7 @@ fn select_target(
     })?;
     let site = select_site(executor, site_rowid)?;
 
-    Ok(WorkingCopyTarget { site, remote_post })
+    Ok(WorkingCopyRemoteTarget { site, remote_post })
 }
 
 fn select_site(
@@ -935,15 +935,15 @@ mod tests {
         }
     }
 
-    fn new_post_on(site: &SiteIdentity) -> WorkingCopyTarget {
-        WorkingCopyTarget {
+    fn new_post_on(site: &SiteIdentity) -> WorkingCopyRemoteTarget {
+        WorkingCopyRemoteTarget {
             site: site.clone(),
             remote_post: None,
         }
     }
 
-    fn wordpress_com_target_editing(post_id: i64) -> WorkingCopyTarget {
-        WorkingCopyTarget {
+    fn wordpress_com_target_editing(post_id: i64) -> WorkingCopyRemoteTarget {
+        WorkingCopyRemoteTarget {
             site: site("https://example.wordpress.com", Some(123_456_789)),
             remote_post: Some(RemotePostReference {
                 post_id: PostId(post_id),
@@ -952,18 +952,18 @@ mod tests {
         }
     }
 
-    fn self_hosted_new_post_target() -> WorkingCopyTarget {
+    fn self_hosted_new_post_target() -> WorkingCopyRemoteTarget {
         new_post_on(&site("https://example.com", None))
     }
 
     fn insert_post(
         conn: &mut Connection,
         working_copy: &PostWorkingCopy,
-        target: &WorkingCopyTarget,
+        remote_target: &WorkingCopyRemoteTarget,
     ) -> WorkingCopyId {
         let tx = conn.transaction().expect("Failed to begin transaction");
         let id = WorkingCopyRepository
-            .insert_post(&tx, working_copy, target)
+            .insert_post(&tx, working_copy, remote_target)
             .expect("Insert should succeed");
         tx.commit().expect("Commit should succeed");
         id
@@ -972,11 +972,11 @@ mod tests {
     fn insert_page(
         conn: &mut Connection,
         working_copy: &PageWorkingCopy,
-        target: &WorkingCopyTarget,
+        remote_target: &WorkingCopyRemoteTarget,
     ) -> WorkingCopyId {
         let tx = conn.transaction().expect("Failed to begin transaction");
         let id = WorkingCopyRepository
-            .insert_page(&tx, working_copy, target)
+            .insert_page(&tx, working_copy, remote_target)
             .expect("Insert should succeed");
         tx.commit().expect("Commit should succeed");
         id
@@ -1042,12 +1042,15 @@ mod tests {
         assert_eq!(columns[PageFieldsColumn::ParentId.as_index()], "parent_id");
         assert_eq!(columns.len(), 2);
 
-        let columns = column_names(&conn, TARGETS);
+        let columns = column_names(&conn, REMOTE_TARGETS);
         for (column, name) in [
-            (WorkingCopyTargetColumn::SiteRowid, "site_rowid"),
-            (WorkingCopyTargetColumn::RemotePostId, "remote_post_id"),
+            (WorkingCopyRemoteTargetColumn::SiteRowid, "site_rowid"),
             (
-                WorkingCopyTargetColumn::BaseModifiedGmt,
+                WorkingCopyRemoteTargetColumn::RemotePostId,
+                "remote_post_id",
+            ),
+            (
+                WorkingCopyRemoteTargetColumn::BaseModifiedGmt,
                 "base_modified_gmt",
             ),
         ] {
@@ -1069,9 +1072,9 @@ mod tests {
     fn test_post_round_trips_every_field() {
         let mut conn = migrated_connection();
         let post = detailed_post();
-        let target = wordpress_com_target_editing(99);
+        let remote_target = wordpress_com_target_editing(99);
 
-        let id = insert_post(&mut conn, &post, &target);
+        let id = insert_post(&mut conn, &post, &remote_target);
         let stored = WorkingCopyRepository
             .select_post(&conn, &id)
             .expect("Select should succeed")
@@ -1079,7 +1082,7 @@ mod tests {
 
         assert_eq!(stored.id, id);
         assert_eq!(stored.working_copy, post);
-        assert_eq!(stored.target, target);
+        assert_eq!(stored.remote_target, remote_target);
     }
 
     #[test]
@@ -1089,16 +1092,16 @@ mod tests {
             common: common("A page"),
             parent: Some(PostId(3)),
         };
-        let target = self_hosted_new_post_target();
+        let remote_target = self_hosted_new_post_target();
 
-        let id = insert_page(&mut conn, &page, &target);
+        let id = insert_page(&mut conn, &page, &remote_target);
         let stored = WorkingCopyRepository
             .select_page(&conn, &id)
             .expect("Select should succeed")
             .expect("Inserted page should exist");
 
         assert_eq!(stored.working_copy, page);
-        assert_eq!(stored.target, target);
+        assert_eq!(stored.remote_target, remote_target);
     }
 
     #[test]
@@ -1128,8 +1131,8 @@ mod tests {
     #[test]
     fn test_update_replaces_fields_and_keeps_the_target() {
         let mut conn = migrated_connection();
-        let target = wordpress_com_target_editing(99);
-        let id = insert_post(&mut conn, &detailed_post(), &target);
+        let remote_target = wordpress_com_target_editing(99);
+        let id = insert_post(&mut conn, &detailed_post(), &remote_target);
         let before = WorkingCopyRepository
             .select_post(&conn, &id)
             .expect("Select should succeed")
@@ -1156,7 +1159,7 @@ mod tests {
 
         assert!(updated);
         assert_eq!(after.working_copy, edited);
-        assert_eq!(after.target, target);
+        assert_eq!(after.remote_target, remote_target);
         assert_eq!(after.created_at, before.created_at);
         assert_eq!(stored_password, None);
     }
@@ -1181,8 +1184,8 @@ mod tests {
     #[test]
     fn test_custom_status_another_variant_stands_for_is_saved_as_that_variant() {
         let mut conn = migrated_connection();
-        let target = self_hosted_new_post_target();
-        let saved = insert_post(&mut conn, &simple_post("Saved"), &target);
+        let remote_target = self_hosted_new_post_target();
+        let saved = insert_post(&mut conn, &simple_post("Saved"), &remote_target);
         let secret = || Some("secret".to_string());
 
         for (status, expected) in [
@@ -1215,7 +1218,7 @@ mod tests {
                 },
                 ..simple_post("Custom")
             };
-            let inserted = insert_post(&mut conn, &post, &target);
+            let inserted = insert_post(&mut conn, &post, &remote_target);
             let tx = conn.transaction().expect("Failed to begin transaction");
             WorkingCopyRepository
                 .update_post(&tx, &saved, &post)
@@ -1261,8 +1264,10 @@ mod tests {
             &format!("UPDATE {POST_FIELDS} SET tags = '{{\"new\": {{\"name\": \"a\"}}}}'"),
             [],
         );
-        let remote_post_without_base =
-            conn.execute(&format!("UPDATE {TARGETS} SET remote_post_id = 5"), []);
+        let remote_post_without_base = conn.execute(
+            &format!("UPDATE {REMOTE_TARGETS} SET remote_post_id = 5"),
+            [],
+        );
         let two_sites_without_a_site_id_at_one_url = conn.execute(
             &format!("INSERT INTO {SITES} (url) SELECT url FROM {SITES}"),
             [],
@@ -1295,7 +1300,7 @@ mod tests {
 
         let orphan_target = conn.execute(
             &format!(
-                "INSERT INTO {TARGETS} (working_copy_rowid, site_rowid)
+                "INSERT INTO {REMOTE_TARGETS} (working_copy_rowid, site_rowid)
                  SELECT 12345, rowid FROM {SITES}"
             ),
             [],
@@ -1309,14 +1314,14 @@ mod tests {
 
         assert!(
             orphan_target.is_err(),
-            "A target must not exist without a working copy"
+            "A remote target must not exist without a working copy"
         );
         assert!(
             delete_targeted_site.is_err(),
             "A site must not be deleted while a working copy targets it"
         );
         assert_eq!(count_rows(&conn, POST_FIELDS), 0);
-        assert_eq!(count_rows(&conn, TARGETS), 0);
+        assert_eq!(count_rows(&conn, REMOTE_TARGETS), 0);
     }
 
     #[test]
@@ -1373,10 +1378,11 @@ mod tests {
     #[test]
     fn test_a_remote_post_has_at_most_one_working_copy() {
         let mut conn = migrated_connection();
-        let self_hosted = |url: &str, remote_post: Option<RemotePostReference>| WorkingCopyTarget {
-            site: site(url, None),
-            remote_post,
-        };
+        let self_hosted =
+            |url: &str, remote_post: Option<RemotePostReference>| WorkingCopyRemoteTarget {
+                site: site(url, None),
+                remote_post,
+            };
         let editing_post_5 = Some(RemotePostReference {
             post_id: PostId(5),
             base_modified_gmt: date(1_700_000_000),
@@ -1387,9 +1393,10 @@ mod tests {
             &self_hosted("https://example.com", editing_post_5),
         );
 
-        let insert = |conn: &mut Connection, target: &WorkingCopyTarget| {
+        let insert = |conn: &mut Connection, remote_target: &WorkingCopyRemoteTarget| {
             let tx = conn.transaction().expect("Failed to begin transaction");
-            let result = WorkingCopyRepository.insert_post(&tx, &simple_post("Another"), target);
+            let result =
+                WorkingCopyRepository.insert_post(&tx, &simple_post("Another"), remote_target);
             // A failed insert has already written the working copy's row, so
             // it's rolled back by dropping the transaction rather than committed.
             if result.is_ok() {
@@ -1462,7 +1469,7 @@ mod tests {
             .select_post(&conn, &draft)
             .expect("Select should succeed")
             .expect("The draft should exist")
-            .target
+            .remote_target
             .site;
 
         assert_eq!(found_once_connected, vec![draft.clone()]);
@@ -1520,11 +1527,11 @@ mod tests {
             .select_post(&conn, &editing_99)
             .expect("Select should succeed")
             .expect("The post should exist")
-            .target;
+            .remote_target;
 
         assert!(recorded_new_post && recorded_99);
-        assert_eq!(after.target.remote_post, Some(pushed_as_7));
-        assert_eq!(after.target.site, before.target.site);
+        assert_eq!(after.remote_target.remote_post, Some(pushed_as_7));
+        assert_eq!(after.remote_target.site, before.remote_target.site);
         assert_eq!(after.working_copy, before.working_copy);
         assert_eq!(after.updated_at, before.updated_at);
         assert_eq!(editing_99_target.remote_post, Some(pushed_99_again));
@@ -1567,7 +1574,7 @@ mod tests {
             .select_post(&conn, &new_post)
             .expect("Select should succeed")
             .expect("The new post should exist")
-            .target;
+            .remote_target;
 
         assert_eq!(
             to_another_post,

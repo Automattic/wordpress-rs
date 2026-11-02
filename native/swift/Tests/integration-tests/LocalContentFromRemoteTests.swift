@@ -33,12 +33,12 @@ final class LocalContentFromRemoteTests {
         let post = try await fetchFirst(.posts)
         let service = try openService()
 
-        let target = WorkingCopyTarget(site: site, remotePost: RemotePostReference(remote: post))
-        let read = try service.readOrCreatePostWorkingCopy(target: target, workingCopy: PostWorkingCopy(remote: post))
+        let target = WorkingCopyRemoteTarget(site: site, remotePost: RemotePostReference(remote: post))
+        let read = try service.readOrCreatePostWorkingCopy(remoteTarget: target, workingCopy: PostWorkingCopy(remote: post))
 
         #expect(read.workingCopy.common.title == post.title?.raw)
         #expect(read.workingCopy.common.content == post.content.raw)
-        #expect(read.target.remotePost == RemotePostReference(postId: post.id, baseModifiedGmt: post.modifiedGmt))
+        #expect(read.remoteTarget.remotePost == RemotePostReference(postId: post.id, baseModifiedGmt: post.modifiedGmt))
     }
 
     @Test func postWorkingCopyFromAFetchedPageThrows() async throws {

@@ -50,8 +50,8 @@ final class LocalContentTests {
         )
     }
 
-    private func newPost(on site: SiteIdentity) -> WorkingCopyTarget {
-        WorkingCopyTarget(site: site, remotePost: nil)
+    private func newPost(on site: SiteIdentity) -> WorkingCopyRemoteTarget {
+        WorkingCopyRemoteTarget(site: site, remotePost: nil)
     }
 
     private func post(title: String) -> PostWorkingCopy {
@@ -83,13 +83,13 @@ final class LocalContentTests {
         let target = newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: 123_456_789))
 
         let service = try openService()
-        let created = try service.readOrCreatePostWorkingCopy(target: target, workingCopy: post(title: "Original"))
+        let created = try service.readOrCreatePostWorkingCopy(remoteTarget: target, workingCopy: post(title: "Original"))
         let id = created.id
         try service.savePostWorkingCopy(id: id, workingCopy: edited)
         let read = try #require(try openService().readPostWorkingCopy(id: id))
 
         #expect(read.workingCopy == edited)
-        #expect(read.target == target)
+        #expect(read.remoteTarget == target)
     }
 
     @Test func savedPageWorkingCopySurvivesReopeningTheDatabase() throws {
@@ -97,7 +97,7 @@ final class LocalContentTests {
 
         let service = try openService()
         let created = try service.readOrCreatePageWorkingCopy(
-            target: target,
+            remoteTarget: target,
             workingCopy: PageWorkingCopy(common: common(title: "Original page"), parent: nil)
         )
         var edited = created.workingCopy
@@ -107,13 +107,13 @@ final class LocalContentTests {
         let read = try #require(try openService().readPageWorkingCopy(id: created.id))
 
         #expect(read.workingCopy == edited)
-        #expect(read.target == target)
+        #expect(read.remoteTarget == target)
     }
 
     @Test func savingAPageAsAPostThrows() throws {
         let service = try openService()
         let page = try service.readOrCreatePageWorkingCopy(
-            target: newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)),
+            remoteTarget: newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: nil)),
             workingCopy: PageWorkingCopy(common: common(title: "A page"), parent: nil)
         )
         let post = post(title: "Title")

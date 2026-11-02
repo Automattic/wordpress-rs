@@ -20,7 +20,7 @@ use crate::db_types::{
         FeaturedImage, PageWorkingCopy, PostWorkingCopy, PublishDate, StatusSetting,
         WorkingCopyCommon, WorkingCopyTag,
     },
-    working_copy_target::RemotePostReference,
+    working_copy_remote_target::RemotePostReference,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]

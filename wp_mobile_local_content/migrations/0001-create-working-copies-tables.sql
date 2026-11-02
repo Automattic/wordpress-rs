@@ -1,6 +1,6 @@
 -- Fields shared by every kind of working copy. Each row has exactly one
 -- matching row in the fields table for its `kind`, and one in
--- `working_copy_targets`. The repository writes all of them in one transaction.
+-- `working_copy_remote_targets`. The repository writes all of them in one transaction.
 CREATE TABLE `working_copies` (
   -- Internal DB field (auto-incrementing)
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,7 +79,7 @@ CREATE UNIQUE INDEX `idx_sites_url_without_wordpress_com_site_id`
 -- Where a working copy is pushed: the site, and the remote post it edits.
 -- A row depends on its working copy and is deleted with it, never the other
 -- way around.
-CREATE TABLE `working_copy_targets` (
+CREATE TABLE `working_copy_remote_targets` (
   `working_copy_rowid` INTEGER PRIMARY KEY REFERENCES `working_copies`(`rowid`) ON DELETE CASCADE,
 
   -- No ON DELETE action: a site can't be deleted while a working copy targets it
