@@ -127,7 +127,9 @@ impl SiteRepository {
     ) -> Result<Option<FullEntity<(DbSite, DbSelfHostedSite)>>, SqliteDbError> {
         // First get the self_hosted_site. Use the `urls_eq` UDF so the lookup
         // tolerates trailing-slash and other URL-normalization differences
-        // between the stored value and the caller-provided string.
+        // between the stored value and the caller-provided string. A stored
+        // URL may or may not have a trailing slash, depending on whether its
+        // row was written before or after `ParsedUrl` normalization (#1239).
         let sql = format!(
             "SELECT * FROM {} WHERE urls_eq(url, ?)",
             DbTable::SelfHostedSites.table_name()

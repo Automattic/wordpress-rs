@@ -3,17 +3,12 @@ use rusqlite::Result as SqliteResult;
 use rusqlite::functions::FunctionFlags;
 use wp_api::parsed_url::ParsedUrl;
 
-/// Register custom SQL functions on the given connection.
+/// Register the `urls_eq(a, b)` SQL function on `conn`.
 ///
-/// Currently registers `urls_eq(a, b)`: a deterministic, UTF-8 scalar that
-/// reports semantic URL equivalence (per `ParsedUrl == ParsedUrl`), with a
-/// raw-string fallback when either side fails to parse.
-///
-/// Why: the cache's `self_hosted_sites.url` column may legitimately hold either
-/// `http://example.com` or `http://example.com/` depending on whether it
-/// was inserted before or after `ParsedUrl`-based normalization landed
-/// (see PR #1239). Lookups must tolerate either shape without forcing a
-/// data migration on existing user caches.
+/// `urls_eq` is true when `a` and `b` are the same string, or when both parse
+/// to equal `ParsedUrl`s, such as `https://example.com` and
+/// `https://example.com/`. A query can use it to find a stored URL written in a
+/// different form than the one it looks up, without migrating stored values.
 pub(crate) fn register_url_functions(conn: &Connection) -> SqliteResult<()> {
     conn.create_scalar_function(
         "urls_eq",

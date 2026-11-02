@@ -50,16 +50,11 @@ impl DbConnection {
         Self::try_from(Connection::open_with_flags(path, flags)?)
     }
 
-    /// Execute a database operation with scoped access to the connection.
+    /// Run `f` with the connection, holding the lock until `f` returns.
     ///
-    /// This is the **only** way to access the database. The provided closure
-    /// receives a mutable reference to the connection that is only valid within
-    /// the closure scope.
-    ///
-    /// This design prevents deadlocks by ensuring that:
-    /// 1. The connection cannot be held across multiple `execute()` calls
-    /// 2. The closure scope naturally encourages grouping related operations
-    /// 3. The lock is automatically released when the closure returns
+    /// This is the only way to reach the connection. `f` can't keep it, so the
+    /// lock is never held between calls. Group the statements that belong
+    /// together, such as a transaction, in one call.
     ///
     /// # Example
     /// ```ignore
@@ -82,7 +77,9 @@ impl DbConnection {
     /// db.execute(|conn| write(conn, data))?;  // ✅ OK
     /// ```
     ///
-    /// **Unsafe** - Nested calls, on the same database or across two databases:
+    /// **Unsafe** - Nested calls. On the same database, the inner call never
+    /// returns. Across two databases, two callers nesting them in opposite
+    /// orders deadlock:
     /// ```ignore
     /// db.execute(|conn| {
     ///     other_db.execute(|conn2| { ... })  // ⚠️ Deadlock if another caller nests them in reverse
