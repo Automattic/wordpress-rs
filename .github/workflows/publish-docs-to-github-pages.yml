@@ -24,7 +24,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Rust
-        run: rustup toolchain install
+        # rust-cache hashes every installed toolchain, so drop the runner image's `stable`.
+        run: |
+          rustup toolchain uninstall stable
+          rustup toolchain install
       - name: Configure cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Setup pages
