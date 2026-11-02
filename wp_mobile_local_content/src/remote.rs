@@ -1,12 +1,14 @@
-//! Making working copy fields from a remote post.
+//! Converting a post fetched with the edit context into working copy fields.
 //!
-//! Every value a working copy holds is converted without loss, so a working
-//! copy made from a remote post starts out holding what the server holds. The
-//! one exception is a password on a private post: it's dropped, as WordPress
-//! drops it when saving a private post. Fields the working copy doesn't model,
-//! such as the template, menu order and meta, are not part of it; they stay as
-//! they are on the server provided that pushing a working copy sends only the
-//! fields the user changed.
+//! The fields get the post's values as the server returns them, with two
+//! exceptions. A private post's password is dropped, because WordPress removes
+//! it when saving a private post. An unpublished post whose date the editor
+//! would show as "Immediately" gets `PublishDate::Immediately` instead of its
+//! date.
+//!
+//! Some of the post's values have no working copy field, such as its template,
+//! menu order and meta. They stay as they are on the server only if pushing
+//! sends just the fields the user changed.
 
 use wp_api::{
     date::WpDateString,
@@ -23,6 +25,7 @@ use crate::db_types::{
     working_copy_remote_target::RemotePostReference,
 };
 
+/// Why a fetched post can't be converted into working copy fields.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum RemotePostConversionError {
     #[error("The post's {field} is missing; it must be fetched with the edit context")]
@@ -34,7 +37,11 @@ pub enum RemotePostConversionError {
 }
 
 impl PostWorkingCopyFields {
-    /// Make post working copy fields from a post fetched with the edit context.
+    /// Convert a post fetched with the edit context into working copy fields.
+    ///
+    /// Fails with `WrongPostType` if `post` isn't a post, with
+    /// `UneditableStatus` if it's in the trash, and with `MissingField` if it
+    /// wasn't fetched with the edit context.
     pub fn from_remote(post: &AnyPostWithEditContext) -> Result<Self, RemotePostConversionError> {
         expect_post_type(post, "post")?;
         Ok(Self {
@@ -53,7 +60,11 @@ impl PostWorkingCopyFields {
 }
 
 impl PageWorkingCopyFields {
-    /// Make page working copy fields from a page fetched with the edit context.
+    /// Convert a page fetched with the edit context into working copy fields.
+    ///
+    /// Fails with `WrongPostType` if `post` isn't a page, with
+    /// `UneditableStatus` if it's in the trash, and with `MissingField` if it
+    /// wasn't fetched with the edit context.
     pub fn from_remote(post: &AnyPostWithEditContext) -> Result<Self, RemotePostConversionError> {
         expect_post_type(post, "page")?;
         Ok(Self {
@@ -65,7 +76,10 @@ impl PageWorkingCopyFields {
 }
 
 impl RemotePostReference {
-    /// The reference for a working copy made from `post`, as it was fetched.
+    /// Reference `post`, with its `modified_gmt` as the base version.
+    ///
+    /// Use it with the fetched post a working copy is created from, and with
+    /// the post the server returns after a push.
     pub fn from_remote(post: &AnyPostWithEditContext) -> Self {
         Self {
             post_id: post.id,
@@ -74,7 +88,11 @@ impl RemotePostReference {
     }
 }
 
-/// Make post working copy fields from a post fetched with the edit context.
+/// Convert a post fetched with the edit context into working copy fields.
+///
+/// Fails with `WrongPostType` if `post` isn't a post, with `UneditableStatus`
+/// if it's in the trash, and with `MissingField` if it wasn't fetched with the
+/// edit context.
 #[uniffi::export]
 pub fn post_working_copy_fields_from_remote(
     post: AnyPostWithEditContext,
@@ -82,7 +100,11 @@ pub fn post_working_copy_fields_from_remote(
     PostWorkingCopyFields::from_remote(&post)
 }
 
-/// Make page working copy fields from a page fetched with the edit context.
+/// Convert a page fetched with the edit context into working copy fields.
+///
+/// Fails with `WrongPostType` if `page` isn't a page, with `UneditableStatus`
+/// if it's in the trash, and with `MissingField` if it wasn't fetched with the
+/// edit context.
 #[uniffi::export]
 pub fn page_working_copy_fields_from_remote(
     page: AnyPostWithEditContext,
@@ -90,7 +112,10 @@ pub fn page_working_copy_fields_from_remote(
     PageWorkingCopyFields::from_remote(&page)
 }
 
-/// The reference to `post` for a working copy made from it, as it was fetched.
+/// Reference `post`, with its `modified_gmt` as the base version.
+///
+/// Use it with the fetched post a working copy is created from, and with the
+/// post the server returns after a push.
 #[uniffi::export]
 pub fn remote_post_reference_from_remote(post: AnyPostWithEditContext) -> RemotePostReference {
     RemotePostReference::from_remote(&post)
