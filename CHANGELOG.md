@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `libwordpressFFI.xcframework` now has a Mac Catalyst slice, and the `WordPressAPI` Swift package supports Mac Catalyst 16 and later.
 - **BREAKING:** Errors that Cloudflare generates itself, in front of a site, now surface as `RequestExecutionErrorReason::CloudflareError` instead of `UnknownError` ("Something went wrong") or `HttpForbiddenError`. It carries a `CloudflareErrorKind` (request too large, site's server down or timing out, SSL problem, rate limited, blocked by a security rule, bot challenge, …), Cloudflare's error code when the response has one, the ray ID and any `Retry-After`, and its localized message says what happened and that the site owner or host can fix it. Login site discovery reports them too, where it previously said the site "does not appear to be a WordPress site" or that its server denied access. Responses the site's own server wrote are unchanged, even though they also pass through Cloudflare. Exhaustive `switch`/`when` statements over `RequestExecutionErrorReason` need a case for it.
+- `WpLoginClient.verify_issued_application_password`, which detects a site whose server does not pass the `Authorization` header to WordPress. Call it only with a freshly issued application password. It reports a blocked header only when the API root and the `site_url` returned with the password share an origin.
 
 ### Fixed
 
@@ -30,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `POST /media/<media_id>/post-process` endpoint for generating the registered image sub-sizes that the attachment is missing.
 - `GET /rest/v1.1/sites/<site_id>/stats/archives` endpoint, for views of a site's search, category and other archive pages.
 - `SiteVisibility::Deleted`, for listing only the deleted sites that `GET /me/sites` includes.
-- `WpLoginClient.verify_issued_application_password`, which detects a site whose server does not pass the `Authorization` header to WordPress. Call it only with a freshly issued application password. It reports a blocked header only when the API root and the `site_url` returned with the password share an origin.
 
 ### Fixed
 
