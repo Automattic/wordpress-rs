@@ -12,10 +12,23 @@ use wp_mobile_local_content::{
     repository::working_copies::WorkingCopyRepository,
 };
 
-/// Service for content created or edited on the device.
+/// Stores the posts and pages the user creates or edits on the device, as
+/// working copies.
 ///
-/// Reads and writes go to the local content database only; nothing here
-/// touches the network or the API cache.
+/// A working copy is the user's version of a post or page. It holds `fields`,
+/// the post as the user edits it, and a `remote_target`, the site and post
+/// that pushing it updates. A working copy is deleted only when you call one
+/// of the delete functions, so call them only when the user asks.
+///
+/// The service never talks to the server or the API cache. Your app pushes a
+/// working copy by sending its fields to the server itself, then records the
+/// push with `record_post_working_copy_push` or `record_page_working_copy_push`.
+///
+/// To edit a post from the server, first look for its working copy with
+/// `read_post_working_copy_for_remote_post`. If it has none, create one from
+/// the fetched post with `create_post_working_copy`. To write a new post,
+/// create a working copy whose remote target has no `remote_post`. Pages work
+/// the same way through the page functions.
 #[derive(uniffi::Object)]
 pub struct LocalContentService {
     store: Arc<WpLocalContentStore>,
@@ -23,16 +36,14 @@ pub struct LocalContentService {
 
 #[uniffi::export]
 impl LocalContentService {
+    /// Create the service on `store`. Run the store's migrations first.
     #[uniffi::constructor]
     pub fn new(store: Arc<WpLocalContentStore>) -> Self {
         Self { store }
     }
 
-    /// Read the post working copy that edits remote post `post_id` on `site`.
-    ///
-    /// A remote post has at most one working copy, holding the user's unpushed
-    /// changes to it. To open a remote post for editing, call this first, and
-    /// create a working copy only if it returns `None`.
+    /// Read the working copy of post `post_id` on `site`, or `None` if it has
+    /// none.
     pub fn read_post_working_copy_for_remote_post(
         &self,
         site: SiteIdentity,
@@ -42,11 +53,14 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_post_by_remote_post(conn, &site, post_id))
     }
 
-    /// Store `fields` as a new post working copy targeting `remote_target`, and
-    /// return it.
+    /// Create a post working copy, and return it with its new ID.
     ///
-    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's
-    /// remote post already has a working copy.
+    /// For a post from the server, convert the fetched post into `fields` and
+    /// into the `RemotePostReference` that `remote_target` holds. For a new
+    /// post, leave `remote_target.remote_post` unset.
+    ///
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote post already
+    /// has a working copy.
     pub fn create_post_working_copy(
         &self,
         remote_target: WorkingCopyRemoteTarget,
@@ -63,9 +77,10 @@ impl LocalContentService {
         })
     }
 
-    /// Save new fields for an existing post working copy. Its remote target is unchanged.
+    /// Save the user's changes to a post working copy, replacing all of its
+    /// fields with `fields`.
     ///
-    /// Fails with `WorkingCopyNotFound` if no post working copy has the given ID.
+    /// Fails with `WorkingCopyNotFound` if no post working copy has the ID.
     pub fn save_post_working_copy(
         &self,
         id: WorkingCopyId,
@@ -84,19 +99,18 @@ impl LocalContentService {
         }
     }
 
-    /// Record that a post working copy was pushed, with `remote_post` as the
-    /// server returned the post after the push: from now on the working copy
-    /// edits that post, based on its new `modified_gmt`. Its fields are
-    /// unchanged.
+    /// Tell the service that your app pushed this post working copy to the
+    /// server.
     ///
-    /// Call it after every push of the working copy's fields, including one an
-    /// app makes itself, so the working copy stays based on the version the
-    /// push produced.
+    /// Call it after every successful push, with a `RemotePostReference` made
+    /// from the post the server returned. Its `modified_gmt` becomes the
+    /// working copy's base version. For a new post, the post the push created
+    /// becomes the working copy's remote post.
     ///
-    /// Fails with `WorkingCopyNotFound` if no post working copy has the given
-    /// ID, with `RemotePostAlreadyHasWorkingCopy` if another working copy edits
-    /// that post, and with `PushedToAnotherRemotePost` if this one edits a
-    /// different post.
+    /// Fails with `WorkingCopyNotFound` if no post working copy has the ID.
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if another working copy
+    /// already has the pushed post as its remote post, and with
+    /// `PushedToAnotherRemotePost` if this one has a different remote post.
     pub fn record_post_working_copy_push(
         &self,
         id: WorkingCopyId,
@@ -116,9 +130,9 @@ impl LocalContentService {
         }
     }
 
-    /// Read a post working copy and its remote target from the local content database.
+    /// Read a post working copy by its ID.
     ///
-    /// Returns `None` if no post working copy has the given ID.
+    /// Returns `None` if no post working copy has the ID.
     pub fn read_post_working_copy(
         &self,
         id: WorkingCopyId,
@@ -128,9 +142,9 @@ impl LocalContentService {
     }
 
     /// Delete a post working copy, discarding the user's changes in it. Call it
-    /// only when the user asks to: user content is never lost otherwise.
+    /// only when the user asks to.
     ///
-    /// Fails with `WorkingCopyNotFound` if no post working copy has the given ID.
+    /// Fails with `WorkingCopyNotFound` if no post working copy has the ID.
     pub fn delete_post_working_copy(&self, id: WorkingCopyId) -> Result<(), LocalContentError> {
         let deleted = self
             .store
@@ -142,15 +156,13 @@ impl LocalContentService {
         }
     }
 
-    /// Delete every post and page working copy targeting `site`, discarding
-    /// the user's changes in them. Call it only when the user chooses to
-    /// delete the site's local content, such as by logging out with "Log out
-    /// and delete local content": user content is never lost otherwise.
-    /// Removing a site from the app or logging out doesn't touch the local
-    /// content database, so the site's working copies are still there if it's
-    /// added back.
+    /// Delete every post and page working copy for `site`, discarding the
+    /// user's changes in them, and return how many were deleted.
     ///
-    /// Returns the number of working copies deleted.
+    /// Call it only when the user chooses to delete the site's local content,
+    /// such as by logging out with "Log out and delete local content".
+    /// Removing the site from the API cache doesn't delete its working copies,
+    /// so they're still there if the site is added back.
     pub fn delete_working_copies_for_site(
         &self,
         site: SiteIdentity,
@@ -163,7 +175,7 @@ impl LocalContentService {
         })
     }
 
-    /// Read every post working copy targeting `site`, most recently updated first.
+    /// Read every post working copy for `site`, newest `updated_at` first.
     pub fn read_post_working_copies(
         &self,
         site: SiteIdentity,
@@ -172,18 +184,14 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_posts_by_site(conn, &site))
     }
 
-    /// Read every post working copy, whatever site it targets, most recently
-    /// updated first.
+    /// Read every post working copy on every site, newest `updated_at` first.
     pub fn read_all_post_working_copies(&self) -> Result<Vec<PostWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_all_posts(conn))
     }
 
-    /// Read the page working copy that edits remote page `post_id` on `site`.
-    ///
-    /// A remote page has at most one working copy, holding the user's unpushed
-    /// changes to it. To open a remote page for editing, call this first, and
-    /// create a working copy only if it returns `None`.
+    /// Read the working copy of page `post_id` on `site`, or `None` if it has
+    /// none.
     pub fn read_page_working_copy_for_remote_post(
         &self,
         site: SiteIdentity,
@@ -193,11 +201,14 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_page_by_remote_post(conn, &site, post_id))
     }
 
-    /// Store `fields` as a new page working copy targeting `remote_target`, and
-    /// return it.
+    /// Create a page working copy, and return it with its new ID.
     ///
-    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote target's
-    /// remote post already has a working copy.
+    /// For a page from the server, convert the fetched page into `fields` and
+    /// into the `RemotePostReference` that `remote_target` holds. For a new
+    /// page, leave `remote_target.remote_post` unset.
+    ///
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if the remote page already
+    /// has a working copy.
     pub fn create_page_working_copy(
         &self,
         remote_target: WorkingCopyRemoteTarget,
@@ -214,9 +225,10 @@ impl LocalContentService {
         })
     }
 
-    /// Save new fields for an existing page working copy. Its remote target is unchanged.
+    /// Save the user's changes to a page working copy, replacing all of its
+    /// fields with `fields`.
     ///
-    /// Fails with `WorkingCopyNotFound` if no page working copy has the given ID.
+    /// Fails with `WorkingCopyNotFound` if no page working copy has the ID.
     pub fn save_page_working_copy(
         &self,
         id: WorkingCopyId,
@@ -235,19 +247,18 @@ impl LocalContentService {
         }
     }
 
-    /// Record that a page working copy was pushed, with `remote_post` as the
-    /// server returned the page after the push: from now on the working copy
-    /// edits that page, based on its new `modified_gmt`. Its fields are
-    /// unchanged.
+    /// Tell the service that your app pushed this page working copy to the
+    /// server.
     ///
-    /// Call it after every push of the working copy's fields, including one an
-    /// app makes itself, so the working copy stays based on the version the
-    /// push produced.
+    /// Call it after every successful push, with a `RemotePostReference` made
+    /// from the page the server returned. Its `modified_gmt` becomes the
+    /// working copy's base version. For a new page, the page the push created
+    /// becomes the working copy's remote post.
     ///
-    /// Fails with `WorkingCopyNotFound` if no page working copy has the given
-    /// ID, with `RemotePostAlreadyHasWorkingCopy` if another working copy edits
-    /// that page, and with `PushedToAnotherRemotePost` if this one edits a
-    /// different page.
+    /// Fails with `WorkingCopyNotFound` if no page working copy has the ID.
+    /// Fails with `RemotePostAlreadyHasWorkingCopy` if another working copy
+    /// already has the pushed page as its remote post, and with
+    /// `PushedToAnotherRemotePost` if this one has a different remote post.
     pub fn record_page_working_copy_push(
         &self,
         id: WorkingCopyId,
@@ -267,9 +278,9 @@ impl LocalContentService {
         }
     }
 
-    /// Read a page working copy and its remote target from the local content database.
+    /// Read a page working copy by its ID.
     ///
-    /// Returns `None` if no page working copy has the given ID.
+    /// Returns `None` if no page working copy has the ID.
     pub fn read_page_working_copy(
         &self,
         id: WorkingCopyId,
@@ -279,9 +290,9 @@ impl LocalContentService {
     }
 
     /// Delete a page working copy, discarding the user's changes in it. Call it
-    /// only when the user asks to: user content is never lost otherwise.
+    /// only when the user asks to.
     ///
-    /// Fails with `WorkingCopyNotFound` if no page working copy has the given ID.
+    /// Fails with `WorkingCopyNotFound` if no page working copy has the ID.
     pub fn delete_page_working_copy(&self, id: WorkingCopyId) -> Result<(), LocalContentError> {
         let deleted = self
             .store
@@ -293,7 +304,7 @@ impl LocalContentService {
         }
     }
 
-    /// Read every page working copy targeting `site`, most recently updated first.
+    /// Read every page working copy for `site`, newest `updated_at` first.
     pub fn read_page_working_copies(
         &self,
         site: SiteIdentity,
@@ -302,8 +313,7 @@ impl LocalContentService {
             .execute(|conn| WorkingCopyRepository.select_pages_by_site(conn, &site))
     }
 
-    /// Read every page working copy, whatever site it targets, most recently
-    /// updated first.
+    /// Read every page working copy on every site, newest `updated_at` first.
     pub fn read_all_page_working_copies(&self) -> Result<Vec<PageWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_all_pages(conn))
