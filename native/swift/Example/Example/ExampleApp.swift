@@ -56,6 +56,12 @@ struct ExampleApp: App {
                 Tab("WordPress.com", systemImage: "network") {
                     WPComRootView()
                 }
+
+                #if canImport(WebKit)
+                Tab("Reader", systemImage: "book") {
+                    ReaderRootView()
+                }
+                #endif
             }
         }
         .environmentObject(self.loginManager)

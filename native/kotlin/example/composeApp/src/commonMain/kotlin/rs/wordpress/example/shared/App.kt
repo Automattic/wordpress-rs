@@ -1,6 +1,9 @@
 package rs.wordpress.example.shared
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -8,7 +11,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.savedstate.read
 import org.koin.compose.koinInject
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpComApiClient
@@ -30,6 +36,9 @@ import rs.wordpress.example.shared.ui.postcollection.PostCollectionScreen
 import rs.wordpress.example.shared.ui.posts.PostListByTypeScreen
 import rs.wordpress.example.shared.ui.postmetadatacollection.PostMetadataCollectionScreen
 import rs.wordpress.example.shared.ui.posttypes.PostTypesScreen
+import rs.wordpress.example.shared.ui.reader.ReaderPostListScreen
+import rs.wordpress.example.shared.ui.reader.ReaderPostScreen
+import rs.wordpress.example.shared.ui.reader.ReaderScreen
 import rs.wordpress.example.shared.ui.search.SearchScreen
 import rs.wordpress.example.shared.ui.settings.SiteSettingsScreen
 import rs.wordpress.example.shared.ui.site.SitePostType
@@ -70,13 +79,16 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
     var currentTaxonomy by remember { mutableStateOf<SiteTaxonomy?>(null) }
     var currentUnifiedConversationId by remember { mutableStateOf<ConversationId?>(null) }
 
-    MaterialTheme {
+    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
         NavHost(navController, startDestination = "welcome") {
             composable("welcome") {
                 WelcomeScreen(
                     authenticationEnabled,
                     onLoginClicked = {
                         navController.navigate("login")
+                    },
+                    onReaderClicked = {
+                        navController.navigate("reader")
                     },
                     onSiteClicked = { account ->
                         when (account) {
@@ -370,6 +382,31 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                 }
                 ApplicationPasswordListScreen(
                     apiClient = apiClient,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("reader") {
+                ReaderScreen(
+                    onSiteSubmitted = { site -> navController.navigate("reader/$site") },
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("reader/{site}") { entry ->
+                val site = entry.arguments?.read { getStringOrNull("site") }.orEmpty()
+                ReaderPostListScreen(
+                    site = site,
+                    onPostClicked = { postId -> navController.navigate("reader/$site/$postId") },
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable(
+                "reader/{site}/{postId}",
+                arguments = listOf(navArgument("postId") { type = NavType.LongType })
+            ) { entry ->
+                ReaderPostScreen(
+                    site = entry.arguments?.read { getStringOrNull("site") }.orEmpty(),
+                    postId = (entry.arguments?.read { getLongOrNull("postId") } ?: 0L).toULong(),
+                    onPostClicked = { site, postId -> navController.navigate("reader/$site/$postId") },
                     onBackClicked = { navController.popBackStack() }
                 )
             }

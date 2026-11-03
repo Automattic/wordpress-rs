@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `reader_stylesheet` styles the post with those colours. It replaces the `reader-mobile.css` the apps download from WordPress.com, and the apps' own Reader CSS.
   - `reader_script` is the post page's script: it fades images in as they load, makes images open in the app's image viewer, sizes embeds of other WordPress posts, and tells the app about text selection, copying, taps on links to anchors and on images, the page's height as it changes, and anything the page's Content Security Policy blocks.
   - `ReaderPostContent.page_html` puts the post, the theme's colours, the stylesheet, the script and the embeds' scripts together into the page for the web view. Its Content Security Policy only lets the shared script and the embeds' scripts run. `ReaderPageOptions` sets the theme, the reader's font and text size, the site's language (for right-to-left text), reading offline, CSS from WordPress.com to fix the stylesheet without an app release, and the app's own CSS. `reader_page_base_url` is the base URL to load the page with.
+- The iOS and Android example apps show Reader posts from public sites with `wp_mobile::reader`, in each theme, font and text size.
 - `wp_rs_web` has a Reader Preview at `/reader`: paste a post's URL to see it the way the apps show it, in any theme, with what the shared code found in it.
 
 ### Changed

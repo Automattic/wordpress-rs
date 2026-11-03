@@ -1,0 +1,5 @@
+<resources>
+    <!-- Light, and dark in `values-night`, so the web view's `prefers-color-scheme` follows the system's
+         appearance: it reads `isLightTheme` from the app's theme. -->
+    <style name="Theme.Example" parent="@android:style/Theme.Material.Light.NoActionBar" />
+</resources>
