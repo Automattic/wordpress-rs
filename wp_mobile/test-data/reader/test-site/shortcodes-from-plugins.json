@@ -1,0 +1,15 @@
+{
+ "source": {
+  "site": "jetpack.wpmt.co",
+  "site_type": "jetpack",
+  "post": 154
+ },
+ "fields": {
+  "title": "Reader shortcodes: plugin shortcodes WordPress.com can&#8217;t run",
+  "URL": "https://jetpack.wpmt.co/reader-shortcodes-plugin-shortcodes-wordpress-com-cant-run/",
+  "content": "<p>These come from plugins the site doesn’t have, so they stay as text.</p>\n<p>[vc_row][vc_column width=”1/2″][vc_column_text]WPBakery: text in a column.[/vc_column_text][/vc_column][vc_column width=”1/2″][vc_single_image image=”142″ img_size=”medium”][/vc_column][/vc_row]</p>\n<p>[et_pb_section fb_built=”1″][et_pb_row][et_pb_column type=”4_4″][et_pb_text]Divi: text in a section.[/et_pb_text][et_pb_button button_url=”https://example.com” button_text=”A Divi button”][/et_pb_button][/et_pb_column][/et_pb_row][/et_pb_section]</p>\n<p>[su_dropcap size=”5″]S[/su_dropcap]hortcodes Ultimate: a drop cap starts this sentence.</p>\n<p>[infobox bg=”redlight” color=”black” opacity=”on” subtitle=”An infobox subtitle”]The infobox’s text.[/infobox]</p>\n<p>[one_half]The first half.[/one_half][one_half_last]The second half.[/one_half_last]</p>\n<p>[alert type=”warning”]An alert.[/alert]</p>\n<p>[showhide title=”Show more”]Text to show.[/showhide]</p>\n<p>[cbtabs][cbtab title=”One”]The first tab.[/cbtab][cbtab title=”Two”]The second tab.[/cbtab][/cbtabs]</p>\n<p>[gigya src=”http://www.example.com/player.swf” width=”500″ height=”350″ allowFullScreen=”true”]</p>\n<p>[gdrive url=”https://example.com/a-document.pdf”]</p>\n<p>[wpzoom_rcb_post id=”1″]</p>\n<p>[rt_reading_time label=”Reading time:” postfix=”minutes”]</p>\n<p>Date: [time]Oct 21 2026 19:00 UTC[/time]</p>\n<p>[stuck-order id=123]</p>\n<p>[full_width]Full-width text.[/full_width]</p>\n<p>A sentence with a reference.[ref]The reference.[/ref]</p>\n<p>[rating stars=”4″]</p>\n<p>The end.</p>",
+  "excerpt": "These come from plugins the site doesn’t have, so they stay as text. [vc_row][vc_column width=”1/2″][vc_column_text]WPBakery: text in a column.[/vc_column_text][/vc_column][vc_column width=”1/2″][vc_single_image image=”142″ img_size=”medium”][/vc_column][/vc_row] [et_pb_section fb_built=”1″][et_pb_row][et_pb_column type=”4_4″][et_pb_text]Divi: text in a section.[/et_pb_text][et_pb_button button_url=”https://example.com” button_text=”A Divi button”][/et_pb_button][/et_pb_column][/et_pb_row][/et_pb_section] [su_dropcap size=”5″]S[/su_dropcap]hortcodes Ultimate: a drop cap starts this sentence. [infobox bg=”redlight” color=”black” opacity=”on” subtitle=”An infobox subtitle”]The infobox’s text.[/infobox] [one_half]The first half.[/one_half][one_half_last]The second&hellip;",
+  "featured_image": ""
+ },
+ "features": []
+}

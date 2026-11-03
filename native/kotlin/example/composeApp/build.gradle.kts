@@ -43,6 +43,12 @@ kotlin {
         val desktopMain by getting {
             resources.srcDirs(desktopResourcesPath)
         }
+        val desktopTest by getting {
+            dependencies {
+                implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
 
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -56,6 +62,7 @@ kotlin {
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization)
             implementation(libs.landscapist.coil)
             implementation(libs.lifecycle.viewmodel)
             if (project.hasProperty("wpApiKotlinVersion")) {
@@ -63,6 +70,9 @@ kotlin {
             } else {
                 compileOnly(project(":api:kotlin"))
             }
+        }
+        androidMain.dependencies {
+            implementation(libs.androidx.webkit)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

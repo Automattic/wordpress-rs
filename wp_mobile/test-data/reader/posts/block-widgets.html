@@ -1,0 +1,403 @@
+<div class="is-reader">
+<p>This is a shortcode widget.</p>
+
+
+
+<p class="wp-block-paragraph">The Archive Widget:</p>
+
+
+<ul class="wp-block-archives-list wp-block-archives" style="box-sizing: border-box;">	<li><a href="https://wpthemetestdata.wordpress.com/2020/01/">January 2020</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2018/11/">November 2018</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2018/10/">October 2018</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2013/01/">January 2013</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2012/03/">March 2012</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2012/01/">January 2012</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2011/03/">March 2011</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2010/10/">October 2010</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2010/09/">September 2010</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2010/08/">August 2010</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2010/07/">July 2010</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2010/06/">June 2010</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2010/05/">May 2010</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2010/04/">April 2010</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2010/03/">March 2010</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2010/02/">February 2010</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2010/01/">January 2010</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2009/10/">October 2009</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2009/09/">September 2009</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2009/08/">August 2009</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2009/07/">July 2009</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2009/06/">June 2009</a></li>
+	<li><a href="https://wpthemetestdata.wordpress.com/2009/05/">May 2009</a></li>
+</ul>
+
+
+<p class="wp-block-paragraph">The same Archive widget but as a dropdown:</p>
+
+
+<div class="wp-block-archives-dropdown wp-block-archives" style="box-sizing: border-box;">
+<label for="wp-block-archives-1" class="wp-block-archives__label" style="display: block;">Archives</label>
+		<select id="wp-block-archives-1" name="archive-dropdown">
+		<option value="">Select Month</option>	<option value="https://wpthemetestdata.wordpress.com/2020/01/"> January 2020  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2018/11/"> November 2018  (11)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2018/10/"> October 2018  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2013/01/"> January 2013  (5)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2012/03/"> March 2012  (5)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2012/01/"> January 2012  (6)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2011/03/"> March 2011  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2010/10/"> October 2010  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2010/09/"> September 2010  (2)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2010/08/"> August 2010  (3)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2010/07/"> July 2010  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2010/06/"> June 2010  (3)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2010/05/"> May 2010  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2010/04/"> April 2010  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2010/03/"> March 2010  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2010/02/"> February 2010  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2010/01/"> January 2010  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2009/10/"> October 2009  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2009/09/"> September 2009  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2009/08/"> August 2009  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2009/07/"> July 2009  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2009/06/"> June 2009  (1)</option>
+	<option value="https://wpthemetestdata.wordpress.com/2009/05/"> May 2009  (1)</option>
+</select><script>
+( ( [ dropdownId, homeUrl ] ) => {
+		const dropdown = document.getElementById( dropdownId );
+		function gutenberg_onSelectChange() {
+			setTimeout( () => {
+				if ( 'escape' === dropdown.dataset.lastkey ) {
+					return;
+				}
+				if ( dropdown.value ) {
+					location.href = dropdown.value;
+				}
+			}, 250 );
+		}
+		function gutenberg_onKeyUp( event ) {
+			if ( 'Escape' === event.key ) {
+				dropdown.dataset.lastkey = 'escape';
+			} else {
+				delete dropdown.dataset.lastkey;
+			}
+		}
+		function gutenberg_onClick() {
+			delete dropdown.dataset.lastkey;
+		}
+		dropdown.addEventListener( 'keyup', gutenberg_onKeyUp );
+		dropdown.addEventListener( 'click', gutenberg_onClick );
+		dropdown.addEventListener( 'change', gutenberg_onSelectChange );
+	} )( ["wp-block-archives-1","https://wpthemetestdata.wordpress.com"] );
+//# sourceURL=gutenberg_block_core_archives_build_dropdown_script
+</script>
+</div>
+
+
+<p class="wp-block-paragraph">The Category widget block has an additional option for showing category hierarchies:</p>
+
+
+<ul class="wp-block-categories-list wp-block-categories-taxonomy-category wp-block-categories" style="box-sizing: border-box;">	<li class="cat-item cat-item-2835016">
+<a href="https://wpthemetestdata.wordpress.com/category/aciform/">aciform</a> (1)
+<ul class="children" style="box-sizing: border-box;">
+	<li class="cat-item cat-item-30849">
+<a href="https://wpthemetestdata.wordpress.com/category/aciform/sub/">sub</a> (1)
+</li>
+</ul>
+</li>
+	<li class="cat-item cat-item-1020423">
+<a href="https://wpthemetestdata.wordpress.com/category/antiquarianism/">antiquarianism</a> (1)
+</li>
+	<li class="cat-item cat-item-33280">
+<a href="https://wpthemetestdata.wordpress.com/category/arrangement/">arrangement</a> (1)
+</li>
+	<li class="cat-item cat-item-2720660">
+<a href="https://wpthemetestdata.wordpress.com/category/asmodeus/">asmodeus</a> (1)
+</li>
+	<li class="cat-item cat-item-4803">
+<a href="https://wpthemetestdata.wordpress.com/category/block/">Block</a> (5)
+</li>
+	<li class="cat-item cat-item-714120">
+<a href="https://wpthemetestdata.wordpress.com/category/broder/">broder</a> (1)
+</li>
+	<li class="cat-item cat-item-30256">
+<a href="https://wpthemetestdata.wordpress.com/category/buying/">buying</a> (1)
+</li>
+	<li class="cat-item cat-item-111995">
+<a href="https://wpthemetestdata.wordpress.com/category/cat-a/">Cat A</a> (1)
+</li>
+	<li class="cat-item cat-item-111996">
+<a href="https://wpthemetestdata.wordpress.com/category/cat-b/">Cat B</a> (1)
+</li>
+	<li class="cat-item cat-item-111997">
+<a href="https://wpthemetestdata.wordpress.com/category/cat-c/">Cat C</a> (1)
+</li>
+	<li class="cat-item cat-item-62501">
+<a href="https://wpthemetestdata.wordpress.com/category/championship/">championship</a> (1)
+</li>
+	<li class="cat-item cat-item-2835020">
+<a href="https://wpthemetestdata.wordpress.com/category/chastening/">chastening</a> (1)
+</li>
+	<li class="cat-item cat-item-96553">
+<a href="https://wpthemetestdata.wordpress.com/category/clerkship/">clerkship</a> (1)
+</li>
+	<li class="cat-item cat-item-2834984">
+<a href="https://wpthemetestdata.wordpress.com/category/disinclination/">disinclination</a> (1)
+</li>
+	<li class="cat-item cat-item-1454829">
+<a href="https://wpthemetestdata.wordpress.com/category/disinfection/">disinfection</a> (1)
+</li>
+	<li class="cat-item cat-item-167368">
+<a href="https://wpthemetestdata.wordpress.com/category/dispatch/">dispatch</a> (1)
+</li>
+	<li class="cat-item cat-item-2834987">
+<a href="https://wpthemetestdata.wordpress.com/category/echappee/">echappee</a> (1)
+</li>
+	<li class="cat-item cat-item-161095136">
+<a href="https://wpthemetestdata.wordpress.com/category/edge-case/">Edge Case</a> (6)
+</li>
+	<li class="cat-item cat-item-2834990">
+<a href="https://wpthemetestdata.wordpress.com/category/enphagy/">enphagy</a> (1)
+</li>
+	<li class="cat-item cat-item-2834992">
+<a href="https://wpthemetestdata.wordpress.com/category/equipollent/">equipollent</a> (1)
+</li>
+	<li class="cat-item cat-item-2835022">
+<a href="https://wpthemetestdata.wordpress.com/category/fatuity/">fatuity</a> (1)
+</li>
+	<li class="cat-item cat-item-3128700">
+<a href="https://wpthemetestdata.wordpress.com/category/foo-a/">Foo A</a> (1)
+</li>
+	<li class="cat-item cat-item-3128707">
+<a href="https://wpthemetestdata.wordpress.com/category/foo-parent/">Foo Parent</a> (1)
+<ul class="children" style="box-sizing: border-box;">
+	<li class="cat-item cat-item-3128710">
+<a href="https://wpthemetestdata.wordpress.com/category/foo-parent/foo-a/">Foo A</a> (1)
+</li>
+</ul>
+</li>
+	<li class="cat-item cat-item-2835023">
+<a href="https://wpthemetestdata.wordpress.com/category/gaberlunzie/">gaberlunzie</a> (1)
+</li>
+	<li class="cat-item cat-item-2835026">
+<a href="https://wpthemetestdata.wordpress.com/category/illtempered/">illtempered</a> (1)
+</li>
+	<li class="cat-item cat-item-315209">
+<a href="https://wpthemetestdata.wordpress.com/category/insubordination/">insubordination</a> (1)
+</li>
+	<li class="cat-item cat-item-376018">
+<a href="https://wpthemetestdata.wordpress.com/category/lender/">lender</a> (1)
+</li>
+	<li class="cat-item cat-item-4675">
+<a href="https://wpthemetestdata.wordpress.com/category/markup/">Markup</a> (6)
+</li>
+	<li class="cat-item cat-item-329026">
+<a href="https://wpthemetestdata.wordpress.com/category/media/">Media</a> (2)
+</li>
+	<li class="cat-item cat-item-2835029">
+<a href="https://wpthemetestdata.wordpress.com/category/monosyllable/">monosyllable</a> (1)
+</li>
+	<li class="cat-item cat-item-2835030">
+<a href="https://wpthemetestdata.wordpress.com/category/packthread/">packthread</a> (1)
+</li>
+	<li class="cat-item cat-item-2835031">
+<a href="https://wpthemetestdata.wordpress.com/category/palter/">palter</a> (1)
+</li>
+	<li class="cat-item cat-item-2834994">
+<a href="https://wpthemetestdata.wordpress.com/category/papilionaceous/">papilionaceous</a> (1)
+</li>
+	<li class="cat-item cat-item-54150">
+<a href="https://wpthemetestdata.wordpress.com/category/parent/">Parent</a> (1)
+<ul class="children" style="box-sizing: border-box;">
+	<li class="cat-item cat-item-1043326">
+<a href="https://wpthemetestdata.wordpress.com/category/parent/child-1/">Child 1</a> (1)
+	<ul class="children" style="box-sizing: border-box;">
+	<li class="cat-item cat-item-1043329">
+<a href="https://wpthemetestdata.wordpress.com/category/parent/child-1/child-2/">Child 2</a> (1)
+</li>
+	</ul>
+</li>
+</ul>
+</li>
+	<li class="cat-item cat-item-6004933">
+<a href="https://wpthemetestdata.wordpress.com/category/parent-category/">Parent Category</a> (1)
+<ul class="children" style="box-sizing: border-box;">
+	<li class="cat-item cat-item-158081316">
+<a href="https://wpthemetestdata.wordpress.com/category/parent-category/child-category-01/">Child Category 01</a> (1)
+</li>
+	<li class="cat-item cat-item-158081319">
+<a href="https://wpthemetestdata.wordpress.com/category/parent-category/child-category-02/">Child Category 02</a> (1)
+</li>
+	<li class="cat-item cat-item-158081321">
+<a href="https://wpthemetestdata.wordpress.com/category/parent-category/child-category-03/">Child Category 03</a> (1)
+	<ul class="children" style="box-sizing: border-box;">
+	<li class="cat-item cat-item-57037077">
+<a href="https://wpthemetestdata.wordpress.com/category/parent-category/child-category-03/grandchild-category/">Grandchild Category</a> (1)
+</li>
+	</ul>
+</li>
+	<li class="cat-item cat-item-158081323">
+<a href="https://wpthemetestdata.wordpress.com/category/parent-category/child-category-04/">Child Category 04</a> (1)
+</li>
+	<li class="cat-item cat-item-158081325">
+<a href="https://wpthemetestdata.wordpress.com/category/parent-category/child-category-05/">Child Category 05</a> (1)
+</li>
+</ul>
+</li>
+	<li class="cat-item cat-item-1922221">
+<a href="https://wpthemetestdata.wordpress.com/category/personable/">personable</a> (1)
+</li>
+	<li class="cat-item cat-item-44090582">
+<a href="https://wpthemetestdata.wordpress.com/category/post-formats/">Post Formats</a> (16)
+</li>
+	<li class="cat-item cat-item-2834996">
+<a href="https://wpthemetestdata.wordpress.com/category/propylaeum/">propylaeum</a> (1)
+</li>
+	<li class="cat-item cat-item-177992">
+<a href="https://wpthemetestdata.wordpress.com/category/pustule/">pustule</a> (1)
+</li>
+	<li class="cat-item cat-item-2835000">
+<a href="https://wpthemetestdata.wordpress.com/category/quartern/">quartern</a> (1)
+</li>
+	<li class="cat-item cat-item-34975">
+<a href="https://wpthemetestdata.wordpress.com/category/scholarship/">scholarship</a> (1)
+</li>
+	<li class="cat-item cat-item-2835035">
+<a href="https://wpthemetestdata.wordpress.com/category/selfconvicted/">selfconvicted</a> (1)
+</li>
+	<li class="cat-item cat-item-2835006">
+<a href="https://wpthemetestdata.wordpress.com/category/showshoe/">showshoe</a> (1)
+</li>
+	<li class="cat-item cat-item-2835007">
+<a href="https://wpthemetestdata.wordpress.com/category/sloyd/">sloyd</a> (1)
+</li>
+	<li class="cat-item cat-item-2835009">
+<a href="https://wpthemetestdata.wordpress.com/category/sublunary/">sublunary</a> (1)
+</li>
+	<li class="cat-item cat-item-2016057">
+<a href="https://wpthemetestdata.wordpress.com/category/tamtam/">tamtam</a> (1)
+</li>
+	<li class="cat-item cat-item-33328006">
+<a href="https://wpthemetestdata.wordpress.com/category/template/">Template</a> (10)
+</li>
+	<li class="cat-item cat-item-1">
+<a href="https://wpthemetestdata.wordpress.com/category/uncategorized/">Uncategorized</a> (19)
+</li>
+	<li class="cat-item cat-item-54090">
+<a href="https://wpthemetestdata.wordpress.com/category/unpublished/">Unpublished</a> (2)
+</li>
+	<li class="cat-item cat-item-2835037">
+<a href="https://wpthemetestdata.wordpress.com/category/weakhearted/">weakhearted</a> (1)
+</li>
+	<li class="cat-item cat-item-312342">
+<a href="https://wpthemetestdata.wordpress.com/category/ween/">ween</a> (1)
+</li>
+	<li class="cat-item cat-item-1327706">
+<a href="https://wpthemetestdata.wordpress.com/category/wellhead/">wellhead</a> (1)
+</li>
+	<li class="cat-item cat-item-2835043">
+<a href="https://wpthemetestdata.wordpress.com/category/wellintentioned/">wellintentioned</a> (1)
+</li>
+	<li class="cat-item cat-item-2835045">
+<a href="https://wpthemetestdata.wordpress.com/category/whetstone/">whetstone</a> (1)
+</li>
+	<li class="cat-item cat-item-67899">
+<a href="https://wpthemetestdata.wordpress.com/category/years/">years</a> (1)
+</li>
+</ul>
+
+
+<p class="wp-block-paragraph">The Latest Comments widget can display or hide the avatars, the date, and the comment excerpt:</p>
+
+
+<ol class="has-avatars has-dates has-excerpts wp-block-latest-comments" style="box-sizing: border-box; margin-left: 0;">
+<li class="wp-block-latest-comments__comment" style="margin-bottom: 1em; list-style: none; min-height: 2.25em;">
+<img referrerpolicy="no-referrer" alt="John Doe's avatar" src="https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=48&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D48&amp;r=G" srcset="https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=48&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D48&amp;r=G 1x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=72&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D72&amp;r=G 1.5x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=96&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D96&amp;r=G 2x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=144&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D144&amp;r=G 3x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=192&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D192&amp;r=G 4x" class="avatar avatar-48 wp-block-latest-comments__comment-avatar" height="48" width="48" decoding="async" style="border-radius: 1.5em; display: block; float: left; height: 2.5em; margin-right: .75em; width: 2.5em;"><article><footer class="wp-block-latest-comments__comment-meta" style="margin-left: 3.25em;"><a class="wp-block-latest-comments__comment-author" href="http://example.org/">John Doe</a> on <a class="wp-block-latest-comments__comment-link" href="https://wpthemetestdata.wordpress.com/2009/08/06/edge-case-no-content/#comment-927">Edge Case: No Content</a><time datetime="2013-03-14T12:35:07-07:00" class="wp-block-latest-comments__comment-date" style="display: block; font-size: .75em;">March 14, 2013</time></footer><div class="wp-block-latest-comments__comment-excerpt" style="margin-left: 3.25em;">
+<p style="font-size: .875em; margin: .36em 0 1.4em;">Having no content in the post should have no adverse effects on the layout or functionality.</p>
+</div></article>
+</li>
+<li class="wp-block-latest-comments__comment" style="margin-bottom: 1em; list-style: none; min-height: 2.25em;">
+<img referrerpolicy="no-referrer" alt="Jane Doe's avatar" src="https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=48&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D48&amp;r=G" srcset="https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=48&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D48&amp;r=G 1x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=72&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D72&amp;r=G 1.5x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=96&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D96&amp;r=G 2x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=144&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D144&amp;r=G 3x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=192&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D192&amp;r=G 4x" class="avatar avatar-48 wp-block-latest-comments__comment-avatar" height="48" width="48" decoding="async" style="border-radius: 1.5em; display: block; float: left; height: 2.5em; margin-right: .75em; width: 2.5em;"><article><footer class="wp-block-latest-comments__comment-meta" style="margin-left: 3.25em;"><a class="wp-block-latest-comments__comment-author" href="http://example.org/">Jane Doe</a> on <a class="wp-block-latest-comments__comment-link" href="https://wpthemetestdata.wordpress.com/2012/01/04/template-password-protected/#comment-926">Protected: Template: Password Protected (the password is “enter”)</a><time datetime="2013-03-14T11:56:08-07:00" class="wp-block-latest-comments__comment-date" style="display: block; font-size: .75em;">March 14, 2013</time></footer><div class="wp-block-latest-comments__comment-excerpt" style="margin-left: 3.25em;">
+<p style="font-size: .875em; margin: .36em 0 1.4em;">Password protected</p>
+</div></article>
+</li>
+<li class="wp-block-latest-comments__comment" style="margin-bottom: 1em; list-style: none; min-height: 2.25em;">
+<img referrerpolicy="no-referrer" alt="Joan Smith's avatar" src="https://1.gravatar.com/avatar/74ae204a44e1141c881471d095ea156341407e1057d338063d0e06d1509a9410?s=48&amp;d=https%3A%2F%2F1.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D48&amp;r=G" srcset="https://1.gravatar.com/avatar/74ae204a44e1141c881471d095ea156341407e1057d338063d0e06d1509a9410?s=48&amp;d=https%3A%2F%2F1.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D48&amp;r=G 1x, https://1.gravatar.com/avatar/74ae204a44e1141c881471d095ea156341407e1057d338063d0e06d1509a9410?s=72&amp;d=https%3A%2F%2F1.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D72&amp;r=G 1.5x, https://1.gravatar.com/avatar/74ae204a44e1141c881471d095ea156341407e1057d338063d0e06d1509a9410?s=96&amp;d=https%3A%2F%2F1.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D96&amp;r=G 2x, https://1.gravatar.com/avatar/74ae204a44e1141c881471d095ea156341407e1057d338063d0e06d1509a9410?s=144&amp;d=https%3A%2F%2F1.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D144&amp;r=G 3x, https://1.gravatar.com/avatar/74ae204a44e1141c881471d095ea156341407e1057d338063d0e06d1509a9410?s=192&amp;d=https%3A%2F%2F1.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D192&amp;r=G 4x" class="avatar avatar-48 wp-block-latest-comments__comment-avatar" height="48" width="48" decoding="async" style="border-radius: 1.5em; display: block; float: left; height: 2.5em; margin-right: .75em; width: 2.5em;"><article><footer class="wp-block-latest-comments__comment-meta" style="margin-left: 3.25em;"><a class="wp-block-latest-comments__comment-author" href="http://example.org/">Jane Doe</a> on <a class="wp-block-latest-comments__comment-link" href="https://wpthemetestdata.wordpress.com/2012/01/03/template-comments/#comment-920">Template: Comments</a><time datetime="2013-03-14T11:30:33-07:00" class="wp-block-latest-comments__comment-date" style="display: block; font-size: .75em;">March 14, 2013</time></footer><div class="wp-block-latest-comments__comment-excerpt" style="margin-left: 3.25em;">
+<p style="font-size: .875em; margin: .36em 0 1.4em;">Thanks for all the comments, everyone!</p>
+</div></article>
+</li>
+<li class="wp-block-latest-comments__comment" style="margin-bottom: 1em; list-style: none; min-height: 2.25em;">
+<img referrerpolicy="no-referrer" alt="John Doe's avatar" src="https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=48&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D48&amp;r=G" srcset="https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=48&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D48&amp;r=G 1x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=72&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D72&amp;r=G 1.5x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=96&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D96&amp;r=G 2x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=144&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D144&amp;r=G 3x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=192&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D192&amp;r=G 4x" class="avatar avatar-48 wp-block-latest-comments__comment-avatar" height="48" width="48" decoding="async" style="border-radius: 1.5em; display: block; float: left; height: 2.5em; margin-right: .75em; width: 2.5em;"><article><footer class="wp-block-latest-comments__comment-meta" style="margin-left: 3.25em;"><a class="wp-block-latest-comments__comment-author" href="http://example.org/">John Doe</a> on <a class="wp-block-latest-comments__comment-link" href="https://wpthemetestdata.wordpress.com/2012/01/03/template-comments/#comment-919">Template: Comments</a><time datetime="2013-03-14T11:27:54-07:00" class="wp-block-latest-comments__comment-date" style="display: block; font-size: .75em;">March 14, 2013</time></footer><div class="wp-block-latest-comments__comment-excerpt" style="margin-left: 3.25em;">
+<p style="font-size: .875em; margin: .36em 0 1.4em;">We use these tests all the time! Killer stuff!</p>
+</div></article>
+</li>
+<li class="wp-block-latest-comments__comment" style="margin-bottom: 1em; list-style: none; min-height: 2.25em;">
+<img referrerpolicy="no-referrer" alt="John Doe's avatar" src="https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=48&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D48&amp;r=G" srcset="https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=48&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D48&amp;r=G 1x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=72&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D72&amp;r=G 1.5x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=96&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D96&amp;r=G 2x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=144&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D144&amp;r=G 3x, https://2.gravatar.com/avatar/2f0f47c7ed07a0d1a6fe262e7ced0094b2d66032d4393dbb4aa6acbe9fd2af83?s=192&amp;d=https%3A%2F%2F2.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D192&amp;r=G 4x" class="avatar avatar-48 wp-block-latest-comments__comment-avatar" height="48" width="48" decoding="async" style="border-radius: 1.5em; display: block; float: left; height: 2.5em; margin-right: .75em; width: 2.5em;"><article><footer class="wp-block-latest-comments__comment-meta" style="margin-left: 3.25em;"><a class="wp-block-latest-comments__comment-author" href="http://example.org/">John Doe</a> on <a class="wp-block-latest-comments__comment-link" href="https://wpthemetestdata.wordpress.com/2012/01/03/template-comments/#comment-918">Template: Comments</a><time datetime="2013-03-14T11:23:24-07:00" class="wp-block-latest-comments__comment-date" style="display: block; font-size: .75em;">March 14, 2013</time></footer><div class="wp-block-latest-comments__comment-excerpt" style="margin-left: 3.25em;">
+<p style="font-size: .875em; margin: .36em 0 1.4em;">We are totally going to blog about these tests!</p>
+</div></article>
+</li>
+</ol>
+
+
+<p class="wp-block-paragraph">Here is an example of the Comments widget with all the options disabled. The number of comments has been reduced to two.</p>
+
+
+<ol class="wp-block-latest-comments" style="box-sizing: border-box; margin-left: 0;">
+<li class="wp-block-latest-comments__comment" style="list-style: none; margin-bottom: 1em;"><article><footer class="wp-block-latest-comments__comment-meta"><a class="wp-block-latest-comments__comment-author" href="http://example.org/">John Doe</a> on <a class="wp-block-latest-comments__comment-link" href="https://wpthemetestdata.wordpress.com/2009/08/06/edge-case-no-content/#comment-927">Edge Case: No Content</a></footer></article></li>
+<li class="wp-block-latest-comments__comment" style="list-style: none; margin-bottom: 1em;"><article><footer class="wp-block-latest-comments__comment-meta"><a class="wp-block-latest-comments__comment-author" href="http://example.org/">Jane Doe</a> on <a class="wp-block-latest-comments__comment-link" href="https://wpthemetestdata.wordpress.com/2012/01/04/template-password-protected/#comment-926">Protected: Template: Password Protected (the password is “enter”)</a></footer></article></li>
+</ol>
+
+
+<p class="wp-block-paragraph">And here is the Latest Posts widget in the list view, with dates:</p>
+
+
+<ul class="wp-block-latest-posts__list has-dates wp-block-latest-posts is-layout-flow wp-block-latest-posts-is-layout-flow" style="box-sizing: border-box; list-style: none;">
+<li style="clear: both; overflow-wrap: break-word;">
+<a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2020/01/01/scheduled/">Scheduled</a><time datetime="2020-01-01T12:00:18-07:00" class="wp-block-latest-posts__post-date" style="display: block; font-size: .8125em;">January 1, 2020</time>
+</li>
+<li style="clear: both; overflow-wrap: break-word;">
+<a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/03/block-image/">Block: Image</a><time datetime="2018-11-03T05:41:48-07:00" class="wp-block-latest-posts__post-date" style="display: block; font-size: .8125em;">November 3, 2018</time>
+</li>
+<li style="clear: both; overflow-wrap: break-word;">
+<a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/02/block-gallery/">Block: Gallery</a><time datetime="2018-11-02T21:34:24-07:00" class="wp-block-latest-posts__post-date" style="display: block; font-size: .8125em;">November 2, 2018</time>
+</li>
+<li style="clear: both; overflow-wrap: break-word;">
+<a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/02/block-quote/">Block: Quote</a><time datetime="2018-11-02T20:05:49-07:00" class="wp-block-latest-posts__post-date" style="display: block; font-size: .8125em;">November 2, 2018</time>
+</li>
+<li style="clear: both; overflow-wrap: break-word;">
+<a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/02/block-button/">Block: Button</a><time datetime="2018-11-02T20:02:46-07:00" class="wp-block-latest-posts__post-date" style="display: block; font-size: .8125em;">November 2, 2018</time>
+</li>
+</ul>
+
+
+<p class="wp-block-paragraph">Grid view, now sorted from A -Z.</p>
+
+
+<ul class="wp-block-latest-posts__list is-grid wp-block-latest-posts is-layout-flow wp-block-latest-posts-is-layout-flow" style="box-sizing: border-box; list-style: none; display: flex; flex-wrap: wrap;">
+<li style="clear: both; overflow-wrap: break-word; margin: 0 1.25em 1.25em 0; width: 100%;"><a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2009/09/05/edge-case-no-title/">(no title)</a></li>
+<li style="clear: both; overflow-wrap: break-word; margin: 0 1.25em 1.25em 0; width: 100%;"><a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2009/10/05/title-should-not-overflow-the-content-area/">Antidisestablishmentarianism</a></li>
+<li style="clear: both; overflow-wrap: break-word; margin: 0 1.25em 1.25em 0; width: 100%;"><a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/02/block-category-common/">Block category: Common</a></li>
+<li style="clear: both; overflow-wrap: break-word; margin: 0 1.25em 1.25em 0; width: 100%;"><a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/02/block-category-embeds/">Block category: Embeds</a></li>
+<li style="clear: both; overflow-wrap: break-word; margin: 0 1.25em 1.25em 0; width: 100%;"><a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/02/block-category-formatting/">Block category: Formatting</a></li>
+</ul>
+
+
+<p class="wp-block-paragraph">You can also change the number of columns used to display the latest posts. The block below only displays posts from the Block category:</p>
+
+
+<ul class="wp-block-latest-posts__list is-grid columns-5 has-dates wp-block-latest-posts is-layout-flow wp-block-latest-posts-is-layout-flow" style="box-sizing: border-box; list-style: none; display: flex; flex-wrap: wrap;">
+<li style="clear: both; overflow-wrap: break-word; margin: 0 1.25em 1.25em 0; width: 100%;">
+<a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/03/block-image/">Block: Image</a><time datetime="2018-11-03T05:41:48-07:00" class="wp-block-latest-posts__post-date" style="display: block; font-size: .8125em;">November 3, 2018</time>
+</li>
+<li style="clear: both; overflow-wrap: break-word; margin: 0 1.25em 1.25em 0; width: 100%;">
+<a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/02/block-gallery/">Block: Gallery</a><time datetime="2018-11-02T21:34:24-07:00" class="wp-block-latest-posts__post-date" style="display: block; font-size: .8125em;">November 2, 2018</time>
+</li>
+<li style="clear: both; overflow-wrap: break-word; margin: 0 1.25em 1.25em 0; width: 100%;">
+<a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/02/block-quote/">Block: Quote</a><time datetime="2018-11-02T20:05:49-07:00" class="wp-block-latest-posts__post-date" style="display: block; font-size: .8125em;">November 2, 2018</time>
+</li>
+<li style="clear: both; overflow-wrap: break-word; margin: 0 1.25em 1.25em 0; width: 100%;">
+<a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/02/block-cover/">Block: Cover</a><time datetime="2018-11-02T20:01:22-07:00" class="wp-block-latest-posts__post-date" style="display: block; font-size: .8125em;">November 2, 2018</time>
+</li>
+<li style="clear: both; overflow-wrap: break-word; margin: 0 1.25em 1.25em 0; width: 100%;">
+<a class="wp-block-latest-posts__post-title" href="https://wpthemetestdata.wordpress.com/2018/11/02/block-category-widgets/">Block category: Widgets</a><time datetime="2018-11-02T09:45:35-07:00" class="wp-block-latest-posts__post-date" style="display: block; font-size: .8125em;">November 2, 2018</time>
+</li>
+</ul> </div>

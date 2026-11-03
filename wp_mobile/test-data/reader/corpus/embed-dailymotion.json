@@ -1,0 +1,26 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "Pariatur is Eum",
+  "URL": "https://site-f1e107.wordpress.com/2008/09/29/tjbapmmi-mq-pwt/",
+  "content": "<iframe width=\"425\" height=\"334\" src=\"https://www.dailymotion.com/embed/video/d9qdwzqkfhesihh1rx\" style=\"border:0;\" allowfullscreen></iframe>\n<p>nemo amet!</p>\n",
+  "excerpt": "<p>nemo amet!</p>\n",
+  "featured_image": ""
+ },
+ "features": [
+  "classic-editor",
+  "embed",
+  "embed:dailymotion",
+  "excerpt-generated",
+  "iframe",
+  "iframe-size-numeric",
+  "language:ltr",
+  "published-pre-2019",
+  "site:simple",
+  "style-inline"
+ ]
+}

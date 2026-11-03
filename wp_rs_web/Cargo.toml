@@ -8,6 +8,10 @@ linkify = { workspace = true }
 rocket = { workspace = true }
 rocket_dyn_templates = { workspace = true, features = ["handlebars"] }
 wp_api = { path = "../wp_api", features = ["reqwest-request-executor"] }
+wp_mobile = { path = "../wp_mobile" }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+url = { workspace = true }
 
 [[bin]]
 name = "wp_rs_web"

@@ -5651,14 +5651,19 @@ dependencies = [
  "base64",
  "futures",
  "hkdf",
+ "html5ever",
+ "indoc",
  "log",
  "paste",
  "rand 0.10.3",
  "rstest",
  "rusqlite",
+ "scraper",
  "serde",
  "serde_json",
  "sha2 0.11.1",
+ "strum",
+ "strum_macros",
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
@@ -5710,9 +5715,13 @@ name = "wp_rs_web"
 version = "0.1.0"
 dependencies = [
  "linkify",
+ "reqwest",
  "rocket",
  "rocket_dyn_templates",
+ "serde_json",
+ "url",
  "wp_api",
+ "wp_mobile",
 ]
 
 [[package]]

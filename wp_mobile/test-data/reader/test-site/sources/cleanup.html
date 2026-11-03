@@ -1,0 +1,42 @@
+<!-- wp:paragraph -->
+<p>Markup the shared cleanup removes or changes. Each line says what should happen.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:html -->
+<p style="color: red; font-size: 30px; background: yellow">An inline style, which goes.</p>
+<style>.reader-test-style { color: red; }</style>
+<p class="reader-test-style">A <code>&lt;style&gt;</code> element, which goes, so this isn't red.</p>
+<script>document.documentElement.setAttribute('data-reader-test', 'inline script ran');</script>
+<p>An inline script, which goes.</p>
+<script src="https://example.com/reader-test-not-allowed.js"></script>
+<p>A script from a site that isn't an embed provider, which goes.</p>
+<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+<p>X's embed script, which the page loads.</p>
+<noscript><p>A <code>&lt;noscript&gt;</code>, which goes.</p></noscript>
+<p>A comment follows, which goes.<!-- A comment --></p>
+<p><!-- A paragraph that only holds a comment, which goes --></p>
+<p>An iframe with a size, which keeps its shape and narrows to fit:</p>
+<iframe src="https://www.openstreetmap.org/export/embed.html?bbox=2.28%2C48.85%2C2.31%2C48.866&amp;layer=mapnik" width="640" height="360" title="A map"></iframe>
+<p>A small iframe, which stays its own size:</p>
+<iframe src="https://www.openstreetmap.org/export/embed.html?bbox=2.28%2C48.85%2C2.31%2C48.866&amp;layer=mapnik" width="300" height="250" title="A small map"></iframe>
+<p>An iframe with a percentage width, which is left alone:</p>
+<iframe src="https://www.openstreetmap.org/export/embed.html?bbox=2.28%2C48.85%2C2.31%2C48.866&amp;layer=mapnik" width="100%" height="152" title="A wide map"></iframe>
+<p>A video that plays on its own, which gets controls instead:</p>
+<video autoplay muted loop playsinline src="https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4" poster="http://jetpack.wpmt.co/wp-content/uploads/2026/10/cmm2548-48.jpg"></video>
+<p>Audio that plays on its own, which gets controls instead:</p>
+<audio autoplay src="https://jetpack.wpmt.co/wp-content/uploads/2026/10/reader-test-audio.m4a"></audio>
+<p>A cover block's background video, as WordPress.com's VideoPress sends it, which becomes a <code>&lt;video&gt;</code>:</p>
+<div class="wp-block-cover"><div id="cover_player_reader_test" class="wp-block-cover__video-background intrinsic-ignore" autoplay muted loop playsinline src="https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4" data-object-fit="cover"></div><div class="wp-block-cover__inner-container"><p>Text on the cover</p></div></div>
+<p>An embed that never loaded, which becomes a link:</p>
+<figure class="wp-block-embed is-type-rich wp-block-embed"><div class="wp-block-embed__wrapper">
+https://example.com/an-embed-that-never-loaded
+</div></figure>
+<p>A form, which the stylesheet hides:</p>
+<form action="https://example.com/"><input type="text" placeholder="Name"> <select><option>One</option><option>Two</option></select> <textarea>Text</textarea> <button type="submit">Send</button></form>
+<p>An empty paragraph follows.</p>
+<p></p>
+<!-- /wp:html -->
+
+<!-- wp:paragraph -->
+<p>The end.</p>
+<!-- /wp:paragraph -->

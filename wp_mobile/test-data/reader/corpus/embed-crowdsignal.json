@@ -1,0 +1,24 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": true
+ },
+ "fields": {
+  "title": "Accusamus Voluptas",
+  "URL": "https://site-bade65.wordpress.com/2026/08/29/ijyyfafwk-cbeiacvj/",
+  "content": "\n<figure class=\"wp-block-crowdsignal-forms-cs-embed wp-block-embed is-type-html is-provider-crowdsignal wp-block-embed-crowdsignal\"><div class=\"wp-block-embed__wrapper\"><div class=\"cs-embed pd-embed\" data-settings=\"{&quot;type&quot;:&quot;iframe&quot;,&quot;auto&quot;:true,&quot;domain&quot;:&quot;site-1f9c56.example/&quot;,&quot;id&quot;:&quot;migration-feedback&quot;,&quot;site&quot;:&quot;site-40957e.example&quot;}\"></div><noscript><a href=\"https://site-1f9c56.example/ijyyfafwk-cbeiacvj\" target=\"_blank\" rel=\"noopener noreferrer\">Nemo Ius Fugiat</a></noscript></div></figure>\n",
+  "excerpt": "",
+  "featured_image": ""
+ },
+ "features": [
+  "block-editor",
+  "embed",
+  "embed:crowdsignal",
+  "excerpt-generated",
+  "form-crowdsignal",
+  "language:ltr",
+  "noscript",
+  "site:p2"
+ ]
+}

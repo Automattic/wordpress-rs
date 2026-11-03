@@ -1,0 +1,23 @@
+{
+ "source": {
+  "tier": "B, anonymized from the private corpus",
+  "site_type": "simple",
+  "p2": false
+ },
+ "fields": {
+  "title": "ASPERIORES HIC NESCIUNT ID POSSIMUS IUS IPSUM MOLESTIAE",
+  "URL": "https://site-dbb8fe.wordpress.com/2021/12/16/tquljypifd-cpc-dyokryaj-wo-brillkot-oxt-ibxjg-yhtxljafm/",
+  "content": "\n<p class=\"wp-block-paragraph\"><div class=\"fb-post\" data-href=\"https://www.facebook.com/490023636308227/tlznq/225646838724510/?sfnsn=eaxdgcz\" data-width=\"552\" style=\"background-color: #fff; display: inline-block;\"></div></p>\n",
+  "excerpt": "",
+  "featured_image": ""
+ },
+ "features": [
+  "block-editor",
+  "embed",
+  "embed:facebook",
+  "excerpt-generated",
+  "language:ltr",
+  "site:simple",
+  "style-inline"
+ ]
+}
