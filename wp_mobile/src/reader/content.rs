@@ -260,6 +260,27 @@ impl ReaderPostContent {
         is_manual_excerpt(excerpt, &self.excerpt_source_text)
     }
 
+    /// The post without its featured image, when the post starts with it: no text and no other
+    /// image or embed comes before it. The app shows the featured image above the post instead,
+    /// the way the post's own theme probably does. Its figure, link and caption go with it.
+    ///
+    /// A featured image anywhere else in the post stays where the author put it. So call
+    /// [`includes_image`](Self::includes_image) on the result to decide whether to show the
+    /// featured image above the post as well.
+    pub fn without_featured_image(&self, url: &str) -> Arc<Self> {
+        let mut document = Html::parse_fragment(&self.html);
+        if let Some(id) = leading_image(document.root_element(), url).map(|image| image.id())
+            && let Some(mut node) = document.tree.get_mut(id)
+        {
+            node.detach();
+        }
+        Self::from_cleaned(
+            document,
+            self.scripts.clone(),
+            self.excerpt_source_text.clone(),
+        )
+    }
+
     /// Whether the post shows an image anywhere, at any size. Use it to avoid showing a featured
     /// image the post already shows.
     pub fn includes_image(&self, url: &str) -> bool {
@@ -395,6 +416,63 @@ fn is_image_url(src: &str) -> bool {
         Ok(url) => url.path() != "/",
         Err(_) => !src.trim().is_empty(),
     }
+}
+
+/// Elements that show something other than text, so a featured image after one isn't at the top.
+const MEDIA: [&str; 8] = [
+    "img", "video", "audio", "iframe", "object", "embed", "svg", "canvas",
+];
+
+/// What to remove for the post's featured image, `url`, when it's the first thing in the post:
+/// the image, and the elements around it that hold nothing else but its caption. `None` when
+/// there's text or other media before it, or it's in a gallery.
+fn leading_image<'a>(root: ElementRef<'a>, url: &str) -> Option<ElementRef<'a>> {
+    let key = image_key(url)?;
+    let img = root.descendants().find_map(|node| match node.value() {
+        Node::Text(text) if !text.trim().is_empty() => Some(None),
+        Node::Element(element) if MEDIA.contains(&element.name()) => Some(ElementRef::wrap(node)),
+        _ => None,
+    })??;
+    let is_featured = image(img).is_some_and(|image| {
+        image
+            .urls()
+            .any(|url| image_key(url).as_ref() == Some(&key))
+    });
+    let in_a_gallery = img
+        .ancestors()
+        .filter_map(ElementRef::wrap)
+        .any(|ancestor| GALLERIES.matches(&ancestor));
+    if !is_featured || in_a_gallery {
+        return None;
+    }
+
+    let mut removed = img;
+    for ancestor in img.ancestors().filter_map(ElementRef::wrap) {
+        if ancestor.id() == root.id() || !holds_only(ancestor, img) {
+            break;
+        }
+        removed = ancestor;
+    }
+    Some(removed)
+}
+
+/// Whether `element` holds `img` and nothing else to see but its caption.
+fn holds_only(element: ElementRef, img: ElementRef) -> bool {
+    element.descendants().all(|node| match node.value() {
+        Node::Text(text) => {
+            text.trim().is_empty()
+                || node
+                    .ancestors()
+                    .filter_map(ElementRef::wrap)
+                    .any(|ancestor| {
+                        let element = ancestor.value();
+                        element.name() == "figcaption"
+                            || element.classes().any(|class| class == "wp-caption-text")
+                    })
+        }
+        Node::Element(element) => node.id() == img.id() || !MEDIA.contains(&element.name()),
+        _ => true,
+    })
 }
 
 fn image(img: ElementRef) -> Option<ReaderPostImage> {
@@ -786,6 +864,95 @@ mod tests {
             None,
         );
         assert_eq!(content.includes_image(url), included);
+    }
+
+    const FEATURED: &str = "https://example.files.wordpress.com/hero.jpg";
+
+    #[rstest]
+    #[case::image_block_with_a_caption(
+        r#"<figure class="wp-block-image size-large"><a href="https://example.com/hero/"><img src="https://example.files.wordpress.com/hero.jpg?w=1024" width="1024"></a><figcaption>The view</figcaption></figure><p>Text.</p>"#,
+        "<p>Text.</p>"
+    )]
+    #[case::a_smaller_copy(
+        r#"<figure class="wp-block-image"><img src="https://example.files.wordpress.com/hero-1024x683.jpg"></figure><p>Text.</p>"#,
+        "<p>Text.</p>"
+    )]
+    #[case::photon_copy(
+        r#"<p><img src="https://i0.wp.com/example.files.wordpress.com/hero.jpg?resize=800%2C600"></p><p>Text.</p>"#,
+        "<p>Text.</p>"
+    )]
+    #[case::classic_caption(
+        r#"<div class="wp-caption aligncenter"><img src="https://example.files.wordpress.com/hero.jpg"><p class="wp-caption-text">The view</p></div><p>Text.</p>"#,
+        "<p>Text.</p>"
+    )]
+    #[case::after_empty_paragraphs(
+        r#"<p> </p><p><br></p><figure class="wp-block-image"><img src="https://example.files.wordpress.com/hero.jpg"></figure><p>Text.</p>"#,
+        "<p>Text.</p>"
+    )]
+    #[case::inside_the_first_paragraph(
+        r#"<p><img src="https://example.files.wordpress.com/hero.jpg"> The first words.</p>"#,
+        "<p> The first words.</p>"
+    )]
+    fn removes_the_featured_image_at_the_top(#[case] html: &str, #[case] expected: &str) {
+        let content = ReaderPostContent::new(html, None).without_featured_image(FEATURED);
+        assert_eq!(content.html(), expected);
+        assert!(!content.includes_image(FEATURED));
+    }
+
+    #[rstest]
+    #[case::after_text(
+        r#"<p>Text first.</p><figure class="wp-block-image"><img src="https://example.files.wordpress.com/hero.jpg"></figure>"#
+    )]
+    #[case::after_a_heading(
+        r#"<h2>A heading</h2><figure class="wp-block-image"><img src="https://example.files.wordpress.com/hero.jpg"></figure>"#
+    )]
+    #[case::after_another_image(
+        r#"<figure class="wp-block-image"><img src="https://example.files.wordpress.com/other.jpg"></figure><figure class="wp-block-image"><img src="https://example.files.wordpress.com/hero.jpg"></figure>"#
+    )]
+    #[case::after_an_embed(
+        r#"<figure class="wp-block-embed"><iframe src="https://www.youtube.com/embed/x"></iframe></figure><figure class="wp-block-image"><img src="https://example.files.wordpress.com/hero.jpg"></figure>"#
+    )]
+    #[case::another_image_at_the_top(
+        r#"<figure class="wp-block-image"><img src="https://example.files.wordpress.com/other.jpg"></figure><p>Text.</p>"#
+    )]
+    #[case::in_a_gallery(
+        r#"<figure class="wp-block-gallery"><figure class="wp-block-image"><img src="https://example.files.wordpress.com/hero.jpg"></figure><figure class="wp-block-image"><img src="https://example.files.wordpress.com/b.jpg"></figure></figure>"#
+    )]
+    fn keeps_the_featured_image_anywhere_else(#[case] html: &str) {
+        let content = ReaderPostContent::new(html, None);
+        assert_eq!(
+            content.without_featured_image(FEATURED).html(),
+            content.html()
+        );
+    }
+
+    #[test]
+    fn keeps_an_image_that_shares_a_link_with_the_text() {
+        let html = r#"<p><a href="https://example.com/"><img src="https://example.files.wordpress.com/hero.jpg"> Read on</a></p>"#;
+        let content = ReaderPostContent::new(html, None);
+        assert_eq!(
+            content.without_featured_image(FEATURED).html(),
+            r#"<p><a href="https://example.com/"> Read on</a></p>"#
+        );
+    }
+
+    #[test]
+    fn forgets_the_removed_image() {
+        let content = ReaderPostContent::new(
+            r#"<figure class="wp-block-image"><img src="https://example.files.wordpress.com/hero.jpg"></figure><p><img src="https://example.files.wordpress.com/b.jpg"></p>"#,
+            None,
+        )
+        .without_featured_image(FEATURED);
+        let urls: Vec<String> = content
+            .images()
+            .into_iter()
+            .map(|image| image.url)
+            .collect();
+        assert_eq!(urls, ["https://example.files.wordpress.com/b.jpg"]);
+        assert_eq!(
+            content.offline_image_urls(),
+            ["https://example.files.wordpress.com/b.jpg"]
+        );
     }
 
     #[rstest]

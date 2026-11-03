@@ -68,6 +68,12 @@ struct ReaderPublicApiTests {
         let mentions: [ReaderPostMention] = content.mentions()
         #expect(mentions.isEmpty)
 
+        let hero = "https://example.com/hero.jpg"
+        let withHero: any ReaderPostContentProtocol = ReaderPostContent(
+            html: #"<figure class="wp-block-image"><img src="https://example.com/hero.jpg"></figure><p>Text.</p>"#
+        )
+        #expect(!withHero.withoutFeaturedImage(url: hero).includesImage(url: hero))
+
         let link: ReaderLink = readerLink(url: "https://example.com/post/#intro", postUrl: "https://example.com/post/")
         #expect(link == .anchor(id: "intro"))
     }

@@ -372,6 +372,15 @@ fn knows_whether_the_featured_image_is_in_the_post() {
     assert!(!content.includes_image(&post.featured_image));
 }
 
+/// The featured image here comes after the first paragraph, so it isn't the post's hero image.
+#[test]
+fn keeps_a_featured_image_after_text() {
+    let (post, content) = test_post("images");
+    let without = content.without_featured_image(&post.featured_image);
+    assert_eq!(without.html(), content.html());
+    assert!(without.includes_image(&post.featured_image));
+}
+
 // Text and anchors
 
 #[test]
