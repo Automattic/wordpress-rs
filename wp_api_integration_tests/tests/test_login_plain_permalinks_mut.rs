@@ -25,21 +25,41 @@ use wp_api::{
 use wp_api_integration_tests::prelude::{AssertResponse, TestCredentials, serial};
 
 /// Flips the shared server to plain (`?rest_route=`) permalinks and restores the
-/// original structure on drop — including on unwind, so a failed assertion can't
-/// leave the shared server mis-configured for the rest of the run.
+/// original structure on drop — including on unwind, so a failed assertion
+/// doesn't leave the shared server mis-configured for the rest of the run.
 struct PlainPermalinks(String);
 
 impl PlainPermalinks {
     fn set() -> Self {
         let original = wp_cli::get_permalink_structure();
-        wp_cli::set_permalink_structure("");
+        let output = wp_cli::set_permalink_structure("");
+        assert!(
+            output.status.success(),
+            "failed to switch to Plain permalinks: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         Self(original)
     }
 }
 
 impl Drop for PlainPermalinks {
     fn drop(&mut self) {
-        wp_cli::set_permalink_structure(&self.0);
+        let output = wp_cli::set_permalink_structure(&self.0);
+        if output.status.success() {
+            return;
+        }
+        let message = format!(
+            "failed to restore permalink structure `{}`; the shared test server is still on Plain permalinks: {}",
+            self.0,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        // Panicking while already unwinding aborts the process and hides the
+        // original failure, so only report it in that case.
+        if std::thread::panicking() {
+            eprintln!("{message}");
+        } else {
+            panic!("{message}");
+        }
     }
 }
 

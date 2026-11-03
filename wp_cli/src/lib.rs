@@ -81,6 +81,14 @@ pub fn get_permalink_structure() -> String {
     // structure string. `rewrite`/`option` writes below reject `--format`, so this
     // can't share `run_wp_cli_command`.
     let output = run_wp_cli_command_raw(["option", "get", "permalink_structure"]);
+    // A failed read must not look like "Plain": callers restore whatever this
+    // returns, so an empty string from a failed command would silently switch
+    // the shared server to Plain permalinks.
+    assert!(
+        output.status.success(),
+        "`wp option get permalink_structure` failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
