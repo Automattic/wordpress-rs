@@ -5,17 +5,23 @@
 //! Links to the image file already open in the viewer.
 //!
 //! Most galleries can only link an image to its attachment page or its file: Jetpack's tiled
-//! galleries, the classic `[gallery]`, and the Gallery block before WordPress 5.9. In the newer
-//! Gallery block, each image is an Image block, which can link anywhere. Which one the author
-//! chose is in the block's `linkDestination`, but the Reader API only sends the rendered HTML
+//! galleries, the classic `[gallery]`, and the Gallery block before WordPress 5.9. So a link in one
+//! counts unless it leaves the post's site and doesn't look like an attachment page: sites that
+//! moved domain still link to attachment pages at their old address. Hand-written `.gallery`
+//! elements and plugins can link anywhere, so one that stays on the site still counts by mistake.
+//!
+//! In the newer Gallery block, each image is an Image block, which can link anywhere. Which one the
+//! author chose is in the block's `linkDestination`, but the Reader API only sends the rendered HTML
 //! (READ-874), so this goes by the link instead:
 //!
 //! - Jetpack Carousel gives each image its attachment page, in `data-permalink`. When it's there,
 //!   only a link to that page counts.
 //! - `?attachment_id=<id>` is the attachment page of a site without pretty permalinks.
-//! - Otherwise, an attachment page's address ends in a name made from the file's, or follows the
-//!   post's address. Of 948 linked images in newer Gallery blocks in 284k Reader posts, this left
-//!   7 attachment pages as links, and none of the custom links became images.
+//! - Otherwise, an attachment page is on the post's site, and its address ends in a name made from
+//!   the file's, or follows the post's address.
+//!
+//! Without `linkDestination`, a custom link that looks like an attachment page still counts: a page
+//! at `/about/` on `about.jpg`, or a page's child page. Those wait for READ-874.
 
 use scraper::{ElementRef, Html, Node, Selector};
 use std::sync::LazyLock;
@@ -46,9 +52,12 @@ pub(super) fn mark_gallery_image_links(document: &mut Html, post_url: Option<&Ur
                 .ancestors()
                 .filter_map(ElementRef::wrap)
                 .find(|ancestor| GALLERIES.matches(ancestor))?;
+            // A link around the whole gallery is the author's, not one of the gallery's.
+            let is_the_gallerys = !gallery
+                .ancestors()
+                .any(|ancestor| ancestor.id() == link.id());
             let href = link.value().attr("href")?;
-            let opens =
-                !allows_custom_links(img, gallery) || links_to_attachment_page(href, img, post_url);
+            let opens = is_the_gallerys && opens_in_the_viewer(href, img, gallery, post_url);
             opens.then_some(link.id())
         })
         .collect();
@@ -74,12 +83,28 @@ fn allows_custom_links(img: ElementRef, gallery: ElementRef) -> bool {
         })
 }
 
-fn links_to_attachment_page(href: &str, img: ElementRef, post_url: Option<&Url>) -> bool {
+fn opens_in_the_viewer(
+    href: &str,
+    img: ElementRef,
+    gallery: ElementRef,
+    post_url: Option<&Url>,
+) -> bool {
+    let custom_links = allows_custom_links(img, gallery);
     let Some(link) = parse(href, post_url) else {
-        return false;
+        return !custom_links;
     };
-    let element = img.value();
+    if custom_links {
+        links_to_attachment_page(&link, img, post_url)
+    } else {
+        is_on_the_posts_site(&link, post_url)
+            || has_attachment_id(&link, img)
+            || is_named_after_the_file(&link, img, post_url)
+    }
+}
 
+/// Whether `link` is `?attachment_id=<id>`, for this image.
+fn has_attachment_id(link: &Url, img: ElementRef) -> bool {
+    let element = img.value();
     let ids: Vec<&str> = element
         .attr("data-attachment-id")
         .into_iter()
@@ -90,17 +115,26 @@ fn links_to_attachment_page(href: &str, img: ElementRef, post_url: Option<&Url>)
                 .filter_map(|class| class.strip_prefix("wp-image-")),
         )
         .collect();
-    if link
-        .query_pairs()
+    link.query_pairs()
         .any(|(name, value)| name == "attachment_id" && ids.contains(&value.as_ref()))
-    {
+}
+
+fn links_to_attachment_page(link: &Url, img: ElementRef, post_url: Option<&Url>) -> bool {
+    if has_attachment_id(link, img) {
         return true;
     }
 
-    if let Some(permalink) = element.attr("data-permalink") {
-        return parse(permalink, post_url).is_some_and(|permalink| same_page(&link, &permalink));
+    if let Some(permalink) = img.value().attr("data-permalink") {
+        return parse(permalink, post_url).is_some_and(|permalink| same_page(link, &permalink));
     }
 
+    is_on_the_posts_site(link, post_url)
+        && (is_named_after_the_file(link, img, post_url) || follows_the_post(link, post_url))
+}
+
+/// Whether the last name in the link's address is made from the image's file's.
+fn is_named_after_the_file(link: &Url, img: ElementRef, post_url: Option<&Url>) -> bool {
+    let element = img.value();
     let Some(name) = link.path_segments().and_then(|mut segments| {
         segments
             .rfind(|segment| !segment.is_empty())
@@ -108,12 +142,11 @@ fn links_to_attachment_page(href: &str, img: ElementRef, post_url: Option<&Url>)
     }) else {
         return false;
     };
-    let named_after_the_file = [element.attr("data-orig-file"), element.attr("src")]
+    [element.attr("data-orig-file"), element.attr("src")]
         .into_iter()
         .flatten()
         .filter_map(|url| file_slug(url, post_url))
-        .any(|file| is_named_after(&name, &file));
-    named_after_the_file || follows_the_post(&link, post_url)
+        .any(|file| is_named_after(&name, &file))
 }
 
 fn parse(url: &str, post_url: Option<&Url>) -> Option<Url> {
@@ -123,13 +156,24 @@ fn parse(url: &str, post_url: Option<&Url>) -> Option<Url> {
     }
 }
 
+/// The host of an address, whatever its `www.`.
+fn site(url: &Url) -> Option<String> {
+    let host = url.host_str()?.to_ascii_lowercase();
+    Some(host.strip_prefix("www.").map(str::to_owned).unwrap_or(host))
+}
+
+/// Whether the link is on the post's site. Without the post's address, there's no telling, so it
+/// could be.
+fn is_on_the_posts_site(link: &Url, post_url: Option<&Url>) -> bool {
+    post_url.is_none_or(|post_url| site(link).is_some() && site(link) == site(post_url))
+}
+
 /// Whether two addresses are the same page, whatever their scheme, `www.` or trailing slash. Sites
-/// on their own domain often give their attachment pages as `http:`.
+/// on their own domain often give their attachment pages as `http:`. The query counts, because it's
+/// all that tells pages apart on a site without pretty permalinks.
 fn same_page(a: &Url, b: &Url) -> bool {
-    fn key(url: &Url) -> Option<(String, &str)> {
-        let host = url.host_str()?.to_ascii_lowercase();
-        let host = host.strip_prefix("www.").map(str::to_owned).unwrap_or(host);
-        Some((host, url.path().trim_end_matches('/')))
+    fn key(url: &Url) -> Option<(String, &str, Option<&str>)> {
+        Some((site(url)?, url.path().trim_end_matches('/'), url.query()))
     }
     key(a).is_some_and(|key_a| Some(key_a) == key(b))
 }
@@ -174,7 +218,8 @@ fn slugify(text: &str) -> String {
 }
 
 /// Whether an attachment page's name is the file's slug. WordPress adds `-2` when the name is
-/// taken, and some importers add the extension, as `-jpg`.
+/// taken, and some importers add the extension, as `-jpg`. It numbers a file with the same name
+/// too, and the two numbers don't have to match: `IMG_1-1.jpg` is at `img_1-2`, and `a1.jpg` at `a`.
 fn is_named_after(name: &str, file: &str) -> bool {
     let strip_number = |name: &str| -> String {
         match name.rsplit_once('-') {
@@ -193,6 +238,14 @@ fn is_named_after(name: &str, file: &str) -> bool {
             .unwrap_or(name)
             .to_owned()
     };
+    let is_numbered_file = |candidate: &String| {
+        file.strip_prefix(candidate.as_str()).is_some_and(|rest| {
+            let number = rest.strip_prefix('-').unwrap_or(rest);
+            !candidate.is_empty()
+                && !number.is_empty()
+                && number.bytes().all(|b| b.is_ascii_digit())
+        })
+    };
     let without_number = strip_number(name);
     let without_extension = strip_extension(&without_number);
     [
@@ -202,11 +255,11 @@ fn is_named_after(name: &str, file: &str) -> bool {
         strip_number(&without_extension),
     ]
     .iter()
-    .any(|candidate| candidate == file)
+    .any(|candidate| candidate == file || is_numbered_file(candidate))
 }
 
 /// Whether the link is the post's address with one more name on the end, the way WordPress
-/// addresses the attachment pages of a post's images.
+/// addresses the attachment pages of a post's images. A number on the end is the post's next page.
 fn follows_the_post(link: &Url, post_url: Option<&Url>) -> bool {
     let Some(post_url) = post_url else {
         return false;
@@ -222,14 +275,12 @@ fn follows_the_post(link: &Url, post_url: Option<&Url>) -> bool {
             .unwrap_or_default()
     };
     let (link_segments, post_segments) = (segments(link), segments(post_url));
-    let same_site = same_page(
-        &link.join("/").unwrap_or_else(|_| link.clone()),
-        &post_url.join("/").unwrap_or_else(|_| post_url.clone()),
-    );
-    same_site
-        && !post_segments.is_empty()
+    !post_segments.is_empty()
         && link_segments.len() == post_segments.len() + 1
         && link_segments.starts_with(&post_segments)
+        && !link_segments
+            .last()
+            .is_some_and(|name| name.bytes().all(|b| b.is_ascii_digit()))
 }
 
 #[cfg(test)]
@@ -272,6 +323,31 @@ mod tests {
     )]
     #[case::outside_a_gallery(
         r#"<figure class="wp-block-image"><a href="https://example.com/2023/03/12/a-post/a/"><img src="https://example.com/a.jpg"></a></figure>"#,
+        false
+    )]
+    // Sites that moved domain still link to attachment pages at their old address.
+    #[case::classic_gallery_at_an_old_domain(
+        r#"<div class="gallery"><a href="https://old.example/img_8259/"><img src="https://example.com/uploads/IMG_8259.jpg"></a></div>"#,
+        true
+    )]
+    #[case::classic_gallery_with_a_numbered_file(
+        r#"<div class="gallery"><a href="https://old.example/img_9118-2/"><img src="https://example.com/uploads/IMG_9118-1.jpg"></a></div>"#,
+        true
+    )]
+    #[case::classic_gallery_with_a_number_on_the_file(
+        r#"<div class="gallery"><a href="https://old.example/tim01_01/"><img src="https://example.com/uploads/tim01_011.jpg"></a></div>"#,
+        true
+    )]
+    #[case::classic_gallery_with_another_name_on_the_site_home(
+        r#"<div class="gallery"><a href="https://old.example/"><img src="https://example.com/uploads/2011/kojiki.png"></a></div>"#,
+        false
+    )]
+    #[case::classic_gallery_linking_elsewhere(
+        r#"<div class="gallery"><a href="https://shop.example/item"><img src="https://example.com/a.jpg"></a></div>"#,
+        false
+    )]
+    #[case::link_around_the_whole_gallery(
+        r#"<a href="https://example.com/shop/"><div class="gallery"><img src="https://example.com/a.jpg"></div></a>"#,
         false
     )]
     fn marks_links_by_gallery(#[case] html: &str, #[case] opens: bool) {
@@ -349,6 +425,36 @@ mod tests {
         r#"src="https://example.com/wp-content/uploads/a.jpg""#,
         false
     )]
+    #[case::named_after_the_file_on_another_site(
+        "https://shop.example/product/blue-shirt/",
+        r#"src="https://example.com/wp-content/uploads/blue-shirt.jpg""#,
+        false
+    )]
+    #[case::named_after_the_file_on_wordpress_com(
+        "https://wordpress.com/theme/marl",
+        r#"src="https://example.files.wordpress.com/2022/03/marl.jpg""#,
+        false
+    )]
+    #[case::the_next_page_of_the_post(
+        "https://example.com/2023/03/12/a-post/2/",
+        r#"src="https://example.com/wp-content/uploads/a.jpg""#,
+        false
+    )]
+    #[case::plain_permalinks_attachment_page(
+        "https://example.com/?attachment_id=7",
+        r#"src="https://example.com/a.jpg" data-permalink="https://example.com/?attachment_id=7""#,
+        true
+    )]
+    #[case::plain_permalinks_home_page(
+        "https://example.com/",
+        r#"src="https://example.com/a.jpg" data-permalink="https://example.com/?attachment_id=7""#,
+        false
+    )]
+    #[case::plain_permalinks_another_page(
+        "https://example.com/?page_id=2",
+        r#"src="https://example.com/a.jpg" data-permalink="https://example.com/?attachment_id=7""#,
+        false
+    )]
     fn tells_attachment_pages_from_other_links_in_gallery_blocks(
         #[case] link: &str,
         #[case] img_attributes: &str,
@@ -391,6 +497,30 @@ mod tests {
             post["content"].as_str().unwrap(),
             post["URL"].as_str().map(str::to_owned),
         );
+        assert_eq!(marked_links(&content), expected);
+    }
+
+    /// A site without Carousel sends the same links without `data-permalink`.
+    #[rstest]
+    #[case::tiled_gallery("12152", (27, 27))]
+    #[case::gallery_blocks_with_custom_links("45746", (0, 42))]
+    fn marks_real_posts_without_carousel(#[case] id: &str, #[case] expected: (usize, usize)) {
+        let path = format!(
+            "{}/test-data/reader/gallery-links/{id}.json",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let post: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let html = post["content"]
+            .as_str()
+            .unwrap()
+            .split(r#" data-permalink=""#)
+            .enumerate()
+            .map(|(index, part)| match index {
+                0 => part,
+                _ => part.split_once('"').unwrap().1,
+            })
+            .collect::<String>();
+        let content = ReaderPostContent::new(&html, post["URL"].as_str().map(str::to_owned));
         assert_eq!(marked_links(&content), expected);
     }
 
