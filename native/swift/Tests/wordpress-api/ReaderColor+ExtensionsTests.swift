@@ -41,8 +41,8 @@ struct ReaderColorExtensionsTests {
     func readsUIKitColorsForEachAppearance() throws {
         let light = try #require(ReaderColor(.label, traits: UITraitCollection(userInterfaceStyle: .light)))
         let dark = try #require(ReaderColor(.label, traits: UITraitCollection(userInterfaceStyle: .dark)))
-        #expect(light == ReaderColor(red: 0, green: 0, blue: 0, alpha: 255))
-        #expect(dark == ReaderColor(red: 255, green: 255, blue: 255, alpha: 255))
+        #expect(light.isOpaqueOrTranslucent(red: 0, green: 0, blue: 0))
+        #expect(dark.isOpaqueOrTranslucent(red: 255, green: 255, blue: 255))
         #expect(ReaderColor(light.uiColor, traits: UITraitCollection()) == light)
     }
     #elseif canImport(AppKit)
@@ -80,11 +80,20 @@ struct ReaderColorExtensionsTests {
         #endif
         let light = try #require(ReaderColor(system, in: lightEnvironment))
         let dark = try #require(ReaderColor(system, in: darkEnvironment))
-        #expect(light == ReaderColor(red: 0, green: 0, blue: 0, alpha: 255))
-        #expect(dark == ReaderColor(red: 255, green: 255, blue: 255, alpha: 255))
+        #expect(light.isOpaqueOrTranslucent(red: 0, green: 0, blue: 0))
+        #expect(dark.isOpaqueOrTranslucent(red: 255, green: 255, blue: 255))
     }
     #endif
 
+}
+
+private extension ReaderColor {
+    /// Whether the colour is this one at any opacity. A system text colour isn't always opaque: on
+    /// CI's iOS 26 simulators, `.label` read with only a light or dark style was 85% opaque in one
+    /// run, and opaque in the one before.
+    func isOpaqueOrTranslucent(red: UInt8, green: UInt8, blue: UInt8) -> Bool {
+        self.red == red && self.green == green && self.blue == blue && alpha > 0
+    }
 }
 
 #endif
