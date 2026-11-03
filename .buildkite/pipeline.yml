@@ -22,7 +22,17 @@ common_params:
 steps:
   #
   # Rust Group
-  - label: ":rust: :darwin: Build iOS"
+  - label: ":rust: :darwin: Build iOS (1)"
+    command: .buildkite/build-apple-platform.sh iOS
+    artifact_paths:
+      - "target/*/release/libwp_mobile.a"
+      - "target/*/release/swift-bindings/**"
+      - "native/swift/Sources/wordpress-api-wrapper/*.swift"
+    plugins: [$CI_TOOLKIT]
+    agents:
+      queue: mac-staging
+
+  - label: ":rust: :darwin: Build iOS (2)"
     command: .buildkite/build-apple-platform.sh iOS
     artifact_paths:
       - "target/*/release/libwp_mobile.a"
