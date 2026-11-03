@@ -1,16 +1,23 @@
-//! Golden URL table proving every self-hosted (wp.org) endpoint resolves
-//! correctly on a *plain permalinks* site — i.e. when the API root is the
-//! `?rest_route=` query form rather than `…/wp-json/`. Each test drives the
-//! endpoint's real URL builder (the same code path the typed client uses)
-//! through a `rest_route`-seeded [`WpOrgSiteApiUrlResolver`] and compares the
-//! built URL against a hard-coded expected string.
+//! Golden URL table: for each of the 45 endpoint modules in
+//! `request::endpoint`, one representative URL builder is checked on a *plain
+//! permalinks* site — i.e. when the API root is the `?rest_route=` query form
+//! rather than `…/wp-json/`. Each test drives the endpoint's real URL builder
+//! (the same code path the typed client uses) through a `rest_route`-seeded
+//! [`WpOrgSiteApiUrlResolver`] and compares the built URL against a hard-coded
+//! expected string. Other builders in the same module, and the self-hosted
+//! Jetpack endpoints (built by the Jetpack client), aren't covered here.
 //!
-//! This is the plain-permalinks counterpart to the per-endpoint `wp-json`
-//! golden assertions in each `*_endpoint.rs` module. `?rest_route=` requests
-//! are accepted by WordPress regardless of a site's permalink setting, so this
-//! table also documents the exact URL each endpoint hits on a plain-permalink
-//! site. The `// wp-json form:` comment on each case is the pretty-permalink
-//! path the sibling test asserts, for cross-reference.
+//! `?rest_route=` requests are accepted by WordPress regardless of a site's
+//! permalink setting, so this table also documents the exact URL each endpoint
+//! hits on a plain-permalink site. The `// wp-json form:` comment on each case
+//! is the equivalent pretty-permalink path, relative to the namespace (`/wp/v2`
+//! unless the comment says otherwise). Most `*_endpoint.rs` modules assert that
+//! form in their own tests, but `api_root`, `navigation_autosaves`,
+//! `navigation_revisions`, `navigations`, `taxonomies`, `widgets` and
+//! `wp_block_editor` have none. Of those, `navigations`, `taxonomies`,
+//! `widgets` and `wp_block_editor` are also checked against the server in
+//! `index_self_href_url_tests`; for the other three, this table is the only URL
+//! check.
 
 use super::api_root_endpoint::ApiRootRequestEndpoint;
 use super::application_passwords_endpoint::ApplicationPasswordsRequestEndpoint;
@@ -612,7 +619,7 @@ fn wp_block_editor() {
     let params = WpBlockEditorSettingsParams {
         context: Some(WpBlockEditorSettingsContext::WidgetsEditor),
     };
-    // wp-json form: /settings?context=widgets-editor
+    // wp-json form (`/wp-block-editor/v1`): /settings?context=widgets-editor
     assert_eq!(
         endpoint.retrieve_settings(&params).as_str(),
         "https://example.com/index.php?rest_route=%2Fwp-block-editor%2Fv1%2Fsettings&context=widgets-editor",
@@ -622,7 +629,7 @@ fn wp_block_editor() {
 #[test]
 fn wp_site_health_tests() {
     let endpoint = WpSiteHealthTestsRequestEndpoint::new(resolver());
-    // wp-json form: /tests/background-updates?_fields=actions%2Cbadge
+    // wp-json form (`/wp-site-health/v1`): /tests/background-updates?_fields=actions%2Cbadge
     assert_eq!(
         endpoint
             .filter_background_updates(&[
