@@ -1,5 +1,6 @@
 use crate::{
     SqliteDbError,
+    db_types::helpers::parse_optional_datetime,
     db_types::row_ext::{ColumnIndex, RowExt},
     list_metadata::{
         DbListHeaderWithState, DbListMetadata, DbListMetadataItem, DbListMetadataState, ListState,
@@ -78,7 +79,7 @@ impl DbListMetadataItem {
             row_id: row.get_column(Col::Rowid)?,
             list_metadata_id: row.get_column(Col::ListMetadataId)?,
             entity_id: row.get_column(Col::EntityId)?,
-            modified_gmt: row.get_column(Col::ModifiedGmt)?,
+            modified_gmt: parse_optional_datetime(row, Col::ModifiedGmt)?,
             parent: row.get_column(Col::Parent)?,
             menu_order: row.get_column(Col::MenuOrder)?,
         })

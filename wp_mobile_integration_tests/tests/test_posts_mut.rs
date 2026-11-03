@@ -1,3 +1,4 @@
+use wp_api::date::WpDateString;
 use wp_api::posts::{
     PostCreateParams, PostId, PostStatus, PostUpdateParams, WpApiParamPostsOrderBy,
 };
@@ -43,7 +44,7 @@ async fn test_load_next_page_with_duplicate_items_all_fresh() {
     for i in 1..=5 {
         let params = PostCreateParams {
             title: Some(format!("Test Post {}", i)),
-            date: Some(format!("{}{:02}T12:00:00", base_date, i)),
+            date: Some(WpDateString::new(format!("{}{:02}T12:00:00", base_date, i))),
             status: Some(PostStatus::Future),
             ..Default::default()
         };
@@ -75,7 +76,7 @@ async fn test_load_next_page_with_duplicate_items_all_fresh() {
     assert_eq!(collection.current_page(), Some(1));
 
     // Step 3: Create another future post
-    let new_post_date = format!("{}04T06:00:00", base_date);
+    let new_post_date = WpDateString::new(format!("{}04T06:00:00", base_date));
     let new_post_params = PostCreateParams {
         title: Some("New Post That Pushes One to Page 2".to_string()),
         date: Some(new_post_date),
@@ -500,8 +501,8 @@ async fn test_load_posts_by_ids_includes_trashed_post() {
     let cached_posts = ctx
         .service
         .posts()
-        .read_posts_by_ids_from_db(&[created.id.0])
-        .expect("read_posts_by_ids_from_db should succeed");
+        .read_post_full_entities_by_ids_from_db(&[created.id.0])
+        .expect("read_post_full_entities_by_ids_from_db should succeed");
     assert_eq!(cached_posts.len(), 1, "should have 1 cached post");
     assert_eq!(
         cached_posts[0].data.status,
@@ -571,8 +572,8 @@ async fn test_load_posts_by_ids_includes_mixed_status_posts() {
     let cached_posts = ctx
         .service
         .posts()
-        .read_posts_by_ids_from_db(&[draft.id.0, to_trash.id.0])
-        .expect("read_posts_by_ids_from_db should succeed");
+        .read_post_full_entities_by_ids_from_db(&[draft.id.0, to_trash.id.0])
+        .expect("read_post_full_entities_by_ids_from_db should succeed");
     assert_eq!(cached_posts.len(), 2, "should have 2 cached posts");
 
     let draft_post = cached_posts

@@ -127,6 +127,7 @@ async fn discover_and_build_admin_client(executor: Arc<ReqwestRequestExecutor>) 
             request_executor: executor,
             middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
             app_notifier: Arc::new(EmptyAppNotifier),
+            language_provider: None,
         },
     )
 }

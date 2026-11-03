@@ -32,6 +32,7 @@ pub fn api_client_delegate() -> WpApiClientDelegate {
         request_executor: Arc::new(ReqwestRequestExecutor::default()),
         middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
         app_notifier: Arc::new(EmptyAppNotifier),
+        language_provider: None,
     }
 }
 
@@ -101,6 +102,7 @@ pub fn create_test_context_with_site(
         request_executor: Arc::new(ReqwestRequestExecutor::default()),
         middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
         app_notifier: Arc::new(EmptyAppNotifier),
+        language_provider: None,
     };
 
     let cache = Arc::new(WpApiCache::new(None).expect("Failed to create in-memory cache"));

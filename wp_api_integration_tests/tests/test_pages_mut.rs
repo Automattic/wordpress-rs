@@ -1,4 +1,5 @@
 use macro_helper::{generate_update_page_status_test, generate_update_test};
+use wp_api::date::WpDateString;
 use wp_api::posts::{
     AnyPostWithEditContext, PostCommentStatus, PostCreateParams, PostFootnote, PostMeta,
     PostPingStatus, PostStatus, PostUpdateParams,
@@ -172,9 +173,9 @@ async fn trash_page() {
 generate_update_test!(
     update_date,
     date,
-    "2024-09-09T12:00:00".to_string(),
+    WpDateString::new("2024-09-09T12:00:00".to_string()),
     |updated_page, updated_page_from_wp_cli| {
-        assert_eq!(updated_page.date, "2024-09-09T12:00:00");
+        assert_eq!(updated_page.date.value, "2024-09-09T12:00:00");
         assert_eq!(updated_page_from_wp_cli.date, "2024-09-09 12:00:00");
     }
 );
@@ -182,11 +183,11 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00"),
     |updated_page, updated_page_from_wp_cli| {
         assert_eq!(
             updated_page.date_gmt,
-            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00")
         );
         assert_eq!(updated_page_from_wp_cli.date_gmt, "2024-09-09 12:00:00");
     }
@@ -340,10 +341,22 @@ generate_update_test!(
 generate_update_test!(
     update_menu_order,
     menu_order,
-    5u32,
+    5i64,
     |updated_page, updated_page_from_wp_cli| {
         assert_eq!(updated_page.menu_order, Some(5));
         assert_eq!(updated_page_from_wp_cli.menu_order, 5);
+    }
+);
+
+// WordPress allows a negative `menu_order` to force a page to the top of a list,
+// so it has to round-trip as a signed value.
+generate_update_test!(
+    update_negative_menu_order,
+    menu_order,
+    -1000i64,
+    |updated_page, updated_page_from_wp_cli| {
+        assert_eq!(updated_page.menu_order, Some(-1000));
+        assert_eq!(updated_page_from_wp_cli.menu_order, -1000);
     }
 );
 
@@ -381,7 +394,7 @@ async fn update_status_to_future() {
         &PostUpdateParams {
             status: Some(PostStatus::Future),
             // Publish date has to be in the future
-            date: Some("2026-09-09T12:00:00".to_string()),
+            date: Some(WpDateString::new("2099-09-09T12:00:00".to_string())),
             ..Default::default()
         },
         |updated_page, updated_page_from_wp_cli| {

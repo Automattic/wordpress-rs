@@ -8,7 +8,7 @@ docker_container_repo_dir=/app
 # Pinned Rust toolchain version. Keep in lockstep with `rust-toolchain.toml` and
 # `wp_rs_web/Dockerfile` so local `cargo`, the CI Docker image, and the pinned
 # toolchain never drift. See https://github.com/Automattic/wordpress-rs/issues/1436.
-rust_stable_toolchain := 1.97.1
+rust_stable_toolchain := 1.99.1
 rust_docker_container := public.ecr.aws/docker/library/rust:$(rust_stable_toolchain)
 
 docker_opts_shared := --rm -v "$(PWD)":$(docker_container_repo_dir) -w $(docker_container_repo_dir)
@@ -18,6 +18,7 @@ docker_build_and_run := docker build -t foo . && docker run $(docker_opts_shared
 swift_package_platform_version = $(shell swift package dump-package | jq -r '.platforms[] | select(.platformName=="$1") | .version')
 swift_package_platform_macos = $(call swift_package_platform_version,macos)
 swift_package_platform_ios = $(call swift_package_platform_version,ios)
+swift_package_platform_maccatalyst = $(call swift_package_platform_version,maccatalyst)
 swift_package_platform_watchos = $(call swift_package_platform_version,watchos)
 swift_package_platform_tvos = $(call swift_package_platform_version,tvos)
 
@@ -54,36 +55,23 @@ swift-docs-only:
 	tar -czf swift-docs.tar.gz docs
 
 release-on-ci:
-	@[ -n "$(BUILDKITE_API_TOKEN)" ] || (echo "BUILDKITE_API_TOKEN is not set" && exit 1)
-	@[ -n "$(WORDPRESS_RS_NEW_VERSION)" ] || (echo "WORDPRESS_RS_NEW_VERSION is not set" && exit 1)
-
-	@echo "Triggering a release job on Buildkite. New version: $(WORDPRESS_RS_NEW_VERSION)"
-
-	@mkdir -p .build
-	@echo '{ \
-			"commit": "HEAD", \
-			"branch": "trunk", \
-			"message": "Publishing a new release", \
-			"env": {"NEW_VERSION":"${WORDPRESS_RS_NEW_VERSION}"} \
-		}' | jq > .build/buildkite_release_job_request.json
-
-	@curl -s "https://api.buildkite.com/v2/organizations/automattic/pipelines/wordpress-rs/builds" \
-		-H "Authorization: Bearer $(BUILDKITE_API_TOKEN)" \
-		--json @.build/buildkite_release_job_request.json \
-		--output .build/buildkite_release_job_response.json
-
-	@echo "Buildkite job triggerd. See .build/buildkite_release_job_response.json for the buildkite job details."
+	@# Help: Deprecated. Cut releases by merging a version bump PR; see Documentation/RELEASING.md.
+	@echo "'make release-on-ci' no longer triggers a release."
 	@echo ""
-	@echo "Swift package will be released by https://buildkite.com/automattic/wordpress-rs/builds/$$(jq -r '.number' .build/buildkite_release_job_response.json)"
-	@echo "Once that job finishes, Android libraries will be release by https://buildkite.com/automattic/wordpress-rs/builds?branch=$(WORDPRESS_RS_NEW_VERSION)"
+	@echo "Releases are cut by merging a version bump PR to trunk."
+	@echo "See Documentation/RELEASING.md for the full process, including how to force"
+	@echo "or re-run a release from the Buildkite UI."
+	@exit 1
 
 apple-platform-targets-macos := x86_64-apple-darwin aarch64-apple-darwin
 apple-platform-targets-ios := aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+apple-platform-targets-catalyst := aarch64-apple-ios-macabi x86_64-apple-ios-macabi
 apple-platform-targets-tvos := aarch64-apple-tvos aarch64-apple-tvos-sim
 apple-platform-targets-watchos := arm64_32-apple-watchos x86_64-apple-watchos-sim aarch64-apple-watchos-sim
 apple-platform-targets := \
 	$(apple-platform-targets-macos) \
 	$(apple-platform-targets-ios) \
+	$(apple-platform-targets-catalyst) \
 	$(apple-platform-targets-tvos) \
 	$(apple-platform-targets-watchos)
 
@@ -100,6 +88,7 @@ cargo_config_library = --config profile.$(CARGO_PROFILE).debug=true --config 'pr
 # Set deployment targets for each platform
 _build-apple-%-darwin: export MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos)
 _build-apple-%-ios _build-apple-%-ios-sim: export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios)
+_build-apple-%-macabi: export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_maccatalyst)
 _build-apple-%-tvos _build-apple-%-tvos-sim: export TVOS_DEPLOYMENT_TARGET=$(swift_package_platform_tvos)
 _build-apple-%-watchos _build-apple-%-watchos-sim: export WATCHOS_DEPLOYMENT_TARGET=$(swift_package_platform_watchos)
 
@@ -115,12 +104,14 @@ _build-apple-%:
 # Build the library for one single platform, including real device and simulator.
 build-apple-platform-macos := $(addprefix _build-apple-,$(apple-platform-targets-macos))
 build-apple-platform-ios := $(addprefix _build-apple-,$(apple-platform-targets-ios))
+build-apple-platform-catalyst := $(addprefix _build-apple-,$(apple-platform-targets-catalyst))
 build-apple-platform-tvos := $(addprefix _build-apple-,$(apple-platform-targets-tvos))
 build-apple-platform-watchos := $(addprefix _build-apple-,$(apple-platform-targets-watchos))
 
 # Build all targets for a specific platform (without creating xcframework).
 build-apple-macOS: $(build-apple-platform-macos)
 build-apple-iOS: $(build-apple-platform-ios)
+build-apple-Catalyst: $(build-apple-platform-catalyst)
 build-apple-tvOS: $(build-apple-platform-tvos)
 build-apple-watchOS: $(build-apple-platform-watchos)
 
@@ -141,6 +132,9 @@ xcframework-only-macos: $(build-apple-platform-macos)
 xcframework-only-ios: $(build-apple-platform-ios)
 	@# Help: Build an xcframework containing only iOS (~24GB). Replaces any existing xcframework.
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-ios)
+xcframework-only-catalyst: $(build-apple-platform-catalyst)
+	@# Help: Build an xcframework containing only Mac Catalyst. Replaces any existing xcframework.
+	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-catalyst)
 xcframework-only-tvos: $(build-apple-platform-tvos)
 	@# Help: Build an xcframework containing only tvOS. Replaces any existing xcframework.
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets-tvos)
@@ -155,10 +149,10 @@ xcframework-assemble:
 
 # Creating xcframework for all platforms.
 #
-# This builds all 11 Apple targets and consumes ~100GB in `target/`. For local
+# This builds all 12 Apple targets and consumes ~100GB in `target/`. For local
 # verification of a UniFFI change, prefer `xcframework-only-macos` — see
 # Documentation/local-development.md.
-xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
+xcframework-all: $(build-apple-platform-macos) $(build-apple-platform-ios) $(build-apple-platform-catalyst) $(build-apple-platform-tvos) $(build-apple-platform-watchos)
 	cargo run --quiet --bin xcframework -- --profile $(CARGO_PROFILE) --targets $(apple-platform-targets)
 
 ifeq ($(SKIP_PACKAGE_WP_API),true)
@@ -201,6 +195,10 @@ swift-example-app-ios:
 	xcrun simctl create "iPhone 17 Pro Test Device" "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
 	bundle exec fastlane run run_tests project:native/swift/Example/Example.xcodeproj scheme:Example build_for_testing:true ensure_devices_found:true device:"iPhone 17 Pro Test Device (26.5)" xcargs:"-skipPackagePluginValidation"
 
+example-app-login:
+	@# Help: Sign an example app into WordPress.com (vars: PLATFORM=ios|android, DEVICE, RESET=1; token from ~/.wpcom-token).
+	./scripts/example-app-signin.sh $(if $(PLATFORM),--platform $(PLATFORM)) $(if $(DEVICE),--device $(DEVICE)) $(if $(RESET),--reset)
+
 test-swift:
 	$(MAKE) test-swift-$(uname)
 
@@ -217,6 +215,9 @@ test-swift-macOS: test-swift-darwin
 
 test-swift-iOS: xcframework
 	scripts/xcodebuild-test.sh iOS-26-5
+
+test-swift-Catalyst: xcframework
+	scripts/xcodebuild-test.sh Catalyst
 
 test-swift-tvOS: xcframework
 	scripts/xcodebuild-test.sh tvOS-26-5
@@ -280,6 +281,29 @@ stop-server:
 	@# Help: Stop the running server.
 	docker-compose down
 
+# The `-native` targets run the test server directly on this Mac instead of in Docker. That's what
+# our macOS CI uses, because its VMs can't run Docker. See `scripts/native-test-server.sh`.
+test-server-native-deps:
+	@# Help: Install what the native test server needs (PHP, MariaDB, Apache and jo) using Homebrew.
+	./scripts/native-test-server.sh install-deps
+
+test-server-native:
+	@# Help: Start the test server directly on this Mac, without Docker.
+	./scripts/native-test-server.sh start
+
+stop-server-native:
+	@# Help: Stop the native test server.
+	./scripts/native-test-server.sh stop
+
+test-rust-integration-native:
+	@# Help: Run Rust integration tests against the native test server.
+	./scripts/native-test-server.sh exec cargo test -p wp_api_integration_tests -p wp_mobile_integration_tests --no-fail-fast
+
+# Needs an xcframework with a macOS slice – build one with `make xcframework-only-macos`.
+test-swift-integration-native:
+	@# Help: Run Swift integration tests against the native test server.
+	./scripts/native-test-server.sh exec swift test --filter IntegrationTests --no-parallel
+
 lint: lint-rust lint-swift
 	@# Help: Run the linter for all languages.
 
@@ -328,7 +352,8 @@ setup-rust-toolchain:
 		aarch64-apple-ios \
 		aarch64-apple-darwin \
 		x86_64-apple-darwin \
-		aarch64-apple-ios-sim
+		aarch64-apple-ios-sim \
+		$(apple-platform-targets-catalyst)
 
 # Platform-specific Rust setup (only installs what each platform needs in CI)
 setup-rust-macOS:
@@ -338,6 +363,10 @@ setup-rust-macOS:
 setup-rust-iOS:
 	rustup toolchain install $(rust_stable_toolchain)
 	rustup target add --toolchain $(rust_stable_toolchain) aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+
+setup-rust-Catalyst:
+	rustup toolchain install $(rust_stable_toolchain)
+	rustup target add --toolchain $(rust_stable_toolchain) $(apple-platform-targets-catalyst)
 
 setup-rust-tvOS setup-rust-watchOS:
 	rustup toolchain install $(rust_stable_toolchain)

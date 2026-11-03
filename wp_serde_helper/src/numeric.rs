@@ -332,6 +332,46 @@ where
     deserializer.deserialize_any(DeserializeBoolOrIntVisitor)
 }
 
+/// Deserialize an `Option<bool>` from either a bool or an integer (0/1).
+///
+/// Accepts everything [`deserialize_bool_or_int`] does, plus `null`, which
+/// reads as `None`. An absent field also reads as `None` on a member carrying
+/// `#[serde(default)]`.
+///
+/// # Errors
+///
+/// Returns an error for integers other than 0 or 1, strings, arrays, or objects.
+pub fn deserialize_optional_bool_or_int<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_option(DeserializeOptionalBoolOrIntVisitor)
+}
+
+struct DeserializeOptionalBoolOrIntVisitor;
+
+impl<'de> de::Visitor<'de> for DeserializeOptionalBoolOrIntVisitor {
+    type Value = Option<bool>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("bool or integer (0/1)")
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(None)
+    }
+
+    fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserialize_bool_or_int(deserializer).map(Some)
+    }
+}
+
 struct DeserializeBoolOrIntVisitor;
 
 impl de::Visitor<'_> for DeserializeBoolOrIntVisitor {
@@ -608,6 +648,53 @@ mod tests {
         );
         assert_eq!(
             bool_or_int.err().unwrap().to_string(),
+            expected_error_message
+        );
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct OptionalBoolOrInt {
+        #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+        pub value: Option<bool>,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": true}"#, Some(true))]
+    #[case(r#"{"value": false}"#, Some(false))]
+    #[case(r#"{"value": 1}"#, Some(true))]
+    #[case(r#"{"value": 0}"#, Some(false))]
+    #[case(r#"{"value": null}"#, None)]
+    #[case(r#"{}"#, None)]
+    fn test_deserialize_optional_bool_or_int(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<bool>,
+    ) {
+        let optional: OptionalBoolOrInt =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, optional.value);
+    }
+
+    /// A populated value goes through `deserialize_bool_or_int`, so the two
+    /// helpers reject the same inputs with the same message.
+    #[rstest]
+    #[case(
+        r#"{"value": 2}"#,
+        r#"invalid value: integer `2`, expected bool or integer (0/1) at line 1 column 11"#
+    )]
+    #[case(
+        r#"{"value": "true"}"#,
+        r#"invalid type: string "true", expected bool or integer (0/1) at line 1 column 16"#
+    )]
+    fn test_deserialize_optional_bool_or_int_errors(
+        #[case] test_case: &str,
+        #[case] expected_error_message: &str,
+    ) {
+        let optional: Result<OptionalBoolOrInt, serde_json::Error> =
+            serde_json::from_str(test_case);
+        assert_eq!(
+            optional
+                .expect_err("The deserializer should emit an error")
+                .to_string(),
             expected_error_message
         );
     }

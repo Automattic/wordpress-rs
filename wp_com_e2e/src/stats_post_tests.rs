@@ -1,7 +1,7 @@
 use libtest_mimic::Trial;
 use std::sync::Arc;
 use wp_api::{
-    api_error::WpApiError,
+    api_error::{WpApiError, WpErrorCode},
     posts::PostId,
     wp_com::{
         WpComSiteId,
@@ -76,8 +76,9 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                                 }
                                 // Test sites without Jetpack Stats have nothing to
                                 // report; that isn't a failure of this endpoint.
-                                Err(WpApiError::UnknownError { response, .. })
-                                    if response.contains("invalid_blog") =>
+                                Err(WpApiError::WpError { error_code, .. })
+                                    if error_code
+                                        == WpErrorCode::CustomError("invalid_blog".to_string()) =>
                                 {
                                     Ok(())
                                 }

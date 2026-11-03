@@ -1,6 +1,6 @@
 use crate::{
     WpApiParamOrder,
-    date::WpGmtDateTime,
+    date::{WpDateString, WpGmtDateTime},
     impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
@@ -47,7 +47,7 @@ impl_as_query_value_from_to_string!(NavigationStatus);
 #[derive(Debug, Serialize, Deserialize, WpContextual)]
 pub struct SparseNavigation {
     #[WpContext(edit, embed, view)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     #[WpContext(edit, view)]
     pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, view)]
@@ -58,7 +58,7 @@ pub struct SparseNavigation {
     #[WpContext(edit, embed, view)]
     pub link: Option<String>,
     #[WpContext(edit, view)]
-    pub modified: Option<String>,
+    pub modified: Option<WpDateString>,
     #[WpContext(edit, view)]
     pub modified_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]
@@ -130,16 +130,16 @@ pub struct NavigationListParams {
     pub search: Option<String>,
     /// Limit response to posts published after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub after: Option<String>,
+    pub after: Option<WpGmtDateTime>,
     /// Limit response to posts modified after a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_after: Option<String>,
+    pub modified_after: Option<WpGmtDateTime>,
     /// Limit response to posts published before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub before: Option<String>,
+    pub before: Option<WpGmtDateTime>,
     /// Limit response to posts modified before a given ISO8601 compliant date.
     #[uniffi(default = None)]
-    pub modified_before: Option<String>,
+    pub modified_before: Option<WpGmtDateTime>,
     /// Ensure result set excludes specific IDs.
     #[uniffi(default = [])]
     pub exclude: Vec<NavigationId>,
@@ -219,7 +219,7 @@ pub struct NavigationUpdateParams {
     /// The date the post was published, in the site's timezone.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -255,7 +255,7 @@ pub struct NavigationCreateParams {
     /// The date the post was published, in the site's timezone.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The date the post was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]

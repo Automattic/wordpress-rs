@@ -21,6 +21,7 @@ pub mod segments_endpoint;
 pub mod shopping_cart_endpoint;
 pub mod site_plans_endpoint;
 pub mod sites_endpoint;
+pub mod stats_archives_endpoint;
 pub mod stats_city_views_endpoint;
 pub mod stats_clicks_endpoint;
 pub mod stats_country_views_endpoint;
@@ -159,7 +160,13 @@ impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::{request::endpoint::ApiEndpointUrl, wp_com::WpComNamespace};
+    use crate::{
+        request::endpoint::ApiEndpointUrl,
+        wp_com::{
+            WpComNamespace,
+            language::{WPComLanguage, WpComLanguageProvider},
+        },
+    };
     use rstest::*;
     use std::sync::Arc;
 
@@ -168,6 +175,23 @@ pub(crate) mod tests {
     #[fixture]
     pub fn fixture_wp_com_api_url_resolver() -> Arc<dyn ApiUrlResolver> {
         Arc::new(WpComApiClientInternalUrlResolver::default())
+    }
+
+    /// Returns whichever language it was built with, standing in for a client that
+    /// reads the device or in-app language.
+    #[derive(Debug)]
+    pub struct StubLanguageProvider(pub Option<WPComLanguage>);
+
+    impl WpComLanguageProvider for StubLanguageProvider {
+        fn current_language(&self) -> Option<WPComLanguage> {
+            self.0
+        }
+    }
+
+    pub fn language_provider(
+        language: Option<WPComLanguage>,
+    ) -> Option<Arc<dyn WpComLanguageProvider>> {
+        Some(Arc::new(StubLanguageProvider(language)))
     }
 
     pub fn validate_wp_com_rest_v1_1_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {

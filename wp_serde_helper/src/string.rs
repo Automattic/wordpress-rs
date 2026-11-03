@@ -1,4 +1,5 @@
 use serde::{Deserialize, Deserializer, de};
+use std::fmt;
 
 /// Deserialize a value that can be either a boolean `false` or a string.
 ///
@@ -144,6 +145,85 @@ where
         StringOrVec::Null => Ok(None),
         StringOrVec::String(s) => Ok(Some(vec![s])),
         StringOrVec::Vec(v) => Ok(Some(v)),
+    }
+}
+
+/// Deserialize an optional string from a string, an integer, or `null`.
+///
+/// PHP turns an array key that looks like an integer into one, so a WordPress.com field whose
+/// values are array keys arrives as a JSON number whenever the value is numeric. The stats
+/// archives endpoint's archive names are such keys: the home page is always `1`, and a search
+/// for `2024` or a category slug of `2024` comes back as a number rather than a string.
+///
+/// Accepts:
+/// - `"swag"` → `Some("swag")`
+/// - `2024` → `Some("2024")`
+/// - `-1` → `Some("-1")`
+/// - `""` → `Some("")`
+/// - `null` → `None`
+///
+/// Numbers are rendered with `to_string`, so a number and the equivalent string are
+/// indistinguishable afterwards. That is the point where this is used — a numeric archive name
+/// and a numeric-looking one are the same page. Use an untagged enum where the distinction
+/// matters.
+///
+/// # Errors
+///
+/// Returns an error for floating-point numbers, booleans, arrays, and objects. PHP array keys
+/// are only ever integers or strings, so a fraction is drift rather than a value to coerce.
+/// Unlike [`deserialize_false_or_string_or_null`], boolean `false` is not an absence marker
+/// here.
+pub fn deserialize_string_or_integer_or_null<'de, D>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(DeserializeStringOrIntegerOrNullVisitor)
+}
+
+struct DeserializeStringOrIntegerOrNullVisitor;
+
+impl de::Visitor<'_> for DeserializeStringOrIntegerOrNullVisitor {
+    type Value = Option<String>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string, an integer, or null")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Some(value.to_string()))
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Some(value.to_string()))
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Some(value.to_string()))
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(None)
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(None)
     }
 }
 
@@ -308,5 +388,71 @@ mod tests {
         let wrapper: PlaceholderStringAsNone =
             serde_json::from_str(test_case).expect("Test case should be a valid JSON");
         assert_eq!(expected_result, wrapper.value);
+    }
+
+    #[derive(Debug, Deserialize)]
+    pub struct StringOrInteger {
+        #[serde(default, deserialize_with = "deserialize_string_or_integer_or_null")]
+        pub value: Option<String>,
+    }
+
+    #[rstest]
+    #[case(r#"{"value": "swag"}"#, Some("swag".to_string()))]
+    #[case(r#"{"value": "2024"}"#, Some("2024".to_string()))]
+    #[case(r#"{"value": ""}"#, Some(String::new()))]
+    #[case(r#"{"value": 2024}"#, Some("2024".to_string()))]
+    #[case(r#"{"value": 1}"#, Some("1".to_string()))]
+    #[case(r#"{"value": 0}"#, Some("0".to_string()))]
+    #[case(r#"{"value": -1}"#, Some("-1".to_string()))]
+    // PHP's integer keys span the whole signed range, so both halves matter.
+    #[case(
+        r#"{"value": 9223372036854775807}"#,
+        Some("9223372036854775807".to_string())
+    )]
+    #[case(
+        r#"{"value": -9223372036854775808}"#,
+        Some("-9223372036854775808".to_string())
+    )]
+    #[case(r#"{"value": null}"#, None)]
+    #[case(r#"{}"#, None)]
+    fn test_deserialize_string_or_integer_or_null(
+        #[case] test_case: &str,
+        #[case] expected_result: Option<String>,
+    ) {
+        let wrapper: StringOrInteger =
+            serde_json::from_str(test_case).expect("Test case should be a valid JSON");
+        assert_eq!(expected_result, wrapper.value);
+    }
+
+    /// A PHP array key is an integer or a string, never a fraction or a boolean, so anything
+    /// else is drift rather than a value to coerce.
+    #[rstest]
+    #[case(
+        r#"{"value": 1.5}"#,
+        "invalid type: floating point `1.5`, expected a string, an integer, or null at line 1 column 13"
+    )]
+    #[case(
+        r#"{"value": true}"#,
+        "invalid type: boolean `true`, expected a string, an integer, or null at line 1 column 14"
+    )]
+    #[case(
+        r#"{"value": []}"#,
+        "invalid type: sequence, expected a string, an integer, or null at line 1 column 12"
+    )]
+    #[case(
+        r#"{"value": {}}"#,
+        "invalid type: map, expected a string, an integer, or null at line 1 column 12"
+    )]
+    fn test_deserialize_string_or_integer_or_null_errors(
+        #[case] test_case: &str,
+        #[case] expected_error_message: &str,
+    ) {
+        let result: Result<StringOrInteger, serde_json::Error> = serde_json::from_str(test_case);
+        assert_eq!(
+            result
+                .expect_err("The deserializer should emit an error")
+                .to_string(),
+            expected_error_message
+        );
     }
 }

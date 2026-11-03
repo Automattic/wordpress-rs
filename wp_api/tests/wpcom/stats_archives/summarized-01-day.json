@@ -1,0 +1,36 @@
+{
+    "date": "2026-10-08",
+    "utc_offset": "+03:00",
+    "period": "day",
+    "summary": {
+        "search": [
+            {
+                "href": "https://example.com/?s=sabbatical",
+                "value": "sabbatical",
+                "views": 5
+            },
+            {
+                "href": "https://example.com/?s=swag",
+                "value": "swag",
+                "views": 4
+            },
+            {
+                "href": "https://example.com/?s=computer+buyback",
+                "value": "computer buyback",
+                "views": 3
+            }
+        ],
+        "cat": [
+            {
+                "href": "https://example.com/category/benefits/",
+                "value": "benefits",
+                "views": 27
+            },
+            {
+                "href": "https://example.com/category/overview/",
+                "value": "overview",
+                "views": 12
+            }
+        ]
+    }
+}

@@ -13,6 +13,7 @@ import okhttp3.mockwebserver.SocketPolicy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import uniffi.wp_api.CloudflareErrorKind
 import uniffi.wp_api.MediaCreateParams
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.UserListParams
@@ -20,6 +21,7 @@ import uniffi.wp_api.WpAuthenticationProvider
 import java.io.File
 import java.net.URI
 import java.util.concurrent.TimeUnit
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -225,7 +227,7 @@ class WpRequestExecutorTest {
                 wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
                 authProvider = WpAuthenticationProvider.none(),
                 requestExecutor = executor,
-                errorLogger = RequestErrorLogger { message -> loggedErrors.add(message) }
+                errorLogger = WpRequestErrorLogger { message -> loggedErrors.add(message) }
             )
 
             var observedResult: WpRequestResult<*>? = null
@@ -279,6 +281,103 @@ class WpRequestExecutorTest {
         assertIs<RequestExecutionErrorReason.ConnectionError>(
             (result as WpRequestResult.RequestExecutionFailed<*>).reason
         )
+    }
+
+    @Test
+    fun `a file that fails while its bytes are read is mapped to MediaFileUnreadable`() = runTest {
+        // A file that passes the pre-upload check (`exists()`/`isFile`/`canRead()`) but then fails
+        // when OkHttp reads its bytes to stream the body — e.g. deleted after the check, or a storage
+        // read error. This drives the whole executor -> caller chain that `MediaFileRequestBodyTest`
+        // only covers in isolation: `MediaFileRequestBody` tags the read failure as
+        // `MediaFileUnreadableException`, `executeRequestSafely` catches it *before* the generic
+        // `IOException`, and it surfaces as `WpRequestResult.MediaFileUnreadable` carrying the path.
+        // Guards against dropping/reordering that catch, which would re-drop it to `GenericError`.
+        // The body write fails before any response is read, so an enqueued response is never used —
+        // it only keeps a regression that lets the request complete from blocking on an empty queue.
+        mockWebServer.enqueue(MockResponse())
+
+        val filePath = "/tmp/wp-rs-test/gone-after-check.jpg"
+        // Lies about being present and readable so `canBeUploaded()` passes, but points at a path with
+        // no file, so okio's `file.source()` throws `FileNotFoundException` exactly where OkHttp
+        // streams the request body — a deterministic, uid-independent stand-in for a mid-upload read
+        // failure (a genuine one is a non-deterministic TOCTOU race against the pre-upload check).
+        val unreadableFileResolver = object : FileResolver {
+            override fun getFile(path: String): File = object : File(filePath) {
+                override fun exists() = true
+                override fun isFile() = true
+                override fun canRead() = true
+                override fun length() = 8L
+            }
+        }
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true },
+            fileResolver = unreadableFileResolver
+        )
+
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.media().create(
+                params = MediaCreateParams(title = "Unreadable upload", filePath = filePath)
+            )
+        }
+
+        assertIs<WpRequestResult.MediaFileUnreadable<*>>(result)
+        assertEquals(filePath, (result as WpRequestResult.MediaFileUnreadable<*>).filePath)
+    }
+
+    /**
+     * Cloudflare only sends its JSON error body when the request carries `Accept-Encoding`
+     * alongside `Accept: application/json`. OkHttp adds `Accept-Encoding` itself; this guards
+     * against anything removing it, and checks the Kotlin path classifies the JSON body.
+     */
+    @Test
+    fun `a Cloudflare JSON error is mapped to CloudflareError`() = runTest {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(522)
+                .setHeader("Content-Type", "application/json; charset=utf-8")
+                .setHeader("Server", "cloudflare")
+                .setHeader("CF-RAY", "a50c80a41cb4ff4c-SEA")
+                .setHeader("Retry-After", "120")
+                .setBody(
+                    """{"title":"Error 522: Connection timed out","status":522,""" +
+                        """"error_code":522,"error_category":"origin",""" +
+                        """"ray_id":"a50c80a41cb4ff4c","cloudflare_error":true,"retry_after":120}"""
+                )
+        )
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        val request = mockWebServer.takeRequest()
+        assertEquals("application/json", request.getHeader("Accept"))
+        assertNotNull(request.getHeader("Accept-Encoding"))
+
+        assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+        val reason = (result as WpRequestResult.RequestExecutionFailed<*>).reason
+        assertIs<RequestExecutionErrorReason.CloudflareError>(reason)
+        assertEquals(CloudflareErrorKind.ORIGIN_TIMEOUT, reason.kind)
+        assertEquals(522u, reason.cloudflareCode)
+        assertEquals("a50c80a41cb4ff4c", reason.rayId)
+        assertEquals(120uL, reason.retryAfter)
     }
 
     /**

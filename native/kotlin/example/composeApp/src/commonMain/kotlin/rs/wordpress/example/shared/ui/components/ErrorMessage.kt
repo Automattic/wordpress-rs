@@ -25,6 +25,7 @@ fun <T> WpRequestResult<T>.errorDescription(): String = when (this) {
         "Failed to parse response: $reason"
     is WpRequestResult.SiteUrlParsingError -> "Invalid site URL: $reason"
     is WpRequestResult.MediaFileNotFound -> "File not found: $filePath"
+    is WpRequestResult.MediaFileUnreadable -> "File could not be read: $filePath"
     is WpRequestResult.UnknownError ->
         "Unknown error (HTTP $statusCode)"
 }
@@ -35,7 +36,7 @@ private fun WpErrorCode.displayName(): String = when (this) {
 }
 
 private fun RequestExecutionErrorReason.description(): String = when (this) {
-    is RequestExecutionErrorReason.DeviceIsOfflineError -> "Device is offline: $errorMessage"
+    is RequestExecutionErrorReason.DeviceIsOfflineError -> "Device is offline"
     is RequestExecutionErrorReason.HttpTimeoutError -> "Request timed out"
     is RequestExecutionErrorReason.InvalidSslError -> "SSL error: $reason"
     is RequestExecutionErrorReason.NonExistentSiteError -> errorMessage ?: "Site not found"
@@ -48,6 +49,7 @@ private fun RequestExecutionErrorReason.description(): String = when (this) {
     is RequestExecutionErrorReason.CancellationError -> "Request cancelled"
     is RequestExecutionErrorReason.HttpError -> "HTTP error: $reason"
     is RequestExecutionErrorReason.GenericError -> errorMessage
+    is RequestExecutionErrorReason.CloudflareError -> "Cloudflare error: $kind (ray ID ${rayId ?: "unknown"})"
 }
 
 @Composable

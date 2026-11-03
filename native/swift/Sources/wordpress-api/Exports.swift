@@ -53,6 +53,7 @@ public typealias FindApiRootFailure = WordPressAPIInternal.FindApiRootFailure
 public typealias FetchAndParseApiRootFailure = WordPressAPIInternal.FetchAndParseApiRootFailure
 public typealias ApplicationPasswordsNotSupportedReason = WordPressAPIInternal.ApplicationPasswordsNotSupportedReason
 public typealias RequestExecutionErrorReason = WordPressAPIInternal.RequestExecutionErrorReason
+public typealias CloudflareErrorKind = WordPressAPIInternal.CloudflareErrorKind
 
 // MARK: - Users
 
@@ -187,6 +188,7 @@ public typealias CommentCreateParams = WordPressAPIInternal.CommentCreateParams
 public typealias CommentUpdateParams = WordPressAPIInternal.CommentUpdateParams
 public typealias CommentDeleteParams = WordPressAPIInternal.CommentDeleteParams
 public typealias CommentStatus = WordPressAPIInternal.CommentStatus
+public typealias WpApiParamCommentsStatus = WordPressAPIInternal.WpApiParamCommentsStatus
 public typealias CommentType = WordPressAPIInternal.CommentType
 public typealias CommentsRequestExecutor = WordPressAPIInternal.CommentsRequestExecutor
 
@@ -302,7 +304,6 @@ public typealias WpComSiteIdentifier = WordPressAPIInternal.WpComSiteIdentifier
 
 // MARK: Languages
 public typealias WPComLanguage = WordPressAPIInternal.WpComLanguage
-public typealias LanguagesGetParams = WordPressAPIInternal.LanguagesGetParams
 
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams

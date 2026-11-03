@@ -250,6 +250,11 @@ impl From<RequestExecutionError> for WordPressOrgApiClientError {
                     reason: "file not found".to_string(),
                 }
             }
+            RequestExecutionError::MediaFileUnreadable { .. } => {
+                WordPressOrgApiClientError::RequestEncodingError {
+                    reason: "file could not be read".to_string(),
+                }
+            }
         }
     }
 }

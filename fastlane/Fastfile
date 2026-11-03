@@ -735,12 +735,12 @@ end
 def set_up_certificate_in_keychain(type:, readonly:)
   require_env_vars!(*ASC_API_KEY_ENV_VARS, *CODE_SIGNING_STORAGE_ENV_VARS)
 
-  # This will fetch the certificate and provisioning profile for the given type from remote storage.
-  # It will then set them up in the local keychain, where 'codesign' looks for identities.
+  # This will fetch the certificate for the given type from remote storage
+  # and set it up in the local keychain, where 'codesign' looks for identities.
   #
-  # Notice we do not need the provisioning profile because we sign with 'codesign' elsewhere.
-  # However, there is no other way to set up the certificate in the keychain.
-  # Fastlane offers a tool called cert, but it only downloads certificates.
+  # Given XCFrameworks can be signed with Developer ID distribution and
+  # this framework has no entitlement requirement, we don't need a provisioning
+  # profile and therefore don't need an app identifier to match it with either.
   sync_code_signing(
     team_id: APPLE_TEAM_ID,
     api_key: app_store_connect_api_key,
@@ -749,12 +749,8 @@ def set_up_certificate_in_keychain(type:, readonly:)
     s3_region: 'us-east-2',
     s3_bucket: 'a8c-fastlane-match',
     readonly: readonly,
-    # We need to provide an app identifier, but remember we only care about the certificate that gets downloaded.
-    # The identifier is used to find a provisioning profile, but we don't care about it.
-    #
-    # Similar rationale for the platform argument,
-    # with the addition that it's required to identify the existing provisioning profile for the given app id.
-    app_identifier: 'com.automattic.hostmgr',
+    skip_provisioning_profiles: true,
+    app_identifier: [],
     platform: 'macos'
   )
 end

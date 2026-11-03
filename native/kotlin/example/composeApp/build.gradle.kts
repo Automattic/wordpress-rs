@@ -179,8 +179,14 @@ val generateWpComCredentials = tasks.register("generateWpComCredentials") {
 
         if (credentialsFile.exists()) {
             val json = groovy.json.JsonSlurper().parseText(credentialsFile.readText()) as Map<*, *>
-            val clientId = json["client_id"]
-            val clientSecret = json["client_secret"]
+            // `wp_com_test_credentials.json-example` ships `client_id: 0` / `client_secret: ""`, and a file
+            // holding only a `bearer_token` needs them to satisfy `integration_test_credentials`. Treat those
+            // as unset (matching the Swift example app), so OAuth sign-in isn't offered with unusable values.
+            val configuredId = (json["client_id"] as? Number)?.toLong()?.takeIf { it != 0L }
+            val configuredSecret = (json["client_secret"] as? String)?.takeIf { it.isNotEmpty() }
+            val isConfigured = configuredId != null && configuredSecret != null
+            val clientId = configuredId.takeIf { isConfigured }
+            val clientSecret = configuredSecret.takeIf { isConfigured }
             wpComCredentialsFile.writeText("""
                 package rs.wordpress.example
 

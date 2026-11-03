@@ -1,7 +1,7 @@
 use crate::{
+    date::WpDateString,
     impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
-    wp_com::language::WPComLanguage,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
@@ -42,19 +42,16 @@ pub struct StatsTopAuthorsParams {
     pub period: Option<StatsTopAuthorsPeriod>,
     /// The start date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub start_date: Option<String>,
+    pub start_date: Option<WpDateString>,
     /// The date to query stats for (format: YYYY-MM-DD).
     #[uniffi(default = None)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The maximum number of top authors to return.
     #[uniffi(default = None)]
     pub max: Option<u32>,
     /// The number of periods to include in the response.
     #[uniffi(default = None)]
     pub num: Option<u32>,
-    /// The locale for the response.
-    #[uniffi(default = None)]
-    pub locale: Option<WPComLanguage>,
     /// Whether to return a summary of the data.
     ///
     /// - `true` (default): Response contains `summary` field with aggregated data
@@ -71,7 +68,6 @@ impl Default for StatsTopAuthorsParams {
             date: None,
             max: None,
             num: None,
-            locale: None,
             summarize: true,
         }
     }
@@ -85,7 +81,6 @@ impl AppendUrlQueryPairs for StatsTopAuthorsParams {
             .append_option_query_value_pair("date", self.date.as_ref())
             .append_option_query_value_pair("max", self.max.as_ref())
             .append_option_query_value_pair("num", self.num.as_ref())
-            .append_option_query_value_pair("locale", self.locale.as_ref())
             .append_query_value_pair("summarize", &(self.summarize as u32));
     }
 }
@@ -98,7 +93,7 @@ impl AppendUrlQueryPairs for StatsTopAuthorsParams {
 #[derive(Debug, Serialize, Deserialize, uniffi::Record)]
 pub struct StatsTopAuthorsResponse {
     /// The date for the stats query.
-    pub date: String,
+    pub date: WpDateString,
     /// The time period used for grouping (present when summarize=1).
     pub period: Option<String>,
     /// Summary data with aggregated author views (present when summarize=1).
@@ -210,11 +205,10 @@ mod tests {
 
         let params = StatsTopAuthorsParams {
             period: Some(StatsTopAuthorsPeriod::Day),
-            start_date: Some("2026-01-30".to_string()),
-            date: Some("2026-02-05".to_string()),
+            start_date: Some(WpDateString::new("2026-01-30".to_string())),
+            date: Some(WpDateString::new("2026-02-05".to_string())),
             max: Some(10),
             num: Some(7),
-            locale: Some(WPComLanguage::English),
             summarize: true,
         };
 
@@ -223,7 +217,7 @@ mod tests {
 
         assert_eq!(
             query_pairs.finish().as_str(),
-            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-authors?period=day&start_date=2026-01-30&date=2026-02-05&max=10&num=7&locale=en&summarize=1"
+            "https://public-api.wordpress.com/rest/v1.1/sites/1234/stats/top-authors?period=day&start_date=2026-01-30&date=2026-02-05&max=10&num=7&summarize=1"
         );
     }
 
@@ -237,10 +231,9 @@ mod tests {
         let params = StatsTopAuthorsParams {
             period: Some(StatsTopAuthorsPeriod::Week),
             start_date: None,
-            date: Some("2026-02-05".to_string()),
+            date: Some(WpDateString::new("2026-02-05".to_string())),
             max: None,
             num: None,
-            locale: None,
             summarize: true,
         };
 
@@ -262,7 +255,7 @@ mod tests {
 
         let params = StatsTopAuthorsParams {
             period: Some(StatsTopAuthorsPeriod::Day),
-            date: Some("2026-02-05".to_string()),
+            date: Some(WpDateString::new("2026-02-05".to_string())),
             summarize: false,
             ..Default::default()
         };
@@ -285,7 +278,6 @@ mod tests {
         assert!(params.start_date.is_none());
         assert!(params.max.is_none());
         assert!(params.num.is_none());
-        assert!(params.locale.is_none());
     }
 
     #[rstest]
@@ -300,7 +292,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.date.is_empty());
+        assert!(!response.date.value.is_empty());
         assert!(response.period.is_some());
         assert!(!response.period.as_ref().unwrap().is_empty());
 
@@ -317,7 +309,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = response
@@ -346,7 +338,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert!(!response.date.is_empty());
+        assert!(!response.date.value.is_empty());
         assert!(response.summary.is_none());
         assert!(response.days.is_some());
     }
@@ -358,7 +350,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON");
 
-        assert_eq!(response.date, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
         assert!(response.period.is_none());
         assert!(response.summary.is_none());
 
@@ -400,7 +392,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with empty response");
 
-        assert_eq!(response.date, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = response
@@ -417,7 +409,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with null values");
 
-        assert_eq!(response.date, "2026-02-05");
+        assert_eq!(response.date.value, "2026-02-05");
 
         let summary = response
             .summary
@@ -487,7 +479,7 @@ mod tests {
         let response: StatsTopAuthorsResponse =
             serde_json::from_reader(file).expect("Unable to parse JSON with mixed follow_data");
 
-        assert_eq!(response.date, "2026-02-02");
+        assert_eq!(response.date.value, "2026-02-02");
         assert_eq!(response.period, Some("day".to_string()));
 
         let summary = response

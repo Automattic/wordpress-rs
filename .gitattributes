@@ -4,3 +4,6 @@
 # driver takes both. Note it does not deduplicate, so a reworded line can
 # leave a duplicate to tidy by hand.
 CHANGELOG.md merge=union
+
+# Recorded HTTP responses: keep their CRLF line endings byte for byte.
+test-data/cloudflare-responses/*.http -text

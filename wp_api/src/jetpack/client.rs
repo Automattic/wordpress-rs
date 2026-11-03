@@ -18,7 +18,8 @@ impl JetpackApiRequestBuilder {
         auth_provider: Arc<WpAuthenticationProvider>,
     ) -> Self {
         Self {
-            connection: ConnectionRequestBuilder::new(api_url_resolver, auth_provider).into(),
+            // The Jetpack namespace doesn't read a locale query parameter.
+            connection: ConnectionRequestBuilder::new(api_url_resolver, auth_provider, None).into(),
         }
     }
 

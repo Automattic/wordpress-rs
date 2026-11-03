@@ -1,0 +1,26 @@
+{
+    "date": "2026-10-08",
+    "utc_offset": "+03:00",
+    "period": "day",
+    "summary": {
+        "home": [
+            {
+                "href": "https://example.com/",
+                "value": 1,
+                "views": 31
+            }
+        ],
+        "search": [
+            {
+                "href": "https://example.com/?s=2024",
+                "value": 2024,
+                "views": 7
+            },
+            {
+                "href": "https://example.com/?s=swag",
+                "value": "swag",
+                "views": 4
+            }
+        ]
+    }
+}

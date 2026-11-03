@@ -1,6 +1,6 @@
 use libtest_mimic::Trial;
 use std::sync::Arc;
-use wp_api::wp_com::language::{LanguagesGetParams, WPComLanguage};
+use wp_api::wp_com::language::WPComLanguage;
 
 use crate::context::TestContext;
 
@@ -13,7 +13,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             ctx.runtime.block_on(async {
                 ctx.client
                     .languages()
-                    .get(&LanguagesGetParams::default())
+                    .get()
                     .await
                     .map_err(|e| e.to_string())?;
                 Ok(())
@@ -28,7 +28,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 let languages = ctx
                     .client
                     .languages()
-                    .get(&LanguagesGetParams::default())
+                    .get()
                     .await
                     .map_err(|e| e.to_string())?
                     .data;

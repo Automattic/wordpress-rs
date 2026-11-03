@@ -31,7 +31,7 @@ See [Android Studio Configuration](#android-studio-configuration) for required I
 
 - **Core:** Required for all platforms.
 - **Android:** Required for Android development.
-- **Apple Platforms:** Required for iOS, macOS, watchOS, and tvOS development.
+- **Apple Platforms:** Required for iOS, Mac Catalyst, macOS, watchOS, and tvOS development.
 - **Server:** Required for server-side development.
 
 ## Development
@@ -58,6 +58,25 @@ This project has several test suites. Integration tests require Docker, and you 
 | Rust Integration Tests           | `cargo test -p wp_api_integration_tests` | `make test-rust-integration`    |
 | Kotlin Integration Tests         | `cd native/kotlin && ./gradlew :api:kotlin:integrationTest` | `make test-kotlin-integration`   |
 | Swift Unit Tests                 | `swift test`                          | `make test-swift-linux-in-docker` |
+
+#### Running the test server without Docker
+
+On a Mac, the test server can also run directly on the machine. This is how the Swift integration tests run on our macOS CI, where Docker isn't available.
+
+```sh
+# Install PHP, MariaDB, Apache and jo using Homebrew
+make test-server-native-deps
+
+# Create a fresh test site and start it – `make stop-server-native` stops it
+make test-server-native
+
+make test-rust-integration-native
+
+# The Swift tests link the xcframework, so build one first – `make xcframework-only-macos`
+make test-swift-integration-native
+```
+
+The site is served on port 80, like the Docker one, so only one of them can run at a time. Everything the native test server creates lives in `.wordpress/`.
 
 #### Android Studio Configuration
 

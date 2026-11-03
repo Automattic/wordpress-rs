@@ -2,7 +2,8 @@
 
 set -e
 
-# This script sets up a WordPress test site on the `wordpress` docker image.
+# This script sets up a WordPress test site. It runs on the `wordpress` docker image, or directly on
+# the host through `native-test-server.sh`. Either way, it expects to start in the site's directory.
 # You might wonder "why not do this work once, then just import the database for each run?"
 # We do each step each time for each build because we're trying to get a "mint" condition site
 # for each WordPress version – if there are issues with DB migrations, different default themes
@@ -10,7 +11,19 @@ set -e
 
 # Run all the commands below as `www-data` (because that's what WordPress uses itself, so there shouldn't
 # be any weird permissions issues)
-su -s /bin/bash www-data
+#
+# This only applies to the docker image, where this script is piped to a root shell: `su` takes over
+# stdin, so the shell it starts is what reads and runs the rest of the script. On the host, the web
+# server and this script already run as the same user.
+if [ "$(id -u)" -eq 0 ]; then
+	su -s /bin/bash www-data
+fi
+
+# The wordpress-rs checkout. `docker-compose.yml` mounts it at `/app`.
+REPO_ROOT="${WORDPRESS_RS_REPO_ROOT:-/app}"
+
+DOWNLOADS_DIR="$(mktemp -d)"
+trap 'rm -rf "$DOWNLOADS_DIR"' EXIT
 
 ## Wait for the DB to be ready before attempting install – Docker can do this for us, but we get way better
 ## diagnostic information from `wp db check`, whereas if `wp core install` fails it won't tell us about issues
@@ -60,27 +73,27 @@ mkdir -p wp-content/uploads/fonts
 echo "--- :card_file_box: Importing Data"
 
 ## Download the sample data (https://codex.wordpress.org/Theme_Unit_Test)
-curl -s https://raw.githubusercontent.com/WPTT/theme-unit-test/master/themeunittestdata.wordpress.xml -C - -o /tmp/testdata.xml
+curl -s https://raw.githubusercontent.com/WPTT/theme-unit-test/master/themeunittestdata.wordpress.xml -o "$DOWNLOADS_DIR/testdata.xml"
 
 ## Then install the importer plugin
 wp plugin install wordpress-importer --activate
 
 ## Then install the test data (https://developer.wordpress.org/cli/commands/import/)
 echo "Importing test data..."
-wp import --quiet /tmp/testdata.xml --authors=create
+wp import --quiet "$DOWNLOADS_DIR/testdata.xml" --authors=create
 
 ## Then clean up the importer plugin
 wp plugin deactivate wordpress-importer
 wp plugin delete wordpress-importer
 
-curl -sSL https://downloads.wordpress.org/plugin/gutenberg.21.7.0.zip -o /tmp/gutenberg.zip
-unzip -q /tmp/gutenberg.zip -d wp-content/plugins/
+curl -sSL https://downloads.wordpress.org/plugin/gutenberg.21.7.0.zip -o "$DOWNLOADS_DIR/gutenberg.zip"
+unzip -q "$DOWNLOADS_DIR/gutenberg.zip" -d wp-content/plugins/
 wp plugin activate gutenberg
 
 # Install custom must-use plugins for integration tests
 mkdir -p wp-content/mu-plugins
-cp -v /app/scripts/test-site-mu-plugins/*.php wp-content/mu-plugins/
-cp -v /app/scripts/test-site-plugins/*.php wp-content/plugins/
+cp -v "$REPO_ROOT"/scripts/test-site-mu-plugins/*.php wp-content/mu-plugins/
+cp -v "$REPO_ROOT"/scripts/test-site-plugins/*.php wp-content/plugins/
 
 wp plugin activate books-plugin
 
@@ -382,7 +395,7 @@ create_test_credentials () {
   done
   REVISION_ID_FOR_GLOBAL_STYLES_ID=$((GLOBAL_STYLES_ID + 1))
 
-  rm -rf /app/test_credentials.json
+  rm -rf "$REPO_ROOT/test_credentials.json"
   jo -p \
     site_url="$SITE_URL" \
     admin_username="$ADMIN_USERNAME" \
@@ -439,7 +452,7 @@ create_test_credentials () {
     revision_id_for_global_styles_id="$REVISION_ID_FOR_GLOBAL_STYLES_ID" \
     autosaved_block_id="$AUTOSAVED_BLOCK_ID" \
     autosave_id_for_autosaved_block_id="$AUTOSAVE_ID_FOR_AUTOSAVED_BLOCK_ID" \
-    > /app/test_credentials.json
+    > "$REPO_ROOT/test_credentials.json"
 }
 create_test_credentials
 

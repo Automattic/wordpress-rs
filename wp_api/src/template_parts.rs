@@ -1,5 +1,6 @@
 use crate::{
     UserId,
+    date::WpDateString,
     post_types::PostType,
     posts::PostId,
     templates::{
@@ -67,9 +68,9 @@ pub struct SparseTemplatePart {
     #[WpContextualOption]
     #[serde(
         default,
-        deserialize_with = "wp_serde_helper::deserialize_false_or_string"
+        deserialize_with = "crate::date::deserialize_optional_date_string"
     )]
-    pub modified: Option<String>,
+    pub modified: Option<WpDateString>,
     #[WpContext(edit, embed, view)]
     pub area: Option<String>,
 }

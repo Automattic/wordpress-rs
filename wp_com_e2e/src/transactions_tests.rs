@@ -2,7 +2,7 @@ use crate::context::TestContext;
 use libtest_mimic::Trial;
 use std::sync::Arc;
 use wp_api::{
-    api_error::WpApiError,
+    api_error::{WpApiError, WpErrorCode},
     decimal2::Decimal2,
     wp_com::{
         CouponCode, CurrencyCode, WpComSiteId,
@@ -88,10 +88,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
                 match result {
                     Ok(_) => Err("expected redeeming an empty cart to fail".into()),
-                    // wp.com sends `{"error", "message"}`, which the error layer
-                    // doesn't parse, so the code is matched in the raw body.
-                    Err(WpApiError::UnknownError { response, .. })
-                        if response.contains("empty_cart") =>
+                    Err(WpApiError::WpError { error_code, .. })
+                        if error_code == WpErrorCode::CustomError("empty_cart".to_string()) =>
                     {
                         Ok(())
                     }

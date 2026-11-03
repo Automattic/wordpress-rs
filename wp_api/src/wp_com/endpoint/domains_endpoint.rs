@@ -49,9 +49,11 @@ mod tests {
             WpComSiteId,
             domains::{AllDomainsParams, CountryCode, DomainAvailabilityParams, DomainName},
             endpoint::tests::{
-                fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
-                validate_wp_com_rest_v1_2_endpoint, validate_wp_com_rest_v1_3_endpoint,
+                fixture_wp_com_api_url_resolver, language_provider,
+                validate_wp_com_rest_v1_1_endpoint, validate_wp_com_rest_v1_2_endpoint,
+                validate_wp_com_rest_v1_3_endpoint,
             },
+            language::WPComLanguage,
             segments::SegmentId,
         },
     };
@@ -191,6 +193,66 @@ mod tests {
         validate_wp_com_rest_v1_1_endpoint(endpoint.set_primary(&site_id), expected_path);
     }
 
+    #[rstest]
+    fn site_domains_sends_locale(localized_endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            localized_endpoint.site_domains(&WpComSiteId(12345)),
+            "/sites/12345/domains?locale=es",
+        );
+    }
+
+    #[rstest]
+    fn all_domains_sends_locale_on_v1_2(localized_endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            localized_endpoint.all_domains(&AllDomainsParams::default()),
+            "/all-domains?locale=es",
+        );
+    }
+
+    #[rstest]
+    fn is_available_sends_locale_on_v1_3(localized_endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_3_endpoint(
+            localized_endpoint.is_available(
+                &DomainName("example.com".to_string()),
+                &DomainAvailabilityParams::default(),
+            ),
+            "/domains/example.com/is-available?locale=es",
+        );
+    }
+
+    #[rstest]
+    fn locale_precedes_request_params(localized_endpoint: DomainsRequestEndpoint) {
+        // The locale is appended first so an endpoint's own parameters come after it.
+        validate_wp_com_rest_v1_1_endpoint(
+            localized_endpoint.suggestions(&base_domain_suggestions_params()),
+            "/domains/suggestions?locale=es&query=coolsite&quantity=5",
+        );
+    }
+
+    #[rstest]
+    fn post_requests_send_locale(localized_endpoint: DomainsRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            localized_endpoint.set_primary(&WpComSiteId(12345)),
+            "/sites/12345/domains/primary?locale=es",
+        );
+    }
+
+    #[rstest]
+    fn provider_returning_no_language_sends_no_locale(
+        fixture_wp_com_api_url_resolver: Arc<dyn ApiUrlResolver>,
+    ) {
+        // A client whose language doesn't map to a `WPComLanguage` sends nothing,
+        // leaving the choice to the server.
+        let endpoint = DomainsRequestEndpoint::with_language_provider(
+            fixture_wp_com_api_url_resolver,
+            language_provider(None),
+        );
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.site_domains(&WpComSiteId(12345)),
+            "/sites/12345/domains",
+        );
+    }
+
     fn base_domain_suggestions_params() -> DomainSuggestionsParams {
         DomainSuggestionsParams {
             query: "coolsite".to_string(),
@@ -209,5 +271,15 @@ mod tests {
         fixture_wp_com_api_url_resolver: Arc<dyn ApiUrlResolver>,
     ) -> DomainsRequestEndpoint {
         DomainsRequestEndpoint::new(fixture_wp_com_api_url_resolver)
+    }
+
+    #[fixture]
+    fn localized_endpoint(
+        fixture_wp_com_api_url_resolver: Arc<dyn ApiUrlResolver>,
+    ) -> DomainsRequestEndpoint {
+        DomainsRequestEndpoint::with_language_provider(
+            fixture_wp_com_api_url_resolver,
+            language_provider(Some(WPComLanguage::Spanish)),
+        )
     }
 }

@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use crate::date::WpGmtDateTime;
 use serde::{Deserialize, Serialize};
 use wp_contextual::WpContextual;
 
@@ -12,10 +13,10 @@ pub struct SparseApplicationPassword {
     #[WpContext(edit, embed, view)]
     pub name: Option<String>,
     #[WpContext(edit, view)]
-    pub created: Option<String>,
+    pub created: Option<WpGmtDateTime>,
     #[WpContextualOption]
     #[WpContext(edit, view)]
-    pub last_used: Option<String>,
+    pub last_used: Option<WpGmtDateTime>,
     #[WpContextualOption]
     #[WpContext(edit, view)]
     pub last_ip: Option<IpAddress>,

@@ -46,7 +46,7 @@ final class WPComService: ObservableObject {
                 callback: {
                     try await WPComApiClient.instance(loginManager: self.loginManager).supportBots
                         .getBotConversationList(
-                            botId: "jetpack-chat-mobile",
+                            botId: "wpcom-workflow-support_chat",
                             params: ListBotConversationParams()
                         )
                         .data

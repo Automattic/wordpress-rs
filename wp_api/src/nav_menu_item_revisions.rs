@@ -1,6 +1,6 @@
 use crate::{
     UserId,
-    date::WpGmtDateTime,
+    date::{WpDateString, WpGmtDateTime},
     nav_menu_items::{NavMenuItemId, NavMenuItemStatus, NavMenuItemType},
     nav_menus::NavMenuId,
     wp_content_i64_id,
@@ -15,7 +15,7 @@ pub struct SparseNavMenuItemRevision {
     #[WpContext(edit, embed, view)]
     pub author: Option<UserId>,
     #[WpContext(edit, embed, view)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     #[WpContext(edit, view)]
     pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, view)]
@@ -24,7 +24,7 @@ pub struct SparseNavMenuItemRevision {
     #[WpContext(edit, embed, view)]
     pub id: Option<NavMenuItemRevisionId>,
     #[WpContext(edit, view)]
-    pub modified: Option<String>,
+    pub modified: Option<WpDateString>,
     #[WpContext(edit, view)]
     pub modified_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]

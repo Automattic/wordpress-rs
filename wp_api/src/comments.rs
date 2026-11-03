@@ -1,6 +1,6 @@
 use crate::{
     UserAvatarSize, UserId, WpAdditionalFields, WpApiParamOrder, WpResponseString,
-    date::WpGmtDateTime,
+    date::{WpDateString, WpGmtDateTime},
     impl_as_query_value_from_to_string,
     posts::PostId,
     url_query::{
@@ -130,8 +130,12 @@ pub struct CommentListParams {
     pub post: Vec<PostId>,
     /// Limit result set to comments assigned a specific status. Requires authorization.
     /// Default: approve
+    ///
+    /// This is a [`WpApiParamCommentsStatus`], not a [`CommentStatus`],
+    /// because the query vocabulary differs from the stored status
+    /// vocabulary. See the type's documentation.
     #[uniffi(default = None)]
-    pub status: Option<CommentStatus>,
+    pub status: Option<WpApiParamCommentsStatus>,
     /// Limit result set to comments assigned a specific type. Requires authorization.
     /// Default: comment
     #[uniffi(default = None)]
@@ -215,7 +219,7 @@ pub struct CommentCreateParams {
     /// The date the comment was published, in the site's timezone.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The date the comment was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -290,7 +294,7 @@ impl CommentCreateParamsBuilder {
         self.params.author_user_agent = author_user_agent;
         self
     }
-    pub fn date(mut self, date: Option<String>) -> Self {
+    pub fn date(mut self, date: Option<WpDateString>) -> Self {
         self.params.date = date;
         self
     }
@@ -348,7 +352,7 @@ pub struct CommentUpdateParams {
     /// The date the comment was published, in the site's timezone.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
     /// The date the comment was published, as GMT.
     #[uniffi(default = None)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -388,8 +392,16 @@ pub struct SparseComment {
     #[WpContextualField]
     pub content: Option<SparseCommentContent>,
     #[WpContext(edit, embed, view)]
-    pub date: Option<String>,
+    pub date: Option<WpDateString>,
+    /// The date the comment was published, as GMT. `None` when it was never
+    /// set: this endpoint formats the column without guarding it, so a comment
+    /// with no date arrives as WordPress's zero date rather than `null`.
     #[WpContext(edit, view)]
+    #[WpContextualOption]
+    #[serde(
+        default,
+        deserialize_with = "crate::date::deserialize_optional_wp_gmt_date_time"
+    )]
     pub date_gmt: Option<WpGmtDateTime>,
     #[WpContext(edit, embed, view)]
     pub link: Option<String>,
@@ -402,7 +414,10 @@ pub struct SparseComment {
     #[serde(rename = "type")]
     #[WpContext(edit, embed, view)]
     pub comment_type: Option<CommentType>,
+    /// `None` when the site has "Show Avatars" turned off, because WordPress
+    /// then leaves the field out of the response entirely.
     #[WpContext(edit, embed, view)]
+    #[WpContextualOption]
     pub author_avatar_urls: Option<HashMap<UserAvatarSize, WpResponseString>>,
     #[serde(flatten)]
     #[WpContext(edit, embed, view)]
@@ -465,6 +480,54 @@ fn comment_status_from_string(value: String) -> CommentStatus {
     CommentStatus::from_str(value.as_str()).unwrap_or(CommentStatus::Custom(value))
 }
 
+/// Comment status values accepted by the `status` query param when listing
+/// comments.
+///
+/// This is deliberately a different type from [`CommentStatus`]. WordPress
+/// core's `WP_Comment_Query` recognizes the query values `approve`, `hold`,
+/// `all`, and `any`, and passes any other value through as a literal
+/// `comment_approved` column value. Approved comments are stored as `'1'`,
+/// so querying with the stored/response vocabulary (`status=approved`)
+/// matches nothing and silently returns an empty result set.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[uniffi::export(Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum WpApiParamCommentsStatus {
+    /// Approved and pending (hold) comments. Spam and trash are excluded.
+    All,
+    /// Every comment regardless of status, including spam, trash, and
+    /// custom statuses. `WP_Comment_Query` removes the status predicate
+    /// entirely for this value.
+    Any,
+    /// Approved comments. This is the server default when no status is sent,
+    /// and the only value permitted for unauthenticated requests.
+    Approve,
+    /// Pending comments.
+    Hold,
+    Spam,
+    Trash,
+    /// A custom `comment_approved` value, passed through as a literal.
+    #[serde(untagged)]
+    #[strum(default)]
+    Custom(String),
+}
+
+impl_as_query_value_from_to_string!(WpApiParamCommentsStatus);
+
 #[uniffi::export]
 fn comment_type_from_string(value: String) -> CommentType {
     CommentType::from_str(value.as_str()).unwrap_or(CommentType::Custom(value))
@@ -481,6 +544,52 @@ mod tests {
         },
     };
     use rstest::*;
+
+    /// `/wp/v2/comments` formats `comment_date_gmt` without guarding the
+    /// zero date, so a comment that has none arrives as that value rather
+    /// than `null`. It has to read as absent — anything else fails the whole
+    /// page, taking every other comment in the response with it.
+    #[rstest]
+    #[case::never_set(r#""-0001-11-30T00:00:00""#)]
+    #[case::null("null")]
+    #[case::empty_string(r#""""#)]
+    fn test_comment_date_gmt_reads_as_absent(#[case] date_gmt: &str) {
+        let json = format!(r#"{{"date_gmt": {date_gmt}}}"#);
+        let comment: SparseComment = serde_json::from_str(&json).expect("Unable to parse JSON");
+        assert_eq!(comment.date_gmt, None);
+    }
+
+    /// WordPress only registers `author_avatar_urls` while the site's "Show
+    /// Avatars" setting is on, so every comment omits it when that's off.
+    #[test]
+    fn test_comment_without_author_avatar_urls() {
+        let json = r#"{
+            "id": 1,
+            "author": 0,
+            "author_email": "jane@example.com",
+            "author_ip": "127.0.0.1",
+            "author_name": "Jane",
+            "author_url": "",
+            "author_user_agent": "",
+            "content": { "raw": "Hi", "rendered": "<p>Hi</p>\n" },
+            "date": "2026-09-03T10:00:00",
+            "date_gmt": "2026-09-03T08:00:00",
+            "link": "https://example.com/hello-world/#comment-1",
+            "parent": 0,
+            "post": 1,
+            "status": "approved",
+            "type": "comment"
+        }"#;
+        let edit: CommentWithEditContext =
+            serde_json::from_str(json).expect("Unable to parse JSON");
+        assert!(edit.author_avatar_urls.is_none());
+        let view: CommentWithViewContext =
+            serde_json::from_str(json).expect("Unable to parse JSON");
+        assert!(view.author_avatar_urls.is_none());
+        let embed: CommentWithEmbedContext =
+            serde_json::from_str(json).expect("Unable to parse JSON");
+        assert!(embed.author_avatar_urls.is_none());
+    }
 
     #[rstest]
     #[case(CommentListParams::default(), "")]
@@ -509,11 +618,13 @@ mod tests {
     #[case(generate!(CommentListParams, (parent, vec![CommentId(44444), CommentId(44445)])), "parent=44444%2C44445")]
     #[case(generate!(CommentListParams, (parent_exclude, vec![CommentId(55555), CommentId(55556)])), "parent_exclude=55555%2C55556")]
     #[case(generate!(CommentListParams, (post, vec![PostId(66666), PostId(66667)])), "post=66666%2C66667")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Hold))), "status=hold")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Approved))), "status=approved")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Spam))), "status=spam")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Trash))), "status=trash")]
-    #[case(generate!(CommentListParams, (status, Some(CommentStatus::Custom("foo".to_string())))), "status=foo")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::All))), "status=all")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Any))), "status=any")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Approve))), "status=approve")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Hold))), "status=hold")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Spam))), "status=spam")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Trash))), "status=trash")]
+    #[case(generate!(CommentListParams, (status, Some(WpApiParamCommentsStatus::Custom("foo".to_string())))), "status=foo")]
     #[case(generate!(CommentListParams, (comment_type, Some(CommentType::Comment))), "type=comment")]
     #[case(generate!(CommentListParams, (comment_type, Some(CommentType::Pingback))), "type=pingback")]
     #[case(generate!(CommentListParams, (comment_type, Some(CommentType::Trackback))), "type=trackback")]
@@ -536,7 +647,7 @@ mod tests {
             parent: vec![CommentId(44444), CommentId(44445)],
             parent_exclude: vec![CommentId(55555), CommentId(55556)],
             post: vec![PostId(66666), PostId(66667)],
-            status: Some(CommentStatus::Spam),
+            status: Some(WpApiParamCommentsStatus::Spam),
             comment_type: Some(CommentType::Pingback),
             password: Some("p_q".to_string()),
         },

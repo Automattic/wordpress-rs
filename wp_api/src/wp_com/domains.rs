@@ -13,6 +13,7 @@ use crate::{
     },
 };
 use serde::{Deserialize, Serialize};
+use wp_serde_helper::deserialize_optional_bool_or_int;
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct DomainSuggestionsParams {
@@ -905,6 +906,10 @@ pub struct SiteDomain {
     /// Whether this is a free WordPress.com subdomain.
     pub wpcom_domain: Option<bool>,
     /// Whether automatic renewal is enabled.
+    ///
+    /// Arrives as either a JSON boolean or `0`/`1` depending on the domain
+    /// type, so both encodings are accepted.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
     pub auto_renewing: Option<bool>,
     /// Whether the domain has expired.
     pub expired: Option<bool>,
@@ -1005,7 +1010,9 @@ pub struct SiteDomain {
     pub domain_registration_agreement_url: Option<String>,
     /// Google Workspace email subscription, if configured.
     pub google_apps_subscription: Option<GoogleAppsSubscription>,
-    /// Time when domain registration becomes pending, if applicable.
+    /// How long a pending registration is expected to take, phrased for
+    /// display. Despite the name this is a duration, not a point in time, so
+    /// it is not a date.
     pub pending_registration_time: Option<String>,
     /// Whether a WHOIS update is pending.
     pub pending_whois_update: Option<bool>,
@@ -1099,7 +1106,7 @@ mod tests {
         // Date-only `"YYYY-MM-DD"` expiry, the real-world format from the API.
         assert_eq!(
             registration.expiry,
-            Some(WpDateString("2027-01-01".to_string()))
+            Some(WpDateString::new("2027-01-01".to_string()))
         );
         // The API returns `subscription_id` as a string, not a number.
         assert_eq!(registration.subscription_id, Some(SubscriptionId(55555)));
@@ -1691,14 +1698,14 @@ mod tests {
         assert_eq!(registered.expired, Some(false));
         assert_eq!(
             registered.expiry,
-            Some(WpDateString("2027-03-15".to_string()))
+            Some(WpDateString::new("2027-03-15".to_string()))
         );
         assert_eq!(registered.expiry_soon, Some(false));
         assert_eq!(registered.has_registration, Some(true));
         assert_eq!(registered.has_private_registration, Some(true));
         assert_eq!(
             registered.registration_date,
-            Some(WpDateString("2024-03-15".to_string()))
+            Some(WpDateString::new("2024-03-15".to_string()))
         );
         assert_eq!(registered.is_renewable, Some(true));
         assert_eq!(registered.is_redeemable, Some(false));
@@ -1720,11 +1727,11 @@ mod tests {
         assert_eq!(registered.contact_info_disclosure_available, Some(true));
         assert_eq!(
             registered.auto_renewal_date,
-            Some(WpDateString("2027-03-15".to_string()))
+            Some(WpDateString::new("2027-03-15".to_string()))
         );
         assert_eq!(
             registered.renewable_until,
-            Some(WpDateString("2027-04-15".to_string()))
+            Some(WpDateString::new("2027-04-15".to_string()))
         );
     }
 
@@ -1746,7 +1753,7 @@ mod tests {
         assert_eq!(google.is_eligible_for_introductory_offer, Some(false));
         assert_eq!(
             google.subscribed_date,
-            Some(WpDateString("2024-07-15T10:00:00+00:00".to_string()))
+            Some(WpDateString::new("2024-07-15T10:00:00+00:00".to_string()))
         );
         assert_eq!(google.subscription_id, Some(SubscriptionId(55001)));
         assert_eq!(google.owned_by_user_id, Some(WpComUserId(33001)));
@@ -1812,6 +1819,35 @@ mod tests {
         );
         assert_eq!(mapped.supports_domain_connect, Some(true));
         assert_eq!(mapped.has_wpcom_nameservers, Some(false));
+    }
+
+    /// `auto_renewing` arrives as an integer on some domains and a boolean on
+    /// others, and a single response mixes the two. Typing it as a plain
+    /// `bool` failed the whole response with "invalid type: integer 0,
+    /// expected a boolean" for any site with a mapped domain.
+    #[test]
+    fn test_site_domains_auto_renewing_accepts_bool_and_int() {
+        let file = File::open("tests/wpcom/domains/site_domains/with-email-subscriptions.json")
+            .expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(
+            response.domains[1].auto_renewing,
+            Some(false),
+            "the mapped domain encodes it as the integer 0"
+        );
+
+        let file =
+            File::open("tests/wpcom/domains/site_domains/basic.json").expect("Failed to open file");
+        let response: SiteDomainsResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert_eq!(
+            response.domains[0].auto_renewing,
+            Some(false),
+            "the wpcom subdomain encodes it as a boolean"
+        );
     }
 
     #[test]

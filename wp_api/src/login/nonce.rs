@@ -73,6 +73,7 @@ impl WpRestNonceRetrieval {
                     request_executor: self.request_executor.clone(),
                     middleware_pipeline: WpApiMiddlewarePipeline::default().into(),
                     app_notifier: Arc::new(EmptyAppNotifier),
+                    language_provider: None,
                 },
             );
             let logged_in = users.retrieve_me_with_edit_context().await?.data.username;

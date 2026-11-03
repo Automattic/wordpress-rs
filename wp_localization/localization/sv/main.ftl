@@ -1,3 +1,9 @@
+device_is_offline = Ingen internetanslutning. Kontrollera dina nätverksinställningar och försök igen.
+
+media_file_unreadable = Mediafil på { $path } kunde inte läsas.
+
+database_generic_message = Det var ett problem att ladda in dina data: { $reason }.
+
 already_logged_in = Du är redan inloggad som { $username }.
 
 site_error_message = { $error_message }

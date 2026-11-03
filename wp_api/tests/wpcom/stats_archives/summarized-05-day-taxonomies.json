@@ -1,0 +1,30 @@
+{
+    "date": "2026-10-08",
+    "utc_offset": "+03:00",
+    "period": "day",
+    "summary": {
+        "cat": [
+            {
+                "href": "https://example.com/category/benefits/",
+                "value": "benefits",
+                "views": 27
+            }
+        ],
+        "tax": {
+            "topics": [
+                {
+                    "href": "https://example.com/topics/jetpack/",
+                    "value": "jetpack",
+                    "views": 4
+                }
+            ],
+            "series": [
+                {
+                    "href": "https://example.com/series/field-notes/",
+                    "value": "field-notes",
+                    "views": 2
+                }
+            ]
+        }
+    }
+}

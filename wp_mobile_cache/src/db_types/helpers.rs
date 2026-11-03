@@ -5,6 +5,7 @@ use crate::{
 use rusqlite::Row;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use wp_api::date::WpDateString;
 
 /// Helper to get a required ID wrapper type (e.g., PostId, UserId) from a row.
 pub fn get_id<T, C>(row: &Row, column: C) -> Result<T, SqliteDbError>
@@ -14,6 +15,15 @@ where
 {
     let id: i64 = row.get_column(column)?;
     Ok(id.into())
+}
+
+/// Helper to get a required [`WpDateString`] from a string column.
+pub fn get_date_string<C>(row: &Row, column: C) -> Result<WpDateString, SqliteDbError>
+where
+    C: ColumnIndex,
+{
+    let value: String = row.get_column(column)?;
+    Ok(WpDateString::new(value))
 }
 
 /// Helper to get an optional ID wrapper type from a row.
@@ -123,6 +133,20 @@ where
     let datetime_str: String = row.get_column(column)?;
     datetime_str
         .parse()
+        .map_err(|e| SqliteDbError::SqliteError(format!("Failed to parse datetime: {}", e)))
+}
+
+/// Helper to parse an optional DateTime-like type from a string column.
+pub fn parse_optional_datetime<T, C>(row: &Row, column: C) -> Result<Option<T>, SqliteDbError>
+where
+    T: FromStr,
+    T::Err: std::fmt::Display,
+    C: ColumnIndex,
+{
+    let datetime_str: Option<String> = row.get_column(column)?;
+    datetime_str
+        .map(|s| s.parse())
+        .transpose()
         .map_err(|e| SqliteDbError::SqliteError(format!("Failed to parse datetime: {}", e)))
 }
 

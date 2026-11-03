@@ -1,7 +1,7 @@
 use crate::context::TestContext;
 use libtest_mimic::Trial;
 use std::sync::Arc;
-use wp_api::wp_com::{language::WPComLanguage, site_plans::SitePlansParams};
+use wp_api::wp_com::site_plans::SitePlansParams;
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     let mut trials = vec![];
@@ -55,33 +55,6 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 // availability, since there's nothing to transition from.
                 if current[0].transition.is_some() {
                     return Err("the current plan should not report a transition".into());
-                }
-
-                Ok(())
-            })
-        }
-    }));
-
-    trials.push(Trial::test("site_plans::list_with_locale", {
-        let ctx = Arc::clone(&ctx);
-        move || {
-            ctx.runtime.block_on(async {
-                let plans = ctx
-                    .client
-                    .site_plans()
-                    .list(
-                        &site_id,
-                        &SitePlansParams {
-                            locale: Some(WPComLanguage::Spanish),
-                            ..Default::default()
-                        },
-                    )
-                    .await
-                    .map_err(|e| e.to_string())?
-                    .data;
-
-                if plans.is_empty() {
-                    return Err("expected at least one plan with locale".into());
                 }
 
                 Ok(())

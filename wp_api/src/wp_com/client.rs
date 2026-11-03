@@ -12,6 +12,7 @@ use super::endpoint::{
     purchases_endpoint::{PurchasesRequestBuilder, PurchasesRequestExecutor},
     shopping_cart_endpoint::{ShoppingCartRequestBuilder, ShoppingCartRequestExecutor},
     site_plans_endpoint::{SitePlansRequestBuilder, SitePlansRequestExecutor},
+    stats_archives_endpoint::{StatsArchivesRequestBuilder, StatsArchivesRequestExecutor},
     stats_city_views_endpoint::{StatsCityViewsRequestBuilder, StatsCityViewsRequestExecutor},
     stats_clicks_endpoint::{StatsClicksRequestBuilder, StatsClicksRequestExecutor},
     stats_country_views_endpoint::{
@@ -71,6 +72,7 @@ use crate::{
         segments_endpoint::{SegmentsRequestBuilder, SegmentsRequestExecutor},
         sites_endpoint::{SitesRequestBuilder, SitesRequestExecutor},
     },
+    wp_com::language::WpComLanguageProvider,
 };
 use std::sync::Arc;
 
@@ -88,6 +90,7 @@ pub struct WpComApiRequestBuilder {
     shopping_cart: Arc<ShoppingCartRequestBuilder>,
     site_plans: Arc<SitePlansRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
+    stats_archives: Arc<StatsArchivesRequestBuilder>,
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
     stats_clicks: Arc<StatsClicksRequestBuilder>,
     stats_file_downloads: Arc<StatsFileDownloadsRequestBuilder>,
@@ -118,12 +121,16 @@ pub struct WpComApiRequestBuilder {
 }
 
 impl WpComApiRequestBuilder {
-    pub fn new(auth_provider: Arc<WpAuthenticationProvider>) -> Self {
+    pub fn new(
+        auth_provider: Arc<WpAuthenticationProvider>,
+        language_provider: Option<Arc<dyn WpComLanguageProvider>>,
+    ) -> Self {
         let api_url_resolver: Arc<dyn ApiUrlResolver> =
             Arc::new(WpComApiClientInternalUrlResolver::default());
         api_client_generate_request_builder!(
             api_url_resolver,
-            auth_provider;
+            auth_provider,
+            language_provider;
             domains,
             followers,
             jetpack_connection,
@@ -137,6 +144,7 @@ impl WpComApiRequestBuilder {
             shopping_cart,
             site_plans,
             sites,
+            stats_archives,
             stats_city_views,
             stats_clicks,
             stats_file_downloads,
@@ -197,6 +205,7 @@ pub struct WpComApiClient {
     shopping_cart: Arc<ShoppingCartRequestExecutor>,
     site_plans: Arc<SitePlansRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
+    stats_archives: Arc<StatsArchivesRequestExecutor>,
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
     stats_clicks: Arc<StatsClicksRequestExecutor>,
     stats_file_downloads: Arc<StatsFileDownloadsRequestExecutor>,
@@ -247,6 +256,7 @@ impl WpComApiClient {
             shopping_cart,
             site_plans,
             sites,
+            stats_archives,
             stats_city_views,
             stats_clicks,
             stats_file_downloads,
@@ -290,6 +300,7 @@ api_client_generate_endpoint_impl!(WpComApi, purchases);
 api_client_generate_endpoint_impl!(WpComApi, shopping_cart);
 api_client_generate_endpoint_impl!(WpComApi, site_plans);
 api_client_generate_endpoint_impl!(WpComApi, sites);
+api_client_generate_endpoint_impl!(WpComApi, stats_archives);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_clicks);
 api_client_generate_endpoint_impl!(WpComApi, stats_file_downloads);

@@ -12,7 +12,8 @@ import uniffi.wp_api.WpApiMiddlewarePipeline
 class WpLoginClient @JvmOverloads constructor(
     requestExecutor: RequestExecutor,
     middlewarePipeline: WpApiMiddlewarePipeline = WpApiMiddlewarePipeline(listOf()),
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val errorLogger: RequestErrorLogger? = null
 ) {
 
     private val internalClient: UniffiWpLoginClient =
@@ -27,35 +28,25 @@ class WpLoginClient @JvmOverloads constructor(
         interceptors: List<Interceptor> = listOf(),
         networkAvailabilityProvider: NetworkAvailabilityProvider,
         middlewarePipeline: WpApiMiddlewarePipeline = WpApiMiddlewarePipeline(listOf()),
-        dispatcher: CoroutineDispatcher = Dispatchers.IO
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        errorLogger: RequestErrorLogger? = null
     ) : this(
         requestExecutor = WpRequestExecutor(interceptors, networkAvailabilityProvider),
         middlewarePipeline = middlewarePipeline,
-        dispatcher = dispatcher
+        dispatcher = dispatcher,
+        errorLogger = errorLogger
     )
 
     suspend fun apiDiscovery(
         siteUrl: String
     ): ApiDiscoveryResult = withContext(dispatcher) {
         try {
-            val success = internalClient.apiDiscovery(siteUrl, null)
-            ApiDiscoveryResult.Success(success)
+            ApiDiscoveryResult.Success(internalClient.apiDiscovery(siteUrl, null))
         } catch (exception: AutoDiscoveryAttemptFailure) {
-            when (exception) {
-                is AutoDiscoveryAttemptFailure.ParseSiteUrl -> ApiDiscoveryResult.FailureParseSiteUrl(
-                    error = exception.error,
-                )
-                is AutoDiscoveryAttemptFailure.FindApiRoot -> ApiDiscoveryResult.FailureFindApiRoot(
-                    parsedSiteUrl = exception.parsedSiteUrl.toURL(),
-                    findApiRootFailure = exception.findApiRootFailure,
-                )
-
-                is AutoDiscoveryAttemptFailure.FetchAndParseApiRoot -> ApiDiscoveryResult.FailureFetchAndParseApiRoot(
-                    parsedSiteUrl = exception.parsedSiteUrl.toURL(),
-                    apiRootUrl = exception.apiRootUrl.toURL(),
-                    fetchAndParseApiRootFailure = exception.fetchAndParseApiRootFailure
-                )
-            }
+            errorLogger?.logFailedDiscovery(exception)
+            // Pass the failure straight through: it carries its own sealed variants to
+            // match on and the localized, translated message (`localizedDescription()`).
+            ApiDiscoveryResult.Failure(exception)
         }
     }
 }

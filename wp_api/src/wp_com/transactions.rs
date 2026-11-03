@@ -94,7 +94,7 @@ pub struct TransactionReceipt {
     /// Receipt total formatted for display (e.g. `"C$33.90"`).
     pub display_price: String,
     /// Receipt total in the smallest unit of [`currency`](Self::currency).
-    pub price_integer: u64,
+    pub price_integer: i64,
     /// Receipt total as a decimal amount.
     pub price_float: Decimal2,
     pub currency: CurrencyCode,
@@ -127,7 +127,7 @@ pub struct TransactionPurchase {
     /// Email address of the buyer.
     pub user_email: String,
     /// Amount paid in the smallest unit of the receipt's currency.
-    pub price_integer: u64,
+    pub price_integer: i64,
     /// When the purchased subscription expires. `None` for products that
     /// don't create a subscription.
     #[serde(default)]
@@ -226,7 +226,7 @@ mod tests {
         assert_eq!(domain.blog_id, Some(WpComSiteId(98765432)));
         assert_eq!(
             domain.expiry,
-            Some(WpDateString("2030-01-15".to_string())),
+            Some(WpDateString::new("2030-01-15".to_string())),
             "expiry is a date without a time component"
         );
         assert!(domain.product_name_short.is_none());

@@ -204,6 +204,7 @@ impl JetpackConnectionClient {
             request_executor: self.delegate.request_executor.clone(),
             middleware_pipeline: self.delegate.middleware_pipeline.clone(),
             app_notifier: self.delegate.app_notifier.clone(),
+            language_provider: self.delegate.language_provider.clone(),
         });
         let params = JetpackRemoteConnectionParams {
             secret: provision_info.secret,

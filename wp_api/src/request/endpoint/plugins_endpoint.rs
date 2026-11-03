@@ -33,6 +33,7 @@ mod tests {
             ApiUrlResolver,
             tests::{fixture_wp_org_site_api_url_resolver, validate_wp_v2_endpoint},
         },
+        wp_com::{endpoint::tests::language_provider, language::WPComLanguage},
     };
     use rstest::*;
     use std::sync::Arc;
@@ -198,6 +199,22 @@ mod tests {
         #[case] expected_path: &str,
     ) {
         validate_wp_v2_endpoint(endpoint.update(&plugin_slug), expected_path);
+    }
+
+    #[rstest]
+    fn wp_org_namespace_ignores_a_language_provider(
+        fixture_wp_org_site_api_url_resolver: Arc<dyn ApiUrlResolver>,
+    ) {
+        // A delegate shared with a WordPress.com client carries a language provider.
+        // `WpNamespace` declares no locale parameter, so nothing is appended here.
+        let endpoint = PluginsRequestEndpoint::with_language_provider(
+            fixture_wp_org_site_api_url_resolver,
+            language_provider(Some(WPComLanguage::Spanish)),
+        );
+        validate_wp_v2_endpoint(
+            endpoint.update(&"classic-editor/classic-editor".into()),
+            "/plugins/classic-editor/classic-editor",
+        );
     }
 
     #[fixture]

@@ -91,6 +91,52 @@
     "interval": 1095,
     "badges": ["Fake popular"]
   },
+  "9007": {
+    "formatted_original_price": "$60",
+    "original_price": {},
+    "raw_price": 900,
+    "raw_price_integer": 90000,
+    "formatted_price": "$900",
+    "raw_discount": -840,
+    "raw_discount_integer": -84000,
+    "formatted_discount": "-$840",
+    "product_id": 9007,
+    "product_slug": "fake-ecommerce-bundle-3y",
+    "product_name": "Fake Ecommerce",
+    "discount_reason": "Your fake recent plan purchase is deducted from the price ($60).",
+    "cost_overrides": [
+      {
+        "old_price": 60,
+        "new_price": 1500,
+        "override_code": "fake-multiterm-upgrade",
+        "does_override_original_cost": false,
+        "human_readable_reason": "Fake remaining billing periods",
+        "percentage": 0,
+        "first_unit_only": false
+      },
+      {
+        "old_price": 1500,
+        "new_price": 900,
+        "override_code": "fake-plan-proration",
+        "does_override_original_cost": false,
+        "human_readable_reason": "Fake prorated balance from previous plan",
+        "percentage": 0,
+        "first_unit_only": false
+      }
+    ],
+    "is_domain_upgrade": null,
+    "currency_code": "USD",
+    "plan_card_order": 3,
+    "tagline": "Sell fake things to fake people.",
+    "plan_card_name": "Ecommerce",
+    "product_tier_id": 7003,
+    "product_tier_product_ids": [9007],
+    "can_start_trial": false,
+    "available_for_upgrade": true,
+    "available_for_downgrade": false,
+    "interval": 1095,
+    "badges": []
+  },
   "9001": {
     "formatted_original_price": "$0",
     "original_price": {},

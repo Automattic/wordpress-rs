@@ -1,6 +1,7 @@
 use macro_helper::generate_update_test;
+use wp_api::date::WpDateString;
 use wp_api::{
-    media::{MediaCreateParams, MediaUpdateParams},
+    media::{MediaCreateParams, MediaPostProcessAction, MediaPostProcessParams, MediaUpdateParams},
     posts::{PostCommentStatus, PostPingStatus, PostStatus},
 };
 use wp_api_integration_tests::prelude::*;
@@ -33,12 +34,36 @@ async fn delete_media() {
     RestoreServer::db().await;
 }
 
-generate_update_test!(update_date, date, "2024-09-09T12:00:00".to_string());
+/// The server generates only the sub-sizes the attachment is missing, so this is a no-op
+/// when the test site's attachment already has all of them. It's kept alongside the
+/// mutating tests because the same call does write sub-sizes when any are missing.
+#[tokio::test]
+#[serial]
+async fn post_process_media() {
+    api_client()
+        .media()
+        .post_process(
+            &MEDIA_ID_611,
+            &MediaPostProcessParams {
+                action: MediaPostProcessAction::CreateImageSubsizes,
+            },
+        )
+        .await
+        .assert_response();
+
+    RestoreServer::db().await;
+}
+
+generate_update_test!(
+    update_date,
+    date,
+    WpDateString::new("2024-09-09T12:00:00".to_string())
+);
 
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00")
 );
 
 generate_update_test!(update_slug, slug, "new_slug".to_string());

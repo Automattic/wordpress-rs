@@ -22,6 +22,10 @@ fun <T> mapWpApiExceptionToWpRequestResult(apiException: WpApiException): WpRequ
             filePath = apiException.filePath
         )
 
+        is WpApiException.MediaFileUnreadable -> WpRequestResult.MediaFileUnreadable<T>(
+            filePath = apiException.filePath
+        )
+
         is WpApiException.ResponseParsingException -> WpRequestResult.ResponseParsingError<T>(
             reason = apiException.reason,
             response = apiException.response,

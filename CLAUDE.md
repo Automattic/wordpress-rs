@@ -39,7 +39,7 @@ swift build --target WordPressAPI
 cd native/kotlin && ./gradlew :api:kotlin:compileKotlin :api:kotlin:detekt
 ```
 
-**Do not run `make xcframework` to verify a local change.** It builds all 11
+**Do not run `make xcframework` to verify a local change.** It builds all 12
 Apple targets, consumes ~100GB in `target/`, and takes tens of minutes. It is
 what CI and releases need, not what a code change needs. Note also that
 `xcframework-only-<platform>` *replaces* the xcframework rather than adding a
@@ -70,12 +70,26 @@ make test-server
 cargo test -p wp_api_integration_tests
 ```
 
+On a Mac, the test server can also run without Docker, which is how macOS CI runs it. Install its
+Homebrew dependencies once with `make test-server-native-deps`, then:
+```bash
+# Start test server (stop it with `make stop-server-native`)
+make test-server-native
+
+# Run the integration tests
+make test-rust-integration-native
+
+# Run the Swift integration tests (needs `make xcframework-only-macos` first)
+make test-swift-integration-native
+```
+
 Test credentials are configured in:
 - `test_credentials.json` (WordPress.org)
 - `wp_com_test_credentials.json` (WordPress.com)
 
 ## Important Files
 
+- `CONVENTIONS.md` - Rules for modelling API responses; read before adding types
 - `Makefile` - Build automation and platform-specific targets
 - `wp_api/src/lib.rs` - Main library entry point
 - `wp_api/src/request.rs` - Core request/response handling

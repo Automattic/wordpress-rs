@@ -100,6 +100,92 @@ struct SafeRequestExecutorTests {
             }
         }
     }
+
+    // End-to-end companion for `MediaFileUnreadable` (#1546), mirroring the timeout test above and
+    // Kotlin's `MockWebServer` executor test. A directory at the upload path passes field
+    // construction (`attributesOfItem` is a `stat`, needing no read permission) but fails the stream
+    // read (EISDIR) — the deterministic, uid-independent sibling of a genuine mid-read. Serialization
+    // happens before any network I/O, so no `URLProtocol` is needed. This guards the chain the
+    // isolated `MultipartFormTests` can't reach — `WpMultipartFormRequest.perform`'s do/catch, the
+    // `asRequestExecutionError` mapping, and the Rust round-trip — so a future refactor that re-drops
+    // the failure to `.genericError` is caught here.
+    @Test("A mid-read serialization failure surfaces end-to-end as .MediaFileUnreadable", .timeLimit(.minutes(1)))
+    func testMediaFileUnreadableSurfacesEndToEnd() async throws {
+        // A directory opens (`stat` succeeds) yet can't be read as a file. `chmod 000` would be
+        // bypassed when tests run as root (common in CI); a directory's EISDIR is enforced for every uid.
+        let directoryPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true).path
+        try FileManager.default.createDirectory(atPath: directoryPath, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: directoryPath) }
+
+        // Serialization fails before the upload, so the session is never used for I/O; the short
+        // request timeout only bounds a hang if a regression ever lets the request reach the network.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 0.3
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+
+        let api = try WordPressAPI(
+            siteInfo: .selfHosted(
+                siteUrl: ParsedUrl.parse(input: "https://example.com"),
+                apiRoot: ParsedUrl.parse(input: "https://example.com/wp-json")
+            ),
+            authenticationProvider: .none(),
+            executor: WpRequestExecutor(urlSession: session),
+            middlewarePipeline: .default,
+            appNotifier: nil
+        )
+
+        await #expect(
+            throws: WpApiError.MediaFileUnreadable(filePath: directoryPath),
+            performing: {
+                _ = try await api.media.create(params: .init(filePath: directoryPath))
+            }
+        )
+    }
+
+    // Regression test for #1501: three `URLError` codes that mean the device can't use the network
+    // right now — cellular data disallowed (`.dataNotAllowed`), international roaming off
+    // (`.internationalRoamingOff`), and an active call holding a single-radio device
+    // (`.callIsActive`) — had no branch in `errorIsDeviceIsOffline`, so they fell through to the
+    // catch-all `.genericError` instead of `.deviceIsOfflineError`. Drive each code through the real
+    // URLSession completion path via a `URLProtocol` that fails the request with it, and assert the
+    // reason is `.deviceIsOfflineError`. These codes are produced by device state a test can't set
+    // (cellular policy, roaming, an in-progress call), so injecting the `URLError` is the only way to
+    // exercise the branch.
+    //
+    // Excluded on watchOS: unlike a natural `.timedOut` (which round-trips fine there), watchOS's URL
+    // loading system does not faithfully deliver these cellular-radio codes when they are *injected*
+    // via `URLProtocolClient`, so the stub can't drive the branch on that platform. The classifier
+    // itself is platform-agnostic (`errorIsDeviceIsOffline` has no `#if`), and is exercised on macOS,
+    // iOS, and tvOS. The watchOS simulator leg of build #6181 caught this.
+    #if !os(watchOS)
+    @Test(
+        "OS 'can't use the network right now' codes are classified as .deviceIsOfflineError",
+        arguments: [URLError.Code.dataNotAllowed, .internationalRoamingOff, .callIsActive]
+    )
+    func testDeviceCannotUseNetworkCodesAreClassifiedAsDeviceIsOffline(code: URLError.Code) async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [FailingURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+        let executor = WpRequestExecutor(urlSession: session)
+
+        let result = await executor.perform(FailingRequest(code: code))
+
+        guard case .failure(let error) = result,
+            case .RequestExecutionFailed(_, _, let reason, _, _) = error
+        else {
+            Issue.record("Expected a RequestExecutionFailed failure for \(code), got \(result)")
+            return
+        }
+
+        guard case .deviceIsOfflineError = reason else {
+            Issue.record("Expected .deviceIsOfflineError for \(code), got \(reason)")
+            return
+        }
+    }
+    #endif // !os(watchOS)
     #endif
 }
 
@@ -135,4 +221,45 @@ private final class NeverRespondingURLProtocol: URLProtocol {
     }
     override func stopLoading() {}
 }
+
+// Only used by the watchOS-excluded test above, so gated identically to avoid an unused-type warning.
+#if !os(watchOS)
+/// A `URLProtocol` that fails every request with the `URLError.Code` carried in a request header,
+/// letting a test drive a specific OS error code through the real URLSession completion path
+/// without depending on device state (cellular policy, roaming, an in-progress call) it can't set.
+private final class FailingURLProtocol: URLProtocol {
+    static let codeHeader = "X-Test-URLError-Code"
+
+    override static func canInit(with request: URLRequest) -> Bool { true }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let rawCode = request.value(forHTTPHeaderField: Self.codeHeader).flatMap { Int($0) }
+        let code = rawCode.map { URLError.Code(rawValue: $0) } ?? .unknown
+        client?.urlProtocol(self, didFailWithError: URLError(code))
+    }
+    override func stopLoading() {}
+}
+
+/// A `NetworkRequestContent` that issues its request through the executor's session, tagging it with
+/// the `URLError.Code` for `FailingURLProtocol` to fail with.
+private struct FailingRequest: NetworkRequestContent {
+    let code: URLError.Code
+
+    func requestId() -> String { "1501-device-offline-regression" }
+    func method() -> RequestMethod { .get }
+    func url() -> WpEndpointUrl { "https://example.com/wp-json/" }
+    func headerMap() -> WpNetworkHeaderMap { .empty }
+    func encodeBody(into _: inout URLRequest) throws {}
+
+    func perform(
+        in session: URLSession,
+        withAdditionalHeaders _: [String: String],
+        delegate _: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        var request = URLRequest(url: URL(string: url())!)
+        request.setValue(String(code.rawValue), forHTTPHeaderField: FailingURLProtocol.codeHeader)
+        return try await session.data(for: request)
+    }
+}
+#endif // !os(watchOS)
 #endif

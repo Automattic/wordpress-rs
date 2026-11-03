@@ -87,12 +87,11 @@ class WpApiClient @JvmOverloads constructor(
     suspend fun <T> request(
         executeRequest: suspend (UniffiWpApiClient) -> T
     ): WpRequestResult<T> = withContext(dispatcher) {
-        val result = try {
+        try {
             WpRequestResult.Success(response = executeRequest(requestBuilder))
         } catch (exception: WpApiException) {
+            errorLogger?.logFailedRequest(exception)
             mapWpApiExceptionToWpRequestResult<T>(exception)
         }
-        errorLogger?.let { logger -> result.toLogErrorString()?.let(logger::logError) }
-        result
     }
 }

@@ -1,0 +1,12 @@
+HTTP/1.1 401 Unauthorized
+content-type: text/html; charset=iso-8859-1
+www-authenticate: Basic realm="Restricted"
+server: cloudflare
+cf-ray: a50c71565ed1595c-SEA
+
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>401 Unauthorized</title>
+</head><body>
+<h1>Unauthorized</h1>
+</body></html>

@@ -1,6 +1,6 @@
 use crate::{
     WpApiParamOrder,
-    date::WpGmtDateTime,
+    date::{WpGmtDateTime, deserialize_optional_wp_gmt_date_time},
     impl_as_query_value_for_new_type, impl_as_query_value_from_to_string,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     users::UserId,
@@ -16,7 +16,10 @@ pub struct Subscriber {
     pub display_name: String,
     pub email_address: String,
     pub is_email_subscriber: bool,
-    pub date_subscribed: WpGmtDateTime,
+    /// When the subscription started. `None` when WordPress.com has never set
+    /// it, which it reports with its zero date rather than `null`.
+    #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
+    pub date_subscribed: Option<WpGmtDateTime>,
     pub subscription_status: Option<String>,
     pub avatar: String,
     pub url: Option<String>,
@@ -334,7 +337,15 @@ pub struct IndividualSubscriberStats {
     emails_sent: u64,
     unique_opens: u64,
     unique_clicks: u64,
-    blog_registration_date: String,
+    /// When the site was registered, in GMT. `None` when it was never set:
+    /// this endpoint returns the column verbatim without guarding it, so a
+    /// site with no registration date arrives as WordPress's zero date
+    /// rather than `null`.
+    #[serde(
+        default,
+        deserialize_with = "crate::date::deserialize_optional_wp_gmt_date_time"
+    )]
+    blog_registration_date: Option<WpGmtDateTime>,
 }
 
 // MARK: - Add Subscribers
@@ -510,6 +521,7 @@ pub struct SubscriberSnapshot {
 mod tests {
     use super::*;
     use crate::api_error::WpError;
+    use rstest::rstest;
 
     #[test]
     fn test_list_subscribers_parameters_serialization() {
@@ -577,12 +589,39 @@ mod tests {
         assert_eq!(response.subscribers.len(), 4);
     }
 
+    /// The fixture's second subscriber carries WordPress.com's zero date,
+    /// which reads as absent rather than failing the whole list.
     #[test]
-    fn test_subscriber_list_with_invalid_date_returns_parsing_error() {
+    fn test_subscriber_list_reads_a_never_set_date_as_absent() {
         let json_file_path = "tests/wpcom/subscribers/subscriber-list-with-invalid-date.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let result: Result<ListSubscribersResponse, _> = serde_json::from_reader(file);
-        assert!(result.is_err(), "Expected parsing error for malformed date");
+        let response: ListSubscribersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(response.subscribers[0].date_subscribed.is_some());
+        assert_eq!(response.subscribers[1].date_subscribed, None);
+    }
+
+    /// A `date_subscribed` that is neither a datetime nor the zero date
+    /// still fails the response — absent and malformed stay distinct.
+    #[rstest]
+    #[case::not_a_date("banana")]
+    #[case::before_year_one("-0500-01-01T00:00:00")]
+    fn test_subscriber_with_malformed_date_returns_parsing_error(#[case] date_subscribed: &str) {
+        let json = serde_json::json!({
+            "user_id": 1,
+            "subscription_id": 2,
+            "display_name": "Test User",
+            "email_address": "user@example.com",
+            "is_email_subscriber": true,
+            "date_subscribed": date_subscribed,
+            "avatar": "https://example.com/avatar",
+        });
+
+        assert!(
+            serde_json::from_value::<Subscriber>(json).is_err(),
+            "Expected parsing error for {date_subscribed}"
+        );
     }
 
     #[test]
@@ -804,13 +843,18 @@ mod tests {
         assert_eq!(first.url, Some("https://nikhilc.dev".to_string()));
     }
 
+    /// As [`test_subscriber_list_reads_a_never_set_date_as_absent`], for the
+    /// by-user-type response shape.
     #[test]
-    fn test_subscribers_by_user_type_with_invalid_date_returns_parsing_error() {
+    fn test_subscribers_by_user_type_reads_a_never_set_date_as_absent() {
         let json_file_path =
             "tests/wpcom/subscribers/subscribers-by-user-type-with-invalid-date.json";
         let file = std::fs::File::open(json_file_path).expect("Failed to open file");
-        let result: Result<ListSubscribersResponse, _> = serde_json::from_reader(file);
-        assert!(result.is_err(), "Expected parsing error for malformed date");
+        let response: ListSubscribersResponse =
+            serde_json::from_reader(file).expect("Unable to parse JSON");
+
+        assert!(response.subscribers[0].date_subscribed.is_some());
+        assert_eq!(response.subscribers[1].date_subscribed, None);
     }
 
     #[test]

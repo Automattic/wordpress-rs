@@ -226,7 +226,7 @@ fn generate_async_request_executor(
             pub fn new(api_url_resolver: #static_api_url_resolver, delegate: #static_delegate_type) -> Self {
                 Self {
                     api_url_resolver: api_url_resolver.clone(),
-                    request_builder: #generated_request_builder_ident::new(api_url_resolver, delegate.auth_provider.clone()),
+                    request_builder: #generated_request_builder_ident::new(api_url_resolver, delegate.auth_provider.clone(), delegate.language_provider.clone()),
                     delegate,
                 }
             }
@@ -259,6 +259,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
     let static_api_url_resolver = &config.static_types.api_url_resolver;
     let static_inner_request_builder_type = &config.static_types.inner_request_builder;
     let static_auth_provider_type = &config.static_types.auth_provider;
+    let static_language_provider = &config.static_types.language_provider;
     let static_wp_network_request_type = &config.static_types.wp_network_request;
     let static_wp_multipart_form_request_type = &config.static_types.wp_multipart_form_request;
     let generated_endpoint_ident = &config.generated_idents.endpoint;
@@ -317,9 +318,13 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
             inner: #static_inner_request_builder_type,
         }
         impl #generated_request_builder_ident {
-            pub fn new(api_url_resolver: #static_api_url_resolver, auth_provider: #static_auth_provider_type) -> Self {
+            pub fn new(
+                api_url_resolver: #static_api_url_resolver,
+                auth_provider: #static_auth_provider_type,
+                language_provider: #static_language_provider,
+            ) -> Self {
                 Self {
-                    endpoint: #generated_endpoint_ident::new(api_url_resolver),
+                    endpoint: #generated_endpoint_ident::with_language_provider(api_url_resolver, language_provider),
                     inner: #static_inner_request_builder_type::new(auth_provider),
                 }
             }
@@ -333,6 +338,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
 fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStream {
     let static_api_url_resolver = &config.static_types.api_url_resolver;
     let static_api_endpoint_url_type = &config.static_types.api_endpoint_url;
+    let static_language_provider = &config.static_types.language_provider;
     let generated_endpoint_ident = &config.generated_idents.endpoint;
 
     let functions = parsed_enum.variants.iter().map(|variant| {
@@ -348,6 +354,8 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
             fn_body_query_pairs(&config.crate_ident, params_type.as_ref(), request_type);
         let additional_query_pairs =
             fn_body_additional_query_pairs(&parsed_enum.enum_ident, &variant.variant_ident);
+        let locale_query_pair =
+            fn_body_locale_query_pair(&parsed_enum.enum_ident, &variant.variant_ident);
 
         ContextAndFilterHandler::from_request_type(
             request_type,
@@ -371,6 +379,9 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
             quote! {
                 pub #fn_signature -> #static_api_endpoint_url_type {
                     #url_from_api_url_resolver
+                    // Appended before the request's own params so that an endpoint
+                    // declaring its own locale parameter overrides this one.
+                    #locale_query_pair
                     #context_query_pair
                     #query_pairs
                     #additional_query_pairs
@@ -385,11 +396,20 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
     quote! {
         pub struct #generated_endpoint_ident {
             api_url_resolver: #static_api_url_resolver,
+            language_provider: #static_language_provider,
         }
 
         impl #generated_endpoint_ident {
+            /// Builds URLs without a locale query parameter, whatever the namespace.
             pub fn new(api_url_resolver: #static_api_url_resolver) -> Self {
-                Self { api_url_resolver }
+                Self { api_url_resolver, language_provider: None }
+            }
+
+            pub fn with_language_provider(
+                api_url_resolver: #static_api_url_resolver,
+                language_provider: #static_language_provider,
+            ) -> Self {
+                Self { api_url_resolver, language_provider }
             }
 
             #(#functions)*
@@ -521,6 +541,7 @@ pub struct ConfigStaticTypes {
     pub api_endpoint_url: TokenStream,
     pub inner_request_builder: TokenStream,
     pub auth_provider: TokenStream,
+    pub language_provider: TokenStream,
     pub wp_network_request: TokenStream,
     pub wp_multipart_form_request: TokenStream,
 }
@@ -532,6 +553,7 @@ impl ConfigStaticTypes {
             api_endpoint_url: quote! { #crate_ident::request::endpoint::ApiEndpointUrl },
             inner_request_builder: quote! { #crate_ident::request::InnerRequestBuilder },
             auth_provider: quote! { std::sync::Arc<#crate_ident::auth::WpAuthenticationProvider> },
+            language_provider: quote! { Option<std::sync::Arc<dyn #crate_ident::wp_com::language::WpComLanguageProvider>> },
             wp_network_request: quote! { #crate_ident::request::WpNetworkRequest },
             wp_multipart_form_request: quote! { #crate_ident::request::WpMultipartFormRequest },
         }

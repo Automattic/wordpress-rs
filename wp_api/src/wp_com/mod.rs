@@ -19,6 +19,7 @@ pub mod segments;
 pub mod shopping_cart;
 pub mod site_plans;
 pub mod sites;
+pub mod stats_archives;
 pub mod stats_city_views;
 pub mod stats_clicks;
 pub mod stats_country_views;
@@ -121,6 +122,17 @@ impl AsNamespace for WpComNamespace {
             WpComNamespace::RestV1_2 => "/rest/v1.2",
             WpComNamespace::RestV1_3 => "/rest/v1.3",
             WpComNamespace::V2 => "/wpcom/v2",
+        }
+    }
+
+    fn locale_param_name(&self) -> Option<&'static str> {
+        match self {
+            // `/oauth2` is served outside the REST frameworks that read a locale.
+            WpComNamespace::Oauth2 => None,
+            WpComNamespace::RestV1_1 | WpComNamespace::RestV1_2 | WpComNamespace::RestV1_3 => {
+                Some("locale")
+            }
+            WpComNamespace::V2 => Some("_locale"),
         }
     }
 }

@@ -1,5 +1,4 @@
 use std::{future::Future, sync::Arc};
-use wp_api::prelude::WpGmtDateTime;
 use wp_mobile_cache::{
     RowId, WpApiCache,
     db_types::db_site::DbSite,
@@ -184,10 +183,12 @@ impl MetadataService {
             let metadata = items
                 .into_iter()
                 .map(|item| {
-                    let modified_gmt = item
-                        .modified_gmt
-                        .and_then(|s| s.parse::<WpGmtDateTime>().ok());
-                    EntityMetadata::new(item.entity_id, modified_gmt, item.parent, item.menu_order)
+                    EntityMetadata::new(
+                        item.entity_id,
+                        item.modified_gmt,
+                        item.parent,
+                        item.menu_order,
+                    )
                 })
                 .collect();
 
@@ -457,7 +458,7 @@ impl MetadataService {
             .iter()
             .map(|m| ListMetadataItemInput {
                 entity_id: m.id,
-                modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
+                modified_gmt: m.modified_gmt,
                 parent: m.parent,
                 menu_order: m.menu_order,
             })
@@ -597,7 +598,7 @@ impl MetadataService {
             .iter()
             .map(|m| ListMetadataItemInput {
                 entity_id: m.id,
-                modified_gmt: m.modified_gmt.as_ref().map(|dt| dt.to_string()),
+                modified_gmt: m.modified_gmt,
                 parent: m.parent,
                 menu_order: m.menu_order,
             })

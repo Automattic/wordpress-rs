@@ -18,6 +18,7 @@ var package = Package(
     name: "WordPressAPI",
     platforms: [
         .iOS(.v16),
+        .macCatalyst(.v16),
         .macOS(.v13),
         .tvOS(.v16),
         .watchOS(.v9)
@@ -45,7 +46,7 @@ var package = Package(
             path: "native/swift/Sources/wordpress-api",
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency"),
-                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
+                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macCatalyst, .macOS, .tvOS, .watchOS]))
             ]
         ),
         .target(
@@ -59,6 +60,9 @@ var package = Package(
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v5)
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3", .when(platforms: [.iOS, .macCatalyst, .macOS, .tvOS, .watchOS]))
             ]
         ),
         .target(
@@ -79,7 +83,7 @@ var package = Package(
             path: "native/swift/Tests/wordpress-api",
             resources: [.copy("../../../../test-data/integration-test-responses/")],
             swiftSettings: [
-                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macOS, .tvOS, .watchOS]))
+                .define("PROGRESS_REPORTING_ENABLED", .when(platforms: [.iOS, .macCatalyst, .macOS, .tvOS, .watchOS]))
             ]
         ),
         .testTarget(
@@ -136,9 +140,12 @@ extension Array where Element == Target {
         var enabled = false
 
         if Context.environment["BUILDKITE"] != nil {
-            // When running on CI, only enable integration tests on Linux, since macOS CI agent does not have docker.
+            // When running on CI, the Linux agents run the test server in docker. The macOS agents can't, so they
+            // only have a test server in the step that starts one using `scripts/native-test-server.sh`.
             #if os(Linux)
             enabled = true
+            #else
+            enabled = Context.environment["WP_TEST_SERVER"] == "native"
             #endif
         } else {
             // Enable integration tests during local development, since we can easily install docker env on our macOS.

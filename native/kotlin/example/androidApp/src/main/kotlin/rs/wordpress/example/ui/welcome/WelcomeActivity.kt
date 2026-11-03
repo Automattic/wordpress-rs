@@ -28,6 +28,7 @@ import uniffi.wp_api.WpComOauthScope
 import uniffi.wp_api.WpComSiteIdentifier
 import uniffi.wp_api.applicationPasswordsUrl
 import uniffi.wp_api.buildTokenRequestUrl
+import uniffi.wp_api.localizedDescription
 import uniffi.wp_api.parseAuthorizationUrl
 import uniffi.wp_api.wordpressComOauth2Configuration
 import uniffi.wp_mobile.Account
@@ -45,6 +46,10 @@ class WelcomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        if (savedInstanceState == null) {
+            signInToWpComFromLaunchExtraIfNeeded()
+        }
+
         val wpComAuth = if (WpComCredentials.CLIENT_ID != null && WpComCredentials.CLIENT_SECRET != null) {
             ::authenticateWpCom
         } else {
@@ -56,6 +61,30 @@ class WelcomeActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Stores the `wpcom-token` launch extra as the WordPress.com account, unless one is already signed in. Lets
+     * an emulator be signed in without the OAuth flow – see `scripts/example-app-signin.sh`.
+     *
+     * Only called on a fresh `onCreate`, so it runs at most once per launch – signing out doesn't immediately sign
+     * the account back in with the still-present extra.
+     */
+    private fun signInToWpComFromLaunchExtraIfNeeded() {
+        val token = intent.getStringExtra(WPCOM_TOKEN_EXTRA)?.trim()?.takeIf { it.isNotEmpty() } ?: return
+        intent.removeExtra(WPCOM_TOKEN_EXTRA)
+
+        val hasWpComAccount = accountRepository.all().any { it is Account.WpCom && it.siteApiRoot.isEmpty() }
+        if (hasWpComAccount) return
+
+        accountRepository.store(
+            Account.WpCom(
+                id = 0uL,
+                username = "WordPress.com",
+                token = token,
+                siteApiRoot = ""
+            )
+        )
+    }
+
     @Suppress("LongMethod", "TooGenericExceptionCaught")
     private fun authenticateSite(url: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         lifecycleScope.launch {
@@ -63,10 +92,9 @@ class WelcomeActivity : ComponentActivity() {
                 val apiDiscoveryResult = WpLoginClient(emptyList(), networkAvailabilityProvider).apiDiscovery(url)
                 val success = when (apiDiscoveryResult) {
                     is ApiDiscoveryResult.Success -> apiDiscoveryResult.success
-                    else -> {
+                    is ApiDiscoveryResult.Failure -> {
                         runOnUiThread {
-                            val message = apiDiscoveryResult.userFacingErrorMessage(url)
-                                ?: "Failed to discover site API"
+                            val message = apiDiscoveryResult.failure.localizedDescription()
                             Toast.makeText(this@WelcomeActivity, message, Toast.LENGTH_LONG).show()
                             onError(message)
                         }
@@ -284,6 +312,7 @@ class WelcomeActivity : ComponentActivity() {
     companion object {
         private const val SELF_HOSTED_REDIRECT_URI = "wordpressrsexample://authorized"
         private const val WPCOM_REDIRECT_URI = "wordpressrsexample://wpcom-authorized"
+        private const val WPCOM_TOKEN_EXTRA = "wpcom-token"
     }
 }
 

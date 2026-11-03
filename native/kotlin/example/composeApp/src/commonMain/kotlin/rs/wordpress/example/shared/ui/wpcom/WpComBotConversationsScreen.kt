@@ -47,7 +47,7 @@ fun WpComBotConversationsScreen(
     LaunchedEffect(Unit) {
         when (val result = wpComApiClient.request {
             it.supportBots().getBotConversationList(
-                botId = "jetpack-chat-mobile",
+                botId = "wpcom-workflow-support_chat",
                 params = ListBotConversationsParams()
             )
         }) {

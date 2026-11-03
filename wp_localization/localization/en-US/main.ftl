@@ -8,6 +8,8 @@ response_parsing_error = Response couldn't be parsed: {$reason}.
 
 media_file_not_found = Media file not found at {$path}.
 
+media_file_unreadable = Media file at {$path} could not be read.
+
 invalid_http_status_code = Invalid HTTP status code: {$status_code}.
 
 request_execution_failed = Failed to send HTTP.
@@ -18,6 +20,8 @@ invalid_ssl_error_certificate_not_valid_for_name = Invalid SSL certificate
 invalid_ssl_error_generic_ssl_error = Unable to establish a secure connection to the server
 
 non_existent_site_error = A server with the specified hostname could not be found.
+
+device_is_offline = No internet connection. Please check your network settings and try again.
 
 http_authentication_required_error = The server at {$url} requires authentication. Please provide your username and password.
 http_forbidden_error = The server at {$url} denied access to the requested resource. Please check your site's configuration.
@@ -33,6 +37,18 @@ http_server_error = Unable to connect to server: {$reason}. Please contact your 
 misconfigured_http_authentication_error = The server is sending invalid HTTP authentication information. Please check your site's HTTP authentication configuration.
 
 misconfigured_rate_limit_error = The server is rate limiting requests in a way that will never succeed. Please check your site's rate limit configuration.
+
+cloudflare_error_request_too_large = This file is larger than your site's Cloudflare settings allow.
+cloudflare_error_origin_error = Cloudflare couldn't get a valid response from your site's server.
+cloudflare_error_origin_down = Cloudflare reports that your site's server is down.
+cloudflare_error_origin_timeout = Cloudflare reports that your site's server isn't responding.
+cloudflare_error_origin_unreachable = Cloudflare can't reach your site's server.
+cloudflare_error_origin_ssl = Your site's server has an SSL problem, according to Cloudflare.
+cloudflare_error_cloudflare_internal = Cloudflare had a problem handling this request. Try again shortly.
+cloudflare_error_rate_limited = Cloudflare is limiting requests to your site. Try again shortly.
+cloudflare_error_access_denied = A Cloudflare security rule on your site blocked this request.
+cloudflare_error_challenge = Your site's Cloudflare bot protection is blocking the app.
+cloudflare_error_other = Cloudflare returned an error (code {$code}).
 
 oauth_response_url_error_url_invalid = The site sent an invalid authentication response URL.
 oauth_response_url_error_unsuccessful_login = Unsuccessful Login.

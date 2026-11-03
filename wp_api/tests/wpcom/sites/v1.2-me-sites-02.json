@@ -1,0 +1,51 @@
+{
+    "sites": [
+      {
+        "ID": 100002001,
+        "name": "deletedsite1",
+        "description": "",
+        "URL": "https:\/\/deletedsite1.wordpress.com",
+        "jetpack": false,
+        "jetpack_connection": false,
+        "post_count": 0,
+        "subscribers_count": 1,
+        "lang": "en",
+        "logo": {
+          "id": 0,
+          "sizes": [],
+          "url": ""
+        },
+        "visible": true,
+        "is_private": false,
+        "is_coming_soon": false,
+        "is_following": true,
+        "organization_id": 0,
+        "meta": {
+          "links": {
+            "self": "https:\/\/public-api.wordpress.com\/rest\/v1.2\/sites\/100002001",
+            "help": "https:\/\/public-api.wordpress.com\/rest\/v1.2\/sites\/100002001\/help",
+            "posts": "https:\/\/public-api.wordpress.com\/rest\/v1.2\/sites\/100002001\/posts\/",
+            "comments": "https:\/\/public-api.wordpress.com\/rest\/v1.1\/sites\/100002001\/comments\/",
+            "xmlrpc": "https:\/\/deletedsite1.wordpress.com\/xmlrpc.php"
+          }
+        },
+        "launch_status": false,
+        "site_migration": {
+          "is_complete": false,
+          "in_progress": false
+        },
+        "is_fse_active": false,
+        "is_fse_eligible": false,
+        "is_core_site_editor_enabled": false,
+        "is_wpcom_atomic": false,
+        "is_wpcom_staging_site": false,
+        "is_deleted": true,
+        "is_a4a_client": false,
+        "is_a4a_dev_site": false,
+        "is_garden": false,
+        "garden_name": null,
+        "is_wpcom_flex": false,
+        "big_sky_enabled": false
+      }
+    ]
+}

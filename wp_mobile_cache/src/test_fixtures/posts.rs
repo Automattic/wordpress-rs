@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicI64, Ordering};
 use wp_api::{
+    date::WpDateString,
     media::MediaId,
     posts::{
         AnyPostWithEditContext, PostContentWithEditContext, PostFootnote, PostGuidWithEditContext,
@@ -177,14 +178,14 @@ impl Default for PostBuilder {
 fn create_minimal_post() -> AnyPostWithEditContext {
     AnyPostWithEditContext {
         id: PostId(1),
-        date: "2024-01-01T00:00:00".to_string(),
+        date: WpDateString::new("2024-01-01T00:00:00".to_string()),
         date_gmt: "2024-01-01T00:00:00Z".parse().unwrap(),
         guid: PostGuidWithEditContext {
             raw: None,
             rendered: "https://example.com/?p=1".to_string(),
         },
         link: "https://example.com/minimal-post".to_string(),
-        modified: "2024-01-01T00:00:00".to_string(),
+        modified: WpDateString::new("2024-01-01T00:00:00".to_string()),
         modified_gmt: "2024-01-01T00:00:00Z".parse().unwrap(),
         slug: "minimal-post".to_string(),
         status: PostStatus::Publish,
@@ -222,14 +223,14 @@ fn create_minimal_post() -> AnyPostWithEditContext {
 fn create_full_post() -> AnyPostWithEditContext {
     AnyPostWithEditContext {
         id: PostId(42),
-        date: "2024-01-15T10:30:00".to_string(),
+        date: WpDateString::new("2024-01-15T10:30:00".to_string()),
         date_gmt: "2024-01-15T10:30:00Z".parse().unwrap(),
         guid: PostGuidWithEditContext {
             raw: Some("https://example.com/?p=42".to_string()),
             rendered: "https://example.com/?p=42".to_string(),
         },
         link: "https://example.com/full-post".to_string(),
-        modified: "2024-01-16T14:20:00".to_string(),
+        modified: WpDateString::new("2024-01-16T14:20:00".to_string()),
         modified_gmt: "2024-01-16T14:20:00Z".parse().unwrap(),
         slug: "full-post".to_string(),
         status: PostStatus::Draft,
@@ -284,14 +285,14 @@ fn create_full_post() -> AnyPostWithEditContext {
 fn create_custom_post() -> AnyPostWithEditContext {
     AnyPostWithEditContext {
         id: PostId(42),
-        date: "2024-01-15T10:30:00".to_string(),
+        date: WpDateString::new("2024-01-15T10:30:00".to_string()),
         date_gmt: "2024-01-15T10:30:00Z".parse().unwrap(),
         guid: PostGuidWithEditContext {
             raw: Some("https://example.com/?p=42".to_string()),
             rendered: "https://example.com/?p=42".to_string(),
         },
         link: "https://example.com/full-post".to_string(),
-        modified: "2024-01-16T14:20:00".to_string(),
+        modified: WpDateString::new("2024-01-16T14:20:00".to_string()),
         modified_gmt: "2024-01-16T14:20:00Z".parse().unwrap(),
         slug: "1000".to_string(),
         status: PostStatus::Draft,

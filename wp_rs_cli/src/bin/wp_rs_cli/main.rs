@@ -432,6 +432,7 @@ async fn build_api_client(args: &AuthArgs, url: &Option<String>) -> Result<WpApi
             request_executor,
             middleware_pipeline,
             app_notifier: Arc::new(CliAppNotifier),
+            language_provider: None,
         },
     ))
 }

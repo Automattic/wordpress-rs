@@ -1,7 +1,7 @@
 use libtest_mimic::Trial;
 use std::sync::Arc;
 use wp_api::{
-    api_error::WpApiError,
+    api_error::{WpApiError, WpErrorCode},
     wp_com::{sites::SitesListParams, stats_region_views::StatsRegionViewsParams},
 };
 
@@ -45,8 +45,9 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
                         match &result {
                             Ok(_) => has_success = true,
-                            Err(WpApiError::UnknownError { response, .. })
-                                if response.contains("unauthorized") =>
+                            Err(WpApiError::WpError { error_code, .. })
+                                if *error_code
+                                    == WpErrorCode::CustomError("unauthorized".to_string()) =>
                             {
                                 has_unauthorized = true;
                             }

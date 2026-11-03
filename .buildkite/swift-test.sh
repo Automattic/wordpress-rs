@@ -8,16 +8,21 @@ export SKIP_PACKAGE_WP_API=true
 
 function run_tests() {
     local platform; platform=$1
-    echo "--- :swift: Testing on $platform simulator"
+    echo "--- :swift: Testing on $platform"
     make "test-swift-$platform"
 }
 
 function build_for_real_device() {
     local platform; platform=$1
 
+    local destination="generic/platform=$platform"
+    if [ "$platform" == "Catalyst" ]; then
+        destination="generic/platform=macOS,variant=Mac Catalyst"
+    fi
+
     echo "--- :swift: Building for $platform device"
     export NSUnbufferedIO=YES
-    xcodebuild -destination "generic/platform=$platform" \
+    xcodebuild -destination "$destination" \
         -scheme WordPressAPI-Package \
         -derivedDataPath DerivedData \
         -skipPackagePluginValidation \
@@ -26,6 +31,6 @@ function build_for_real_device() {
 
 func=$1
 
-for platform in "iOS" "macOS" "tvOS" "watchOS"; do
+for platform in "iOS" "macOS" "Catalyst" "tvOS" "watchOS"; do
     $func $platform
 done

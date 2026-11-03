@@ -34,6 +34,11 @@ services:
         image: 'public.ecr.aws/docker/library/mariadb:11.2'
         ports:
             - '3306:3306'
+        # Keep the data in memory rather than on disk – most tests restore this database from a dump,
+        # which is about 10x faster this way. The data doesn't survive the container stopping, but
+        # `make test-server` always starts from an empty database anyway.
+        tmpfs:
+            - /var/lib/mysql
         environment:
             MYSQL_DATABASE: 'wordpress'
             MYSQL_USER: 'wordpress'

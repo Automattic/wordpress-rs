@@ -89,7 +89,7 @@ fun PostListByTypeScreen(
                     ListItem(
                         headlineContent = { Text(post.title?.rendered ?: "(untitled)") },
                         supportingContent = { Text(post.status.toString()) },
-                        overlineContent = { Text(post.date) }
+                        overlineContent = { Text(post.date.value) }
                     )
                 }
                 if (error != null) {

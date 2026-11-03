@@ -91,6 +91,38 @@ final class LoginManager: ObservableObject {
         )
         self.isLoggedIn = accountStore.hasSelfHostedAccount()
         self.isLoggedInToWpCom = accountStore.hasWpComAccount()
+
+        try self.signInToWpComFromLaunchArgumentIfNeeded()
+    }
+
+    /// A WordPress.com bearer token supplied with the `-wpcom-token <token>` launch argument, used to sign a
+    /// Simulator in without the OAuth flow. See `scripts/example-app-signin.sh`.
+    ///
+    /// Read from the raw process arguments rather than `UserDefaults`, which parses argument values as
+    /// property lists and could mangle a token containing plist syntax.
+    static var launchArgumentToken: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard
+            let index = arguments.firstIndex(of: "-wpcom-token"),
+            arguments.indices.contains(index + 1)
+        else {
+            return nil
+        }
+
+        let token = arguments[index + 1].trimmingCharacters(in: .whitespacesAndNewlines)
+        return token.isEmpty ? nil : token
+    }
+
+    /// Stores the `-wpcom-token` launch argument as the WordPress.com account, unless one is already signed in.
+    ///
+    /// Only called from `init`, so it runs at most once per process — signing out doesn't immediately sign the
+    /// account back in with the still-present launch argument.
+    private func signInToWpComFromLaunchArgumentIfNeeded() throws {
+        guard let token = Self.launchArgumentToken, !isLoggedInToWpCom else {
+            return
+        }
+
+        try setWpComLoginCredentials(to: token)
     }
 
     public func logInToWpCom(

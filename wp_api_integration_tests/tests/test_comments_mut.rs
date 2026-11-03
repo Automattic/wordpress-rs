@@ -1,8 +1,9 @@
 use macro_helper::generate_update_test;
 use wp_api::comments::{
     CommentCreateParams, CommentCreateParamsBuilder, CommentDeleteParams, CommentStatus,
-    CommentUpdateParams, CommentWithEditContext,
+    CommentUpdateParams, CommentWithEditContext, CommentWithViewContext,
 };
+use wp_api::date::WpDateString;
 use wp_api_integration_tests::prelude::*;
 use wp_cli::WpCliComment;
 
@@ -12,7 +13,7 @@ async fn create_comment_with_just_content() {
     test_create_comment(
         &CommentCreateParams::new(FIRST_POST_ID, "foo".to_string()),
         |created_comment, comment_from_wp_cli| {
-            assert_eq!(created_comment.content.raw, "foo");
+            assert!(created_comment.content.rendered.contains("foo"));
             assert_eq!(comment_from_wp_cli.content, "foo");
         },
     )
@@ -27,12 +28,28 @@ async fn create_comment_with_content_and_status() {
             .status(Some(CommentStatus::Hold))
             .build(),
         |created_comment, comment_from_wp_cli| {
-            assert_eq!(created_comment.content.raw, "foo");
+            assert!(created_comment.content.rendered.contains("foo"));
             assert_eq!(created_comment.status, CommentStatus::Hold);
             assert_eq!(comment_from_wp_cli.content, "foo");
         },
     )
     .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn create_comment_as_subscriber() {
+    // Core returns a view-context response to users without `moderate_comments`,
+    // so the create response must parse for a subscriber as well.
+    let created_comment = api_client_as_subscriber()
+        .comments()
+        .create(&CommentCreateParams::new(FIRST_POST_ID, "foo".to_string()))
+        .await
+        .assert_response()
+        .data;
+    let created_comment_from_wp_cli = Backend::comment(&created_comment.id).await;
+    assert_eq!(created_comment_from_wp_cli.content, "foo");
+    RestoreServer::db().await;
 }
 
 #[tokio::test]
@@ -160,9 +177,9 @@ generate_update_test!(
 generate_update_test!(
     update_date,
     date,
-    "2024-09-09T12:00:00".to_string(),
+    WpDateString::new("2024-09-09T12:00:00".to_string()),
     |updated_comment, updated_comment_from_wp_cli| {
-        assert_eq!(updated_comment.date, "2024-09-09T12:00:00");
+        assert_eq!(updated_comment.date.value, "2024-09-09T12:00:00");
         assert_eq!(updated_comment_from_wp_cli.date, "2024-09-09 12:00:00");
     }
 );
@@ -170,11 +187,11 @@ generate_update_test!(
 generate_update_test!(
     update_date_gmt,
     date_gmt,
-    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000"),
+    unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00"),
     |updated_comment, updated_comment_from_wp_cli| {
         assert_eq!(
             updated_comment.date_gmt,
-            unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+0000")
+            Some(unwrapped_wp_gmt_date_time("2024-09-09T12:00:00+00:00"))
         );
         assert_eq!(updated_comment_from_wp_cli.date_gmt, "2024-09-09 12:00:00");
     }
@@ -211,7 +228,7 @@ generate_update_test!(
 
 async fn test_create_comment<F>(params: &CommentCreateParams, assert: F)
 where
-    F: Fn(CommentWithEditContext, WpCliComment),
+    F: Fn(CommentWithViewContext, WpCliComment),
 {
     let created_comment = api_client()
         .comments()

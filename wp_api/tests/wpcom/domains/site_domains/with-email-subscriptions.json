@@ -98,7 +98,7 @@
       "type": "mapping",
       "primary_domain": false,
       "wpcom_domain": false,
-      "auto_renewing": false,
+      "auto_renewing": 0,
       "expired": false,
       "expiry": "2027-12-01",
       "expiry_soon": false,

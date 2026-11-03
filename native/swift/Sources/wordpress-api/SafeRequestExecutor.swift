@@ -197,10 +197,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         for request: NetworkRequestContent
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
 
-        guard
-            var peerCertificateChain = getPeerCertificateChain(error),
-            !peerCertificateChain.isEmpty
-        else {
+        guard let siteCertificate = leafCertificate(from: error) else {
             return .failure(
                 .RequestExecutionFailed(
                     statusCode: nil,
@@ -212,8 +209,6 @@ public final class WpRequestExecutor: SafeRequestExecutor {
             )
         }
 
-        let siteCertificate = peerCertificateChain.remove(at: 0)
-
         return .failure(
             .RequestExecutionFailed(
                 statusCode: nil,
@@ -221,7 +216,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 reason: RequestExecutionErrorReason.invalidSslError(
                     reason: .certificateNotValidForName(
                         hostname: URL(string: request.url())?.host ?? "unknown host",
-                        presentedHostnames: [siteCertificate.commonName()]
+                        presentedHostnames: siteCertificate.presentedHostnames()
                     )
                 ),
                 requestUrl: request.url(),
@@ -322,9 +317,22 @@ public final class WpRequestExecutor: SafeRequestExecutor {
     }
 
     private func errorIsDeviceIsOffline(_ error: Error) -> Bool {
+        // The device can't use the network right now; the site itself is not
+        // implicated. Two codes mean there's no connection at all
+        // (`.notConnectedToInternet`, and `.networkConnectionLost` for a connection
+        // severed mid-request); three more mean the OS is refusing network use even
+        // though the hardware is present — cellular data disallowed for the app or by
+        // carrier policy (`.dataNotAllowed`, the common Wi-Fi-off case), roaming
+        // turned off while abroad (`.internationalRoamingOff`), or a voice call
+        // holding the radio on an older single-radio device (`.callIsActive`). This
+        // matches what Kotlin callers get through the `NetworkAvailabilityProvider`
+        // gate. See #1501.
         [
             .networkConnectionLost,
-            .notConnectedToInternet
+            .notConnectedToInternet,
+            .dataNotAllowed,
+            .internationalRoamingOff,
+            .callIsActive
         ]
         .contains((error as? URLError)?.code)
     }
@@ -346,19 +354,28 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         )
     }
 
-    private func getPeerCertificateChain(_ error: Error) -> [SslCertificateInfo]? {
+    /// Parse the site (leaf) certificate out of a failed TLS handshake.
+    ///
+    /// The peer certificate chain is leaf-first, so the site's certificate is
+    /// element 0 of the *raw* chain. We parse that element directly rather than
+    /// parsing the whole chain and taking element 0 of whatever survived: a leaf
+    /// we can't parse must degrade to `genericSslError`, never silently promote an
+    /// intermediate CA's certificate into the site's position and report the CA's
+    /// name (e.g. `R10`) as the presented hostname.
+    private func leafCertificate(from error: Error) -> SslCertificateInfo? {
         #if os(Linux) // Linux doesn't support `SecCertificate`
-        return []
+        return nil
         #else
         // The certificate chain the server presented during the failed TLS handshake.
         guard
             let trust = (error as? URLError)?.failureURLPeerTrust,
-            let certChainArray = SecTrustCopyCertificateChain(trust) as? [SecCertificate]
+            let certChainArray = SecTrustCopyCertificateChain(trust) as? [SecCertificate],
+            let leaf = certChainArray.first
         else {
             return nil
         }
 
-        return certChainArray.compactMap { parseCertificate(data: SecCertificateCopyData($0) as Data) }
+        return parseCertificate(data: SecCertificateCopyData(leaf) as Data)
         #endif
     }
 }
@@ -396,8 +413,12 @@ private final class RequestExecutorDelegate:
     }
 
     private func alternateNames(forCertificate cert: SslCertificateInfo) -> Set<String> {
-        lock.withLock {
-            additionalAlternativeNames[cert.commonName()] ?? []
+        // The allowlist is keyed on the certificate's Common Name, so a SAN-only
+        // certificate that omits its CN can't be matched here — there's no key to
+        // look it up under. Fall through to default handling in that case.
+        guard let commonName = cert.commonName() else { return [] }
+        return lock.withLock {
+            additionalAlternativeNames[commonName] ?? []
         }
     }
 
@@ -642,6 +663,21 @@ extension WpNetworkRequest: NetworkRequestContent {
     }
 }
 
+extension MultipartFormError {
+    /// The executor error this serialization failure maps to, or `nil` to fall through
+    /// to `.genericError`. A file-backed field with a read failure (non-nil `filePath`)
+    /// becomes `.MediaFileUnreadable`; an in-memory field (nil path) or `.impossible`
+    /// has no file to name and stays generic.
+    var asRequestExecutionError: RequestExecutionError? {
+        switch self {
+        case let .inaccessibleFile(_, filePath?):
+            return .MediaFileUnreadable(filePath: filePath)
+        case .inaccessibleFile(_, nil), .impossible:
+            return nil
+        }
+    }
+}
+
 extension WpMultipartFormRequest: NetworkRequestContent {
 
     func encodeBody(into request: inout URLRequest) throws {
@@ -690,49 +726,77 @@ extension WpMultipartFormRequest: NetworkRequestContent {
 
         let boundery = String(format: "wordpressrs.%08x", Int.random(in: Int.min..<Int.max))
         request.setValue("multipart/form-data; boundary=\(boundery)", forHTTPHeaderField: "Content-Type")
-        let body = try form.multipartFormDataStream(boundary: boundery, forceWriteToFile: false)
+
+        let body: MultipartFormContent
+        do {
+            body = try form.multipartFormDataStream(boundary: boundery, forceWriteToFile: false)
+        } catch let error as MultipartFormError {
+            // Map a mid-read failure to `.MediaFileUnreadable` (see `asRequestExecutionError`);
+            // anything with no file to name re-throws and falls through to `.genericError`.
+            throw error.asRequestExecutionError ?? error
+        }
+
+        // `upload(...)` owns the temp file's lifetime and removes it once the transfer finishes. Arm
+        // cleanup here too, where serialization acquires the file, so a future edit that throws
+        // between this line and the `upload(...)` call below can't silently reintroduce the #1540
+        // leak. Idempotent with upload's own `defer`: a second `removeItem` on an already-deleted
+        // file is a harmless no-op.
+        defer { body.removeTemporaryFileIfNeeded() }
         return try await upload(body: body, with: request, session: session, delegate: delegate)
     }
+}
 
-    private func upload(
-        body: MultipartFormContent,
-        with request: URLRequest,
-        session: URLSession,
-        delegate: URLSessionTaskDelegate?
-    ) async throws -> (Data, URLResponse) {
-        let cancellation = TaskCancellation()
-        return try await withTaskCancellationHandler {
-            let result: Result<(Data, URLResponse), Error> = await withCheckedContinuation { continuation in
-                let completion = completionHandler(continuation)
-                let task =
-                    switch body {
-                    case let .inMemory(data):
-                        session.uploadTask(with: request, from: data, completionHandler: completion)
-                    case let .onDisk(file):
-                        session.uploadTask(with: request, fromFile: file, completionHandler: completion)
-                    }
-                cancellation.task = task
+/// Uploads a serialized multipart `body` — either in memory or a temporary file on disk — over
+/// `URLSession`, awaiting completion.
+///
+/// A `.onDisk` body must be cleaned up once the transfer finishes. `URLSession`'s
+/// `uploadTask(fromFile:)` reads the file asynchronously for the duration of the transfer and never
+/// deletes it, so the file has to outlive serialization (it can't be removed in
+/// `multipartFormDataStream`) and can only be removed here, after the upload completes on any path —
+/// success, failure, or cancellation. Without this, every large upload leaks a temp file (#1540).
+///
+/// This is a free function rather than a method because it needs no state from the request, which
+/// also lets tests drive it directly against a stubbed `URLSession`.
+func upload(
+    body: MultipartFormContent,
+    with request: URLRequest,
+    session: URLSession,
+    delegate: URLSessionTaskDelegate?
+) async throws -> (Data, URLResponse) {
+    defer { body.removeTemporaryFileIfNeeded() }
 
-                // See https://github.com/Automattic/wordpress-rs/pull/1046
-                #if !os(Linux)
-                task.delegate = delegate
-                #endif
+    let cancellation = TaskCancellation()
+    return try await withTaskCancellationHandler {
+        let result: Result<(Data, URLResponse), Error> = await withCheckedContinuation { continuation in
+            let completion = completionHandler(continuation)
+            let task =
+                switch body {
+                case let .inMemory(data):
+                    session.uploadTask(with: request, from: data, completionHandler: completion)
+                case let .onDisk(file):
+                    session.uploadTask(with: request, fromFile: file, completionHandler: completion)
+                }
+            cancellation.task = task
 
-                task.resume()
+            // See https://github.com/Automattic/wordpress-rs/pull/1046
+            #if !os(Linux)
+            task.delegate = delegate
+            #endif
 
-                #if !os(Linux)
-                delegate?.urlSession?(session, didCreateTask: task)
-                #endif
-            }
+            task.resume()
 
-            if let task = cancellation.task {
-                notifyTaskResult(delegate: delegate, session: session, task: task, result: result)
-            }
-
-            return try result.get()
-        } onCancel: {
-            cancellation.cancel()
+            #if !os(Linux)
+            delegate?.urlSession?(session, didCreateTask: task)
+            #endif
         }
+
+        if let task = cancellation.task {
+            notifyTaskResult(delegate: delegate, session: session, task: task, result: result)
+        }
+
+        return try result.get()
+    } onCancel: {
+        cancellation.cancel()
     }
 }
 
