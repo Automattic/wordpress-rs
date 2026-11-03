@@ -125,6 +125,10 @@ val cargoBuild = tasks.register<Exec>("cargoBuild") {
     )
 
     outputs.dir(rustJniLibsDir)
+    // The task's inputs are the whole Rust workspace, which cargo tracks better than Gradle can.
+    // Without this, it counts as up to date after its first run and the library goes stale, which
+    // crashes at launch if the generated bindings have moved on.
+    outputs.upToDateWhen { false }
 
     doFirst {
         // Point cargo-ndk at the NDK AGP resolves for the configured `ndkVersion`.
