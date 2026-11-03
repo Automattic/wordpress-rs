@@ -17,7 +17,7 @@ use wp_api::{
 };
 use wp_mobile_sqlite::ColumnIndex;
 
-use crate::db_types::working_copy_remote_target::WorkingCopyRemoteTarget;
+use crate::{LocalContentError, db_types::working_copy_remote_target::WorkingCopyRemoteTarget};
 
 uniffi::custom_newtype!(WorkingCopyId, String);
 
@@ -245,6 +245,32 @@ mod term_id {
 
     pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TermId, D::Error> {
         i64::deserialize(deserializer).map(TermId)
+    }
+}
+
+/// The `category_ids` column value: a JSON array of term IDs.
+pub(crate) fn categories_to_json(categories: &[TermId]) -> Result<String, LocalContentError> {
+    let ids: Vec<i64> = categories.iter().map(|category| category.0).collect();
+    serde_json::to_string(&ids).map_err(json_error)
+}
+
+pub(crate) fn categories_from_json(json: &str) -> Result<Vec<TermId>, FromSqlError> {
+    let ids: Vec<i64> = serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))?;
+    Ok(ids.into_iter().map(TermId).collect())
+}
+
+/// The `tags` column value: a JSON array of tags.
+pub(crate) fn tags_to_json(tags: &[WorkingCopyTag]) -> Result<String, LocalContentError> {
+    serde_json::to_string(tags).map_err(json_error)
+}
+
+pub(crate) fn tags_from_json(json: &str) -> Result<Vec<WorkingCopyTag>, FromSqlError> {
+    serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))
+}
+
+fn json_error(err: serde_json::Error) -> LocalContentError {
+    LocalContentError::Sqlite {
+        err_message: format!("Failed to serialize to JSON: {err}"),
     }
 }
 

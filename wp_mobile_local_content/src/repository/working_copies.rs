@@ -2,7 +2,6 @@ use rusqlite::types::{FromSqlError, Type};
 use rusqlite::{ErrorCode, OptionalExtension, Row, ffi};
 use wp_api::{
     posts::{PostCommentStatus, PostFormat, PostId, PostPingStatus},
-    terms::TermId,
     users::UserId,
 };
 use wp_mobile_sqlite::{ColumnIndex, RowExt};
@@ -14,7 +13,8 @@ use crate::{
             FeaturedImage, PageFieldsColumn, PageWorkingCopy, PageWorkingCopyFields,
             PostFieldsColumn, PostWorkingCopy, PostWorkingCopyFields, PublishDate, StatusSetting,
             WorkingCopyColumn, WorkingCopyCommonFields, WorkingCopyId, WorkingCopyKind,
-            WorkingCopyTag, date_from_timestamp,
+            categories_from_json, categories_to_json, date_from_timestamp, tags_from_json,
+            tags_to_json,
         },
         working_copy_remote_target::{
             RemotePostReference, SiteColumn, SiteIdentity, WorkingCopyRemoteTarget,
@@ -419,8 +419,8 @@ fn insert_common(
             common.publish_date.to_column(),
             common.author.map(|author| author.0),
             common.featured_image.to_column(),
-            common.comment_status.as_ref().map(comment_status_str),
-            common.ping_status.as_ref().map(ping_status_str),
+            common.comment_status.as_ref().map(ToString::to_string),
+            common.ping_status.as_ref().map(ToString::to_string),
         ],
         |row| row.get(0),
     )?;
@@ -455,8 +455,8 @@ fn update_common(
                 common.publish_date.to_column(),
                 common.author.map(|author| author.0),
                 common.featured_image.to_column(),
-                common.comment_status.as_ref().map(comment_status_str),
-                common.ping_status.as_ref().map(ping_status_str),
+                common.comment_status.as_ref().map(ToString::to_string),
+                common.ping_status.as_ref().map(ToString::to_string),
                 id,
                 kind.as_str(),
             ],
@@ -618,8 +618,10 @@ fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
                 .map_err(|e| conversion_error(C::PublishDate, Type::Integer, e))?,
             author: author.map(UserId),
             featured_image: FeaturedImage::from_column(featured_media_id),
-            comment_status: comment_status.as_deref().map(comment_status_from_str),
-            ping_status: ping_status.as_deref().map(ping_status_from_str),
+            comment_status: comment_status
+                .map(|status| status.parse().unwrap_or(PostCommentStatus::Custom(status))),
+            ping_status: ping_status
+                .map(|status| status.parse().unwrap_or(PostPingStatus::Custom(status))),
         },
         created_at: row.get_column(C::CreatedAt)?,
         updated_at: row.get_column(C::UpdatedAt)?,
@@ -779,62 +781,6 @@ fn select_site(
     Ok(site)
 }
 
-fn categories_to_json(categories: &[TermId]) -> Result<String, LocalContentError> {
-    let ids: Vec<i64> = categories.iter().map(|category| category.0).collect();
-    serde_json::to_string(&ids).map_err(json_error)
-}
-
-fn categories_from_json(json: &str) -> Result<Vec<TermId>, FromSqlError> {
-    let ids: Vec<i64> = serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))?;
-    Ok(ids.into_iter().map(TermId).collect())
-}
-
-fn tags_to_json(tags: &[WorkingCopyTag]) -> Result<String, LocalContentError> {
-    serde_json::to_string(tags).map_err(json_error)
-}
-
-fn tags_from_json(json: &str) -> Result<Vec<WorkingCopyTag>, FromSqlError> {
-    serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))
-}
-
-fn comment_status_str(status: &PostCommentStatus) -> &str {
-    match status {
-        PostCommentStatus::Open => "open",
-        PostCommentStatus::Closed => "closed",
-        PostCommentStatus::Custom(status) => status,
-    }
-}
-
-fn comment_status_from_str(status: &str) -> PostCommentStatus {
-    match status {
-        "open" => PostCommentStatus::Open,
-        "closed" => PostCommentStatus::Closed,
-        status => PostCommentStatus::Custom(status.to_string()),
-    }
-}
-
-fn ping_status_str(status: &PostPingStatus) -> &str {
-    match status {
-        PostPingStatus::Open => "open",
-        PostPingStatus::Closed => "closed",
-        PostPingStatus::Custom(status) => status,
-    }
-}
-
-fn ping_status_from_str(status: &str) -> PostPingStatus {
-    match status {
-        "open" => PostPingStatus::Open,
-        "closed" => PostPingStatus::Closed,
-        status => PostPingStatus::Custom(status.to_string()),
-    }
-}
-
-fn json_error(err: serde_json::Error) -> LocalContentError {
-    LocalContentError::Sqlite {
-        err_message: format!("Failed to serialize to JSON: {err}"),
-    }
-}
-
 fn conversion_error(
     column: impl ColumnIndex,
     column_type: Type,
@@ -848,7 +794,7 @@ mod tests {
     use super::*;
     use crate::{
         MIGRATIONS,
-        db_types::working_copy::{StatusSetting, WorkingCopyId},
+        db_types::working_copy::{StatusSetting, WorkingCopyId, WorkingCopyTag},
     };
     use rusqlite::Connection;
     use std::sync::Arc;
@@ -857,6 +803,7 @@ mod tests {
         media::MediaId,
         parsed_url::ParsedUrl,
         posts::{PostCommentStatus, PostPingStatus},
+        terms::TermId,
         wp_com::WpComSiteId,
     };
     use wp_mobile_sqlite::MigrationManager;
