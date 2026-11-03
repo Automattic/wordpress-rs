@@ -448,6 +448,20 @@ mod tests {
         ));
     }
 
+    /// CMM-2748: the excerpt joins the post's paragraphs with a space, and the content puts blank
+    /// lines between them. Both have non-breaking spaces between sentences.
+    #[test]
+    fn finds_an_excerpt_of_paragraphs_joined_differently() {
+        let content = ReaderPostContent::new(
+            "<div class=\"is-reader\">\n<p class=\"wp-block-paragraph\">August 2005:</p>\n\n\n\n\
+             <p class=\"wp-block-paragraph\">Here I am at work, minding my own business as usual. \u{a0}I\u{2019}m a bartender.</p>\n</div>",
+            None,
+        );
+        assert!(!content.is_manual_excerpt(
+            "<p>August 2005: Here I am at work, minding my own business as usual. \u{a0}I\u{2019}m a bartender.</p>\n"
+        ));
+    }
+
     #[test]
     fn leaves_shortcodes_out_of_the_comparison() {
         let content = ReaderPostContent::new(
