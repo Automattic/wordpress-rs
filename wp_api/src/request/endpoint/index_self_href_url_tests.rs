@@ -1,6 +1,7 @@
-//! Full-URL oracle: for every self-hosted endpoint that WordPress advertises as
-//! a non-parameterized route, assert our resolver builds *exactly* the URL the
-//! server publishes in the REST index's `_links.self.href`.
+//! Full-URL oracle: for each non-parameterized route that a
+//! `request::endpoint` builder targets and that WordPress publishes in the REST
+//! index, assert our resolver builds *exactly* the URL the server publishes in
+//! that route's `_links.self.href`.
 //!
 //! Each expected URL is read at run time from the committed real-site index
 //! fixture `test-data/api-details/test-case-03.json` (a self-hosted `wp-json`
@@ -11,9 +12,18 @@
 //! is the source of truth, not a golden copied into this file.
 //!
 //! The REST index only emits a concrete `self` href for routes without path
-//! parameters, so this covers the 30 collection/singleton endpoints; the
-//! ID-bearing ones are covered end-to-end by the plain-permalinks integration
-//! tests instead.
+//! parameters, so this checks 38 routes across 29 endpoint modules. Two
+//! published routes are deliberately left out:
+//! - `/` (the API root): the index publishes `…/wp-json/` while
+//!   `ApiRootRequestEndpoint` builds `…/wp-json`, so an exact comparison would
+//!   fail on the trailing slash alone.
+//! - `/jetpack/v4/connection*`: built by the Jetpack client, not a
+//!   `request::endpoint` module.
+//!
+//! This validates the route *path* on the `wp-json` form only. The ID-bearing
+//! routes, which the index never publishes a URL for, have no server-sourced
+//! check here; one representative (`/wp/v2/users/<id>`) is fetched end-to-end
+//! over `?rest_route=` by the plain-permalinks integration test.
 //!
 //! The query string our representative call appends (`?context=edit`, etc.) is
 //! stripped before comparison, since the advertised `self` href is the bare
@@ -439,4 +449,61 @@ fn tags() {
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/tags"));
+}
+
+// --- Other non-parameterized routes the index publishes a `self` href for, on
+// modules already covered above. ---
+
+#[test]
+fn users_me() {
+    let endpoint = UsersRequestEndpoint::new(resolver());
+    let built = endpoint
+        .retrieve_me_with_edit_context()
+        .as_str()
+        .to_string();
+    assert_eq!(strip_query(&built), published_self_href("/wp/v2/users/me"));
+}
+
+#[test]
+fn pages() {
+    let endpoint = PostsRequestEndpoint::new(resolver());
+    let built = endpoint
+        .list_with_edit_context(&PostEndpointType::Pages, &PostListParams::default())
+        .as_str()
+        .to_string();
+    assert_eq!(strip_query(&built), published_self_href("/wp/v2/pages"));
+}
+
+#[test]
+fn wp_site_health_tests_remaining_routes() {
+    let endpoint = WpSiteHealthTestsRequestEndpoint::new(resolver());
+    for (built, route) in [
+        (
+            endpoint.loopback_requests(),
+            "/wp-site-health/v1/tests/loopback-requests",
+        ),
+        (
+            endpoint.https_status(),
+            "/wp-site-health/v1/tests/https-status",
+        ),
+        (
+            endpoint.dotorg_communication(),
+            "/wp-site-health/v1/tests/dotorg-communication",
+        ),
+        (
+            endpoint.authorization_header(),
+            "/wp-site-health/v1/tests/authorization-header",
+        ),
+        (endpoint.page_cache(), "/wp-site-health/v1/tests/page-cache"),
+        (
+            endpoint.directory_sizes(),
+            "/wp-site-health/v1/directory-sizes",
+        ),
+    ] {
+        assert_eq!(
+            strip_query(built.as_str()),
+            published_self_href(route),
+            "route `{route}`"
+        );
+    }
 }
