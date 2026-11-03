@@ -1,5 +1,5 @@
 use rusqlite::types::{FromSqlError, Type};
-use rusqlite::{ErrorCode, OptionalExtension, Row, ffi};
+use rusqlite::{OptionalExtension, Row};
 use wp_api::{
     posts::{PostCommentStatus, PostFormat, PostId, PostPingStatus},
     users::UserId,
@@ -13,16 +13,19 @@ use crate::{
             FeaturedImage, PageFieldsColumn, PageWorkingCopy, PageWorkingCopyFields,
             PostFieldsColumn, PostWorkingCopy, PostWorkingCopyFields, PublishDate, StatusSetting,
             WorkingCopyColumn, WorkingCopyCommonFields, WorkingCopyId, WorkingCopyKind,
-            categories_from_json, categories_to_json, date_from_timestamp, tags_from_json,
-            tags_to_json,
+            categories_from_json, categories_to_json, tags_from_json, tags_to_json,
         },
-        working_copy_remote_target::{
-            RemotePostReference, SiteColumn, SiteIdentity, WorkingCopyRemoteTarget,
-            WorkingCopyRemoteTargetColumn,
-        },
+        working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
     repository::{InTransaction, QueryExecutor},
 };
+use remote_targets::{
+    insert_remote_target, record_push, select_id_by_remote_post, select_remote_target,
+};
+use sites::select_site_rowid;
+
+mod remote_targets;
+mod sites;
 
 const WORKING_COPIES: &str = "working_copies";
 const POST_FIELDS: &str = "post_working_copy_fields";
@@ -479,70 +482,6 @@ fn delete_working_copy(
     Ok(deleted > 0)
 }
 
-fn record_push(
-    transaction: &impl InTransaction,
-    kind: WorkingCopyKind,
-    id: &WorkingCopyId,
-    remote_post: RemotePostReference,
-) -> Result<bool, LocalContentError> {
-    let mut stmt = transaction.prepare(&format!(
-        "SELECT w.rowid, t.remote_post_id FROM {WORKING_COPIES} w
-         JOIN {REMOTE_TARGETS} t ON t.working_copy_rowid = w.rowid
-         WHERE w.uuid = ? AND w.kind = ?"
-    ))?;
-    let Some((rowid, remote_post_id)) = stmt
-        .query_row(rusqlite::params![id, kind.as_str()], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, Option<i64>>(1)?))
-        })
-        .optional()?
-    else {
-        return Ok(false);
-    };
-    if let Some(remote_post_id) = remote_post_id.map(PostId)
-        && remote_post_id != remote_post.post_id
-    {
-        return Err(LocalContentError::PushedToAnotherRemotePost {
-            remote_post_id,
-            pushed_post_id: remote_post.post_id,
-        });
-    }
-
-    let mut update = transaction.prepare(&format!(
-        "UPDATE {REMOTE_TARGETS} SET remote_post_id = ?, base_modified_gmt = ?
-         WHERE working_copy_rowid = ?"
-    ))?;
-    let result = update.execute(rusqlite::params![
-        remote_post.post_id.0,
-        remote_post.base_modified_gmt.0.timestamp(),
-        rowid,
-    ]);
-    remote_post_conflict(result, remote_post.post_id)?;
-    Ok(true)
-}
-
-fn select_id_by_remote_post(
-    executor: &impl QueryExecutor,
-    kind: WorkingCopyKind,
-    site: &SiteIdentity,
-    post_id: PostId,
-) -> Result<Option<WorkingCopyId>, LocalContentError> {
-    let Some(site_rowid) = select_site_rowid(executor, site)? else {
-        return Ok(None);
-    };
-    let mut stmt = executor.prepare(&format!(
-        "SELECT w.uuid FROM {WORKING_COPIES} w
-         JOIN {REMOTE_TARGETS} t ON t.working_copy_rowid = w.rowid
-         WHERE w.kind = ? AND t.site_rowid = ? AND t.remote_post_id = ?"
-    ))?;
-    let id = stmt
-        .query_row(
-            rusqlite::params![kind.as_str(), site_rowid, post_id.0],
-            |row| row.get(0),
-        )
-        .optional()?;
-    Ok(id)
-}
-
 fn select_ids_by_site(
     executor: &impl QueryExecutor,
     kind: WorkingCopyKind,
@@ -628,159 +567,6 @@ fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
     })
 }
 
-fn insert_remote_target(
-    transaction: &impl InTransaction,
-    rowid: i64,
-    remote_target: &WorkingCopyRemoteTarget,
-) -> Result<(), LocalContentError> {
-    let site_rowid = upsert_site(transaction, &remote_target.site)?;
-    let mut stmt = transaction.prepare(&format!(
-        "INSERT INTO {REMOTE_TARGETS} (working_copy_rowid, site_rowid, remote_post_id, base_modified_gmt)
-         VALUES (?, ?, ?, ?)"
-    ))?;
-    let result = stmt.execute(rusqlite::params![
-        rowid,
-        site_rowid,
-        remote_target.remote_post.map(|remote| remote.post_id.0),
-        remote_target
-            .remote_post
-            .map(|remote| remote.base_modified_gmt.0.timestamp()),
-    ]);
-    match remote_target.remote_post {
-        Some(remote_post) => remote_post_conflict(result, remote_post.post_id),
-        None => {
-            result?;
-            Ok(())
-        }
-    }
-}
-
-/// Maps the result of writing a remote target whose remote post is `post_id`.
-///
-/// The only unique constraint a remote target write can break is the one on
-/// `(site_rowid, remote_post_id)`, meaning another working copy already has
-/// that remote post.
-fn remote_post_conflict(
-    result: rusqlite::Result<usize>,
-    post_id: PostId,
-) -> Result<(), LocalContentError> {
-    match result {
-        Err(rusqlite::Error::SqliteFailure(err, _))
-            if err.code == ErrorCode::ConstraintViolation
-                && err.extended_code == ffi::SQLITE_CONSTRAINT_UNIQUE =>
-        {
-            Err(LocalContentError::RemotePostAlreadyHasWorkingCopy { post_id })
-        }
-        result => {
-            result?;
-            Ok(())
-        }
-    }
-}
-
-/// Returns the `sites` row `site` identifies, if there is one: the row with
-/// its WordPress.com site ID, or else the row with its URL and no site ID.
-fn select_site_rowid(
-    executor: &impl QueryExecutor,
-    site: &SiteIdentity,
-) -> Result<Option<i64>, LocalContentError> {
-    let (wordpress_com_site_id, url) = site.to_columns();
-    let mut stmt = executor.prepare(&format!(
-        "SELECT rowid FROM {SITES}
-         WHERE wordpress_com_site_id = ?1 OR (wordpress_com_site_id IS NULL AND url = ?2)
-         ORDER BY wordpress_com_site_id IS NULL
-         LIMIT 1"
-    ))?;
-    let rowid = stmt
-        .query_row(rusqlite::params![wordpress_com_site_id, url], |row| {
-            row.get(0)
-        })
-        .optional()?;
-    Ok(rowid)
-}
-
-/// Returns the `sites` row `site` identifies, inserting one if there isn't one
-/// yet. An existing row takes `site`'s URL, and its site ID if it had none.
-fn upsert_site(
-    transaction: &impl InTransaction,
-    site: &SiteIdentity,
-) -> Result<i64, LocalContentError> {
-    let (wordpress_com_site_id, url) = site.to_columns();
-    if let Some(rowid) = select_site_rowid(transaction, site)? {
-        transaction.execute(
-            &format!(
-                "UPDATE {SITES}
-                 SET wordpress_com_site_id = COALESCE(?, wordpress_com_site_id), url = ?
-                 WHERE rowid = ?"
-            ),
-            rusqlite::params![wordpress_com_site_id, url, rowid],
-        )?;
-        return Ok(rowid);
-    }
-
-    let mut insert = transaction.prepare(&format!(
-        "INSERT INTO {SITES} (wordpress_com_site_id, url) VALUES (?, ?) RETURNING rowid"
-    ))?;
-    Ok(
-        insert.query_row(rusqlite::params![wordpress_com_site_id, url], |row| {
-            row.get(0)
-        })?,
-    )
-}
-
-fn select_remote_target(
-    executor: &impl QueryExecutor,
-    rowid: i64,
-) -> Result<WorkingCopyRemoteTarget, LocalContentError> {
-    let mut stmt = executor.prepare(&format!(
-        "SELECT * FROM {REMOTE_TARGETS} WHERE working_copy_rowid = ?"
-    ))?;
-    let (site_rowid, remote_post) = stmt.query_row([rowid], |row| {
-        use WorkingCopyRemoteTargetColumn::*;
-
-        let site_rowid: i64 = row.get_column(SiteRowid)?;
-        let remote_post_id: Option<i64> = row.get_column(RemotePostId)?;
-        let base_modified_gmt: Option<i64> = row.get_column(BaseModifiedGmt)?;
-        let remote_post = match (remote_post_id, base_modified_gmt) {
-            (Some(post_id), Some(seconds)) => Some(RemotePostReference {
-                post_id: PostId(post_id),
-                base_modified_gmt: date_from_timestamp(seconds)
-                    .map_err(|e| conversion_error(BaseModifiedGmt, Type::Integer, e))?,
-            }),
-            (None, None) => None,
-            _ => {
-                return Err(conversion_error(
-                    RemotePostId,
-                    Type::Integer,
-                    FromSqlError::Other(
-                        "remote_post_id and base_modified_gmt must both be set or both be NULL"
-                            .into(),
-                    ),
-                ));
-            }
-        };
-        Ok((site_rowid, remote_post))
-    })?;
-    let site = select_site(executor, site_rowid)?;
-
-    Ok(WorkingCopyRemoteTarget { site, remote_post })
-}
-
-fn select_site(
-    executor: &impl QueryExecutor,
-    site_rowid: i64,
-) -> Result<SiteIdentity, LocalContentError> {
-    let mut stmt = executor.prepare(&format!("SELECT * FROM {SITES} WHERE rowid = ?"))?;
-    let site = stmt.query_row([site_rowid], |row| {
-        use SiteColumn::*;
-
-        let url: String = row.get_column(Url)?;
-        SiteIdentity::from_columns(row.get_column(WordPressComSiteId)?, &url)
-            .map_err(|e| conversion_error(Url, Type::Text, e))
-    })?;
-    Ok(site)
-}
-
 fn conversion_error(
     column: impl ColumnIndex,
     column_type: Type,
@@ -794,7 +580,10 @@ mod tests {
     use super::*;
     use crate::{
         MIGRATIONS,
-        db_types::working_copy::{StatusSetting, WorkingCopyId, WorkingCopyTag},
+        db_types::{
+            working_copy::{StatusSetting, WorkingCopyId, WorkingCopyTag, date_from_timestamp},
+            working_copy_remote_target::{SiteColumn, WorkingCopyRemoteTargetColumn},
+        },
     };
     use rusqlite::Connection;
     use std::sync::Arc;
