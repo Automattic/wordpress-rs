@@ -490,7 +490,7 @@ fn record_push(
          JOIN {REMOTE_TARGETS} t ON t.working_copy_rowid = w.rowid
          WHERE w.uuid = ? AND w.kind = ?"
     ))?;
-    let Some((rowid, edited_post_id)) = stmt
+    let Some((rowid, remote_post_id)) = stmt
         .query_row(rusqlite::params![id, kind.as_str()], |row| {
             Ok((row.get::<_, i64>(0)?, row.get::<_, Option<i64>>(1)?))
         })
@@ -498,11 +498,11 @@ fn record_push(
     else {
         return Ok(false);
     };
-    if let Some(edited_post_id) = edited_post_id.map(PostId)
-        && edited_post_id != remote_post.post_id
+    if let Some(remote_post_id) = remote_post_id.map(PostId)
+        && remote_post_id != remote_post.post_id
     {
         return Err(LocalContentError::PushedToAnotherRemotePost {
-            edited_post_id,
+            remote_post_id,
             pushed_post_id: remote_post.post_id,
         });
     }
@@ -631,7 +631,7 @@ fn insert_remote_target(
     rowid: i64,
     remote_target: &WorkingCopyRemoteTarget,
 ) -> Result<(), LocalContentError> {
-    let site_rowid = select_or_insert_site(transaction, &remote_target.site)?;
+    let site_rowid = upsert_site(transaction, &remote_target.site)?;
     let mut stmt = transaction.prepare(&format!(
         "INSERT INTO {REMOTE_TARGETS} (working_copy_rowid, site_rowid, remote_post_id, base_modified_gmt)
          VALUES (?, ?, ?, ?)"
@@ -699,7 +699,7 @@ fn select_site_rowid(
 
 /// Returns the `sites` row `site` identifies, inserting one if there isn't one
 /// yet. An existing row takes `site`'s URL, and its site ID if it had none.
-fn select_or_insert_site(
+fn upsert_site(
     transaction: &impl InTransaction,
     site: &SiteIdentity,
 ) -> Result<i64, LocalContentError> {
@@ -1186,7 +1186,7 @@ mod tests {
     /// on insert and on update, so a status always reads back the same way. Any
     /// other status stays `Custom`.
     #[test]
-    fn test_custom_status_another_variant_stands_for_is_saved_as_that_variant() {
+    fn test_custom_status_another_variant_covers_is_saved_as_that_variant() {
         let mut conn = migrated_connection();
         let remote_target = self_hosted_new_post_target();
         let saved = insert_post(&mut conn, &simple_post("Saved"), &remote_target);
@@ -1584,7 +1584,7 @@ mod tests {
         assert_eq!(
             to_another_post,
             Err(LocalContentError::PushedToAnotherRemotePost {
-                edited_post_id: PostId(99),
+                remote_post_id: PostId(99),
                 pushed_post_id: PostId(5),
             })
         );
