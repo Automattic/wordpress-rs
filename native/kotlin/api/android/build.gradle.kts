@@ -125,9 +125,10 @@ val cargoBuild = tasks.register<Exec>("cargoBuild") {
     )
 
     outputs.dir(rustJniLibsDir)
-    // The task's inputs are the whole Rust workspace, which cargo tracks better than Gradle can.
-    // Without this, it counts as up to date after its first run and the library goes stale, which
-    // crashes at launch if the generated bindings have moved on.
+    // Always run, and let cargo decide what to rebuild. Without inputs, Gradle counts this task as up
+    // to date after its first run, and the library goes stale. That crashes at launch once the
+    // generated bindings have moved on. Cargo takes about 0.2s to find nothing to rebuild, so it's
+    // simpler and more accurate than declaring the inputs to Gradle, for almost no extra time.
     outputs.upToDateWhen { false }
 
     doFirst {
