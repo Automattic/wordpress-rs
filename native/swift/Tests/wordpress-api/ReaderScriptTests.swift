@@ -159,6 +159,12 @@ struct ReaderScriptTests {
 
         window.addEventListener('load', async () => {
           await new Promise((resolve) => setTimeout(resolve, 300));
+          // The page's policy reports the gist it blocked in its own time, which can be seconds on a
+          // busy simulator. Wait for its callback to go, for up to 5 seconds.
+          const pending = () => Object.keys(window).some((name) => name.startsWith('readerGist'));
+          for (let waited = 0; pending() && waited < 5000; waited += 100) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
 
           const first = 'https://gist.github.com/octocat/6cad326836d38bd3a7ae.json'
             + '?file=hello_world.rb&callback=readerGist0';
