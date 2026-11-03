@@ -5,6 +5,12 @@ import WordPressAPI
 
 #if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
+#if canImport(SwiftUI)
+import SwiftUI
 #endif
 
 struct ReaderColorExtensionsTests {
@@ -38,6 +44,44 @@ struct ReaderColorExtensionsTests {
         #expect(light == ReaderColor(red: 0, green: 0, blue: 0, alpha: 255))
         #expect(dark == ReaderColor(red: 255, green: 255, blue: 255, alpha: 255))
         #expect(ReaderColor(light.uiColor, traits: UITraitCollection()) == light)
+    }
+    #elseif canImport(AppKit)
+    @Test
+    func readsAppKitColorsForEachAppearance() throws {
+        let lightAppearance = try #require(NSAppearance(named: .aqua))
+        let darkAppearance = try #require(NSAppearance(named: .darkAqua))
+        let light = try #require(ReaderColor(.textColor, appearance: lightAppearance))
+        let dark = try #require(ReaderColor(.textColor, appearance: darkAppearance))
+        #expect(light == ReaderColor(red: 0, green: 0, blue: 0, alpha: 255))
+        #expect(dark == ReaderColor(red: 255, green: 255, blue: 255, alpha: 255))
+        #expect(ReaderColor(light.nsColor, appearance: darkAppearance) == light)
+    }
+    #endif
+
+    #if canImport(SwiftUI)
+    @Test
+    @available(iOS 17, macOS 14, tvOS 17, watchOS 10, *)
+    @MainActor
+    func readsSwiftUIColorsForEachAppearance() throws {
+        var lightEnvironment = EnvironmentValues()
+        lightEnvironment.colorScheme = .light
+        var darkEnvironment = EnvironmentValues()
+        darkEnvironment.colorScheme = .dark
+
+        let color = ReaderColor(red: 0x38, green: 0x58, blue: 0xe9, alpha: 0x80)
+        #expect(ReaderColor(color.color, in: lightEnvironment) == color)
+
+        #if canImport(UIKit) && !os(watchOS)
+        let system = Color(uiColor: .label)
+        #elseif canImport(AppKit)
+        let system = Color(nsColor: .textColor)
+        #else
+        let system = Color.primary
+        #endif
+        let light = try #require(ReaderColor(system, in: lightEnvironment))
+        let dark = try #require(ReaderColor(system, in: darkEnvironment))
+        #expect(light == ReaderColor(red: 0, green: 0, blue: 0, alpha: 255))
+        #expect(dark == ReaderColor(red: 255, green: 255, blue: 255, alpha: 255))
     }
     #endif
 
