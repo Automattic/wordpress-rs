@@ -196,7 +196,7 @@ impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parsed_url::ParsedUrl;
+    use crate::parsed_url::{ParsedUrl, QueryPair};
     use rstest::*;
     use std::sync::Arc;
 
@@ -277,8 +277,6 @@ mod tests {
         "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes&context=edit&exclude=core%2Cgutenberg"
     )]
     fn resolve_then_append_query_pairs(#[case] api_root: &str, #[case] expected: &str) {
-        use crate::parsed_url::QueryPair;
-
         let resolver =
             WpOrgSiteApiUrlResolver::new(ParsedUrl::parse(api_root).expect("valid url").into());
         let resolved = resolver.resolve(

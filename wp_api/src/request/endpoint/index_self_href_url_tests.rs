@@ -19,8 +19,59 @@
 //! stripped before comparison, since the advertised `self` href is the bare
 //! route URL.
 
+use super::block_directory_endpoint::BlockDirectoryRequestEndpoint;
+use super::block_pattern_categories_endpoint::BlockPatternCategoriesRequestEndpoint;
+use super::block_patterns_endpoint::BlockPatternsRequestEndpoint;
+use super::block_types_endpoint::BlockTypesRequestEndpoint;
+use super::blocks_endpoint::BlocksRequestEndpoint;
+use super::comments_endpoint::CommentsRequestEndpoint;
+use super::media_endpoint::MediaRequestEndpoint;
+use super::menu_locations_endpoint::MenuLocationsRequestEndpoint;
+use super::nav_menu_items_endpoint::NavMenuItemsRequestEndpoint;
+use super::nav_menus_endpoint::NavMenusRequestEndpoint;
+use super::navigations_endpoint::NavigationsRequestEndpoint;
+use super::pattern_directory_endpoint::PatternDirectoryRequestEndpoint;
+use super::plugins_endpoint::PluginsRequestEndpoint;
+use super::post_statuses_endpoint::PostStatusesRequestEndpoint;
+use super::post_types_endpoint::PostTypesRequestEndpoint;
+use super::posts_endpoint::PostEndpointType;
+use super::posts_endpoint::PostsRequestEndpoint;
+use super::search_endpoint::SearchRequestEndpoint;
+use super::sidebars_endpoint::SidebarsRequestEndpoint;
+use super::site_settings_endpoint::SiteSettingsRequestEndpoint;
+use super::taxonomies_endpoint::TaxonomiesRequestEndpoint;
+use super::template_parts_endpoint::TemplatePartsRequestEndpoint;
+use super::templates_endpoint::TemplatesRequestEndpoint;
+use super::terms_endpoint::TermEndpointType;
+use super::terms_endpoint::TermsRequestEndpoint;
+use super::themes_endpoint::ThemesRequestEndpoint;
+use super::users_endpoint::UsersRequestEndpoint;
+use super::widget_types_endpoint::WidgetTypesRequestEndpoint;
+use super::widgets_endpoint::WidgetsRequestEndpoint;
+use super::wp_block_editor_endpoint::WpBlockEditorRequestEndpoint;
+use super::wp_site_health_tests_endpoint::WpSiteHealthTestsRequestEndpoint;
 use super::{ApiUrlResolver, WpOrgSiteApiUrlResolver};
+use crate::block_directory::BlockDirectorySearchParams;
+use crate::blocks::BlockListParams;
+use crate::comments::CommentListParams;
+use crate::media::MediaListParams;
+use crate::nav_menu_items::NavMenuItemListParams;
+use crate::nav_menus::NavMenuListParams;
+use crate::navigations::NavigationListParams;
 use crate::parsed_url::ParsedUrl;
+use crate::pattern_directory::PatternDirectoryCategoryId;
+use crate::pattern_directory::PatternDirectoryListParams;
+use crate::posts::PostListParams;
+use crate::search_results::SearchListParams;
+use crate::taxonomies::TaxonomyListParams;
+use crate::template_parts::TemplatePartListParams;
+use crate::templates::TemplateListParams;
+use crate::terms::TermListParams;
+use crate::themes::ThemeListParams;
+use crate::widgets::WidgetListParams;
+use crate::wp_block_editor::WpBlockEditorSettingsContext;
+use crate::wp_block_editor::WpBlockEditorSettingsParams;
+use crate::wp_site_health_tests::SparseWpSiteHealthTestField;
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
@@ -47,7 +98,7 @@ fn resolver() -> Arc<dyn ApiUrlResolver> {
 }
 
 fn strip_query(url: &str) -> &str {
-    url.split('?').next().unwrap_or(url)
+    url.split_once('?').map_or(url, |(base, _)| base)
 }
 
 /// The exact URL WordPress published for `route` in the committed REST index
@@ -65,11 +116,9 @@ fn published_self_href(route: &str) -> String {
 
 #[test]
 fn block_directory() {
-    let endpoint = super::block_directory_endpoint::BlockDirectoryRequestEndpoint::new(resolver());
+    let endpoint = BlockDirectoryRequestEndpoint::new(resolver());
     let built = endpoint
-        .search(&crate::block_directory::BlockDirectorySearchParams::new(
-            "coblocks".to_string(),
-        ))
+        .search(&BlockDirectorySearchParams::new("coblocks".to_string()))
         .as_str()
         .to_string();
     assert_eq!(
@@ -80,10 +129,7 @@ fn block_directory() {
 
 #[test]
 fn block_pattern_categories() {
-    let endpoint =
-        super::block_pattern_categories_endpoint::BlockPatternCategoriesRequestEndpoint::new(
-            resolver(),
-        );
+    let endpoint = BlockPatternCategoriesRequestEndpoint::new(resolver());
     let built = endpoint.list_with_edit_context().as_str().to_string();
     assert_eq!(
         strip_query(&built),
@@ -93,7 +139,7 @@ fn block_pattern_categories() {
 
 #[test]
 fn block_patterns() {
-    let endpoint = super::block_patterns_endpoint::BlockPatternsRequestEndpoint::new(resolver());
+    let endpoint = BlockPatternsRequestEndpoint::new(resolver());
     let built = endpoint.list_with_edit_context().as_str().to_string();
     assert_eq!(
         strip_query(&built),
@@ -103,7 +149,7 @@ fn block_patterns() {
 
 #[test]
 fn block_types() {
-    let endpoint = super::block_types_endpoint::BlockTypesRequestEndpoint::new(resolver());
+    let endpoint = BlockTypesRequestEndpoint::new(resolver());
     let built = endpoint.list_with_edit_context().as_str().to_string();
     assert_eq!(
         strip_query(&built),
@@ -113,9 +159,9 @@ fn block_types() {
 
 #[test]
 fn blocks() {
-    let endpoint = super::blocks_endpoint::BlocksRequestEndpoint::new(resolver());
+    let endpoint = BlocksRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::blocks::BlockListParams::default())
+        .list_with_edit_context(&BlockListParams::default())
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/blocks"));
@@ -123,9 +169,9 @@ fn blocks() {
 
 #[test]
 fn comments() {
-    let endpoint = super::comments_endpoint::CommentsRequestEndpoint::new(resolver());
+    let endpoint = CommentsRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::comments::CommentListParams::default())
+        .list_with_edit_context(&CommentListParams::default())
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/comments"));
@@ -133,9 +179,9 @@ fn comments() {
 
 #[test]
 fn media() {
-    let endpoint = super::media_endpoint::MediaRequestEndpoint::new(resolver());
+    let endpoint = MediaRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::media::MediaListParams::default())
+        .list_with_edit_context(&MediaListParams::default())
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/media"));
@@ -143,7 +189,7 @@ fn media() {
 
 #[test]
 fn menu_locations() {
-    let endpoint = super::menu_locations_endpoint::MenuLocationsRequestEndpoint::new(resolver());
+    let endpoint = MenuLocationsRequestEndpoint::new(resolver());
     let built = endpoint.list_with_edit_context().as_str().to_string();
     assert_eq!(
         strip_query(&built),
@@ -153,9 +199,9 @@ fn menu_locations() {
 
 #[test]
 fn navigations() {
-    let endpoint = super::navigations_endpoint::NavigationsRequestEndpoint::new(resolver());
+    let endpoint = NavigationsRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::navigations::NavigationListParams::default())
+        .list_with_edit_context(&NavigationListParams::default())
         .as_str()
         .to_string();
     assert_eq!(
@@ -166,11 +212,10 @@ fn navigations() {
 
 #[test]
 fn pattern_directory() {
-    let endpoint =
-        super::pattern_directory_endpoint::PatternDirectoryRequestEndpoint::new(resolver());
-    let params = crate::pattern_directory::PatternDirectoryListParams {
+    let endpoint = PatternDirectoryRequestEndpoint::new(resolver());
+    let params = PatternDirectoryListParams {
         per_page: Some(10),
-        category: Some(crate::pattern_directory::PatternDirectoryCategoryId(5)),
+        category: Some(PatternDirectoryCategoryId(5)),
         ..Default::default()
     };
     let built = endpoint
@@ -185,26 +230,23 @@ fn pattern_directory() {
 
 #[test]
 fn post_statuses() {
-    let endpoint = super::post_statuses_endpoint::PostStatusesRequestEndpoint::new(resolver());
+    let endpoint = PostStatusesRequestEndpoint::new(resolver());
     let built = endpoint.list_with_edit_context().as_str().to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/statuses"));
 }
 
 #[test]
 fn post_types() {
-    let endpoint = super::post_types_endpoint::PostTypesRequestEndpoint::new(resolver());
+    let endpoint = PostTypesRequestEndpoint::new(resolver());
     let built = endpoint.list_with_edit_context().as_str().to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/types"));
 }
 
 #[test]
 fn posts() {
-    let endpoint = super::posts_endpoint::PostsRequestEndpoint::new(resolver());
+    let endpoint = PostsRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(
-            &crate::request::endpoint::posts_endpoint::PostEndpointType::Posts,
-            &crate::posts::PostListParams::default(),
-        )
+        .list_with_edit_context(&PostEndpointType::Posts, &PostListParams::default())
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/posts"));
@@ -212,9 +254,9 @@ fn posts() {
 
 #[test]
 fn search() {
-    let endpoint = super::search_endpoint::SearchRequestEndpoint::new(resolver());
+    let endpoint = SearchRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_embed_context(&crate::search_results::SearchListParams::default())
+        .list_with_embed_context(&SearchListParams::default())
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/search"));
@@ -222,23 +264,23 @@ fn search() {
 
 #[test]
 fn sidebars() {
-    let endpoint = super::sidebars_endpoint::SidebarsRequestEndpoint::new(resolver());
+    let endpoint = SidebarsRequestEndpoint::new(resolver());
     let built = endpoint.list_with_edit_context().as_str().to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/sidebars"));
 }
 
 #[test]
 fn site_settings() {
-    let endpoint = super::site_settings_endpoint::SiteSettingsRequestEndpoint::new(resolver());
+    let endpoint = SiteSettingsRequestEndpoint::new(resolver());
     let built = endpoint.retrieve_with_edit_context().as_str().to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/settings"));
 }
 
 #[test]
 fn taxonomies() {
-    let endpoint = super::taxonomies_endpoint::TaxonomiesRequestEndpoint::new(resolver());
+    let endpoint = TaxonomiesRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::taxonomies::TaxonomyListParams::default())
+        .list_with_edit_context(&TaxonomyListParams::default())
         .as_str()
         .to_string();
     assert_eq!(
@@ -249,7 +291,7 @@ fn taxonomies() {
 
 #[test]
 fn users() {
-    let endpoint = super::users_endpoint::UsersRequestEndpoint::new(resolver());
+    let endpoint = UsersRequestEndpoint::new(resolver());
     let built = endpoint
         .list_with_edit_context(&crate::UserListParams::default())
         .as_str()
@@ -259,7 +301,7 @@ fn users() {
 
 #[test]
 fn widget_types() {
-    let endpoint = super::widget_types_endpoint::WidgetTypesRequestEndpoint::new(resolver());
+    let endpoint = WidgetTypesRequestEndpoint::new(resolver());
     let built = endpoint.list_with_edit_context().as_str().to_string();
     assert_eq!(
         strip_query(&built),
@@ -269,9 +311,9 @@ fn widget_types() {
 
 #[test]
 fn widgets() {
-    let endpoint = super::widgets_endpoint::WidgetsRequestEndpoint::new(resolver());
+    let endpoint = WidgetsRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::widgets::WidgetListParams::default())
+        .list_with_edit_context(&WidgetListParams::default())
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/widgets"));
@@ -279,9 +321,9 @@ fn widgets() {
 
 #[test]
 fn wp_block_editor() {
-    let endpoint = super::wp_block_editor_endpoint::WpBlockEditorRequestEndpoint::new(resolver());
-    let params = crate::wp_block_editor::WpBlockEditorSettingsParams {
-        context: Some(crate::wp_block_editor::WpBlockEditorSettingsContext::WidgetsEditor),
+    let endpoint = WpBlockEditorRequestEndpoint::new(resolver());
+    let params = WpBlockEditorSettingsParams {
+        context: Some(WpBlockEditorSettingsContext::WidgetsEditor),
     };
     let built = endpoint.retrieve_settings(&params).as_str().to_string();
     assert_eq!(
@@ -292,12 +334,11 @@ fn wp_block_editor() {
 
 #[test]
 fn wp_site_health_tests() {
-    let endpoint =
-        super::wp_site_health_tests_endpoint::WpSiteHealthTestsRequestEndpoint::new(resolver());
+    let endpoint = WpSiteHealthTestsRequestEndpoint::new(resolver());
     let built = endpoint
         .filter_background_updates(&[
-            crate::wp_site_health_tests::SparseWpSiteHealthTestField::Actions,
-            crate::wp_site_health_tests::SparseWpSiteHealthTestField::Badge,
+            SparseWpSiteHealthTestField::Actions,
+            SparseWpSiteHealthTestField::Badge,
         ])
         .as_str()
         .to_string();
@@ -313,9 +354,9 @@ fn wp_site_health_tests() {
 
 #[test]
 fn themes() {
-    let endpoint = super::themes_endpoint::ThemesRequestEndpoint::new(resolver());
+    let endpoint = ThemesRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::themes::ThemeListParams::default())
+        .list_with_edit_context(&ThemeListParams::default())
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/themes"));
@@ -323,7 +364,7 @@ fn themes() {
 
 #[test]
 fn plugins() {
-    let endpoint = super::plugins_endpoint::PluginsRequestEndpoint::new(resolver());
+    let endpoint = PluginsRequestEndpoint::new(resolver());
     let built = endpoint
         .list_with_edit_context(&crate::PluginListParams::default())
         .as_str()
@@ -333,9 +374,9 @@ fn plugins() {
 
 #[test]
 fn templates() {
-    let endpoint = super::templates_endpoint::TemplatesRequestEndpoint::new(resolver());
+    let endpoint = TemplatesRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::templates::TemplateListParams::default())
+        .list_with_edit_context(&TemplateListParams::default())
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/templates"));
@@ -343,9 +384,9 @@ fn templates() {
 
 #[test]
 fn template_parts() {
-    let endpoint = super::template_parts_endpoint::TemplatePartsRequestEndpoint::new(resolver());
+    let endpoint = TemplatePartsRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::template_parts::TemplatePartListParams::default())
+        .list_with_edit_context(&TemplatePartListParams::default())
         .as_str()
         .to_string();
     assert_eq!(
@@ -356,9 +397,9 @@ fn template_parts() {
 
 #[test]
 fn nav_menus() {
-    let endpoint = super::nav_menus_endpoint::NavMenusRequestEndpoint::new(resolver());
+    let endpoint = NavMenusRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::nav_menus::NavMenuListParams::default())
+        .list_with_edit_context(&NavMenuListParams::default())
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/menus"));
@@ -366,9 +407,9 @@ fn nav_menus() {
 
 #[test]
 fn nav_menu_items() {
-    let endpoint = super::nav_menu_items_endpoint::NavMenuItemsRequestEndpoint::new(resolver());
+    let endpoint = NavMenuItemsRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(&crate::nav_menu_items::NavMenuItemListParams::default())
+        .list_with_edit_context(&NavMenuItemListParams::default())
         .as_str()
         .to_string();
     assert_eq!(
@@ -379,12 +420,9 @@ fn nav_menu_items() {
 
 #[test]
 fn categories() {
-    let endpoint = super::terms_endpoint::TermsRequestEndpoint::new(resolver());
+    let endpoint = TermsRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(
-            &super::terms_endpoint::TermEndpointType::Categories,
-            &crate::terms::TermListParams::default(),
-        )
+        .list_with_edit_context(&TermEndpointType::Categories, &TermListParams::default())
         .as_str()
         .to_string();
     assert_eq!(
@@ -395,12 +433,9 @@ fn categories() {
 
 #[test]
 fn tags() {
-    let endpoint = super::terms_endpoint::TermsRequestEndpoint::new(resolver());
+    let endpoint = TermsRequestEndpoint::new(resolver());
     let built = endpoint
-        .list_with_edit_context(
-            &super::terms_endpoint::TermEndpointType::Tags,
-            &crate::terms::TermListParams::default(),
-        )
+        .list_with_edit_context(&TermEndpointType::Tags, &TermListParams::default())
         .as_str()
         .to_string();
     assert_eq!(strip_query(&built), published_self_href("/wp/v2/tags"));
