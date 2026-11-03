@@ -304,6 +304,29 @@ public typealias WpComSiteIdentifier = WordPressAPIInternal.WpComSiteIdentifier
 // MARK: Languages
 public typealias WPComLanguage = WordPressAPIInternal.WpComLanguage
 
+// MARK: Reader Saved Posts
+public typealias ReaderFeedId = WordPressAPIInternal.ReaderFeedId
+public typealias ReaderFeedItemId = WordPressAPIInternal.ReaderFeedItemId
+public typealias ReaderPostSaveIdentity = WordPressAPIInternal.ReaderPostSaveIdentity
+public typealias ReaderSavePostParams = WordPressAPIInternal.ReaderSavePostParams
+public typealias ReaderSaveId = WordPressAPIInternal.ReaderSaveId
+public typealias ReaderSavedBulkKey = WordPressAPIInternal.ReaderSavedBulkKey
+public typealias ReaderSavedBulkParams = WordPressAPIInternal.ReaderSavedBulkParams
+public typealias ReaderSavedBulkResponse = WordPressAPIInternal.ReaderSavedBulkResponse
+public typealias ReaderSavedBulkResult = WordPressAPIInternal.ReaderSavedBulkResult
+public typealias ReaderSavedKey = WordPressAPIInternal.ReaderSavedKey
+public typealias ReaderSavedKeyEntry = WordPressAPIInternal.ReaderSavedKeyEntry
+public typealias ReaderSavedKeysResponse = WordPressAPIInternal.ReaderSavedKeysResponse
+public typealias ReaderSavedPageDetails = WordPressAPIInternal.ReaderSavedPageDetails
+public typealias ReaderSavedRequestExecutor = WordPressAPIInternal.ReaderSavedRequestExecutor
+public typealias ReaderSavedPost = WordPressAPIInternal.ReaderSavedPost
+public typealias ReaderSavedPostAuthor = WordPressAPIInternal.ReaderSavedPostAuthor
+public typealias ReaderSavedPostResponse = WordPressAPIInternal.ReaderSavedPostResponse
+public typealias ReaderSavedPostsParams = WordPressAPIInternal.ReaderSavedPostsParams
+public typealias ReaderSavedPostsResponse = WordPressAPIInternal.ReaderSavedPostsResponse
+public typealias ReaderSavedSource = WordPressAPIInternal.ReaderSavedSource
+public typealias ReaderUnsavePostParams = WordPressAPIInternal.ReaderUnsavePostParams
+
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams
 public typealias SubscriberImportJobsListParams = WordPressAPIInternal.SubscriberImportJobsListParams
