@@ -236,8 +236,12 @@ pub(super) fn parse_dimension(dimension: &str) -> Option<u32> {
 }
 
 /// What two URLs for the same image have in common: the host and path, without the Photon CDN in
-/// front, and without the size WordPress adds to the names of smaller copies (`-1024x768`, or
-/// `-scaled` for a large original).
+/// front, without `www.`, and without the size WordPress adds to the names of smaller copies
+/// (`-1024x768`, or `-scaled` for a large original).
+///
+/// An upload in a dated folder, like `2025/06/photo.jpg`, is the same image at any host: WordPress.com
+/// serves it from `<site>.files.wordpress.com` and from the site's `/wp-content/uploads/`, and a
+/// site that moved domain still has posts with its old address.
 pub(super) fn image_key(url: &str) -> Option<String> {
     let url = match url.strip_prefix("//") {
         Some(rest) => Url::parse(&format!("https://{rest}")),
@@ -245,17 +249,44 @@ pub(super) fn image_key(url: &str) -> Option<String> {
     }
     .ok()?;
     let host = url.host_str()?.to_ascii_lowercase();
-    let path = url.path();
 
     // Photon serves `https://i0.wp.com/example.com/image.jpg` from `https://example.com/image.jpg`.
-    let key = if is_photon_host(&host) {
-        let path = path.trim_start_matches('/');
+    let (host, path) = if is_photon_host(&host) {
+        let path = url.path().trim_start_matches('/');
         let (origin, path) = path.split_once('/').unwrap_or((path, ""));
-        format!("{}/{path}", origin.to_ascii_lowercase())
+        (origin.to_ascii_lowercase(), format!("/{path}"))
     } else {
-        format!("{host}{path}")
+        (host, url.path().to_owned())
+    };
+    let host = host.strip_prefix("www.").unwrap_or(&host);
+
+    let key = match dated_upload(host, &path) {
+        Some(upload) => format!("uploads/{upload}"),
+        None => format!("{host}{path}"),
     };
     Some(without_size_suffix(&key))
+}
+
+/// An upload's path from its dated folder on, like `2025/06/photo.jpg`, or `sites/5/2025/06/photo.jpg`
+/// on a multisite network.
+fn dated_upload<'a>(host: &str, path: &'a str) -> Option<&'a str> {
+    let upload = if host.ends_with(".files.wordpress.com") {
+        path.trim_start_matches('/')
+    } else {
+        path.split_once("/wp-content/uploads/")?.1
+    };
+    let dated = match upload.strip_prefix("sites/") {
+        Some(rest) => rest.split_once('/').filter(|(site, _)| is_number(site))?.1,
+        None => upload,
+    };
+    let mut folders = dated.splitn(3, '/');
+    let (year, month, file) = (folders.next()?, folders.next()?, folders.next()?);
+    (year.len() == 4 && month.len() == 2 && is_number(year) && is_number(month) && !file.is_empty())
+        .then_some(upload)
+}
+
+fn is_number(text: &str) -> bool {
+    !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit())
 }
 
 /// A WordPress image file name without its size suffix: `photo-1024x768.jpg` and `photo-scaled.jpg`
@@ -534,6 +565,34 @@ mod tests {
         assert_eq!(image_key(a), image_key(b));
     }
 
+    /// WordPress keeps an upload in a dated folder, which WordPress.com serves from two addresses,
+    /// and a site can move to a new domain.
+    #[rstest]
+    #[case::wordpress_com_file_host(
+        "https://example.files.wordpress.com/2025/06/a.jpg",
+        "https://example.wordpress.com/wp-content/uploads/2025/06/a.jpg"
+    )]
+    #[case::wordpress_com_file_host_and_its_domain(
+        "https://example.files.wordpress.com/2025/06/a.jpg?w=1024",
+        "https://example.blog/wp-content/uploads/2025/06/a-1024x683.jpg"
+    )]
+    #[case::photon_of_the_file_host(
+        "https://i0.wp.com/example.files.wordpress.com/2025/06/a.jpg?ssl=1",
+        "https://example.com/wp-content/uploads/2025/06/a.jpg"
+    )]
+    #[case::moved_domain(
+        "https://fs.blog/wp-content/uploads/2016/01/a.jpg",
+        "https://www.farnamstreetblog.com/wp-content/uploads/2016/01/a.jpg"
+    )]
+    #[case::multisite(
+        "https://example.com/wp-content/uploads/sites/5/2025/06/a.jpg",
+        "https://example.org/wp-content/uploads/sites/5/2025/06/a.jpg"
+    )]
+    #[case::www("https://www.example.com/a.jpg", "https://example.com/a.jpg")]
+    fn matches_the_same_upload_at_another_address(#[case] a: &str, #[case] b: &str) {
+        assert_eq!(image_key(a), image_key(b));
+    }
+
     #[rstest]
     #[case::not_a_size(
         "https://example.com/uploads/a-final.jpg",
@@ -546,6 +605,18 @@ mod tests {
     #[case::path("https://example.com/a.jpg", "https://example.com/b.jpg")]
     #[case::host("https://example.com/a.jpg", "https://example.org/a.jpg")]
     #[case::not_photon("https://i0.wp.com.example.com/a.jpg", "https://example.com/a.jpg")]
+    #[case::upload_from_another_month(
+        "https://example.com/wp-content/uploads/2025/06/a.jpg",
+        "https://example.com/wp-content/uploads/2025/07/a.jpg"
+    )]
+    #[case::undated_upload_on_another_site(
+        "https://example.com/wp-content/uploads/logo.png",
+        "https://example.org/wp-content/uploads/logo.png"
+    )]
+    #[case::another_multisite_site(
+        "https://example.com/wp-content/uploads/sites/5/2025/06/a.jpg",
+        "https://example.com/wp-content/uploads/sites/6/2025/06/a.jpg"
+    )]
     fn tells_different_images_apart(#[case] a: &str, #[case] b: &str) {
         assert_ne!(image_key(a), image_key(b));
     }
