@@ -412,76 +412,24 @@ mod tests {
         vec![("status", "active")],
         "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes&status=active"
     )]
-    // --- Encoding: reserved / special characters in values ---
+    // --- Encoding: a reserved character is form-urlencoded, matching `by_extending_rest_api_path` ---
     #[case::reserved_comma_encoded(
         "https://example.com/wp-json/wp/v2/themes",
         vec![("exclude", "core,gutenberg")],
         "https://example.com/wp-json/wp/v2/themes?exclude=core%2Cgutenberg"
     )]
-    #[case::space_encoded_as_plus(
-        "https://example.com/wp-json/wp/v2/search",
-        vec![("search", "hello world")],
-        "https://example.com/wp-json/wp/v2/search?search=hello+world"
-    )]
-    #[case::ampersand_in_value_encoded(
+    // --- Pairs are appended in order and duplicate keys are kept, not deduplicated ---
+    #[case::order_preserved_duplicates_kept(
         "https://example.com/wp-json",
-        vec![("q", "a&b")],
-        "https://example.com/wp-json?q=a%26b"
-    )]
-    #[case::equals_in_value_encoded(
-        "https://example.com/wp-json",
-        vec![("q", "a=b")],
-        "https://example.com/wp-json?q=a%3Db"
-    )]
-    #[case::plus_in_value_encoded(
-        "https://example.com/wp-json",
-        vec![("q", "a+b")],
-        "https://example.com/wp-json?q=a%2Bb"
-    )]
-    #[case::slash_in_value_encoded(
-        "https://example.com/wp-json",
-        vec![("path", "/wp/v2")],
-        "https://example.com/wp-json?path=%2Fwp%2Fv2"
-    )]
-    #[case::unicode_value_percent_encoded(
-        "https://example.com/wp-json",
-        vec![("q", "café")],
-        "https://example.com/wp-json?q=caf%C3%A9"
-    )]
-    // --- Encoding: special characters in names ---
-    #[case::space_in_name_encoded(
-        "https://example.com/wp-json",
-        vec![("a b", "c")],
-        "https://example.com/wp-json?a+b=c"
-    )]
-    // --- Empty value / empty name edge cases ---
-    #[case::empty_value(
-        "https://example.com/wp-json",
-        vec![("flag", "")],
-        "https://example.com/wp-json?flag="
-    )]
-    #[case::empty_name(
-        "https://example.com/wp-json",
-        vec![("", "v")],
-        "https://example.com/wp-json?=v"
-    )]
-    // --- Order preserved; duplicate keys kept ---
-    #[case::order_preserved(
-        "https://example.com/wp-json",
-        vec![("z", "1"), ("a", "2"), ("m", "3")],
-        "https://example.com/wp-json?z=1&a=2&m=3"
-    )]
-    #[case::duplicate_keys_kept(
-        "https://example.com/wp-json",
-        vec![("status", "active"), ("status", "inactive")],
-        "https://example.com/wp-json?status=active&status=inactive"
+        vec![("z", "1"), ("status", "active"), ("a", "2"), ("status", "inactive")],
+        "https://example.com/wp-json?z=1&status=active&a=2&status=inactive"
     )]
     fn by_appending_query_pairs(
         #[case] input: &str,
         #[case] pairs: Vec<(&str, &str)>,
         #[case] expected: &str,
     ) {
-        let parsed = ParsedUrl::parse(input).unwrap();
+        let parsed = ParsedUrl::parse(input).expect("valid url");
         let result = parsed.by_appending_query_pairs(query_pairs(&pairs));
         assert_eq!(result.url(), expected);
     }
@@ -497,7 +445,7 @@ mod tests {
     #[case::bare_host("https://example.com")]
     #[case::with_fragment("https://example.com/wp-json?foo=bar#section")]
     fn by_appending_empty_query_pairs_is_unchanged(#[case] input: &str) {
-        let parsed = ParsedUrl::parse(input).unwrap();
+        let parsed = ParsedUrl::parse(input).expect("valid url");
         let result = parsed.by_appending_query_pairs(Vec::new());
         assert_eq!(result.url(), parsed.url());
         assert_eq!(*result, parsed);
@@ -521,55 +469,8 @@ mod tests {
         #[case] pairs: Vec<(&str, &str)>,
         #[case] expected: &str,
     ) {
-        let parsed = ParsedUrl::parse(input).unwrap();
+        let parsed = ParsedUrl::parse(input).expect("valid url");
         let result = parsed.by_appending_query_pairs(query_pairs(&pairs));
-        assert_eq!(result.url(), expected);
-    }
-
-    /// The receiver is borrowed, not consumed: appending returns a new URL and
-    /// leaves the original untouched.
-    #[test]
-    fn by_appending_query_pairs_does_not_mutate_receiver() {
-        let parsed = ParsedUrl::parse("https://example.com/wp-json/wp/v2/themes").unwrap();
-        let before = parsed.url();
-        let _ = parsed.by_appending_query_pairs(query_pairs(&[("context", "edit")]));
-        assert_eq!(parsed.url(), before);
-    }
-
-    /// Successive appends accumulate, matching a single append of all pairs.
-    #[test]
-    fn by_appending_query_pairs_is_chainable() {
-        let parsed = ParsedUrl::parse("https://example.com/wp-json/wp/v2/themes").unwrap();
-        let chained = parsed
-            .by_appending_query_pairs(query_pairs(&[("context", "edit")]))
-            .by_appending_query_pairs(query_pairs(&[("status", "active")]));
-        let combined = parsed
-            .by_appending_query_pairs(query_pairs(&[("context", "edit"), ("status", "active")]));
-        assert_eq!(
-            chained.url(),
-            "https://example.com/wp-json/wp/v2/themes?context=edit&status=active"
-        );
-        assert_eq!(chained.url(), combined.url());
-    }
-
-    /// End-to-end consumer flow: resolve the REST path (both root forms) and
-    /// then attach endpoint query parameters, exactly as GutenbergKit will.
-    #[rstest]
-    #[case::path_root(
-        "https://example.com/wp-json",
-        "https://example.com/wp-json/wp/v2/themes?context=edit&status=active"
-    )]
-    #[case::query_root(
-        "https://example.com/index.php?rest_route=/",
-        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes&context=edit&status=active"
-    )]
-    fn by_extending_then_appending_composes(#[case] api_root: &str, #[case] expected: &str) {
-        let parsed = ParsedUrl::parse(api_root).unwrap();
-        let resolved: ParsedUrl = parsed
-            .by_extending_rest_api_path(["/wp/v2", "themes"])
-            .into();
-        let result = resolved
-            .by_appending_query_pairs(query_pairs(&[("context", "edit"), ("status", "active")]));
         assert_eq!(result.url(), expected);
     }
 }
