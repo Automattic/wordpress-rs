@@ -29,12 +29,12 @@ pub enum LocalContentError {
     #[error("Remote post {} already has a working copy", post_id.0)]
     RemotePostAlreadyHasWorkingCopy { post_id: PostId },
     #[error(
-        "The working copy edits remote post {}, so it can't be pushed to {}",
-        edited_post_id.0,
+        "The working copy's remote post is {}, so a push to {} can't be recorded for it",
+        remote_post_id.0,
         pushed_post_id.0
     )]
     PushedToAnotherRemotePost {
-        edited_post_id: PostId,
+        remote_post_id: PostId,
         pushed_post_id: PostId,
     },
 }
