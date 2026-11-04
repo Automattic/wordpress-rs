@@ -14,6 +14,7 @@ import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpComApiClient
 import rs.wordpress.cache.kotlin.WordPressApiCache
 import rs.wordpress.example.shared.di.createWpApiClient
+import rs.wordpress.example.shared.di.createReaderSavedService
 import rs.wordpress.example.shared.di.createWpComApiClient
 import rs.wordpress.example.shared.di.createWpService
 import rs.wordpress.example.shared.ui.components.ErrorMessage
@@ -44,6 +45,7 @@ import rs.wordpress.example.shared.ui.users.UserListScreen
 import rs.wordpress.example.shared.ui.welcome.WelcomeScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComBotConversationsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComMeScreen
+import rs.wordpress.example.shared.ui.wpcom.WpComReaderSavedPostsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSiteScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComSupportConversationsScreen
 import rs.wordpress.example.shared.ui.wpcom.WpComUnifiedConversationScreen
@@ -52,6 +54,7 @@ import uniffi.wp_api.ConversationId
 import uniffi.wp_api.PostEndpointType
 import uniffi.wp_api.TermEndpointType
 import uniffi.wp_mobile.Account
+import uniffi.wp_mobile.ReaderSavedService
 import uniffi.wp_mobile.WpService
 
 @Composable
@@ -64,6 +67,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
     var currentWpService by remember { mutableStateOf<WpService?>(null) }
     var currentAccount by remember { mutableStateOf<Account.SelfHostedSite?>(null) }
     var currentWpComClient by remember { mutableStateOf<WpComApiClient?>(null) }
+    var currentReaderSavedService by remember { mutableStateOf<ReaderSavedService?>(null) }
     var currentApiClient by remember { mutableStateOf<WpApiClient?>(null) }
     var currentSiteViewModel by remember { mutableStateOf<SiteViewModel?>(null) }
     var currentPostType by remember { mutableStateOf<SitePostType?>(null) }
@@ -98,6 +102,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                                     navController.navigate("site")
                                 } else {
                                     currentWpComClient = createWpComApiClient(account)
+                                    currentReaderSavedService = createReaderSavedService(account)
                                     navController.navigate("wpcom_site")
                                 }
                             }
@@ -379,6 +384,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                     onSupportConversationsClicked = { navController.navigate("wpcom_support") },
                     onUnifiedConversationsClicked = { navController.navigate("wpcom_unified") },
                     onBotConversationsClicked = { navController.navigate("wpcom_bots") },
+                    onReaderSavedPostsClicked = { navController.navigate("wpcom_reader_saved") },
                     onBackClicked = { navController.popBackStack() }
                 )
             }
@@ -412,6 +418,17 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                 }
                 WpComBotConversationsScreen(
                     wpComApiClient = wpComClient,
+                    onBackClicked = { navController.popBackStack() }
+                )
+            }
+            composable("wpcom_reader_saved") {
+                val readerSavedService = currentReaderSavedService
+                if (readerSavedService == null) {
+                    ErrorMessage("No WordPress.com account connected")
+                    return@composable
+                }
+                WpComReaderSavedPostsScreen(
+                    readerSavedService = readerSavedService,
                     onBackClicked = { navController.popBackStack() }
                 )
             }

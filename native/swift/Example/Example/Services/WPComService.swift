@@ -8,8 +8,21 @@ final class WPComService: ObservableObject {
 
     private let loginManager: LoginManager
 
+    /// One per account, shared by every screen: each instance only knows its own writes.
+    private var readerSavedService: ReaderSavedService?
+
     init(loginManager: LoginManager) {
         self.loginManager = loginManager
+    }
+
+    func sharedReaderSavedService() async throws -> ReaderSavedService {
+        if let readerSavedService {
+            return readerSavedService
+        }
+        let service = try await WPComApiClient.instance(loginManager: self.loginManager)
+            .makeReaderSavedService(source: .ios)
+        readerSavedService = service
+        return service
     }
 
     public func loadRootListItems() async throws -> [RootListData] {
@@ -59,6 +72,20 @@ final class WPComService: ObservableObject {
                             )
                         }
                 }
+            ),
+
+            RootListData.view(
+                "Saved Posts",
+                {
+                    AnyView(
+                        ReaderSavedPostsView(
+                            viewModel: ReaderSavedPostsViewModel {
+                                try await self.sharedReaderSavedService()
+                            }
+                        )
+                    )
+                },
+                .posts
             ),
 
             // System

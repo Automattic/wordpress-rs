@@ -16,7 +16,9 @@ import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.AccountRepository
+import uniffi.wp_mobile.ReaderSavedService
 import uniffi.wp_api.ParsedUrl
+import uniffi.wp_api.ReaderSavedSource
 import uniffi.wp_api.WpComBaseUrl
 import uniffi.wp_api.WpComDotOrgApiUrlResolver
 import uniffi.wp_mobile.SiteInfo
@@ -131,6 +133,23 @@ fun createWpComApiClient(
         ),
         interceptors = emptyList(),
         networkAvailabilityProvider = networkAvailabilityProvider
+    )
+}
+
+fun createReaderSavedService(
+    account: Account.WpCom,
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): ReaderSavedService {
+    return ReaderSavedService(
+        delegate = WpApiClientDelegate(
+            WpAuthenticationProvider.staticWithAuth(
+                WpAuthentication.Bearer(token = account.token)
+            ),
+            requestExecutor = WpRequestExecutor(emptyList(), networkAvailabilityProvider),
+            middlewarePipeline = WpApiMiddlewarePipeline(listOf(DebugMiddleware())),
+            appNotifier = EmptyAppNotifier()
+        ),
+        source = ReaderSavedSource.ANDROID
     )
 }
 
