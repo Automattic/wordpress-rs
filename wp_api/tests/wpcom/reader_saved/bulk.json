@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "key": {
+        "blog_id": 123,
+        "post_id": 456
+      },
+      "saved": true
+    },
+    {
+      "key": {
+        "feed_item_id": 789
+      },
+      "saved": false,
+      "error": "saved_limit_reached"
+    },
+    {
+      "key": {
+        "post_id": 5
+      },
+      "saved": false,
+      "error": "invalid_input"
+    },
+    {
+      "key": {},
+      "saved": false,
+      "error": "invalid_input"
+    }
+  ],
+  "total": 1000
+}

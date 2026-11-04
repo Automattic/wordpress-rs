@@ -88,6 +88,10 @@ public final class WPComApiClient: Sendable {
         internalClient.subscribers()
     }
 
+    public var readerSaved: ReaderSavedRequestExecutor {
+        internalClient.readerSaved()
+    }
+
     public var supportBots: SupportBotsRequestExecutor {
         internalClient.supportBots()
     }

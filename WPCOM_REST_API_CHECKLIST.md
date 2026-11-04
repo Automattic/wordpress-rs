@@ -231,6 +231,14 @@ investigate the relevant code before making decisions based on this document.
 - [ ] `GET /rest/v1.2/read/tags/$tag/posts` — fetch posts for a tag
 - [ ] `GET /rest/v1.3/read/feed/$feed/posts/$post_id` — fetch feed post
 
+## Reader — Saved Posts
+
+- [x] `GET /rest/v1.2/read/saved` — saved posts, newest save first (paginated)
+- [x] `POST /wpcom/v2/read/saved/bulk` — import up to 100 saves by post or feed item key
+- [x] `POST /wpcom/v2/read/saved/delete` — unsave a post
+- [x] `GET /wpcom/v2/read/saved/keys` — every saved key, up to 1,000
+- [x] `POST /wpcom/v2/read/saved/new` — save a post
+
 ## Reader — Search
 
 - [ ] `GET /rest/v1.1/read/feed/` — search reader sites/feeds

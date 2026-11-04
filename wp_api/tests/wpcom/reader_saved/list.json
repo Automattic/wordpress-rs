@@ -1,0 +1,92 @@
+{
+  "number": 4,
+  "found": 12,
+  "date_range": {
+    "before": "2026-11-02T10:15:00+00:00",
+    "after": "2026-10-30T08:30:00+00:00"
+  },
+  "posts": [
+    {
+      "ID": 456,
+      "site_ID": 123,
+      "feed_ID": 5,
+      "feed_item_ID": 789,
+      "global_ID": "95578653e45d88b5e370096f75d36566",
+      "is_external": false,
+      "URL": "https://example.com/2026/11/02/a-post",
+      "site_URL": "https://example.com",
+      "feed_URL": "https://example.com",
+      "site_name": "Example",
+      "title": "A WordPress.com post",
+      "excerpt": "<p>An excerpt</p>",
+      "content": "<p>The content</p>",
+      "date": "2026-11-01T12:00:00-03:00",
+      "modified": "2026-11-01T12:30:00-03:00",
+      "date_saved": "2026-11-02T10:15:00+00:00",
+      "featured_image": "https://example.com/image.jpg",
+      "like_count": 3,
+      "i_like": false,
+      "is_following": true,
+      "author": {
+        "ID": 1,
+        "name": "An Author",
+        "avatar_URL": "https://example.com/avatar.jpg",
+        "URL": "https://example.com/author"
+      }
+    },
+    {
+      "ID": 789,
+      "site_ID": 5,
+      "feed_ID": 5,
+      "feed_item_ID": 789,
+      "is_external": true,
+      "is_jetpack": false,
+      "URL": "https://rss.example.org/an-rss-post",
+      "site_URL": "https://rss.example.org",
+      "site_name": "An RSS feed",
+      "title": "An RSS post",
+      "excerpt": "",
+      "content": "<p>The content</p>",
+      "date": "2026-10-30T07:00:00+00:00",
+      "modified": "2026-10-30T07:00:00+00:00",
+      "date_saved": "2026-11-01T09:00:00+00:00",
+      "like_count": 0,
+      "i_like": 0,
+      "is_following": 1,
+      "author": {
+        "name": "An RSS feed",
+        "URL": "https://rss.example.org"
+      }
+    },
+    {
+      "ID": 790,
+      "site_ID": 0,
+      "feed_ID": 0,
+      "feed_item_ID": 790,
+      "is_external": true,
+      "URL": "https://rss.example.org/a-pruned-post",
+      "site_URL": "https://rss.example.org",
+      "site_name": "An RSS feed",
+      "title": "A pruned feed item",
+      "date": null,
+      "modified": null,
+      "date_saved": "2026-10-31T09:00:00+00:00",
+      "featured_image": ""
+    },
+    {
+      "ID": 13,
+      "site_ID": 0,
+      "feed_ID": 0,
+      "is_external": true,
+      "URL": "https://example.com/page",
+      "site_URL": "",
+      "site_name": "example.com",
+      "title": "A page saved by URL",
+      "date": "2026-10-30T08:00:00+00:00",
+      "modified": "2026-10-30T08:00:00+00:00",
+      "date_saved": "2026-10-30T08:30:00+00:00",
+      "featured_image": ""
+    }
+  ],
+  "next_page_handle": "handle=="
+}

@@ -125,6 +125,11 @@ val cargoBuild = tasks.register<Exec>("cargoBuild") {
     )
 
     outputs.dir(rustJniLibsDir)
+    // Always run, and let cargo decide what to rebuild. Without inputs, Gradle counts this task as up
+    // to date after its first run, and the library goes stale. That crashes at launch once the
+    // generated bindings have moved on. Cargo takes about 0.2s to find nothing to rebuild, so it's
+    // simpler and more accurate than declaring the inputs to Gradle, for almost no extra time.
+    outputs.upToDateWhen { false }
 
     doFirst {
         // Point cargo-ndk at the NDK AGP resolves for the configured `ndkVersion`.

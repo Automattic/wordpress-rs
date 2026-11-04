@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `libwordpressFFI.xcframework` now has a Mac Catalyst slice, and the `WordPressAPI` Swift package supports Mac Catalyst 16 and later.
 - **BREAKING:** Errors that Cloudflare generates itself, in front of a site, now surface as `RequestExecutionErrorReason::CloudflareError` instead of `UnknownError` ("Something went wrong") or `HttpForbiddenError`. It carries a `CloudflareErrorKind` (request too large, site's server down or timing out, SSL problem, rate limited, blocked by a security rule, bot challenge, …), Cloudflare's error code when the response has one, the ray ID and any `Retry-After`, and its localized message says what happened and that the site owner or host can fix it. Login site discovery reports them too, where it previously said the site "does not appear to be a WordPress site" or that its server denied access. Responses the site's own server wrote are unchanged, even though they also pass through Cloudflare. Exhaustive `switch`/`when` statements over `RequestExecutionErrorReason` need a case for it.
 - `WpLoginClient.verify_issued_application_password`, which detects a site whose server does not pass the `Authorization` header to WordPress. Call it only with a freshly issued application password. It reports a blocked header only when the API root and the `site_url` returned with the password share an origin.
+- WordPress.com Reader saved posts: `GET /rest/v1.2/read/saved` and `GET /wpcom/v2/read/saved/keys` to read a user's saves, `POST /wpcom/v2/read/saved/new`, `/delete` and `/bulk` to change them, and `reader_saved_key_for_post` / `reader_saved_keys_for_post` to pick the key a post is saved under. Swift gets them through `WPComApiClient.readerSaved` and `ReaderPostSaveIdentity.savedKey` / `.savedKeys`.
 
 ### Fixed
 
@@ -24,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Sign the PR-build XCFramework before zipping it, so the published PR artifact is signed.
 - **Internal:** Bumped `cc` from `1.2.38` to `1.2.65`. The older version passes an invalid target triple to `clang` for Mac Catalyst with the pinned Rust toolchain.
 
+- **Internal:** The Android `cargoBuild` Gradle task now always runs and leaves it to cargo to skip unchanged work. It declared outputs but no inputs, so after its first run Gradle treated it as up to date, and a local Android build kept a stale `libwp_mobile.so` that crashed at launch once the generated bindings had moved on.
 ## [0.10.0] - 2026-10-20
 
 ### Added
