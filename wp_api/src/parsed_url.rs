@@ -161,6 +161,13 @@ impl ParsedUrl {
     /// `by_extending_rest_api_path` already uses — so a value like
     /// `core,gutenberg` is written as `core%2Cgutenberg`. An empty `pairs`
     /// returns the URL unchanged (no trailing `?` is added).
+    ///
+    /// # Panics
+    ///
+    /// Panics if any pair is named `rest_route`. WordPress lets a query-string
+    /// `rest_route` override the route on both root forms, so the request would
+    /// silently go to a different endpoint. Choose the route with
+    /// `ApiUrlResolver::resolve` instead.
     pub fn by_appending_query_pairs(&self, pairs: Vec<QueryPair>) -> Arc<ParsedUrl> {
         // Returning early keeps the URL byte-for-byte identical. `query_pairs_mut()`
         // pushes a `?` as soon as it is called, even if nothing is appended, so we
@@ -168,6 +175,11 @@ impl ParsedUrl {
         if pairs.is_empty() {
             return Arc::new(self.clone());
         }
+
+        assert!(
+            pairs.iter().all(|pair| pair.name != "rest_route"),
+            "`rest_route` must not be passed to `by_appending_query_pairs`: it would override the route. Choose the route with `ApiUrlResolver::resolve` instead."
+        );
 
         let mut url = self.inner.clone();
         {
@@ -432,6 +444,20 @@ mod tests {
         let parsed = ParsedUrl::parse(input).expect("valid url");
         let result = parsed.by_appending_query_pairs(query_pairs(&pairs));
         assert_eq!(result.url(), expected);
+    }
+
+    /// A `rest_route` pair would override the route WordPress serves, on both
+    /// root forms, so it is rejected rather than appended.
+    #[rstest]
+    #[case::path_root("https://example.com/wp-json/wp/v2/themes")]
+    #[case::query_root("https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes")]
+    #[should_panic(expected = "`rest_route` must not be passed")]
+    fn by_appending_rest_route_panics(#[case] input: &str) {
+        let parsed = ParsedUrl::parse(input).expect("valid url");
+        parsed.by_appending_query_pairs(query_pairs(&[
+            ("context", "edit"),
+            ("rest_route", "/wp/v2/users"),
+        ]));
     }
 
     /// Appending an empty `pairs` must return the URL byte-for-byte unchanged —
