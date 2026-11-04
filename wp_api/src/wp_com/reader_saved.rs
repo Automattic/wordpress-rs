@@ -8,6 +8,7 @@ use crate::{
     wp_content_u64_id,
 };
 use serde::{Deserialize, Serialize};
+use url::Url;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
     deserialize_false_as_none, deserialize_null_as_empty_vec, deserialize_optional_bool_or_int,
@@ -24,6 +25,9 @@ wp_content_u64_id!(ReaderSaveId);
 /// The API stores a feed item that belongs to a WordPress.com post under its `blog_id` + `post_id`.
 /// A Jetpack post can be saved under either, so check both when showing whether a post is saved;
 /// [`reader_saved_keys_for_post`] returns them.
+///
+/// The API stores URLs normalized, so compare keys with [`reader_saved_key_normalized`] rather
+/// than as they are: `https://example.com/page/` and `https://example.com/page` are one save.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, uniffi::Enum)]
 #[serde(untagged, try_from = "RawReaderSavedKey")]
 pub enum ReaderSavedKey {
@@ -199,11 +203,35 @@ pub struct ReaderUnsavePostParams {
     pub source: ReaderSavedSource,
 }
 
-/// Response from `POST /wpcom/v2/read/saved/new` and `POST /wpcom/v2/read/saved/delete`.
+/// Response from `POST /wpcom/v2/read/saved/new`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
-pub struct ReaderSavedPostResponse {
+pub struct ReaderSavePostResponse {
     pub saved: bool,
     /// The key the API stored, which can differ from the one sent.
+    pub key: ReaderSavedKey,
+    /// How many posts are saved after this request.
+    pub total: u64,
+    /// What the key resolved to. A URL can resolve to a WordPress.com post.
+    pub resolved: ReaderSavedResolution,
+}
+
+/// What a saved key resolved to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum ReaderSavedResolution {
+    Post,
+    FeedItem,
+    Url,
+    /// A kind this version doesn't know. A save that succeeded mustn't read as a failure.
+    #[serde(other)]
+    Unknown,
+}
+
+/// Response from `POST /wpcom/v2/read/saved/delete`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderUnsavePostResponse {
+    pub saved: bool,
+    /// The key the API unsaved.
     pub key: ReaderSavedKey,
     /// How many posts are saved after this request.
     pub total: u64,
@@ -243,8 +271,10 @@ pub struct ReaderSavedBulkResult {
 
 #[derive(Deserialize)]
 struct RawReaderSavedBulkResult {
+    /// Read as plain JSON, because a rejected key comes back as sent and can hold anything: a
+    /// negative ID, or `[]` for an empty key.
     #[serde(default)]
-    key: Option<RawReaderSavedKey>,
+    key: serde_json::Value,
     saved: bool,
     #[serde(default)]
     error: Option<String>,
@@ -254,9 +284,12 @@ impl TryFrom<RawReaderSavedBulkResult> for ReaderSavedBulkResult {
     type Error = String;
 
     fn try_from(raw: RawReaderSavedBulkResult) -> Result<Self, Self::Error> {
-        // A rejected key comes back without its zero or malformed IDs, so `{ blog_id: 0, post_id: 5 }`
-        // returns as `{ post_id: 5 }`. That can't fail the other 99 results.
-        let key = match (raw.key.unwrap_or_default().try_into(), &raw.error) {
+        // A rejected key comes back without its zero IDs, so `{ blog_id: 0, post_id: 5 }` returns as
+        // `{ post_id: 5 }`, or with IDs that were never valid. That can't fail the other 99 results.
+        let key = match (
+            ReaderSavedBulkKey::deserialize(raw.key).map_err(|error| error.to_string()),
+            &raw.error,
+        ) {
             (Ok(key), _) => Some(key),
             (Err(_), Some(_)) => None,
             (Err(error), None) => return Err(error),
@@ -398,6 +431,65 @@ pub fn reader_saved_keys_for_post(post: ReaderPostSaveIdentity) -> Vec<ReaderSav
         Some(feed_item_id) => vec![key, ReaderSavedKey::FeedItem { feed_item_id }],
         None => vec![key],
     }
+}
+
+/// The key as the saved posts API matches it, so two spellings of a URL compare equal. Other keys
+/// are returned as they are.
+#[uniffi::export]
+pub fn reader_saved_key_normalized(key: ReaderSavedKey) -> ReaderSavedKey {
+    key.normalized()
+}
+
+impl ReaderSavedKey {
+    /// See [`reader_saved_key_normalized`].
+    pub fn normalized(&self) -> Self {
+        match self {
+            Self::Url { url } => Self::Url {
+                url: normalized_url(url),
+            },
+            _ => self.clone(),
+        }
+    }
+}
+
+/// A URL with the scheme and host lowercased, and without the fragment, a default port, tracking
+/// params, or trailing slashes except on the root path. Matches `normalizeReadSavedUrl()` in
+/// wp-calypso.
+fn normalized_url(url: &str) -> String {
+    let Ok(parsed) = Url::parse(url) else {
+        return url.to_string();
+    };
+    let Some(host) = parsed.host_str() else {
+        return url.to_string();
+    };
+
+    let port = parsed
+        .port()
+        .map(|port| format!(":{port}"))
+        .unwrap_or_default();
+    let path = match parsed.path().trim_end_matches('/') {
+        "" => "/",
+        path => path,
+    };
+    let query = parsed
+        .query()
+        .unwrap_or_default()
+        .split('&')
+        .filter(|pair| !pair.is_empty() && !is_tracking_param(pair))
+        .collect::<Vec<_>>()
+        .join("&");
+    let query = if query.is_empty() {
+        query
+    } else {
+        format!("?{query}")
+    };
+
+    format!("{}://{host}{port}{path}{query}", parsed.scheme())
+}
+
+fn is_tracking_param(pair: &str) -> bool {
+    let name = pair.split('=').next().unwrap_or_default();
+    name.starts_with("utm_") || name == "fbclid" || name == "gclid"
 }
 
 /// Text the API can send as `null`, `false` or an empty string when there isn't any. A page saved by
@@ -646,6 +738,87 @@ mod tests {
     }
 
     #[test]
+    fn test_deserialize_text_rejects_true() {
+        let result = serde_json::from_value::<ReaderSavedPost>(json!({
+            "ID": 1, "site_ID": 2, "is_external": false, "title": true,
+        }));
+        assert!(result.is_err());
+    }
+
+    #[rstest]
+    #[case::unchanged("https://example.com/page", "https://example.com/page")]
+    #[case::root("https://example.com/", "https://example.com/")]
+    #[case::root_without_a_slash("https://example.com", "https://example.com/")]
+    #[case::trailing_slash("https://example.com/page/", "https://example.com/page")]
+    #[case::many_trailing_slashes("https://example.com/page///", "https://example.com/page")]
+    #[case::inner_slashes_stay("https://example.com/a//b", "https://example.com/a//b")]
+    #[case::uppercase_scheme("HTTPS://example.com/page", "https://example.com/page")]
+    #[case::uppercase_host("https://EXAMPLE.com/page", "https://example.com/page")]
+    #[case::path_case_stays("https://example.com/Page", "https://example.com/Page")]
+    #[case::fragment("https://example.com/page#section", "https://example.com/page")]
+    #[case::default_https_port("https://example.com:443/page", "https://example.com/page")]
+    #[case::default_http_port("http://example.com:80/page", "http://example.com/page")]
+    #[case::other_port("https://example.com:8443/page", "https://example.com:8443/page")]
+    #[case::http_stays("http://example.com/page", "http://example.com/page")]
+    #[case::utm("https://example.com/page?utm_source=a", "https://example.com/page")]
+    #[case::many_utm("https://example.com/page?utm_a=1&utm_b=2", "https://example.com/page")]
+    #[case::fbclid("https://example.com/page?fbclid=abc", "https://example.com/page")]
+    #[case::gclid("https://example.com/page?gclid=abc", "https://example.com/page")]
+    #[case::other_params_stay("https://example.com/page?a=1", "https://example.com/page?a=1")]
+    #[case::mixed_params(
+        "https://example.com/p?a=1&utm_x=2&b=3",
+        "https://example.com/p?a=1&b=3"
+    )]
+    #[case::param_order_stays("https://example.com/p?b=2&a=1", "https://example.com/p?b=2&a=1")]
+    #[case::empty_query("https://example.com/page?", "https://example.com/page")]
+    #[case::empty_pairs("https://example.com/page?&a=1&", "https://example.com/page?a=1")]
+    #[case::param_without_value("https://example.com/page?a", "https://example.com/page?a")]
+    #[case::tracking_name_inside_another(
+        "https://example.com/p?my_utm_source=1",
+        "https://example.com/p?my_utm_source=1"
+    )]
+    #[case::tracking_name_in_a_value(
+        "https://example.com/p?a=fbclid",
+        "https://example.com/p?a=fbclid"
+    )]
+    #[case::tracking_name_is_case_sensitive(
+        "https://example.com/p?GCLID=1",
+        "https://example.com/p?GCLID=1"
+    )]
+    #[case::all_together(
+        "HTTPS://Example.COM:443/Page/?utm_source=x&a=1#top",
+        "https://example.com/Page?a=1"
+    )]
+    #[case::not_a_url("not a url", "not a url")]
+    #[case::empty("", "")]
+    #[case::no_host("mailto:someone@example.com", "mailto:someone@example.com")]
+    fn test_url_keys_are_normalized_like_calypso(#[case] input: &str, #[case] expected: &str) {
+        assert_eq!(
+            reader_saved_key_normalized(ReaderSavedKey::Url {
+                url: input.to_string()
+            }),
+            ReaderSavedKey::Url {
+                url: expected.to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_normalizing_keeps_ids_as_they_are() {
+        assert_eq!(post_key().normalized(), post_key());
+        assert_eq!(feed_item_key(2).normalized(), feed_item_key(2));
+    }
+
+    #[rstest]
+    #[case("https://example.com/Page/?utm_a=1&b=2#x")]
+    #[case("https://example.com")]
+    #[case("not a url")]
+    fn test_normalizing_twice_changes_nothing(#[case] input: &str) {
+        let once = normalized_url(input);
+        assert_eq!(normalized_url(&once), once);
+    }
+
+    #[test]
     fn test_deserialize_treats_empty_text_as_missing() {
         let post: ReaderSavedPost = serde_json::from_value(json!({
             "ID": 13,
@@ -702,11 +875,54 @@ mod tests {
     #[test]
     fn test_deserialize_mutation_response() {
         let json = include_str!("../../tests/wpcom/reader_saved/new.json");
-        let response: ReaderSavedPostResponse =
+        let response: ReaderSavePostResponse =
             serde_json::from_str(json).expect("Failed to deserialize save response");
         assert!(response.saved);
         assert_eq!(response.key, post_key());
         assert_eq!(response.total, 4);
+        assert_eq!(response.resolved, ReaderSavedResolution::Post);
+    }
+
+    #[rstest]
+    #[case::post("post", ReaderSavedResolution::Post)]
+    #[case::feed_item("feed_item", ReaderSavedResolution::FeedItem)]
+    #[case::url("url", ReaderSavedResolution::Url)]
+    // A kind added later on the server can't make a successful save read as a failure.
+    #[case::unknown("something_new", ReaderSavedResolution::Unknown)]
+    fn test_deserialize_resolution(#[case] value: &str, #[case] expected: ReaderSavedResolution) {
+        let response: ReaderSavePostResponse = serde_json::from_value(
+            json!({ "saved": true, "key": { "url": "https://example.com/" }, "total": 1, "resolved": value }),
+        )
+        .unwrap();
+        assert_eq!(response.resolved, expected);
+    }
+
+    #[test]
+    fn test_deserialize_unsave_response() {
+        let response: ReaderUnsavePostResponse = serde_json::from_value(
+            json!({ "saved": false, "key": { "feed_item_id": 789 }, "total": 3 }),
+        )
+        .unwrap();
+        assert!(!response.saved);
+        assert_eq!(response.key, feed_item_key(789));
+    }
+
+    #[rstest]
+    #[case::negative_id(json!({ "blog_id": 1, "post_id": -5 }))]
+    #[case::empty_array(json!([]))]
+    #[case::string_garbage(json!({ "blog_id": "abc" }))]
+    #[case::null(json!(null))]
+    fn test_deserialize_rejected_bulk_key_of_any_shape(#[case] key: serde_json::Value) {
+        let response: ReaderSavedBulkResponse = serde_json::from_value(json!({
+            "results": [
+                { "key": { "blog_id": 123, "post_id": 456 }, "saved": true },
+                { "key": key, "saved": false, "error": "invalid_input" },
+            ],
+            "total": 1,
+        }))
+        .unwrap();
+        assert_eq!(response.results[0].key, Some(bulk_post_key()));
+        assert_eq!(response.results[1].key, None);
     }
 
     #[test]
