@@ -10,8 +10,8 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
-    deserialize_false_as_none, deserialize_false_or_string_or_null, deserialize_null_as_empty_vec,
-    deserialize_optional_bool_or_int, deserialize_u64_or_string, deserialize_u64_or_string_or_none,
+    deserialize_false_as_none, deserialize_null_as_empty_vec, deserialize_optional_bool_or_int,
+    deserialize_u64_or_string, deserialize_u64_or_string_or_none,
     deserialize_u64_or_string_or_none_as_t,
 };
 
@@ -402,11 +402,27 @@ pub fn reader_saved_keys_for_post(post: ReaderPostSaveIdentity) -> Vec<ReaderSav
 
 /// Text the API can send as `null`, `false` or an empty string when there isn't any. A page saved by
 /// URL with no details has an empty title and site name, for example.
+///
+/// Unlike `deserialize_false_or_string_or_null`, the string `"false"` is kept: it can be a real
+/// title or name.
 fn deserialize_optional_text<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    Ok(deserialize_false_or_string_or_null(deserializer)?.filter(|text| !text.is_empty()))
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum FalseOrText {
+        False(bool),
+        Text(String),
+    }
+
+    match Option::<FalseOrText>::deserialize(deserializer)? {
+        None | Some(FalseOrText::False(false)) => Ok(None),
+        Some(FalseOrText::False(true)) => Err(serde::de::Error::custom(
+            "expected a string, `null`, or `false`, got `true`",
+        )),
+        Some(FalseOrText::Text(text)) => Ok(Some(text).filter(|text| !text.is_empty())),
+    }
 }
 
 /// A post in the saved list.
@@ -656,6 +672,24 @@ mod tests {
             post.identity.url.as_deref(),
             Some("https://example.com/page")
         );
+    }
+
+    #[test]
+    fn test_deserialize_keeps_text_that_reads_false() {
+        let post: ReaderSavedPost = serde_json::from_value(json!({
+            "ID": 456,
+            "site_ID": 123,
+            "title": "False",
+            "site_name": "false",
+            "excerpt": false,
+            "author": { "name": null },
+        }))
+        .unwrap();
+
+        assert_eq!(post.title.as_deref(), Some("False"));
+        assert_eq!(post.site_name.as_deref(), Some("false"));
+        assert_eq!(post.excerpt, None);
+        assert_eq!(post.author.and_then(|author| author.name), None);
     }
 
     #[test]

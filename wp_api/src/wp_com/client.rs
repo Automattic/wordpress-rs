@@ -88,10 +88,10 @@ pub struct WpComApiRequestBuilder {
     products: Arc<ProductsRequestBuilder>,
     publicize: Arc<PublicizeRequestBuilder>,
     purchases: Arc<PurchasesRequestBuilder>,
+    reader_saved: Arc<ReaderSavedRequestBuilder>,
     shopping_cart: Arc<ShoppingCartRequestBuilder>,
     site_plans: Arc<SitePlansRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
-    reader_saved: Arc<ReaderSavedRequestBuilder>,
     stats_archives: Arc<StatsArchivesRequestBuilder>,
     stats_city_views: Arc<StatsCityViewsRequestBuilder>,
     stats_clicks: Arc<StatsClicksRequestBuilder>,
@@ -143,10 +143,10 @@ impl WpComApiRequestBuilder {
             products,
             publicize,
             purchases,
+            reader_saved,
             shopping_cart,
             site_plans,
             sites,
-            reader_saved,
             stats_archives,
             stats_city_views,
             stats_clicks,
@@ -205,10 +205,10 @@ pub struct WpComApiClient {
     products: Arc<ProductsRequestExecutor>,
     publicize: Arc<PublicizeRequestExecutor>,
     purchases: Arc<PurchasesRequestExecutor>,
+    reader_saved: Arc<ReaderSavedRequestExecutor>,
     shopping_cart: Arc<ShoppingCartRequestExecutor>,
     site_plans: Arc<SitePlansRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
-    reader_saved: Arc<ReaderSavedRequestExecutor>,
     stats_archives: Arc<StatsArchivesRequestExecutor>,
     stats_city_views: Arc<StatsCityViewsRequestExecutor>,
     stats_clicks: Arc<StatsClicksRequestExecutor>,
@@ -257,10 +257,10 @@ impl WpComApiClient {
             products,
             publicize,
             purchases,
+            reader_saved,
             shopping_cart,
             site_plans,
             sites,
-            reader_saved,
             stats_archives,
             stats_city_views,
             stats_clicks,
@@ -302,10 +302,10 @@ api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, products);
 api_client_generate_endpoint_impl!(WpComApi, publicize);
 api_client_generate_endpoint_impl!(WpComApi, purchases);
+api_client_generate_endpoint_impl!(WpComApi, reader_saved);
 api_client_generate_endpoint_impl!(WpComApi, shopping_cart);
 api_client_generate_endpoint_impl!(WpComApi, site_plans);
 api_client_generate_endpoint_impl!(WpComApi, sites);
-api_client_generate_endpoint_impl!(WpComApi, reader_saved);
 api_client_generate_endpoint_impl!(WpComApi, stats_archives);
 api_client_generate_endpoint_impl!(WpComApi, stats_city_views);
 api_client_generate_endpoint_impl!(WpComApi, stats_clicks);
