@@ -31,14 +31,17 @@ struct PlainPermalinks(String);
 
 impl PlainPermalinks {
     fn set() -> Self {
-        let original = wp_cli::get_permalink_structure();
+        // Build the guard before switching: `wp rewrite structure` saves the
+        // option before it flushes, so a failed flush exits non-zero with the
+        // server already on Plain. The guard must exist so `Drop` restores it.
+        let guard = Self(wp_cli::get_permalink_structure());
         let output = wp_cli::set_permalink_structure("");
         assert!(
             output.status.success(),
             "failed to switch to Plain permalinks: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        Self(original)
+        guard
     }
 }
 
