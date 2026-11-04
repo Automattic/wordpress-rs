@@ -97,6 +97,15 @@ public final class WPComApiClient: Sendable {
         internalClient.readerSaved()
     }
 
+    /// Creates the account's saved Reader posts service, which stays in step with what this device
+    /// has just changed. Prefer it over `readerSaved` for anything a user sees, because the API's
+    /// reads can lag behind its writes.
+    ///
+    /// Create one per account and share it: each instance only knows its own writes.
+    public func makeReaderSavedService(source: ReaderSavedSource) -> ReaderSavedService {
+        ReaderSavedService(delegate: delegate, source: source)
+    }
+
     public var supportBots: SupportBotsRequestExecutor {
         internalClient.supportBots()
     }
