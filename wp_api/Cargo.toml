@@ -18,6 +18,7 @@ base64 = { workspace = true }
 chrono = { workspace = true, features = [ "serde" ] }
 futures = { workspace = true }
 h2 = { workspace = true, optional = true }
+htmlize = { workspace = true, features = [ "unescape" ] }
 http = { workspace = true }
 hyper = { workspace = true, optional = true }
 hyper-util = { workspace = true, optional = true }
