@@ -319,3 +319,15 @@ fn reads_prune_the_writes_they_include() {
     refresh(&mut state, now + LAG, &[], 0);
     assert!(state.writes.is_empty());
 }
+
+#[test]
+fn a_slow_list_read_cannot_replace_a_newer_one() {
+    let now = Instant::now();
+    let mut state = ReaderSavedState::default();
+    state.note_listed_post(&[post(1)], now + S * 10);
+    assert!(!state.note_listed_post(&[post(1)], now));
+
+    // The keys read started between the two list reads, so the newer one still stands.
+    refresh(&mut state, now + S, &[], 0);
+    assert_eq!(state.status(&[post(1)]), ReaderSavedStatus::Saved);
+}
