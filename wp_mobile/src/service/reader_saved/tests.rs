@@ -545,21 +545,31 @@ async fn unsave_sends_the_key_and_source() {
 }
 
 #[tokio::test]
-async fn unsave_uses_the_key_that_matched() {
+async fn unsave_sends_every_key_the_post_may_be_saved_under() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[feed_json(2)]).await;
+    executor.push(Step::Respond(404, error_response()));
     executor.push(Step::Respond(200, write_response(false, feed_json(2), 0)));
 
+    // The post isn't saved under its blog and post IDs, so the server can't find that one.
     service.unsave(jetpack_identity(1, 2)).await.unwrap();
 
+    let bodies: Vec<_> = executor.sent()[1..]
+        .iter()
+        .map(|sent| sent.body.clone())
+        .collect();
     assert_eq!(
-        executor.sent().last().unwrap().body,
-        Some(json!({ "feed_item_id": 2, "source": "android" }))
+        bodies,
+        vec![
+            Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" })),
+            Some(json!({ "feed_item_id": 2, "source": "android" })),
+        ]
     );
     assert_eq!(
         service.status(jetpack_identity(1, 2)),
         ReaderSavedStatus::NotSaved
     );
+    assert_eq!(service.saved_count(), Some(0));
 }
 
 #[tokio::test]
@@ -579,17 +589,31 @@ async fn unsave_removes_every_key_that_matched() {
     assert_eq!(service.saved_count(), Some(0));
 }
 
+/// Before the first refresh nothing says which key the post is saved under, and missing one
+/// leaves it saved.
 #[tokio::test]
-async fn unsave_before_a_refresh_uses_the_main_key() {
+async fn unsave_before_a_refresh_sends_every_key() {
     let (service, executor) = service();
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+    executor.push(Step::Respond(200, write_response(false, feed_json(2), 0)));
 
     service.unsave(jetpack_identity(1, 2)).await.unwrap();
 
-    assert_eq!(executor.sent().len(), 1);
+    let bodies: Vec<_> = executor
+        .sent()
+        .iter()
+        .map(|sent| sent.body.clone())
+        .collect();
     assert_eq!(
-        executor.sent()[0].body,
-        Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" }))
+        bodies,
+        vec![
+            Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" })),
+            Some(json!({ "feed_item_id": 2, "source": "android" })),
+        ]
+    );
+    assert_eq!(
+        service.status(jetpack_identity(1, 2)),
+        ReaderSavedStatus::NotSaved
     );
 }
 
@@ -822,102 +846,119 @@ async fn a_slow_older_refresh_cannot_replace_a_newer_one() {
     assert_eq!(service.status(identity(2)), ReaderSavedStatus::Saved);
 }
 
+/// The server applies a post's writes in the order it receives them, so the unsave isn't sent
+/// until the save has been answered.
 #[tokio::test]
-async fn saving_then_quickly_unsaving_ends_up_unsaved_whichever_response_lands_first() {
+async fn a_write_waits_for_the_posts_earlier_write_to_finish() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
     let (release, held) = oneshot::channel();
     executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
 
-    let (save, ()) = futures::join!(service.save(identity(1)), async {
-        service.unsave(identity(1)).await.unwrap();
-        release.send(()).unwrap();
-    });
+    let mut save = Box::pin(service.save(identity(1)));
+    let mut unsave = Box::pin(service.unsave(identity(1)));
+    assert!(futures::poll!(save.as_mut()).is_pending());
+    assert!(futures::poll!(unsave.as_mut()).is_pending());
+    assert_eq!(executor.sent().len(), 2, "only the save has been sent");
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
 
+    release.send(()).unwrap();
+    let (save, unsave) = futures::join!(save, unsave);
     save.unwrap();
+    unsave.unwrap();
+
+    let sent = executor.sent();
+    assert!(sent[1].url.starts_with(NEW_URL), "{}", sent[1].url);
+    assert!(sent[2].url.starts_with(DELETE_URL), "{}", sent[2].url);
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.saved_count(), Some(0));
+    assert!(service.recent_saves().is_empty());
+}
+
+#[tokio::test]
+async fn a_cancelled_write_lets_the_posts_next_write_go() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[]).await;
+    let (_release, held) = oneshot::channel::<()>();
+    executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+
+    let mut save = Box::pin(service.save(identity(1)));
+    let mut unsave = Box::pin(service.unsave(identity(1)));
+    assert!(futures::poll!(save.as_mut()).is_pending());
+    assert!(futures::poll!(unsave.as_mut()).is_pending());
+
+    drop(save);
+    unsave.await.unwrap();
+
+    assert_eq!(executor.sent().len(), 3);
     assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
 }
 
-/// Saves an RSS post the API stores as a WordPress.com post, then unsaves it before the save
-/// returns. `unsave_response_key` is the key the delete echoes back.
-async fn save_then_quick_unsave(
-    unsave_response_key: Value,
-) -> Vec<(&'static str, ReaderSavedStatus, Option<u64>, usize)> {
+/// A save the server stores under another key, with an unsave queued behind it: the unsave also
+/// sends the key the save was stored under.
+#[tokio::test]
+async fn a_queued_unsave_also_unsaves_the_key_the_save_was_stored_under() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
-    let (release_save, held_save) = oneshot::channel();
-    let (release_unsave, held_unsave) = oneshot::channel();
-    executor.push(Step::Hold(
-        held_save,
-        200,
-        write_response(true, post_json(1), 1),
-    ));
-    executor.push(Step::Hold(
-        held_unsave,
-        200,
-        write_response(false, unsave_response_key, 0),
-    ));
+    let (release, held) = oneshot::channel();
+    executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
+    executor.push(Step::Respond(404, error_response()));
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
 
-    let look = |label| {
-        (
-            label,
-            service.status(rss_identity(7)),
-            service.saved_count(),
-            service.recent_saves().len(),
-        )
-    };
-    let mut seen = Vec::new();
-    let (save, unsave, ()) = futures::join!(
-        service.save(rss_identity(7)),
-        service.unsave(rss_identity(7)),
-        async {
-            seen.push(look("both requests in flight"));
-            release_save.send(()).unwrap();
-            for _ in 0..10 {
-                tokio::task::yield_now().await;
-            }
-            seen.push(look("save returned, unsave in flight"));
-            release_unsave.send(()).unwrap();
-        }
-    );
+    let mut save = Box::pin(service.save(rss_identity(7)));
+    let mut unsave = Box::pin(service.unsave(rss_identity(7)));
+    assert!(futures::poll!(save.as_mut()).is_pending());
+    assert!(futures::poll!(unsave.as_mut()).is_pending());
+    assert_eq!(service.status(rss_identity(7)), ReaderSavedStatus::NotSaved);
+
+    release.send(()).unwrap();
+    let (save, unsave) = futures::join!(save, unsave);
     save.unwrap();
     unsave.unwrap();
-    seen.push(look("both returned"));
-    seen
-}
 
-#[rstest]
-#[case::delete_echoes_the_post_key(post_json(1))]
-#[case::delete_echoes_the_feed_item_key(feed_json(7))]
-#[tokio::test]
-async fn a_quick_unsave_wins_over_a_save_the_server_stores_under_another_key(
-    #[case] unsave_response_key: Value,
-) {
-    for (label, status, count, recent) in save_then_quick_unsave(unsave_response_key).await {
-        assert_eq!(
-            (status, count, recent),
-            (ReaderSavedStatus::NotSaved, Some(0), 0),
-            "{label}"
-        );
-    }
+    let bodies: Vec<_> = executor.sent()[2..]
+        .iter()
+        .map(|sent| sent.body.clone())
+        .collect();
+    assert_eq!(
+        bodies,
+        vec![
+            Some(json!({ "feed_item_id": 7, "source": "android" })),
+            Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" })),
+        ]
+    );
+    assert_eq!(service.status(rss_identity(7)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.saved_count(), Some(0));
+    assert!(service.recent_saves().is_empty());
 }
 
 #[tokio::test]
-async fn unsave_key_sends_the_key_the_server_stores_the_post_under() {
+async fn unsave_key_also_unsaves_the_key_the_server_stores_the_post_under() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
     executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    executor.push(Step::Respond(404, error_response()));
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
     service.save(rss_identity(7)).await.unwrap();
 
     service.unsave_key(feed_key(7)).await.unwrap();
 
+    let bodies: Vec<_> = executor.sent()[2..]
+        .iter()
+        .map(|sent| sent.body.clone())
+        .collect();
     assert_eq!(
-        executor.sent().last().unwrap().body,
-        Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" }))
+        bodies,
+        vec![
+            Some(json!({ "feed_item_id": 7, "source": "android" })),
+            Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" })),
+        ]
     );
     assert_eq!(service.status(rss_identity(7)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.saved_count(), Some(0));
 }
 
 // The saved list
@@ -1132,6 +1173,27 @@ async fn import_splits_keys_into_batches_oldest_first(
         .collect();
     let keys: Vec<_> = results.into_iter().map(|result| result.key).collect();
     assert_eq!(keys, expected);
+}
+
+/// `import` takes keys newest first, and `recent_saves` returns them newest first.
+#[tokio::test]
+async fn imported_posts_are_recent_saves_newest_first() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[]).await;
+    executor.push(Step::Respond(
+        200,
+        bulk_response(&[post_json(1), post_json(2), post_json(3)], 3),
+    ));
+
+    service
+        .import(vec![bulk_post_key(1), bulk_post_key(2), bulk_post_key(3)])
+        .await
+        .unwrap();
+
+    assert_eq!(
+        service.recent_saves(),
+        vec![post_key(1), post_key(2), post_key(3)]
+    );
 }
 
 #[tokio::test]
@@ -1514,3 +1576,6 @@ async fn a_full_session_stays_consistent() {
     assert_eq!(service.status(identity(3)), ReaderSavedStatus::Saved);
     assert_eq!(service.saved_count(), Some(2));
 }
+
+#[path = "fake_server_tests.rs"]
+mod fake_server;

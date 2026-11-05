@@ -1,19 +1,24 @@
 //! The saved posts this device knows about, without any networking.
 //!
-//! Reads of the saved posts API can lag behind its writes, so a refetch straight after a write can
-//! return the state from before it. Each write this device makes is kept as a [`RecentWrite`] on
-//! top of the server's list until the server has had time to catch up.
+//! The saved posts API's reads can lag behind its writes. Rather than guess what the server holds,
+//! this relies on three facts about it, and nothing else:
 //!
-//! Only a key's newest write counts, and only until it expires; after that the server's list
-//! decides. Writes can finish in any order, so an older one that finishes after a newer one has
-//! already finished is dropped rather than applied.
+//! 1. A successful response means the write was applied.
+//! 2. A read includes every write applied at least [`MAX_READ_LAG`] before the read started.
+//! 3. Writes to one post are applied in the order they were sent. The service makes this true by
+//!    sending them one at a time, in the order the user made them.
+//!
+//! So the newest write to a key is what the server holds once it succeeds, and it decides the key's
+//! state until a read that started [`MAX_READ_LAG`] after it finished has been applied. Time passing
+//! changes nothing on its own: only a tap, a response or a read does. A post is saved if any of the
+//! keys it may be saved under is.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use wp_api::wp_com::reader_saved::ReaderSavedKey;
 
-/// How long a finished write wins over what the server says.
-pub(super) const RECENT_WRITE_TTL: Duration = Duration::from_secs(120);
+/// How far behind the server's writes a read can be.
+pub(super) const MAX_READ_LAG: Duration = Duration::from_secs(120);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct WriteId(u64);
@@ -21,10 +26,8 @@ pub(super) struct WriteId(u64);
 /// A refresh in flight. Ordered by when it started.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct RefreshTicket {
-    id: u64,
-    /// The server's answer can be no newer than this, so a write still in its window at this time
-    /// may be missing from it, however long the request then takes.
     started: Instant,
+    id: u64,
 }
 
 /// Whether a post is saved, as far as this device knows.
@@ -32,179 +35,227 @@ pub(super) struct RefreshTicket {
 pub enum ReaderSavedStatus {
     Saved,
     NotSaved,
-    /// The saved keys haven't loaded yet, and this device hasn't changed the post.
+    /// The saved keys haven't loaded, or the post is older than the 1,000 keys they stop at, and
+    /// this device hasn't changed it.
     Unknown,
 }
 
 #[derive(Debug)]
-struct RecentWrite {
+struct Write {
     id: WriteId,
-    /// The key as sent, or as the server stored it once the write finishes. The map holds it
-    /// normalized; this is the spelling to hand back to apps.
+    /// The key sent, or the key the server stored once it answered.
     key: ReaderSavedKey,
     saved: bool,
-    /// `None` while the request is in flight, so a slow request can't expire before it finishes.
-    expires_at: Option<Instant>,
+    /// When the server answered. `None` while the write is queued or in flight.
+    done_at: Option<Instant>,
 }
 
-impl RecentWrite {
-    fn is_live(&self, now: Instant) -> bool {
-        self.expires_at.is_none_or(|expires_at| now < expires_at)
+#[derive(Debug)]
+struct Snapshot {
+    ticket: RefreshTicket,
+    /// The server's keys, normalized.
+    keys: HashSet<ReaderSavedKey>,
+    total: u64,
+}
+
+impl Snapshot {
+    /// How many saves are beyond the keys, which stop at 1,000.
+    fn beyond_keys(&self) -> u64 {
+        self.total.saturating_sub(self.keys.len() as u64)
     }
+}
+
+/// A post the saved list showed, and when that read started. The list doesn't say which of the
+/// post's keys it's saved under.
+#[derive(Debug)]
+struct Listed {
+    post: Vec<ReaderSavedKey>,
+    started: Instant,
 }
 
 #[derive(Debug, Default)]
 pub(super) struct ReaderSavedState {
-    /// The server's keys, normalized, or `None` until the first refresh.
-    saved: Option<HashSet<ReaderSavedKey>>,
-    /// How many saves the server has beyond `saved`, because the keys stop at 1,000.
-    beyond_keys: u64,
-    /// Each post's writes, oldest first. Keyed by the post's key, normalized, or by the key the
-    /// server stores it under once that's known, so one post's writes are always in one list.
-    recent_writes: HashMap<ReaderSavedKey, Vec<RecentWrite>>,
-    /// Keys the server stored a save under instead of the one sent, so the post that was saved
-    /// still reads as saved under the key it was saved by.
+    /// Writes that may still decide their key's state, in the order they were made.
+    writes: Vec<Write>,
+    /// The newest refresh applied.
+    snapshot: Option<Snapshot>,
+    /// Posts the saved list showed since the snapshot's refresh started.
+    listed: Vec<Listed>,
+    /// Keys the server stores as another key, as it last said: a URL of a WordPress.com post is
+    /// stored as the post.
     stored_as: HashMap<ReaderSavedKey, ReaderSavedKey>,
-    /// Each post's newest write that has finished, kept after the write itself is dropped, so an
-    /// older write that finishes later still knows it was overridden.
-    newest_finished: HashMap<ReaderSavedKey, WriteId>,
-    /// When the server was last read: the start of the newest refresh applied, and when each key
-    /// was last seen in the saved list. A write whose window ended before then is older than what
-    /// was read.
-    refreshed_at: Option<Instant>,
-    listed_at: HashMap<ReaderSavedKey, Instant>,
     next_write_id: u64,
-    next_refresh_ticket: u64,
-    /// The newest refresh applied, so a slow response can't replace a newer one.
-    applied_refresh: Option<RefreshTicket>,
+    next_refresh_id: u64,
 }
 
 impl ReaderSavedState {
+    /// The keys a post's saves are stored under: its own keys, normalized, or the keys the server
+    /// stores them as.
+    pub(super) fn post_keys(&self, keys: &[ReaderSavedKey]) -> Vec<ReaderSavedKey> {
+        let mut all = Vec::new();
+        for key in keys {
+            let key = self.stored_key(key);
+            if !all.contains(&key) {
+                all.push(key);
+            }
+        }
+        all
+    }
+
+    /// The keys a write to these keys must wait its turn on: each key, normalized, and the key the
+    /// server stores it as. An earlier write may have been queued before that was known.
+    pub(super) fn lock_keys(&self, keys: &[ReaderSavedKey]) -> Vec<ReaderSavedKey> {
+        let mut all = Vec::new();
+        for key in keys {
+            for key in [key.normalized(), self.stored_key(key)] {
+                if !all.contains(&key) {
+                    all.push(key);
+                }
+            }
+        }
+        all
+    }
+
+    /// The key the server stores a key as, normalized.
+    fn stored_key(&self, key: &ReaderSavedKey) -> ReaderSavedKey {
+        let key = key.normalized();
+        self.stored_as.get(&key).cloned().unwrap_or(key)
+    }
+
+    fn is_for(&self, write: &Write, key: &ReaderSavedKey) -> bool {
+        self.stored_key(&write.key) == *key
+    }
+
+    fn snapshot_has(&self, snapshot: &Snapshot, key: &ReaderSavedKey) -> bool {
+        snapshot.keys.contains(key)
+            || (!self.stored_as.is_empty()
+                && snapshot
+                    .keys
+                    .iter()
+                    .any(|saved| self.stored_key(saved) == *key))
+    }
+
     /// Records a write about to be sent, which takes effect straight away.
     pub(super) fn begin_write(&mut self, key: &ReaderSavedKey, saved: bool) -> WriteId {
         let id = WriteId(self.next_write_id);
         self.next_write_id += 1;
-        let slot = self.slot(key);
-        self.recent_writes
-            .entry(slot)
-            .or_default()
-            .push(RecentWrite {
-                id,
-                key: key.clone(),
-                saved,
-                expires_at: None,
-            });
+        self.writes.push(Write {
+            id,
+            key: key.clone(),
+            saved,
+            done_at: None,
+        });
         id
     }
 
-    /// Records that the server accepted a write. `stored_key` is the key it stored, which can
-    /// differ from the one sent.
+    /// Like [`Self::begin_write`], for a write that belongs to the same tap as `with`, so it takes
+    /// that tap's place among the writes rather than coming after newer taps.
+    pub(super) fn begin_write_with(
+        &mut self,
+        with: WriteId,
+        key: &ReaderSavedKey,
+        saved: bool,
+    ) -> WriteId {
+        let id = self.begin_write(key, saved);
+        let write = self.writes.pop().expect("just added");
+        let index = self
+            .writes
+            .iter()
+            .position(|other| other.id == with)
+            .map_or(self.writes.len(), |index| index + 1);
+        self.writes.insert(index, write);
+        id
+    }
+
+    /// Records that the server applied a write. `stored_key` is the key it stored, which can differ
+    /// from the one sent.
     pub(super) fn complete_write(
         &mut self,
-        requested_key: &ReaderSavedKey,
         id: WriteId,
         stored_key: &ReaderSavedKey,
         now: Instant,
     ) {
-        let slot = self.slot(requested_key);
-        let Some(mut write) = self.take_in_flight_write(&slot, id) else {
+        let Some(write) = self.in_flight(id) else {
             return;
         };
-        let stored = self.learn_stored_key(requested_key, &slot, stored_key);
-
-        // A newer write to the post has already finished, so the server has its result, not this
-        // one's. Applying this one would undo it.
-        if self
-            .newest_finished
-            .get(&stored)
-            .is_some_and(|newest| *newest > write.id)
-        {
-            return;
-        }
-        self.newest_finished.insert(stored.clone(), write.id);
-
+        let requested = write.key.normalized();
+        let stored = stored_key.normalized();
         write.key = stored_key.clone();
-        write.expires_at = Some(now + RECENT_WRITE_TTL);
-        if let Some(saved) = &mut self.saved {
-            if write.saved {
-                saved.insert(stored.clone());
-            } else {
-                saved.remove(&stored);
-            }
+        write.done_at = Some(now);
+
+        // What the server says now replaces what it said before, so a URL whose post was deleted
+        // stops being looked up as the post.
+        if requested == stored {
+            self.stored_as.remove(&requested);
+        } else {
+            self.stored_as.insert(requested, stored);
         }
-
-        // Keep the key's writes in the order they were made.
-        let writes = self.recent_writes.entry(stored).or_default();
-        let index = writes.partition_point(|other| other.id < write.id);
-        writes.insert(index, write);
     }
 
-    /// Undoes a write the server refused.
-    pub(super) fn fail_write(&mut self, key: &ReaderSavedKey, id: WriteId) {
-        let slot = self.slot(key);
-        self.take_in_flight_write(&slot, id);
-    }
-
-    /// The key to send for a key: the one the server stores the post under, when that's known.
-    pub(super) fn key_to_send(&self, key: &ReaderSavedKey) -> ReaderSavedKey {
-        let normalized = key.normalized();
-        match self.stored_as.get(&normalized) {
-            Some(stored) => stored.clone(),
-            None => key.clone(),
+    /// Undoes a write the server refused, or that was cancelled.
+    pub(super) fn fail_write(&mut self, id: WriteId) {
+        if self.in_flight(id).is_some() {
+            self.writes.retain(|write| write.id != id);
         }
     }
 
     pub(super) fn begin_refresh(&mut self, now: Instant) -> RefreshTicket {
         let ticket = RefreshTicket {
-            id: self.next_refresh_ticket,
             started: now,
+            id: self.next_refresh_id,
         };
-        self.next_refresh_ticket += 1;
+        self.next_refresh_id += 1;
         ticket
     }
 
-    /// Replaces the server's keys. Recent writes stay on top of them.
+    /// Replaces the server's keys, unless a refresh that started later has already been applied.
+    /// Each key comes with the URL of a post saved by its IDs, if it has one.
     pub(super) fn apply_refresh(
         &mut self,
         ticket: RefreshTicket,
-        keys: impl IntoIterator<Item = ReaderSavedKey>,
+        keys: impl IntoIterator<Item = (ReaderSavedKey, Option<String>)>,
         total: u64,
     ) {
-        if self.applied_refresh.is_some_and(|applied| ticket < applied) {
+        if self
+            .snapshot
+            .as_ref()
+            .is_some_and(|snapshot| ticket < snapshot.ticket)
+        {
             return;
         }
-        self.applied_refresh = Some(ticket);
 
-        let mut saved: HashSet<_> = keys.into_iter().map(|key| self.slot(&key)).collect();
-        self.beyond_keys = total.saturating_sub(saved.len() as u64);
-
-        // This list may be from before the device's latest writes. Keeping them in it, rather than
-        // only on top of it, stops it coming back when they expire if there's no other refresh
-        // before then. A write whose window had ended when the request started is older than the
-        // list, so the list wins.
-        for (key, writes) in &self.recent_writes {
-            let finished = writes.iter().rfind(|write| write.expires_at.is_some());
-            if let Some(write) = finished.filter(|write| write.is_live(ticket.started)) {
-                if write.saved {
-                    saved.insert(key.clone());
-                } else {
-                    saved.remove(key);
-                }
+        let mut saved = HashSet::new();
+        for (key, url) in keys {
+            let key = key.normalized();
+            if let Some(url) = url.filter(|_| !matches!(key, ReaderSavedKey::Url { .. })) {
+                let url = ReaderSavedKey::Url { url }.normalized();
+                self.stored_as.insert(url, key.clone());
             }
+            saved.insert(key);
         }
-        self.saved = Some(saved);
-        self.refreshed_at = Some(ticket.started);
-        self.prune(ticket.started);
+        self.snapshot = Some(Snapshot {
+            ticket,
+            keys: saved,
+            total,
+        });
+
+        // This read includes every write that finished `MAX_READ_LAG` before it started, and every
+        // post the saved list showed before it started.
+        self.writes.retain(|write| {
+            write
+                .done_at
+                .is_none_or(|done_at| done_at + MAX_READ_LAG > ticket.started)
+        });
+        self.listed.retain(|listed| listed.started > ticket.started);
     }
 
     /// Whether a post is saved, given every key it may be saved under.
-    pub(super) fn status(&self, keys: &[ReaderSavedKey], now: Instant) -> ReaderSavedStatus {
-        let keys = self.with_stored_keys(keys);
-        if keys.is_empty() {
-            return ReaderSavedStatus::NotSaved;
-        }
-
-        let states: Vec<_> = keys.iter().map(|key| self.is_saved(key, now)).collect();
+    pub(super) fn status(&self, keys: &[ReaderSavedKey]) -> ReaderSavedStatus {
+        let states: Vec<_> = self
+            .post_keys(keys)
+            .iter()
+            .map(|key| self.is_saved(key))
+            .collect();
         if states.contains(&Some(true)) {
             ReaderSavedStatus::Saved
         } else if states.contains(&None) {
@@ -214,218 +265,191 @@ impl ReaderSavedState {
         }
     }
 
-    /// The keys to send to unsave a post: the ones it's saved under, or its main key if none are
-    /// known to be.
-    pub(super) fn keys_to_unsave(
-        &self,
-        keys: &[ReaderSavedKey],
-        now: Instant,
-    ) -> Vec<ReaderSavedKey> {
-        let matched: Vec<_> = self
-            .with_stored_keys(keys)
-            .into_iter()
-            .filter(|key| self.is_saved(key, now) == Some(true))
-            .collect();
-
-        if matched.is_empty() {
-            keys.iter().take(1).cloned().collect()
-        } else {
-            matched
-        }
-    }
-
-    /// Whether to show a post from the saved list, which can still have a post that was just
-    /// unsaved.
-    pub(super) fn should_show_listed_post(&self, keys: &[ReaderSavedKey], now: Instant) -> bool {
-        let recently_unsaved = self.with_stored_keys(keys).iter().any(|key| {
-            self.current_write(key, now)
-                .is_some_and(|write| !write.saved)
-        });
-        !recently_unsaved || self.status(keys, now) == ReaderSavedStatus::Saved
-    }
-
-    /// Records that the saved list has a post, which can reach it before the keys do. Returns
-    /// whether that changed anything.
-    ///
-    /// Nothing is added for a post already saved under any of its keys: a Jetpack post saved under
-    /// its feed item can be listed with its blog and post IDs, and adding those would count it
-    /// twice. Nor for an account past the 1,000 key limit, whose listed posts may already be
-    /// counted beyond the keys.
-    pub(super) fn note_listed_post(&mut self, keys: &[ReaderSavedKey], now: Instant) -> bool {
-        if self.beyond_keys > 0 || self.status(keys, now) == ReaderSavedStatus::Saved {
-            return false;
-        }
-        let slot = keys.first().map(|key| self.slot(key));
-        if let Some(slot) = &slot {
-            self.listed_at.insert(slot.clone(), now);
-        }
-        match (&mut self.saved, slot) {
-            (Some(saved), Some(key)) => saved.insert(key),
-            _ => false,
-        }
-    }
-
-    /// How many posts are saved, or `None` until the first refresh.
-    pub(super) fn saved_count(&self, now: Instant) -> Option<u64> {
-        let saved = self.saved.as_ref()?;
-
-        let mut count = saved.len() as u64 + self.beyond_keys;
-        for key in self.recent_writes.keys() {
-            let Some(write) = self.current_write(key, now) else {
-                continue;
-            };
-            match (write.saved, saved.contains(key)) {
-                (true, false) => count += 1,
-                (false, true) => count = count.saturating_sub(1),
-                _ => {}
-            }
-        }
-        Some(count)
-    }
-
-    /// The keys this device saved recently, newest first, which the saved list may not have yet.
-    pub(super) fn recent_saves(&self, now: Instant) -> Vec<ReaderSavedKey> {
-        let mut saves: Vec<_> = self
-            .recent_writes
-            .keys()
-            .filter_map(|key| {
-                let write = self.current_write(key, now)?;
-                write.saved.then_some((write.id, write.key.clone()))
-            })
-            .collect();
-        saves.sort_by_key(|(id, _)| std::cmp::Reverse(*id));
-        saves.into_iter().map(|(_, key)| key).collect()
-    }
-
-    /// The write that decides a key's state: its newest, unless that has expired.
-    fn current_write(&self, key: &ReaderSavedKey, now: Instant) -> Option<&RecentWrite> {
-        self.recent_writes
-            .get(key)?
-            .last()
-            .filter(|write| write.is_live(now))
-    }
-
-    fn is_saved(&self, key: &ReaderSavedKey, now: Instant) -> Option<bool> {
-        match self.current_write(key, now) {
-            Some(write) => Some(write.saved),
-            None => self.saved.as_ref().map(|saved| saved.contains(key)),
-        }
-    }
-
-    /// Where a key's writes live: the key the server stores the post under if that's known,
-    /// otherwise the key itself, normalized.
-    fn slot(&self, key: &ReaderSavedKey) -> ReaderSavedKey {
-        let key = key.normalized();
-        self.stored_as.get(&key).cloned().unwrap_or(key)
-    }
-
-    /// Records the key the server stored a write under, and returns where the post's writes now
-    /// live. When it's new, the writes already under the sent key move there, so newest-wins sees
-    /// all of them.
-    fn learn_stored_key(
-        &mut self,
-        requested_key: &ReaderSavedKey,
-        slot: &ReaderSavedKey,
-        stored_key: &ReaderSavedKey,
-    ) -> ReaderSavedKey {
-        let stored = stored_key.normalized();
-        if stored == *slot || stored == requested_key.normalized() {
-            return slot.clone();
-        }
-
-        self.stored_as
-            .insert(requested_key.normalized(), stored.clone());
-        for target in self.stored_as.values_mut() {
-            if target == slot {
-                *target = stored.clone();
-            }
-        }
-        if let Some(moved) = self.newest_finished.remove(slot) {
-            let newest = self.newest_finished.entry(stored.clone()).or_insert(moved);
-            *newest = (*newest).max(moved);
-        }
-        if let Some(moved) = self.recent_writes.remove(slot) {
-            let writes = self.recent_writes.entry(stored.clone()).or_default();
-            for write in moved {
-                let index = writes.partition_point(|other| other.id < write.id);
-                writes.insert(index, write);
-            }
-
-            // A write that finished under the sent key was applied to it, not to the post's stored
-            // key, so the stored key may still show the post's state from before it. Unless the
-            // server has been read since its window ended, which is newer than the write.
-            let last_read = self
-                .refreshed_at
-                .into_iter()
-                .chain(self.listed_at.get(&stored).copied())
-                .max();
-            let newest = writes
-                .iter()
-                .rfind(|write| write.expires_at.is_some())
-                .filter(|write| {
-                    last_read.is_none_or(|read| write.expires_at.is_some_and(|end| end > read))
-                });
-            if let (Some(write), Some(saved)) = (newest, &mut self.saved) {
-                if write.saved {
-                    saved.insert(stored.clone());
-                } else {
-                    saved.remove(&stored);
+    /// The keys to send to unsave a post: every key it may be saved under. Sending one the post
+    /// isn't saved under does nothing, while missing one leaves the post saved.
+    pub(super) fn keys_to_unsave(&self, keys: &[ReaderSavedKey]) -> Vec<ReaderSavedKey> {
+        let mut sent: Vec<ReaderSavedKey> = Vec::new();
+        for key in keys {
+            let stored = self.stored_as.get(&key.normalized()).cloned();
+            for key in std::iter::once(key.clone()).chain(stored) {
+                if !sent
+                    .iter()
+                    .any(|other| other.normalized() == key.normalized())
+                {
+                    sent.push(key);
                 }
             }
         }
-        stored
+        sent
     }
 
-    /// The keys to check for a post: each of its keys, or the key the server stores it under once
-    /// that's known, since that's where the post's writes and saves are.
-    fn with_stored_keys(&self, keys: &[ReaderSavedKey]) -> Vec<ReaderSavedKey> {
-        let mut all: Vec<ReaderSavedKey> = Vec::new();
-        for key in keys {
-            let key = self.slot(key);
-            if !all.contains(&key) {
-                all.push(key);
-            }
-        }
-        all
-    }
-
-    /// Only a write in flight can finish, so finishing one twice does nothing.
-    fn take_in_flight_write(&mut self, key: &ReaderSavedKey, id: WriteId) -> Option<RecentWrite> {
-        let writes = self.recent_writes.get_mut(key)?;
-        let index = writes
+    /// Whether this device has seen the server hold a save under this exact key: as the result of
+    /// its newest finished write to it, or else in the keys it last read.
+    pub(super) fn known_saved_under(&self, key: &ReaderSavedKey) -> bool {
+        let key = key.normalized();
+        match self
+            .writes
             .iter()
-            .position(|write| write.id == id && write.expires_at.is_none())?;
-        let write = writes.remove(index);
-        if writes.is_empty() {
-            self.recent_writes.remove(key);
+            .rev()
+            .find(|write| write.done_at.is_some() && write.key.normalized() == key)
+        {
+            Some(write) => write.saved,
+            None => self
+                .snapshot
+                .as_ref()
+                .is_some_and(|snapshot| snapshot.keys.contains(&key)),
         }
-        Some(write)
     }
 
-    /// Drops writes whose window had ended by `started`, the start of a refresh being applied:
-    /// that refresh, and any accepted after it, is new enough to include them. A write whose
-    /// window ended later is kept, because another refresh that started before then could still
-    /// land and needs it on top. Keys with a write still in flight keep everything: an older write
-    /// that finishes later has to see the newer ones to know it was overridden.
-    ///
-    /// Once nothing is in flight only the newest write matters, so the others go too. Dropping
-    /// writes one at a time could leave an older one, with a later window, standing in for it.
-    fn prune(&mut self, started: Instant) {
-        self.recent_writes.retain(|_, writes| {
-            if writes.iter().all(|write| write.expires_at.is_some()) {
-                let newest = writes.pop().filter(|write| write.is_live(started));
-                writes.clear();
-                writes.extend(newest);
-            }
-            !writes.is_empty()
-        });
+    /// Whether to show a post from the saved list: not if this device unsaved it since.
+    pub(super) fn should_show_listed_post(&self, keys: &[ReaderSavedKey]) -> bool {
+        let post = self.post_keys(keys);
+        let unsaved_here = post
+            .iter()
+            .any(|key| self.deciding_write(key).is_some_and(|write| !write.saved));
+        !unsaved_here || self.status(keys) == ReaderSavedStatus::Saved
     }
+
+    /// Records that a read of the saved list that started at `started` showed a post. Returns
+    /// whether that changed what this device shows.
+    pub(super) fn note_listed_post(&mut self, keys: &[ReaderSavedKey], started: Instant) -> bool {
+        let post = self.post_keys(keys);
+        if post.is_empty()
+            || self
+                .snapshot
+                .as_ref()
+                .is_some_and(|snapshot| snapshot.ticket.started >= started)
+        {
+            return false;
+        }
+        let before = (self.status(&post), self.saved_count());
+        self.listed
+            .retain(|listed| !intersects(&listed.post, &post));
+        self.listed.push(Listed {
+            post: post.clone(),
+            started,
+        });
+        before != (self.status(&post), self.saved_count())
+    }
+
+    /// How many saves there are, or `None` until the first refresh. Like the server's total, a post
+    /// saved under two keys counts twice.
+    pub(super) fn saved_count(&self) -> Option<u64> {
+        let snapshot = self.snapshot.as_ref()?;
+        let mut count = snapshot.total as i64;
+
+        let mut seen: Vec<ReaderSavedKey> = Vec::new();
+        for write in self.writes.iter().rev() {
+            let key = self.stored_key(&write.key);
+            if seen.contains(&key) {
+                continue;
+            }
+            if self.decides(write) {
+                count += i64::from(write.saved) - i64::from(self.snapshot_has(snapshot, &key));
+            }
+            seen.push(key);
+        }
+
+        // A listed post the keys don't have yet. Past the 1,000 keys it may already be counted.
+        if snapshot.beyond_keys() == 0 {
+            for listed in &self.listed {
+                let changed_here = listed
+                    .post
+                    .iter()
+                    .any(|key| self.deciding_write(key).is_some());
+                if !changed_here
+                    && !listed
+                        .post
+                        .iter()
+                        .any(|key| self.snapshot_has(snapshot, key))
+                {
+                    count += 1;
+                }
+            }
+        }
+        Some(count.max(0) as u64)
+    }
+
+    /// The keys this device saved and the server may not have read yet, newest first.
+    pub(super) fn recent_saves(&self) -> Vec<ReaderSavedKey> {
+        let mut seen: Vec<ReaderSavedKey> = Vec::new();
+        let mut saves = Vec::new();
+        for write in self.writes.iter().rev() {
+            let key = self.stored_key(&write.key);
+            if seen.contains(&key) {
+                continue;
+            }
+            seen.push(key);
+            if write.saved && self.decides(write) {
+                saves.push(write.key.clone());
+            }
+        }
+        saves
+    }
+
+    fn in_flight(&mut self, id: WriteId) -> Option<&mut Write> {
+        self.writes
+            .iter_mut()
+            .find(|write| write.id == id && write.done_at.is_none())
+    }
+
+    fn is_saved(&self, key: &ReaderSavedKey) -> Option<bool> {
+        match self.deciding_write(key) {
+            Some(write) => Some(write.saved),
+            None => self.server_has(key),
+        }
+    }
+
+    /// The key's newest write, if the server may not have been read since it.
+    fn deciding_write(&self, key: &ReaderSavedKey) -> Option<&Write> {
+        self.writes
+            .iter()
+            .rev()
+            .find(|write| self.is_for(write, key))
+            .filter(|write| self.decides(write))
+    }
+
+    fn decides(&self, write: &Write) -> bool {
+        let Some(done_at) = write.done_at else {
+            return true;
+        };
+        let key = self.stored_key(&write.key);
+        let last_read = self
+            .snapshot
+            .as_ref()
+            .map(|snapshot| snapshot.ticket.started)
+            .into_iter()
+            .chain(
+                self.listed
+                    .iter()
+                    .filter(|listed| listed.post.contains(&key))
+                    .map(|listed| listed.started),
+            )
+            .max();
+        last_read.is_none_or(|read| read < done_at + MAX_READ_LAG)
+    }
+
+    /// What the server held when it was last read: `None` before the first refresh, and for a key
+    /// beyond the 1,000 keys that the saved list hasn't shown.
+    fn server_has(&self, key: &ReaderSavedKey) -> Option<bool> {
+        if self.listed.iter().any(|listed| listed.post.contains(key)) {
+            return Some(true);
+        }
+        let snapshot = self.snapshot.as_ref()?;
+        if self.snapshot_has(snapshot, key) {
+            Some(true)
+        } else if snapshot.beyond_keys() > 0 {
+            None
+        } else {
+            Some(false)
+        }
+    }
+}
+
+fn intersects(a: &[ReaderSavedKey], b: &[ReaderSavedKey]) -> bool {
+    a.iter().any(|key| b.contains(key))
 }
 
 #[cfg(test)]
 #[path = "state_tests.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "model_tests.rs"]
-mod model_tests;
