@@ -329,8 +329,8 @@ mod tests {
         assert_eq!(decode(input), expected);
     }
 
-    // The forms that occur in the titles and excerpts of 284,159 Reader posts,
-    // beyond the `wptexturize()` and `esc_html()` output above. Authors and
+    // Forms identified in a test corpus of post titles and excerpts, beyond
+    // the `wptexturize()` and `esc_html()` output above. Authors and
     // importers type references by hand, `wp_encode_emoji()` writes emoji as
     // lowercase hex, and older content keeps zero padding and Windows-1252
     // codes.
@@ -385,7 +385,7 @@ mod tests {
     #[case::flat("B&flat;", "B♭")]
     #[case::acute_accent("&acute;", "´")]
     #[case::accented_letters("&uuml;&ouml;&ccedil;&Ccedil;&oslash;", "üöçÇø")]
-    fn decodes_references_seen_in_reader_posts(#[case] input: &str, #[case] expected: &str) {
+    fn decodes_references_seen_in_a_test_corpus(#[case] input: &str, #[case] expected: &str) {
         assert_eq!(decode(input), expected);
     }
 
