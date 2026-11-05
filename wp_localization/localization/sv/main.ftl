@@ -1,3 +1,23 @@
+cloudflare_error_other = Cloudflare returnerade ett fel (kod { $code }).
+
+cloudflare_error_access_denied = En säkerhetsregel från Cloudflare på din webbplats blockerade denna begäran.
+
+cloudflare_error_rate_limited = Cloudflare begränsar förfrågningar till din webbplats. Försök igen om en stund.
+
+cloudflare_error_cloudflare_internal = Cloudflare hade problem med att hantera denna begäran. Försök igen om en stund.
+
+cloudflare_error_origin_ssl = Din webbplats server har ett SSL-problem, enligt Cloudflare.
+
+cloudflare_error_origin_unreachable = Cloudflare kan inte nå din webbplats server.
+
+cloudflare_error_origin_timeout = Cloudflare rapporterar att din webbplats server inte svarar.
+
+cloudflare_error_origin_down = Cloudflare rapporterar att din webbplats server är nere.
+
+cloudflare_error_origin_error = Cloudflare kunde inte få ett giltigt svar från din webbplats server.
+
+cloudflare_error_request_too_large = Denna fil är större än vad din webbplats Cloudflare-inställningar tillåter.
+
 device_is_offline = Ingen internetanslutning. Kontrollera dina nätverksinställningar och försök igen.
 
 media_file_unreadable = Mediafil på { $path } kunde inte läsas.
