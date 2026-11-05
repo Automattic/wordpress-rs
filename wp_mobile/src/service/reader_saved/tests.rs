@@ -22,7 +22,10 @@ enum Step {
     Respond(u32, Value),
     /// Waits for the test to release it, so the test can act while the request is in flight.
     Hold(oneshot::Receiver<()>, u32, Value),
+    /// The device is offline, so the request never left.
     Offline,
+    /// The request timed out, so the server may have applied it.
+    TimedOut,
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +82,17 @@ impl RequestExecutor for ScriptedExecutor {
                 (status_code, body)
             }
             Step::Offline => {
+                return Err(RequestExecutionError::RequestExecutionFailed {
+                    status_code: None,
+                    redirects: None,
+                    reason: RequestExecutionErrorReason::DeviceIsOfflineError {
+                        error_message: "The Internet connection appears to be offline.".to_string(),
+                    },
+                    request_url: request.url().0,
+                    request_method: request.method(),
+                });
+            }
+            Step::TimedOut => {
                 return Err(RequestExecutionError::RequestExecutionFailed {
                     status_code: None,
                     redirects: None,
@@ -433,15 +447,33 @@ async fn a_save_that_cannot_reach_the_server_is_undone() {
     assert!(service.recent_saves().is_empty());
 }
 
+/// The server answered, so it may have applied the save: it stands until a read can say.
 #[tokio::test]
-async fn a_save_with_a_malformed_response_is_undone() {
+async fn a_save_whose_answer_cannot_be_read_stands_until_a_read() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
     executor.push(Step::Respond(200, json!({ "unexpected": true })));
 
     assert!(service.save(identity(1)).await.is_err());
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+}
+
+#[tokio::test]
+async fn a_save_that_times_out_stands_until_a_read() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[]).await;
+    executor.push(Step::TimedOut);
+
+    assert!(service.save(identity(1)).await.is_err());
+
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    refreshed(&service, &executor, &[]).await;
+    assert_eq!(
+        service.status(identity(1)),
+        ReaderSavedStatus::Saved,
+        "a refresh straight away may predate it"
+    );
 }
 
 #[tokio::test]
@@ -548,10 +580,10 @@ async fn unsave_sends_the_key_and_source() {
 async fn unsave_sends_every_key_the_post_may_be_saved_under() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[feed_json(2)]).await;
-    executor.push(Step::Respond(404, error_response()));
+    // The post isn't saved under its blog and post IDs: deleting those does nothing.
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 1)));
     executor.push(Step::Respond(200, write_response(false, feed_json(2), 0)));
 
-    // The post isn't saved under its blog and post IDs, so the server can't find that one.
     service.unsave(jetpack_identity(1, 2)).await.unwrap();
 
     let bodies: Vec<_> = executor.sent()[1..]
@@ -671,10 +703,31 @@ async fn unsaving_a_post_under_two_keys_shows_straight_away() {
     result.unwrap();
 }
 
-// Cancellation: Swift and Kotlin cancel a call by dropping its future.
+// Cancellation: Kotlin cancels a call by dropping its future. Swift doesn't.
 
 #[tokio::test]
-async fn a_cancelled_save_is_undone() {
+async fn a_save_cancelled_before_it_is_sent_is_undone() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[]).await;
+    let (_release, held) = oneshot::channel::<()>();
+    executor.push(Step::Hold(held, 200, write_response(true, post_json(2), 1)));
+
+    let mut earlier = Box::pin(service.save(identity(2)));
+    let mut save = Box::pin(service.save(identity(1)));
+    assert!(futures::poll!(earlier.as_mut()).is_pending());
+    assert!(futures::poll!(save.as_mut()).is_pending());
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+
+    drop(save);
+
+    assert_eq!(executor.sent().len(), 2, "only the earlier save was sent");
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.recent_saves(), vec![post_key(2)]);
+}
+
+/// Its request went out, so the server may have applied it.
+#[tokio::test]
+async fn a_save_cancelled_after_it_is_sent_stands_until_a_read() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
     let (_release, held) = oneshot::channel::<()>();
@@ -682,13 +735,10 @@ async fn a_cancelled_save_is_undone() {
 
     let mut save = Box::pin(service.save(identity(1)));
     assert!(futures::poll!(save.as_mut()).is_pending());
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-
     drop(save);
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert!(service.recent_saves().is_empty());
-    assert_eq!(service.saved_count(), Some(0));
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    assert_eq!(service.saved_count(), Some(1));
 }
 
 #[tokio::test]
@@ -711,13 +761,14 @@ async fn a_cancelled_unsave_is_undone_for_the_keys_not_yet_sent() {
 
     drop(unsave);
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    // The post key's delete went out and stands; the feed item's never did.
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
     assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::Saved);
-    assert_eq!(service.saved_count(), Some(2));
+    assert_eq!(service.saved_count(), Some(1));
 }
 
 #[tokio::test]
-async fn a_cancelled_import_is_undone() {
+async fn a_cancelled_import_stands_until_a_read() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
     let (_release, held) = oneshot::channel::<()>();
@@ -729,7 +780,31 @@ async fn a_cancelled_import_is_undone() {
 
     drop(import);
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+}
+
+/// A feed item stops resolving once it's pruned, so the server can't find a save the device knows
+/// is there.
+#[tokio::test]
+async fn a_feed_item_the_server_cannot_find_is_an_error_when_it_was_saved_there() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[feed_json(2)]).await;
+    executor.push(Step::Respond(404, error_response()));
+
+    assert!(service.unsave(rss_identity(2)).await.is_err());
+
+    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::Saved);
+}
+
+#[tokio::test]
+async fn a_feed_item_the_server_cannot_find_counts_as_unsaved_when_it_was_not_saved_there() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[]).await;
+    executor.push(Step::Respond(404, error_response()));
+
+    service.unsave(rss_identity(2)).await.unwrap();
+
+    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::NotSaved);
 }
 
 #[tokio::test]
@@ -904,7 +979,9 @@ async fn a_queued_unsave_also_unsaves_the_key_the_save_was_stored_under() {
     refreshed(&service, &executor, &[]).await;
     let (release, held) = oneshot::channel();
     executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
-    executor.push(Step::Respond(404, error_response()));
+    // The feed item resolves to the post, which the delete removes; the post's own delete then
+    // finds nothing.
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
 
     let mut save = Box::pin(service.save(rss_identity(7)));
@@ -940,7 +1017,9 @@ async fn unsave_key_also_unsaves_the_key_the_server_stores_the_post_under() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
     executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
-    executor.push(Step::Respond(404, error_response()));
+    // The feed item resolves to the post, which the delete removes; the post's own delete then
+    // finds nothing.
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
     service.save(rss_identity(7)).await.unwrap();
 
@@ -1175,9 +1254,9 @@ async fn import_splits_keys_into_batches_oldest_first(
     assert_eq!(keys, expected);
 }
 
-/// `import` takes keys newest first, and `recent_saves` returns them newest first.
+/// The device already had them, so they don't need showing above the list.
 #[tokio::test]
-async fn imported_posts_are_recent_saves_newest_first() {
+async fn imported_posts_are_not_recent_saves() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
     executor.push(Step::Respond(
@@ -1190,10 +1269,8 @@ async fn imported_posts_are_recent_saves_newest_first() {
         .await
         .unwrap();
 
-    assert_eq!(
-        service.recent_saves(),
-        vec![post_key(1), post_key(2), post_key(3)]
-    );
+    assert!(service.recent_saves().is_empty());
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
 }
 
 #[tokio::test]
