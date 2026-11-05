@@ -331,3 +331,15 @@ fn a_slow_list_read_cannot_replace_a_newer_one() {
     refresh(&mut state, now + S, &[], 0);
     assert_eq!(state.status(&[post(1)]), ReaderSavedStatus::Saved);
 }
+
+/// Deleting a URL that isn't saved echoes the URL, as the live API does.
+#[test]
+fn an_unsave_that_echoes_its_key_does_not_forget_where_the_post_is_stored() {
+    let now = Instant::now();
+    let page = url("https://example.com/p3");
+    let mut state = loaded(now, &[]);
+    saved(&mut state, &page, &post(3), now);
+    unsaved(&mut state, &page, now);
+
+    assert_eq!(state.post_keys(std::slice::from_ref(&page)), vec![post(3)]);
+}

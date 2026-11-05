@@ -122,8 +122,6 @@ impl Object {
 struct Fake {
     /// Every state the fake has been in, and when it started.
     history: Vec<(Instant, BTreeSet<ReaderSavedKeyOrd>)>,
-    /// Whether deleting a key that isn't saved is an error, as the API may answer.
-    delete_missing_is_error: bool,
 }
 
 /// `ReaderSavedKey` has no ordering, so the fake keeps its JSON.
@@ -350,7 +348,6 @@ impl Sim {
         }
         let fake = Fake {
             history: vec![(start, initial)],
-            delete_missing_is_error: rng.random_bool(0.5),
         };
         Self {
             pool: LocalPool::new(),
@@ -692,14 +689,15 @@ impl Sim {
             assert!(url.starts_with(DELETE_URL), "{url}");
             let removed = self.fake.apply(now, &key, false);
             self.say(format!("  unsaved {key:?} (was saved: {removed})"));
-            if !removed && self.fake.delete_missing_is_error {
-                // An error, if the service last read the key as saved.
-                self.failed_writes.push(ord(&stored));
-                return respond(404, error_response());
-            }
+            // As the live API answers: a delete echoes the save it removed. With nothing saved, a
+            // feed item still resolves to its post, but a URL echoes itself.
+            let echoed = match &key {
+                ReaderSavedKey::Url { .. } if !removed => key.normalized(),
+                _ => stored,
+            };
             ok(json!({
                 "saved": false,
-                "key": serde_json::to_value(&stored).unwrap(),
+                "key": serde_json::to_value(&echoed).unwrap(),
                 "total": self.total(),
             }))
         }
