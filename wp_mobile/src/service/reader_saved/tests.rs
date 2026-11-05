@@ -1577,5 +1577,5 @@ async fn a_full_session_stays_consistent() {
     assert_eq!(service.saved_count(), Some(2));
 }
 
-#[path = "fake_server_tests.rs"]
-mod fake_server;
+#[path = "scenario_tests.rs"]
+mod scenarios;
