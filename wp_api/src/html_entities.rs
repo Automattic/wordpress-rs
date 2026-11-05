@@ -374,20 +374,20 @@ mod tests {
         }
 
         #[test]
-        fn agrees_on_random_text() {
+        fn agrees_on_every_short_combination_of_pieces() {
             // Pieces that combine into references, near misses and plain
             // text. `<`, a raw carriage return and a raw NUL are left out:
             // the parser treats those as markup or rewrites them, which is
             // not decoding.
+            //
+            // The decoder only looks a character or two past a reference, so
+            // every string of up to three pieces covers each reference
+            // followed by anything that could change how it decodes.
             const PIECES: &[&str] = &[
                 "&",
-                "&",
-                "&",
-                "#",
                 "#",
                 "x",
                 "X",
-                ";",
                 ";",
                 "0",
                 "1",
@@ -430,22 +430,20 @@ mod tests {
                 "'",
             ];
 
-            // A fixed seed, so a failure is reproducible.
-            let mut state: u64 = 0x2545_F491_4F6C_DD1D;
-            let mut next = || {
-                state ^= state << 13;
-                state ^= state >> 7;
-                state ^= state << 17;
-                state
-            };
-
-            for _ in 0..20_000 {
-                let length = (next() % 12) as usize;
-                let input: String = (0..length)
-                    .map(|_| PIECES[(next() % PIECES.len() as u64) as usize])
+            let mut checked = 0;
+            let mut inputs = vec![String::new()];
+            for _ in 0..3 {
+                inputs = inputs
+                    .iter()
+                    .flat_map(|prefix| PIECES.iter().map(move |piece| format!("{prefix}{piece}")))
                     .collect();
-                assert_eq!(decode(&input), browser_text(&input), "decoding {input:?}");
+                for input in &inputs {
+                    assert_eq!(decode(input), browser_text(input), "decoding {input:?}");
+                    checked += 1;
+                }
             }
+            let n = PIECES.len();
+            assert_eq!(checked, n + n * n + n * n * n);
         }
     }
 }
