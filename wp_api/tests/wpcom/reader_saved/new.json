@@ -4,5 +4,6 @@
     "blog_id": 123,
     "post_id": 456
   },
-  "total": 4
+  "total": 4,
+  "resolved": "post"
 }
