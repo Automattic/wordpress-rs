@@ -25,7 +25,10 @@
 /// - A numeric reference to zero, a surrogate, or a value past U+10FFFF
 ///   becomes U+FFFD REPLACEMENT CHARACTER.
 /// - Anything that is not a reference, such as a bare `&` or an unknown name,
-///   is left as it is.
+///   is left as it is. A legacy name is still decoded when other text follows
+///   it, so an unescaped query string like `?a=1&region=us` becomes
+///   `?a=1®ion=us`, as it does in a browser. WordPress escapes that `&` in
+///   the fields it texturizes.
 ///
 /// It decodes once: `&amp;amp;` becomes `&amp;`. It does not remove or
 /// interpret tags, so `<em>` stays in the text, while `&lt;em&gt;` becomes
@@ -107,6 +110,11 @@ mod tests {
     #[case::two_code_points("&acE;", "∾\u{333}")]
     #[case::long_name("&NotNestedGreaterGreater;", "⪢\u{338}")]
     #[case::html5_only("&nbsp;&ThinSpace;", "\u{a0}\u{2009}")]
+    #[case::fractions("&frac12;&frac14;&frac34;", "½¼¾")]
+    #[case::superscripts("&sup1;&sup2;&sup3;", "¹²³")]
+    #[case::soft_hyphen("co&shy;op", "co\u{ad}op")]
+    // HTML 4 and PHP map these to U+2329 and U+232A.
+    #[case::angle_brackets("&lang;x&rang;", "⟨x⟩")]
     fn decodes_named_references(#[case] input: &str, #[case] expected: &str) {
         assert_eq!(decode(input), expected);
     }
@@ -118,6 +126,8 @@ mod tests {
     #[case::less_than("&lt;b&gt", "<b>")]
     #[case::non_breaking_space("a&nbspb", "a\u{a0}b")]
     #[case::at_the_end("&copy", "©")]
+    #[case::name_with_digits("1&frac12 cups", "1½ cups")]
+    #[case::name_ending_in_a_digit("x&sup2", "x²")]
     #[case::numeric_decimal("&#8211 next", "– next")]
     #[case::numeric_hex("&#x2013 next", "– next")]
     fn decodes_references_without_a_semicolon(#[case] input: &str, #[case] expected: &str) {
@@ -203,6 +213,10 @@ mod tests {
     // The spec calls these parse errors but still emits the code point.
     #[rstest]
     #[case::carriage_return("&#13;", "\r")]
+    #[case::padded_carriage_return("&#013;", "\r")]
+    #[case::line_feed("&#10;", "\n")]
+    #[case::padded_line_feed("&#010;", "\n")]
+    #[case::padded_tab("&#009;", "\t")]
     #[case::tab("&#9;", "\t")]
     #[case::delete("&#x7F;", "\u{7F}")]
     #[case::noncharacter("&#xFFFF;", "\u{FFFF}")]
@@ -303,6 +317,18 @@ mod tests {
         assert_eq!(decode(&htmlize::escape_all_quotes(text)), text);
     }
 
+    // Locales translate the quotes and primes `wptexturize()` uses.
+    #[rstest]
+    #[case::german_quotes("&#8222;Zitat&#8220;", "„Zitat“")]
+    #[case::german_single_quotes("&#8218;Zitat&#8216;", "‚Zitat‘")]
+    #[case::guillemets("&#171;Цитата&#187;", "«Цитата»")]
+    #[case::french_primes("9&prime; 6&Prime;", "9′ 6″")]
+    #[case::french_apostrophe("l&rsquo;&lsquo;", "l’‘")]
+    #[case::norwegian_quotes("&laquo;sitat&raquo;", "«sitat»")]
+    fn decodes_translated_wptexturize_output(#[case] input: &str, #[case] expected: &str) {
+        assert_eq!(decode(input), expected);
+    }
+
     // The forms that occur in the titles and excerpts of 284,159 Reader posts,
     // beyond the `wptexturize()` and `esc_html()` output above. Authors and
     // importers type references by hand, `wp_encode_emoji()` writes emoji as
@@ -313,6 +339,11 @@ mod tests {
     #[case::padded_hash("X-post from &#035;tag", "X-post from #tag")]
     #[case::padded_quote("&#034;Quoted&#034;", "\"Quoted\"")]
     #[case::unpadded_ampersand("Q&#38;A", "Q&A")]
+    #[case::texturized_url(
+        "https://example.com/?p=1&#038;region=us",
+        "https://example.com/?p=1&region=us"
+    )]
+    #[case::escaped_url("?p=1&amp;section=2", "?p=1&section=2")]
     #[case::unpadded_quote("&#34;", "\"")]
     #[case::unpadded_plus("&#43;", "+")]
     #[case::at_sign("me&#64;example.com", "me@example.com")]
@@ -358,9 +389,15 @@ mod tests {
         assert_eq!(decode(input), expected);
     }
 
-    // A query string in a pasted link looks like a reference but is not one.
-    #[test]
-    fn leaves_query_strings_alone() {
-        assert_eq!(decode("?p=123&preview=true"), "?p=123&preview=true");
+    // An unescaped query string is left alone unless a parameter starts with
+    // a legacy name, which a browser decodes too.
+    #[rstest]
+    #[case::not_a_legacy_name("?p=123&preview=true", "?p=123&preview=true")]
+    #[case::region("?lang=en&region=us", "?lang=en®ion=us")]
+    #[case::section("?a=1&section=2", "?a=1§ion=2")]
+    #[case::copy("?a=1&copy=2", "?a=1©=2")]
+    #[case::notify("?a=1&notify=1", "?a=1¬ify=1")]
+    fn decodes_legacy_names_in_query_strings(#[case] input: &str, #[case] expected: &str) {
+        assert_eq!(decode(input), expected);
     }
 }
