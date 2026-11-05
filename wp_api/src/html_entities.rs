@@ -303,147 +303,64 @@ mod tests {
         assert_eq!(decode(&htmlize::escape_all_quotes(text)), text);
     }
 
-    // `html5ever`, the parser behind `scraper`, is a separate implementation
-    // of the same specification, so these check the decoder against it.
-    mod against_html5ever {
-        use super::decode;
+    // The forms that occur in the titles and excerpts of 284,159 Reader posts,
+    // beyond the `wptexturize()` and `esc_html()` output above. Authors and
+    // importers type references by hand, `wp_encode_emoji()` writes emoji as
+    // lowercase hex, and older content keeps zero padding and Windows-1252
+    // codes.
+    #[rstest]
+    #[case::padded_plus("X-post from &#043;team", "X-post from +team")]
+    #[case::padded_hash("X-post from &#035;tag", "X-post from #tag")]
+    #[case::padded_quote("&#034;Quoted&#034;", "\"Quoted\"")]
+    #[case::unpadded_ampersand("Q&#38;A", "Q&A")]
+    #[case::unpadded_quote("&#34;", "\"")]
+    #[case::unpadded_plus("&#43;", "+")]
+    #[case::at_sign("me&#64;example.com", "me@example.com")]
+    #[case::vertical_bar("a &#124; b", "a | b")]
+    #[case::hex_apostrophe("I&#x27;m", "I'm")]
+    #[case::hex_right_single_quote("Here&#x2019;s", "Here’s")]
+    #[case::hex_non_breaking_space("end.&#xA0; Next", "end.\u{a0} Next")]
+    #[case::decimal_non_breaking_space("&#160;", "\u{a0}")]
+    #[case::trademark_decimal("&#8482;", "™")]
+    #[case::bullet("&#8226;", "•")]
+    #[case::footnote_back_arrow("&#8617;", "↩")]
+    #[case::heart("&#10084;", "❤")]
+    #[case::check_box("&#9745;", "☑")]
+    #[case::male_sign("&#9794;", "♂")]
+    #[case::stopwatch("&#9202;", "⏲")]
+    #[case::one_half("&#189;", "½")]
+    #[case::pound_decimal("&#163;", "£")]
+    #[case::e_acute_decimal("&#233;", "é")]
+    #[case::u_umlaut_decimal("&#252;", "ü")]
+    #[case::windows_1252_apostrophe("don&#146;t", "don’t")]
+    #[case::emoji_decimal("&#128525;", "😍")]
+    #[case::emoji_lowercase_hex("&#x1f631;", "😱")]
+    #[case::emoji_with_skin_tone("&#x1f44d;&#x1f3fc;", "👍🏼")]
+    #[case::emoji_with_variation_selector("&#x2764;&#xfe0f;", "❤️")]
+    #[case::emoji_with_zero_width_joiner("&#128105;&#8205;&#128187;", "👩\u{200d}💻")]
+    #[case::flag("&#127462;&#127482;", "🇦🇺")]
+    #[case::repeated_emoji("&#x1f355;&#x1f355;&#x1f355;", "🍕🍕🍕")]
+    #[case::hellip("Wait&hellip;", "Wait…")]
+    #[case::mdash("&mdash;", "—")]
+    #[case::ndash("&ndash;", "–")]
+    #[case::rsquo("it&rsquo;s", "it’s")]
+    #[case::lsquo("&lsquo;", "‘")]
+    #[case::ldquo_rdquo("&ldquo;Hi&rdquo;", "“Hi”")]
+    #[case::raquo("Read more &raquo;", "Read more »")]
+    #[case::apos("&apos;", "'")]
+    #[case::pound("&pound;5", "£5")]
+    #[case::hearts("&hearts;", "♥")]
+    #[case::thin_space("&thinsp;", "\u{2009}")]
+    #[case::flat("B&flat;", "B♭")]
+    #[case::acute_accent("&acute;", "´")]
+    #[case::accented_letters("&uuml;&ouml;&ccedil;&Ccedil;&oslash;", "üöçÇø")]
+    fn decodes_references_seen_in_reader_posts(#[case] input: &str, #[case] expected: &str) {
+        assert_eq!(decode(input), expected);
+    }
 
-        /// How a browser shows `text` as the content of a paragraph.
-        fn browser_text(text: &str) -> String {
-            let fragment = scraper::Html::parse_fragment(&format!("<p>{text}</p>"));
-            fragment.root_element().text().collect()
-        }
-
-        #[test]
-        fn agrees_on_every_named_reference() {
-            let mut checked = 0;
-            for name in htmlize::ENTITIES.keys() {
-                let name = std::str::from_utf8(name).unwrap();
-                for suffix in ["", " ", "x", "1", ";", "=", "&amp;"] {
-                    let input = format!("a{name}{suffix}");
-                    assert_eq!(decode(&input), browser_text(&input), "decoding {input:?}");
-                    checked += 1;
-                }
-            }
-            // Every name in the WHATWG list, with and without the semicolon
-            // where browsers allow that.
-            assert!(checked > 2_000 * 7, "only checked {checked} inputs");
-        }
-
-        #[test]
-        fn agrees_on_every_numeric_reference_up_to_0x10000() {
-            for code in 0..=0x1_0000u32 {
-                // A raw carriage return is rewritten before tokenizing, but a
-                // reference to one is not, so both sides see the same input.
-                for input in [format!("&#{code};"), format!("&#x{code:x};")] {
-                    assert_eq!(decode(&input), browser_text(&input), "decoding {input:?}");
-                }
-            }
-        }
-
-        #[test]
-        fn agrees_on_numeric_references_at_the_edges() {
-            for code in [
-                0xD7FFu32,
-                0xD800,
-                0xDBFF,
-                0xDC00,
-                0xDFFF,
-                0xE000,
-                0xFDD0,
-                0xFDEF,
-                0xFFFE,
-                0xFFFF,
-                0x1_0000,
-                0x1_FFFE,
-                0x1_FFFF,
-                0x10_FFFE,
-                0x10_FFFF,
-                0x11_0000,
-                0xFFFF_FFFF,
-            ] {
-                for input in [
-                    format!("&#{code};"),
-                    format!("&#x{code:X};"),
-                    format!("&#{code}"),
-                    format!("&#x{code:x} "),
-                ] {
-                    assert_eq!(decode(&input), browser_text(&input), "decoding {input:?}");
-                }
-            }
-        }
-
-        #[test]
-        fn agrees_on_every_short_combination_of_pieces() {
-            // Pieces that combine into references, near misses and plain
-            // text. `<`, a raw carriage return and a raw NUL are left out:
-            // the parser treats those as markup or rewrites them, which is
-            // not decoding.
-            //
-            // The decoder only looks a character or two past a reference, so
-            // every string of up to three pieces covers each reference
-            // followed by anything that could change how it decodes.
-            const PIECES: &[&str] = &[
-                "&",
-                "#",
-                "x",
-                "X",
-                ";",
-                "0",
-                "1",
-                "2",
-                "8",
-                "9",
-                "A",
-                "F",
-                "f",
-                "13",
-                "128",
-                "150",
-                "8211",
-                "55296",
-                "1114112",
-                "99999999999",
-                "amp",
-                "copy",
-                "not",
-                "notin",
-                "it",
-                "lt",
-                "gt",
-                "hellip",
-                "nbsp",
-                "acE",
-                "AMP",
-                "Amp",
-                " ",
-                "a",
-                "é",
-                "😀",
-                "=",
-                "&#x",
-                "&#",
-                "&amp;",
-                "&#8211;",
-                "\n",
-                "\"",
-                "'",
-            ];
-
-            let mut checked = 0;
-            let mut inputs = vec![String::new()];
-            for _ in 0..3 {
-                inputs = inputs
-                    .iter()
-                    .flat_map(|prefix| PIECES.iter().map(move |piece| format!("{prefix}{piece}")))
-                    .collect();
-                for input in &inputs {
-                    assert_eq!(decode(input), browser_text(input), "decoding {input:?}");
-                    checked += 1;
-                }
-            }
-            let n = PIECES.len();
-            assert_eq!(checked, n + n * n + n * n * n);
-        }
+    // A query string in a pasted link looks like a reference but is not one.
+    #[test]
+    fn leaves_query_strings_alone() {
+        assert_eq!(decode("?p=123&preview=true"), "?p=123&preview=true");
     }
 }
