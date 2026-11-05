@@ -173,6 +173,9 @@ pub struct ReaderSavePostParams {
 }
 
 /// The details of a page saved by URL, as plain text.
+///
+/// The server strips tags and decodes character references before storing them, then
+/// HTML-escapes them again in the saved list. Read them back from [`ReaderSavedPost`].
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
 pub struct ReaderSavedPageDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -336,8 +339,8 @@ pub struct ReaderSavedPostsResponse {
 
 /// The fields of a Reader post that decide which key it's saved under.
 ///
-/// IDs stay as the API sent them, because a `0` means something different from a missing ID: see
-/// [`Self::is_snapshot`].
+/// IDs stay as the API sent them, because a `0` means something different from a missing ID: a
+/// saved snapshot, such as a page saved by URL, has `0` for both its site and feed IDs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ReaderPostSaveIdentity {
     /// The post's ID. On an RSS post it's the feed item ID, and on a page saved by URL it's the
@@ -536,10 +539,14 @@ pub struct ReaderSavedPost {
         deserialize_with = "deserialize_optional_text"
     )]
     pub global_id: Option<String>,
+    /// HTML: it carries character references such as `&#8211;`. Decode it with
+    /// `decode_html_entities` to show it as text.
     #[serde(default, deserialize_with = "deserialize_optional_text")]
     pub title: Option<String>,
+    /// HTML, with tags as well as character references.
     #[serde(default, deserialize_with = "deserialize_optional_text")]
     pub excerpt: Option<String>,
+    /// HTML, with tags as well as character references.
     #[serde(default, deserialize_with = "deserialize_optional_text")]
     pub content: Option<String>,
     #[serde(
@@ -556,6 +563,8 @@ pub struct ReaderSavedPost {
     pub author: Option<ReaderSavedPostAuthor>,
     #[serde(default, deserialize_with = "deserialize_optional_text")]
     pub featured_image: Option<String>,
+    /// Can carry character references such as `&amp;`. Decode it with
+    /// `decode_html_entities` to show it as text.
     #[serde(default, deserialize_with = "deserialize_optional_text")]
     pub site_name: Option<String>,
     #[serde(
@@ -581,6 +590,8 @@ pub struct ReaderSavedPost {
 /// The author of a [`ReaderSavedPost`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ReaderSavedPostAuthor {
+    /// Can carry character references such as `&amp;`. Decode it with
+    /// `decode_html_entities` to show it as text.
     #[serde(default, deserialize_with = "deserialize_optional_text")]
     pub name: Option<String>,
     #[serde(
@@ -844,6 +855,29 @@ mod tests {
         assert_eq!(
             post.identity.url.as_deref(),
             Some("https://example.com/page")
+        );
+    }
+
+    #[test]
+    fn test_deserialize_keeps_character_references() {
+        // The API sends these as HTML. Decoding is left to whoever shows them.
+        let post: ReaderSavedPost = serde_json::from_value(json!({
+            "ID": 456,
+            "site_ID": 123,
+            "title": "Rolled out &#8211; 3.6 in code freeze",
+            "site_name": "Tom &amp; Jerry",
+            "author": { "name": "R&amp;D" },
+        }))
+        .unwrap();
+
+        assert_eq!(
+            post.title.as_deref(),
+            Some("Rolled out &#8211; 3.6 in code freeze")
+        );
+        assert_eq!(post.site_name.as_deref(), Some("Tom &amp; Jerry"));
+        assert_eq!(
+            post.author.and_then(|author| author.name).as_deref(),
+            Some("R&amp;D")
         );
     }
 
