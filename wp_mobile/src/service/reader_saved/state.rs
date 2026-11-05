@@ -319,6 +319,11 @@ impl ReaderSavedState {
                 .snapshot
                 .as_ref()
                 .is_some_and(|snapshot| snapshot.ticket.started >= started)
+            // A slower read that started earlier can't replace a newer one.
+            || self
+                .listed
+                .iter()
+                .any(|listed| intersects(&listed.post, &post) && listed.started >= started)
         {
             return false;
         }
