@@ -180,15 +180,17 @@ impl ReaderSavedState {
         };
         let requested = write.key.normalized();
         let stored = stored_key.normalized();
+        let saved = write.saved;
         write.key = stored_key.clone();
         write.done_at = Some(now);
 
-        // What the server says now replaces what it said before, so a URL whose post was deleted
-        // stops being looked up as the post.
-        if requested == stored {
-            self.stored_as.remove(&requested);
-        } else {
+        // What a save stores now replaces what the server said before, so a URL whose post was
+        // deleted stops being looked up as the post. An unsave echoes the key it was sent when
+        // nothing was saved under it, which says nothing about where the post is stored.
+        if requested != stored {
             self.stored_as.insert(requested, stored);
+        } else if saved {
+            self.stored_as.remove(&requested);
         }
     }
 
