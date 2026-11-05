@@ -8,10 +8,9 @@
 use futures::FutureExt;
 use futures::channel::oneshot;
 use futures::future::Shared;
-use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
-use wp_api::prelude::{WpApiClientDelegate, WpApiError, WpErrorCode};
+use wp_api::prelude::{RequestExecutionErrorReason, WpApiClientDelegate, WpApiError, WpErrorCode};
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::reader_saved::{
     ReaderPostSaveIdentity, ReaderSavePostParams, ReaderSavedBulkKey, ReaderSavedBulkParams,
@@ -23,7 +22,7 @@ use wp_api::wp_com::reader_saved::{
 mod state;
 
 pub use state::ReaderSavedStatus;
-use state::{ReaderSavedState, WriteId};
+use state::{ReaderSavedState, Tap, WriteId};
 
 /// The most keys `POST /wpcom/v2/read/saved/bulk` takes in a call.
 const MAX_BULK_KEYS: usize = 100;
@@ -61,8 +60,13 @@ pub trait ReaderSavedObserver: Send + Sync {
 /// kept in memory: call [`Self::refresh`] after launch, until which posts this device hasn't changed
 /// are [`ReaderSavedStatus::Unknown`].
 ///
-/// Create one per account and share it. Each instance only knows its own writes, and only sends one
-/// write to a post at a time, so a second instance could undo a change made through the first.
+/// Create one per account and share it. It sends one write at a time, in the order the user tapped,
+/// so the server ends up as the user last asked; a second instance could undo a change made through
+/// the first.
+///
+/// On Android, call the writes from a scope that outlives the screen, or with
+/// `withContext(NonCancellable)`. A write cancelled after its request is sent may still reach the
+/// server after the next one, which would leave the server out of order.
 #[derive(uniffi::Object)]
 pub struct ReaderSavedService {
     client: WpComApiClient,
@@ -77,7 +81,7 @@ type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
 #[derive(Default)]
 struct Inner {
     state: ReaderSavedState,
-    /// For each key, the writes that took a turn on it and may not have finished.
+    /// The taps whose writes may not have finished.
     queue: Queue,
 }
 
@@ -97,13 +101,14 @@ impl ReaderSavedService {
         self.state().status(&reader_saved_keys_for_post(post))
     }
 
-    /// How many posts are saved, or `None` until the first refresh.
+    /// How many saves there are, or `None` until the first refresh or answered write. A post saved
+    /// under two keys counts twice, as the server counts it.
     pub fn saved_count(&self) -> Option<u64> {
         self.state().saved_count()
     }
 
-    /// The keys this device saved recently, newest first. The server's list can lag behind them, and
-    /// a write doesn't return the post, so show these above the list.
+    /// The posts this device saved that the saved list hasn't shown yet, newest first. A write
+    /// doesn't return the post, so show these above the list. Imports aren't included.
     pub fn recent_saves(&self) -> Vec<ReaderSavedKey> {
         self.state().recent_saves()
     }
@@ -139,7 +144,7 @@ impl ReaderSavedService {
             let mut state = self.state();
             response.posts.retain(|post| {
                 let keys = reader_saved_keys_for_post(post.identity.clone());
-                let should_show = state.should_show_listed_post(&keys);
+                let should_show = state.should_show_listed_post(&keys, started);
                 if should_show {
                     changed |= state.note_listed_post(&keys, started);
                 }
@@ -157,10 +162,8 @@ impl ReaderSavedService {
         &self,
         post: ReaderPostSaveIdentity,
     ) -> Result<ReaderSavedKey, ReaderSavedError> {
-        let key =
-            reader_saved_key_for_post(post.clone()).ok_or(ReaderSavedError::PostCannotBeSaved)?;
-        self.save_key(&reader_saved_keys_for_post(post), key, None)
-            .await
+        let key = reader_saved_key_for_post(post).ok_or(ReaderSavedError::PostCannotBeSaved)?;
+        self.save_key(key, None).await
     }
 
     /// Saves a page by URL, and returns the key the server stored: the URL of a WordPress.com post
@@ -170,9 +173,8 @@ impl ReaderSavedService {
         url: String,
         page_details: Option<ReaderSavedPageDetails>,
     ) -> Result<ReaderSavedKey, ReaderSavedError> {
-        let key = ReaderSavedKey::Url { url };
-        let post = [key.clone()];
-        self.save_key(&post, key, page_details).await
+        self.save_key(ReaderSavedKey::Url { url }, page_details)
+            .await
     }
 
     /// Unsaves a post from every key it may be saved under. The post reads as unsaved straight
@@ -230,22 +232,22 @@ impl ReaderSavedService {
 
     async fn save_key(
         &self,
-        post: &[ReaderSavedKey],
         key: ReaderSavedKey,
         page_details: Option<ReaderSavedPageDetails>,
     ) -> Result<ReaderSavedKey, ReaderSavedError> {
-        let (mut writes, turn) = PendingWrites::begin(self, post, vec![key.clone()], true);
+        let (mut writes, turn) = PendingWrites::begin(self, vec![key.clone()], true, true);
         turn.wait().await;
         let params = ReaderSavePostParams {
             key: key.clone(),
             source: self.source,
             page_details,
         };
+        writes.mark_all_sent();
         let result = self.client.reader_saved().save(&params).await;
         let write = writes.forget_all()[0].1;
-        let stored_key = result.map(|response| response.data.key);
-        let returned = stored_key.as_ref().ok().cloned();
-        self.finish_write(write, stored_key)?;
+        let answer = result.map(|response| (response.data.key, Some(response.data.total)));
+        let returned = answer.as_ref().ok().map(|(key, _)| key.clone());
+        self.finish_write(write, answer)?;
         Ok(returned.unwrap_or(key))
     }
 
@@ -253,30 +255,31 @@ impl ReaderSavedService {
         // Picks the keys and starts their writes under one lock, so the post reads as unsaved
         // straight away.
         let (mut writes, turn) =
-            PendingWrites::begin_with(self, post, false, |state| state.keys_to_unsave(post));
+            PendingWrites::begin_with(self, false, true, |state| state.keys_to_unsave(post));
         turn.wait().await;
 
         // A write that went before this one may have shown the post is stored under another key.
         writes.add(|state| state.keys_to_unsave(post));
 
         let mut first_error = None;
-        for (key, write) in writes.writes.clone() {
+        for (key, write) in writes.unsent() {
             let known_saved = self.state().known_saved_under(&key);
             let params = ReaderUnsavePostParams {
                 key: key.clone(),
                 source: self.source,
             };
+            writes.mark_sent(write);
             let result = self
                 .client
                 .reader_saved()
                 .unsave(&params)
                 .await
-                .map(|response| response.data.key);
+                .map(|response| (response.data.key, Some(response.data.total)));
             writes.forget(write);
             // The post isn't saved under a key the server can't find, unless this device has seen
             // it saved there: a feed item stops resolving once it's pruned.
             let result = match result {
-                Err(error) if !known_saved && is_post_not_found(&error) => Ok(key),
+                Err(error) if !known_saved && is_post_not_found(&error) => Ok((key, None)),
                 result => result,
             };
             if let Err(error) = self.finish_write(write, result) {
@@ -290,18 +293,32 @@ impl ReaderSavedService {
         &self,
         keys: &[ReaderSavedBulkKey],
     ) -> Result<Vec<ReaderSavedBulkResult>, ReaderSavedError> {
-        // The keys are newest first. Starting their writes oldest first makes the newest the most
-        // recent save.
+        // The keys are newest first, so their writes start oldest first. An import's saves aren't
+        // recent saves: the device already had them.
         let saved_keys: Vec<_> = keys.iter().rev().map(saved_key).collect();
-        let (mut pending, turn) = PendingWrites::begin_each(self, saved_keys, true);
+        let (mut pending, turn) = PendingWrites::begin(self, saved_keys, true, false);
         turn.wait().await;
 
         let params = ReaderSavedBulkParams {
             keys: keys.to_vec(),
             source: self.source,
         };
-        // A failed request drops `pending`, which undoes every key in the batch.
-        let response = self.client.reader_saved().bulk_save(&params).await?.data;
+        pending.mark_all_sent();
+        let response = match self.client.reader_saved().bulk_save(&params).await {
+            Ok(response) => response.data,
+            Err(error) => {
+                let writes = pending.forget_all();
+                {
+                    let mut state = self.state();
+                    let now = self.now();
+                    for (_, write) in writes {
+                        state.finish_with_error(write, &error, now);
+                    }
+                }
+                self.notify();
+                return Err(error.into());
+            }
+        };
         let mut writes = pending.forget_all();
         writes.reverse();
 
@@ -332,7 +349,12 @@ impl ReaderSavedService {
                         key: Some(stored_key),
                         saved: true,
                         ..
-                    } => state.complete_write(*write, &saved_key(stored_key), now),
+                    } => state.complete_write(
+                        *write,
+                        &saved_key(stored_key),
+                        Some(response.total),
+                        now,
+                    ),
                     _ => state.fail_write(*write),
                 }
             }
@@ -341,19 +363,21 @@ impl ReaderSavedService {
         Ok(results)
     }
 
+    /// Records a write's answer: the key the server stored and the total it reported, or an error.
     fn finish_write(
         &self,
         write: WriteId,
-        stored_key: Result<ReaderSavedKey, WpApiError>,
+        answer: Result<(ReaderSavedKey, Option<u64>), WpApiError>,
     ) -> Result<(), ReaderSavedError> {
-        let result = match stored_key {
-            Ok(stored_key) => {
+        let result = match answer {
+            Ok((stored_key, total)) => {
                 let now = self.now();
-                self.state().complete_write(write, &stored_key, now);
+                self.state().complete_write(write, &stored_key, total, now);
                 Ok(())
             }
             Err(error) => {
-                self.state().fail_write(write);
+                let now = self.now();
+                self.state().finish_with_error(write, &error, now);
                 Err(error.into())
             }
         };
@@ -397,6 +421,30 @@ impl std::ops::DerefMut for StateGuard<'_> {
     }
 }
 
+impl ReaderSavedState {
+    /// Records a write that failed: undone if the server refused it or never got it, but left to
+    /// stand until a read if it may have been applied.
+    fn finish_with_error(&mut self, write: WriteId, error: &WpApiError, now: Instant) {
+        if may_have_been_applied(error) {
+            self.abandon_write(write, now);
+        } else {
+            self.fail_write(write);
+        }
+    }
+}
+
+/// Whether a failed write may still have been applied: the request timed out, or the server
+/// answered and the answer couldn't be read.
+fn may_have_been_applied(error: &WpApiError) -> bool {
+    matches!(
+        error,
+        WpApiError::RequestExecutionFailed {
+            reason: RequestExecutionErrorReason::HttpTimeoutError,
+            ..
+        } | WpApiError::ResponseParsingError { .. }
+    )
+}
+
 fn is_post_not_found(error: &WpApiError) -> bool {
     matches!(
         error,
@@ -407,34 +455,24 @@ fn is_post_not_found(error: &WpApiError) -> bool {
     )
 }
 
-/// A write's place in line: it waits for every earlier write that shares a key with it and hasn't
-/// finished, so the server applies a post's writes in the order the user made them. Waiting for all
-/// of them, rather than the last, matters when one in between is cancelled before it's sent.
+/// A tap's place in line. It waits for every earlier tap's writes that haven't finished, so the
+/// server applies writes in the order the user made them. Waiting for all of them, rather than the
+/// last, matters when one in between is cancelled before it's sent.
 struct Turn {
-    /// Dropped when the write finishes or is cancelled.
+    /// Dropped when the tap's writes finish or are cancelled.
     _done: oneshot::Sender<()>,
     before: Vec<Shared<oneshot::Receiver<()>>>,
 }
 
-type Queue = HashMap<ReaderSavedKey, Vec<Shared<oneshot::Receiver<()>>>>;
+/// The taps whose writes may not have finished, oldest first.
+type Queue = Vec<Shared<oneshot::Receiver<()>>>;
 
 impl Turn {
-    fn take(queue: &mut Queue, keys: &[ReaderSavedKey]) -> Self {
+    fn take(queue: &mut Queue) -> Self {
+        queue.retain(|earlier| earlier.clone().now_or_never().is_none());
         let (done, finished) = oneshot::channel();
-        let finished = finished.shared();
-        let keys: HashSet<_> = keys.iter().map(ReaderSavedKey::normalized).collect();
-        let mut before: Vec<Shared<oneshot::Receiver<()>>> = Vec::new();
-        for key in keys {
-            let waiting = queue.entry(key).or_default();
-            waiting.retain(|earlier| earlier.clone().now_or_never().is_none());
-            for earlier in waiting.iter() {
-                if !before.iter().any(|other| other.ptr_eq(earlier)) {
-                    before.push(earlier.clone());
-                }
-            }
-            waiting.push(finished.clone());
-        }
-        queue.retain(|_, waiting| !waiting.is_empty());
+        let before = queue.clone();
+        queue.push(finished.shared());
         Self {
             _done: done,
             before,
@@ -443,103 +481,112 @@ impl Turn {
 
     async fn wait(&self) {
         for earlier in &self.before {
-            // Cancelled is how an earlier write says it's done.
+            // Cancelled is how an earlier tap says it's done.
             let _ = earlier.clone().await;
         }
     }
 }
 
-/// Writes started but not yet finished. Dropping it undoes the ones still pending, so a call that's
-/// cancelled can't leave a write in flight forever. Kotlin cancels a call by dropping its future.
-/// Swift, as of UniFFI 0.32, doesn't: a cancelled Swift task still waits for the call to finish.
+/// A tap's writes that haven't finished. Dropping it, as Kotlin does when it cancels a call, undoes
+/// the ones never sent. One already sent may have reached the server, so it stands until a read can
+/// say. Swift, as of UniFFI 0.32, doesn't cancel: a cancelled Swift task still waits for the call.
 struct PendingWrites<'a> {
     service: &'a ReaderSavedService,
+    tap: Tap,
     saved: bool,
-    post: Vec<ReaderSavedKey>,
-    writes: Vec<(ReaderSavedKey, WriteId)>,
+    recent: bool,
+    /// Each write, and whether its request has been sent.
+    writes: Vec<(ReaderSavedKey, WriteId, bool)>,
 }
 
 impl<'a> PendingWrites<'a> {
     /// Starts a write for each key, all at once, so the change shows straight away, and takes the
-    /// writes' turn.
+    /// tap's turn.
     fn begin(
         service: &'a ReaderSavedService,
-        post: &[ReaderSavedKey],
         keys: Vec<ReaderSavedKey>,
         saved: bool,
+        recent: bool,
     ) -> (Self, Turn) {
-        Self::begin_with(service, post, saved, |_| keys)
+        Self::begin_with(service, saved, recent, |_| keys)
     }
 
     /// Like [`Self::begin`], choosing the keys from the state under the same lock.
     fn begin_with(
         service: &'a ReaderSavedService,
-        post: &[ReaderSavedKey],
         saved: bool,
+        recent: bool,
         choose: impl FnOnce(&ReaderSavedState) -> Vec<ReaderSavedKey>,
     ) -> (Self, Turn) {
-        Self::start(service, Some(post), saved, choose)
-    }
-
-    /// Starts a write for each key, each its own post, as an import does.
-    fn begin_each(
-        service: &'a ReaderSavedService,
-        keys: Vec<ReaderSavedKey>,
-        saved: bool,
-    ) -> (Self, Turn) {
-        Self::start(service, None, saved, |_| keys)
-    }
-
-    fn start(
-        service: &'a ReaderSavedService,
-        post: Option<&[ReaderSavedKey]>,
-        saved: bool,
-        choose: impl FnOnce(&ReaderSavedState) -> Vec<ReaderSavedKey>,
-    ) -> (Self, Turn) {
-        let mut pending = Self {
-            service,
-            saved,
-            post: post.unwrap_or_default().to_vec(),
-            writes: Vec::new(),
-        };
-        let turn = {
+        let (pending, turn) = {
             let mut inner = service.inner();
-            let keys = choose(&inner.state);
-            let mut lock_keys = inner.state.lock_keys(&pending.post);
-            for key in keys {
-                let write = inner.state.begin_write(&key, saved);
-                lock_keys.extend(inner.state.lock_keys(std::slice::from_ref(&key)));
-                pending.writes.push((key, write));
+            let tap = inner.state.begin_tap();
+            let mut pending = Self {
+                service,
+                tap,
+                saved,
+                recent,
+                writes: Vec::new(),
+            };
+            for key in choose(&inner.state) {
+                let write = inner.state.begin_write(tap, &key, saved, recent);
+                pending.writes.push((key, write, false));
             }
-            Turn::take(&mut inner.queue, &lock_keys)
+            let turn = Turn::take(&mut inner.queue);
+            (pending, turn)
         };
         service.notify();
         (pending, turn)
     }
 
-    /// Starts a write for each key chosen that doesn't have one yet.
+    /// Starts a write, in the same tap, for each key chosen that doesn't have one yet.
     fn add(&mut self, choose: impl FnOnce(&ReaderSavedState) -> Vec<ReaderSavedKey>) {
         let mut state = self.service.state();
         for key in choose(&state) {
-            if let Some(&(_, with)) = self.writes.last()
-                && !self
-                    .writes
-                    .iter()
-                    .any(|(other, _)| other.normalized() == key.normalized())
+            if !self
+                .writes
+                .iter()
+                .any(|(other, _, _)| other.normalized() == key.normalized())
             {
-                let write = state.begin_write_with(with, &key, self.saved);
-                self.writes.push((key, write));
+                let write = state.begin_write(self.tap, &key, self.saved, self.recent);
+                self.writes.push((key, write, false));
             }
+        }
+    }
+
+    fn unsent(&self) -> Vec<(ReaderSavedKey, WriteId)> {
+        self.writes
+            .iter()
+            .filter(|(_, _, sent)| !sent)
+            .map(|(key, write, _)| (key.clone(), *write))
+            .collect()
+    }
+
+    /// Records that a write's request is about to go out.
+    fn mark_sent(&mut self, write: WriteId) {
+        for (_, other, sent) in &mut self.writes {
+            if *other == write {
+                *sent = true;
+            }
+        }
+    }
+
+    fn mark_all_sent(&mut self) {
+        for (_, _, sent) in &mut self.writes {
+            *sent = true;
         }
     }
 
     /// Stops tracking a write, because the caller is about to finish it.
     fn forget(&mut self, write: WriteId) {
-        self.writes.retain(|(_, other)| *other != write);
+        self.writes.retain(|(_, other, _)| *other != write);
     }
 
     fn forget_all(&mut self) -> Vec<(ReaderSavedKey, WriteId)> {
         std::mem::take(&mut self.writes)
+            .into_iter()
+            .map(|(key, write, _)| (key, write))
+            .collect()
     }
 }
 
@@ -548,10 +595,15 @@ impl Drop for PendingWrites<'_> {
         if self.writes.is_empty() {
             return;
         }
+        let now = self.service.now();
         {
             let mut state = self.service.state();
-            for (_, write) in &self.writes {
-                state.fail_write(*write);
+            for (_, write, sent) in &self.writes {
+                if *sent {
+                    state.abandon_write(*write, now);
+                } else {
+                    state.fail_write(*write);
+                }
             }
         }
         self.service.notify();
