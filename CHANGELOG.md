@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WordPress.com Reader saved posts: `GET /rest/v1.2/read/saved` and `GET /wpcom/v2/read/saved/keys` to read a user's saves, `POST /wpcom/v2/read/saved/new`, `/delete` and `/bulk` to change them, and `reader_saved_key_for_post` / `reader_saved_keys_for_post` to pick the key a post is saved under. `reader_saved_key_normalized` compares URL keys the way the API stores them. Swift gets them through `WPComApiClient.readerSaved`, `ReaderPostSaveIdentity.savedKey` / `.savedKeys` and `ReaderSavedKey.normalized`.
 - WordPress.com Reader saved posts: `GET /rest/v1.2/read/saved` and `GET /wpcom/v2/read/saved/keys` to read a user's saves, `POST /wpcom/v2/read/saved/new`, `/delete` and `/bulk` to change them, and `reader_saved_key_for_post` / `reader_saved_keys_for_post` to pick the key a post is saved under. Swift gets them through `WPComApiClient.readerSaved` and `ReaderPostSaveIdentity.savedKey` / `.savedKeys`.
 - `wp_mobile` adds `ReaderSavedService` for a WordPress.com account's saved Reader posts. It shows a save or unsave straight away, undoes it if the request fails, and keeps it in place while the API's reads catch up. Swift creates one with `WPComApiClient.makeReaderSavedService(source:)`; create one per account and share it.
+- The Swift and Kotlin example apps have a Saved Posts screen, built on `ReaderSavedService`, with paging, saving a URL, unsaving and refreshing.
 
 ### Fixed
 

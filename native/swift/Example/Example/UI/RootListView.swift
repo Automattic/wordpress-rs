@@ -61,6 +61,14 @@ struct RootListViewItem: View {
                     Text(name)
                 }
             }
+        case .view(let name, let destination, _):
+            VStack(alignment: .leading) {
+                NavigationLink {
+                    destination()
+                } label: {
+                    Text(name)
+                }
+            }
         }
     }
 }
@@ -95,12 +103,15 @@ enum RootListData: Identifiable, Sendable {
         CollectionListViewModel.FetchedResultsProvider,
         Category
     )
+    /// A screen of its own, for anything `ListView` can't show, such as a list you can edit.
+    case view(String, @MainActor @Sendable () -> AnyView, Category)
 
     var id: String {
         switch self {
         case .callback(let id, _, _): id
         case .sequence(let id, _, _): id
         case .collection(let id, _, _, _): id
+        case .view(let id, _, _): id
         }
     }
 
@@ -109,6 +120,7 @@ enum RootListData: Identifiable, Sendable {
         case .callback(_, _, let category): category
         case .sequence(_, _, let category): category
         case .collection(_, _, _, let category): category
+        case .view(_, _, let category): category
         }
     }
 
