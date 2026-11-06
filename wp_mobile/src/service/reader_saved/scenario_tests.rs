@@ -1899,3 +1899,94 @@ fn a_list_read_older_than_a_refresh_that_says_a_post_is_unsaved_hides_it() {
         shown.lock().unwrap()
     );
 }
+
+// A list read and a refresh started together
+
+impl World {
+    /// Starts a list read, then 10ms later a refresh, as an app that loads both together does.
+    /// Answers the refresh first with `keys`, then the list with `list`, and returns what the list
+    /// kept.
+    fn list_and_refresh(&mut self, keys: Value, list: Value) -> Vec<String> {
+        let shown: Arc<Mutex<Vec<String>>> = Arc::default();
+        let sink = shown.clone();
+        self.call(move |service| async move {
+            let page = service
+                .list_posts(ReaderSavedPostsParams::default())
+                .await?;
+            *sink.lock().unwrap() = page
+                .posts
+                .iter()
+                .map(|post| names(&reader_saved_keys_for_post(post.identity.clone())).join("+"))
+                .collect();
+            Ok::<(), ReaderSavedError>(())
+        });
+        self.advance(Duration::from_millis(10));
+        self.call(|service| async move { service.refresh().await });
+        let held = self.take_held(|held| held.what == "keys").unwrap();
+        let _ = held.reply.send(respond(200, keys));
+        self.pool.run_until_stalled();
+        let held = self.take_held(|held| held.what == "list").unwrap();
+        let _ = held.reply.send(respond(200, list));
+        self.pool.run_until_stalled();
+        shown.lock().unwrap().clone()
+    }
+}
+
+/// Saved on the web a second ago. The list read has it; the keys read, started 10ms later, lags.
+#[test]
+fn a_post_saved_elsewhere_shows_in_the_list_while_the_keys_lag() {
+    let mut world = World::new();
+    world.refresh();
+    world.advance(MAX_READ_LAG * 3);
+    let before = world.server.clone();
+    world.server.saved.insert("P1".to_string());
+    world.advance(SEC);
+
+    let shown = world.list_and_refresh(before.keys_response(), world.server.list_response());
+
+    assert_eq!(world.status(identity(1)), NotSaved, "the keys lag");
+    assert_eq!(shown, ["P1"], "the list shows a saved post");
+}
+
+/// Saved under post 3. The list returns it by its feed item while its WordPress.com copy fails to
+/// load. The keys don't lag.
+#[test]
+fn a_jetpack_post_the_list_returns_by_its_feed_item_shows_in_the_list() {
+    let mut world = World::new();
+    world.server.saved.insert("P3".to_string());
+    world.refresh();
+    world.advance(MAX_READ_LAG * 3);
+
+    let shown = world.list_and_refresh(
+        world.server.keys_response(),
+        json!({ "posts": [listed_rss_post(4)] }),
+    );
+
+    assert_eq!(world.status(jetpack()), Saved);
+    assert_eq!(shown, ["F4"], "the list shows a saved post");
+}
+
+/// 1,002 saves, posts 1 and 2 past the 1,000 keys. Unsave post 1, then pull to refresh 5s later,
+/// and the read lags behind the unsave.
+#[test]
+fn past_the_key_limit_a_lagging_refresh_after_an_unsave_keeps_the_answered_count() {
+    let mut world = World::new();
+    past_the_keys_with(&mut world, &["P1", "P2"]);
+    world.refresh();
+    let before = world.server.clone();
+    world.unsave(identity(1));
+    world.answer_writes();
+    assert_eq!(world.service.saved_count(), Some(1001));
+
+    world.advance(SEC * 5);
+    world.refresh_from(Some(before));
+    world.advance(Duration::from_secs(3600));
+
+    assert_eq!(world.server.total(), 1001);
+    assert_eq!(world.status(identity(1)), NotSaved);
+    assert_eq!(
+        world.service.saved_count(),
+        Some(1001),
+        "the server holds 1,001"
+    );
+}

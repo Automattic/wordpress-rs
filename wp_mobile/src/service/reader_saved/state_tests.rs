@@ -755,3 +755,35 @@ fn saving_a_url_already_saved_as_its_post_counts_once() {
     let _write = tap(&mut state, &page, true);
     assert_eq!(state.saved_count(), Some(1));
 }
+
+/// The external view (feed item 4) is saved and times out, but the server stores it as post 3.
+/// Unsaving from the WordPress.com view deletes post 3, and the answers teach the device that feed
+/// item 4 is stored as post 3, so the save given up on counts under post 3 and is undone with it.
+#[test]
+fn a_save_given_up_on_counts_under_the_key_the_server_stores_it_as() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    let save = tap(&mut state, &feed(4), true);
+    state.abandon_write(save, now);
+    let later = now + S * 10;
+    let unsave = state.begin_tap();
+    let by_post = state.begin_write(unsave, &post(3), false);
+    let by_feed = state.begin_write(unsave, &feed(4), false);
+    state.complete_write(by_post, &post(3), Some(0), later);
+    state.complete_write(by_feed, &post(3), Some(0), later);
+    assert_eq!(state.saved_count(), Some(0));
+
+    refresh(&mut state, later + LAG, &[], 0);
+    assert_eq!(state.saved_count(), Some(0));
+    assert_eq!(state.status(&[post(3), feed(4)]), NotSaved);
+}
+
+/// A post this device never unsaved isn't hidden because a refresh that started after the list
+/// read doesn't have it yet.
+#[test]
+fn a_list_read_older_than_a_refresh_still_shows_a_post_this_device_did_not_unsave() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    refresh(&mut state, now + S, &[], 0);
+    assert!(state.should_show_listed_post(&[post(1)], now));
+}
