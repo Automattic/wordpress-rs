@@ -28,6 +28,10 @@
 //!   has had a write to it answered. A post in the saved list that reads `Unknown` is saved.
 //! - A post leaves [`ReaderSavedState::recent_saves`] once the saved list shows it. A later read of
 //!   the list that lags behind can leave it in neither, until the next read.
+//! - The count is the newest total the server gave, adjusted for this device's writes since. A
+//!   refresh that lags can be off by saves made elsewhere until the next one. A save given up on,
+//!   of a key the server stores as one this device doesn't know about yet (a feed item stored as
+//!   its post), can count twice until a refresh includes it.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -141,6 +145,9 @@ pub(super) struct ReaderSavedState {
     stored_as: HashMap<ReaderSavedKey, ReaderSavedKey>,
     /// The server's total in the newest write answer.
     answered_total: Option<AnsweredTotal>,
+    /// Keys whose unsave a refresh included, and when that refresh started. A read of the saved list
+    /// that started before it may still predate the unsave.
+    unsaved_before: HashMap<ReaderSavedKey, Instant>,
     next_tap: u64,
     next_write_id: u64,
     next_refresh_id: u64,
@@ -324,6 +331,11 @@ impl ReaderSavedState {
                     && !write.included_in(ticket.started)
             })
         });
+        for (key, &newest) in &included {
+            if !self.writes[newest].saved {
+                self.unsaved_before.insert(key.clone(), ticket.started);
+            }
+        }
         let mut index = 0;
         self.writes.retain(|write| {
             let this = index;
@@ -340,11 +352,14 @@ impl ReaderSavedState {
         });
 
         // A refresh that started after a write's answer gives the count instead: its total agrees
-        // with its own keys, which may already have writes sent after that answer.
-        if self
-            .answered_total
-            .is_some_and(|answered| answered.at < ticket.started)
-        {
+        // with its own keys, which may already have writes sent after that answer. Past the 1,000
+        // keys it can't count a write to a key it doesn't have, so until it's sure to include the
+        // answer, the answer's total stays.
+        let snapshot = self.snapshot.as_ref().expect("just set");
+        if self.answered_total.is_some_and(|answered| {
+            answered.at < ticket.started
+                && (!snapshot.past_the_keys() || answered.at + MAX_READ_LAG <= ticket.started)
+        }) {
             self.answered_total = None;
         }
     }
@@ -402,26 +417,23 @@ impl ReaderSavedState {
     }
 
     /// Whether to show a post from a read of the saved list that started at `started`: not if this
-    /// device unsaved it, unless the read is new enough to include the unsave, and not if a refresh
-    /// that started later says it isn't saved.
+    /// device unsaved it, unless the read is new enough to include the unsave.
     pub(super) fn should_show_listed_post(
         &self,
         keys: &[ReaderSavedKey],
         started: Instant,
     ) -> bool {
-        let status = self.status(keys);
-        if status == ReaderSavedStatus::Saved {
-            return true;
-        }
         let unsaved_since = self.post_keys(keys).iter().any(|key| {
-            self.newest_write(key)
-                .is_some_and(|write| !write.saved && !write.included_in(started))
+            let pending = self
+                .newest_write(key)
+                .is_some_and(|write| !write.saved && !write.included_in(started));
+            let refreshed = self
+                .unsaved_before
+                .get(key)
+                .is_some_and(|refresh| started < *refresh);
+            pending || refreshed
         });
-        let refreshed_since = self
-            .snapshot
-            .as_ref()
-            .is_some_and(|snapshot| snapshot.ticket.started > started);
-        !unsaved_since && !(refreshed_since && status == ReaderSavedStatus::NotSaved)
+        !unsaved_since || self.status(keys) == ReaderSavedStatus::Saved
     }
 
     /// Records that the saved list showed a post, so it no longer needs showing as a recent save.
@@ -451,7 +463,7 @@ impl ReaderSavedState {
         let after = |write: &Write| includes.is_none_or(|includes| write.order() > includes);
         let mut seen: HashSet<ReaderSavedKey> = HashSet::new();
         for write in self.writes.iter().rev().filter(|write| after(write)) {
-            let key = self.counted_key(&write.key);
+            let key = self.counted_key(write);
             if !seen.insert(key.clone()) {
                 continue;
             }
@@ -460,7 +472,7 @@ impl ReaderSavedState {
                 .iter()
                 .rev()
                 .filter(|other| !after(other))
-                .find(|other| self.counted_key(&other.key) == key)
+                .find(|other| self.counted_key(other) == key)
                 .map(|other| other.saved)
                 .or_else(|| match &self.snapshot {
                     None => Some(false),
@@ -501,12 +513,15 @@ impl ReaderSavedState {
         all
     }
 
-    /// The key a save is counted under, as the server's total counts it: the key itself, except a
-    /// URL known to be stored as another key, which is saved as that key.
-    fn counted_key(&self, key: &ReaderSavedKey) -> ReaderSavedKey {
-        match key {
-            ReaderSavedKey::Url { .. } => self.stored_as_of(key),
-            _ => key.normalized(),
+    /// The key a write counts under, as the server's total counts it. A save not yet answered counts
+    /// under the key the server will store it as, if the device knows it. Any other write counts
+    /// under its own key: an answer gives the key stored, and an unsave of a key stored as another
+    /// can still remove an older save under the key itself.
+    fn counted_key(&self, write: &Write) -> ReaderSavedKey {
+        if write.saved && !write.is_answered() {
+            self.stored_as_of(&write.key)
+        } else {
+            write.key.normalized()
         }
     }
 
