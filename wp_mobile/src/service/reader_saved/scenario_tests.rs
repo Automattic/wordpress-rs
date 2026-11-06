@@ -181,8 +181,8 @@ fn respond(status_code: u32, body: Value) -> Result<WpNetworkResponse, RequestEx
 
 fn refused() -> Result<WpNetworkResponse, RequestExecutionError> {
     respond(
-        500,
-        json!({ "code": "internal", "message": "", "data": { "status": 500 } }),
+        400,
+        json!({ "code": "invalid_param", "message": "", "data": { "status": 400 } }),
     )
 }
 
@@ -436,6 +436,24 @@ impl World {
         }
     }
 
+    /// Gives up on the oldest write held, as a request that timed out. The server may still apply
+    /// it: see [`World::apply`].
+    fn time_out_next_write(&mut self) -> String {
+        let held = self.take_held(Held::is_write).unwrap();
+        let what = held.what.clone();
+        let _ = held
+            .reply
+            .send(Err(RequestExecutionError::RequestExecutionFailed {
+                status_code: None,
+                redirects: None,
+                reason: RequestExecutionErrorReason::HttpTimeoutError,
+                request_url: String::new(),
+                request_method: RequestMethod::POST,
+            }));
+        self.pool.run_until_stalled();
+        what
+    }
+
     /// A tap whose call is cancelled before it's answered. If its request went out, `applied` says
     /// whether it reached the server.
     fn tap_then_cancel(&mut self, save: bool, applied: bool) {
@@ -494,6 +512,28 @@ impl World {
         };
         let _ = held.reply.send(response);
         self.pool.run_until_stalled();
+    }
+
+    /// Loads the saved list from `read`, and returns the posts it kept, each as its keys joined by
+    /// `+`.
+    fn list_shown(&mut self, read: FakeServer) -> Vec<String> {
+        let shown: Arc<Mutex<Vec<String>>> = Arc::default();
+        let sink = shown.clone();
+        self.call(move |service| async move {
+            let page = service
+                .list_posts(ReaderSavedPostsParams::default())
+                .await?;
+            *sink.lock().unwrap() = page
+                .posts
+                .iter()
+                .map(|post| names(&reader_saved_keys_for_post(post.identity.clone())).join("+"))
+                .collect();
+            Ok::<(), ReaderSavedError>(())
+        });
+        let held = self.take_held(|held| held.what == "list").unwrap();
+        let _ = held.reply.send(respond(200, read.list_response()));
+        self.pool.run_until_stalled();
+        shown.lock().unwrap().clone()
     }
 
     fn sent_since(&self, before: usize) -> Vec<String> {
@@ -861,9 +901,9 @@ fn rows() -> Vec<(Start, Action, End)> {
         (UnknownSaved,              RefreshesOutOfOrder,     end(Saved,    s(1),    false, true,  &["keys", "keys"])),
         (UnknownSaved,              RefreshFails,            end(Unknown,  n,       false, true,  &["keys"])),
         // The list shows the post before any refresh, so it's saved, but nothing gives a count.
-        (UnknownSaved,              ListLoads,               end(Saved,    n,       false, true,  &["list"])),
-        (UnknownSaved,              StaleListLoads,          end(Saved,    n,       false, true,  &["list"])),
-        (UnknownSaved,              LateListLoads,           end(Saved,    n,       false, true,  &["list"])),
+        (UnknownSaved,              ListLoads,               end(Unknown,  n,       false, true,  &["list"])),
+        (UnknownSaved,              StaleListLoads,          end(Unknown,  n,       false, true,  &["list"])),
+        (UnknownSaved,              LateListLoads,           end(Unknown,  n,       false, true,  &["list"])),
         (UnknownSaved,              ListFails,               end(Unknown,  n,       false, true,  &["list"])),
         (UnknownSaved,              TimePasses,              end(Unknown,  n,       false, true,  &[])),
 
@@ -932,30 +972,30 @@ fn rows() -> Vec<(Start, Action, End)> {
         (UnsavedButSavedElsewhere,  StaleRefresh,            end(NotSaved, s(0),    false, true,  &["keys"])),
         (UnsavedButSavedElsewhere,  RefreshesOutOfOrder,     end(Saved,    s(1),    false, true,  &["keys", "keys"])),
         (UnsavedButSavedElsewhere,  RefreshFails,            end(NotSaved, s(0),    false, true,  &["keys"])),
-        (UnsavedButSavedElsewhere,  ListLoads,               end(Saved,    s(1),    false, true,  &["list"])),
+        (UnsavedButSavedElsewhere,  ListLoads,               end(NotSaved, s(0),    false, true,  &["list"])),
         (UnsavedButSavedElsewhere,  StaleListLoads,          end(NotSaved, s(0),    false, true,  &["list"])),
-        (UnsavedButSavedElsewhere,  LateListLoads,           end(Saved,    s(1),    false, true,  &["list"])),
+        (UnsavedButSavedElsewhere,  LateListLoads,           end(NotSaved, s(0),    false, true,  &["list"])),
         (UnsavedButSavedElsewhere,  ListFails,               end(NotSaved, s(0),    false, true,  &["list"])),
         (UnsavedButSavedElsewhere,  TimePasses,              end(NotSaved, s(0),    false, true,  &[])),
 
         (ListedButNotInTheKeys,     Save,                    end(Saved,    s(1),    true,  true,  &["new P1"])),
-        (ListedButNotInTheKeys,     SaveRefused,             end(Saved,    s(1),    false, true,  &["new P1"])),
+        (ListedButNotInTheKeys,     SaveRefused,             end(NotSaved, s(0),    false, true,  &["new P1"])),
         (ListedButNotInTheKeys,     Unsave,                  end(NotSaved, s(0),    false, false, &["delete P1"])),
-        (ListedButNotInTheKeys,     UnsaveRefused,           end(Saved,    s(1),    false, true,  &["delete P1"])),
+        (ListedButNotInTheKeys,     UnsaveRefused,           end(NotSaved, s(0),    false, true,  &["delete P1"])),
         (ListedButNotInTheKeys,     SaveCancelledAndLost,    end(Saved,    s(1),    true,  true,  &["new P1"])),
         (ListedButNotInTheKeys,     SaveCancelledButApplied, end(Saved,    s(1),    true,  true,  &["new P1"])),
         // Can't know: the unsave never arrived, but nothing says so until a read.
         (ListedButNotInTheKeys,     UnsaveCancelledAndLost,  end(NotSaved, s(0),    false, true,  &["delete P1"])),
         (ListedButNotInTheKeys,     FreshRefresh,            end(Saved,    s(1),    false, true,  &["keys"])),
         // A refresh that started soon after the list read may predate it, so the list still says.
-        (ListedButNotInTheKeys,     StaleRefresh,            end(Saved,    s(1),    false, true,  &["keys"])),
+        (ListedButNotInTheKeys,     StaleRefresh,            end(NotSaved, s(0),    false, true,  &["keys"])),
         (ListedButNotInTheKeys,     RefreshesOutOfOrder,     end(Saved,    s(1),    false, true,  &["keys", "keys"])),
-        (ListedButNotInTheKeys,     RefreshFails,            end(Saved,    s(1),    false, true,  &["keys"])),
-        (ListedButNotInTheKeys,     ListLoads,               end(Saved,    s(1),    false, true,  &["list"])),
-        (ListedButNotInTheKeys,     StaleListLoads,          end(Saved,    s(1),    false, true,  &["list"])),
-        (ListedButNotInTheKeys,     LateListLoads,           end(Saved,    s(1),    false, true,  &["list"])),
-        (ListedButNotInTheKeys,     ListFails,               end(Saved,    s(1),    false, true,  &["list"])),
-        (ListedButNotInTheKeys,     TimePasses,              end(Saved,    s(1),    false, true,  &[])),
+        (ListedButNotInTheKeys,     RefreshFails,            end(NotSaved, s(0),    false, true,  &["keys"])),
+        (ListedButNotInTheKeys,     ListLoads,               end(NotSaved, s(0),    false, true,  &["list"])),
+        (ListedButNotInTheKeys,     StaleListLoads,          end(NotSaved, s(0),    false, true,  &["list"])),
+        (ListedButNotInTheKeys,     LateListLoads,           end(NotSaved, s(0),    false, true,  &["list"])),
+        (ListedButNotInTheKeys,     ListFails,               end(NotSaved, s(0),    false, true,  &["list"])),
+        (ListedButNotInTheKeys,     TimePasses,              end(NotSaved, s(0),    false, true,  &[])),
 
         // The save in flight is answered before the new request is sent.
         (Saving,                    Save,                    end(Saved,    s(1),    true,  true,  &["new P1"])),
@@ -1021,10 +1061,10 @@ fn rows() -> Vec<(Start, Action, End)> {
         // Can't know: the unsave never arrived, but nothing says so until a read.
         (JustSaved,                 UnsaveCancelledAndLost,  end(NotSaved, s(0),    false, true,  &["delete P1"])),
         // A read that started after the window includes the save, so it no longer needs holding.
-        (JustSaved,                 FreshRefresh,            end(Saved,    s(1),    false, true,  &["keys"])),
+        (JustSaved,                 FreshRefresh,            end(Saved,    s(1),    true,  true,  &["keys"])),
         // A read from before the save can't undo it.
         (JustSaved,                 StaleRefresh,            end(Saved,    s(1),    true,  true,  &["keys"])),
-        (JustSaved,                 RefreshesOutOfOrder,     end(Saved,    s(1),    false, true,  &["keys", "keys"])),
+        (JustSaved,                 RefreshesOutOfOrder,     end(Saved,    s(1),    true,  true,  &["keys", "keys"])),
         (JustSaved,                 RefreshFails,            end(Saved,    s(1),    true,  true,  &["keys"])),
         // The list shows it, so it isn't shown again above the list.
         (JustSaved,                 ListLoads,               end(Saved,    s(1),    false, true,  &["list"])),
@@ -1058,37 +1098,37 @@ fn rows() -> Vec<(Start, Action, End)> {
         (PastTheKeyLimit,           Unsave,                  end(NotSaved, s(1000), false, false, &["delete P1"])),
         (PastTheKeyLimit,           UnsaveRefused,           end(Unknown,  s(1001), false, true,  &["delete P1"])),
         // Can't know: no answer says the post was already one of the 1,001.
-        (PastTheKeyLimit,           SaveCancelledAndLost,    end(Saved,    s(1002), true,  true,  &["new P1"])),
-        (PastTheKeyLimit,           SaveCancelledButApplied, end(Saved,    s(1002), true,  true,  &["new P1"])),
+        (PastTheKeyLimit,           SaveCancelledAndLost,    end(Saved,    s(1001), true,  true,  &["new P1"])),
+        (PastTheKeyLimit,           SaveCancelledButApplied, end(Saved,    s(1001), true,  true,  &["new P1"])),
         (PastTheKeyLimit,           UnsaveCancelledAndLost,  end(NotSaved, s(1001), false, true,  &["delete P1"])),
         (PastTheKeyLimit,           FreshRefresh,            end(Unknown,  s(1001), false, true,  &["keys"])),
         (PastTheKeyLimit,           StaleRefresh,            end(Unknown,  s(1001), false, true,  &["keys"])),
         (PastTheKeyLimit,           RefreshesOutOfOrder,     end(Unknown,  s(1001), false, true,  &["keys", "keys"])),
         (PastTheKeyLimit,           RefreshFails,            end(Unknown,  s(1001), false, true,  &["keys"])),
-        (PastTheKeyLimit,           ListLoads,               end(Saved,    s(1001), false, true,  &["list"])),
-        (PastTheKeyLimit,           StaleListLoads,          end(Saved,    s(1001), false, true,  &["list"])),
-        (PastTheKeyLimit,           LateListLoads,           end(Saved,    s(1001), false, true,  &["list"])),
+        (PastTheKeyLimit,           ListLoads,               end(Unknown,  s(1001), false, true,  &["list"])),
+        (PastTheKeyLimit,           StaleListLoads,          end(Unknown,  s(1001), false, true,  &["list"])),
+        (PastTheKeyLimit,           LateListLoads,           end(Unknown,  s(1001), false, true,  &["list"])),
         (PastTheKeyLimit,           ListFails,               end(Unknown,  s(1001), false, true,  &["list"])),
         (PastTheKeyLimit,           TimePasses,              end(Unknown,  s(1001), false, true,  &[])),
 
         (PastTheKeyLimitAndListed,  Save,                    end(Saved,    s(1001), true,  true,  &["new P1"])),
-        (PastTheKeyLimitAndListed,  SaveRefused,             end(Saved,    s(1001), false, true,  &["new P1"])),
+        (PastTheKeyLimitAndListed,  SaveRefused,             end(Unknown,  s(1001), false, true,  &["new P1"])),
         (PastTheKeyLimitAndListed,  Unsave,                  end(NotSaved, s(1000), false, false, &["delete P1"])),
-        (PastTheKeyLimitAndListed,  UnsaveRefused,           end(Saved,    s(1001), false, true,  &["delete P1"])),
+        (PastTheKeyLimitAndListed,  UnsaveRefused,           end(Unknown,  s(1001), false, true,  &["delete P1"])),
         (PastTheKeyLimitAndListed,  SaveCancelledAndLost,    end(Saved,    s(1001), true,  true,  &["new P1"])),
         (PastTheKeyLimitAndListed,  SaveCancelledButApplied, end(Saved,    s(1001), true,  true,  &["new P1"])),
         // Can't know: the unsave never arrived, but nothing says so until a read.
-        (PastTheKeyLimitAndListed,  UnsaveCancelledAndLost,  end(NotSaved, s(1000), false, true,  &["delete P1"])),
+        (PastTheKeyLimitAndListed,  UnsaveCancelledAndLost,  end(NotSaved, s(1001), false, true,  &["delete P1"])),
         // A refresh can't see past the keys, so the list still says.
-        (PastTheKeyLimitAndListed,  FreshRefresh,            end(Saved,    s(1001), false, true,  &["keys"])),
-        (PastTheKeyLimitAndListed,  StaleRefresh,            end(Saved,    s(1001), false, true,  &["keys"])),
-        (PastTheKeyLimitAndListed,  RefreshesOutOfOrder,     end(Saved,    s(1001), false, true,  &["keys", "keys"])),
-        (PastTheKeyLimitAndListed,  RefreshFails,            end(Saved,    s(1001), false, true,  &["keys"])),
-        (PastTheKeyLimitAndListed,  ListLoads,               end(Saved,    s(1001), false, true,  &["list"])),
-        (PastTheKeyLimitAndListed,  StaleListLoads,          end(Saved,    s(1001), false, true,  &["list"])),
-        (PastTheKeyLimitAndListed,  LateListLoads,           end(Saved,    s(1001), false, true,  &["list"])),
-        (PastTheKeyLimitAndListed,  ListFails,               end(Saved,    s(1001), false, true,  &["list"])),
-        (PastTheKeyLimitAndListed,  TimePasses,              end(Saved,    s(1001), false, true,  &[])),
+        (PastTheKeyLimitAndListed,  FreshRefresh,            end(Unknown,  s(1001), false, true,  &["keys"])),
+        (PastTheKeyLimitAndListed,  StaleRefresh,            end(Unknown,  s(1001), false, true,  &["keys"])),
+        (PastTheKeyLimitAndListed,  RefreshesOutOfOrder,     end(Unknown,  s(1001), false, true,  &["keys", "keys"])),
+        (PastTheKeyLimitAndListed,  RefreshFails,            end(Unknown,  s(1001), false, true,  &["keys"])),
+        (PastTheKeyLimitAndListed,  ListLoads,               end(Unknown,  s(1001), false, true,  &["list"])),
+        (PastTheKeyLimitAndListed,  StaleListLoads,          end(Unknown,  s(1001), false, true,  &["list"])),
+        (PastTheKeyLimitAndListed,  LateListLoads,           end(Unknown,  s(1001), false, true,  &["list"])),
+        (PastTheKeyLimitAndListed,  ListFails,               end(Unknown,  s(1001), false, true,  &["list"])),
+        (PastTheKeyLimitAndListed,  TimePasses,              end(Unknown,  s(1001), false, true,  &[])),
     ]
 }
 
@@ -1265,38 +1305,6 @@ fn a_save_tapped_after_an_unsave_still_decides_when_the_unsave_learns_another_ke
 /// Two list reads land in the opposite order to the one they started in, around a refresh that
 /// started between them and predates the save. The newer list read still stands.
 #[test]
-fn a_slow_list_read_does_not_replace_a_newer_one() {
-    let mut world = World::new();
-    let list = |service: Arc<ReaderSavedService>| async move {
-        service.list_posts(ReaderSavedPostsParams::default()).await
-    };
-    world.call(list);
-    world.advance(Duration::from_secs(5));
-    world.call(|service| async move { service.refresh().await });
-    world.advance(Duration::from_secs(5));
-    world.call(list);
-    world.server.saved.insert("P1".to_string());
-
-    let listed = world.server.list_response();
-    let newer = world.take_newest_held(|held| held.what == "list").unwrap();
-    let _ = newer.reply.send(respond(200, listed.clone()));
-    world.pool.run_until_stalled();
-    let older = world.take_held(|held| held.what == "list").unwrap();
-    let _ = older.reply.send(respond(200, listed));
-    world.pool.run_until_stalled();
-    let keys = world.take_held(|held| held.what == "keys").unwrap();
-    let _ = keys
-        .reply
-        .send(respond(200, FakeServer::default().keys_response()));
-    world.pool.run_until_stalled();
-
-    assert_eq!(world.status(identity(1)), Saved);
-}
-
-// Jetpack posts: post 3, also known by its feed item 4. The API stores a save by the feed item as
-// the post, but older saves can still be under the feed item.
-
-#[test]
 fn saving_a_jetpack_post_sends_its_post_key() {
     let mut world = World::new();
     world.refresh();
@@ -1388,6 +1396,63 @@ fn the_external_view_of_a_jetpack_post_saved_elsewhere_reads_not_saved_but_unsav
     assert_eq!(world.sent_since(1), ["delete F4"]);
     assert!(world.server.saved.is_empty());
     assert_eq!(world.status(jetpack()), NotSaved);
+}
+
+/// The saved list shows the post with both keys, but it's saved under its main key alone, so an
+/// unsave from a screen that only knows the post key unsaves it everywhere.
+#[test]
+fn a_listed_jetpack_post_unsaved_by_its_post_key_reads_unsaved_with_both_keys() {
+    let mut world = World::new();
+    world.server.saved.insert("P3".to_string());
+    world.refresh();
+    world.advance(Duration::from_secs(1));
+    world.list_from(Some(world.server.clone()));
+    let before_unsave = world.server.clone();
+    world.advance(Duration::from_secs(10));
+
+    world.unsave(identity(3));
+    world.answer_writes();
+
+    assert!(world.server.saved.is_empty());
+    assert_eq!(world.status(identity(3)), NotSaved);
+    assert_eq!(world.status(jetpack()), NotSaved);
+    assert_eq!(world.service.saved_count(), Some(0));
+    world.advance(Duration::from_secs(5));
+    assert_eq!(
+        world.list_shown(before_unsave),
+        Vec::<String>::new(),
+        "a list read that lags behind the unsave"
+    );
+}
+
+/// The delete of the feed item it isn't saved under doesn't take a second save off the count.
+#[test]
+fn unsaving_a_listed_jetpack_post_takes_one_off_the_count() {
+    let mut world = World::new();
+    world.server.saved.insert("P1".to_string());
+    world.server.saved.insert("P3".to_string());
+    world.refresh();
+    world.advance(Duration::from_secs(1));
+    world.list_from(Some(world.server.clone()));
+    assert_eq!(world.service.saved_count(), Some(2));
+    world.advance(Duration::from_secs(10));
+
+    let before = world.sent_count();
+    let call = world.unsave(jetpack());
+    world.answer_next_write(false);
+    assert_eq!(world.sent_since(before), ["delete P3", "delete F4"]);
+    assert_eq!(
+        world.service.saved_count(),
+        Some(1),
+        "while F4 is in flight"
+    );
+
+    // The server applies the delete of F4, but the call is cancelled before its answer arrives.
+    let _ = world.apply("delete F4");
+    world.cancel(call);
+    world.advance(Duration::from_secs(60));
+    assert_eq!(world.server.total(), 1);
+    assert_eq!(world.service.saved_count(), Some(1));
 }
 
 // A URL of a WordPress.com post: the API stores a save by the URL as the post.
@@ -1496,4 +1561,220 @@ fn unsaving_a_feed_item_that_does_not_exist_counts_as_unsaved() {
 
     assert_eq!(world.sent_since(1), ["delete F99"]);
     assert_eq!(world.status(rss_identity(99)), NotSaved);
+}
+
+// Writes given up on
+
+const SEC: Duration = Duration::from_secs(1);
+
+/// The device gives up waiting, but the server is still working on the request, and applies it
+/// 30s later. A read 121s after the device gave up may still not include it.
+#[test]
+fn a_timed_out_save_the_server_applies_late_is_not_undone_by_a_read_that_may_predate_it() {
+    let mut world = World::new();
+    world.refresh();
+    let before = world.server.clone();
+    world.save(identity(1));
+    let sent = world.time_out_next_write();
+    assert_eq!(world.status(identity(1)), Saved, "it may have been applied");
+
+    world.advance(SEC * 30);
+    let _ = world.apply(&sent);
+    world.advance(MAX_READ_LAG - SEC * 29);
+    world.refresh_from(Some(before));
+    assert_eq!(world.status(identity(1)), Saved);
+
+    // Twice the window after giving up, a read includes it.
+    world.advance(MAX_READ_LAG);
+    world.refresh();
+    assert_eq!(world.status(identity(1)), Saved);
+    world.advance(SEC);
+    world.refresh_from(Some(FakeServer::default()));
+    assert_eq!(world.status(identity(1)), NotSaved);
+}
+
+/// An unsave that timed out, then a save that was answered: the save decides, however long the
+/// unsave waits for a read.
+#[test]
+fn a_write_given_up_on_does_not_outlast_a_newer_answered_write() {
+    let mut world = World::new();
+    world.server.saved.insert("P1".to_string());
+    world.refresh();
+    world.unsave(identity(1));
+    world.time_out_next_write();
+    world.advance(SEC);
+    world.save(identity(1));
+    world.answer_writes();
+    assert!(world.server.has("P1"));
+
+    for _ in 0..2 {
+        world.advance(MAX_READ_LAG + SEC);
+        world.refresh();
+        assert_eq!(world.status(identity(1)), Saved);
+        assert_eq!(world.service.saved_count(), Some(1));
+    }
+}
+
+/// A known limit: the timed-out save lands after the unsave tapped after it, so the server ends
+/// up opposite to the last tap.
+#[test]
+fn a_timed_out_write_applied_after_a_later_tap_leaves_the_server_out_of_order() {
+    let mut world = World::new();
+    world.refresh();
+    world.save(identity(1));
+    let sent = world.time_out_next_write();
+    world.unsave(identity(1));
+    world.answer_writes();
+    let _ = world.apply(&sent);
+
+    assert!(world.server.has("P1"), "the server applied the save last");
+    assert_eq!(world.status(identity(1)), NotSaved, "the user's last tap");
+}
+
+/// The keys said 1 save. The first save timed out but was applied; the second's answer says 2.
+#[test]
+fn a_timed_out_write_before_an_answered_one_is_counted_once() {
+    let mut world = World::new();
+    world.server.saved.insert("P5".to_string());
+    world.refresh();
+    world.save(identity(1));
+    let sent = world.time_out_next_write();
+    let _ = world.apply(&sent);
+    world.save(identity(2));
+    world.answer_writes();
+    assert_eq!(world.server.total(), 3);
+    assert_eq!(world.service.saved_count(), Some(3));
+}
+
+// Recent saves
+
+#[test]
+fn a_keys_refresh_keeps_a_recent_save_the_list_has_not_shown() {
+    let mut world = World::new();
+    world.refresh();
+    world.save(identity(1));
+    world.answer_writes();
+    world.advance(MAX_READ_LAG + SEC);
+    world.refresh();
+    assert_eq!(world.recent(), ["P1"]);
+}
+
+/// A known limit: the list showed the post, so it left recent saves, and then a list read that
+/// lags behind the save doesn't show it. It's in neither until the next read of the list.
+#[test]
+fn a_lagging_list_read_after_one_that_showed_a_save_shows_it_nowhere() {
+    let mut world = World::new();
+    world.refresh();
+    let before_save = world.server.clone();
+    world.save(identity(1));
+    world.answer_writes();
+
+    world.advance(SEC * 5);
+    let now = world.server.clone();
+    assert_eq!(world.list_shown(now), ["P1"]);
+    assert!(world.recent().is_empty());
+
+    world.advance(SEC * 5);
+    assert!(world.list_shown(before_save).is_empty());
+    assert!(world.recent().is_empty());
+    assert_eq!(world.status(identity(1)), Saved);
+
+    let now = world.server.clone();
+    assert_eq!(world.list_shown(now), ["P1"]);
+}
+
+/// A list read that lags behind an unsave still hides the post.
+#[test]
+fn a_lagging_list_read_hides_a_post_just_unsaved() {
+    let mut world = World::new();
+    world.server.saved.insert("P1".to_string());
+    world.refresh();
+    let before = world.server.clone();
+    world.unsave(identity(1));
+    world.answer_writes();
+    world.advance(SEC);
+    assert!(world.list_shown(before).is_empty());
+}
+
+// Past the 1,000 keys
+
+/// 1,002 saves, with `hidden` among those the keys don't return.
+fn past_the_keys_with(world: &mut World, hidden: &[&str]) {
+    for id in 1001..=2000 {
+        world.server.saved.insert(format!("P{id}"));
+    }
+    for name in hidden {
+        world.server.saved.insert(name.to_string());
+        world.server.hidden.insert(name.to_string());
+    }
+}
+
+#[test]
+fn past_the_key_limit_a_post_unsaved_here_stays_unsaved_after_a_refresh() {
+    let mut world = World::new();
+    past_the_keys_with(&mut world, &["P1", "P2"]);
+    world.refresh();
+    assert_eq!(world.status(identity(1)), Unknown);
+
+    world.unsave(identity(1));
+    world.answer_writes();
+    for _ in 0..2 {
+        world.advance(MAX_READ_LAG + SEC);
+        world.refresh();
+        assert_eq!(world.status(identity(1)), NotSaved);
+        assert_eq!(world.service.saved_count(), Some(1001));
+    }
+}
+
+#[test]
+fn past_the_key_limit_a_post_saved_here_stays_saved_after_a_refresh() {
+    let mut world = World::new();
+    past_the_keys_with(&mut world, &["P1", "P2"]);
+    world.refresh();
+    world.save(identity(1));
+    world.answer_writes();
+    world.advance(MAX_READ_LAG + SEC);
+    world.refresh();
+    assert_eq!(world.status(identity(1)), Saved);
+    assert_eq!(world.service.saved_count(), Some(1002));
+}
+
+/// Unsaving one of 1,001 brings the account back within the keys, so they say about the rest.
+#[test]
+fn back_within_the_key_limit_the_keys_say_again() {
+    let mut world = World::new();
+    past_the_keys_with(&mut world, &["P1"]);
+    world.server.saved.remove("P2000");
+    world.refresh();
+    assert_eq!(world.status(identity(2)), Unknown);
+
+    world.unsave(identity(1));
+    world.answer_writes();
+    world.advance(MAX_READ_LAG + SEC);
+    world.server.hidden.clear();
+    world.refresh();
+    assert_eq!(world.status(identity(1)), NotSaved);
+    assert_eq!(world.status(identity(2)), NotSaved);
+}
+
+// Jetpack posts
+
+/// Delete P3 is answered, then delete F4 is applied but the call is cancelled before its answer.
+#[test]
+fn unsaving_a_listed_jetpack_post_cancelled_mid_way_takes_one_off_the_count() {
+    let mut world = World::new();
+    world.server.saved.insert("P1".to_string());
+    world.server.saved.insert("P3".to_string());
+    world.refresh();
+    world.advance(SEC);
+    world.list_from(Some(world.server.clone()));
+
+    world.advance(SEC * 10);
+    let call = world.unsave(jetpack());
+    world.answer_next_write(false);
+    let _ = world.apply("delete F4");
+    world.cancel(call);
+    assert_eq!(world.server.total(), 1);
+    world.advance(SEC * 60);
+    assert_eq!(world.service.saved_count(), Some(1));
 }

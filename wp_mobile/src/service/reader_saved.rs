@@ -97,6 +97,9 @@ impl ReaderSavedService {
     }
 
     /// Whether a post is saved. Doesn't touch the network.
+    ///
+    /// Past 1,000 saves, a post the saved keys don't include reads `Unknown`. One the saved list
+    /// shows is saved.
     pub fn status(&self, post: ReaderPostSaveIdentity) -> ReaderSavedStatus {
         self.state().status(&reader_saved_keys_for_post(post))
     }
@@ -146,7 +149,7 @@ impl ReaderSavedService {
                 let keys = reader_saved_keys_for_post(post.identity.clone());
                 let should_show = state.should_show_listed_post(&keys, started);
                 if should_show {
-                    changed |= state.note_listed_post(&keys, started);
+                    changed |= state.note_listed_post(&keys);
                 }
                 should_show
             });
@@ -203,13 +206,18 @@ impl ReaderSavedService {
     ///
     /// Stops at the first batch that fails and returns its error. Saving a post twice does nothing,
     /// so it's safe to import everything again.
+    ///
+    /// The import takes one place in line, like a tap: a save or unsave tapped while it runs is
+    /// sent once every batch is done, so a later batch can't undo it.
     pub async fn import(
         &self,
         keys: Vec<ReaderSavedBulkKey>,
     ) -> Result<Vec<ReaderSavedBulkResult>, ReaderSavedError> {
+        let (mut pending, turn) = PendingWrites::begin(self, Vec::new(), true, false);
+        turn.wait().await;
         let mut batches = Vec::new();
         for batch in keys.chunks(MAX_BULK_KEYS).rev() {
-            batches.push(self.import_batch(batch).await?);
+            batches.push(self.import_batch(&mut pending, batch).await?);
         }
         Ok(batches.into_iter().rev().flatten().collect())
     }
@@ -289,29 +297,36 @@ impl ReaderSavedService {
         first_error.map_or(Ok(()), Err)
     }
 
+    /// Sends one batch of an import, whose turn has come. Its writes start now, so a batch not sent
+    /// yet changes nothing.
     async fn import_batch(
         &self,
+        pending: &mut PendingWrites<'_>,
         keys: &[ReaderSavedBulkKey],
     ) -> Result<Vec<ReaderSavedBulkResult>, ReaderSavedError> {
-        // The keys are newest first, so their writes start oldest first. An import's saves aren't
-        // recent saves: the device already had them.
+        // The keys are newest first, so their writes start oldest first.
         let saved_keys: Vec<_> = keys.iter().rev().map(saved_key).collect();
-        let (mut pending, turn) = PendingWrites::begin(self, saved_keys, true, false);
-        turn.wait().await;
+        let mut writes = pending.start(saved_keys);
+        self.notify();
 
         let params = ReaderSavedBulkParams {
             keys: keys.to_vec(),
             source: self.source,
         };
-        pending.mark_all_sent();
-        let response = match self.client.reader_saved().bulk_save(&params).await {
+        for write in &writes {
+            pending.mark_sent(*write);
+        }
+        let result = self.client.reader_saved().bulk_save(&params).await;
+        for write in &writes {
+            pending.forget(*write);
+        }
+        let response = match result {
             Ok(response) => response.data,
             Err(error) => {
-                let writes = pending.forget_all();
                 {
                     let mut state = self.state();
                     let now = self.now();
-                    for (_, write) in writes {
+                    for write in writes {
                         state.finish_with_error(write, &error, now);
                     }
                 }
@@ -319,7 +334,6 @@ impl ReaderSavedService {
                 return Err(error.into());
             }
         };
-        let mut writes = pending.forget_all();
         writes.reverse();
 
         // One result per key, in order, so the batches can be joined by position. A result the
@@ -340,10 +354,11 @@ impl ReaderSavedService {
             })
             .collect();
 
+        // Answered oldest first, the order the server applied them, so the total is the newest's.
         {
             let mut state = self.state();
             let now = self.now();
-            for ((_, write), result) in writes.iter().zip(&results) {
+            for (write, result) in writes.iter().zip(&results).rev() {
                 match result {
                     ReaderSavedBulkResult {
                         key: Some(stored_key),
@@ -433,16 +448,41 @@ impl ReaderSavedState {
     }
 }
 
-/// Whether a failed write may still have been applied: the request timed out, or the server
-/// answered and the answer couldn't be read.
+/// Whether a failed write may still have been applied: the request may have reached the server,
+/// and the server didn't say it refused it. That's a timeout, a connection lost or cancelled
+/// mid-request, an answer that couldn't be read, or a server error (5xx) from WordPress.com or a
+/// proxy in front of it.
+///
+/// Errors from before the request was sent are undone: no network, a host that doesn't resolve, a
+/// refused connection, TLS. So is any 4xx answer. iOS reports a connection lost mid-request as
+/// offline too, so that's undone, and the next refresh corrects it if the server applied it.
 fn may_have_been_applied(error: &WpApiError) -> bool {
-    matches!(
-        error,
-        WpApiError::RequestExecutionFailed {
-            reason: RequestExecutionErrorReason::HttpTimeoutError,
-            ..
-        } | WpApiError::ResponseParsingError { .. }
-    )
+    use RequestExecutionErrorReason as Reason;
+    match error {
+        WpApiError::RequestExecutionFailed { reason, .. } => match reason {
+            Reason::HttpTimeoutError
+            | Reason::HttpError { .. }
+            | Reason::GenericError { .. }
+            | Reason::CancellationError => true,
+            Reason::CloudflareError { status_code, .. } => *status_code >= 500,
+            Reason::InvalidSslError { .. }
+            | Reason::NonExistentSiteError { .. }
+            | Reason::HttpAuthenticationRequiredError { .. }
+            | Reason::HttpAuthenticationRejectedError { .. }
+            | Reason::HttpForbiddenError { .. }
+            | Reason::MisconfiguredHttpAuthenticationError { .. }
+            | Reason::MisconfiguredRateLimitError
+            | Reason::DeviceIsOfflineError { .. }
+            | Reason::ConnectionError { .. } => false,
+        },
+        WpApiError::ResponseParsingError { .. } => true,
+        WpApiError::InvalidHttpStatusCode { status_code, .. }
+        | WpApiError::UnknownError { status_code, .. }
+        | WpApiError::WpError { status_code, .. } => *status_code >= 500,
+        WpApiError::MediaFileNotFound { .. }
+        | WpApiError::MediaFileUnreadable { .. }
+        | WpApiError::SiteUrlParsingError { .. } => false,
+    }
 }
 
 fn is_post_not_found(error: &WpApiError) -> bool {
@@ -494,14 +534,14 @@ struct PendingWrites<'a> {
     service: &'a ReaderSavedService,
     tap: Tap,
     saved: bool,
-    recent: bool,
     /// Each write, and whether its request has been sent.
     writes: Vec<(ReaderSavedKey, WriteId, bool)>,
 }
 
 impl<'a> PendingWrites<'a> {
     /// Starts a write for each key, all at once, so the change shows straight away, and takes the
-    /// tap's turn.
+    /// tap's turn. `recent` is whether saves go in recent saves: an import's don't, because the
+    /// device already had them.
     fn begin(
         service: &'a ReaderSavedService,
         keys: Vec<ReaderSavedKey>,
@@ -525,11 +565,13 @@ impl<'a> PendingWrites<'a> {
                 service,
                 tap,
                 saved,
-                recent,
                 writes: Vec::new(),
             };
             for key in choose(&inner.state) {
-                let write = inner.state.begin_write(tap, &key, saved, recent);
+                let write = inner.state.begin_write(tap, &key, saved);
+                if saved && recent {
+                    inner.state.note_save_tap(&key);
+                }
                 pending.writes.push((key, write, false));
             }
             let turn = Turn::take(&mut inner.queue);
@@ -537,6 +579,18 @@ impl<'a> PendingWrites<'a> {
         };
         service.notify();
         (pending, turn)
+    }
+
+    /// Starts a write for each key, in the same tap.
+    fn start(&mut self, keys: Vec<ReaderSavedKey>) -> Vec<WriteId> {
+        let mut state = self.service.state();
+        keys.into_iter()
+            .map(|key| {
+                let write = state.begin_write(self.tap, &key, self.saved);
+                self.writes.push((key, write, false));
+                write
+            })
+            .collect()
     }
 
     /// Starts a write, in the same tap, for each key chosen that doesn't have one yet.
@@ -548,7 +602,7 @@ impl<'a> PendingWrites<'a> {
                 .iter()
                 .any(|(other, _, _)| other.normalized() == key.normalized())
             {
-                let write = state.begin_write(self.tap, &key, self.saved, self.recent);
+                let write = state.begin_write(self.tap, &key, self.saved);
                 self.writes.push((key, write, false));
             }
         }

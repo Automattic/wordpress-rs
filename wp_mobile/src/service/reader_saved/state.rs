@@ -1,17 +1,33 @@
 //! The saved posts this device knows about, without any networking.
 //!
 //! The saved posts API's reads can lag behind its writes. Rather than guess what the server holds,
-//! this relies on three facts about it, and nothing else:
+//! this relies on four facts about it, and nothing else:
 //!
 //! 1. A successful response means the write was applied.
 //! 2. A read includes every write applied at least [`MAX_READ_LAG`] before the read started.
 //! 3. Writes are applied in the order they're sent. The service sends them one at a time, in the
 //!    order the user tapped.
+//! 4. A write the device gave up on, if the server applies it at all, applies within
+//!    [`MAX_READ_LAG`] of the device giving up.
 //!
 //! So a key's newest write is what the server ends up holding, and it decides the key's state until
-//! a read that started [`MAX_READ_LAG`] after the write finished has been applied. Time passing
-//! changes nothing on its own: only a tap, a response or a read does. A post is saved if any of the
-//! keys it may be saved under is.
+//! a refresh that started late enough to include it has been applied: [`MAX_READ_LAG`] after the
+//! write was answered, or twice that after the device gave up on it. Time passing changes nothing on
+//! its own: only a tap, a response or a refresh does. A post is saved if any of the keys it may be
+//! saved under is.
+//!
+//! Only the saved keys and this device's writes say whether a post is saved. The saved list
+//! doesn't: it doesn't say which key a post is saved under.
+//!
+//! Known limits:
+//!
+//! - A write the device gave up on can still be applied after a later tap's write, so the server can
+//!   end up opposite to the user's last tap until they tap again.
+//! - The saved keys stop at 1,000. Past that, which only accounts that saved more before the server's
+//!   cap can be, a post the keys don't have reads [`ReaderSavedStatus::Unknown`] unless this device
+//!   has had a write to it answered. A post in the saved list that reads `Unknown` is saved.
+//! - A post leaves [`ReaderSavedState::recent_saves`] once the saved list shows it. A later read of
+//!   the list that lags behind can leave it in neither, until the next read.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -40,7 +56,7 @@ pub enum ReaderSavedStatus {
     Saved,
     NotSaved,
     /// The saved keys haven't loaded, or the post is older than the 1,000 keys they stop at, and
-    /// neither this device nor the saved list has said.
+    /// this device hasn't changed it.
     Unknown,
 }
 
@@ -50,7 +66,7 @@ enum Progress {
     Pending,
     /// The server answered.
     Answered { at: Instant },
-    /// Cancelled after it was sent, so the server may or may not have applied it.
+    /// Given up on after it was sent, so the server may or may not apply it.
     Abandoned { at: Instant },
 }
 
@@ -61,16 +77,16 @@ struct Write {
     /// The key sent, or the key the server stored once it answered.
     key: ReaderSavedKey,
     saved: bool,
-    /// Whether it belongs in recent saves: not an import, and not shown by the saved list yet.
-    recent: bool,
     progress: Progress,
 }
 
 impl Write {
-    fn finished_at(&self) -> Option<Instant> {
+    /// Whether a read that started at `started` includes this write, if the server applied it.
+    fn included_in(&self, started: Instant) -> bool {
         match self.progress {
-            Progress::Pending => None,
-            Progress::Answered { at } | Progress::Abandoned { at } => Some(at),
+            Progress::Pending => false,
+            Progress::Answered { at } => at + MAX_READ_LAG <= started,
+            Progress::Abandoned { at } => at + 2 * MAX_READ_LAG <= started,
         }
     }
 
@@ -94,19 +110,20 @@ struct Snapshot {
 }
 
 impl Snapshot {
-    /// How many saves are beyond the keys, which stop at 1,000.
-    fn beyond_keys(&self) -> u64 {
-        self.total.saturating_sub(self.keys.len() as u64)
+    /// Whether there are saves beyond the keys, which stop at 1,000.
+    fn past_the_keys(&self) -> bool {
+        self.total > self.keys.len() as u64
     }
 }
 
-/// A post the saved list showed, and when that read started. The list doesn't say which of the
-/// post's keys it's saved under.
-#[derive(Debug)]
-struct Listed {
-    /// The post's keys, as the server stores them.
-    post: Vec<ReaderSavedKey>,
-    started: Instant,
+/// The server's total in a write's answer. Writes are answered in the order they're applied, so
+/// it includes every write before that one too.
+#[derive(Debug, Clone, Copy)]
+struct AnsweredTotal {
+    total: u64,
+    at: Instant,
+    /// The newest write the total includes.
+    includes: (Tap, WriteId),
 }
 
 #[derive(Debug, Default)]
@@ -115,13 +132,13 @@ pub(super) struct ReaderSavedState {
     writes: Vec<Write>,
     /// The newest refresh applied.
     snapshot: Option<Snapshot>,
-    /// Posts the saved list showed that the snapshot may not have.
-    listed: Vec<Listed>,
+    /// Keys saved by a tap here, oldest first, until the saved list shows them.
+    recent: Vec<ReaderSavedKey>,
     /// Keys the server stores as another key, as it last said: a URL of a WordPress.com post is
     /// stored as the post.
     stored_as: HashMap<ReaderSavedKey, ReaderSavedKey>,
-    /// The server's total in the newest write response, and when it arrived.
-    answered_total: Option<(u64, Instant)>,
+    /// The server's total in the newest write answer.
+    answered_total: Option<AnsweredTotal>,
     next_tap: u64,
     next_write_id: u64,
     next_refresh_id: u64,
@@ -135,15 +152,8 @@ impl ReaderSavedState {
         tap
     }
 
-    /// Records a write about to be sent, which takes effect straight away. `recent` is whether a
-    /// save belongs in recent saves: an import's don't.
-    pub(super) fn begin_write(
-        &mut self,
-        tap: Tap,
-        key: &ReaderSavedKey,
-        saved: bool,
-        recent: bool,
-    ) -> WriteId {
+    /// Records a write about to be sent, which takes effect straight away.
+    pub(super) fn begin_write(&mut self, tap: Tap, key: &ReaderSavedKey, saved: bool) -> WriteId {
         let id = WriteId(self.next_write_id);
         self.next_write_id += 1;
         let write = Write {
@@ -151,7 +161,6 @@ impl ReaderSavedState {
             id,
             key: key.clone(),
             saved,
-            recent,
             progress: Progress::Pending,
         };
         let index = self
@@ -159,6 +168,16 @@ impl ReaderSavedState {
             .partition_point(|other| other.order() < write.order());
         self.writes.insert(index, write);
         id
+    }
+
+    /// Records that the user saved a key with a tap, so it shows in recent saves until the saved
+    /// list shows it.
+    pub(super) fn note_save_tap(&mut self, key: &ReaderSavedKey) {
+        let stored = self.stored_as_of(key);
+        let stored_as = &self.stored_as;
+        self.recent
+            .retain(|other| stored_key_in(stored_as, other) != stored);
+        self.recent.push(key.clone());
     }
 
     /// Records that the server applied a write. `stored_key` is the key it stored, which can differ
@@ -176,24 +195,36 @@ impl ReaderSavedState {
         let requested = write.key.normalized();
         let stored = stored_key.normalized();
         let saved = write.saved;
+        let order = write.order();
         write.key = stored_key.clone();
         write.progress = Progress::Answered { at: now };
         if let Some(total) = total {
-            self.answered_total = Some((total, now));
+            self.answered_total = Some(AnsweredTotal {
+                total,
+                at: now,
+                includes: order,
+            });
         }
 
         // What a save stores now replaces what the server said before, so a URL whose post was
         // deleted stops being looked up as the post. An unsave echoes the key it was sent when
         // nothing was saved under it, which says nothing about where the post is stored.
         if requested != stored {
-            self.stored_as.insert(requested, stored);
+            self.stored_as.insert(requested.clone(), stored);
             self.restore_snapshot_keys();
         } else if saved && self.stored_as.remove(&requested).is_some() {
             self.restore_snapshot_keys();
         }
+        if saved {
+            for key in &mut self.recent {
+                if key.normalized() == requested {
+                    *key = stored_key.clone();
+                }
+            }
+        }
     }
 
-    /// Records that a write was cancelled after it was sent. The server may have applied it, so it
+    /// Records that a write was given up on after it was sent. The server may still apply it, so it
     /// stands until a read can say.
     pub(super) fn abandon_write(&mut self, id: WriteId, now: Instant) {
         if let Some(write) = self.pending(id) {
@@ -201,10 +232,25 @@ impl ReaderSavedState {
         }
     }
 
-    /// Undoes a write the server refused, or that was cancelled before it was sent.
+    /// Undoes a write the server refused, or that was never sent. A save undone is no longer a
+    /// recent save, unless another save of the key still stands.
     pub(super) fn fail_write(&mut self, id: WriteId) {
-        if self.pending(id).is_some() {
-            self.writes.retain(|write| write.id != id);
+        let Some(write) = self.pending(id) else {
+            return;
+        };
+        let undone_save = write.saved.then(|| write.key.clone());
+        let undone_save = undone_save.map(|key| self.stored_as_of(&key));
+        self.writes.retain(|write| write.id != id);
+        if let Some(key) = undone_save {
+            let stored_as = &self.stored_as;
+            let still_saved = self
+                .writes
+                .iter()
+                .any(|write| write.saved && stored_key_in(stored_as, &write.key) == key);
+            if !still_saved {
+                self.recent
+                    .retain(|other| stored_key_in(stored_as, other) != key);
+            }
         }
     }
 
@@ -250,22 +296,39 @@ impl ReaderSavedState {
         });
         self.restore_snapshot_keys();
 
-        // This read includes every write that finished `MAX_READ_LAG` before it started.
-        let covers = |at: Instant| at + MAX_READ_LAG <= ticket.started;
-        self.writes
-            .retain(|write| write.finished_at().is_none_or(|at| !covers(at)));
-        if self.answered_total.is_some_and(|(_, at)| covers(at)) {
+        // The refresh includes each key's newest write that finished long enough before it started,
+        // and with it every older write to the key. Past the 1,000 keys, it can't see a key it
+        // doesn't have, so an answered write to one stays: the server applied it.
+        let snapshot = self.snapshot.as_ref().expect("just set");
+        let mut included: HashMap<ReaderSavedKey, usize> = HashMap::new();
+        for (index, write) in self.writes.iter().enumerate().rev() {
+            if write.included_in(ticket.started) {
+                included
+                    .entry(stored_key_in(&self.stored_as, &write.key))
+                    .or_insert(index);
+            }
+        }
+        let stored_as = &self.stored_as;
+        let mut index = 0;
+        self.writes.retain(|write| {
+            let this = index;
+            index += 1;
+            let key = stored_key_in(stored_as, &write.key);
+            let Some(&newest) = included.get(&key) else {
+                return true;
+            };
+            this > newest
+                || (this == newest
+                    && write.is_answered()
+                    && snapshot.past_the_keys()
+                    && !snapshot.stored.contains(&key))
+        });
+        if self
+            .answered_total
+            .is_some_and(|answered| answered.at + MAX_READ_LAG <= ticket.started)
+        {
             self.answered_total = None;
         }
-
-        // And every post the list showed `MAX_READ_LAG` before it started, unless the post is past
-        // the keys, where a refresh can't see it.
-        let snapshot = self.snapshot.as_ref().expect("just set");
-        let past_the_keys = snapshot.beyond_keys() > 0;
-        self.listed.retain(|listed| {
-            !covers(listed.started)
-                || (past_the_keys && !listed.post.iter().any(|key| snapshot.stored.contains(key)))
-        });
     }
 
     /// Whether a post is saved, given every key it may be saved under.
@@ -328,72 +391,21 @@ impl ReaderSavedState {
         started: Instant,
     ) -> bool {
         let unsaved_since = self.post_keys(keys).iter().any(|key| {
-            self.newest_write(key).is_some_and(|write| {
-                !write.saved
-                    && write
-                        .finished_at()
-                        .is_none_or(|at| started < at + MAX_READ_LAG)
-            })
+            self.newest_write(key)
+                .is_some_and(|write| !write.saved && !write.included_in(started))
         });
         !unsaved_since || self.status(keys) == ReaderSavedStatus::Saved
     }
 
-    /// Records that a read of the saved list that started at `started` showed a post. Returns
-    /// whether that changed anything this device shows.
-    pub(super) fn note_listed_post(&mut self, keys: &[ReaderSavedKey], started: Instant) -> bool {
+    /// Records that the saved list showed a post, so it no longer needs showing as a recent save.
+    /// Returns whether that changed recent saves.
+    pub(super) fn note_listed_post(&mut self, keys: &[ReaderSavedKey]) -> bool {
         let post = self.post_keys(keys);
-        if post.is_empty() {
-            return false;
-        }
-        let status_before = self.status(&post);
-        let mut changed = false;
-
-        // The list shows the post, so it doesn't need showing above it as a recent save.
         let stored_as = &self.stored_as;
-        for write in &mut self.writes {
-            if write.recent && write.saved && post.contains(&stored_key_in(stored_as, &write.key)) {
-                write.recent = false;
-                changed = true;
-            }
-        }
-
-        // A refresh that started `MAX_READ_LAG` after this read includes everything it showed.
-        let newer_read = self
-            .snapshot
-            .as_ref()
-            .is_some_and(|snapshot| snapshot.ticket.started >= started + MAX_READ_LAG)
-            || self
-                .listed
-                .iter()
-                .any(|listed| intersects(&listed.post, &post) && listed.started >= started);
-        if !newer_read {
-            // This read includes the post's writes that finished `MAX_READ_LAG` before it started.
-            let stored_as = &self.stored_as;
-            let writes = self.writes.len();
-            self.writes.retain(|write| {
-                !post.contains(&stored_key_in(stored_as, &write.key))
-                    || write
-                        .finished_at()
-                        .is_none_or(|at| started < at + MAX_READ_LAG)
-            });
-            // A post listed for the first time can change the count, if the keys don't have it.
-            let newly_listed = !self
-                .listed
-                .iter()
-                .any(|listed| intersects(&listed.post, &post));
-            let in_keys = self
-                .snapshot
-                .as_ref()
-                .is_some_and(|snapshot| post.iter().any(|key| snapshot.stored.contains(key)));
-            changed |= self.writes.len() != writes || (newly_listed && !in_keys);
-            self.listed
-                .retain(|listed| !intersects(&listed.post, &post));
-            self.listed.push(Listed {
-                post: post.clone(),
-                started,
-            });
-        }
-        changed || status_before != self.status(&post)
+        let before = self.recent.len();
+        self.recent
+            .retain(|key| !post.contains(&stored_key_in(stored_as, key)));
+        self.recent.len() != before
     }
 
     /// How many saves there are, or `None` before the first refresh or answered write. Like the
@@ -401,72 +413,62 @@ impl ReaderSavedState {
     pub(super) fn saved_count(&self) -> Option<u64> {
         // The newest total the server reported: a write's, unless a refresh started late enough to
         // include that write.
-        let from_write = self.answered_total.filter(|(_, at)| {
+        let from_write = self.answered_total.filter(|answered| {
             self.snapshot
                 .as_ref()
-                .is_none_or(|snapshot| snapshot.ticket.started < *at + MAX_READ_LAG)
+                .is_none_or(|snapshot| snapshot.ticket.started < answered.at + MAX_READ_LAG)
         });
-        let (mut count, includes_answered) = match (from_write, &self.snapshot) {
-            (Some((total, _)), _) => (total as i64, true),
-            (None, Some(snapshot)) => (snapshot.total as i64, false),
+        let (mut count, includes) = match (from_write, &self.snapshot) {
+            (Some(answered), _) => (answered.total as i64, Some(answered.includes)),
+            (None, Some(snapshot)) => (snapshot.total as i64, None),
             (None, None) => return None,
         };
 
-        // Each key's newest write, where the total doesn't include it yet.
+        // Each key's newest write the total doesn't include, against what the total counted for
+        // that key: the key's newest write it does include, or else what the keys had. Past the
+        // 1,000 keys, a key they don't have can't be compared.
+        let after = |write: &Write| includes.is_none_or(|includes| write.order() > includes);
         let mut seen: HashSet<ReaderSavedKey> = HashSet::new();
-        for write in self.writes.iter().rev() {
+        for write in self.writes.iter().rev().filter(|write| after(write)) {
             let key = write.key.normalized();
-            if !seen.insert(key.clone()) || (includes_answered && write.is_answered()) {
+            if !seen.insert(key.clone()) {
                 continue;
             }
-            let before = if includes_answered {
-                // The total includes the key's newest answered write, or whatever was last read.
-                self.writes
-                    .iter()
-                    .rev()
-                    .find(|other| other.is_answered() && other.key.normalized() == key)
-                    .map_or_else(|| self.was_saved(&key), |other| other.saved)
-            } else {
-                self.in_keys_total(&key)
-            };
-            count += i64::from(write.saved) - i64::from(before);
-        }
-
-        // A listed post the keys don't have yet. Past the 1,000 keys it may already be counted.
-        if !includes_answered
-            && let Some(snapshot) = &self.snapshot
-            && snapshot.beyond_keys() == 0
-        {
-            let written: HashSet<_> = self
+            let counted = self
                 .writes
                 .iter()
-                .map(|write| self.stored_as_of(&write.key))
-                .collect();
-            for listed in &self.listed {
-                let changed_here = listed.post.iter().any(|key| written.contains(key));
-                if !changed_here && !listed.post.iter().any(|key| snapshot.stored.contains(key)) {
-                    count += 1;
-                }
+                .rev()
+                .filter(|other| !after(other))
+                .find(|other| other.key.normalized() == key)
+                .map(|other| other.saved)
+                .or_else(|| match &self.snapshot {
+                    None => Some(false),
+                    Some(snapshot) if snapshot.keys.contains(&key) => Some(true),
+                    Some(snapshot) if snapshot.past_the_keys() => None,
+                    Some(_) => Some(false),
+                });
+            if let Some(counted) = counted {
+                count += i64::from(write.saved) - i64::from(counted);
             }
         }
         Some(count.max(0) as u64)
     }
 
-    /// The posts this device saved that the saved list hasn't shown yet, newest first. Imports
-    /// aren't included.
+    /// The posts saved by a tap here that read as saved and that the saved list hasn't shown yet,
+    /// newest first.
     pub(super) fn recent_saves(&self) -> Vec<ReaderSavedKey> {
-        let mut seen: HashSet<ReaderSavedKey> = HashSet::new();
-        let mut saves = Vec::new();
-        for write in self.writes.iter().rev() {
-            if seen.insert(self.stored_as_of(&write.key)) && write.saved && write.recent {
-                saves.push(write.key.clone());
-            }
-        }
-        saves
+        let mut seen = HashSet::new();
+        self.recent
+            .iter()
+            .rev()
+            .filter(|key| seen.insert(self.stored_as_of(key)))
+            .filter(|key| self.status(std::slice::from_ref(key)) == ReaderSavedStatus::Saved)
+            .cloned()
+            .collect()
     }
 
-    /// The keys a post's saves are stored under: its own keys, normalized, or the keys the server
-    /// stores them as.
+    /// The keys a post's saves are stored under, main key first: its own keys, normalized, or the
+    /// keys the server stores them as.
     pub(super) fn post_keys(&self, keys: &[ReaderSavedKey]) -> Vec<ReaderSavedKey> {
         let mut all = Vec::new();
         for key in keys {
@@ -516,48 +518,16 @@ impl ReaderSavedState {
     }
 
     /// What the server held when it was last read: `None` before the first refresh, and for a key
-    /// past the 1,000 keys that the saved list hasn't shown.
+    /// past the 1,000 keys.
     fn server_has(&self, key: &ReaderSavedKey) -> Option<bool> {
-        if self.listed.iter().any(|listed| listed.post.contains(key)) {
-            return Some(true);
-        }
         let snapshot = self.snapshot.as_ref()?;
         if snapshot.stored.contains(key) {
             Some(true)
-        } else if snapshot.beyond_keys() > 0 {
+        } else if snapshot.past_the_keys() {
             None
         } else {
             Some(false)
         }
-    }
-
-    /// Whether the keys' total counts a save under exactly this key: one in the keys, or one the
-    /// list showed past them.
-    fn in_keys_total(&self, key: &ReaderSavedKey) -> bool {
-        let Some(snapshot) = &self.snapshot else {
-            return false;
-        };
-        let stored = self.stored_as_of(key);
-        snapshot.keys.contains(key)
-            || (snapshot.beyond_keys() > 0
-                && self
-                    .listed
-                    .iter()
-                    .any(|listed| listed.post.contains(&stored)))
-    }
-
-    /// Whether the last reads had a save under exactly this key, for counting.
-    fn was_saved(&self, key: &ReaderSavedKey) -> bool {
-        let in_keys = self
-            .snapshot
-            .as_ref()
-            .is_some_and(|snapshot| snapshot.keys.contains(key));
-        let stored = self.stored_as_of(key);
-        in_keys
-            || self
-                .listed
-                .iter()
-                .any(|listed| listed.post.contains(&stored))
     }
 }
 
@@ -575,10 +545,6 @@ fn stored_key_in(
         }
     }
     key
-}
-
-fn intersects(a: &[ReaderSavedKey], b: &[ReaderSavedKey]) -> bool {
-    a.iter().any(|key| b.contains(key))
 }
 
 #[cfg(test)]
