@@ -1826,3 +1826,56 @@ async fn a_save_answered_with_a_server_error_stands_until_a_read() {
 
     assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
 }
+
+// The count after a refresh during an import
+
+/// 150 keys: the first batch (50) is answered with a total of 50. The second (100) times out, but
+/// the server applied it. A refresh straight after reads all 150.
+#[tokio::test]
+async fn the_count_after_a_refresh_that_has_a_timed_out_import_batch() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[]).await;
+    let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
+    let first: Vec<_> = (101..=150).map(post_json).collect();
+    executor.push(Step::Respond(200, bulk_response(&first, 50)));
+    executor.push(Step::TimedOut);
+
+    assert!(service.import(keys).await.is_err());
+    assert_eq!(service.saved_count(), Some(150), "before the refresh");
+
+    let all: Vec<_> = (1..=150).map(post_json).collect();
+    refreshed(&service, &executor, &all).await;
+    assert_eq!(service.saved_count(), Some(150), "the server holds 150");
+}
+
+/// The same with the second batch still in flight: the server applied it, and a refresh lands
+/// before its answer.
+#[tokio::test]
+async fn the_count_while_an_import_batch_a_refresh_already_has_is_in_flight() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[]).await;
+    let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
+    let first: Vec<_> = (101..=150).map(post_json).collect();
+    executor.push(Step::Respond(200, bulk_response(&first, 50)));
+    let (release, held) = oneshot::channel();
+    let second: Vec<_> = (1..=100).map(post_json).collect();
+    executor.push(Step::Hold(held, 200, bulk_response(&second, 150)));
+    let all: Vec<_> = (1..=150).map(post_json).collect();
+
+    let (result, during) = futures::join!(service.import(keys), async {
+        tokio::task::yield_now().await;
+        assert_eq!(service.saved_count(), Some(150));
+        executor.push(Step::Respond(200, keys_response(&all)));
+        service.refresh().await.unwrap();
+        let during = service.saved_count();
+        release.send(()).unwrap();
+        during
+    });
+    result.unwrap();
+    assert_eq!(service.saved_count(), Some(150), "after the answer");
+    assert_eq!(
+        during,
+        Some(150),
+        "while the second batch's answer is on its way"
+    );
+}
