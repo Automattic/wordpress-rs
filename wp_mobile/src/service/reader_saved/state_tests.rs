@@ -478,6 +478,16 @@ fn past_the_key_limit_a_post_the_keys_do_not_have_is_unknown() {
     assert_eq!(state.status(&[post(1)]), Saved);
 }
 
+/// Two saved URLs that normalize to one are still two of the total, so nothing is past the keys.
+#[test]
+fn keys_that_normalize_to_one_are_not_past_the_key_limit() {
+    let now = Instant::now();
+    let mut state = ReaderSavedState::default();
+    let keys = [url("https://example.com/a"), url("https://example.com/a/")];
+    refresh(&mut state, now, &keys, 2);
+    assert_eq!(state.status(&[post(1)]), NotSaved);
+}
+
 /// The refresh can't see post 5000, so it can't say the answered write is out of date.
 #[test]
 fn past_the_key_limit_an_answered_write_to_a_post_the_keys_do_not_have_stands() {
@@ -584,9 +594,34 @@ fn a_write_answer_reports_the_count() {
     tap(&mut state, &post(5), true);
     assert_eq!(state.saved_count(), Some(5));
 
-    // A stale refresh doesn't replace the answered total.
-    refresh(&mut state, now + S, &[post(1), post(2)], 2);
+    // A refresh that started before the answer, but landed after it, doesn't replace it.
+    let older = state.begin_refresh(now - S);
+    state.apply_refresh(older, [(post(1), None), (post(2), None)], 2);
     assert_eq!(state.saved_count(), Some(5));
+
+    // One that started after it does, with its own keys.
+    let keys = [post(1), post(2), post(3), post(4)];
+    refresh(&mut state, now + S, &keys, 4);
+    assert_eq!(state.saved_count(), Some(5));
+    refresh(
+        &mut state,
+        now + S * 2,
+        &[post(1), post(2), post(3), post(4), post(5)],
+        5,
+    );
+    assert_eq!(state.saved_count(), Some(5));
+}
+
+/// A save that timed out was applied, and a refresh after the last answer already has it.
+#[test]
+fn a_refresh_after_an_answer_counts_a_write_it_already_has_once() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    saved(&mut state, &post(1), &post(1), now);
+    let write = tap(&mut state, &post(2), true);
+    state.abandon_write(write, now + S);
+    refresh(&mut state, now + S * 5, &[post(1), post(2)], 2);
+    assert_eq!(state.saved_count(), Some(2));
 }
 
 /// The answered total already includes a write given up on before it, if the server applied it.
@@ -620,4 +655,103 @@ fn a_write_answer_gives_a_count_before_the_first_refresh() {
     let write = tap(&mut state, &post(1), true);
     state.complete_write(write, &post(1), Some(7), now);
     assert_eq!(state.saved_count(), Some(7));
+}
+
+// Counting after a refresh, and writes to two keys of one post
+
+/// The keys said 0. Save P1 is answered with a total of 1. Save P2 times out, but the server
+/// applied it. A refresh 5s later reads both saves: the server holds 2.
+#[test]
+fn a_refresh_after_an_answer_counts_a_save_given_up_on_that_it_has_once() {
+    let t0 = Instant::now();
+    let mut state = loaded(t0, &[]);
+    let first = tap(&mut state, &post(1), true);
+    state.complete_write(first, &post(1), Some(1), t0);
+    let second = tap(&mut state, &post(2), true);
+    state.abandon_write(second, t0 + S);
+    assert_eq!(state.saved_count(), Some(2), "before the refresh");
+
+    refresh(&mut state, t0 + S * 5, &[post(1), post(2)], 2);
+    assert_eq!(state.saved_count(), Some(2), "the server holds 2");
+}
+
+/// The same with an unsave: the keys said P5. Save P1 is answered with 2. Unsave P5 times out but
+/// was applied. A refresh 5s later reads P1 alone: the server holds 1.
+#[test]
+fn a_refresh_after_an_answer_counts_an_unsave_given_up_on_that_it_has_once() {
+    let t0 = Instant::now();
+    let mut state = loaded(t0, &[post(5)]);
+    let first = tap(&mut state, &post(1), true);
+    state.complete_write(first, &post(1), Some(2), t0);
+    let second = tap(&mut state, &post(5), false);
+    state.abandon_write(second, t0 + S);
+    assert_eq!(state.saved_count(), Some(1), "before the refresh");
+
+    refresh(&mut state, t0 + S * 5, &[post(1)], 1);
+    assert_eq!(state.saved_count(), Some(1), "the server holds 1");
+}
+
+/// The same while the second save is still in flight: the server applied it, its answer is slow,
+/// and a refresh lands first.
+#[test]
+fn a_refresh_that_has_a_write_still_in_flight_counts_it_once() {
+    let t0 = Instant::now();
+    let mut state = loaded(t0, &[]);
+    let first = tap(&mut state, &post(1), true);
+    state.complete_write(first, &post(1), Some(1), t0);
+    let _second = tap(&mut state, &post(2), true);
+    assert_eq!(state.saved_count(), Some(2));
+    refresh(&mut state, t0 + S, &[post(1), post(2)], 2);
+    assert_eq!(state.saved_count(), Some(2), "the server holds 2");
+}
+
+/// A Jetpack post saved under both P3 and F4, and the device knows F4 is stored as P3. Unsaving it
+/// sends delete P3, which times out (the server applies it 30s later), then delete F4, answered.
+/// A read that started LAG after F4's answer includes F4's delete, but not necessarily the late P3
+/// delete, which fact 4 only covers from 2 x LAG after giving up.
+#[test]
+fn a_read_that_includes_one_key_keeps_a_write_given_up_on_to_another_key_of_the_post() {
+    let t0 = Instant::now();
+    let mut state = loaded(t0, &[feed(4)]);
+    saved(&mut state, &feed(4), &post(3), t0);
+    let t1 = t0 + LAG;
+    refresh(&mut state, t1, &[post(3), feed(4)], 2);
+    assert!(state.writes.is_empty());
+    assert_eq!(
+        state.keys_to_unsave(&[post(3), feed(4)]),
+        vec![post(3), feed(4)]
+    );
+
+    let unsave = state.begin_tap();
+    let by_post = state.begin_write(unsave, &post(3), false);
+    let by_feed = state.begin_write(unsave, &feed(4), false);
+    let t2 = t1 + S;
+    state.abandon_write(by_post, t2);
+    state.complete_write(by_feed, &feed(4), Some(1), t2);
+    assert_eq!(state.status(&[post(3), feed(4)]), NotSaved);
+
+    refresh(&mut state, t2 + LAG, &[post(3)], 1);
+    assert_eq!(
+        state.status(&[post(3), feed(4)]),
+        NotSaved,
+        "the delete of P3 may still land, so it should stand until t2 + 2 x LAG"
+    );
+}
+
+/// The keys have P9, with U9 as its URL. Saving U9 is a no-op on the server, so it counts once
+/// while it's in flight.
+#[test]
+fn saving_a_url_already_saved_as_its_post_counts_once() {
+    let t0 = Instant::now();
+    let page = url("https://example.com/p9");
+    let mut state = ReaderSavedState::default();
+    let ticket = state.begin_refresh(t0);
+    state.apply_refresh(
+        ticket,
+        [(post(9), Some("https://example.com/p9".to_string()))],
+        1,
+    );
+    assert_eq!(state.status(std::slice::from_ref(&page)), Saved);
+    let _write = tap(&mut state, &page, true);
+    assert_eq!(state.saved_count(), Some(1));
 }
