@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Internal:** Added integration test covering the `MediaService::create_media` cache upsert and collection update path.
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.99.0` to `1.99.1`.
 - **Internal:** Updated code signing configuration to not require a provisioning profile.
 - **Internal:** Sign the PR-build XCFramework before zipping it, so the published PR artifact is signed.
