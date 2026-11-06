@@ -811,7 +811,7 @@ async fn a_feed_item_the_server_cannot_find_counts_as_unsaved_when_it_was_not_sa
 async fn a_failed_unsave_is_undone_and_reported() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[post_json(1)]).await;
-    executor.push(Step::Respond(500, error_response()));
+    executor.push(Step::Respond(400, error_response()));
 
     assert!(service.unsave(identity(1)).await.is_err());
 
@@ -823,7 +823,7 @@ async fn a_failed_unsave_is_undone_and_reported() {
 async fn a_partly_failed_unsave_tries_every_key_and_keeps_the_one_that_failed() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[post_json(1), feed_json(2)]).await;
-    executor.push(Step::Respond(500, error_response()));
+    executor.push(Step::Respond(400, error_response()));
     executor.push(Step::Respond(200, write_response(false, feed_json(2), 1)));
 
     assert!(service.unsave(jetpack_identity(1, 2)).await.is_err());
@@ -1119,7 +1119,7 @@ async fn listing_a_hidden_post_does_not_mark_it_saved() {
 }
 
 #[tokio::test]
-async fn a_post_in_the_list_counts_as_saved_before_the_keys_catch_up() {
+async fn the_saved_list_does_not_change_a_post_s_status() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
     executor.push(Step::Respond(
@@ -1132,8 +1132,9 @@ async fn a_post_in_the_list_counts_as_saved_before_the_keys_catch_up() {
         .await
         .unwrap();
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::Saved);
+    // It doesn't say which key the post is saved under, so the keys decide.
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::NotSaved);
 }
 
 #[tokio::test]
@@ -1381,7 +1382,7 @@ async fn a_failed_batch_stops_the_import_and_undoes_its_keys() {
     let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
     let first_batch: Vec<_> = (101..=150).map(post_json).collect();
     executor.push(Step::Respond(200, bulk_response(&first_batch, 50)));
-    executor.push(Step::Respond(500, error_response()));
+    executor.push(Step::Respond(400, error_response()));
 
     let result = service.import(keys).await;
 
@@ -1519,7 +1520,7 @@ async fn the_observer_hears_when_a_save_starts_and_finishes() {
 async fn the_observer_hears_about_a_rollback() {
     let (service, executor) = service();
     let observer = observed(&service);
-    executor.push(Step::Respond(500, error_response()));
+    executor.push(Step::Respond(400, error_response()));
 
     assert!(service.save(identity(1)).await.is_err());
 
@@ -1594,7 +1595,7 @@ async fn the_observer_can_read_the_state_back() {
     service.set_observer(Some(observer.clone()));
     executor.push(Step::Respond(200, keys_response(&[])));
     executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
-    executor.push(Step::Respond(200, json!({ "posts": [listed_post(2)] })));
+    executor.push(Step::Respond(200, json!({ "posts": [listed_post(1)] })));
 
     service.refresh().await.unwrap();
     service.save(identity(1)).await.unwrap();
@@ -1656,3 +1657,172 @@ async fn a_full_session_stays_consistent() {
 
 #[path = "scenario_tests.rs"]
 mod scenarios;
+
+// An import takes one place in line
+
+/// The unsave is tapped while the import's first batch is in flight, and post 1 is in the second.
+#[tokio::test]
+async fn an_unsave_tapped_during_an_import_waits_for_every_batch() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[post_json(1)]).await;
+    // 101 keys, newest first: post 1 is in the second, newest batch.
+    let keys: Vec<_> = (1..=101).map(bulk_post_key).collect();
+    let (release, held) = oneshot::channel();
+    executor.push(Step::Hold(held, 200, bulk_response(&[post_json(101)], 2)));
+    let newest: Vec<_> = (1..=100).map(post_json).collect();
+    executor.push(Step::Respond(200, bulk_response(&newest, 101)));
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 100)));
+
+    let mut import = Box::pin(service.import(keys));
+    assert!(futures::poll!(import.as_mut()).is_pending());
+    let mut unsave = Box::pin(service.unsave(identity(1)));
+    assert!(futures::poll!(unsave.as_mut()).is_pending());
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+
+    release.send(()).unwrap();
+    let (imported, unsaved) = futures::join!(import, unsave);
+    imported.unwrap();
+    unsaved.unwrap();
+
+    let sent: Vec<_> = executor
+        .sent()
+        .iter()
+        .map(|sent| sent.url.rsplit('/').next().unwrap().to_string())
+        .collect();
+    assert_eq!(sent, ["keys", "bulk", "bulk", "delete"]);
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.saved_count(), Some(100));
+}
+
+/// Cancelled while its first batch is in flight: that batch may have been applied, the second was
+/// never sent, and the tap waiting behind the import goes ahead.
+#[tokio::test]
+async fn a_cancelled_import_keeps_the_batch_sent_and_lets_a_waiting_tap_go() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[]).await;
+    let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
+    let (_release, held) = oneshot::channel::<()>();
+    let first: Vec<_> = (101..=150).map(post_json).collect();
+    executor.push(Step::Hold(held, 200, bulk_response(&first, 50)));
+    executor.push(Step::Respond(200, write_response(true, post_json(500), 51)));
+
+    let mut import = Box::pin(service.import(keys));
+    assert!(futures::poll!(import.as_mut()).is_pending());
+    let mut save = Box::pin(service.save(identity(500)));
+    assert!(futures::poll!(save.as_mut()).is_pending());
+    assert_eq!(service.status(identity(100)), ReaderSavedStatus::NotSaved);
+
+    drop(import);
+    save.await.unwrap();
+
+    assert_eq!(service.status(identity(150)), ReaderSavedStatus::Saved);
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.status(identity(500)), ReaderSavedStatus::Saved);
+    assert_eq!(executor.sent().len(), 3);
+}
+
+/// The first batch's total includes its own 50 saves, and the second batch's 100 are still to
+/// come.
+#[tokio::test]
+async fn the_count_during_an_import_counts_each_save_once() {
+    let (service, executor) = service();
+    let existing: Vec<_> = (1001..=1010).map(post_json).collect();
+    refreshed(&service, &executor, &existing).await;
+    let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
+    let first: Vec<_> = (101..=150).map(post_json).collect();
+    executor.push(Step::Respond(200, bulk_response(&first, 60)));
+    let (release, held) = oneshot::channel();
+    let second: Vec<_> = (1..=100).map(post_json).collect();
+    executor.push(Step::Hold(held, 200, bulk_response(&second, 160)));
+
+    let (result, ()) = futures::join!(service.import(keys), async {
+        tokio::task::yield_now().await;
+        assert_eq!(service.saved_count(), Some(160));
+        release.send(()).unwrap();
+    });
+    result.unwrap();
+    assert_eq!(service.saved_count(), Some(160));
+}
+
+// Which errors may have been applied
+
+fn execution_failed(reason: RequestExecutionErrorReason) -> WpApiError {
+    WpApiError::RequestExecutionFailed {
+        status_code: None,
+        redirects: None,
+        reason,
+        request_url: String::new(),
+        request_method: RequestMethod::POST,
+    }
+}
+
+fn answered(status_code: u32) -> WpApiError {
+    WpApiError::WpError {
+        error_code: WpErrorCode::CustomError("x".to_string()),
+        error_message: String::new(),
+        status_code,
+        response: String::new(),
+        request_url: String::new(),
+        request_method: RequestMethod::POST,
+    }
+}
+
+fn unknown(status_code: u32) -> WpApiError {
+    WpApiError::UnknownError {
+        status_code,
+        response: String::new(),
+        request_url: String::new(),
+        request_method: RequestMethod::POST,
+    }
+}
+
+fn cloudflare(status_code: u32) -> WpApiError {
+    execution_failed(RequestExecutionErrorReason::CloudflareError {
+        status_code,
+        cloudflare_code: None,
+        kind: wp_api::cloudflare::CloudflareErrorKind::OriginTimeout,
+        ray_id: None,
+        retry_after: None,
+    })
+}
+
+#[rstest]
+#[case::timeout(execution_failed(RequestExecutionErrorReason::HttpTimeoutError), true)]
+#[case::lost_mid_request(execution_failed(RequestExecutionErrorReason::HttpError { reason: String::new() }), true)]
+#[case::generic(execution_failed(RequestExecutionErrorReason::GenericError { error_message: String::new() }), true)]
+#[case::cancelled(execution_failed(RequestExecutionErrorReason::CancellationError), true)]
+#[case::unreadable_answer(WpApiError::ResponseParsingError { reason: String::new(), response: String::new(), request_url: String::new(), request_method: RequestMethod::POST }, true)]
+#[case::server_error(answered(500), true)]
+#[case::bad_gateway(unknown(502), true)]
+#[case::gateway_timeout(unknown(504), true)]
+#[case::invalid_status(WpApiError::InvalidHttpStatusCode { status_code: 503, request_url: String::new(), request_method: RequestMethod::POST }, true)]
+#[case::cloudflare_timeout(cloudflare(524), true)]
+#[case::cloudflare_block(cloudflare(403), false)]
+#[case::offline(execution_failed(RequestExecutionErrorReason::DeviceIsOfflineError { error_message: String::new() }), false)]
+#[case::no_such_host(execution_failed(RequestExecutionErrorReason::NonExistentSiteError { error_message: None, suggested_action: None }), false)]
+#[case::refused_connection(execution_failed(RequestExecutionErrorReason::ConnectionError { reason: String::new() }), false)]
+#[case::tls(execution_failed(RequestExecutionErrorReason::InvalidSslError { reason: InvalidSslErrorReason::GenericSslError }), false)]
+#[case::forbidden(execution_failed(RequestExecutionErrorReason::HttpForbiddenError { hostname: String::new() }), false)]
+#[case::rate_limited(
+    execution_failed(RequestExecutionErrorReason::MisconfiguredRateLimitError),
+    false
+)]
+#[case::bad_request(answered(400), false)]
+#[case::not_found(unknown(404), false)]
+fn a_failed_write_stands_only_if_it_may_have_been_applied(
+    #[case] error: WpApiError,
+    #[case] stands: bool,
+) {
+    assert_eq!(may_have_been_applied(&error), stands);
+}
+
+#[tokio::test]
+async fn a_save_answered_with_a_server_error_stands_until_a_read() {
+    let (service, executor) = service();
+    refreshed(&service, &executor, &[]).await;
+    executor.push(Step::Respond(502, json!({})));
+
+    assert!(service.save(identity(1)).await.is_err());
+
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+}

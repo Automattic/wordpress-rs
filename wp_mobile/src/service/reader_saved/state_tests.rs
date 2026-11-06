@@ -36,10 +36,13 @@ fn loaded(at: Instant, keys: &[ReaderSavedKey]) -> ReaderSavedState {
     state
 }
 
-/// Starts a tap with one write.
+/// Starts a tap with one write. A save tap is a recent save.
 fn tap(state: &mut ReaderSavedState, key: &ReaderSavedKey, saved: bool) -> WriteId {
     let tap = state.begin_tap();
-    state.begin_write(tap, key, saved, true)
+    if saved {
+        state.note_save_tap(key);
+    }
+    state.begin_write(tap, key, saved)
 }
 
 fn saved(state: &mut ReaderSavedState, key: &ReaderSavedKey, stored: &ReaderSavedKey, at: Instant) {
@@ -89,20 +92,20 @@ fn a_refused_write_is_undone() {
     assert_eq!(state.saved_count(), Some(1));
 }
 
-/// Cancelled after its request went out: the server may have applied it, so it stands until a read
-/// that includes it.
+/// Given up on after its request went out: the server may still apply it, up to `MAX_READ_LAG`
+/// later, so it stands until a read that includes that.
 #[test]
-fn a_write_cancelled_after_it_was_sent_stands_until_a_read_says() {
+fn a_write_given_up_on_after_it_was_sent_stands_until_a_read_says() {
     let now = Instant::now();
     let mut state = loaded(now, &[]);
     let write = tap(&mut state, &post(1), true);
     state.abandon_write(write, now);
     assert_eq!(state.status(&[post(1)]), Saved);
 
-    refresh(&mut state, now + LAG - S, &[], 0);
+    refresh(&mut state, now + LAG * 2 - S, &[], 0);
     assert_eq!(state.status(&[post(1)]), Saved, "this read may predate it");
 
-    refresh(&mut state, now + LAG, &[], 0);
+    refresh(&mut state, now + LAG * 2, &[], 0);
     assert_eq!(
         state.status(&[post(1)]),
         NotSaved,
@@ -171,9 +174,9 @@ fn a_write_added_to_a_tap_comes_before_later_taps() {
     let now = Instant::now();
     let mut state = loaded(now, &[]);
     let unsave = state.begin_tap();
-    state.begin_write(unsave, &feed(4), false, true);
+    state.begin_write(unsave, &feed(4), false);
     tap(&mut state, &post(3), true);
-    state.begin_write(unsave, &post(3), false, true);
+    state.begin_write(unsave, &post(3), false);
 
     assert_eq!(state.status(&[post(3)]), Saved, "the later tap was save");
 }
@@ -204,8 +207,8 @@ fn a_partly_failed_unsave_leaves_the_post_saved_under_the_key_that_failed() {
     let now = Instant::now();
     let mut state = loaded(now, &[post(1), feed(2)]);
     let unsave = state.begin_tap();
-    let by_post = state.begin_write(unsave, &post(1), false, true);
-    let by_feed = state.begin_write(unsave, &feed(2), false, true);
+    let by_post = state.begin_write(unsave, &post(1), false);
+    let by_feed = state.begin_write(unsave, &feed(2), false);
     state.complete_write(by_feed, &feed(2), None, now);
     state.fail_write(by_post);
 
@@ -309,80 +312,30 @@ fn known_saved_under_counts_only_answered_writes_and_the_keys() {
     assert!(state.known_saved_under(&feed(2)));
 }
 
+/// A newer write decides, so a read that includes it includes the older ones too, even one that
+/// was given up on and so waits longer.
+#[test]
+fn a_read_that_includes_a_write_includes_the_older_writes_to_its_key() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[post(1)]);
+    let unsave = tap(&mut state, &post(1), false);
+    state.abandon_write(unsave, now);
+    saved(&mut state, &post(1), &post(1), now + S);
+
+    refresh(&mut state, now + S + LAG, &[post(1)], 1);
+    assert!(state.writes.is_empty());
+    assert_eq!(state.status(&[post(1)]), Saved);
+}
+
 // The saved list
 
 #[test]
-fn a_listed_post_counts_as_saved_before_the_keys_catch_up() {
+fn the_saved_list_does_not_say_a_post_is_saved() {
     let now = Instant::now();
     let mut state = loaded(now, &[]);
-    assert!(state.note_listed_post(&[post(1)], now + S));
-    assert_eq!(state.status(&[post(1)]), Saved);
-    assert_eq!(state.saved_count(), Some(1));
-}
-
-#[test]
-fn a_listed_jetpack_post_already_saved_under_its_feed_item_counts_once() {
-    let now = Instant::now();
-    let mut state = loaded(now, &[feed(2)]);
-    assert!(!state.note_listed_post(&[post(1), feed(2)], now + S));
-    assert_eq!(state.saved_count(), Some(1));
-}
-
-/// Reads lag, so a refresh that started soon after a list read may predate it.
-#[test]
-fn a_list_read_stands_until_a_refresh_that_started_long_enough_after_it() {
-    let now = Instant::now();
-    let mut state = ReaderSavedState::default();
-    assert!(state.note_listed_post(&[post(1)], now));
-    refresh(&mut state, now + LAG - S, &[], 0);
-    assert_eq!(state.status(&[post(1)]), Saved);
-    assert_eq!(state.saved_count(), Some(1));
-
-    refresh(&mut state, now + LAG, &[], 0);
+    assert!(!state.note_listed_post(&[post(1)]));
     assert_eq!(state.status(&[post(1)]), NotSaved);
-}
-
-/// The list read started first but landed after a refresh that started just after it, which may
-/// predate it.
-#[test]
-fn a_list_read_landing_after_a_refresh_that_started_just_after_it_still_counts() {
-    let now = Instant::now();
-    let mut state = loaded(now + S, &[]);
-    assert!(state.note_listed_post(&[post(1)], now));
-    assert_eq!(state.status(&[post(1)]), Saved);
-}
-
-#[test]
-fn a_list_read_long_before_the_keys_is_ignored() {
-    let now = Instant::now();
-    let mut state = loaded(now + LAG, &[]);
-    assert!(!state.note_listed_post(&[post(1)], now));
-    assert_eq!(state.status(&[post(1)]), NotSaved);
-}
-
-/// The keys' total doesn't include a post only the list has shown, so a write to it counts from
-/// the keys.
-#[test]
-fn a_write_to_a_listed_post_the_keys_do_not_have_yet_counts_once() {
-    let now = Instant::now();
-    let mut state = loaded(now, &[]);
-    state.note_listed_post(&[post(1)], now + S);
-    assert_eq!(state.saved_count(), Some(1));
-
-    let write = tap(&mut state, &post(1), true);
-    state.abandon_write(write, now + S);
-    assert_eq!(state.saved_count(), Some(1));
-}
-
-#[test]
-fn a_slow_list_read_cannot_replace_a_newer_one() {
-    let now = Instant::now();
-    let mut state = ReaderSavedState::default();
-    state.note_listed_post(&[post(1)], now + S * 10);
-    assert!(!state.note_listed_post(&[post(1)], now));
-    // The keys read started between the two list reads, so the newer one stands.
-    refresh(&mut state, now + S, &[], 0);
-    assert_eq!(state.status(&[post(1)]), Saved);
+    assert_eq!(state.saved_count(), Some(0));
 }
 
 #[test]
@@ -392,19 +345,39 @@ fn a_post_unsaved_here_is_hidden_from_a_list_read_that_may_predate_the_unsave() 
     unsaved(&mut state, &post(1), now);
     assert!(!state.should_show_listed_post(&[post(1)], now + S));
     assert!(!state.should_show_listed_post(&[post(1)], now + LAG - S));
+    assert!(state.should_show_listed_post(&[post(1)], now + LAG));
 }
 
-/// A list read that started long after the unsave includes it, so a post it shows was saved again.
 #[test]
-fn a_list_read_long_after_an_unsave_shows_the_post_saved_again() {
+fn a_post_unsaved_here_and_given_up_on_is_hidden_twice_as_long() {
     let now = Instant::now();
     let mut state = loaded(now, &[post(1)]);
-    unsaved(&mut state, &post(1), now);
-
-    assert!(state.should_show_listed_post(&[post(1)], now + LAG));
-    state.note_listed_post(&[post(1)], now + LAG);
-    assert_eq!(state.status(&[post(1)]), Saved);
+    let write = tap(&mut state, &post(1), false);
+    state.abandon_write(write, now);
+    assert!(!state.should_show_listed_post(&[post(1)], now + LAG * 2 - S));
+    assert!(state.should_show_listed_post(&[post(1)], now + LAG * 2));
 }
+
+/// Unsaved by the feed item alone, while the server holds the post under it.
+#[test]
+fn a_jetpack_post_unsaved_by_its_feed_item_is_hidden() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[feed(2)]);
+    unsaved(&mut state, &feed(2), now);
+    assert!(!state.should_show_listed_post(&[post(1), feed(2)], now + S));
+}
+
+/// Unsaved by its post key, but still saved under its feed item.
+#[test]
+fn a_jetpack_post_still_saved_under_another_key_is_shown() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[post(1), feed(2)]);
+    unsaved(&mut state, &post(1), now);
+    assert_eq!(state.status(&[post(1), feed(2)]), Saved);
+    assert!(state.should_show_listed_post(&[post(1), feed(2)], now + S));
+}
+
+// Recent saves
 
 #[test]
 fn a_post_the_list_shows_leaves_recent_saves() {
@@ -413,7 +386,7 @@ fn a_post_the_list_shows_leaves_recent_saves() {
     saved(&mut state, &post(1), &post(1), now);
     saved(&mut state, &post(2), &post(2), now);
 
-    assert!(state.note_listed_post(&[post(1)], now + S));
+    assert!(state.note_listed_post(&[post(1)]));
     assert_eq!(state.recent_saves(), vec![post(2)]);
     assert_eq!(state.status(&[post(1)]), Saved);
 }
@@ -423,7 +396,7 @@ fn an_import_is_not_a_recent_save() {
     let now = Instant::now();
     let mut state = loaded(now, &[]);
     let import = state.begin_tap();
-    let write = state.begin_write(import, &post(1), true, false);
+    let write = state.begin_write(import, &post(1), true);
     state.complete_write(write, &post(1), Some(1), now);
     assert!(state.recent_saves().is_empty());
     assert_eq!(state.status(&[post(1)]), Saved);
@@ -440,36 +413,129 @@ fn recent_saves_are_newest_first_and_leave_out_posts_unsaved_since() {
     assert_eq!(state.recent_saves(), vec![post(3), post(1)]);
 }
 
+/// A refresh that includes the save says nothing about whether the list has shown it.
+#[test]
+fn a_refresh_does_not_take_a_post_out_of_recent_saves() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    saved(&mut state, &post(1), &post(1), now);
+    refresh(&mut state, now + LAG, &[post(1)], 1);
+    assert_eq!(state.recent_saves(), vec![post(1)]);
+}
+
+/// The unsave was refused, so the post is saved again, and still recent.
+#[test]
+fn a_refused_unsave_puts_the_post_back_in_recent_saves() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    saved(&mut state, &post(1), &post(1), now);
+    let unsave = tap(&mut state, &post(1), false);
+    assert!(state.recent_saves().is_empty());
+    state.fail_write(unsave);
+    assert_eq!(state.recent_saves(), vec![post(1)]);
+}
+
+/// Saved by a URL the device doesn't know is post 9 yet, then unsaved from post 9's card.
+#[test]
+fn a_post_saved_by_url_and_unsaved_by_its_ids_leaves_recent_saves() {
+    let now = Instant::now();
+    let page = url("https://example.com/p9");
+    let mut state = loaded(now, &[]);
+    let save = tap(&mut state, &page, true);
+    let unsave = tap(&mut state, &post(9), false);
+    state.complete_write(save, &post(9), Some(1), now);
+    state.complete_write(unsave, &post(9), Some(0), now);
+    assert!(state.recent_saves().is_empty());
+}
+
+/// Saved by a URL before the device knew it's post 9, then by its IDs: one post, one recent save.
+#[test]
+fn a_post_saved_twice_under_keys_found_to_be_one_is_one_recent_save() {
+    let now = Instant::now();
+    let page = url("https://example.com/p9");
+    let mut state = loaded(now, &[]);
+    let by_url = tap(&mut state, &page, true);
+    let by_ids = tap(&mut state, &post(9), true);
+    state.complete_write(by_url, &post(9), Some(1), now);
+    state.complete_write(by_ids, &post(9), Some(1), now);
+    assert_eq!(state.recent_saves(), vec![post(9)]);
+}
+
 // Past the 1,000 keys
 
-#[test]
-fn past_the_key_limit_an_unseen_post_is_unknown_and_a_listed_one_saved() {
-    let now = Instant::now();
+fn past_the_keys(at: Instant) -> ReaderSavedState {
     let keys: Vec<_> = (1..=1000).map(post).collect();
     let mut state = ReaderSavedState::default();
-    refresh(&mut state, now, &keys, 1200);
-
-    assert_eq!(state.status(&[post(5000)]), Unknown);
-    state.note_listed_post(&[post(5000)], now + S);
-    assert_eq!(state.status(&[post(5000)]), Saved);
-    // It may be one of the 200 already counted.
-    assert_eq!(state.saved_count(), Some(1200));
-
-    // A refresh can't see past the keys, so the list still says.
-    refresh(&mut state, now + S * 2, &keys, 1200);
-    assert_eq!(state.status(&[post(5000)]), Saved);
+    refresh(&mut state, at, &keys, 1002);
+    state
 }
 
 #[test]
-fn past_the_key_limit_unsaving_a_listed_post_counts() {
+fn past_the_key_limit_a_post_the_keys_do_not_have_is_unknown() {
     let now = Instant::now();
-    let keys: Vec<_> = (1..=1000).map(post).collect();
-    let mut state = ReaderSavedState::default();
-    refresh(&mut state, now, &keys, 1200);
-    state.note_listed_post(&[post(5000)], now + S);
+    let state = past_the_keys(now);
+    assert_eq!(state.status(&[post(5000)]), Unknown);
+    assert_eq!(state.status(&[post(1)]), Saved);
+}
 
-    unsaved(&mut state, &post(5000), now + S * 2);
-    assert_eq!(state.saved_count(), Some(1199));
+/// The refresh can't see post 5000, so it can't say the answered write is out of date.
+#[test]
+fn past_the_key_limit_an_answered_write_to_a_post_the_keys_do_not_have_stands() {
+    let now = Instant::now();
+    let mut state = past_the_keys(now);
+    unsaved(&mut state, &post(5000), now);
+    saved(&mut state, &post(6000), &post(6000), now);
+    for later in [now + LAG, now + LAG * 10] {
+        refresh(
+            &mut state,
+            later,
+            &(1..=1000).map(post).collect::<Vec<_>>(),
+            1002,
+        );
+        assert_eq!(state.status(&[post(5000)]), NotSaved);
+        assert_eq!(state.status(&[post(6000)]), Saved);
+        assert_eq!(state.saved_count(), Some(1002));
+    }
+}
+
+/// Given up on, so it may never have reached the server: past the key limit that's unknown.
+#[test]
+fn past_the_key_limit_a_write_given_up_on_reads_unknown_once_a_read_includes_it() {
+    let now = Instant::now();
+    let mut state = past_the_keys(now);
+    let write = tap(&mut state, &post(5000), false);
+    state.abandon_write(write, now);
+    refresh(
+        &mut state,
+        now + LAG * 2,
+        &(1..=1000).map(post).collect::<Vec<_>>(),
+        1002,
+    );
+    assert_eq!(state.status(&[post(5000)]), Unknown);
+}
+
+#[test]
+fn back_within_the_key_limit_a_post_the_keys_do_not_have_is_not_saved() {
+    let now = Instant::now();
+    let mut state = past_the_keys(now);
+    unsaved(&mut state, &post(5000), now);
+    let keys: Vec<_> = (1..=1000).map(post).collect();
+    refresh(&mut state, now + LAG, &keys, 1000);
+    assert!(state.writes.is_empty());
+    assert_eq!(state.status(&[post(5000)]), NotSaved);
+    assert_eq!(state.status(&[post(6000)]), NotSaved);
+}
+
+/// The keys' total may or may not count post 5000, so a write to it can't change the count until
+/// its answer gives one.
+#[test]
+fn past_the_key_limit_a_write_to_a_post_the_keys_do_not_have_counts_once_answered() {
+    let now = Instant::now();
+    let mut state = past_the_keys(now);
+    let write = tap(&mut state, &post(5000), false);
+    assert_eq!(state.saved_count(), Some(1002));
+    state.complete_write(write, &post(5000), Some(1001), now);
+    assert_eq!(state.saved_count(), Some(1001));
 }
 
 // Counting
@@ -495,8 +561,8 @@ fn unsaving_both_saves_of_a_post_under_aliased_keys_counts_both() {
     assert_eq!(state.saved_count(), Some(2));
 
     let unsave = state.begin_tap();
-    let by_post = state.begin_write(unsave, &post(3), false, true);
-    let by_feed = state.begin_write(unsave, &feed(4), false, true);
+    let by_post = state.begin_write(unsave, &post(3), false);
+    let by_feed = state.begin_write(unsave, &feed(4), false);
     state.complete_write(by_post, &post(3), None, now);
     state.complete_write(by_feed, &feed(4), None, now);
     assert_eq!(state.saved_count(), Some(0));
@@ -506,23 +572,45 @@ fn unsaving_both_saves_of_a_post_under_aliased_keys_counts_both() {
 #[test]
 fn a_write_answer_reports_the_count() {
     let now = Instant::now();
-    let keys: Vec<_> = (1..=1000).map(post).collect();
-    let mut state = ReaderSavedState::default();
-    refresh(&mut state, now, &keys, 1200);
+    let mut state = loaded(now, &[post(1), post(2)]);
 
-    // Post 5000 was already one of the 1,200.
-    let write = tap(&mut state, &post(5000), true);
-    assert_eq!(state.saved_count(), Some(1201), "not answered yet");
-    state.complete_write(write, &post(5000), Some(1200), now);
-    assert_eq!(state.saved_count(), Some(1200));
+    // Post 3 was saved elsewhere since the keys were read.
+    let write = tap(&mut state, &post(4), true);
+    assert_eq!(state.saved_count(), Some(3), "not answered yet");
+    state.complete_write(write, &post(4), Some(4), now);
+    assert_eq!(state.saved_count(), Some(4));
 
     // A write still in flight counts on top of the answered total.
-    tap(&mut state, &post(6000), true);
-    assert_eq!(state.saved_count(), Some(1201));
+    tap(&mut state, &post(5), true);
+    assert_eq!(state.saved_count(), Some(5));
 
     // A stale refresh doesn't replace the answered total.
-    refresh(&mut state, now + S, &keys, 1199);
-    assert_eq!(state.saved_count(), Some(1201));
+    refresh(&mut state, now + S, &[post(1), post(2)], 2);
+    assert_eq!(state.saved_count(), Some(5));
+}
+
+/// The answered total already includes a write given up on before it, if the server applied it.
+#[test]
+fn a_write_given_up_on_before_an_answered_one_is_not_counted_twice() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    let first = tap(&mut state, &post(1), true);
+    state.abandon_write(first, now);
+    let second = tap(&mut state, &post(2), true);
+    state.complete_write(second, &post(2), Some(2), now + S);
+    assert_eq!(state.saved_count(), Some(2));
+}
+
+/// A write answered without a total, after the one whose total is the count.
+#[test]
+fn a_write_answered_without_a_total_counts_on_top_of_the_last_total() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[post(1)]);
+    saved(&mut state, &post(2), &post(2), now);
+    let with_total = tap(&mut state, &post(3), true);
+    state.complete_write(with_total, &post(3), Some(3), now);
+    unsaved(&mut state, &post(1), now);
+    assert_eq!(state.saved_count(), Some(2));
 }
 
 #[test]
