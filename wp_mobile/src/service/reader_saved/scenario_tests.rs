@@ -1778,3 +1778,124 @@ fn unsaving_a_listed_jetpack_post_cancelled_mid_way_takes_one_off_the_count() {
     world.advance(SEC * 60);
     assert_eq!(world.service.saved_count(), Some(1));
 }
+
+// Refreshes after writes given up on
+
+/// Save P1 is answered. Save P2 times out, but the server applied it. The user pulls to refresh
+/// 5s later, and the refresh reads what the server holds.
+#[test]
+fn the_count_after_a_refresh_that_has_a_timed_out_save() {
+    let mut world = World::new();
+    world.refresh();
+    world.save(identity(1));
+    world.answer_writes();
+    world.save(identity(2));
+    let sent = world.time_out_next_write();
+    let _ = world.apply(&sent);
+    assert_eq!(world.server.total(), 2);
+    assert_eq!(world.service.saved_count(), Some(2), "before the refresh");
+
+    world.advance(SEC * 5);
+    world.refresh();
+    assert_eq!(world.service.saved_count(), Some(2), "the server holds 2");
+}
+
+/// The existing mid-way cancellation test, with F4 saved as well and a refresh after.
+#[test]
+fn the_count_after_a_jetpack_unsave_cancelled_mid_way_and_a_refresh() {
+    let mut world = World::new();
+    world.server.saved.insert("P1".to_string());
+    world.server.saved.insert("P3".to_string());
+    world.server.saved.insert("F4".to_string());
+    world.refresh();
+    world.advance(SEC * 10);
+
+    let call = world.unsave(jetpack());
+    world.answer_next_write(false);
+    let _ = world.apply("delete F4");
+    world.cancel(call);
+    assert_eq!(world.server.total(), 1);
+    assert_eq!(world.service.saved_count(), Some(1), "before the refresh");
+
+    world.advance(SEC * 5);
+    world.refresh();
+    assert_eq!(world.service.saved_count(), Some(1), "the server holds 1");
+}
+
+/// A Jetpack post saved under F4 (older) and P3. Unsave: delete P3 times out and the server
+/// applies it 30s later; delete F4 is answered. A read that started LAG after F4's answer
+/// includes F4's delete but not P3's late one.
+#[test]
+fn a_jetpack_unsave_partly_timed_out_stays_unsaved_after_a_refresh() {
+    let mut world = World::new();
+    world.server.saved.insert("F4".to_string());
+    world.save(jetpack_external());
+    world.answer_writes();
+    assert_eq!(
+        world.server.saved,
+        ["F4".to_string(), "P3".to_string()].into()
+    );
+    world.refresh();
+    world.advance(MAX_READ_LAG + SEC);
+    world.refresh();
+
+    let before = world.sent_count();
+    world.unsave(jetpack());
+    let late = world.time_out_next_write();
+    assert_eq!(late, "delete P3");
+    world.answer_next_write(false);
+    assert_eq!(world.sent_since(before), ["delete P3", "delete F4"]);
+    let stale = world.server.clone();
+    world.advance(SEC * 30);
+    let _ = world.apply(&late);
+    assert!(world.server.saved.is_empty());
+    assert_eq!(world.status(jetpack()), NotSaved);
+
+    world.advance(MAX_READ_LAG - SEC * 30);
+    world.refresh_from(Some(stale));
+    assert!(world.server.saved.is_empty());
+    assert_eq!(
+        world.status(jetpack()),
+        NotSaved,
+        "the user unsaved it and the server holds nothing"
+    );
+}
+
+/// A list read that starts just inside the window, lags behind the unsave, and lands after a
+/// refresh that started at the window and pruned the unsave.
+#[test]
+fn a_list_read_older_than_a_refresh_that_says_a_post_is_unsaved_hides_it() {
+    let mut world = World::new();
+    world.server.saved.insert("P1".to_string());
+    world.refresh();
+    let before = world.server.clone();
+    world.unsave(identity(1));
+    world.answer_writes();
+
+    world.advance(MAX_READ_LAG - SEC);
+    let shown: Arc<Mutex<Vec<String>>> = Arc::default();
+    let sink = shown.clone();
+    world.call(move |service| async move {
+        let page = service
+            .list_posts(ReaderSavedPostsParams::default())
+            .await?;
+        *sink.lock().unwrap() = page
+            .posts
+            .iter()
+            .map(|post| names(&reader_saved_keys_for_post(post.identity.clone())).join("+"))
+            .collect();
+        Ok::<(), ReaderSavedError>(())
+    });
+    world.advance(SEC);
+    world.refresh();
+    let held = world.take_held(|held| held.what == "list").unwrap();
+    let _ = held.reply.send(respond(200, before.list_response()));
+    world.pool.run_until_stalled();
+
+    assert_eq!(world.status(identity(1)), NotSaved);
+    assert!(
+        shown.lock().unwrap().is_empty(),
+        "shown: {:?}",
+        shown.lock().unwrap()
+    );
+}
