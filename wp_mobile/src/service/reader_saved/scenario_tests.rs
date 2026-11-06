@@ -2014,3 +2014,66 @@ fn past_the_key_limit_a_refresh_that_has_a_timed_out_unsave_counts_it_once() {
     assert_eq!(world.status(identity(1500)), NotSaved);
     assert_eq!(world.service.saved_count(), Some(1002));
 }
+
+/// Like `a_list_read_older_than_a_refresh_that_says_a_post_is_unsaved_hides_it`, for a Jetpack
+/// post whose unsave partly timed out. Saved under F4 (older) and P3. Unsave: delete P3 times out,
+/// delete F4 is answered. The server applies the late delete of P3 just inside its window
+/// (MAX_READ_LAG after giving up). A list read starts 1s before P3's window ends, so it may lag
+/// behind that delete; a refresh started 1s later includes both deletes and lands first.
+#[test]
+fn a_list_read_that_may_predate_a_late_jetpack_delete_stays_hidden_after_a_refresh() {
+    let mut world = World::new();
+    world.server.saved.insert("F4".to_string());
+    world.save(jetpack_external());
+    world.answer_writes();
+    assert_eq!(
+        world.server.saved,
+        ["F4".to_string(), "P3".to_string()].into()
+    );
+    world.refresh();
+    world.advance(MAX_READ_LAG + SEC);
+    world.refresh();
+
+    let before = world.sent_count();
+    world.unsave(jetpack());
+    let late = world.time_out_next_write();
+    assert_eq!(late, "delete P3");
+    world.answer_next_write(false);
+    assert_eq!(world.sent_since(before), ["delete P3", "delete F4"]);
+    let stale = world.server.clone();
+    assert_eq!(stale.saved, ["P3".to_string()].into());
+
+    let half = Duration::from_millis(500);
+    world.advance(MAX_READ_LAG - half);
+    let _ = world.apply(&late);
+    assert!(world.server.saved.is_empty());
+    world.advance(MAX_READ_LAG - half);
+
+    let shown: Arc<Mutex<Vec<String>>> = Arc::default();
+    let sink = shown.clone();
+    world.call(move |service| async move {
+        let page = service
+            .list_posts(ReaderSavedPostsParams::default())
+            .await?;
+        *sink.lock().unwrap() = page
+            .posts
+            .iter()
+            .map(|post| names(&reader_saved_keys_for_post(post.identity.clone())).join("+"))
+            .collect();
+        Ok::<(), ReaderSavedError>(())
+    });
+    world.advance(SEC);
+    world.refresh();
+    let held = world.take_held(|held| held.what == "list").unwrap();
+    let _ = held.reply.send(respond(200, stale.list_response()));
+    world.pool.run_until_stalled();
+
+    assert_eq!(world.status(jetpack()), NotSaved);
+    assert_eq!(world.service.saved_count(), Some(0));
+    assert!(
+        shown.lock().unwrap().is_empty(),
+        "the user unsaved it, the server holds nothing, and the list read may predate the late \
+         delete of P3; shown: {:?}",
+        shown.lock().unwrap()
+    );
+}
