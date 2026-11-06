@@ -337,9 +337,18 @@ impl ReaderSavedState {
                     && !write.included_in(ticket.started)
             })
         });
+        // A post unsaved by its newest write stays hidden from list reads that may predate any of
+        // the unsaves pruned with it.
         for (key, &newest) in &included {
-            let write = &self.writes[newest];
-            if let (false, Some(from)) = (write.saved, write.included_from()) {
+            if self.writes[newest].saved {
+                continue;
+            }
+            let from = self.writes[..=newest]
+                .iter()
+                .filter(|write| !write.saved && stored_key_in(stored_as, &write.key) == *key)
+                .filter_map(Write::included_from)
+                .max();
+            if let Some(from) = from {
                 let before = self.unsaved_before.entry(key.clone()).or_insert(from);
                 *before = (*before).max(from);
             }
