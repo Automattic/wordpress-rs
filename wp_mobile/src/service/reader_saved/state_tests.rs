@@ -787,3 +787,47 @@ fn a_list_read_older_than_a_refresh_still_shows_a_post_this_device_did_not_unsav
     refresh(&mut state, now + S, &[], 0);
     assert!(state.should_show_listed_post(&[post(1)], now));
 }
+
+/// 1,002 saves, post 5000 past the keys. Its unsave times out and never reaches the server. A list
+/// read that started late enough to include the unsave, had it landed, still has the post.
+#[test]
+fn a_list_read_late_enough_to_include_an_unsave_given_up_on_shows_the_post_if_it_has_it() {
+    let now = Instant::now();
+    let mut state = past_the_keys(now);
+    let unsave = tap(&mut state, &post(5000), false);
+    state.abandon_write(unsave, now);
+    let listed = now + LAG * 2 + S * 10;
+    refresh(
+        &mut state,
+        listed + S,
+        &(1..=1000).map(post).collect::<Vec<_>>(),
+        1002,
+    );
+    assert_eq!(state.status(&[post(5000)]), Unknown);
+    assert!(state.should_show_listed_post(&[post(5000)], listed));
+    assert!(!state.should_show_listed_post(&[post(5000)], now + LAG * 2 - S));
+}
+
+/// Saved under feed item 4 (older) and post 3. Unsaving it: delete P3 times out, and delete F4 is
+/// answered. A list read a window after F4's answer includes that, but may predate a late delete of
+/// P3, so the post stays hidden, with or without a refresh alongside.
+#[test]
+fn a_jetpack_post_stays_hidden_while_any_of_its_unsaves_may_be_missing_from_the_list() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[feed(4)]);
+    let save = tap(&mut state, &feed(4), true);
+    state.complete_write(save, &post(3), Some(2), now);
+    refresh(&mut state, now + LAG, &[post(3), feed(4)], 2);
+    let given_up = now + LAG + S;
+    let unsave = state.begin_tap();
+    let by_post = state.begin_write(unsave, &post(3), false);
+    let by_feed = state.begin_write(unsave, &feed(4), false);
+    state.abandon_write(by_post, given_up);
+    state.complete_write(by_feed, &feed(4), Some(1), given_up);
+
+    let listed = given_up + LAG + S * 5;
+    assert!(!state.should_show_listed_post(&[post(3), feed(4)], listed));
+    refresh(&mut state, listed + S, &[post(3)], 1);
+    assert!(!state.should_show_listed_post(&[post(3), feed(4)], listed));
+    assert!(state.should_show_listed_post(&[post(3), feed(4)], given_up + LAG * 2));
+}
