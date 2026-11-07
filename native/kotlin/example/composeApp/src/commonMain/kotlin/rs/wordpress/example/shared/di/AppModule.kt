@@ -9,6 +9,7 @@ import rs.wordpress.api.kotlin.WpRequestExecutor
 import rs.wordpress.cache.kotlin.WordPressApiCache
 import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
 import rs.wordpress.api.kotlin.WpComApiClient
+import rs.wordpress.api.kotlin.WpRequestResult
 import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAuthentication
@@ -136,10 +137,20 @@ fun createWpComApiClient(
     )
 }
 
-fun createReaderSavedService(
+/**
+ * The account's saved posts service, kept in [cache] under the account's WordPress.com user ID,
+ * which it asks `/me` for. Create one per account and share it.
+ */
+suspend fun createReaderSavedService(
     account: Account.WpCom,
+    cache: WordPressApiCache,
+    wpComApiClient: WpComApiClient,
     networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
 ): ReaderSavedService {
+    val userId = when (val result = wpComApiClient.request { it.me().get() }) {
+        is WpRequestResult.Success -> result.response.data.id
+        else -> error("Couldn't load the account's user ID: $result")
+    }
     return ReaderSavedService(
         delegate = WpApiClientDelegate(
             WpAuthenticationProvider.staticWithAuth(
@@ -149,7 +160,9 @@ fun createReaderSavedService(
             middlewarePipeline = WpApiMiddlewarePipeline(listOf(DebugMiddleware())),
             appNotifier = EmptyAppNotifier()
         ),
-        source = ReaderSavedSource.ANDROID
+        source = ReaderSavedSource.ANDROID,
+        cache = cache.cache,
+        userId = userId
     )
 }
 
