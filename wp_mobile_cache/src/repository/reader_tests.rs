@@ -207,7 +207,19 @@ fn test_stream_cursor_and_state() {
     assert_eq!(stream.has_more, Some(true));
     assert!(stream.last_refreshed_at.is_some());
     assert_eq!(stream.state, ListState::Idle);
-    assert_eq!(stream.version, version);
+    assert_eq!(
+        stream.version,
+        version + 1,
+        "Storing the first page makes a load-more that started during the refresh stale"
+    );
+
+    // A later page leaves the version alone.
+    ReaderStreamRepository::set_cursor(&conn, stream.row_id, None, false).unwrap();
+    let stream = ReaderStreamRepository::select(&conn, account, "saved")
+        .unwrap()
+        .unwrap();
+    assert_eq!(stream.version, version + 1);
+    assert_eq!(stream.has_more, Some(false));
 }
 
 #[test]

@@ -268,8 +268,25 @@ impl ReaderStreamRepository {
         Ok(())
     }
 
+    /// Sets the stream's state, unless a refresh started since `version`. Returns whether it did.
+    pub fn set_state_if_version(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        version: i64,
+        state: ListState,
+        error_message: Option<&str>,
+    ) -> Result<bool, SqliteDbError> {
+        let updated = executor.execute(
+            "UPDATE reader_streams SET state = ?3, error_message = ?4
+            WHERE rowid = ?1 AND version = ?2",
+            params![stream, version, state, error_message],
+        )?;
+        Ok(updated > 0)
+    }
+
     /// Records where the stream is up to after a page loaded, and that it's idle. `refreshed` is
-    /// whether the page was the first.
+    /// whether the page was the first, which bumps the version again: a load-more that started
+    /// during the refresh read the old cursor, so its page is discarded.
     pub fn set_cursor(
         executor: &impl QueryExecutor,
         stream: RowId,
@@ -282,6 +299,7 @@ impl ReaderStreamRepository {
                 has_more = ?3,
                 last_refreshed_at = CASE WHEN ?4
                     THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now') ELSE last_refreshed_at END,
+                version = version + CASE WHEN ?4 THEN 1 ELSE 0 END,
                 state = ?5,
                 error_message = NULL
             WHERE rowid = ?1",

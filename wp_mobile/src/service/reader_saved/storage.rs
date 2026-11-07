@@ -139,6 +139,8 @@ impl ReaderSavedService {
         &self,
         saves: Vec<ReaderLocalSave>,
     ) -> Result<ReaderSavedImportReport, ReaderSavedError> {
+        // One import at a time, so a second waits and then sees the first finished.
+        let _importing = self.importing.lock().await;
         let imported_before = self
             .cache
             .execute(|connection| ReaderSavedRepository::select_state(connection, self.account))?;
@@ -304,10 +306,23 @@ impl ReaderSavedService {
         Ok(())
     }
 
-    /// Records a failed page as the list's error, and returns the error.
-    fn page_failed(&self, error: ReaderSavedError) -> ReaderSavedError {
+    /// Records a failed page as the list's error, unless a refresh started since `version`, and
+    /// returns the error.
+    fn page_failed(&self, error: ReaderSavedError, version: i64) -> ReaderSavedError {
+        let message = error.to_string();
+        let recorded = self.cache.execute(|connection| {
+            let stream =
+                ReaderStreamRepository::get_or_create(&*connection, self.account, SAVED_STREAM)?;
+            ReaderStreamRepository::set_state_if_version(
+                &*connection,
+                stream.row_id,
+                version,
+                ListState::Error,
+                Some(&message),
+            )
+        });
         // The page's error is the one to return, so a failure to record it is only logged.
-        if let Err(record_error) = self.saved_stream_state(ListState::Error, Some(&error)) {
+        if let Err(record_error) = recorded {
             log::error!("Couldn't record the saved list's error: {record_error}");
         }
         error
@@ -332,7 +347,10 @@ impl ReaderSavedService {
         let unsaved: Vec<_> = items
             .into_iter()
             .filter(|(_, item)| {
+                // An unsave still in flight can fail and leave the post saved, so it stays.
+                let keys = reader_saved_keys_for_post(item.post.identity.clone());
                 self.status(item.post.identity.clone()) == ReaderSavedStatus::NotSaved
+                    && !self.state().has_pending_write(&keys)
             })
             .collect();
         if unsaved.is_empty() {
@@ -365,7 +383,7 @@ impl ReaderSavedService {
             Ok(page_result(&response))
         }
         .await;
-        result.map_err(|error| self.page_failed(error))
+        result.map_err(|error| self.page_failed(error, version))
     }
 
     async fn load_next_saved_page(&self) -> Result<ReaderSavedPageResult, ReaderSavedError> {
@@ -374,6 +392,11 @@ impl ReaderSavedService {
         })?;
         if stream.last_refreshed_at.is_none() {
             return self.refresh_saved_list().await;
+        }
+        if stream.state == ListState::FetchingFirstPage {
+            // The refresh replaces the first page and the cursor, so a page after the old one
+            // would be stale.
+            return Err(ReaderSavedError::StaleLoadMore);
         }
         let Some(page_handle) = stream.next_page_handle else {
             return Ok(ReaderSavedPageResult {
@@ -402,7 +425,7 @@ impl ReaderSavedService {
         result.map_err(|error| match error {
             // The refresh that made the page stale owns the list's state.
             ReaderSavedError::StaleLoadMore => error,
-            error => self.page_failed(error),
+            error => self.page_failed(error, stream.version),
         })
     }
 
@@ -509,15 +532,21 @@ fn page_result(response: &ReaderSavedPostsResponse) -> ReaderSavedPageResult {
     }
 }
 
-/// Whether the server refused a save, rather than the request failing on the way.
+/// Whether the server refused a save, rather than the request failing on the way. A refusal keeps
+/// the save on this device for good, so an answer that may pass, such as a rate limit or an expired
+/// token, isn't one.
 fn is_refused(error: &WpApiError) -> bool {
+    /// Unauthorized, forbidden, request timeout, too many requests.
+    const TEMPORARY: [u32; 4] = [401, 403, 408, 429];
     let status_code = match error {
         WpApiError::WpError { status_code, .. }
         | WpApiError::InvalidHttpStatusCode { status_code, .. }
         | WpApiError::UnknownError { status_code, .. } => *status_code,
         _ => return false,
     };
-    (400..500).contains(&status_code) && !may_have_been_applied(error)
+    (400..500).contains(&status_code)
+        && !TEMPORARY.contains(&status_code)
+        && !may_have_been_applied(error)
 }
 
 /// The account's saved posts, as the cache has them.

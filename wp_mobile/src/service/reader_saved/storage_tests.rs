@@ -849,6 +849,151 @@ async fn unsaving_a_local_only_save_removes_it() {
     assert!(service.saved_posts().load_items().await.unwrap().is_empty());
 }
 
+// Found in review
+
+#[tokio::test]
+async fn a_load_more_during_a_refresh_is_stale_and_keeps_the_new_cursor() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(
+        200,
+        page(&[listed(1, "2026-11-01T00:00:00Z")], Some("old")),
+    ));
+    collection.refresh().await.unwrap();
+
+    let (release, held) = oneshot::channel();
+    executor.push(Step::Hold(held, 200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(
+        200,
+        page(&[listed(1, "2026-11-01T00:00:00Z")], Some("new")),
+    ));
+    let (refreshed, next) = futures::join!(collection.refresh(), async {
+        let next = collection.load_next_page().await;
+        release.send(()).unwrap();
+        next
+    });
+
+    refreshed.unwrap();
+    assert!(matches!(next, Err(ReaderSavedError::StaleLoadMore)));
+    assert!(
+        !executor
+            .sent()
+            .iter()
+            .any(|sent| sent.url.contains("page_handle=old")),
+        "The load-more didn't fetch the old cursor"
+    );
+    let info = collection.list_info().unwrap();
+    assert_eq!(info.has_more, Some(true));
+    assert_eq!(info.state, ListState::Idle);
+}
+
+#[tokio::test]
+async fn a_url_save_that_is_rate_limited_during_import_is_tried_again() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    refreshed(&service, &executor, &[]).await;
+    executor.push(Step::Respond(
+        429,
+        json!({ "code": "rate_limit_exceeded", "message": "Slow down.", "data": { "status": 429 } }),
+    ));
+
+    let save = || local_save(url_identity("https://example.com/a"), "A");
+    assert!(service.import_local_saves(vec![save()]).await.is_err());
+    assert!(service.local_only_keys().is_empty());
+
+    executor.push(Step::Respond(
+        200,
+        write_response(true, json!({ "url": "https://example.com/a" }), 1),
+    ));
+    let report = service.import_local_saves(vec![save()]).await.unwrap();
+    assert!(!report.already_imported);
+    assert_eq!(report.imported, 1);
+}
+
+#[tokio::test]
+async fn two_imports_at_once_send_the_saves_once() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    refreshed(&service, &executor, &[]).await;
+    // The first import waits on the server while the second starts.
+    let (release, held) = oneshot::channel();
+    executor.push(Step::Hold(
+        held,
+        200,
+        json!({ "results": [{ "key": post_json(1), "saved": true }], "total": 1 }),
+    ));
+
+    let (first, second, ()) = futures::join!(
+        service.import_local_saves(vec![local_save(identity(1), "One")]),
+        service.import_local_saves(vec![local_save(identity(1), "One")]),
+        async { release.send(()).unwrap() },
+    );
+
+    let mut already = [first.unwrap(), second.unwrap()].map(|report| report.already_imported);
+    already.sort();
+    assert_eq!(already, [false, true]);
+    assert_eq!(executor.sent().len(), 2, "The keys, then one import");
+}
+
+#[tokio::test]
+async fn a_url_no_longer_stored_as_its_post_stays_that_way_after_a_relaunch() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let url = "https://example.com/p";
+    let mut with_url = post_json(1);
+    with_url["url"] = json!(url);
+    refreshed(&service, &executor, &[with_url]).await;
+
+    // The post was deleted, so saving its URL now stores the URL itself.
+    executor.push(Step::Respond(
+        200,
+        write_response(true, json!({ "url": url }), 2),
+    ));
+    service.save_url(url.to_string(), None).await.unwrap();
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 1)));
+    service.unsave(identity(1)).await.unwrap();
+    assert_eq!(service.status(url_identity(url)), ReaderSavedStatus::Saved);
+    drop(service);
+
+    let (service, _) = device.relaunch();
+
+    assert_eq!(service.status(url_identity(url)), ReaderSavedStatus::Saved);
+}
+
+#[tokio::test]
+async fn a_refresh_keeps_a_post_whose_unsave_is_still_in_flight() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(
+        200,
+        page(&[listed(1, "2026-11-01T00:00:00Z")], None),
+    ));
+    collection.refresh().await.unwrap();
+
+    let (release, held) = oneshot::channel();
+    executor.push(Step::Hold(held, 400, error_response()));
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(200, page(&[], None)));
+    let (unsaved, ()) = futures::join!(service.unsave(identity(1)), async {
+        collection.refresh().await.unwrap();
+        release.send(()).unwrap();
+    });
+
+    assert!(unsaved.is_err(), "The server refused the unsave");
+    let keys: Vec<_> = collection
+        .load_items()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|item| item.key)
+        .collect();
+    assert_eq!(keys, vec![post_key(1)]);
+}
+
 // How long the cache takes
 
 /// Times the cache work at the 1,000-key cap, on a database file. Not run by default: run it in a

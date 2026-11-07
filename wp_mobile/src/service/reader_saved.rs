@@ -113,6 +113,8 @@ pub struct ReaderSavedService {
     /// Held while the state is stored, so the newest state is the one left in the cache. Holds the
     /// generation of the server's keys last stored, so an older refresh can't replace a newer one.
     stored_keys: Mutex<u64>,
+    /// Held while local saves are imported.
+    importing: futures::lock::Mutex<()>,
 }
 
 type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
@@ -367,6 +369,7 @@ impl ReaderSavedService {
             cache,
             account,
             stored_keys: Mutex::new(stored_keys),
+            importing: futures::lock::Mutex::new(()),
         })
     }
 
