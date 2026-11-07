@@ -3,9 +3,9 @@ use crate::{
     wp_com::{
         WpComNamespace,
         reader_saved::{
-            ReaderSavePostParams, ReaderSavedBulkParams, ReaderSavedBulkResponse,
-            ReaderSavedKeysResponse, ReaderSavedPostResponse, ReaderSavedPostsParams,
-            ReaderSavedPostsResponse, ReaderUnsavePostParams,
+            ReaderSavePostParams, ReaderSavePostResponse, ReaderSavedBulkParams,
+            ReaderSavedBulkResponse, ReaderSavedKeysResponse, ReaderSavedPostsParams,
+            ReaderSavedPostsResponse, ReaderUnsavePostParams, ReaderUnsavePostResponse,
         },
     },
 };
@@ -17,9 +17,9 @@ enum ReaderSavedRequest {
     ListPosts,
     #[get(url = "/read/saved/keys", output = ReaderSavedKeysResponse)]
     ListKeys,
-    #[post(url = "/read/saved/new", params = &ReaderSavePostParams, output = ReaderSavedPostResponse)]
+    #[post(url = "/read/saved/new", params = &ReaderSavePostParams, output = ReaderSavePostResponse)]
     Save,
-    #[post(url = "/read/saved/delete", params = &ReaderUnsavePostParams, output = ReaderSavedPostResponse)]
+    #[post(url = "/read/saved/delete", params = &ReaderUnsavePostParams, output = ReaderUnsavePostResponse)]
     Unsave,
     #[post(url = "/read/saved/bulk", params = &ReaderSavedBulkParams, output = ReaderSavedBulkResponse)]
     BulkSave,
