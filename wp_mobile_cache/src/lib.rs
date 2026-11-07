@@ -6,9 +6,12 @@ use std::sync::{Arc, Mutex};
 
 use crate::repository::entity_state::EntityStateRepository;
 use crate::repository::list_metadata::ListMetadataRepository;
+use crate::repository::reader::ReaderStreamRepository;
 use crate::repository::sites::SiteRepository;
+use crate::repository::wordpress_com_accounts::WordPressComAccountRepository;
 use wp_api::parsed_url::ParsedUrl;
 use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::me::WpComUserId;
 
 pub mod context;
 pub mod db_types;
@@ -110,6 +113,18 @@ pub enum DbTable {
     EntityState,
     /// WordPress.com sites
     WordPressComSites,
+    /// WordPress.com accounts, which own account-level data such as the Reader
+    WordPressComAccounts,
+    /// Reader posts, one per post per account
+    ReaderPosts,
+    /// Reader streams (pagination and sync state)
+    ReaderStreams,
+    /// Posts in Reader streams, with their order
+    ReaderStreamItems,
+    /// What the saved posts service knows, kept across launches
+    ReaderSavedState,
+    /// Saves the server refused on import, kept on this device
+    ReaderSavedLocalOnly,
 }
 
 impl DbTable {
@@ -132,6 +147,12 @@ impl DbTable {
             DbTable::ListMetadataState => "list_metadata_state",
             DbTable::EntityState => "entity_state",
             DbTable::WordPressComSites => "wordpress_com_sites",
+            DbTable::WordPressComAccounts => "wordpress_com_accounts",
+            DbTable::ReaderPosts => "reader_posts",
+            DbTable::ReaderStreams => "reader_streams",
+            DbTable::ReaderStreamItems => "reader_stream_items",
+            DbTable::ReaderSavedState => "reader_saved_state",
+            DbTable::ReaderSavedLocalOnly => "reader_saved_local_only",
         }
     }
 }
@@ -167,6 +188,12 @@ impl TryFrom<&str> for DbTable {
             "list_metadata_state" => Ok(DbTable::ListMetadataState),
             "entity_state" => Ok(DbTable::EntityState),
             "wordpress_com_sites" => Ok(DbTable::WordPressComSites),
+            "wordpress_com_accounts" => Ok(DbTable::WordPressComAccounts),
+            "reader_posts" => Ok(DbTable::ReaderPosts),
+            "reader_streams" => Ok(DbTable::ReaderStreams),
+            "reader_stream_items" => Ok(DbTable::ReaderStreamItems),
+            "reader_saved_state" => Ok(DbTable::ReaderSavedState),
+            "reader_saved_local_only" => Ok(DbTable::ReaderSavedLocalOnly),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -318,6 +345,9 @@ impl WpApiCache {
             if let Err(e) = ListMetadataRepository::reset_stale_fetching_states(connection) {
                 log::warn!("Failed to reset stale fetching states: {}", e);
             }
+            if let Err(e) = ReaderStreamRepository::reset_stale_fetching_states(connection) {
+                log::warn!("Failed to reset stale Reader stream states: {}", e);
+            }
 
             // Clear abandoned fetch operations after migrations complete.
             // Deletes Fetching states to prevent stuck loading indicators while
@@ -391,6 +421,17 @@ impl WpApiCache {
             SiteRepository.delete_wordpress_com_site_by_site_id(connection, site_id)
         })
     }
+
+    /// Remove a WordPress.com account and everything cached for it, such as its Reader posts and
+    /// saved posts. Call it when the user signs out.
+    ///
+    /// Returns `true` if the account was found and removed, `false` if nothing was cached for it.
+    pub fn remove_wordpress_com_account(
+        &self,
+        user_id: WpComUserId,
+    ) -> Result<bool, SqliteDbError> {
+        self.execute(|connection| WordPressComAccountRepository::delete(connection, user_id))
+    }
 }
 
 impl WpApiCache {
@@ -460,7 +501,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 14] = [
+static MIGRATION_QUERIES: [&str; 18] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -475,6 +516,10 @@ static MIGRATION_QUERIES: [&str; 14] = [
     include_str!("../migrations/0012-invalidate-post-entity-states.sql"),
     include_str!("../migrations/0013-invalidate-post-entity-states-for-meta.sql"),
     include_str!("../migrations/0014-create-media-edit-context-table.sql"),
+    include_str!("../migrations/0015-create-wordpress-com-accounts-table.sql"),
+    include_str!("../migrations/0016-create-reader-posts-table.sql"),
+    include_str!("../migrations/0017-create-reader-streams-tables.sql"),
+    include_str!("../migrations/0018-create-reader-saved-tables.sql"),
 ];
 
 pub struct MigrationManager<'a> {
@@ -803,6 +848,84 @@ mod tests {
         }
 
         assert!(checked > 0, "No tables were checked");
+    }
+
+    /// Account-level data goes with its account when the user signs out, through
+    /// `ON DELETE CASCADE` on `account_id`.
+    #[test]
+    fn test_every_table_referencing_wordpress_com_accounts_cascades_on_delete() {
+        let conn = Connection::open_in_memory().expect("Failed to open in-memory database");
+        MigrationManager::new(&conn)
+            .expect("Failed to create MigrationManager")
+            .perform_migrations()
+            .expect("All migrations should succeed");
+
+        let tables: Vec<String> = conn
+            .prepare(
+                "SELECT name FROM sqlite_master \
+                 WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != '_migrations'",
+            )
+            .expect("Failed to prepare sqlite_master query")
+            .query_map([], |row| row.get::<_, String>(0))
+            .expect("Failed to execute sqlite_master query")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("Failed to collect table names");
+
+        let mut checked = 0;
+        for table in tables {
+            if !get_table_column_names(&conn, &table)
+                .iter()
+                .any(|column| column == "account_id")
+            {
+                continue;
+            }
+            let foreign_keys: Vec<(String, String, String)> = conn
+                .prepare(&format!("PRAGMA foreign_key_list({})", table))
+                .expect("Failed to prepare PRAGMA query")
+                .query_map([], |row| Ok((row.get(2)?, row.get(3)?, row.get(6)?)))
+                .expect("Failed to execute PRAGMA query")
+                .collect::<Result<Vec<_>, _>>()
+                .expect("Failed to collect foreign keys");
+            assert!(
+                foreign_keys.contains(&(
+                    DbTable::WordPressComAccounts.table_name().to_string(),
+                    "account_id".to_string(),
+                    "CASCADE".to_string()
+                )),
+                "{} has an account_id column but no ON DELETE CASCADE foreign key to {}. \
+                 Foreign keys found: {:?}",
+                table,
+                DbTable::WordPressComAccounts,
+                foreign_keys
+            );
+            checked += 1;
+        }
+        assert!(checked > 0, "No tables were checked");
+    }
+
+    #[test]
+    fn test_every_table_is_a_db_table() {
+        let conn = Connection::open_in_memory().expect("Failed to open in-memory database");
+        MigrationManager::new(&conn)
+            .expect("Failed to create MigrationManager")
+            .perform_migrations()
+            .expect("All migrations should succeed");
+        let tables: Vec<String> = conn
+            .prepare(
+                "SELECT name FROM sqlite_master \
+                 WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != '_migrations'",
+            )
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        for table in tables {
+            let db_table = DbTable::try_from(table.as_str()).unwrap_or_else(|_| {
+                panic!("{table} has no DbTable, so observers never hear of it")
+            });
+            assert_eq!(db_table.table_name(), table);
+        }
     }
 
     #[test]
