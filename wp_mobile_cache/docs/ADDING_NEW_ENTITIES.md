@@ -48,10 +48,9 @@ When adding a new entity type (e.g., implementing cache support for comments):
    - `migrations/NNNN-create-comments-edit-context-table.sql`
    - `migrations/NNNN-create-comments-view-context-table.sql`
    - `migrations/NNNN-create-comments-embed-context-table.sql`
-   - Add to `MIGRATION_QUERIES` array in `lib.rs`
-   - Update migration count assertions in platform test files:
-     - `native/swift/Tests/wordpress-api-cache/WordPressApiCacheTests.swift`
-     - `native/kotlin/api/kotlin/src/integrationTest/kotlin/WordPressApiCacheTest.kt`
+   - Add to `MIGRATION_QUERIES` array in `lib.rs`. `test_migration_works` checks the count.
+   - Add a `DbTable` variant for each new table, with its `table_name()` and `TryFrom<&str>` arms. Without one, the update hook logs "Unknown table" and observers never hear of changes. `test_every_table_is_a_db_table` checks this.
+   - The migration runner splits each file on `;`, so don't put one in an SQL comment.
 
 4. **Add module exports** in `src/db_types/mod.rs`:
    ```rust
@@ -59,6 +58,12 @@ When adding a new entity type (e.g., implementing cache support for comments):
    ```
 
 5. **Write tests** in the repository file covering round-trip persistence and enum variants
+
+## Site-scoped and account-scoped entities
+
+Most entities belong to a site: their tables have a `db_site_id` foreign key to `db_sites(id)` with `ON DELETE CASCADE`, so removing the site removes them.
+
+Some data belongs to a WordPress.com account instead, whichever site is selected, such as the Reader. Those tables have an `account_id` foreign key to `wordpress_com_accounts(rowid)` with `ON DELETE CASCADE`, and `WpApiCache::remove_wordpress_com_account` removes them on sign-out. Get an account's row with `WordPressComAccountRepository::get_or_create`. `test_every_table_referencing_wordpress_com_accounts_cascades_on_delete` checks the foreign key. See `repository/reader.rs` for an example.
 
 ## Key Design Decisions
 

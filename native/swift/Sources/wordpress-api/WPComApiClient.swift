@@ -1,5 +1,6 @@
 import Foundation
 import WordPressAPIInternal
+import WordPressApiCache
 
 #if os(Linux)
 import FoundationNetworking
@@ -101,9 +102,17 @@ public final class WPComApiClient: Sendable {
     /// has just changed. Prefer it over `readerSaved` for anything a user sees, because the API's
     /// reads can lag behind its writes.
     ///
+    /// What it knows is kept in `cache` under `userID`, so it survives a relaunch. The cache's
+    /// migrations must have run. Call `WordPressApiCache.removeWordpressComAccount(userId:)` on
+    /// sign-out to delete it.
+    ///
     /// Create one per account and share it: each instance only knows its own writes.
-    public func makeReaderSavedService(source: ReaderSavedSource) -> ReaderSavedService {
-        ReaderSavedService(delegate: delegate, source: source)
+    public func makeReaderSavedService(
+        source: ReaderSavedSource,
+        cache: WordPressApiCache,
+        userID: WpComUserId
+    ) throws -> ReaderSavedService {
+        try ReaderSavedService(delegate: delegate, source: source, cache: cache.cache, userId: userID)
     }
 
     public var supportBots: SupportBotsRequestExecutor {

@@ -10,15 +10,16 @@ use wp_api::posts::PostId;
 use wp_api::prelude::*;
 use wp_api::request::{NetworkRequestAccessor, RequestContext, WpMultipartFormRequest};
 use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderFeedItemId};
 
-const KEYS_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/keys";
-const NEW_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/new";
-const DELETE_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/delete";
-const BULK_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/bulk";
-const LIST_URL: &str = "https://public-api.wordpress.com/rest/v1.2/read/saved";
+pub(super) const KEYS_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/keys";
+pub(super) const NEW_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/new";
+pub(super) const DELETE_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/delete";
+pub(super) const BULK_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/bulk";
+pub(super) const LIST_URL: &str = "https://public-api.wordpress.com/rest/v1.2/read/saved";
 
-enum Step {
+pub(super) enum Step {
     Respond(u32, Value),
     /// Waits for the test to release it, so the test can act while the request is in flight.
     Hold(oneshot::Receiver<()>, u32, Value),
@@ -29,20 +30,20 @@ enum Step {
 }
 
 #[derive(Debug, Clone)]
-struct Sent {
-    method: RequestMethod,
-    url: String,
-    body: Option<Value>,
+pub(super) struct Sent {
+    pub(super) method: RequestMethod,
+    pub(super) url: String,
+    pub(super) body: Option<Value>,
 }
 
 /// Plays back a script of responses, and records every request.
 #[derive(Debug, Default)]
-struct ScriptedExecutor {
+pub(super) struct ScriptedExecutor {
     steps: Mutex<VecDeque<StepBox>>,
     sent: Mutex<Vec<Sent>>,
 }
 
-struct StepBox(Step);
+pub(super) struct StepBox(Step);
 
 impl std::fmt::Debug for StepBox {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -51,11 +52,11 @@ impl std::fmt::Debug for StepBox {
 }
 
 impl ScriptedExecutor {
-    fn push(&self, step: Step) {
+    pub(super) fn push(&self, step: Step) {
         self.steps.lock().unwrap().push_back(StepBox(step));
     }
 
-    fn sent(&self) -> Vec<Sent> {
+    pub(super) fn sent(&self) -> Vec<Sent> {
         self.sent.lock().unwrap().clone()
     }
 }
@@ -125,7 +126,9 @@ impl RequestExecutor for ScriptedExecutor {
     fn cancel(&self, _: Arc<RequestContext>) {}
 }
 
-fn service_with(source: ReaderSavedSource) -> (ReaderSavedService, Arc<ScriptedExecutor>) {
+pub(super) fn service_with(
+    source: ReaderSavedSource,
+) -> (ReaderSavedService, Arc<ScriptedExecutor>) {
     let executor = Arc::new(ScriptedExecutor::default());
     let service = ReaderSavedService::new(
         WpApiClientDelegate {
@@ -136,15 +139,18 @@ fn service_with(source: ReaderSavedSource) -> (ReaderSavedService, Arc<ScriptedE
             language_provider: None,
         },
         source,
-    );
+        storage::migrated_in_memory_cache(),
+        WpComUserId(1),
+    )
+    .unwrap();
     (service, executor)
 }
 
-fn service() -> (ReaderSavedService, Arc<ScriptedExecutor>) {
+pub(super) fn service() -> (ReaderSavedService, Arc<ScriptedExecutor>) {
     service_with(ReaderSavedSource::Android)
 }
 
-fn identity(post_id: u64) -> ReaderPostSaveIdentity {
+pub(super) fn identity(post_id: u64) -> ReaderPostSaveIdentity {
     ReaderPostSaveIdentity {
         id: post_id,
         site_id: Some(WpComSiteId(123)),
@@ -155,7 +161,7 @@ fn identity(post_id: u64) -> ReaderPostSaveIdentity {
     }
 }
 
-fn jetpack_identity(post_id: u64, feed_item_id: u64) -> ReaderPostSaveIdentity {
+pub(super) fn jetpack_identity(post_id: u64, feed_item_id: u64) -> ReaderPostSaveIdentity {
     ReaderPostSaveIdentity {
         feed_id: Some(ReaderFeedId(5)),
         feed_item_id: Some(ReaderFeedItemId(feed_item_id)),
@@ -163,7 +169,7 @@ fn jetpack_identity(post_id: u64, feed_item_id: u64) -> ReaderPostSaveIdentity {
     }
 }
 
-fn rss_identity(feed_item_id: u64) -> ReaderPostSaveIdentity {
+pub(super) fn rss_identity(feed_item_id: u64) -> ReaderPostSaveIdentity {
     ReaderPostSaveIdentity {
         id: feed_item_id,
         site_id: Some(WpComSiteId(5)),
@@ -174,42 +180,42 @@ fn rss_identity(feed_item_id: u64) -> ReaderPostSaveIdentity {
     }
 }
 
-fn unsaveable_identity() -> ReaderPostSaveIdentity {
+pub(super) fn unsaveable_identity() -> ReaderPostSaveIdentity {
     ReaderPostSaveIdentity {
         site_id: None,
         ..identity(1)
     }
 }
 
-fn post_key(post_id: i64) -> ReaderSavedKey {
+pub(super) fn post_key(post_id: i64) -> ReaderSavedKey {
     ReaderSavedKey::Post {
         blog_id: WpComSiteId(123),
         post_id: PostId(post_id),
     }
 }
 
-fn feed_key(feed_item_id: u64) -> ReaderSavedKey {
+pub(super) fn feed_key(feed_item_id: u64) -> ReaderSavedKey {
     ReaderSavedKey::FeedItem {
         feed_item_id: ReaderFeedItemId(feed_item_id),
     }
 }
 
-fn bulk_post_key(post_id: i64) -> ReaderSavedBulkKey {
+pub(super) fn bulk_post_key(post_id: i64) -> ReaderSavedBulkKey {
     ReaderSavedBulkKey::Post {
         blog_id: WpComSiteId(123),
         post_id: PostId(post_id),
     }
 }
 
-fn post_json(post_id: u64) -> Value {
+pub(super) fn post_json(post_id: u64) -> Value {
     json!({ "blog_id": 123, "post_id": post_id })
 }
 
-fn feed_json(feed_item_id: u64) -> Value {
+pub(super) fn feed_json(feed_item_id: u64) -> Value {
     json!({ "feed_item_id": feed_item_id })
 }
 
-fn keys_response(keys: &[Value]) -> Value {
+pub(super) fn keys_response(keys: &[Value]) -> Value {
     let entries: Vec<_> = keys
         .iter()
         .enumerate()
@@ -224,7 +230,7 @@ fn keys_response(keys: &[Value]) -> Value {
 }
 
 /// A `new` or `delete` response. Only `new` sends `resolved`; `delete` ignores it.
-fn write_response(saved: bool, key: Value, total: u64) -> Value {
+pub(super) fn write_response(saved: bool, key: Value, total: u64) -> Value {
     let resolved = if key.get("url").is_some() {
         "url"
     } else if key.get("feed_item_id").is_some() {
@@ -235,11 +241,11 @@ fn write_response(saved: bool, key: Value, total: u64) -> Value {
     json!({ "saved": saved, "key": key, "total": total, "resolved": resolved })
 }
 
-fn listed_post(post_id: u64) -> Value {
+pub(super) fn listed_post(post_id: u64) -> Value {
     json!({ "ID": post_id, "site_ID": 123, "is_external": false, "title": format!("Post {post_id}") })
 }
 
-fn listed_rss_post(feed_item_id: u64) -> Value {
+pub(super) fn listed_rss_post(feed_item_id: u64) -> Value {
     json!({
         "ID": feed_item_id,
         "site_ID": 5,
@@ -249,11 +255,15 @@ fn listed_rss_post(feed_item_id: u64) -> Value {
     })
 }
 
-fn error_response() -> Value {
+pub(super) fn error_response() -> Value {
     json!({ "code": "post_not_found", "message": "Post not found.", "data": { "status": 404 } })
 }
 
-async fn refreshed(service: &ReaderSavedService, executor: &ScriptedExecutor, keys: &[Value]) {
+pub(super) async fn refreshed(
+    service: &ReaderSavedService,
+    executor: &ScriptedExecutor,
+    keys: &[Value],
+) {
     executor.push(Step::Respond(200, keys_response(keys)));
     service.refresh().await.unwrap();
 }
@@ -1169,7 +1179,7 @@ async fn a_failed_list_reports_the_error() {
 
 // Importing
 
-fn bulk_response(keys: &[Value], total: u64) -> Value {
+pub(super) fn bulk_response(keys: &[Value], total: u64) -> Value {
     let results: Vec<_> = keys
         .iter()
         .map(|key| json!({ "key": key, "saved": true }))
@@ -1542,7 +1552,7 @@ async fn too_many_results_fail_the_batch() {
 // The observer
 
 #[derive(Default)]
-struct CountingObserver {
+pub(super) struct CountingObserver {
     count: AtomicUsize,
 }
 
@@ -1552,7 +1562,7 @@ impl ReaderSavedObserver for CountingObserver {
     }
 }
 
-fn observed(service: &ReaderSavedService) -> Arc<CountingObserver> {
+pub(super) fn observed(service: &ReaderSavedService) -> Arc<CountingObserver> {
     let observer = Arc::new(CountingObserver::default());
     service.set_observer(Some(observer.clone()));
     observer
@@ -1643,7 +1653,7 @@ async fn the_observer_stops_hearing_once_removed() {
 
 /// Apps read the state back from inside the callback, which would deadlock if it ran with a lock
 /// held.
-struct ReadingObserver {
+pub(super) struct ReadingObserver {
     service: Mutex<Option<Arc<ReaderSavedService>>>,
     statuses: Mutex<Vec<ReaderSavedStatus>>,
 }
@@ -1820,7 +1830,7 @@ async fn the_count_during_an_import_counts_each_save_once() {
 
 // Which errors may have been applied
 
-fn execution_failed(reason: RequestExecutionErrorReason) -> WpApiError {
+pub(super) fn execution_failed(reason: RequestExecutionErrorReason) -> WpApiError {
     WpApiError::RequestExecutionFailed {
         status_code: None,
         redirects: None,
@@ -1830,7 +1840,7 @@ fn execution_failed(reason: RequestExecutionErrorReason) -> WpApiError {
     }
 }
 
-fn answered(status_code: u32) -> WpApiError {
+pub(super) fn answered(status_code: u32) -> WpApiError {
     WpApiError::WpError {
         error_code: WpErrorCode::CustomError("x".to_string()),
         error_message: String::new(),
@@ -1841,7 +1851,7 @@ fn answered(status_code: u32) -> WpApiError {
     }
 }
 
-fn unknown(status_code: u32) -> WpApiError {
+pub(super) fn unknown(status_code: u32) -> WpApiError {
     WpApiError::UnknownError {
         status_code,
         response: String::new(),
@@ -1850,7 +1860,7 @@ fn unknown(status_code: u32) -> WpApiError {
     }
 }
 
-fn cloudflare(status_code: u32) -> WpApiError {
+pub(super) fn cloudflare(status_code: u32) -> WpApiError {
     execution_failed(RequestExecutionErrorReason::CloudflareError {
         status_code,
         cloudflare_code: None,

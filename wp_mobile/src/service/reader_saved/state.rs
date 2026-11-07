@@ -35,8 +35,9 @@
 //!   of a key the server stores as one this device doesn't know about yet (a feed item stored as
 //!   its post), can count twice until a refresh includes it.
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use wp_api::wp_com::reader_saved::ReaderSavedKey;
 
 /// How far behind the server's writes a read can be.
@@ -158,6 +159,8 @@ pub(super) struct ReaderSavedState {
     next_tap: u64,
     next_write_id: u64,
     next_refresh_id: u64,
+    /// Bumped each time a refresh is applied, so the service only stores the keys when they change.
+    snapshot_generation: u64,
 }
 
 impl ReaderSavedState {
@@ -306,6 +309,7 @@ impl ReaderSavedState {
             }
             saved.insert(key);
         }
+        self.snapshot_generation += 1;
         self.snapshot = Some(Snapshot {
             ticket,
             keys: saved,
@@ -640,6 +644,236 @@ fn stored_key_in(
         }
     }
     key
+}
+
+// Keeping the state across launches.
+
+/// How far from now a stored time can be when it's loaded. The rules look back at most twice
+/// [`MAX_READ_LAG`], so anything older behaves the same as this, and a wall clock that moved can't
+/// put a time far in the future.
+const LOAD_HORIZON: Duration = Duration::from_secs(3 * MAX_READ_LAG.as_secs());
+
+/// The version of [`PersistedLocal`] and [`PersistedSnapshot`]. A stored state of another version
+/// isn't loaded, which only costs what a fresh install has: `Unknown` until the first refresh.
+pub(super) const PERSISTED_FORMAT: u32 = 1;
+
+/// The time on both clocks: the state compares monotonic `Instant`s, which don't survive a
+/// relaunch, so stored times are wall clock.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Now {
+    pub(super) instant: Instant,
+    pub(super) wall: SystemTime,
+}
+
+impl Now {
+    fn wall_ms(&self, instant: Instant) -> i64 {
+        let wall = unix_ms(self.wall);
+        if instant <= self.instant {
+            wall - millis(self.instant - instant)
+        } else {
+            wall + millis(instant - self.instant)
+        }
+    }
+
+    /// The `Instant` for a stored wall clock time, no further from now than [`LOAD_HORIZON`]. A
+    /// time this device's clock can't go back to, early after a reboot, loads as now: that only
+    /// keeps a write deciding its key for longer, which is the safe direction.
+    fn instant(&self, wall_ms: i64) -> Instant {
+        let horizon = millis(LOAD_HORIZON);
+        let offset = (wall_ms - unix_ms(self.wall)).clamp(-horizon, horizon);
+        let by = Duration::from_millis(offset.unsigned_abs());
+        if offset < 0 {
+            self.instant.checked_sub(by).unwrap_or(self.instant)
+        } else {
+            self.instant + by
+        }
+    }
+}
+
+fn millis(duration: Duration) -> i64 {
+    i64::try_from(duration.as_millis()).unwrap_or(i64::MAX)
+}
+
+fn unix_ms(time: SystemTime) -> i64 {
+    match time.duration_since(UNIX_EPOCH) {
+        Ok(since) => millis(since),
+        Err(before) => -millis(before.duration()),
+    }
+}
+
+/// Everything but the server's keys: this device's writes and what it learned from them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub(super) struct PersistedLocal {
+    pub(super) format: u32,
+    writes: Vec<PersistedWrite>,
+    recent: Vec<ReaderSavedKey>,
+    stored_as: Vec<(ReaderSavedKey, ReaderSavedKey)>,
+    answered_total: Option<PersistedAnsweredTotal>,
+    unsaved_before: Vec<(ReaderSavedKey, i64)>,
+    next_tap: u64,
+    next_write_id: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct PersistedWrite {
+    tap: u64,
+    id: u64,
+    key: ReaderSavedKey,
+    saved: bool,
+    progress: PersistedProgress,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+enum PersistedProgress {
+    Pending,
+    Answered { at: i64 },
+    Abandoned { at: i64 },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct PersistedAnsweredTotal {
+    total: u64,
+    at: i64,
+    tap: u64,
+    id: u64,
+}
+
+/// The server's keys from the newest refresh applied.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub(super) struct PersistedSnapshot {
+    pub(super) format: u32,
+    /// When the refresh started.
+    started: i64,
+    keys: Vec<ReaderSavedKey>,
+    returned: u64,
+    total: u64,
+}
+
+impl ReaderSavedState {
+    pub(super) fn snapshot_generation(&self) -> u64 {
+        self.snapshot_generation
+    }
+
+    pub(super) fn persisted_local(&self, now: Now) -> PersistedLocal {
+        PersistedLocal {
+            format: PERSISTED_FORMAT,
+            writes: self
+                .writes
+                .iter()
+                .map(|write| PersistedWrite {
+                    tap: write.tap.0,
+                    id: write.id.0,
+                    key: write.key.clone(),
+                    saved: write.saved,
+                    progress: match write.progress {
+                        Progress::Pending => PersistedProgress::Pending,
+                        Progress::Answered { at } => PersistedProgress::Answered {
+                            at: now.wall_ms(at),
+                        },
+                        Progress::Abandoned { at } => PersistedProgress::Abandoned {
+                            at: now.wall_ms(at),
+                        },
+                    },
+                })
+                .collect(),
+            recent: self.recent.clone(),
+            stored_as: self
+                .stored_as
+                .iter()
+                .map(|(key, stored)| (key.clone(), stored.clone()))
+                .collect(),
+            answered_total: self.answered_total.map(|answered| PersistedAnsweredTotal {
+                total: answered.total,
+                at: now.wall_ms(answered.at),
+                tap: answered.includes.0.0,
+                id: answered.includes.1.0,
+            }),
+            unsaved_before: self
+                .unsaved_before
+                .iter()
+                .map(|(key, from)| (key.clone(), now.wall_ms(*from)))
+                .collect(),
+            next_tap: self.next_tap,
+            next_write_id: self.next_write_id,
+        }
+    }
+
+    pub(super) fn persisted_snapshot(&self, now: Now) -> Option<PersistedSnapshot> {
+        self.snapshot.as_ref().map(|snapshot| PersistedSnapshot {
+            format: PERSISTED_FORMAT,
+            started: now.wall_ms(snapshot.ticket.started),
+            keys: snapshot.keys.iter().cloned().collect(),
+            returned: snapshot.returned,
+            total: snapshot.total,
+        })
+    }
+
+    /// The state as it was stored. A write that hadn't been answered was cut off by the app quitting
+    /// after it may have been sent, so it's given up on now, as a cancelled one is.
+    pub(super) fn restore(
+        local: Option<PersistedLocal>,
+        snapshot: Option<PersistedSnapshot>,
+        now: Now,
+    ) -> Self {
+        let mut state = Self::default();
+        if let Some(snapshot) = snapshot {
+            state.snapshot = Some(Snapshot {
+                ticket: RefreshTicket {
+                    started: now.instant(snapshot.started).min(now.instant),
+                    id: 0,
+                },
+                keys: snapshot
+                    .keys
+                    .into_iter()
+                    .map(|key| key.normalized())
+                    .collect(),
+                stored: HashSet::new(),
+                returned: snapshot.returned,
+                total: snapshot.total,
+            });
+            state.next_refresh_id = 1;
+            state.snapshot_generation = 1;
+        }
+        if let Some(local) = local {
+            state.writes = local
+                .writes
+                .into_iter()
+                .map(|write| Write {
+                    tap: Tap(write.tap),
+                    id: WriteId(write.id),
+                    key: write.key,
+                    saved: write.saved,
+                    progress: match write.progress {
+                        PersistedProgress::Pending => Progress::Abandoned { at: now.instant },
+                        PersistedProgress::Answered { at } => Progress::Answered {
+                            at: now.instant(at),
+                        },
+                        PersistedProgress::Abandoned { at } => Progress::Abandoned {
+                            at: now.instant(at),
+                        },
+                    },
+                })
+                .collect();
+            state.writes.sort_by_key(Write::order);
+            state.recent = local.recent;
+            state.stored_as = local.stored_as.into_iter().collect();
+            state.answered_total = local.answered_total.map(|answered| AnsweredTotal {
+                total: answered.total,
+                at: now.instant(answered.at),
+                includes: (Tap(answered.tap), WriteId(answered.id)),
+            });
+            state.unsaved_before = local
+                .unsaved_before
+                .into_iter()
+                .map(|(key, from)| (key, now.instant(from)))
+                .collect();
+            let last = state.writes.iter().map(Write::order).max();
+            state.next_tap = local.next_tap.max(last.map_or(0, |(tap, _)| tap.0 + 1));
+            state.next_write_id = local.next_write_id.max(last.map_or(0, |(_, id)| id.0 + 1));
+        }
+        state.restore_snapshot_keys();
+        state
+    }
 }
 
 #[cfg(test)]
