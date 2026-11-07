@@ -25,11 +25,12 @@ use wp_mobile_cache::{DbTable, SqliteDbError, UpdateHook};
 const SAVED_STREAM: &str = "saved";
 
 /// The tables the saved list is read from.
-const SAVED_LIST_TABLES: [DbTable; 5] = [
+const SAVED_LIST_TABLES: [DbTable; 6] = [
     DbTable::ReaderPosts,
     DbTable::ReaderStreams,
     DbTable::ReaderStreamItems,
     DbTable::ReaderSavedState,
+    DbTable::ReaderSavedKeys,
     DbTable::ReaderSavedLocalOnly,
 ];
 

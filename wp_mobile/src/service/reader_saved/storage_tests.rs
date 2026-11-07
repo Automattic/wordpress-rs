@@ -1,8 +1,8 @@
 //! What the service keeps in the cache: across a relaunch, through an import, and as the saved list.
 
 use super::super::tests::{
-    ScriptedExecutor, Step, error_response, identity, keys_response, post_json, post_key,
-    rss_identity, unsaveable_identity, write_response,
+    ScriptedExecutor, Step, error_response, feed_json, feed_key, identity, keys_response,
+    post_json, post_key, rss_identity, unsaveable_identity, write_response,
 };
 use super::*;
 use crate::testing::EmptyAppNotifier;
@@ -250,23 +250,95 @@ async fn a_wall_clock_that_moved_back_doesnt_shorten_a_write_that_still_decides_
 }
 
 #[tokio::test]
-async fn a_stored_state_that_cant_be_read_is_ignored() {
+async fn local_state_that_cant_be_read_is_ignored_but_the_keys_still_answer() {
     let device = Device::new();
     let (service, executor) = device.launch();
     refreshed(&service, &executor, &[post_json(1)]).await;
+    saved(&service, &executor, 2).await;
     drop(service);
     device.cache.execute(|connection| {
         connection
-            .execute(
-                "UPDATE reader_saved_state SET snapshot = '{\"format\":99}', local = 'nonsense'",
-                [],
-            )
+            .execute("UPDATE reader_saved_state SET local = 'nonsense'", [])
             .unwrap();
     });
 
     let (service, _) = device.relaunch();
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Unknown);
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    assert_eq!(
+        service.status(identity(2)),
+        ReaderSavedStatus::NotSaved,
+        "The save only this device knew about is lost, until a refresh"
+    );
+    assert!(service.recent_saves().is_empty());
+}
+
+#[tokio::test]
+async fn a_refresh_stores_each_key_as_the_server_sent_it() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let mut with_url = post_json(1);
+    with_url["url"] = json!("https://example.com/post-1");
+    refreshed(&service, &executor, &[with_url, feed_json(7)]).await;
+
+    let keys = device
+        .cache
+        .execute(|connection| ReaderSavedRepository::select_keys(&*connection, service.account))
+        .unwrap()
+        .unwrap();
+    assert_eq!(keys.returned, 2);
+    assert_eq!(keys.total, 2);
+    assert_eq!(keys.keys.len(), 2);
+    let first = &keys.keys[0];
+    assert_eq!(first.key, post_key(1));
+    assert_eq!(first.save_id, 1);
+    assert_eq!(first.date_saved, "2026-11-02T10:15:00Z".parse().unwrap());
+    assert_eq!(first.url.as_deref(), Some("https://example.com/post-1"));
+    assert_eq!(keys.keys[1].key, feed_key(7));
+}
+
+#[tokio::test]
+async fn a_post_saved_by_its_ids_is_found_by_its_url_after_a_relaunch() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let mut with_url = post_json(1);
+    with_url["url"] = json!("https://example.com/post-1");
+    refreshed(&service, &executor, &[with_url]).await;
+    drop(service);
+    // Even without this device's own state, the stored keys say where the URL is saved.
+    device.cache.execute(|connection| {
+        connection
+            .execute("UPDATE reader_saved_state SET local = NULL", [])
+            .unwrap();
+    });
+
+    let (service, _) = device.relaunch();
+
+    assert_eq!(
+        service.status(url_identity("https://example.com/post-1/")),
+        ReaderSavedStatus::Saved
+    );
+}
+
+#[tokio::test]
+async fn an_older_refresh_that_answers_late_doesnt_replace_the_stored_keys() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let (release, held) = oneshot::channel();
+    executor.push(Step::Hold(held, 200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(200, keys_response(&[post_json(2)])));
+
+    let (older, ()) = futures::join!(service.refresh(), async {
+        device.clocks.advance(Duration::from_secs(1));
+        service.refresh().await.unwrap();
+        release.send(()).unwrap();
+    });
+    older.unwrap();
+    drop(service);
+
+    let (service, _) = device.relaunch();
+    assert_eq!(service.status(identity(2)), ReaderSavedStatus::Saved);
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
 }
 
 // Signing out
@@ -548,6 +620,7 @@ fn the_collection_is_relevant_to_the_reader_tables_only() {
         DbTable::ReaderStreams,
         DbTable::ReaderStreamItems,
         DbTable::ReaderSavedState,
+        DbTable::ReaderSavedKeys,
         DbTable::ReaderSavedLocalOnly,
     ] {
         assert!(collection.is_relevant_update(&hook(table)), "{table}");

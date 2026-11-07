@@ -134,12 +134,35 @@ pub struct DbReaderSavedLocalOnly {
     pub date_saved: Option<WpGmtDateTime>,
 }
 
-/// What the saved posts service stored for an account. The blobs belong to the service.
+/// What the saved posts service stored for an account besides its keys.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct DbReaderSavedState {
-    pub snapshot: Option<String>,
+    /// The service's own record of this device's writes. The service owns its format.
     pub local: Option<String>,
     pub imported_local_saves: bool,
+}
+
+/// One saved key, as `GET /wpcom/v2/read/saved/keys` returned it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DbReaderSavedKey {
+    pub key: ReaderSavedKey,
+    pub save_id: u64,
+    pub date_saved: WpGmtDateTime,
+    /// The URL of a post saved by its IDs, when the server sent it.
+    pub url: Option<String>,
+}
+
+/// The saved keys from the newest refresh applied, and that refresh.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DbReaderSavedKeys {
+    /// When the refresh started, as milliseconds since the Unix epoch.
+    pub refreshed_at_ms: i64,
+    /// How many keys the refresh returned, before any normalized to the same key.
+    pub returned: u64,
+    /// The server's total, which goes past the 1,000 keys it returns.
+    pub total: u64,
+    /// Newest first. Keys that normalize to the same key are stored once.
+    pub keys: Vec<DbReaderSavedKey>,
 }
 
 /// A key as stored text: `post:{blog_id}:{post_id}`, `feed-item:{feed_item_id}` or `url:{url}`,
