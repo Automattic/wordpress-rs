@@ -53,6 +53,7 @@ public typealias FetchAndParseApiRootFailure = WordPressAPIInternal.FetchAndPars
 public typealias ApplicationPasswordsNotSupportedReason = WordPressAPIInternal.ApplicationPasswordsNotSupportedReason
 public typealias RequestExecutionErrorReason = WordPressAPIInternal.RequestExecutionErrorReason
 public typealias CloudflareErrorKind = WordPressAPIInternal.CloudflareErrorKind
+public typealias VerifyIssuedApplicationPasswordError = WordPressAPIInternal.VerifyIssuedApplicationPasswordError
 
 // MARK: - Users
 
