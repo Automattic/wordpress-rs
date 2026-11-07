@@ -223,10 +223,11 @@ investigate the relevant code before making decisions based on this document.
 - [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/likes/mine/delete` — unlike a post
 - [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/likes/new` — like a post
 - [ ] `GET /rest/v1.1/sites/$site/posts/slug:$slug` — fetch post by slug
-- [ ] `GET /rest/v1.2/read/feed/$feed/posts/` — fetch posts for a feed
+- [x] `GET /rest/v1.2/read/feed/$feed/posts/` — fetch posts for a feed
+- [x] `GET /rest/v1.2/read/following` — posts from followed sites and feeds (paginated by date)
 - [ ] `GET /rest/v1.2/read/search` — search reader posts
 - [ ] `GET /rest/v1.2/read/site/$site/post/$post_id/related` — related posts
-- [ ] `GET /rest/v1.2/read/sites/$site/posts/` — fetch posts for a blog
+- [x] `GET /rest/v1.2/read/sites/$site/posts/` — fetch posts for a blog
 - [ ] `GET /rest/v1.2/read/sites/$site/posts/$post_id` — fetch single reader post (v1.2)
 - [ ] `GET /rest/v1.2/read/tags/$tag/posts` — fetch posts for a tag
 - [ ] `GET /rest/v1.3/read/feed/$feed/posts/$post_id` — fetch feed post

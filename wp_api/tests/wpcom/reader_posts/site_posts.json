@@ -1,0 +1,477 @@
+{
+  "found": 2,
+  "posts": [
+    {
+      "ID": 89902,
+      "site_ID": 3584907,
+      "author": {
+        "ID": 149377960,
+        "login": "",
+        "email": false,
+        "name": "Rich Tabor",
+        "first_name": "",
+        "last_name": "",
+        "nice_name": "richptabor",
+        "URL": "https://rich.blog",
+        "avatar_URL": "https://1.gravatar.com/avatar/4923576b79872daf6fcf827a2259ef886cc4939af72fe1719502133d67c2f123?s=96&d=retro",
+        "profile_URL": "https://gravatar.com/richptabor",
+        "site_ID": 213949716,
+        "has_avatar": true,
+        "wpcom_id": 149377960,
+        "wpcom_login": ""
+      },
+      "date": "2026-11-04T16:33:17+00:00",
+      "modified": "2026-11-04T16:33:22+00:00",
+      "title": "A New Workspace for Building with WordPress",
+      "URL": "https://en.blog.wordpress.com/2026/11/04/wordpress-studio-workspace/",
+      "short_URL": "https://wp.me/pf2B5-no2",
+      "content": "<p>Post content.</p>",
+      "excerpt": "<p>Post excerpt.</p>",
+      "slug": "wordpress-studio-workspace",
+      "guid": "https://en.blog.wordpress.com/?p=89902",
+      "status": "publish",
+      "sticky": false,
+      "password": "",
+      "has_password": false,
+      "parent": false,
+      "type": "post",
+      "discussion": {
+        "comments_open": true,
+        "comment_status": "open",
+        "pings_open": false,
+        "ping_status": "closed",
+        "comment_count": 2
+      },
+      "likes_enabled": true,
+      "sharing_enabled": true,
+      "like_count": 199,
+      "i_like": false,
+      "is_reblogged": false,
+      "is_following": false,
+      "global_ID": "40257480e9777dfbb324e0147beaa0d8",
+      "featured_image": "https://en-blog.files.wordpress.com/2026/11/understanding-your-wordpress-agent-usage_header_2350x1480-4.png",
+      "post_thumbnail": {
+        "ID": 94734,
+        "URL": "https://en-blog.files.wordpress.com/2026/11/understanding-your-wordpress-agent-usage_header_2350x1480-4.png",
+        "guid": "https://en.blog.files.wordpress.com/2026/11/understanding-your-wordpress-agent-usage_header_2350x1480-4.png",
+        "mime_type": "image/png",
+        "width": 1600,
+        "height": 1008
+      },
+      "format": "standard",
+      "geo": false,
+      "menu_order": 0,
+      "page_template": "",
+      "publicize_URLs": [],
+      "terms": {},
+      "tags": {
+        "AI Tools": {
+          "ID": 49112760,
+          "name": "AI Tools",
+          "slug": "ai-tools",
+          "description": "",
+          "post_count": 31,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/tags/slug:ai-tools",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/tags/slug:ai-tools/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+            }
+          },
+          "display_name": "ai-tools"
+        },
+        "WordPress developers": {
+          "ID": 17481200,
+          "name": "WordPress developers",
+          "slug": "wordpress-developers",
+          "description": "",
+          "post_count": 9,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/tags/slug:wordpress-developers",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/tags/slug:wordpress-developers/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+            }
+          },
+          "display_name": "wordpress-developers"
+        },
+        "WordPress Studio": {
+          "ID": 772059344,
+          "name": "WordPress Studio",
+          "slug": "wordpress-studio",
+          "description": "<a href=\"https://developer.wordpress.com/studio/\">WordPress Studio</a> is a fast, free way to develop locally with WordPress. Share your local sites with clients or colleagues, sync with production sites, and keep your local development process smooth and simple — all backed. <a href=\"https://developer.wordpress.com/studio/\">Download it for free</a> and <a href=\"https://developer.wordpress.com/docs/developer-tools/studio/\">check the docs</a>.",
+          "post_count": 34,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/tags/slug:wordpress-studio",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/tags/slug:wordpress-studio/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+            }
+          },
+          "display_name": "wordpress-studio"
+        }
+      },
+      "categories": {
+        "Development": {
+          "ID": 780,
+          "name": "Development",
+          "slug": "development",
+          "description": "The latest insights and innovations from the development world—where code, creativity, and community meet to build the web of tomorrow.",
+          "post_count": 170,
+          "parent": 0,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/categories/slug:development",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/categories/slug:development/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+            }
+          }
+        },
+        "News": {
+          "ID": 103,
+          "name": "News",
+          "slug": "news",
+          "description": "Stay informed with the latest updates, events, and announcements shaping the WordPress.com community and beyond.",
+          "post_count": 887,
+          "parent": 0,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/categories/slug:news",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/categories/slug:news/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+            }
+          }
+        },
+        "Product Features": {
+          "ID": 1352602,
+          "name": "Product Features",
+          "slug": "product-features",
+          "description": "Explore new features, updates, and tools designed to enhance your experience and help you make the most of WordPress.com.",
+          "post_count": 901,
+          "parent": 0,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/categories/slug:product-features",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/categories/slug:product-features/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+            }
+          }
+        }
+      },
+      "attachments": {},
+      "attachment_count": 19,
+      "metadata": [
+        {
+          "id": "370108",
+          "key": "_thumbnail_id",
+          "value": "94734"
+        }
+      ],
+      "meta": {
+        "links": {
+          "self": "https://public-api.wordpress.com/rest/v1.1/read/sites/3584907/posts/89902",
+          "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/posts/89902/help",
+          "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907",
+          "replies": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/posts/89902/replies/",
+          "likes": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/posts/89902/likes/"
+        },
+        "data": {
+          "site": {
+            "ID": 3584907,
+            "name": "WordPress.com Blog",
+            "URL": "https://en.blog.wordpress.com",
+            "locale": "en",
+            "icon": {
+              "img": "https://en-blog.files.wordpress.com/2026/01/wp_favicon_512x512px.png?w=96",
+              "ico": "https://en-blog.files.wordpress.com/2026/01/wp_favicon_512x512px.png?w=96",
+              "media_id": 82862
+            }
+          },
+          "likes": {
+            "found": 199,
+            "i_like": false
+          }
+        }
+      },
+      "other_URLs": {},
+      "feed_ID": 25823,
+      "feed_URL": "https://en.blog.wordpress.com",
+      "pseudo_ID": "40257480e9777dfbb324e0147beaa0d8",
+      "is_external": false,
+      "site_name": "WordPress.com Blog",
+      "site_URL": "https://en.blog.wordpress.com",
+      "site_is_private": false,
+      "organization_id": 0,
+      "site_icon": {
+        "img": "https://en-blog.files.wordpress.com/2026/01/wp_favicon_512x512px.png?w=96",
+        "ico": "https://en-blog.files.wordpress.com/2026/01/wp_favicon_512x512px.png?w=96"
+      },
+      "featured_media": {
+        "uri": "https://en-blog.files.wordpress.com/2026/11/blog-settings-appearance.webp",
+        "width": 2208,
+        "height": 1472,
+        "type": "image"
+      },
+      "use_excerpt": false,
+      "is_following_conversation": false,
+      "is_subscribed_comments": false,
+      "can_subscribe_comments": false,
+      "subscribed_comments_notifications": false,
+      "feed_item_ID": 6235999932,
+      "is_seen": false
+    },
+    {
+      "ID": 94679,
+      "site_ID": 3584907,
+      "author": {
+        "ID": 241238353,
+        "login": "",
+        "email": false,
+        "name": "Alexa Peduzzi",
+        "first_name": "",
+        "last_name": "",
+        "nice_name": "alexanpeduzzi",
+        "URL": "https://wordpress.com",
+        "avatar_URL": "https://2.gravatar.com/avatar/20562e8d36b8d2fab1757ff4b6ec7fbb434f4f17c52184101c2055ff2ee274a4?s=96&d=retro",
+        "profile_URL": "https://gravatar.com/alexanpeduzzi",
+        "site_ID": 249706632,
+        "has_avatar": true,
+        "wpcom_id": 241238353,
+        "wpcom_login": ""
+      },
+      "date": "2026-11-03T20:45:00+00:00",
+      "modified": "2026-11-04T19:39:21+00:00",
+      "title": "Connect ChatGPT or Claude to Your WordPress.com Sites, Free Through November",
+      "URL": "https://en.blog.wordpress.com/2026/11/03/free-chatgpt-claude/",
+      "short_URL": "https://wp.me/pf2B5-oD5",
+      "content": "<p>Post content.</p>",
+      "excerpt": "<p>Post excerpt.</p>",
+      "slug": "free-chatgpt-claude",
+      "guid": "https://en.blog.wordpress.com/?p=94679",
+      "status": "publish",
+      "sticky": false,
+      "password": "",
+      "has_password": false,
+      "parent": false,
+      "type": "post",
+      "discussion": {
+        "comments_open": true,
+        "comment_status": "open",
+        "pings_open": false,
+        "ping_status": "closed",
+        "comment_count": 8
+      },
+      "likes_enabled": true,
+      "sharing_enabled": true,
+      "like_count": 136,
+      "i_like": false,
+      "is_reblogged": false,
+      "is_following": false,
+      "global_ID": "dee3b09e3b9e5fb5acd576e77ba404ea",
+      "featured_image": "https://en-blog.files.wordpress.com/2026/11/free-chatgpt-claude-connection-to-wordpress.png",
+      "post_thumbnail": {
+        "ID": 94707,
+        "URL": "https://en-blog.files.wordpress.com/2026/11/free-chatgpt-claude-connection-to-wordpress.png",
+        "guid": "https://en.blog.files.wordpress.com/2026/11/free-chatgpt-claude-connection-to-wordpress.png",
+        "mime_type": "image/png",
+        "width": 2350,
+        "height": 1480
+      },
+      "format": "standard",
+      "geo": false,
+      "menu_order": 0,
+      "page_template": "",
+      "publicize_URLs": [],
+      "terms": {
+        "category": {
+          "News": {
+            "ID": 103,
+            "name": "News",
+            "slug": "news",
+            "description": "Stay informed with the latest updates, events, and announcements shaping the WordPress.com community and beyond.",
+            "post_count": 887,
+            "parent": 0,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/categories/slug:news",
+                "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/categories/slug:news/help",
+                "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+              }
+            }
+          }
+        },
+        "post_tag": {
+          "ChatGPT": {
+            "ID": 757687150,
+            "name": "ChatGPT",
+            "slug": "chatgpt",
+            "description": "",
+            "post_count": 5,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/tags/slug:chatgpt",
+                "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/tags/slug:chatgpt/help",
+                "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+              }
+            }
+          },
+          "Claude": {
+            "ID": 560341,
+            "name": "Claude",
+            "slug": "claude",
+            "description": "",
+            "post_count": 3,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/tags/slug:claude",
+                "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/tags/slug:claude/help",
+                "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+              }
+            }
+          },
+          "MCP": {
+            "ID": 170871,
+            "name": "MCP",
+            "slug": "mcp",
+            "description": "",
+            "post_count": 6,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/tags/slug:mcp",
+                "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/tags/slug:mcp/help",
+                "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+              }
+            }
+          }
+        },
+        "post_format": {},
+        "mentions": {}
+      },
+      "tags": {
+        "ChatGPT": {
+          "ID": 757687150,
+          "name": "ChatGPT",
+          "slug": "chatgpt",
+          "description": "",
+          "post_count": 5,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/tags/slug:chatgpt",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/tags/slug:chatgpt/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+            }
+          },
+          "display_name": "chatgpt"
+        },
+        "Claude": {
+          "ID": 560341,
+          "name": "Claude",
+          "slug": "claude",
+          "description": "",
+          "post_count": 3,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/tags/slug:claude",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/tags/slug:claude/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+            }
+          },
+          "display_name": "claude"
+        },
+        "MCP": {
+          "ID": 170871,
+          "name": "MCP",
+          "slug": "mcp",
+          "description": "",
+          "post_count": 6,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/tags/slug:mcp",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/tags/slug:mcp/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+            }
+          },
+          "display_name": "mcp"
+        }
+      },
+      "categories": {
+        "News": {
+          "ID": 103,
+          "name": "News",
+          "slug": "news",
+          "description": "Stay informed with the latest updates, events, and announcements shaping the WordPress.com community and beyond.",
+          "post_count": 887,
+          "parent": 0,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/categories/slug:news",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/categories/slug:news/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+            }
+          }
+        }
+      },
+      "attachments": {},
+      "attachment_count": 6,
+      "metadata": [
+        {
+          "id": "369258",
+          "key": "_thumbnail_id",
+          "value": "94707"
+        }
+      ],
+      "meta": {
+        "links": {
+          "self": "https://public-api.wordpress.com/rest/v1.1/read/sites/3584907/posts/94679",
+          "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/posts/94679/help",
+          "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907",
+          "replies": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/posts/94679/replies/",
+          "likes": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/posts/94679/likes/"
+        },
+        "data": {
+          "site": {
+            "ID": 3584907,
+            "name": "WordPress.com Blog",
+            "URL": "https://en.blog.wordpress.com",
+            "locale": "en",
+            "icon": {
+              "img": "https://en-blog.files.wordpress.com/2026/01/wp_favicon_512x512px.png?w=96",
+              "ico": "https://en-blog.files.wordpress.com/2026/01/wp_favicon_512x512px.png?w=96",
+              "media_id": 82862
+            }
+          },
+          "likes": {
+            "found": 136,
+            "i_like": false
+          }
+        }
+      },
+      "other_URLs": {},
+      "feed_ID": 25823,
+      "feed_URL": "https://en.blog.wordpress.com",
+      "pseudo_ID": "dee3b09e3b9e5fb5acd576e77ba404ea",
+      "is_external": false,
+      "site_name": "WordPress.com Blog",
+      "site_URL": "https://en.blog.wordpress.com",
+      "site_is_private": false,
+      "organization_id": 0,
+      "site_icon": {
+        "img": "https://en-blog.files.wordpress.com/2026/01/wp_favicon_512x512px.png?w=96",
+        "ico": "https://en-blog.files.wordpress.com/2026/01/wp_favicon_512x512px.png?w=96"
+      },
+      "featured_media": {
+        "uri": "https://en-blog.files.wordpress.com/2026/11/chatgpt-scheduled-task.png",
+        "width": 1746,
+        "height": 1574,
+        "type": "image"
+      },
+      "use_excerpt": false,
+      "is_following_conversation": false,
+      "is_subscribed_comments": false,
+      "can_subscribe_comments": false,
+      "subscribed_comments_notifications": false,
+      "feed_item_ID": 6234892098,
+      "is_seen": false
+    }
+  ]
+}

@@ -405,7 +405,7 @@ pub fn reader_saved_keys_for_post(post: ReaderPostSaveIdentity) -> Vec<ReaderSav
 ///
 /// Unlike `deserialize_false_or_string_or_null`, the string `"false"` is kept: it can be a real
 /// title or name.
-fn deserialize_optional_text<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+pub(crate) fn deserialize_optional_text<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
