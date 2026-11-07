@@ -730,6 +730,58 @@ mod tests {
         assert_eq!(reparsed, response);
     }
 
+    /// A response recorded from WordPress.com on 2026-11-07, with one save of each kind, and the
+    /// author, content and site details replaced. It shows what the list really sends: a whole
+    /// Reader post for a WordPress.com post, most of one for a feed item, and little more than the
+    /// URL for a page saved by URL.
+    #[test]
+    fn test_deserialize_recorded_list_response() {
+        let json = include_str!("../../tests/wpcom/reader_saved/list_recorded.json");
+        let response: ReaderSavedPostsResponse =
+            serde_json::from_str(json).expect("Failed to deserialize recorded list response");
+        assert_eq!(response.found, Some(3));
+        assert_eq!(response.next_page_handle, None);
+
+        let [url_save, feed_item, post] = &response.posts[..] else {
+            panic!("Expected three posts");
+        };
+
+        assert_eq!(
+            reader_saved_key_for_post(url_save.identity.clone()),
+            Some(ReaderSavedKey::Url {
+                url: "https://example.com/wprs-saved-shape-check".to_string()
+            })
+        );
+        assert_eq!(url_save.title, None);
+        assert_eq!(url_save.date, None);
+        assert!(url_save.date_saved.is_some());
+
+        // A feed item sends its site ID as a string.
+        assert_eq!(
+            reader_saved_key_for_post(feed_item.identity.clone()),
+            Some(feed_item_key(6238295932))
+        );
+        assert_eq!(feed_item.title.as_deref(), Some("Post title 2"));
+        assert_eq!(feed_item.site_name.as_deref(), Some("xkcd.com"));
+        assert!(feed_item.content.is_some());
+
+        assert_eq!(
+            reader_saved_key_for_post(post.identity.clone()),
+            Some(ReaderSavedKey::Post {
+                blog_id: WpComSiteId(123456),
+                post_id: PostId(42),
+            })
+        );
+        assert_eq!(post.title.as_deref(), Some("Post title 3"));
+        assert_eq!(post.like_count, Some(4));
+        assert_eq!(post.i_like, Some(false));
+        assert!(post.content.is_some() && post.excerpt.is_some() && post.modified.is_some());
+        assert_eq!(
+            post.date_saved,
+            Some("2020-02-24T22:38:38Z".parse().unwrap())
+        );
+    }
+
     #[test]
     fn test_deserialize_list_response() {
         let json = include_str!("../../tests/wpcom/reader_saved/list.json");
