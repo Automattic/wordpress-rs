@@ -653,8 +653,8 @@ fn stored_key_in(
 /// put a time far in the future.
 const LOAD_HORIZON: Duration = Duration::from_secs(3 * MAX_READ_LAG.as_secs());
 
-/// The version of [`PersistedLocal`] and [`PersistedSnapshot`]. A stored state of another version
-/// isn't loaded, which only costs what a fresh install has: `Unknown` until the first refresh.
+/// The version of [`PersistedLocal`]. One stored in another version isn't loaded, which only costs
+/// the protection of writes made just before the app quit.
 pub(super) const PERSISTED_FORMAT: u32 = 1;
 
 /// The time on both clocks: the state compares monotonic `Instant`s, which don't survive a
@@ -738,15 +738,15 @@ struct PersistedAnsweredTotal {
     id: u64,
 }
 
-/// The server's keys from the newest refresh applied.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// The server's keys from the newest refresh applied, as the cache stores them.
+#[derive(Debug, Clone, PartialEq)]
 pub(super) struct PersistedSnapshot {
-    pub(super) format: u32,
-    /// When the refresh started.
-    started: i64,
-    keys: Vec<ReaderSavedKey>,
-    returned: u64,
-    total: u64,
+    /// When the refresh started, in milliseconds since the Unix epoch.
+    pub(super) started: i64,
+    /// Each key, with the URL of a post saved by its IDs when the server sent one.
+    pub(super) keys: Vec<(ReaderSavedKey, Option<String>)>,
+    pub(super) returned: u64,
+    pub(super) total: u64,
 }
 
 impl ReaderSavedState {
@@ -798,14 +798,11 @@ impl ReaderSavedState {
         }
     }
 
-    pub(super) fn persisted_snapshot(&self, now: Now) -> Option<PersistedSnapshot> {
-        self.snapshot.as_ref().map(|snapshot| PersistedSnapshot {
-            format: PERSISTED_FORMAT,
-            started: now.wall_ms(snapshot.ticket.started),
-            keys: snapshot.keys.iter().cloned().collect(),
-            returned: snapshot.returned,
-            total: snapshot.total,
-        })
+    /// When the newest refresh applied started, in milliseconds since the Unix epoch.
+    pub(super) fn snapshot_started_ms(&self, now: Now) -> Option<i64> {
+        self.snapshot
+            .as_ref()
+            .map(|snapshot| now.wall_ms(snapshot.ticket.started))
     }
 
     /// The state as it was stored. A write that hadn't been answered was cut off by the app quitting
@@ -817,6 +814,16 @@ impl ReaderSavedState {
     ) -> Self {
         let mut state = Self::default();
         if let Some(snapshot) = snapshot {
+            // As `apply_refresh` does. What this device's writes learned since replaces it below.
+            for (key, url) in &snapshot.keys {
+                if let Some(url) = url
+                    .clone()
+                    .filter(|_| !matches!(key, ReaderSavedKey::Url { .. }))
+                {
+                    let url = ReaderSavedKey::Url { url }.normalized();
+                    state.stored_as.insert(url, key.normalized());
+                }
+            }
             state.snapshot = Some(Snapshot {
                 ticket: RefreshTicket {
                     started: now.instant(snapshot.started).min(now.instant),
@@ -825,7 +832,7 @@ impl ReaderSavedState {
                 keys: snapshot
                     .keys
                     .into_iter()
-                    .map(|key| key.normalized())
+                    .map(|(key, _)| key.normalized())
                     .collect(),
                 stored: HashSet::new(),
                 returned: snapshot.returned,
@@ -856,7 +863,7 @@ impl ReaderSavedState {
                 .collect();
             state.writes.sort_by_key(Write::order);
             state.recent = local.recent;
-            state.stored_as = local.stored_as.into_iter().collect();
+            state.stored_as.extend(local.stored_as);
             state.answered_total = local.answered_total.map(|answered| AnsweredTotal {
                 total: answered.total,
                 at: now.instant(answered.at),

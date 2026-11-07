@@ -4,9 +4,9 @@
 use crate::{
     RowId, SqliteDbError,
     db_types::reader::{
-        DbReaderSavedLocalOnly, DbReaderSavedState, DbReaderStream, DbReaderStreamItem,
-        ReaderPostRecord, reader_date_from_text, reader_date_text, reader_saved_key_from_text,
-        reader_saved_key_text,
+        DbReaderSavedKey, DbReaderSavedKeys, DbReaderSavedLocalOnly, DbReaderSavedState,
+        DbReaderStream, DbReaderStreamItem, ReaderPostRecord, reader_date_from_text,
+        reader_date_text, reader_saved_key_from_text, reader_saved_key_text,
     },
     list_metadata::ListState,
     repository::QueryExecutor,
@@ -371,15 +371,13 @@ impl ReaderSavedRepository {
         account: RowId,
     ) -> Result<DbReaderSavedState, SqliteDbError> {
         let mut statement = executor.prepare(
-            "SELECT snapshot, local, imported_local_saves FROM reader_saved_state
-            WHERE account_id = ?1",
+            "SELECT local, imported_local_saves FROM reader_saved_state WHERE account_id = ?1",
         )?;
         Ok(statement
             .query_row([account], |row| {
                 Ok(DbReaderSavedState {
-                    snapshot: row.get(0)?,
-                    local: row.get(1)?,
-                    imported_local_saves: row.get(2)?,
+                    local: row.get(0)?,
+                    imported_local_saves: row.get(1)?,
                 })
             })
             .optional()?
@@ -399,17 +397,88 @@ impl ReaderSavedRepository {
         Ok(())
     }
 
-    pub fn write_snapshot(
+    /// Replaces the saved keys with a newer refresh's.
+    pub fn replace_keys(
         executor: &impl QueryExecutor,
         account: RowId,
-        snapshot: &str,
+        keys: &DbReaderSavedKeys,
     ) -> Result<(), SqliteDbError> {
         executor.execute(
-            "INSERT INTO reader_saved_state (account_id, snapshot) VALUES (?1, ?2)
-            ON CONFLICT(account_id) DO UPDATE SET snapshot = excluded.snapshot",
-            params![account, snapshot],
+            "DELETE FROM reader_saved_keys WHERE account_id = ?1",
+            [account],
+        )?;
+        let mut insert = executor.prepare(
+            "INSERT INTO reader_saved_keys (account_id, key, save_id, date_saved, url)
+            VALUES (?1, ?2, ?3, ?4, ?5)
+            ON CONFLICT(account_id, key) DO NOTHING",
+        )?;
+        for key in &keys.keys {
+            insert.execute(params![
+                account,
+                reader_saved_key_text(&key.key),
+                key.save_id,
+                reader_date_text(&key.date_saved),
+                key.url,
+            ])?;
+        }
+        executor.execute(
+            "INSERT INTO reader_saved_state (account_id, keys_refreshed_at_ms, keys_returned, keys_total)
+            VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT(account_id) DO UPDATE SET
+                keys_refreshed_at_ms = excluded.keys_refreshed_at_ms,
+                keys_returned = excluded.keys_returned,
+                keys_total = excluded.keys_total",
+            params![account, keys.refreshed_at_ms, keys.returned, keys.total],
         )?;
         Ok(())
+    }
+
+    /// The saved keys from the newest refresh, newest first, or `None` before the first refresh.
+    pub fn select_keys(
+        executor: &impl QueryExecutor,
+        account: RowId,
+    ) -> Result<Option<DbReaderSavedKeys>, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT keys_refreshed_at_ms, keys_returned, keys_total FROM reader_saved_state
+            WHERE account_id = ?1 AND keys_refreshed_at_ms IS NOT NULL",
+        )?;
+        let Some((refreshed_at_ms, returned, total)) = statement
+            .query_row([account], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, u64>(1)?,
+                    row.get::<_, u64>(2)?,
+                ))
+            })
+            .optional()?
+        else {
+            return Ok(None);
+        };
+        let mut statement = executor.prepare(
+            "SELECT key, save_id, date_saved, url FROM reader_saved_keys
+            WHERE account_id = ?1
+            ORDER BY date_saved DESC, rowid ASC",
+        )?;
+        let rows = statement.query_map([account], |row| {
+            Ok((|| -> Result<DbReaderSavedKey, SqliteDbError> {
+                let key: String = row.get(0)?;
+                let date_saved: String = row.get(2)?;
+                Ok(DbReaderSavedKey {
+                    key: reader_saved_key_from_text(&key)?,
+                    save_id: row.get(1)?,
+                    date_saved: reader_date_from_text(&date_saved)?,
+                    url: row.get(3)?,
+                })
+            })())
+        })?;
+        let keys =
+            collect_rows(rows.map(|row| row.map_err(SqliteDbError::from).and_then(|row| row)))?;
+        Ok(Some(DbReaderSavedKeys {
+            refreshed_at_ms,
+            returned,
+            total,
+            keys,
+        }))
     }
 
     pub fn set_imported_local_saves(

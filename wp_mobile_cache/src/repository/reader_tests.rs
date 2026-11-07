@@ -236,18 +236,122 @@ fn test_saved_state_round_trips() {
     );
 
     ReaderSavedRepository::write_local(&conn, account, "local").unwrap();
-    ReaderSavedRepository::write_snapshot(&conn, account, "snapshot").unwrap();
+    ReaderSavedRepository::replace_keys(&conn, account, &saved_keys(&[1])).unwrap();
     ReaderSavedRepository::set_imported_local_saves(&conn, account).unwrap();
     ReaderSavedRepository::write_local(&conn, account, "local 2").unwrap();
 
     assert_eq!(
         ReaderSavedRepository::select_state(&conn, account).unwrap(),
         DbReaderSavedState {
-            snapshot: Some("snapshot".to_string()),
             local: Some("local 2".to_string()),
             imported_local_saves: true,
         }
     );
+}
+
+fn saved_key(post_id: i64, date_saved: &str) -> DbReaderSavedKey {
+    DbReaderSavedKey {
+        key: post_key(post_id),
+        save_id: post_id as u64 + 100,
+        date_saved: date_saved.parse().unwrap(),
+        url: Some(format!("https://example.com/{post_id}")),
+    }
+}
+
+/// Keys for these posts, the first saved newest.
+fn saved_keys(post_ids: &[i64]) -> DbReaderSavedKeys {
+    DbReaderSavedKeys {
+        refreshed_at_ms: 1_000,
+        returned: post_ids.len() as u64,
+        total: post_ids.len() as u64,
+        keys: post_ids
+            .iter()
+            .enumerate()
+            .map(|(index, post_id)| {
+                saved_key(*post_id, &format!("2026-11-{:02}T00:00:00Z", 20 - index))
+            })
+            .collect(),
+    }
+}
+
+#[test]
+fn test_saved_keys_are_none_before_a_refresh() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::write_local(&conn, account, "local").unwrap();
+
+    assert_eq!(
+        ReaderSavedRepository::select_keys(&conn, account).unwrap(),
+        None
+    );
+}
+
+#[test]
+fn test_saved_keys_round_trip_newest_first() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let keys = DbReaderSavedKeys {
+        refreshed_at_ms: 1_234,
+        returned: 2,
+        total: 1_500,
+        keys: vec![
+            saved_key(2, "2026-11-01T00:00:00Z"),
+            saved_key(1, "2026-11-02T00:00:00Z"),
+        ],
+    };
+    ReaderSavedRepository::replace_keys(&conn, account, &keys).unwrap();
+
+    let stored = ReaderSavedRepository::select_keys(&conn, account)
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.refreshed_at_ms, 1_234);
+    assert_eq!(stored.returned, 2);
+    assert_eq!(stored.total, 1_500);
+    assert_eq!(
+        stored.keys,
+        vec![keys.keys[1].clone(), keys.keys[0].clone()]
+    );
+}
+
+#[test]
+fn test_saved_keys_are_replaced_by_a_newer_refresh() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::replace_keys(&conn, account, &saved_keys(&[1, 2])).unwrap();
+    ReaderSavedRepository::replace_keys(&conn, account, &saved_keys(&[3])).unwrap();
+
+    let stored = ReaderSavedRepository::select_keys(&conn, account)
+        .unwrap()
+        .unwrap();
+    let keys: Vec<_> = stored.keys.into_iter().map(|key| key.key).collect();
+    assert_eq!(keys, vec![post_key(3)]);
+}
+
+#[test]
+fn test_two_spellings_of_a_saved_url_are_stored_once() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let url = |url: &str| DbReaderSavedKey {
+        key: ReaderSavedKey::Url {
+            url: url.to_string(),
+        },
+        save_id: 1,
+        date_saved: "2026-11-01T00:00:00Z".parse().unwrap(),
+        url: None,
+    };
+    let keys = DbReaderSavedKeys {
+        refreshed_at_ms: 1,
+        returned: 2,
+        total: 2,
+        keys: vec![url("https://example.com/a/"), url("https://example.com/a")],
+    };
+    ReaderSavedRepository::replace_keys(&conn, account, &keys).unwrap();
+
+    let stored = ReaderSavedRepository::select_keys(&conn, account)
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.keys.len(), 1);
+    assert_eq!(stored.returned, 2, "The count as the server returned it");
 }
 
 #[test]
@@ -294,6 +398,7 @@ fn test_deleting_an_account_deletes_its_reader_data() {
         let stream = ReaderStreamRepository::get_or_create(&conn, account, "saved").unwrap();
         ReaderStreamRepository::upsert_item(&conn, stream.row_id, row, "a").unwrap();
         ReaderSavedRepository::write_local(&conn, account, "{}").unwrap();
+        ReaderSavedRepository::replace_keys(&conn, account, &saved_keys(&[1])).unwrap();
         ReaderSavedRepository::upsert_local_only(&conn, account, &post_key(1), Some(row), None)
             .unwrap();
     }
@@ -305,6 +410,7 @@ fn test_deleting_an_account_deletes_its_reader_data() {
         "reader_streams",
         "reader_stream_items",
         "reader_saved_state",
+        "reader_saved_keys",
         "reader_saved_local_only",
     ] {
         assert_eq!(

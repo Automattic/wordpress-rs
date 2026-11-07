@@ -16,10 +16,11 @@ use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_saved::{
     ReaderPostSaveIdentity, ReaderSavePostParams, ReaderSavedBulkKey, ReaderSavedBulkParams,
-    ReaderSavedBulkResult, ReaderSavedKey, ReaderSavedPageDetails, ReaderSavedPostsParams,
-    ReaderSavedPostsResponse, ReaderSavedSource, ReaderUnsavePostParams, reader_saved_key_for_post,
-    reader_saved_keys_for_post,
+    ReaderSavedBulkResult, ReaderSavedKey, ReaderSavedKeysResponse, ReaderSavedPageDetails,
+    ReaderSavedPostsParams, ReaderSavedPostsResponse, ReaderSavedSource, ReaderUnsavePostParams,
+    reader_saved_key_for_post, reader_saved_keys_for_post,
 };
+use wp_mobile_cache::db_types::reader::{DbReaderSavedKey, DbReaderSavedKeys};
 use wp_mobile_cache::repository::reader::ReaderSavedRepository;
 use wp_mobile_cache::repository::wordpress_com_accounts::WordPressComAccountRepository;
 use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
@@ -110,8 +111,8 @@ pub struct ReaderSavedService {
     /// The account's row in the cache.
     account: RowId,
     /// Held while the state is stored, so the newest state is the one left in the cache. Holds the
-    /// generation of the server's keys last stored.
-    stored_snapshot: Mutex<Option<u64>>,
+    /// generation of the server's keys last stored, so an older refresh can't replace a newer one.
+    stored_keys: Mutex<u64>,
 }
 
 type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
@@ -189,9 +190,23 @@ impl ReaderSavedService {
 
         let keys = response
             .keys
-            .into_iter()
-            .map(|entry| (entry.key, entry.url));
-        self.state().apply_refresh(ticket, keys, response.total);
+            .iter()
+            .map(|entry| (entry.key.clone(), entry.url.clone()));
+        let applied = {
+            let mut state = self.state();
+            let before = state.snapshot_generation();
+            state.apply_refresh(ticket, keys, response.total);
+            let generation = state.snapshot_generation();
+            (generation != before).then(|| {
+                let started = state
+                    .snapshot_started_ms(self.now_on_both_clocks())
+                    .expect("a refresh was just applied");
+                (generation, started)
+            })
+        };
+        if let Some((generation, started)) = applied {
+            self.store_keys(generation, started, &response);
+        }
         self.changed();
         Ok(())
     }
@@ -307,11 +322,12 @@ impl ReaderSavedService {
         clock: Clock,
         wall_clock: WallClock,
     ) -> Result<Self, ReaderSavedError> {
-        let (account, stored, local_only) = cache.execute(|connection| {
+        let (account, stored, keys, local_only) = cache.execute(|connection| {
             let account = WordPressComAccountRepository::get_or_create(connection, user_id)?;
             let stored = ReaderSavedRepository::select_state(connection, account)?;
+            let keys = ReaderSavedRepository::select_keys(connection, account)?;
             let local_only = ReaderSavedRepository::select_local_only(connection, account)?;
-            Ok::<_, SqliteDbError>((account, stored, local_only))
+            Ok::<_, SqliteDbError>((account, stored, keys, local_only))
         })?;
         let now = Now {
             instant: clock(),
@@ -321,13 +337,19 @@ impl ReaderSavedService {
             parse_stored(stored.local.as_deref(), |local: &state::PersistedLocal| {
                 local.format
             }),
-            parse_stored(
-                stored.snapshot.as_deref(),
-                |snapshot: &state::PersistedSnapshot| snapshot.format,
-            ),
+            keys.map(|keys| state::PersistedSnapshot {
+                started: keys.refreshed_at_ms,
+                keys: keys
+                    .keys
+                    .into_iter()
+                    .map(|key| (key.key, key.url))
+                    .collect(),
+                returned: keys.returned,
+                total: keys.total,
+            }),
             now,
         );
-        let stored_snapshot = Some(state.snapshot_generation());
+        let stored_keys = state.snapshot_generation();
         Ok(Self {
             client: WpComApiClient::new(delegate),
             source,
@@ -344,7 +366,7 @@ impl ReaderSavedService {
             wall_clock,
             cache,
             account,
-            stored_snapshot: Mutex::new(stored_snapshot),
+            stored_keys: Mutex::new(stored_keys),
         })
     }
 
@@ -601,39 +623,55 @@ impl ReaderSavedService {
     /// What it costs is the next launch starting from an older state: `Unknown` until a refresh,
     /// or a write that loses to a server that hasn't caught up.
     fn store_state(&self) {
-        let mut stored_snapshot = self
-            .stored_snapshot
-            .lock()
-            .expect("stored snapshot lock poisoned");
-        let now = self.now_on_both_clocks();
-        let (local, snapshot, generation) = {
-            let state = self.state();
-            let generation = state.snapshot_generation();
-            let snapshot = (*stored_snapshot != Some(generation))
-                .then(|| state.persisted_snapshot(now))
-                .flatten();
-            (state.persisted_local(now), snapshot, generation)
+        let _serial = self.stored_keys.lock().expect("stored keys lock poisoned");
+        let local = self.state().persisted_local(self.now_on_both_clocks());
+        let result = serde_json::to_string(&local)
+            .map_err(stored_state_error)
+            .and_then(|local| {
+                self.cache
+                    .execute(|connection| {
+                        ReaderSavedRepository::write_local(&*connection, self.account, &local)
+                    })
+                    .map_err(ReaderSavedError::from)
+            });
+        if let Err(error) = result {
+            log::error!("Couldn't store the saved posts state: {error}");
+        }
+    }
+
+    /// Stores the keys of a refresh just applied, unless a newer refresh's are stored already.
+    ///
+    /// A failure is logged, as in [`Self::store_state`]. The next launch then starts from the
+    /// keys of an older refresh, until it refreshes.
+    fn store_keys(&self, generation: u64, started: i64, response: &ReaderSavedKeysResponse) {
+        let mut stored = self.stored_keys.lock().expect("stored keys lock poisoned");
+        if *stored >= generation {
+            return;
+        }
+        let keys = DbReaderSavedKeys {
+            refreshed_at_ms: started,
+            returned: response.keys.len() as u64,
+            total: response.total,
+            keys: response
+                .keys
+                .iter()
+                .map(|entry| DbReaderSavedKey {
+                    key: entry.key.clone(),
+                    save_id: entry.id.0,
+                    date_saved: entry.date_saved,
+                    url: entry.url.clone(),
+                })
+                .collect(),
         };
-        let result = (|| -> Result<(), ReaderSavedError> {
-            let local = serde_json::to_string(&local).map_err(stored_state_error)?;
-            let snapshot = snapshot
-                .map(|snapshot| serde_json::to_string(&snapshot))
-                .transpose()
-                .map_err(stored_state_error)?;
-            self.cache.execute(|connection| {
-                let transaction =
-                    wp_mobile_cache::repository::TransactionManager::transaction(connection)?;
-                ReaderSavedRepository::write_local(&transaction, self.account, &local)?;
-                if let Some(snapshot) = &snapshot {
-                    ReaderSavedRepository::write_snapshot(&transaction, self.account, snapshot)?;
-                }
-                transaction.commit().map_err(SqliteDbError::from)
-            })?;
-            Ok(())
-        })();
+        let result = self.cache.execute(|connection| {
+            let transaction =
+                wp_mobile_cache::repository::TransactionManager::transaction(connection)?;
+            ReaderSavedRepository::replace_keys(&transaction, self.account, &keys)?;
+            transaction.commit().map_err(SqliteDbError::from)
+        });
         match result {
-            Ok(()) => *stored_snapshot = Some(generation),
-            Err(error) => log::error!("Couldn't store the saved posts state: {error}"),
+            Ok(()) => *stored = generation,
+            Err(error) => log::error!("Couldn't store the saved keys: {error}"),
         }
     }
 
