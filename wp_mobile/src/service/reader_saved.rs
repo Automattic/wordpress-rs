@@ -27,9 +27,6 @@ use state::{ReaderSavedState, Tap, WriteId};
 /// The most keys `POST /wpcom/v2/read/saved/bulk` takes in a call.
 const MAX_BULK_KEYS: usize = 100;
 
-/// The `error` of an import result the server didn't return.
-pub const MISSING_RESULT: &str = "missing_result";
-
 #[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum ReaderSavedError {
@@ -39,6 +36,12 @@ pub enum ReaderSavedError {
     /// The post doesn't have the IDs the API needs to save it.
     #[error("This post can't be saved.")]
     PostCannotBeSaved,
+
+    /// An import batch got back a different number of results than the keys it sent, so no result
+    /// can be matched to its key. The server may have saved any of them, so they read as saved until
+    /// a refresh can include them.
+    #[error("The server returned {received} results for {sent} posts.")]
+    UnexpectedImportResults { sent: u64, received: u64 },
 }
 
 impl From<WpApiError> for ReaderSavedError {
@@ -204,8 +207,9 @@ impl ReaderSavedService {
     /// Sends batches of 100, oldest first, so the list stays in order. Near the 1,000 save cap that
     /// means the newest keys are the ones refused.
     ///
-    /// Stops at the first batch that fails and returns its error. Saving a post twice does nothing,
-    /// so it's safe to import everything again.
+    /// Stops at the first batch that fails and returns its error, including one that gets back a
+    /// different number of results than keys. Saving a post twice does nothing, so it's safe to
+    /// import everything again.
     ///
     /// The import takes one place in line, like a tap: a save or unsave tapped while it runs is
     /// sent once every batch is done, so a later batch can't undo it.
@@ -334,25 +338,26 @@ impl ReaderSavedService {
                 return Err(error.into());
             }
         };
-        writes.reverse();
 
-        // One result per key, in order, so the batches can be joined by position. A result the
-        // server left out is reported as one, rather than shifting every result after it.
-        let results: Vec<_> = keys
-            .iter()
-            .enumerate()
-            .map(|(index, key)| {
-                response
-                    .results
-                    .get(index)
-                    .cloned()
-                    .unwrap_or_else(|| ReaderSavedBulkResult {
-                        key: Some(key.clone()),
-                        saved: false,
-                        error: Some(MISSING_RESULT.to_string()),
-                    })
-            })
-            .collect();
+        // Results are matched to keys by position, which only works with one result per key. With
+        // any other number, one left out shifts the rest onto the wrong keys, and a post would be
+        // recorded as stored under another post's key. The server may have saved any of them.
+        if response.results.len() != keys.len() {
+            {
+                let mut state = self.state();
+                let now = self.now();
+                for write in writes {
+                    state.abandon_write(write, now);
+                }
+            }
+            self.notify();
+            return Err(ReaderSavedError::UnexpectedImportResults {
+                sent: keys.len() as u64,
+                received: response.results.len() as u64,
+            });
+        }
+        writes.reverse();
+        let results = response.results;
 
         // Answered oldest first, the order the server applied them, so the total is the newest's.
         {
