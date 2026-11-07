@@ -380,14 +380,15 @@ impl EntityStateRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MigrationManager;
+    use crate::{MIGRATIONS, MigrationManager};
     use rusqlite::Connection;
 
     use crate::{db_types::self_hosted_site::SelfHostedSite, repository::sites::SiteRepository};
 
     fn setup_test_db() -> (Connection, DbSite) {
         let mut conn = Connection::open_in_memory().expect("Failed to create in-memory database");
-        let mut mgr = MigrationManager::new(&conn).expect("Failed to create MigrationManager");
+        let mut mgr =
+            MigrationManager::new(&conn, &MIGRATIONS).expect("Failed to create MigrationManager");
         mgr.perform_migrations()
             .expect("Failed to perform migrations");
 

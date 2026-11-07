@@ -8,6 +8,7 @@ use wp_api::request::RequestExecutor;
 use wp_mobile_cache::{WpApiCache, db_types::db_site::DbSite};
 
 pub mod entity_state_service;
+pub mod local_content;
 pub mod media;
 pub mod metadata;
 pub mod mock_post_service;

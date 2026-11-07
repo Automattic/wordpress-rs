@@ -686,9 +686,10 @@ mod tests {
     use rstest::*;
     use rusqlite::Connection;
     use wp_mobile_cache::{
-        MigrationManager, WpApiCache, db_types::self_hosted_site::SelfHostedSite,
+        MIGRATIONS, WpApiCache, db_types::self_hosted_site::SelfHostedSite,
         repository::sites::SiteRepository,
     };
+    use wp_mobile_sqlite::MigrationManager;
 
     struct TestContext {
         service: MetadataService,
@@ -702,7 +703,7 @@ mod tests {
     fn test_ctx() -> TestContext {
         let mut conn = Connection::open_in_memory().expect("Failed to create in-memory database");
         let mut migration_manager =
-            MigrationManager::new(&conn).expect("Failed to create migration manager");
+            MigrationManager::new(&conn, &MIGRATIONS).expect("Failed to create migration manager");
         migration_manager
             .perform_migrations()
             .expect("Migrations should succeed");
