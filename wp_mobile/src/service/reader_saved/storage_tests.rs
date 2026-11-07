@@ -89,6 +89,26 @@ impl Device {
         self.clocks.relaunch();
         self.launch()
     }
+
+    /// A device whose cache is a database file, as the apps' is.
+    fn on_file(path: &std::path::Path) -> Self {
+        Self {
+            cache: open_file_cache(path),
+            clocks: Clocks::new(),
+        }
+    }
+
+    /// Quits the app and starts it again: the cache is closed, and opened again from its file.
+    fn relaunch_from_file(&mut self, path: &std::path::Path) {
+        self.clocks.relaunch();
+        self.cache = open_file_cache(path);
+    }
+}
+
+fn open_file_cache(path: &std::path::Path) -> Arc<WpApiCache> {
+    let cache = WpApiCache::new(Some(path.to_str().unwrap().to_string())).unwrap();
+    cache.perform_migrations().unwrap();
+    Arc::new(cache)
 }
 
 async fn refreshed(service: &ReaderSavedService, executor: &ScriptedExecutor, keys: &[Value]) {
@@ -339,6 +359,52 @@ async fn an_older_refresh_that_answers_late_doesnt_replace_the_stored_keys() {
     let (service, _) = device.relaunch();
     assert_eq!(service.status(identity(2)), ReaderSavedStatus::Saved);
     assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+}
+
+#[tokio::test]
+async fn everything_survives_closing_and_reopening_the_database_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("app.sqlite");
+    let mut device = Device::on_file(&path);
+    let (service, executor) = device.launch();
+    executor.push(Step::Respond(
+        200,
+        keys_response(&[post_json(1), post_json(3)]),
+    ));
+    executor.push(Step::Respond(
+        200,
+        page(
+            &[
+                listed(3, "2026-11-03T00:00:00Z"),
+                listed(1, "2026-11-01T00:00:00Z"),
+            ],
+            None,
+        ),
+    ));
+    service.clone().saved_posts().refresh().await.unwrap();
+    saved(&service, &executor, 2).await;
+    executor.push(Step::Respond(200, write_response(false, post_json(3), 2)));
+    service.unsave(identity(3)).await.unwrap();
+    drop((service, executor));
+
+    device.clocks.advance(Duration::from_secs(10));
+    device.relaunch_from_file(&path);
+    let (service, executor) = device.launch();
+
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    assert_eq!(service.status(identity(2)), ReaderSavedStatus::Saved);
+    assert_eq!(service.status(identity(3)), ReaderSavedStatus::NotSaved);
+    assert_eq!(service.recent_saves(), vec![post_key(2)]);
+    let keys: Vec<_> = service
+        .saved_posts()
+        .load_items()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|item| item.key)
+        .collect();
+    assert_eq!(keys, vec![post_key(2), post_key(1)]);
+    assert!(executor.sent().is_empty());
 }
 
 // Signing out
@@ -781,4 +847,78 @@ async fn unsaving_a_local_only_save_removes_it() {
     assert_eq!(service.status(rss_identity(7)), ReaderSavedStatus::NotSaved);
     assert!(service.local_only_keys().is_empty());
     assert!(service.saved_posts().load_items().await.unwrap().is_empty());
+}
+
+// How long the cache takes
+
+/// Times the cache work at the 1,000-key cap, on a database file. Not run by default: run it in a
+/// release build with `cargo test -p wp_mobile --release --lib saved_list_timings -- --ignored
+/// --nocapture`.
+#[tokio::test]
+#[ignore]
+async fn saved_list_timings() {
+    use std::time::Instant as Clock;
+    const SAVES: u64 = 1_000;
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("app.sqlite");
+    let mut device = Device::on_file(&path);
+    let (service, executor) = device.launch();
+    let keys: Vec<_> = (1..=SAVES).map(post_json).collect();
+    let posts: Vec<_> = (1..=SAVES)
+        .map(|post_id| {
+            let mut post = listed(post_id, "2026-11-01T00:00:00Z");
+            post["content"] = json!("<p>".to_string() + &"Some words. ".repeat(400) + "</p>");
+            post
+        })
+        .collect();
+
+    executor.push(Step::Respond(200, keys_response(&keys)));
+    let started = Clock::now();
+    service.refresh().await.unwrap();
+    println!("refresh, {SAVES} keys: {:?}", started.elapsed());
+
+    executor.push(Step::Respond(200, keys_response(&keys)));
+    let started = Clock::now();
+    service.refresh().await.unwrap();
+    println!(
+        "refresh again, {SAVES} keys replaced: {:?}",
+        started.elapsed()
+    );
+
+    executor.push(Step::Respond(200, page(&posts, None)));
+    let started = Clock::now();
+    service
+        .list_posts(ReaderSavedPostsParams::default())
+        .await
+        .unwrap();
+    println!(
+        "store {SAVES} listed posts (~5KB each): {:?}",
+        started.elapsed()
+    );
+
+    executor.push(Step::Respond(
+        200,
+        write_response(true, post_json(SAVES + 1), SAVES + 1),
+    ));
+    let started = Clock::now();
+    service.save(identity(SAVES + 1)).await.unwrap();
+    println!("save (two state writes): {:?}", started.elapsed());
+
+    let collection = service.clone().saved_posts();
+    let started = Clock::now();
+    let items = collection.load_items().await.unwrap();
+    println!("load_items, {} items: {:?}", items.len(), started.elapsed());
+    drop((collection, service, executor));
+
+    device.relaunch_from_file(&path);
+    let started = Clock::now();
+    let (service, _) = device.launch();
+    println!("launch, loading the state: {:?}", started.elapsed());
+    let started = Clock::now();
+    for post_id in 1..=SAVES {
+        service.status(identity(post_id));
+    }
+    println!("status x{SAVES}: {:?}", started.elapsed());
+    let size = std::fs::metadata(&path).unwrap().len();
+    println!("database file: {} KB", size / 1024);
 }

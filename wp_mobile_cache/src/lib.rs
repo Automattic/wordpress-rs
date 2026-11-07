@@ -932,6 +932,79 @@ mod tests {
         }
     }
 
+    /// An app updating from a version whose cache stopped at 0014 keeps its data, and gets the
+    /// Reader tables working beside it.
+    #[test]
+    fn test_upgrading_a_cache_with_data_from_0014() {
+        use crate::db_types::self_hosted_site::SelfHostedSite;
+        use crate::repository::reader::ReaderPostRepository;
+        use wp_api::wp_com::reader_saved::ReaderPostSaveIdentity;
+
+        let mut conn = Connection::open_in_memory().unwrap();
+        enable_foreign_keys(&conn).unwrap();
+        register_url_functions(&conn).unwrap();
+        let mut manager = MigrationManager::new(&conn).unwrap();
+        manager.create_migrations_table().unwrap();
+        for (index, migration) in MIGRATION_QUERIES[..14].iter().enumerate() {
+            for query in migration
+                .split(';')
+                .filter(|query| !query.trim().is_empty())
+            {
+                conn.execute(query, ()).unwrap();
+            }
+            manager.insert_migration(index as i64 + 1).unwrap();
+        }
+
+        let site = SiteRepository
+            .upsert_self_hosted_site(
+                &mut conn,
+                &SelfHostedSite {
+                    url: "https://example.com".to_string(),
+                    api_root: "https://example.com/wp-json".to_string(),
+                },
+            )
+            .unwrap()
+            .db_site;
+        conn.execute(
+            "INSERT INTO list_metadata (db_site_id, key) VALUES (?1, 'edit:posts:publish')",
+            [site.row_id],
+        )
+        .unwrap();
+        let count = |conn: &Connection, table: &str| -> i64 {
+            conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap()
+        };
+
+        let ran = MigrationManager::new(&conn)
+            .unwrap()
+            .perform_migrations()
+            .unwrap();
+
+        assert_eq!(ran, MIGRATION_QUERIES.len() as i64 - 14);
+        assert_eq!(count(&conn, "self_hosted_sites"), 1);
+        assert_eq!(count(&conn, "list_metadata"), 1);
+
+        let account = WordPressComAccountRepository::get_or_create(&conn, WpComUserId(1)).unwrap();
+        let post =
+            crate::db_types::reader::ReaderPostRecord::from_identity(ReaderPostSaveIdentity {
+                id: 1,
+                site_id: Some(WpComSiteId(2)),
+                feed_id: None,
+                feed_item_id: None,
+                is_external: false,
+                url: None,
+            })
+            .unwrap();
+        ReaderPostRepository::upsert(&conn, account, &post).unwrap();
+
+        // Removing the site still removes what's cached for it, and leaves the account's posts.
+        assert!(SiteRepository.delete_site(&mut conn, &site).unwrap());
+        assert_eq!(count(&conn, "list_metadata"), 0);
+        assert_eq!(count(&conn, "reader_posts"), 1);
+    }
+
     #[test]
     fn test_migration_works() {
         let cache = WpApiCache::new(None).unwrap();

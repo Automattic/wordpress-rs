@@ -1,0 +1,307 @@
+{
+  "date_range": {
+    "before": "2026-11-07T18:02:22+00:00",
+    "after": "2020-02-24T22:38:38+00:00"
+  },
+  "found": 3,
+  "number": 3,
+  "posts": [
+    {
+      "ID": 67284,
+      "author": {
+        "ID": 0,
+        "email": "",
+        "nice_name": "author",
+        "name": "Author Name",
+        "URL": "",
+        "avatar_URL": "https://0.gravatar.com/avatar/00000000000000000000000000000000?s=96&d=identicon",
+        "has_avatar": false,
+        "profile_URL": ""
+      },
+      "date": null,
+      "modified": null,
+      "title": "",
+      "URL": "https://example.com/wprs-saved-shape-check",
+      "short_URL": "https://example.com/wprs-saved-shape-check",
+      "content": "",
+      "excerpt": "",
+      "slug": "",
+      "status": "",
+      "password": "",
+      "parent": false,
+      "type": "",
+      "discussion": {
+        "comments_open": false,
+        "comment_count": 0
+      },
+      "like_count": 0,
+      "i_like": 0,
+      "is_reblogged": 0,
+      "is_following": false,
+      "featured_image": "",
+      "format": "standard",
+      "geo": false,
+      "publicize_URLs": {},
+      "tags": {},
+      "categories": {},
+      "attachments": {},
+      "metadata": false,
+      "meta": {
+        "links": {}
+      },
+      "pseudo_ID": "fedcba9876543210fedcba9876543210",
+      "global_ID": "fedcba9876543210fedcba9876543210",
+      "site_ID": 0,
+      "feed_ID": 0,
+      "site_name": "",
+      "site_URL": "",
+      "site_is_private": false,
+      "is_external": true,
+      "is_jetpack": false,
+      "use_excerpt": true,
+      "site_icon_url": "",
+      "date_saved": "2026-11-07T18:02:22+00:00",
+      "is_following_conversation": false
+    },
+    {
+      "ID": 6238295932,
+      "author": {
+        "ID": 0,
+        "email": "",
+        "nice_name": "author",
+        "name": "Author Name",
+        "URL": "https://example.com/author",
+        "avatar_URL": "https://0.gravatar.com/avatar/00000000000000000000000000000000?s=96&d=identicon",
+        "has_avatar": false,
+        "profile_URL": ""
+      },
+      "date": "2026-11-06T00:00:00+00:00",
+      "modified": "2026-11-06T00:00:00+00:00",
+      "title": "Post title 2",
+      "URL": "https://xkcd.com/3321/",
+      "short_URL": "https://xkcd.com/3321/",
+      "content": "<p>Post content.</p>",
+      "excerpt": "",
+      "slug": "",
+      "status": "",
+      "password": "",
+      "parent": false,
+      "type": "",
+      "discussion": {
+        "comments_open": false,
+        "comment_count": 0
+      },
+      "like_count": 0,
+      "i_like": 0,
+      "is_reblogged": 0,
+      "is_following": false,
+      "featured_image": "",
+      "format": "standard",
+      "geo": false,
+      "publicize_URLs": {},
+      "tags": {},
+      "categories": {},
+      "attachments": {},
+      "metadata": false,
+      "meta": {
+        "links": {
+          "feed": "https://public-api.wordpress.com/rest/v1.1/read/feed/8857199/"
+        }
+      },
+      "word_count": 0,
+      "pseudo_ID": "00112233445566778899aabbccddeeff",
+      "global_ID": "00112233445566778899aabbccddeeff",
+      "site_ID": "8857199",
+      "site_name": "xkcd.com",
+      "site_URL": "https://xkcd.com/",
+      "site_is_private": false,
+      "featured_media": {},
+      "is_external": true,
+      "is_jetpack": false,
+      "use_excerpt": false,
+      "feed_ID": 8857199,
+      "feed_URL": "http://xkcd.com/atom.xml",
+      "feed_item_ID": 6238295932,
+      "views": null,
+      "date_saved": "2026-11-07T18:02:22+00:00",
+      "is_subscribed_comments": false,
+      "can_subscribe_comments": false,
+      "subscribed_comments_notifications": false,
+      "is_seen": false,
+      "is_following_conversation": false
+    },
+    {
+      "ID": 42,
+      "site_ID": 123456,
+      "author": {
+        "ID": 1,
+        "login": "",
+        "email": "",
+        "name": "Author Name",
+        "first_name": "",
+        "last_name": "",
+        "nice_name": "author",
+        "URL": "",
+        "avatar_URL": "https://0.gravatar.com/avatar/00000000000000000000000000000000?s=96&d=identicon",
+        "profile_URL": "https://gravatar.com/author",
+        "site_ID": 1,
+        "has_avatar": true,
+        "wpcom_id": 1,
+        "wpcom_login": ""
+      },
+      "date": "2020-02-13T03:48:12+00:00",
+      "modified": "2020-02-13T03:48:12+00:00",
+      "title": "Post title 3",
+      "URL": "https://example.wordpress.com/2020/02/13/post-title-3/",
+      "short_URL": "https://wp.me/pexample-42",
+      "content": "<p>Post content.</p>",
+      "excerpt": "<p>Post excerpt.</p>",
+      "slug": "post-title-3",
+      "guid": "https://example.wordpress.com/?p=42",
+      "status": "publish",
+      "sticky": false,
+      "password": "",
+      "has_password": false,
+      "parent": false,
+      "type": "post",
+      "discussion": {
+        "comments_open": true,
+        "comment_status": "open",
+        "pings_open": true,
+        "ping_status": "open",
+        "comment_count": 0,
+        "comments_require_registration": false,
+        "comments_allow_blocks": true
+      },
+      "likes_enabled": true,
+      "sharing_enabled": true,
+      "like_count": 4,
+      "i_like": false,
+      "is_reblogged": false,
+      "is_following": false,
+      "global_ID": "0123456789abcdef0123456789abcdef",
+      "featured_image": "",
+      "post_thumbnail": null,
+      "format": "standard",
+      "geo": false,
+      "menu_order": 0,
+      "page_template": "",
+      "publicize_URLs": [],
+      "terms": {
+        "category": {
+          "Uncategorized": {
+            "ID": 1,
+            "name": "Uncategorized",
+            "slug": "uncategorized",
+            "description": "",
+            "post_count": 1752,
+            "parent": 0,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/sites/123456/categories/slug:uncategorized",
+                "help": "https://public-api.wordpress.com/rest/v1.2/sites/123456/categories/slug:uncategorized/help",
+                "site": "https://public-api.wordpress.com/rest/v1.2/sites/123456"
+              }
+            }
+          }
+        },
+        "post_tag": {
+          "example": {
+            "ID": 1,
+            "name": "example",
+            "slug": "example",
+            "description": "",
+            "post_count": 1,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/sites/123456/tags/slug:example",
+                "help": "https://public-api.wordpress.com/rest/v1.2/sites/123456/tags/slug:example/help",
+                "site": "https://public-api.wordpress.com/rest/v1.2/sites/123456"
+              }
+            }
+          }
+        },
+        "post_format": {},
+        "mentions": {}
+      },
+      "tags": {
+        "example": {
+          "ID": 1,
+          "name": "example",
+          "slug": "example",
+          "description": "",
+          "post_count": 1,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/123456/tags/slug:example",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/123456/tags/slug:example/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/123456"
+            }
+          },
+          "display_name": "example"
+        }
+      },
+      "categories": {
+        "Uncategorized": {
+          "ID": 1,
+          "name": "Uncategorized",
+          "slug": "uncategorized",
+          "description": "",
+          "post_count": 1752,
+          "parent": 0,
+          "meta": {
+            "links": {
+              "self": "https://public-api.wordpress.com/rest/v1.1/sites/123456/categories/slug:uncategorized",
+              "help": "https://public-api.wordpress.com/rest/v1.2/sites/123456/categories/slug:uncategorized/help",
+              "site": "https://public-api.wordpress.com/rest/v1.2/sites/123456"
+            }
+          }
+        }
+      },
+      "attachments": {},
+      "attachment_count": 0,
+      "metadata": [
+        {
+          "id": "1",
+          "key": "_thumbnail_id",
+          "value": ""
+        }
+      ],
+      "meta": {
+        "links": {
+          "self": "https://public-api.wordpress.com/rest/v1.1/sites/123456/posts/42",
+          "help": "https://public-api.wordpress.com/rest/v1.2/sites/123456/posts/42/help",
+          "site": "https://public-api.wordpress.com/rest/v1.2/sites/123456",
+          "replies": "https://public-api.wordpress.com/rest/v1.1/sites/123456/posts/42/replies/",
+          "likes": "https://public-api.wordpress.com/rest/v1.2/sites/123456/posts/42/likes/"
+        }
+      },
+      "capabilities": {
+        "publish_post": true,
+        "delete_post": true,
+        "edit_post": true
+      },
+      "other_URLs": {},
+      "pseudo_ID": "0123456789abcdef0123456789abcdef",
+      "is_external": false,
+      "site_name": "Example Site",
+      "site_URL": "https://example.wordpress.com",
+      "site_is_private": true,
+      "site_is_atomic": false,
+      "organization_id": 1,
+      "site_icon": {
+        "img": "https://example.wordpress.com/wp-content/uploads/icon.png?w=96",
+        "ico": "https://example.wordpress.com/wp-content/uploads/icon.png?w=96"
+      },
+      "featured_media": {},
+      "feed_ID": 7654321,
+      "feed_URL": "http://example.wordpress.com",
+      "use_excerpt": false,
+      "date_saved": "2020-02-24T22:38:38+00:00",
+      "is_subscribed_comments": false,
+      "can_subscribe_comments": false,
+      "subscribed_comments_notifications": false,
+      "is_following_conversation": true
+    }
+  ]
+}
