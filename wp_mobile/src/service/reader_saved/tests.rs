@@ -1407,52 +1407,76 @@ async fn a_failed_first_batch_saves_nothing() {
     assert!(service.recent_saves().is_empty());
 }
 
+/// Results are matched to keys by position, so with one left out from the middle, every result
+/// after it would land on the wrong key.
 #[tokio::test]
-async fn a_response_with_too_few_results_undoes_the_keys_without_a_result() {
+async fn a_result_missing_from_the_middle_fails_the_batch_and_matches_nothing() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(200, bulk_response(&[post_json(1)], 1)));
+    // Sent newest first, as 3, 2, 1. The server leaves out 2's result.
+    executor.push(Step::Respond(
+        200,
+        bulk_response(&[post_json(3), post_json(1)], 2),
+    ));
 
-    let results = service
-        .import(vec![bulk_post_key(1), bulk_post_key(2)])
-        .await
-        .unwrap();
+    let result = service
+        .import(vec![bulk_post_key(3), bulk_post_key(2), bulk_post_key(1)])
+        .await;
 
-    assert_eq!(results.len(), 2);
-    assert_eq!(results[1].key, Some(bulk_post_key(2)));
-    assert!(!results[1].saved);
-    assert_eq!(results[1].error.as_deref(), Some(MISSING_RESULT));
+    assert!(matches!(
+        result,
+        Err(ReaderSavedError::UnexpectedImportResults {
+            sent: 3,
+            received: 2
+        })
+    ));
+    // The server may have saved any of them, so they stand until a read can say.
+    for post in 1..=3 {
+        assert_eq!(service.status(identity(post)), ReaderSavedStatus::Saved);
+    }
+
+    // Post 2 isn't taken to be stored as post 1, so unsaving it leaves post 1 alone.
+    executor.push(Step::Respond(200, write_response(false, post_json(2), 2)));
+    service.unsave(identity(2)).await.unwrap();
+    let unsaves: Vec<_> = executor.sent()[2..]
+        .iter()
+        .map(|sent| sent.body.clone())
+        .collect();
+    assert_eq!(
+        unsaves,
+        vec![Some(
+            json!({ "blog_id": 123, "post_id": 2, "source": "android" })
+        )]
+    );
     assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(identity(2)), ReaderSavedStatus::NotSaved);
 }
 
 #[tokio::test]
-async fn a_short_batch_does_not_shift_the_results_of_the_other_batches() {
+async fn a_result_missing_from_the_end_fails_the_batch_and_stops_the_import() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
     let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
-    // The newer batch (101 to 150) comes back one short; the older one is whole.
+    // The newest batch, 101 to 150, goes first and comes back without 150's result.
     let short: Vec<_> = (101..=149).map(post_json).collect();
-    let whole: Vec<_> = (1..=100).map(post_json).collect();
     executor.push(Step::Respond(200, bulk_response(&short, 49)));
-    executor.push(Step::Respond(200, bulk_response(&whole, 149)));
 
-    let results = service.import(keys).await.unwrap();
+    let result = service.import(keys).await;
 
-    assert_eq!(results.len(), 150);
-    for (index, result) in results.iter().enumerate().take(149) {
-        assert_eq!(
-            result.key,
-            Some(bulk_post_key(index as i64 + 1)),
-            "result {index}"
-        );
-        assert!(result.saved, "result {index}");
-    }
-    assert_eq!(results[149].error.as_deref(), Some(MISSING_RESULT));
+    assert!(matches!(
+        result,
+        Err(ReaderSavedError::UnexpectedImportResults {
+            sent: 50,
+            received: 49
+        })
+    ));
+    assert_eq!(executor.sent().len(), 2, "the older batch isn't sent");
+    assert_eq!(service.status(identity(150)), ReaderSavedStatus::Saved);
+    assert_eq!(service.status(identity(101)), ReaderSavedStatus::Saved);
+    assert_eq!(service.status(identity(100)), ReaderSavedStatus::NotSaved);
 }
 
 #[tokio::test]
-async fn a_response_with_too_many_results_is_cut_to_one_per_key() {
+async fn too_many_results_fail_the_batch() {
     let (service, executor) = service();
     refreshed(&service, &executor, &[]).await;
     executor.push(Step::Respond(
@@ -1460,9 +1484,17 @@ async fn a_response_with_too_many_results_is_cut_to_one_per_key() {
         bulk_response(&[post_json(1), post_json(2)], 2),
     ));
 
-    let results = service.import(vec![bulk_post_key(1)]).await.unwrap();
+    let result = service.import(vec![bulk_post_key(1)]).await;
 
-    assert_eq!(results.len(), 1);
+    assert!(matches!(
+        result,
+        Err(ReaderSavedError::UnexpectedImportResults {
+            sent: 1,
+            received: 2
+        })
+    ));
+    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    assert_eq!(service.status(identity(2)), ReaderSavedStatus::NotSaved);
 }
 
 // The observer
