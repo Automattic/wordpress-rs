@@ -442,7 +442,7 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                     if (currentReaderSavedService == null) {
                         try {
                             currentReaderSavedService =
-                                createReaderSavedService(account, cache, wpComClient)
+                                createReaderSavedService(account, wpComClient)
                         } catch (e: Exception) {
                             loadError = e.toString()
                         }

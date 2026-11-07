@@ -137,20 +137,46 @@ fun createWpComApiClient(
     )
 }
 
+/** Where the saved posts screen keeps its cache and each account's user ID, across launches. */
+private val readerSavedDirectory = File(System.getProperty("java.io.tmpdir"), "reader-saved-posts")
+
 /**
- * The account's saved posts service, kept in [cache] under the account's WordPress.com user ID,
- * which it asks `/me` for. Create one per account and share it.
+ * A cache file that lasts across launches, unlike the shared one in [cacheModule], so the saved
+ * posts screen shows its list after a relaunch, offline.
  */
-suspend fun createReaderSavedService(
-    account: Account.WpCom,
-    cache: WordPressApiCache,
-    wpComApiClient: WpComApiClient,
-    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
-): ReaderSavedService {
+val readerSavedCache: WordPressApiCache by lazy {
+    readerSavedDirectory.mkdirs()
+    WordPressApiCache(File(readerSavedDirectory, "cache.db").toPath()).apply {
+        performMigrations()
+    }
+}
+
+/**
+ * The account's WordPress.com user ID: from `/me` the first time, and remembered after that, as an
+ * app would have it, so the saved posts screen opens offline.
+ */
+private suspend fun wpComUserId(account: Account.WpCom, wpComApiClient: WpComApiClient): ULong {
+    val file = File(readerSavedDirectory, "user-${account.id}")
+    file.takeIf { it.exists() }?.readText()?.toULongOrNull()?.let { return it }
     val userId = when (val result = wpComApiClient.request { it.me().get() }) {
         is WpRequestResult.Success -> result.response.data.id
         else -> error("Couldn't load the account's user ID: $result")
     }
+    readerSavedDirectory.mkdirs()
+    file.writeText(userId.toString())
+    return userId
+}
+
+/**
+ * The account's saved posts service, kept in [readerSavedCache] under the account's WordPress.com
+ * user ID. Create one per account and share it.
+ */
+suspend fun createReaderSavedService(
+    account: Account.WpCom,
+    wpComApiClient: WpComApiClient,
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): ReaderSavedService {
+    val userId = wpComUserId(account, wpComApiClient)
     return ReaderSavedService(
         delegate = WpApiClientDelegate(
             WpAuthenticationProvider.staticWithAuth(
@@ -161,7 +187,7 @@ suspend fun createReaderSavedService(
             appNotifier = EmptyAppNotifier()
         ),
         source = ReaderSavedSource.ANDROID,
-        cache = cache.cache,
+        cache = readerSavedCache.cache,
         userId = userId
     )
 }

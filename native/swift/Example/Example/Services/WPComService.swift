@@ -22,7 +22,7 @@ final class WPComService: ObservableObject {
             return readerSaved
         }
         let client = try await WPComApiClient.instance(loginManager: self.loginManager)
-        let userID = try await client.me.get().data.id
+        let userID = try await wpComUserID(client: client)
 
         let directory = try FileManager.default.url(
             for: .applicationSupportDirectory,
@@ -37,6 +37,19 @@ final class WPComService: ObservableObject {
         let service = try client.makeReaderSavedService(source: .ios, cache: cache, userID: userID)
         readerSaved = (service, cache)
         return (service, cache)
+    }
+
+    /// The account's WordPress.com user ID: from `/me` the first time, and remembered after that, as
+    /// an app would have it, so the saved posts screen opens offline.
+    private func wpComUserID(client: WPComApiClient) async throws -> UInt64 {
+        let accountID = try loginManager.getWpComAccountID() ?? 0
+        let key = "reader-saved-posts.user-id.\(accountID)"
+        if let stored = UserDefaults.standard.object(forKey: key) as? UInt64 {
+            return stored
+        }
+        let userID = try await client.me.get().data.id
+        UserDefaults.standard.set(userID, forKey: key)
+        return userID
     }
 
     public func loadRootListItems() async throws -> [RootListData] {
