@@ -177,12 +177,12 @@ impl ReaderPostRepository {
             ORDER BY p.rowid LIMIT 1"
         );
         let mut statement = executor.prepare(&sql)?;
-        Ok(statement
+        statement
             .query_row(params![account, feed_item_id.0], |row| {
                 Ok(post_from_row(row, 0))
             })
             .optional()?
-            .transpose()?)
+            .transpose()
     }
 }
 

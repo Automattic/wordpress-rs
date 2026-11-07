@@ -8,21 +8,31 @@
 use futures::FutureExt;
 use futures::channel::oneshot;
 use futures::future::Shared;
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 use wp_api::prelude::{RequestExecutionErrorReason, WpApiClientDelegate, WpApiError, WpErrorCode};
 use wp_api::wp_com::client::WpComApiClient;
+use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_saved::{
     ReaderPostSaveIdentity, ReaderSavePostParams, ReaderSavedBulkKey, ReaderSavedBulkParams,
     ReaderSavedBulkResult, ReaderSavedKey, ReaderSavedPageDetails, ReaderSavedPostsParams,
     ReaderSavedPostsResponse, ReaderSavedSource, ReaderUnsavePostParams, reader_saved_key_for_post,
     reader_saved_keys_for_post,
 };
+use wp_mobile_cache::repository::reader::ReaderSavedRepository;
+use wp_mobile_cache::repository::wordpress_com_accounts::WordPressComAccountRepository;
+use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 
 mod state;
+mod storage;
 
 pub use state::ReaderSavedStatus;
-use state::{ReaderSavedState, Tap, WriteId};
+use state::{Now, PERSISTED_FORMAT, ReaderSavedState, Tap, WriteId};
+pub use storage::{
+    ReaderLocalSave, ReaderSavedImportReport, ReaderSavedListInfo, ReaderSavedListItem,
+    ReaderSavedPageResult, ReaderSavedPostsCollection,
+};
 
 /// The most keys `POST /wpcom/v2/read/saved/bulk` takes in a call.
 const MAX_BULK_KEYS: usize = 100;
@@ -43,11 +53,24 @@ pub enum ReaderSavedError {
     /// a refresh can include them.
     #[error("The server returned {received} results for {sent} posts.")]
     UnexpectedImportResults { sent: u64, received: u64 },
+
+    #[error("{0}")]
+    Database(SqliteDbError),
+
+    /// The saved list was refreshed while its next page loaded, so the page was discarded.
+    #[error("The saved list was refreshed while the next page loaded.")]
+    StaleLoadMore,
 }
 
 impl From<WpApiError> for ReaderSavedError {
     fn from(err: WpApiError) -> Self {
         Self::Api(err)
+    }
+}
+
+impl From<SqliteDbError> for ReaderSavedError {
+    fn from(err: SqliteDbError) -> Self {
+        Self::Database(err)
     }
 }
 
@@ -60,9 +83,13 @@ pub trait ReaderSavedObserver: Send + Sync {
 
 /// The current account's saved Reader posts.
 ///
-/// Saves belong to the account rather than a site, so this is separate from `WpService`. State is
-/// kept in memory: call [`Self::refresh`] after launch, until which posts this device hasn't changed
-/// are [`ReaderSavedStatus::Unknown`].
+/// Saves belong to the account rather than a site, so this is separate from `WpService`. What it
+/// knows is kept in the cache, under the account, so after a relaunch a post reads as it did before,
+/// and a change made just before the app quit still wins over a server that hasn't caught up. Call
+/// [`Self::refresh`] after launch to catch up with changes made elsewhere.
+///
+/// [`WpApiCache::remove_wordpress_com_account`] deletes it all. Drop the service first: one still
+/// holding the removed account stops storing anything.
 ///
 /// Create one per account and share it. It sends one write at a time, in the order the user tapped,
 /// so the server ends up as the user last asked; a second instance could undo a change made through
@@ -78,22 +105,45 @@ pub struct ReaderSavedService {
     inner: Mutex<Inner>,
     observer: Mutex<Option<Arc<dyn ReaderSavedObserver>>>,
     clock: Clock,
+    wall_clock: WallClock,
+    cache: Arc<WpApiCache>,
+    /// The account's row in the cache.
+    account: RowId,
+    /// Held while the state is stored, so the newest state is the one left in the cache. Holds the
+    /// generation of the server's keys last stored.
+    stored_snapshot: Mutex<Option<u64>>,
 }
 
 type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
+type WallClock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 
 #[derive(Default)]
 struct Inner {
     state: ReaderSavedState,
     /// The taps whose writes may not have finished.
     queue: Queue,
+    /// Saves the server refused on import, normalized. They stay saved on this device.
+    local_only: HashSet<ReaderSavedKey>,
 }
 
 #[uniffi::export]
 impl ReaderSavedService {
+    /// Loads what the cache has for the account. `cache` must have had its migrations run.
     #[uniffi::constructor]
-    pub fn new(delegate: WpApiClientDelegate, source: ReaderSavedSource) -> Self {
-        Self::with_clock(delegate, source, Arc::new(Instant::now))
+    pub fn new(
+        delegate: WpApiClientDelegate,
+        source: ReaderSavedSource,
+        cache: Arc<WpApiCache>,
+        user_id: WpComUserId,
+    ) -> Result<Self, ReaderSavedError> {
+        Self::with_clocks(
+            delegate,
+            source,
+            cache,
+            user_id,
+            Arc::new(Instant::now),
+            Arc::new(SystemTime::now),
+        )
     }
 
     pub fn set_observer(&self, observer: Option<Arc<dyn ReaderSavedObserver>>) {
@@ -104,8 +154,20 @@ impl ReaderSavedService {
     ///
     /// Past 1,000 saves, a post the saved keys don't include reads `Unknown`. One the saved list
     /// shows is saved.
+    ///
+    /// A save the server refused on import is saved: it stays saved on this device.
     pub fn status(&self, post: ReaderPostSaveIdentity) -> ReaderSavedStatus {
-        self.state().status(&reader_saved_keys_for_post(post))
+        let keys = reader_saved_keys_for_post(post);
+        let inner = self.inner();
+        let status = inner.state.status(&keys);
+        if status != ReaderSavedStatus::Saved
+            && keys
+                .iter()
+                .any(|key| inner.local_only.contains(&key.normalized()))
+        {
+            return ReaderSavedStatus::Saved;
+        }
+        status
     }
 
     /// How many saves there are, or `None` until the first refresh or answered write. A post saved
@@ -130,11 +192,12 @@ impl ReaderSavedService {
             .into_iter()
             .map(|entry| (entry.key, entry.url));
         self.state().apply_refresh(ticket, keys, response.total);
-        self.notify();
+        self.changed();
         Ok(())
     }
 
-    /// A page of the saved list, without the posts this device recently unsaved.
+    /// A page of the saved list, without the posts this device recently unsaved. The posts are
+    /// stored, so [`Self::saved_posts`] shows them.
     ///
     /// Only a missing `next_page_handle` means the end of the list: a page can be short, or even
     /// empty, with more to come. `found` comes straight from the server, so prefer
@@ -143,24 +206,8 @@ impl ReaderSavedService {
         &self,
         params: ReaderSavedPostsParams,
     ) -> Result<ReaderSavedPostsResponse, ReaderSavedError> {
-        let started = self.now();
-        let mut response = self.client.reader_saved().list_posts(&params).await?.data;
-
-        let mut changed = false;
-        {
-            let mut state = self.state();
-            response.posts.retain(|post| {
-                let keys = reader_saved_keys_for_post(post.identity.clone());
-                let should_show = state.should_show_listed_post(&keys, started);
-                if should_show {
-                    changed |= state.note_listed_post(&keys);
-                }
-                should_show
-            });
-        }
-        if changed {
-            self.notify();
-        }
+        let response = self.fetch_posts(&params).await?;
+        self.store_listed_posts(&response, storage::Page::Any)?;
         Ok(response)
     }
 
@@ -170,7 +217,7 @@ impl ReaderSavedService {
         post: ReaderPostSaveIdentity,
     ) -> Result<ReaderSavedKey, ReaderSavedError> {
         let key = reader_saved_key_for_post(post).ok_or(ReaderSavedError::PostCannotBeSaved)?;
-        self.save_key(key, None).await
+        self.save_key(key, None, true).await
     }
 
     /// Saves a page by URL, and returns the key the server stored: the URL of a WordPress.com post
@@ -180,7 +227,7 @@ impl ReaderSavedService {
         url: String,
         page_details: Option<ReaderSavedPageDetails>,
     ) -> Result<ReaderSavedKey, ReaderSavedError> {
-        self.save_key(ReaderSavedKey::Url { url }, page_details)
+        self.save_key(ReaderSavedKey::Url { url }, page_details, true)
             .await
     }
 
@@ -252,30 +299,118 @@ impl ReaderSavedService {
 }
 
 impl ReaderSavedService {
-    fn with_clock(delegate: WpApiClientDelegate, source: ReaderSavedSource, clock: Clock) -> Self {
-        Self {
+    fn with_clocks(
+        delegate: WpApiClientDelegate,
+        source: ReaderSavedSource,
+        cache: Arc<WpApiCache>,
+        user_id: WpComUserId,
+        clock: Clock,
+        wall_clock: WallClock,
+    ) -> Result<Self, ReaderSavedError> {
+        let (account, stored, local_only) = cache.execute(|connection| {
+            let account = WordPressComAccountRepository::get_or_create(connection, user_id)?;
+            let stored = ReaderSavedRepository::select_state(connection, account)?;
+            let local_only = ReaderSavedRepository::select_local_only(connection, account)?;
+            Ok::<_, SqliteDbError>((account, stored, local_only))
+        })?;
+        let now = Now {
+            instant: clock(),
+            wall: wall_clock(),
+        };
+        let state = ReaderSavedState::restore(
+            parse_stored(stored.local.as_deref(), |local: &state::PersistedLocal| {
+                local.format
+            }),
+            parse_stored(
+                stored.snapshot.as_deref(),
+                |snapshot: &state::PersistedSnapshot| snapshot.format,
+            ),
+            now,
+        );
+        let stored_snapshot = Some(state.snapshot_generation());
+        Ok(Self {
             client: WpComApiClient::new(delegate),
             source,
-            inner: Mutex::default(),
+            inner: Mutex::new(Inner {
+                state,
+                queue: Queue::default(),
+                local_only: local_only
+                    .into_iter()
+                    .map(|save| save.key.normalized())
+                    .collect(),
+            }),
             observer: Mutex::default(),
             clock,
-        }
+            wall_clock,
+            cache,
+            account,
+            stored_snapshot: Mutex::new(stored_snapshot),
+        })
+    }
+
+    /// A service on a new in-memory cache, for tests that drive the clock.
+    #[cfg(test)]
+    fn with_clock(delegate: WpApiClientDelegate, source: ReaderSavedSource, clock: Clock) -> Self {
+        Self::with_clocks(
+            delegate,
+            source,
+            storage::migrated_in_memory_cache(),
+            WpComUserId(1),
+            clock,
+            Arc::new(SystemTime::now),
+        )
+        .expect("an in-memory cache works")
     }
 
     fn now(&self) -> Instant {
         (self.clock)()
     }
 
+    fn now_on_both_clocks(&self) -> Now {
+        Now {
+            instant: self.now(),
+            wall: (self.wall_clock)(),
+        }
+    }
+
+    /// Fetches a page of the saved list, without the posts this device recently unsaved.
+    async fn fetch_posts(
+        &self,
+        params: &ReaderSavedPostsParams,
+    ) -> Result<ReaderSavedPostsResponse, ReaderSavedError> {
+        let started = self.now();
+        let mut response = self.client.reader_saved().list_posts(params).await?.data;
+        let mut changed = false;
+        {
+            let mut state = self.state();
+            response.posts.retain(|post| {
+                let keys = reader_saved_keys_for_post(post.identity.clone());
+                let should_show = state.should_show_listed_post(&keys, started);
+                if should_show {
+                    changed |= state.note_listed_post(&keys);
+                }
+                should_show
+            });
+        }
+        if changed {
+            self.changed();
+        }
+        Ok(response)
+    }
+
+    /// Saves a key. `recent` is whether it goes in recent saves: an import's don't, because the
+    /// device already had them.
     async fn save_key(
         &self,
         key: ReaderSavedKey,
         page_details: Option<ReaderSavedPageDetails>,
+        recent: bool,
     ) -> Result<ReaderSavedKey, ReaderSavedError> {
         // The server would refuse it, and a key that can't be stored mustn't become a write.
         if !key.is_complete() {
             return Err(ReaderSavedError::PostCannotBeSaved);
         }
-        let (mut writes, turn) = PendingWrites::begin(self, vec![key.clone()], true, true);
+        let (mut writes, turn) = PendingWrites::begin(self, vec![key.clone()], true, recent);
         turn.wait().await;
         let params = ReaderSavePostParams {
             key: key.clone(),
@@ -288,13 +423,19 @@ impl ReaderSavedService {
         let answer = result.map(|response| (response.data.key, Some(response.data.total)));
         let returned = answer.as_ref().ok().map(|(key, _)| key.clone());
         self.finish_write(write, answer)?;
-        Ok(returned.unwrap_or(key))
+        let returned = returned.unwrap_or(key.clone());
+        // The server has it now, so it's no longer only on this device.
+        self.remove_local_only(&[key, returned.clone()]);
+        Ok(returned)
     }
 
     async fn unsave_keys(&self, post: &[ReaderSavedKey]) -> Result<(), ReaderSavedError> {
         if post.iter().any(|key| !key.is_complete()) {
             return Err(ReaderSavedError::PostCannotBeSaved);
         }
+        // A save only this device has is gone as soon as it's unsaved here.
+        self.remove_local_only(post);
+
         // Picks the keys and starts their writes under one lock, so the post reads as unsaved
         // straight away.
         let (mut writes, turn) =
@@ -302,7 +443,9 @@ impl ReaderSavedService {
         turn.wait().await;
 
         // A write that went before this one may have shown the post is stored under another key.
-        writes.add(|state| state.keys_to_unsave(post));
+        if writes.add(|state| state.keys_to_unsave(post)) {
+            self.changed();
+        }
 
         let mut first_error = None;
         for (key, write) in writes.unsent() {
@@ -342,7 +485,7 @@ impl ReaderSavedService {
         // The keys are newest first, so their writes start oldest first.
         let saved_keys: Vec<_> = keys.iter().rev().map(saved_key).collect();
         let mut writes = pending.start(saved_keys);
-        self.notify();
+        self.changed();
 
         let params = ReaderSavedBulkParams {
             keys: keys.to_vec(),
@@ -365,7 +508,7 @@ impl ReaderSavedService {
                         state.finish_with_error(write, &error, now);
                     }
                 }
-                self.notify();
+                self.changed();
                 return Err(error.into());
             }
         };
@@ -381,7 +524,7 @@ impl ReaderSavedService {
                     state.abandon_write(write, now);
                 }
             }
-            self.notify();
+            self.changed();
             return Err(ReaderSavedError::UnexpectedImportResults {
                 sent: keys.len() as u64,
                 received: response.results.len() as u64,
@@ -410,7 +553,7 @@ impl ReaderSavedService {
                 }
             }
         }
-        self.notify();
+        self.changed();
         Ok(results)
     }
 
@@ -432,7 +575,7 @@ impl ReaderSavedService {
                 Err(error.into())
             }
         };
-        self.notify();
+        self.changed();
         result
     }
 
@@ -442,6 +585,85 @@ impl ReaderSavedService {
 
     fn state(&self) -> StateGuard<'_> {
         StateGuard(self.inner())
+    }
+
+    /// Stores the state and tells the observer. Call it after every change, never with the state
+    /// locked.
+    fn changed(&self) {
+        self.store_state();
+        self.notify();
+    }
+
+    /// Stores the state in the cache, so the next launch starts from it.
+    ///
+    /// A failure is logged rather than returned. It doesn't change what this launch knows, and it
+    /// can follow a change the server has already made, which an error would misreport as failed.
+    /// What it costs is the next launch starting from an older state: `Unknown` until a refresh,
+    /// or a write that loses to a server that hasn't caught up.
+    fn store_state(&self) {
+        let mut stored_snapshot = self
+            .stored_snapshot
+            .lock()
+            .expect("stored snapshot lock poisoned");
+        let now = self.now_on_both_clocks();
+        let (local, snapshot, generation) = {
+            let state = self.state();
+            let generation = state.snapshot_generation();
+            let snapshot = (*stored_snapshot != Some(generation))
+                .then(|| state.persisted_snapshot(now))
+                .flatten();
+            (state.persisted_local(now), snapshot, generation)
+        };
+        let result = (|| -> Result<(), ReaderSavedError> {
+            let local = serde_json::to_string(&local).map_err(stored_state_error)?;
+            let snapshot = snapshot
+                .map(|snapshot| serde_json::to_string(&snapshot))
+                .transpose()
+                .map_err(stored_state_error)?;
+            self.cache.execute(|connection| {
+                let transaction =
+                    wp_mobile_cache::repository::TransactionManager::transaction(connection)?;
+                ReaderSavedRepository::write_local(&transaction, self.account, &local)?;
+                if let Some(snapshot) = &snapshot {
+                    ReaderSavedRepository::write_snapshot(&transaction, self.account, snapshot)?;
+                }
+                transaction.commit().map_err(SqliteDbError::from)
+            })?;
+            Ok(())
+        })();
+        match result {
+            Ok(()) => *stored_snapshot = Some(generation),
+            Err(error) => log::error!("Couldn't store the saved posts state: {error}"),
+        }
+    }
+
+    /// Removes saves only this device has, under any of these keys.
+    fn remove_local_only(&self, keys: &[ReaderSavedKey]) {
+        let keys: Vec<_> = keys
+            .iter()
+            .map(ReaderSavedKey::normalized)
+            .filter(|key| self.inner().local_only.contains(key))
+            .collect();
+        if keys.is_empty() {
+            return;
+        }
+        {
+            let mut inner = self.inner();
+            for key in &keys {
+                inner.local_only.remove(key);
+            }
+        }
+        let result = self.cache.execute(|connection| {
+            keys.iter().try_for_each(|key| {
+                ReaderSavedRepository::delete_local_only(&*connection, self.account, key)
+                    .map(|_| ())
+            })
+        });
+        // Logged, not returned, for the same reason as in `store_state`.
+        if let Err(error) = result {
+            log::error!("Couldn't remove a local-only save: {error}");
+        }
+        self.notify();
     }
 
     /// Never called with the state locked, because the observer is app code that reads it back.
@@ -613,7 +835,7 @@ impl<'a> PendingWrites<'a> {
             let turn = Turn::take(&mut inner.queue);
             (pending, turn)
         };
-        service.notify();
+        service.changed();
         (pending, turn)
     }
 
@@ -629,9 +851,11 @@ impl<'a> PendingWrites<'a> {
             .collect()
     }
 
-    /// Starts a write, in the same tap, for each key chosen that doesn't have one yet.
-    fn add(&mut self, choose: impl FnOnce(&ReaderSavedState) -> Vec<ReaderSavedKey>) {
+    /// Starts a write, in the same tap, for each key chosen that doesn't have one yet. Returns
+    /// whether it started any.
+    fn add(&mut self, choose: impl FnOnce(&ReaderSavedState) -> Vec<ReaderSavedKey>) -> bool {
         let mut state = self.service.state();
+        let before = self.writes.len();
         for key in choose(&state) {
             if !self
                 .writes
@@ -642,6 +866,7 @@ impl<'a> PendingWrites<'a> {
                 self.writes.push((key, write, false));
             }
         }
+        self.writes.len() != before
     }
 
     fn unsent(&self) -> Vec<(ReaderSavedKey, WriteId)> {
@@ -696,7 +921,33 @@ impl Drop for PendingWrites<'_> {
                 }
             }
         }
-        self.service.notify();
+        self.service.changed();
+    }
+}
+
+fn stored_state_error(error: serde_json::Error) -> ReaderSavedError {
+    ReaderSavedError::Database(SqliteDbError::SqliteError(format!(
+        "Couldn't encode the saved posts state: {error}"
+    )))
+}
+
+/// Reads a stored state. One that can't be read, or that an older or newer version of the library
+/// stored, is left out, which only costs what a fresh install has.
+fn parse_stored<T: serde::de::DeserializeOwned>(
+    stored: Option<&str>,
+    format: impl Fn(&T) -> u32,
+) -> Option<T> {
+    let stored = stored?;
+    match serde_json::from_str::<T>(stored) {
+        Ok(value) if format(&value) == PERSISTED_FORMAT => Some(value),
+        Ok(_) => {
+            log::warn!("Ignoring a saved posts state stored in another format");
+            None
+        }
+        Err(error) => {
+            log::warn!("Ignoring a saved posts state that can't be read: {error}");
+            None
+        }
     }
 }
 
