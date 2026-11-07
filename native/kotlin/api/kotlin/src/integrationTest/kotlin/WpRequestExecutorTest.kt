@@ -19,6 +19,7 @@ import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.UserListParams
 import uniffi.wp_api.WpAuthenticationProvider
 import java.io.File
+import java.net.NoRouteToHostException
 import java.net.URI
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
@@ -281,6 +282,36 @@ class WpRequestExecutorTest {
         assertIs<RequestExecutionErrorReason.ConnectionError>(
             (result as WpRequestResult.RequestExecutionFailed<*>).reason
         )
+    }
+
+    @Test
+    fun `no route to host is mapped to ConnectionError`() = runTest {
+        // A real "no route to host" depends on the machine's network, so an interceptor throws the
+        // exception OkHttp's connect would. Like a refused connection, no connection was made, so it
+        // must classify as ConnectionError, not the generic HttpError.
+        val client = OkHttpClient.Builder()
+            .addInterceptor { throw NoRouteToHostException("Host is unreachable") }
+            .build()
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(client),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+        val reason = (result as WpRequestResult.RequestExecutionFailed<*>).reason
+        assertIs<RequestExecutionErrorReason.ConnectionError>(reason)
+        assertTrue(reason.isSiteUnreachable)
     }
 
     @Test
