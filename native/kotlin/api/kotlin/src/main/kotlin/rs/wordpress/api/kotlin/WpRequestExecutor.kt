@@ -242,7 +242,9 @@ class WpRequestExecutor @JvmOverloads constructor(
         } catch (e: UnknownHostException) {
             RequestExecutionErrorReason.unknownHost(e, networkAvailabilityProvider)
         } catch (e: NoRouteToHostException) {
-            RequestExecutionErrorReason.noRouteToHost(e)
+            // The host resolved, but no route to it exists (host or network unreachable). Like a
+            // refused connection, no connection was made, so the request never reached the server.
+            RequestExecutionErrorReason.ConnectionError(reason = "No route to host: ${e.localizedMessage}")
         } catch (e: ConnectException) {
             RequestExecutionErrorReason.ConnectionError(reason = "Connection failed: ${e.localizedMessage}")
         } catch (e: SocketTimeoutException) {
@@ -348,11 +350,6 @@ private fun RequestExecutionErrorReason.Companion.unknownHost(
         suggestedAction = "Check that the URL is valid and try again"
     )
 }
-
-private fun RequestExecutionErrorReason.Companion.noRouteToHost(e: NoRouteToHostException) =
-    RequestExecutionErrorReason.HttpError(
-        reason = e.localizedMessage
-    )
 
 @Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
 private fun RequestExecutionErrorReason.Companion.invalidSSLError(
