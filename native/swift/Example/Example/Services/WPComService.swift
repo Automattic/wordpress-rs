@@ -9,20 +9,34 @@ final class WPComService: ObservableObject {
     private let loginManager: LoginManager
 
     /// One per account, shared by every screen: each instance only knows its own writes.
-    private var readerSavedService: ReaderSavedService?
+    private var readerSaved: (service: ReaderSavedService, cache: WordPressApiCache)?
 
     init(loginManager: LoginManager) {
         self.loginManager = loginManager
     }
 
-    func sharedReaderSavedService() async throws -> ReaderSavedService {
-        if let readerSavedService {
-            return readerSavedService
+    /// The account's saved posts service, and the cache it keeps them in. The cache is a file, so
+    /// the list is still there after a relaunch, before any refresh.
+    func sharedReaderSavedService() async throws -> (service: ReaderSavedService, cache: WordPressApiCache) {
+        if let readerSaved {
+            return readerSaved
         }
-        let service = try await WPComApiClient.instance(loginManager: self.loginManager)
-            .makeReaderSavedService(source: .ios)
-        readerSavedService = service
-        return service
+        let client = try await WPComApiClient.instance(loginManager: self.loginManager)
+        let userID = try await client.me.get().data.id
+
+        let directory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let cache = try WordPressApiCache(path: directory.appendingPathComponent("reader-saved-posts.sqlite").path)
+        _ = try cache.performMigrations()
+        cache.startListeningForUpdates()
+
+        let service = try client.makeReaderSavedService(source: .ios, cache: cache, userID: userID)
+        readerSaved = (service, cache)
+        return (service, cache)
     }
 
     public func loadRootListItems() async throws -> [RootListData] {

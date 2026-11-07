@@ -1,11 +1,17 @@
 package rs.wordpress.example.shared
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -67,6 +73,8 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
     var currentWpService by remember { mutableStateOf<WpService?>(null) }
     var currentAccount by remember { mutableStateOf<Account.SelfHostedSite?>(null) }
     var currentWpComClient by remember { mutableStateOf<WpComApiClient?>(null) }
+    var currentWpComAccount by remember { mutableStateOf<Account.WpCom?>(null) }
+    // One per account, shared by every screen: each instance only knows its own writes.
     var currentReaderSavedService by remember { mutableStateOf<ReaderSavedService?>(null) }
     var currentApiClient by remember { mutableStateOf<WpApiClient?>(null) }
     var currentSiteViewModel by remember { mutableStateOf<SiteViewModel?>(null) }
@@ -102,7 +110,8 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                                     navController.navigate("site")
                                 } else {
                                     currentWpComClient = createWpComApiClient(account)
-                                    currentReaderSavedService = createReaderSavedService(account)
+                                    currentWpComAccount = account
+                                    currentReaderSavedService = null
                                     navController.navigate("wpcom_site")
                                 }
                             }
@@ -422,15 +431,37 @@ fun App(authenticationEnabled: Boolean, authenticateSite: (String, onSuccess: ()
                 )
             }
             composable("wpcom_reader_saved") {
-                val readerSavedService = currentReaderSavedService
-                if (readerSavedService == null) {
+                val account = currentWpComAccount
+                val wpComClient = currentWpComClient
+                if (account == null || wpComClient == null) {
                     ErrorMessage("No WordPress.com account connected")
                     return@composable
                 }
-                WpComReaderSavedPostsScreen(
-                    readerSavedService = readerSavedService,
-                    onBackClicked = { navController.popBackStack() }
-                )
+                var loadError by remember { mutableStateOf<String?>(null) }
+                LaunchedEffect(account) {
+                    if (currentReaderSavedService == null) {
+                        try {
+                            currentReaderSavedService =
+                                createReaderSavedService(account, cache, wpComClient)
+                        } catch (e: Exception) {
+                            loadError = e.toString()
+                        }
+                    }
+                }
+                val readerSavedService = currentReaderSavedService
+                when {
+                    loadError != null -> ErrorMessage(loadError!!)
+                    readerSavedService == null -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                    else -> WpComReaderSavedPostsScreen(
+                        readerSavedService = readerSavedService,
+                        onBackClicked = { navController.popBackStack() }
+                    )
+                }
             }
             composable("wpcom_unified") {
                 val wpComClient = currentWpComClient

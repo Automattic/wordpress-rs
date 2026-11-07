@@ -1,5 +1,6 @@
 import SwiftUI
 import WordPressAPI
+import WordPressApiCache
 
 struct ReaderSavedPostRow: Identifiable {
     let id: ReaderSavedKey
@@ -7,38 +8,46 @@ struct ReaderSavedPostRow: Identifiable {
     let subtitle: String
     /// The post behind this row, which a save made just now doesn't have yet.
     let post: ReaderPostSaveIdentity?
+
+    init(_ item: ReaderSavedListItem) {
+        id = item.key
+        post = item.post?.identity
+
+        if let title = item.post?.title {
+            self.title = title
+        } else if let url = item.post?.identity.url {
+            self.title = url
+        } else if case .url(let url) = item.key {
+            self.title = url
+        } else {
+            self.title = String(describing: item.key)
+        }
+
+        let saved = item.isRecent ? "Saved just now" : item.dateSaved.map { "Saved \($0.formatted())" }
+        subtitle = [item.post?.siteName, saved, item.isLocalOnly ? "On this device only" : nil]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+    }
 }
 
+/// The saved list from the cache, through the service's collection. The rows reload whenever the
+/// cache changes in a way the list shows, so a save, an unsave, a refresh and a relaunch all show up
+/// without any bookkeeping here.
 @MainActor
 @Observable
 final class ReaderSavedPostsViewModel {
-    typealias ServiceProvider = @Sendable () async throws -> ReaderSavedService
-
-    private static let pageSize: UInt32 = 20
-
-    /// Passes the service's changes on to the main actor.
-    private final class ChangeObserver: ReaderSavedObserver {
-        private let onChange: @Sendable () -> Void
-
-        init(onChange: @escaping @Sendable () -> Void) {
-            self.onChange = onChange
-        }
-
-        func savedPostsChanged() {
-            onChange()
-        }
-    }
+    typealias ServiceProvider = @Sendable () async throws -> (service: ReaderSavedService, cache: WordPressApiCache)
 
     private let serviceProvider: ServiceProvider
 
     private var service: ReaderSavedService?
-    private var listedPosts: [ReaderSavedPost] = []
-    private var savedURLs: [ReaderSavedKey: String] = [:]
-    /// Bumped when the service's state changes, because that state lives outside this type.
-    private var revision = 0
+    private var collection: ReaderSavedPostsCollection?
+    private var updatesObserver: NSObjectProtocol?
 
+    private(set) var rows: [ReaderSavedPostRow] = []
+    private(set) var total: UInt64?
+    private(set) var hasMore = false
     private(set) var isLoading = false
-    private(set) var nextPageHandle: String?
 
     var urlToSave = ""
     var error: MyError?
@@ -48,56 +57,28 @@ final class ReaderSavedPostsViewModel {
         self.serviceProvider = serviceProvider
     }
 
-    var total: UInt64? {
-        _ = revision
-        return service?.savedCount()
-    }
-
-    /// The service's recent saves above the list, without anything just unsaved. A save, an unsave
-    /// or a failure of either shows up here without any bookkeeping in this type.
-    var rows: [ReaderSavedPostRow] {
-        _ = revision
-        guard let service else { return [] }
-
-        let listedRows =
-            listedPosts
-            .filter { service.status(post: $0.identity) != .notSaved }
-            .compactMap(Self.row(for:))
-        let listedKeys = Set(listedRows.map(\.id))
-        let recentRows = service.recentSaves()
-            .filter { !listedKeys.contains($0) }
-            .map { key in
-                ReaderSavedPostRow(
-                    id: key,
-                    title: savedURLs[key] ?? String(describing: key),
-                    subtitle: "Saved just now",
-                    post: nil
-                )
-            }
-
-        return recentRows + listedRows
+    /// Shows what the cache has straight away, then catches up with the server.
+    func start() async {
+        await perform {
+            _ = try await self.loadedCollection()
+            try await self.reloadFromCache()
+            _ = try await self.loadedCollection().refresh()
+        }
     }
 
     func reload() async {
         await perform {
-            let service = try await self.loadedService()
-            try await service.refresh()
-            let page = try await service.listPosts(params: .init(number: Self.pageSize))
-
-            self.listedPosts = page.posts
-            self.nextPageHandle = page.nextPageHandle
+            _ = try await self.loadedCollection().refresh()
         }
     }
 
     func loadMore() async {
-        guard let nextPageHandle else { return }
-
         await perform {
-            let service = try await self.loadedService()
-            let page = try await service.listPosts(params: .init(pageHandle: nextPageHandle, number: Self.pageSize))
-
-            self.listedPosts.append(contentsOf: page.posts)
-            self.nextPageHandle = page.nextPageHandle
+            do {
+                _ = try await self.loadedCollection().loadNextPage()
+            } catch ReaderSavedError.StaleLoadMore {
+                // A refresh started while the page loaded, and replaced it.
+            }
         }
     }
 
@@ -106,10 +87,7 @@ final class ReaderSavedPostsViewModel {
         guard !url.isEmpty else { return }
 
         await perform {
-            let service = try await self.loadedService()
-            let key = try await service.saveUrl(url: url, pageDetails: nil)
-
-            self.savedURLs[key] = url
+            _ = try await self.loadedService().saveUrl(url: url, pageDetails: nil)
             self.urlToSave = ""
         }
     }
@@ -117,6 +95,7 @@ final class ReaderSavedPostsViewModel {
     func unsave(_ row: ReaderSavedPostRow) async {
         await perform {
             let service = try await self.loadedService()
+            // The post's identity covers every key it may be saved under.
             if let post = row.post {
                 try await service.unsave(post: post)
             } else {
@@ -125,32 +104,32 @@ final class ReaderSavedPostsViewModel {
         }
     }
 
-    private func loadedService() async throws -> ReaderSavedService {
-        if let service {
-            return service
-        }
-
-        let service = try await serviceProvider()
-        service.setObserver(
-            observer: ChangeObserver { [weak self] in
-                Task { @MainActor in self?.revision += 1 }
-            }
-        )
-        self.service = service
-        return service
+    private func reloadFromCache() async throws {
+        guard let collection, let service else { return }
+        rows = try await collection.loadItems().map(ReaderSavedPostRow.init)
+        hasMore = try collection.listInfo().hasMore ?? false
+        total = service.savedCount()
     }
 
-    private static func row(for post: ReaderSavedPost) -> ReaderSavedPostRow? {
-        guard let key = post.identity.savedKey else { return nil }
+    private func loadedService() async throws -> ReaderSavedService {
+        _ = try await loadedCollection()
+        return service!
+    }
 
-        return ReaderSavedPostRow(
-            id: key,
-            title: post.title ?? post.identity.url ?? "Untitled",
-            subtitle: [post.siteName, post.dateSaved.map { "Saved \($0.formatted())" }]
-                .compactMap { $0 }
-                .joined(separator: " · "),
-            post: post.identity
-        )
+    private func loadedCollection() async throws -> ReaderSavedPostsCollection {
+        if let collection {
+            return collection
+        }
+
+        let (service, cache) = try await serviceProvider()
+        let collection = service.savedPosts()
+        self.service = service
+        self.collection = collection
+        updatesObserver = cache.addDatabaseUpdatesObserver { [weak self] hook in
+            guard collection.isRelevantUpdate(hook: hook) else { return }
+            Task { @MainActor in try? await self?.reloadFromCache() }
+        }
+        return collection
     }
 
     private func perform(_ work: () async throws -> Void) async {
@@ -200,8 +179,7 @@ struct ReaderSavedPostsView: View {
                     }
                 }
 
-                // Only a missing handle means the end: a page can be short, or even empty, with more to come.
-                if viewModel.nextPageHandle != nil {
+                if viewModel.hasMore {
                     Button("Load More") {
                         Task { await viewModel.loadMore() }
                     }
@@ -216,7 +194,7 @@ struct ReaderSavedPostsView: View {
         }
         .navigationTitle("Saved Posts")
         .refreshable { await viewModel.reload() }
-        .task { await viewModel.reload() }
+        .task { await viewModel.start() }
         .alert(isPresented: $viewModel.shouldPresentAlert, error: viewModel.error) {
             Button("OK") {}
         }

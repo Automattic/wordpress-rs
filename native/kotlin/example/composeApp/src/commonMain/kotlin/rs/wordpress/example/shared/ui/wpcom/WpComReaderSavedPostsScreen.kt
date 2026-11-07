@@ -26,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,93 +34,61 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.ui.tooling.preview.Preview
-import uniffi.wp_api.ReaderPostSaveIdentity
+import rs.wordpress.cache.kotlin.createObservableCollection
 import uniffi.wp_api.ReaderSavedKey
-import uniffi.wp_api.ReaderSavedPost
-import uniffi.wp_api.ReaderSavedPostsParams
-import uniffi.wp_api.readerSavedKeyForPost
-import uniffi.wp_mobile.ReaderSavedObserver
+import uniffi.wp_mobile.ReaderSavedException
+import uniffi.wp_mobile.ReaderSavedListItem
 import uniffi.wp_mobile.ReaderSavedService
-import uniffi.wp_mobile.ReaderSavedStatus
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-private const val PAGE_SIZE = 20u
+private fun ReaderSavedListItem.title(): String =
+    post?.title ?: post?.identity?.url ?: (key as? ReaderSavedKey.Url)?.url ?: key.toString()
 
-private data class SavedPostRow(
-    val id: ReaderSavedKey,
-    val title: String,
-    val subtitle: String,
-    /** The post behind this row, which a save made just now doesn't have yet. */
-    val post: ReaderPostSaveIdentity?
-)
-
-private fun ReaderSavedPost.toRow(): SavedPostRow? {
-    val key = readerSavedKeyForPost(identity) ?: return null
-    val saved = dateSaved?.let {
-        "Saved " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(it)
+private fun ReaderSavedListItem.subtitle(): String {
+    val saved = when {
+        isRecent -> "Saved just now"
+        else -> dateSaved?.let {
+            "Saved " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(it)
+        }
     }
-    return SavedPostRow(
-        id = key,
-        title = title ?: identity.url ?: "Untitled",
-        subtitle = listOfNotNull(siteName, saved).joinToString(" · "),
-        post = identity
-    )
+    val localOnly = if (isLocalOnly) "On this device only" else null
+    return listOfNotNull(post?.siteName, saved, localOnly).joinToString(" · ")
 }
 
 /**
- * The service's recent saves above the list, without anything just unsaved. A save, an unsave or a
- * failure of either shows up here without any bookkeeping in the screen.
+ * The saved list from the cache, through the service's collection. The rows reload whenever the
+ * cache changes in a way the list shows, so a save, an unsave, a refresh and a relaunch all show up
+ * without any bookkeeping in the screen.
  */
-private fun visibleRows(
-    service: ReaderSavedService,
-    listedPosts: List<ReaderSavedPost>,
-    savedUrls: Map<ReaderSavedKey, String>
-): List<SavedPostRow> {
-    val listedRows = listedPosts
-        .filter { service.status(it.identity) != ReaderSavedStatus.NOT_SAVED }
-        .mapNotNull { it.toRow() }
-    val listedKeys = listedRows.map { it.id }.toSet()
-    val recentRows = service.recentSaves()
-        .filter { it !in listedKeys }
-        .map { SavedPostRow(it, savedUrls[it] ?: it.toString(), "Saved just now", null) }
-    return recentRows + listedRows
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Preview
 fun WpComReaderSavedPostsScreen(
     readerSavedService: ReaderSavedService,
     onBackClicked: () -> Unit = {}
 ) {
-    var listedPosts by remember { mutableStateOf<List<ReaderSavedPost>>(emptyList()) }
-    var savedUrls by remember { mutableStateOf<Map<ReaderSavedKey, String>>(emptyMap()) }
-    var nextPageHandle by remember { mutableStateOf<String?>(null) }
+    val collection = remember(readerSavedService) { readerSavedService.savedPosts() }
+    var items by remember { mutableStateOf<List<ReaderSavedListItem>>(emptyList()) }
+    var hasMore by remember { mutableStateOf(false) }
+    var total by remember { mutableStateOf<ULong?>(null) }
     var urlToSave by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
-    // Bumped when the service's state changes, because that state lives outside Compose.
-    var revision by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
 
-    DisposableEffect(readerSavedService) {
-        readerSavedService.setObserver(
-            object : ReaderSavedObserver {
-                override fun savedPostsChanged() {
-                    scope.launch { revision++ }
-                }
-            }
-        )
-        onDispose { readerSavedService.setObserver(null) }
+    suspend fun reloadFromCache() {
+        items = collection.loadItems()
+        hasMore = collection.listInfo().hasMore ?: false
+        total = readerSavedService.savedCount()
     }
 
-    suspend fun loadPage(pageHandle: String?) {
-        val params = ReaderSavedPostsParams(pageHandle = pageHandle, number = PAGE_SIZE)
-        val page = readerSavedService.listPosts(params)
-        listedPosts = if (pageHandle == null) page.posts else listedPosts + page.posts
-        nextPageHandle = page.nextPageHandle
+    DisposableEffect(collection) {
+        val observable = createObservableCollection(
+            loadData = { collection.loadItems() },
+            isRelevantUpdate = { collection.isRelevantUpdate(it) }
+        )
+        observable.addObserver { scope.launch { reloadFromCache() } }
+        onDispose { observable.close() }
     }
 
     fun runRequest(request: suspend () -> Unit) {
@@ -130,6 +97,8 @@ fun WpComReaderSavedPostsScreen(
             error = null
             try {
                 request()
+            } catch (e: ReaderSavedException.StaleLoadMore) {
+                // A refresh started while the page loaded, and replaced it.
             } catch (e: Exception) {
                 error = e.toString()
             }
@@ -137,17 +106,11 @@ fun WpComReaderSavedPostsScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        runRequest {
-            readerSavedService.refresh()
-            loadPage(null)
-        }
+    LaunchedEffect(collection) {
+        // Show what the cache has straight away, then catch up with the server.
+        reloadFromCache()
+        runRequest { collection.refresh() }
     }
-
-    val rows = remember(revision, listedPosts, savedUrls) {
-        visibleRows(readerSavedService, listedPosts, savedUrls)
-    }
-    val total = remember(revision) { readerSavedService.savedCount() }
 
     Scaffold(
         topBar = {
@@ -181,8 +144,7 @@ fun WpComReaderSavedPostsScreen(
                         onClick = {
                             val url = urlToSave.trim()
                             runRequest {
-                                val key = readerSavedService.saveUrl(url, null)
-                                savedUrls = savedUrls + (key to url)
+                                readerSavedService.saveUrl(url, null)
                                 urlToSave = ""
                             }
                         },
@@ -194,12 +156,7 @@ fun WpComReaderSavedPostsScreen(
             }
             item {
                 TextButton(
-                    onClick = {
-                        runRequest {
-                            readerSavedService.refresh()
-                            loadPage(null)
-                        }
-                    },
+                    onClick = { runRequest { collection.refresh() } },
                     enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -215,19 +172,20 @@ fun WpComReaderSavedPostsScreen(
                     )
                 }
             }
-            items(rows, key = { it.id.toString() }) { row ->
+            items(items, key = { it.key.toString() }) { item ->
                 ListItem(
-                    headlineContent = { Text(row.title) },
-                    supportingContent = { Text(row.subtitle) },
+                    headlineContent = { Text(item.title()) },
+                    supportingContent = { Text(item.subtitle()) },
                     trailingContent = {
                         TextButton(
                             onClick = {
                                 runRequest {
-                                    val post = row.post
+                                    // The post's identity covers every key it may be saved under.
+                                    val post = item.post
                                     if (post != null) {
-                                        readerSavedService.unsave(post)
+                                        readerSavedService.unsave(post.identity)
                                     } else {
-                                        readerSavedService.unsaveKey(row.id)
+                                        readerSavedService.unsaveKey(item.key)
                                     }
                                 }
                             }
@@ -237,11 +195,10 @@ fun WpComReaderSavedPostsScreen(
                     }
                 )
             }
-            // Only a missing handle means the end: a page can be short, or even empty, with more to come.
-            nextPageHandle?.let { handle ->
+            if (hasMore) {
                 item {
                     TextButton(
-                        onClick = { runRequest { loadPage(handle) } },
+                        onClick = { runRequest { collection.loadNextPage() } },
                         enabled = !isLoading,
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -249,7 +206,7 @@ fun WpComReaderSavedPostsScreen(
                     }
                 }
             }
-            if (isLoading && rows.isEmpty()) {
+            if (isLoading && items.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
