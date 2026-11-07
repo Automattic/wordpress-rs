@@ -452,6 +452,14 @@ impl ReaderSavedState {
         sent
     }
 
+    /// Whether a write to any key the post may be saved under hasn't been answered yet.
+    pub(super) fn has_pending_write(&self, keys: &[ReaderSavedKey]) -> bool {
+        let post = self.post_keys(keys);
+        self.writes.iter().any(|write| {
+            write.progress == Progress::Pending && post.contains(&self.stored_as_of(&write.key))
+        })
+    }
+
     /// Whether this device has seen the server hold a save under this exact key: as the answer to
     /// its newest answered write to it, or else in the keys it last read.
     pub(super) fn known_saved_under(&self, key: &ReaderSavedKey) -> bool {
@@ -863,7 +871,9 @@ impl ReaderSavedState {
                 .collect();
             state.writes.sort_by_key(Write::order);
             state.recent = local.recent;
-            state.stored_as.extend(local.stored_as);
+            // This device's state has the whole map as it stood, including what it removed from
+            // what the keys said, so it replaces the one built from the keys.
+            state.stored_as = local.stored_as.into_iter().collect();
             state.answered_total = local.answered_total.map(|answered| AnsweredTotal {
                 total: answered.total,
                 at: now.instant(answered.at),
