@@ -1,6 +1,6 @@
 # Local Content Principles
 
-Rules for storing content that the user creates or edits on the device. Every storage and sync decision for local content has to satisfy them.
+Rules for storing content that the user creates or edits on the device. Every storage and sync decision for local content has to satisfy them. They don't cover how local content is pushed to the server.
 
 ## Terms
 
