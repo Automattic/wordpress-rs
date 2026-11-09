@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Local content storage: `WpLocalContentStore` and `LocalContentService` keep the posts and pages a user creates or edits on the device as working copies, in a SQLite database of their own, so clearing the API cache doesn't touch them. A working copy holds the post's fields as the editor shows them, and the site and post that pushing it updates. The library doesn't push: the app sends the fields to the server, then records the push with `record_post_working_copy_push` or `record_page_working_copy_push`. `PostWorkingCopyFields`, `PageWorkingCopyFields` and `RemotePostReference` can be made from a post fetched with the edit context; Swift gets them as `init(remote:)`.
 - `libwordpressFFI.xcframework` now has a Mac Catalyst slice, and the `WordPressAPI` Swift package supports Mac Catalyst 16 and later.
 - **BREAKING:** Errors that Cloudflare generates itself, in front of a site, now surface as `RequestExecutionErrorReason::CloudflareError` instead of `UnknownError` ("Something went wrong") or `HttpForbiddenError`. It carries a `CloudflareErrorKind` (request too large, site's server down or timing out, SSL problem, rate limited, blocked by a security rule, bot challenge, …), Cloudflare's error code when the response has one, the ray ID and any `Retry-After`, and its localized message says what happened and that the site owner or host can fix it. Login site discovery reports them too, where it previously said the site "does not appear to be a WordPress site" or that its server denied access. Responses the site's own server wrote are unchanged, even though they also pass through Cloudflare. Exhaustive `switch`/`when` statements over `RequestExecutionErrorReason` need a case for it.
 - WordPress.com Reader saved posts: `GET /rest/v1.2/read/saved` and `GET /wpcom/v2/read/saved/keys` to read a user's saves, `POST /wpcom/v2/read/saved/new`, `/delete` and `/bulk` to change them, and `reader_saved_key_for_post` / `reader_saved_keys_for_post` to pick the key a post is saved under. Swift gets them through `WPComApiClient.readerSaved` and `ReaderPostSaveIdentity.savedKey` / `.savedKeys`.
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Internal:** The SQLite plumbing the cache and the local content database share now lives in a `wp_mobile_sqlite` crate: opening and configuring a connection, running migrations, the `urls_eq` SQL function, and `ColumnIndex` / `RowExt`. `wp_mobile_cache::MigrationManager` is now `wp_mobile_sqlite::MigrationManager`, which takes the migrations to run.
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.99.0` to `1.99.1`.
 - **Internal:** Updated code signing configuration to not require a provisioning profile.
 - **Internal:** Sign the PR-build XCFramework before zipping it, so the published PR artifact is signed.

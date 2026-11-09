@@ -127,7 +127,9 @@ impl SiteRepository {
     ) -> Result<Option<FullEntity<(DbSite, DbSelfHostedSite)>>, SqliteDbError> {
         // First get the self_hosted_site. Use the `urls_eq` UDF so the lookup
         // tolerates trailing-slash and other URL-normalization differences
-        // between the stored value and the caller-provided string.
+        // between the stored value and the caller-provided string. A stored
+        // URL may or may not have a trailing slash, depending on whether its
+        // row was written before or after `ParsedUrl` normalization (#1239).
         let sql = format!(
             "SELECT * FROM {} WHERE urls_eq(url, ?)",
             DbTable::SelfHostedSites.table_name()
@@ -444,7 +446,7 @@ impl SiteRepository {
 mod tests {
     use super::*;
     use crate::{
-        MigrationManager,
+        MIGRATIONS, MigrationManager,
         db_types::row_ext::ColumnIndex,
         db_types::wordpress_com_site::DbWordPressComSiteColumn,
         entity::EntityId,
@@ -459,7 +461,7 @@ mod tests {
     fn test_conn() -> Connection {
         let conn = Connection::open_in_memory().expect("Failed to open in-memory database");
         let mut migration_manager =
-            MigrationManager::new(&conn).expect("Failed to create MigrationManager");
+            MigrationManager::new(&conn, &MIGRATIONS).expect("Failed to create MigrationManager");
         migration_manager
             .perform_migrations()
             .expect("All migrations should succeed");
