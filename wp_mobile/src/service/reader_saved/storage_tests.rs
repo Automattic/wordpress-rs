@@ -14,6 +14,7 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
+use wp_api::wp_com::reader_posts::ReaderPostTag;
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderSavedSource};
 use wp_mobile_cache::HookAction;
 
@@ -1227,4 +1228,71 @@ async fn a_sync_and_a_refresh_that_change_nothing_tell_the_saved_list_nothing() 
             .all(|table| *table == DbTable::ReaderPosts || *table == DbTable::ReaderStreams),
         "{seen:?}"
     );
+}
+
+#[tokio::test]
+async fn the_saved_list_keeps_each_posts_site_icon_tags_and_comment_count() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(
+        200,
+        keys_response(&[post_json(1), post_json(2)]),
+    ));
+    let mut post = listed(2, "2026-11-02T00:00:00Z");
+    post["site_icon"] =
+        json!({ "img": "https://example.com/icon.png", "ico": "https://example.com/favicon.ico" });
+    post["tags"] = json!({ "news": { "slug": "news", "name": "News", "post_count": 3 } });
+    post["discussion"] = json!({ "comment_count": 5, "comments_open": true });
+    executor.push(Step::Respond(200, page(&[post], Some("next"))));
+    collection.refresh().await.unwrap();
+
+    // Like an RSS post: no icon of its own, but its feed has an image.
+    let mut without_icon = listed(1, "2026-11-01T00:00:00Z");
+    without_icon["site_icon"] = json!([]);
+    without_icon["tags"] = json!({});
+    without_icon["meta"] =
+        json!({ "data": { "feed": { "image": "https://example.com/feed.png?w=150&amp;h=150" } } });
+    executor.push(Step::Respond(200, page(&[without_icon], None)));
+    collection.load_next_page().await.unwrap();
+
+    let sent = executor.sent();
+    let [_, first_page, next_page] = &sent[..] else {
+        panic!("Expected the keys and two pages, not {sent:?}");
+    };
+    for request in [first_page, next_page] {
+        assert!(request.url.contains("meta=site%2Cfeed"), "{}", request.url);
+    }
+    drop((collection, service));
+
+    // Offline, the details are still there.
+    let (service, _) = device.launch();
+    let items = service.saved_posts().load_items().await.unwrap();
+    let posts: Vec<_> = items
+        .iter()
+        .map(|item| item.post.clone().unwrap())
+        .collect();
+    let [post, without_icon] = &posts[..] else {
+        panic!("Expected two posts, not {posts:?}");
+    };
+    assert_eq!(
+        post.site_icon_url.as_deref(),
+        Some("https://example.com/icon.png")
+    );
+    assert_eq!(
+        post.tags,
+        Some(vec![ReaderPostTag {
+            slug: "news".to_string(),
+            name: "News".to_string(),
+            display_name: None,
+            post_count: Some(3),
+        }])
+    );
+    assert_eq!(post.comment_count, Some(5));
+    assert_eq!(
+        without_icon.site_icon_url.as_deref(),
+        Some("https://example.com/feed.png?w=150&h=150")
+    );
+    assert_eq!(without_icon.tags, Some(vec![]));
+    assert_eq!(without_icon.comment_count, None);
 }

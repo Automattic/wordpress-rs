@@ -4,15 +4,14 @@ use crate::{
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    wp_com::WpComSiteId,
+    wp_com::{WpComSiteId, reader_posts::ReaderPost},
     wp_content_u64_id,
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
-    deserialize_false_as_none, deserialize_null_as_empty_vec, deserialize_optional_bool_or_int,
-    deserialize_u64_or_string, deserialize_u64_or_string_or_none,
+    deserialize_null_as_empty_vec, deserialize_u64_or_string, deserialize_u64_or_string_or_none,
     deserialize_u64_or_string_or_none_as_t,
 };
 
@@ -321,6 +320,10 @@ pub struct ReaderSavedPostsParams {
     /// Only return posts saved before this time. Ignored when [`Self::page_handle`] is set.
     #[uniffi(default = None)]
     pub before: Option<WpGmtDateTime>,
+    /// Extra data to include, comma-separated. `site,feed` gives every post a
+    /// [`ReaderPost::site_icon_url`] that has one: `feed` adds an RSS feed's image.
+    #[uniffi(default = None)]
+    pub meta: Option<String>,
 }
 
 /// Response from `GET /rest/v1.2/read/saved`, newest save first.
@@ -532,82 +535,18 @@ where
 
 /// A post in the saved list.
 ///
-/// Only [`Self::identity`] is reliably set. A saved snapshot has no Reader post behind it, so
-/// everything else can be missing.
+/// Only [`ReaderPost::identity`] is reliably set. A page saved by URL has no Reader post behind it,
+/// so everything else can be missing. Ask for `meta=site,feed` to get every site's icon: without
+/// it, an RSS post has none.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ReaderSavedPost {
-    #[serde(flatten)]
-    pub identity: ReaderPostSaveIdentity,
     #[serde(
         default,
         deserialize_with = "crate::date::deserialize_optional_wp_gmt_date_time"
     )]
     pub date_saved: Option<WpGmtDateTime>,
-    #[serde(
-        rename = "global_ID",
-        default,
-        deserialize_with = "deserialize_optional_text"
-    )]
-    pub global_id: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_text")]
-    pub title: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_text")]
-    pub excerpt: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_text")]
-    pub content: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "crate::date::deserialize_optional_wp_gmt_date_time"
-    )]
-    pub date: Option<WpGmtDateTime>,
-    #[serde(
-        default,
-        deserialize_with = "crate::date::deserialize_optional_wp_gmt_date_time"
-    )]
-    pub modified: Option<WpGmtDateTime>,
-    #[serde(default, deserialize_with = "deserialize_false_as_none")]
-    pub author: Option<ReaderSavedPostAuthor>,
-    #[serde(default, deserialize_with = "deserialize_optional_text")]
-    pub featured_image: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_text")]
-    pub site_name: Option<String>,
-    #[serde(
-        rename = "site_URL",
-        default,
-        deserialize_with = "deserialize_optional_text"
-    )]
-    pub site_url: Option<String>,
-    #[serde(
-        rename = "feed_URL",
-        default,
-        deserialize_with = "deserialize_optional_text"
-    )]
-    pub feed_url: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
-    pub like_count: Option<u64>,
-    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
-    pub i_like: Option<bool>,
-    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
-    pub is_following: Option<bool>,
-}
-
-/// The author of a [`ReaderSavedPost`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
-pub struct ReaderSavedPostAuthor {
-    #[serde(default, deserialize_with = "deserialize_optional_text")]
-    pub name: Option<String>,
-    #[serde(
-        rename = "avatar_URL",
-        default,
-        deserialize_with = "deserialize_optional_text"
-    )]
-    pub avatar_url: Option<String>,
-    #[serde(
-        rename = "URL",
-        default,
-        deserialize_with = "deserialize_optional_text"
-    )]
-    pub url: Option<String>,
+    #[serde(flatten)]
+    pub post: ReaderPost,
 }
 
 #[cfg(test)]
@@ -747,38 +686,105 @@ mod tests {
         };
 
         assert_eq!(
-            reader_saved_key_for_post(url_save.identity.clone()),
+            reader_saved_key_for_post(url_save.post.identity.clone()),
             Some(ReaderSavedKey::Url {
                 url: "https://example.com/wprs-saved-shape-check".to_string()
             })
         );
-        assert_eq!(url_save.title, None);
-        assert_eq!(url_save.date, None);
+        assert_eq!(url_save.post.title, None);
+        assert_eq!(url_save.post.date, None);
         assert!(url_save.date_saved.is_some());
 
         // A feed item sends its site ID as a string.
         assert_eq!(
-            reader_saved_key_for_post(feed_item.identity.clone()),
+            reader_saved_key_for_post(feed_item.post.identity.clone()),
             Some(feed_item_key(6238295932))
         );
-        assert_eq!(feed_item.title.as_deref(), Some("Post title 2"));
-        assert_eq!(feed_item.site_name.as_deref(), Some("xkcd.com"));
-        assert!(feed_item.content.is_some());
+        assert_eq!(feed_item.post.title.as_deref(), Some("Post title 2"));
+        assert_eq!(feed_item.post.site_name.as_deref(), Some("xkcd.com"));
+        assert!(feed_item.post.content.is_some());
 
         assert_eq!(
-            reader_saved_key_for_post(post.identity.clone()),
+            reader_saved_key_for_post(post.post.identity.clone()),
             Some(ReaderSavedKey::Post {
                 blog_id: WpComSiteId(123456),
                 post_id: PostId(42),
             })
         );
-        assert_eq!(post.title.as_deref(), Some("Post title 3"));
-        assert_eq!(post.like_count, Some(4));
-        assert_eq!(post.i_like, Some(false));
-        assert!(post.content.is_some() && post.excerpt.is_some() && post.modified.is_some());
+        assert_eq!(post.post.title.as_deref(), Some("Post title 3"));
+        assert_eq!(post.post.like_count, Some(4));
+        assert_eq!(post.post.i_like, Some(false));
+        assert!(
+            post.post.content.is_some()
+                && post.post.excerpt.is_some()
+                && post.post.modified.is_some()
+        );
         assert_eq!(
             post.date_saved,
             Some("2020-02-24T22:38:38Z".parse().unwrap())
+        );
+    }
+
+    /// A response recorded from WordPress.com on 2026-11-09 with `meta=site,feed`, from public
+    /// saves made for it and then removed: a page saved by URL, an RSS post from a feed with no
+    /// image (xkcd), one from a feed with an image (The Verge), and a WordPress.com post. Content,
+    /// the site's options and capabilities, and most post metadata are removed.
+    #[test]
+    fn test_deserialize_recorded_list_response_with_meta() {
+        let json = include_str!("../../tests/wpcom/reader_saved/list_with_meta_recorded.json");
+        let response: ReaderSavedPostsResponse =
+            serde_json::from_str(json).expect("Failed to deserialize recorded list response");
+        let [url_save, xkcd, verge, post] = &response.posts[..] else {
+            panic!("Expected four posts");
+        };
+
+        assert_eq!(
+            reader_saved_key_for_post(url_save.post.identity.clone()),
+            Some(ReaderSavedKey::Url {
+                url: "https://www.rust-lang.org/".to_string()
+            })
+        );
+        assert_eq!(url_save.post.site_icon_url, None);
+        assert!(url_save.post.tags.is_empty());
+        assert_eq!(url_save.post.comment_count, Some(0));
+
+        assert_eq!(
+            reader_saved_key_for_post(xkcd.post.identity.clone()),
+            Some(feed_item_key(6240876261))
+        );
+        assert_eq!(xkcd.post.site_icon_url, None, "xkcd's feed has no image");
+        assert!(xkcd.post.tags.is_empty());
+
+        assert_eq!(
+            reader_saved_key_for_post(verge.post.identity.clone()),
+            Some(feed_item_key(6240950319))
+        );
+        assert_eq!(
+            verge.post.site_icon_url.as_deref(),
+            Some(
+                "https://platform.theverge.com/wp-content/uploads/sites/2/2025/01/verge-rss-large_80b47e.png?w=150&h=150&crop=1"
+            ),
+            "The feed's image, unescaped"
+        );
+
+        assert_eq!(
+            reader_saved_key_for_post(post.post.identity.clone()),
+            Some(ReaderSavedKey::Post {
+                blog_id: WpComSiteId(3584907),
+                post_id: PostId(89902),
+            })
+        );
+        assert_eq!(
+            post.post.site_icon_url.as_deref(),
+            Some("https://en-blog.files.wordpress.com/2026/01/wp_favicon_512x512px.png?w=96")
+        );
+        assert_eq!(post.post.tags.len(), 3);
+        assert!(post.post.tags.iter().all(|tag| !tag.name.is_empty()));
+        assert_eq!(post.post.comment_count, Some(2));
+        assert_eq!(post.post.site_locale.as_deref(), Some("en"));
+        assert_eq!(
+            post.date_saved,
+            Some("2026-11-09T22:57:36Z".parse().unwrap())
         );
     }
 
@@ -795,36 +801,36 @@ mod tests {
             panic!("Expected four posts");
         };
 
-        assert_eq!(post.identity.id, 456);
-        assert_eq!(post.title.as_deref(), Some("A WordPress.com post"));
+        assert_eq!(post.post.identity.id, 456);
+        assert_eq!(post.post.title.as_deref(), Some("A WordPress.com post"));
         assert!(post.date_saved.is_some());
-        assert_eq!(post.i_like, Some(false));
-        assert_eq!(post.like_count, Some(3));
+        assert_eq!(post.post.i_like, Some(false));
+        assert_eq!(post.post.like_count, Some(3));
         assert_eq!(
-            post.author.as_ref().and_then(|a| a.name.as_deref()),
+            post.post.author.as_ref().and_then(|a| a.name.as_deref()),
             Some("An Author")
         );
         assert_eq!(
-            reader_saved_key_for_post(post.identity.clone()),
+            reader_saved_key_for_post(post.post.identity.clone()),
             Some(post_key())
         );
 
         // Feed posts send `i_like` and `is_following` as integers.
-        assert_eq!(rss_post.i_like, Some(false));
-        assert_eq!(rss_post.is_following, Some(true));
+        assert_eq!(rss_post.post.i_like, Some(false));
+        assert_eq!(rss_post.post.is_following, Some(true));
         assert_eq!(
-            reader_saved_key_for_post(rss_post.identity.clone()),
+            reader_saved_key_for_post(rss_post.post.identity.clone()),
             Some(feed_item_key(789))
         );
 
-        assert_eq!(pruned_feed_item.date, None);
+        assert_eq!(pruned_feed_item.post.date, None);
         assert_eq!(
-            reader_saved_key_for_post(pruned_feed_item.identity.clone()),
+            reader_saved_key_for_post(pruned_feed_item.post.identity.clone()),
             Some(feed_item_key(790))
         );
 
         assert_eq!(
-            reader_saved_key_for_post(url_save.identity.clone()),
+            reader_saved_key_for_post(url_save.post.identity.clone()),
             Some(url_key())
         );
     }
@@ -927,14 +933,14 @@ mod tests {
         }))
         .unwrap();
 
-        assert_eq!(post.title, None);
-        assert_eq!(post.site_name, None);
-        assert_eq!(post.site_url, None);
-        assert_eq!(post.excerpt, None);
-        assert_eq!(post.featured_image, None);
-        assert_eq!(post.author.and_then(|author| author.name), None);
+        assert_eq!(post.post.title, None);
+        assert_eq!(post.post.site_name, None);
+        assert_eq!(post.post.site_url, None);
+        assert_eq!(post.post.excerpt, None);
+        assert_eq!(post.post.featured_image, None);
+        assert_eq!(post.post.author.and_then(|author| author.name), None);
         assert_eq!(
-            post.identity.url.as_deref(),
+            post.post.identity.url.as_deref(),
             Some("https://example.com/page")
         );
     }
@@ -951,10 +957,10 @@ mod tests {
         }))
         .unwrap();
 
-        assert_eq!(post.title.as_deref(), Some("False"));
-        assert_eq!(post.site_name.as_deref(), Some("false"));
-        assert_eq!(post.excerpt, None);
-        assert_eq!(post.author.and_then(|author| author.name), None);
+        assert_eq!(post.post.title.as_deref(), Some("False"));
+        assert_eq!(post.post.site_name.as_deref(), Some("false"));
+        assert_eq!(post.post.excerpt, None);
+        assert_eq!(post.post.author.and_then(|author| author.name), None);
     }
 
     #[test]

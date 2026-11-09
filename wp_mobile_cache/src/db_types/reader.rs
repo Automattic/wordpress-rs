@@ -5,9 +5,9 @@ use std::str::FromStr;
 use wp_api::date::WpGmtDateTime;
 use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::reader_posts::{ReaderPost, ReaderPostTag};
 use wp_api::wp_com::reader_saved::{
-    ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey, ReaderSavedPost,
-    reader_saved_key_for_post,
+    ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey, reader_saved_key_for_post,
 };
 
 /// A Reader post as the cache stores it.
@@ -52,6 +52,16 @@ pub struct ReaderPostRecord {
     pub i_like: Option<bool>,
     #[uniffi(default = None)]
     pub is_following: Option<bool>,
+    /// The site's icon, or an RSS feed's image. See [`ReaderPost::site_icon_url`] for which wins.
+    #[uniffi(default = None)]
+    pub site_icon_url: Option<String>,
+    /// `None` when the source didn't send tags, and empty when the post has none.
+    #[uniffi(default = None)]
+    pub tags: Option<Vec<ReaderPostTag>>,
+    /// The server sends `0` for a post that can't have comments, such as an RSS post or a page
+    /// saved by URL.
+    #[uniffi(default = None)]
+    pub comment_count: Option<u64>,
 }
 
 impl ReaderPostRecord {
@@ -77,11 +87,14 @@ impl ReaderPostRecord {
             like_count: None,
             i_like: None,
             is_following: None,
+            site_icon_url: None,
+            tags: None,
+            comment_count: None,
         })
     }
 
-    /// The fields the saved list sent, or `None` for a post that has no key.
-    pub fn from_saved_post(post: &ReaderSavedPost) -> Option<Self> {
+    /// The fields a Reader stream sent, or `None` for a post that has no key.
+    pub fn from_reader_post(post: &ReaderPost) -> Option<Self> {
         let author = post.author.as_ref();
         Some(Self {
             global_id: post.global_id.clone(),
@@ -100,6 +113,9 @@ impl ReaderPostRecord {
             like_count: post.like_count,
             i_like: post.i_like,
             is_following: post.is_following,
+            site_icon_url: post.site_icon_url.clone(),
+            tags: Some(post.tags.clone()),
+            comment_count: post.comment_count,
             ..Self::from_identity(post.identity.clone())?
         })
     }
