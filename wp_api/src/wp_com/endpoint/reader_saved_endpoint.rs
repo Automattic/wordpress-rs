@@ -55,8 +55,9 @@ mod tests {
             number: Some(20),
             after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
             before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
+            meta: Some("site,feed".to_string()),
         },
-        "/read/saved?page_handle=abc%3D%3D&number=20&after=2026-10-01T00%3A00%3A00%2B00%3A00&before=2026-11-01T00%3A00%3A00%2B00%3A00"
+        "/read/saved?page_handle=abc%3D%3D&number=20&after=2026-10-01T00%3A00%3A00%2B00%3A00&before=2026-11-01T00%3A00%3A00%2B00%3A00&meta=site%2Cfeed"
     )]
     fn list_posts(
         endpoint: ReaderSavedRequestEndpoint,

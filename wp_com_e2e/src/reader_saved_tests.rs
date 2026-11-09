@@ -55,6 +55,14 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     if items.len() as u64 > page.post_count {
                         return Err("The list has posts the page didn't".into());
                     }
+                    // The list reads each post's tags, so a listed post has them, if only empty.
+                    if items
+                        .iter()
+                        .filter_map(|item| item.post.as_ref())
+                        .any(|post| post.tags.is_none())
+                    {
+                        return Err("A listed post has no tags".into());
+                    }
                     let first = items.first().cloned();
                     drop((collection, service));
 

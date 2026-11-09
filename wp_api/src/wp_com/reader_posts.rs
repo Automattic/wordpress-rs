@@ -7,6 +7,7 @@
 
 use crate::{
     date::{WpGmtDateTime, deserialize_optional_wp_gmt_date_time},
+    html_entities::decode_html_entities,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -39,6 +40,8 @@ pub struct ReaderPost {
     pub pseudo_id: Option<String>,
     #[uniffi(default = None)]
     pub short_url: Option<String>,
+    /// HTML: it carries character references such as `&#8211;`. Decode it with
+    /// `decode_html_entities` to show it as text.
     #[uniffi(default = None)]
     pub title: Option<String>,
     /// HTML.
@@ -56,12 +59,17 @@ pub struct ReaderPost {
     pub modified: Option<WpGmtDateTime>,
     #[uniffi(default = None)]
     pub author: Option<ReaderPostAuthor>,
+    /// Can carry character references such as `&amp;`. Decode it with
+    /// `decode_html_entities` to show it as text.
     #[uniffi(default = None)]
     pub site_name: Option<String>,
     #[uniffi(default = None)]
     pub site_url: Option<String>,
     #[uniffi(default = None)]
     pub feed_url: Option<String>,
+    /// The site's icon: `site_icon.img`, else the icon in `meta=site`, else an RSS feed's image
+    /// from `meta=feed`. `site_icon.ico`, often a small favicon, is the last resort. Feeds that
+    /// publish no image have none.
     #[uniffi(default = None)]
     pub site_icon_url: Option<String>,
     /// The site's language, such as `en`. Only sent when the stream is asked for `meta=site`.
@@ -128,6 +136,8 @@ pub struct ReaderPostAuthor {
     #[serde(rename = "ID", default, deserialize_with = "deserialize_optional_id")]
     #[uniffi(default = None)]
     pub id: Option<u64>,
+    /// Can carry character references such as `&amp;`. Decode it with
+    /// `decode_html_entities` to show it as text.
     #[serde(default, deserialize_with = "deserialize_optional_text")]
     #[uniffi(default = None)]
     pub name: Option<String>,
@@ -365,7 +375,8 @@ struct RawSiteIcon {
     ico: Option<String>,
 }
 
-/// `meta`, of which only the site's locale is kept. `meta=site` adds the whole site here.
+/// `meta`, of which only the site's locale and icon and the feed's image are kept. `meta=site` adds
+/// the whole site here, and `meta=feed` the whole feed.
 #[derive(Deserialize)]
 struct RawMeta {
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
@@ -376,12 +387,23 @@ struct RawMeta {
 struct RawMetaData {
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
     site: Option<RawMetaSite>,
+    #[serde(default, deserialize_with = "deserialize_object_or_empty")]
+    feed: Option<RawMetaFeed>,
 }
 
 #[derive(Deserialize)]
 struct RawMetaSite {
     #[serde(default, deserialize_with = "deserialize_optional_text")]
     locale: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_object_or_empty")]
+    icon: Option<RawSiteIcon>,
+}
+
+#[derive(Deserialize)]
+struct RawMetaFeed {
+    /// HTML-escaped: `&` arrives as `&amp;`.
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    image: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -406,6 +428,23 @@ impl TryFrom<RawReaderPost> for ReaderPost {
     fn try_from(raw: RawReaderPost) -> Result<Self, Self::Error> {
         let metadata = raw.metadata.unwrap_or_default();
         let discussion = raw.discussion;
+        let meta = raw.meta.and_then(|meta| meta.data);
+        let meta_site = meta.as_ref().and_then(|data| data.site.as_ref());
+        let meta_site_icon = meta_site.and_then(|site| site.icon.as_ref());
+        let feed_image = meta
+            .as_ref()
+            .and_then(|data| data.feed.as_ref())
+            .and_then(|feed| feed.image.clone())
+            .map(decode_html_entities);
+        let site_icon_url = raw
+            .site_icon
+            .as_ref()
+            .and_then(|icon| icon.img.clone())
+            .or_else(|| meta_site_icon.and_then(|icon| icon.img.clone()))
+            .or(feed_image)
+            .or_else(|| raw.site_icon.as_ref().and_then(|icon| icon.ico.clone()))
+            .or_else(|| meta_site_icon.and_then(|icon| icon.ico.clone()));
+        let site_locale = meta_site.and_then(|site| site.locale.clone());
         Ok(Self {
             identity: raw.identity,
             global_id: raw.global_id,
@@ -421,12 +460,8 @@ impl TryFrom<RawReaderPost> for ReaderPost {
             site_name: raw.site_name,
             site_url: raw.site_url,
             feed_url: raw.feed_url,
-            site_icon_url: raw.site_icon.and_then(|icon| icon.img.or(icon.ico)),
-            site_locale: raw
-                .meta
-                .and_then(|meta| meta.data)
-                .and_then(|data| data.site)
-                .and_then(|site| site.locale),
+            site_icon_url,
+            site_locale,
             site_is_private: raw.site_is_private,
             site_is_atomic: raw.site_is_atomic,
             is_jetpack: raw.is_jetpack,
@@ -612,6 +647,48 @@ mod tests {
         assert_eq!(post.featured_media, None);
         assert_eq!(post.comment_count, Some(4));
         assert_eq!(post.date, None);
+    }
+
+    #[rstest::rstest]
+    #[case::own_icon(
+        json!({ "img": "https://a/img.png", "ico": "https://a/favicon.ico" }),
+        json!({ "site": { "icon": { "img": "https://site/img.png" } }, "feed": { "image": "https://feed/img.png" } }),
+        Some("https://a/img.png")
+    )]
+    #[case::site_meta_icon(
+        json!({ "ico": "https://a/favicon.ico" }),
+        json!({ "site": { "icon": { "img": "https://site/img.png" } }, "feed": { "image": "https://feed/img.png" } }),
+        Some("https://site/img.png")
+    )]
+    #[case::feed_image_unescaped(
+        json!([]),
+        json!({ "feed": { "image": "https://feed/img.png?w=150&amp;h=150" } }),
+        Some("https://feed/img.png?w=150&h=150")
+    )]
+    #[case::favicon_last(
+        json!({ "ico": "https://a/favicon.ico" }),
+        json!({ "feed": { "image": "" } }),
+        Some("https://a/favicon.ico")
+    )]
+    #[case::site_meta_favicon_last(
+        json!([]),
+        json!({ "site": { "icon": { "ico": "https://site/favicon.ico" } }, "feed": {} }),
+        Some("https://site/favicon.ico")
+    )]
+    #[case::none(json!([]), json!([]), None)]
+    fn test_site_icon_url(
+        #[case] site_icon: serde_json::Value,
+        #[case] meta_data: serde_json::Value,
+        #[case] expected: Option<&str>,
+    ) {
+        let post = parse(json!({
+            "ID": 1,
+            "site_ID": 2,
+            "is_external": false,
+            "site_icon": site_icon,
+            "meta": { "data": meta_data },
+        }));
+        assert_eq!(post.site_icon_url.as_deref(), expected);
     }
 
     #[test]

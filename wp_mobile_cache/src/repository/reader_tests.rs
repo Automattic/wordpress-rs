@@ -6,6 +6,7 @@ use crate::{
 use rusqlite::Connection;
 use wp_api::posts::PostId;
 use wp_api::wp_com::me::WpComUserId;
+use wp_api::wp_com::reader_posts::ReaderPostTag;
 
 fn conn() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
@@ -108,6 +109,41 @@ fn test_upsert_keeps_fields_a_slimmer_source_leaves_out() {
         "New server state replaces the old"
     );
     assert_eq!(count(&conn, "reader_posts"), 1);
+}
+
+#[test]
+fn test_site_icon_tags_and_comment_count_round_trip() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let tag = |slug: &str| ReaderPostTag {
+        slug: slug.to_string(),
+        name: slug.to_uppercase(),
+        display_name: Some(format!("#{slug}")),
+        post_count: Some(7),
+    };
+    let mut full = post(456);
+    full.site_icon_url = Some("https://example.com/icon.png".to_string());
+    full.tags = Some(vec![tag("news"), tag("rust")]);
+    full.comment_count = Some(12);
+    ReaderPostRepository::upsert(&conn, account, &full).unwrap();
+
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found, full);
+
+    // A source that doesn't send them keeps them, and one that sends no tags clears them.
+    ReaderPostRepository::upsert(&conn, account, &post(456)).unwrap();
+    let mut untagged = post(456);
+    untagged.tags = Some(vec![]);
+    untagged.comment_count = Some(13);
+    ReaderPostRepository::upsert(&conn, account, &untagged).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.site_icon_url, full.site_icon_url);
+    assert_eq!(found.tags, Some(vec![]));
+    assert_eq!(found.comment_count, Some(13));
 }
 
 #[test]
