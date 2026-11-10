@@ -4,5 +4,5 @@ source 'https://rubygems.org'
 
 gem 'buildkit', '~> 1.6'
 gem 'fastlane', '~> 2.241'
-gem 'fastlane-plugin-wpmreleasetoolkit', '~> 15.1'
+gem 'fastlane-plugin-wpmreleasetoolkit', '~> 15.3'
 gem 'fluent-tools', '~> 0.3'
