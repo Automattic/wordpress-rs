@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'open-uri'
+require 'tmpdir'
 require 'fluent_tools'
 
 PROJECT_ROOT = File.expand_path('..', __dir__)
@@ -177,6 +178,40 @@ lane :publish_release_to_github do
     is_prerelease: version.include?('-'),
     upload_assets: [xcframework_file_path, xcframework_checksum_file_path]
   )
+
+  verify_release_download
+end
+
+# Resolves the released Package.swift, which makes SwiftPM download the
+# xcframework from the GitHub release and verify its checksum, exactly as a
+# consumer of the release would. This runs after the release is public, so it
+# can't prevent a broken release, but it fails the release step straight away
+# rather than leaving the tag's own CI build to notice later.
+#
+# SwiftPM skips the download when its scratch directory already holds an
+# artifact with the same checksum, or its shared cache holds the URL, so it
+# resolves into empty temporary directories to force a real download.
+lane :verify_release_download do
+  attempts = 3
+  begin
+    Dir.mktmpdir('verify-release-download') do |tmp|
+      sh 'swift', 'package', 'resolve',
+         '--package-path', PROJECT_ROOT,
+         '--scratch-path', File.join(tmp, 'build'),
+         '--cache-path', File.join(tmp, 'cache')
+    end
+  rescue StandardError
+    attempts -= 1
+    if attempts.positive?
+      UI.important('Downloading the released xcframework failed, retrying in 30 seconds')
+      sleep 30
+      retry
+    end
+    UI.user_error!(
+      'The release is published, but its xcframework could not be downloaded or failed checksum verification. ' \
+      'Re-upload target/libwordpressFFI.xcframework.zip to the GitHub release, then check out the tag and run `bundle exec fastlane verify_release_download`.'
+    )
+  end
 end
 
 lane :publish_pr_xcframework do |options|
