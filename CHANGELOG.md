@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Internal:** Updated code signing configuration to not require a provisioning profile.
 - **Internal:** Sign the PR-build XCFramework before zipping it, so the published PR artifact is signed.
 - **Internal:** Bumped `cc` from `1.2.38` to `1.2.65`. The older version passes an invalid target triple to `clang` for Mac Catalyst with the pinned Rust toolchain.
+- Tagged releases now download `libwordpressFFI.xcframework.zip` from the GitHub release instead of `cdn.a8c-ci.services`, and the release no longer uploads it to S3. PR and trunk snapshot builds still use the CDN. Releases up to 0.10.0 are unchanged.
 
 - **Internal:** The Android `cargoBuild` Gradle task now always runs and leaves it to cargo to skip unchanged work. It declared outputs but no inputs, so after its first run Gradle treated it as up to date, and a local Android build kept a stale `libwp_mobile.so` that crashed at launch once the generated bindings had moved on.
 ## [0.10.0] - 2026-10-20
