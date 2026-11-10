@@ -109,7 +109,6 @@ lane :release do |options|
 
   validate
   update_swift_package
-  publish_to_s3
   publish_release_to_github
 end
 
@@ -181,26 +180,6 @@ lane :publish_release_to_github do
   )
 end
 
-lane :publish_to_s3 do
-  version = lane_context[LANE_VALUE_VERSION] || UI.user_error!('Missing version lane context')
-
-  upload_to_s3(
-    bucket: 'a8c-apps-public-artifacts',
-    key: File.join('wordpress-rs', version, File.basename(xcframework_file_path)),
-    file: xcframework_file_path,
-    auto_prefix: false,
-    if_exists: :fail
-  )
-
-  upload_to_s3(
-    bucket: 'a8c-apps-public-artifacts',
-    key: File.join('wordpress-rs', version, File.basename(xcframework_checksum_file_path)),
-    file: xcframework_checksum_file_path,
-    auto_prefix: false,
-    if_exists: :fail
-  )
-end
-
 lane :publish_pr_xcframework do |options|
   pr_number = options[:pr_number] || UI.user_error!('pr_number is required')
   branch_name = "pr-build/#{pr_number}"
@@ -244,7 +223,7 @@ lane :publish_xcframework_snapshot do |options|
   file_path = File.expand_path('./Package.swift', PROJECT_ROOT)
   lines = File.readlines(file_path).map do |line|
     if line.start_with?('let libwordpressFFIVersion: WordPressRSVersion =')
-      "let libwordpressFFIVersion: WordPressRSVersion = .release(version: \"#{version}\", checksum: \"#{xcframework_checksum}\")"
+      "let libwordpressFFIVersion: WordPressRSVersion = .snapshot(version: \"#{version}\", checksum: \"#{xcframework_checksum}\")"
     else
       line
     end

@@ -109,7 +109,10 @@ var package = Package(
 
 enum WordPressRSVersion {
     case local
+    /// A tagged release. The xcframework is downloaded from the GitHub release assets.
     case release(version: String, checksum: String)
+    /// A PR or trunk snapshot build. The xcframework is downloaded from the CDN.
+    case snapshot(version: String, checksum: String)
 
     var isLocal: Bool {
         if case .local = self {
@@ -123,6 +126,12 @@ enum WordPressRSVersion {
         case .local:
             return .binaryTarget(name: "libwordpressFFI", path: "target/libwordpressFFI.xcframework")
         case let .release(version, checksum):
+            return .binaryTarget(
+                name: "libwordpressFFI",
+                url: "https://github.com/Automattic/wordpress-rs/releases/download/\(version)/libwordpressFFI.xcframework.zip",
+                checksum: checksum
+            )
+        case let .snapshot(version, checksum):
             return .binaryTarget(
                 name: "libwordpressFFI",
                 url: "https://cdn.a8c-ci.services/wordpress-rs/\(version)/libwordpressFFI.xcframework.zip",
