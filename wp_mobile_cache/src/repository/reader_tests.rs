@@ -52,7 +52,8 @@ fn count(conn: &Connection, table: &str) -> i64 {
 
 #[test]
 fn test_reader_posts_columns() {
-    // Phase 2 fills the rest of these from the full Reader post, without a migration.
+    // Phase 2 fills the rest of these from the full Reader post, without a migration. Only
+    // `display_image_url`, which 0019 adds, has no column in 0016.
     let columns = get_table_column_names(&conn(), "reader_posts");
     let read: Vec<&str> = POST_COLUMNS
         .split(',')
@@ -65,7 +66,7 @@ fn test_reader_posts_columns() {
             "{column} is read but isn't in reader_posts"
         );
     }
-    assert_eq!(columns.len(), 57, "{columns:?}");
+    assert_eq!(columns.len(), 58, "{columns:?}");
 }
 
 #[test]
@@ -186,6 +187,55 @@ fn test_site_icon_tags_and_comment_count_round_trip() {
     assert_eq!(found.site_icon_url, full.site_icon_url);
     assert_eq!(found.tags, Some(vec![]));
     assert_eq!(found.comment_count, Some(13));
+}
+
+#[test]
+fn test_display_image_round_trips_and_keeps_the_server_copy() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let mut from_server = post(456);
+    from_server.display_image_url = Some("https://example.com/server.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &from_server).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found, from_server);
+
+    // A source that leaves it out keeps it.
+    ReaderPostRepository::upsert(&conn, account, &post(456)).unwrap();
+    // The app's copy doesn't replace it.
+    let mut from_app = post(456);
+    from_app.display_image_url = Some("https://example.com/app.jpg".to_string());
+    ReaderPostRepository::fill_missing(&conn, account, &from_app).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        found.display_image_url.as_deref(),
+        Some("https://example.com/server.jpg")
+    );
+
+    // A newer server copy replaces it.
+    let mut newer = post(456);
+    newer.display_image_url = Some("https://example.com/newer.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &newer).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        found.display_image_url.as_deref(),
+        Some("https://example.com/newer.jpg")
+    );
+
+    // The app fills it in for a post that has none.
+    let mut other = post(789);
+    other.display_image_url = Some("https://example.com/app.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &post(789)).unwrap();
+    ReaderPostRepository::fill_missing(&conn, account, &other).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(789))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.display_image_url, other.display_image_url);
 }
 
 #[test]

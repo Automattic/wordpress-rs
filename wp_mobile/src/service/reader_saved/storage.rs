@@ -79,6 +79,8 @@ pub struct ReaderLocalSave {
     pub title: Option<String>,
     #[uniffi(default = None)]
     pub excerpt: Option<String>,
+    /// The image the app shows for the post. It's stored as both the featured image and the display
+    /// image.
     #[uniffi(default = None)]
     pub featured_image: Option<String>,
     #[uniffi(default = None)]
@@ -145,6 +147,7 @@ impl ReaderSavedService {
                 record.title = save.title.clone();
                 record.excerpt = save.excerpt.clone();
                 record.featured_image = save.featured_image.clone();
+                record.display_image_url = save.featured_image.clone();
                 record.site_name = save.site_name.clone();
                 record.site_url = save.site_url.clone();
                 // The import's copy may be older than what the saved list already stored.

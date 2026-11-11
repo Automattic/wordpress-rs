@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
-use wp_api::wp_com::reader_posts::{ReaderPost, ReaderPostTag};
+use wp_api::wp_com::reader_posts::{ReaderFeaturedMedia, ReaderPost, ReaderPostTag};
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderSavedSource};
 use wp_mobile_cache::HookAction;
 
@@ -1297,6 +1297,89 @@ async fn the_saved_list_keeps_each_posts_site_icon_tags_and_comment_count() {
     assert_eq!(without_icon.comment_count, None);
 }
 
+#[tokio::test]
+async fn the_saved_list_shows_an_image_for_a_post_without_a_featured_image() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(
+        200,
+        keys_response(&[post_json(1), post_json(2)]),
+    ));
+    // Like a post whose author set no featured image: the server picks one from the post.
+    let mut from_media = listed(2, "2026-11-02T00:00:00Z");
+    from_media["featured_image"] = json!("");
+    from_media["featured_media"] = json!({
+        "uri": "https://example.com/from-post.jpg",
+        "width": 2560,
+        "height": 1706,
+        "type": "image",
+    });
+    let mut featured = listed(1, "2026-11-01T00:00:00Z");
+    featured["featured_image"] = json!("https://example.com/featured.jpg");
+    executor.push(Step::Respond(200, page(&[from_media, featured], None)));
+    collection.refresh().await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let images: Vec<_> = items
+        .iter()
+        .map(|item| {
+            let post = item.post.as_ref().unwrap();
+            (post.featured_image.clone(), post.display_image_url.clone())
+        })
+        .collect();
+    assert_eq!(
+        images,
+        vec![
+            (None, Some("https://example.com/from-post.jpg".to_string())),
+            (
+                Some("https://example.com/featured.jpg".to_string()),
+                Some("https://example.com/featured.jpg".to_string())
+            ),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_post_saved_with_only_featured_media_shows_its_image() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    // As the app builds it: the image it shows, as an image `featured_media`, and no display image.
+    let mut post = stream_post(4, "A post");
+    post.featured_image = None;
+    post.display_image_url = None;
+    post.featured_media = Some(ReaderFeaturedMedia {
+        uri: Some("https://example.com/from-app.jpg".to_string()),
+        media_type: Some("image".to_string()),
+        width: None,
+        height: None,
+    });
+    executor.push(Step::Respond(200, write_response(true, post_json(4), 1)));
+    service.save_with_details(post).await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let post = items[0].post.as_ref().unwrap();
+    assert_eq!(post.featured_image, None);
+    assert_eq!(
+        post.display_image_url.as_deref(),
+        Some("https://example.com/from-app.jpg")
+    );
+
+    // The saved list's copy, which has none, keeps it.
+    executor.push(Step::Respond(200, keys_response(&[post_json(4)])));
+    executor.push(Step::Respond(
+        200,
+        page(&[listed(4, "2026-11-05T00:00:00Z")], None),
+    ));
+    collection.refresh().await.unwrap();
+    let items = collection.load_items().await.unwrap();
+    assert_eq!(
+        items[0].post.as_ref().unwrap().display_image_url.as_deref(),
+        Some("https://example.com/from-app.jpg")
+    );
+}
+
 /// A post as the app has it when the user taps bookmark: one it loaded from a Reader stream.
 fn stream_post(post_id: u64, title: &str) -> ReaderPost {
     serde_json::from_value(json!({
@@ -1359,6 +1442,10 @@ async fn a_post_saved_with_its_details_shows_in_full_before_any_refresh() {
     assert_eq!(post.author_name.as_deref(), Some("An author"));
     assert_eq!(
         post.featured_image.as_deref(),
+        Some("https://example.com/image.jpg")
+    );
+    assert_eq!(
+        post.display_image_url.as_deref(),
         Some("https://example.com/image.jpg")
     );
     assert_eq!(post.site_name.as_deref(), Some("A site"));

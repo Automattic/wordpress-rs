@@ -84,6 +84,14 @@ pub struct ReaderPost {
     pub featured_image: Option<String>,
     #[uniffi(default = None)]
     pub featured_media: Option<ReaderFeaturedMedia>,
+    /// The image to show for the post, picked the way the Reader apps pick it. See
+    /// [`reader_post_display_image_url`] for which wins.
+    ///
+    /// Parsing a response sets it. When you build a post yourself, such as one to pass to a save,
+    /// set it to the image you show for the post. Left `None`, the cache falls back to
+    /// [`Self::featured_image`], then [`Self::featured_media`] when it's an image.
+    #[uniffi(default = None)]
+    pub display_image_url: Option<String>,
     pub tags: Vec<ReaderPostTag>,
     /// Set when the post is a cross-post of another.
     #[uniffi(default = None)]
@@ -185,6 +193,32 @@ pub struct ReaderFeaturedMedia {
     #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
     #[uniffi(default = None)]
     pub height: Option<u64>,
+}
+
+/// The image to show for a post, as the Reader apps pick it:
+///
+/// 1. `editorial.image`, which an editor picked for a post in Discover, unless it's a `wp.com/mshots/`
+///    screenshot of the page, which the apps never show.
+/// 2. `featured_image`, the image the author set.
+/// 3. `featured_media.uri`, when `featured_media` is an image rather than a video. The server fills
+///    it in from the post's images when the author set none.
+///
+/// Empty values are skipped. The saved list doesn't send `editorial`.
+pub fn reader_post_display_image_url(
+    editorial_image: Option<&str>,
+    featured_image: Option<&str>,
+    featured_media: Option<&ReaderFeaturedMedia>,
+) -> Option<String> {
+    let featured_media_image = featured_media
+        .filter(|media| media.media_type.as_deref() == Some("image"))
+        .and_then(|media| media.uri.as_deref());
+    editorial_image
+        .filter(|url| !url.contains("wp.com/mshots/"))
+        .into_iter()
+        .chain(featured_image)
+        .chain(featured_media_image)
+        .find(|url| !url.is_empty())
+        .map(str::to_string)
 }
 
 /// A tag on a [`ReaderPost`].
@@ -328,6 +362,8 @@ struct RawReaderPost {
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
     featured_media: Option<ReaderFeaturedMedia>,
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
+    editorial: Option<RawEditorial>,
+    #[serde(default, deserialize_with = "deserialize_object_or_empty")]
     tags: Option<BTreeMap<String, ReaderPostTag>>,
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
     metadata: Option<Vec<RawMetadata>>,
@@ -359,6 +395,13 @@ struct RawReaderPost {
     discover_metadata: Option<serde_json::Value>,
     #[serde(default)]
     railcar: Option<serde_json::Value>,
+}
+
+/// `editorial`, which Discover sends for a post an editor picked. Only its image is kept.
+#[derive(Deserialize)]
+struct RawEditorial {
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    image: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -439,6 +482,13 @@ impl TryFrom<RawReaderPost> for ReaderPost {
             .or_else(|| raw.site_icon.as_ref().and_then(|icon| icon.ico.clone()))
             .or_else(|| meta_site_icon.and_then(|icon| icon.ico.clone()));
         let site_locale = meta_site.and_then(|site| site.locale.clone());
+        let display_image_url = reader_post_display_image_url(
+            raw.editorial
+                .as_ref()
+                .and_then(|editorial| editorial.image.as_deref()),
+            raw.featured_image.as_deref(),
+            raw.featured_media.as_ref(),
+        );
         Ok(Self {
             identity: raw.identity,
             global_id: raw.global_id,
@@ -462,6 +512,7 @@ impl TryFrom<RawReaderPost> for ReaderPost {
             organization_id: raw.organization_id,
             featured_image: raw.featured_image,
             featured_media: raw.featured_media,
+            display_image_url,
             tags: raw.tags.unwrap_or_default().into_values().collect(),
             cross_post: cross_post(&metadata),
             like_count: raw.like_count,
@@ -683,6 +734,58 @@ mod tests {
             "meta": { "data": meta_data },
         }));
         assert_eq!(post.site_icon_url.as_deref(), expected);
+    }
+
+    const MSHOTS: &str = "https://s0.wp.com/mshots/v1/https%3A%2F%2Fexample.com%2Fpost?w=252";
+
+    #[rstest::rstest]
+    #[case::editorial_first(
+        json!({ "image": "https://editorial/img.jpg" }),
+        json!("https://featured/img.jpg"),
+        json!({ "uri": "https://media/img.jpg", "type": "image" }),
+        Some("https://editorial/img.jpg")
+    )]
+    #[case::editorial_mshots_skipped(
+        json!({ "image": MSHOTS }),
+        json!("https://featured/img.jpg"),
+        json!({ "uri": "https://media/img.jpg", "type": "image" }),
+        Some("https://featured/img.jpg")
+    )]
+    #[case::featured_image(
+        json!({ "image": "" }),
+        json!("https://featured/img.jpg"),
+        json!({ "uri": "https://media/img.jpg", "type": "image" }),
+        Some("https://featured/img.jpg")
+    )]
+    #[case::featured_media_image(
+        json!(null),
+        json!(""),
+        json!({ "uri": "https://media/img.jpg", "type": "image" }),
+        Some("https://media/img.jpg")
+    )]
+    #[case::featured_media_not_an_image(
+        json!(null),
+        json!(""),
+        json!({ "uri": "https://media/video.mp4", "type": "video" }),
+        None
+    )]
+    #[case::editorial_mshots_and_nothing_else(json!({ "image": MSHOTS }), json!(""), json!([]), None)]
+    #[case::none(json!(null), json!(null), json!(null), None)]
+    fn test_display_image_url(
+        #[case] editorial: serde_json::Value,
+        #[case] featured_image: serde_json::Value,
+        #[case] featured_media: serde_json::Value,
+        #[case] expected: Option<&str>,
+    ) {
+        let post = parse(json!({
+            "ID": 1,
+            "site_ID": 2,
+            "is_external": false,
+            "editorial": editorial,
+            "featured_image": featured_image,
+            "featured_media": featured_media,
+        }));
+        assert_eq!(post.display_image_url.as_deref(), expected);
     }
 
     #[test]

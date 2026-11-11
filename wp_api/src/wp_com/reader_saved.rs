@@ -788,6 +788,33 @@ mod tests {
         );
     }
 
+    /// A post recorded from WordPress.com on 2026-11-11 with `meta=site,feed`, from a Jetpack site
+    /// that set no featured image: the server sends an empty `featured_image`, and picks an image
+    /// from the post for `featured_media`. The site, author and IDs are replaced, and content,
+    /// capabilities and most metadata are removed. Saved posts have no `editorial`.
+    #[test]
+    fn test_deserialize_recorded_post_with_only_featured_media() {
+        let json = include_str!("../../tests/wpcom/reader_saved/list_featured_media_recorded.json");
+        let response: ReaderSavedPostsResponse =
+            serde_json::from_str(json).expect("Failed to deserialize recorded list response");
+        let [saved] = &response.posts[..] else {
+            panic!("Expected one post");
+        };
+        let post = &saved.post;
+        assert_eq!(post.title.as_deref(), Some("Caption Demo"));
+        assert_eq!(post.featured_image, None, "Sent as an empty string");
+        assert_eq!(
+            post.featured_media
+                .as_ref()
+                .and_then(|media| media.media_type.as_deref()),
+            Some("image")
+        );
+        assert_eq!(
+            post.display_image_url.as_deref(),
+            Some("https://example.com/wp-content/uploads/2026/11/image.jpg")
+        );
+    }
+
     #[test]
     fn test_deserialize_list_response() {
         let json = include_str!("../../tests/wpcom/reader_saved/list.json");
