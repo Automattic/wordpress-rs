@@ -112,6 +112,48 @@ fn test_upsert_keeps_fields_a_slimmer_source_leaves_out() {
 }
 
 #[test]
+fn test_fill_missing_only_fills_fields_the_stored_post_lacks() {
+    let conn = conn();
+    let account = account(&conn, 1);
+
+    // Nothing stored yet: every field is stored.
+    let mut from_app = post(456);
+    from_app.title = Some("App title".to_string());
+    from_app.author_name = Some("App author".to_string());
+    let first = ReaderPostRepository::fill_missing(&conn, account, &from_app).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found, from_app);
+
+    // The server's copy replaces the app's.
+    let mut from_server = post(456);
+    from_server.title = Some("Server title".to_string());
+    from_server.comment_count = Some(2);
+    ReaderPostRepository::upsert(&conn, account, &from_server).unwrap();
+
+    // The app's details don't replace the server's, but fill in what it left out.
+    let mut again = post(456);
+    again.title = Some("Older app title".to_string());
+    again.comment_count = Some(1);
+    again.featured_image = Some("https://example.com/image.jpg".to_string());
+    let second = ReaderPostRepository::fill_missing(&conn, account, &again).unwrap();
+
+    assert_eq!(first, second);
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.title.as_deref(), Some("Server title"));
+    assert_eq!(found.comment_count, Some(2));
+    assert_eq!(found.author_name.as_deref(), Some("App author"));
+    assert_eq!(
+        found.featured_image.as_deref(),
+        Some("https://example.com/image.jpg")
+    );
+    assert_eq!(count(&conn, "reader_posts"), 1);
+}
+
+#[test]
 fn test_site_icon_tags_and_comment_count_round_trip() {
     let conn = conn();
     let account = account(&conn, 1);

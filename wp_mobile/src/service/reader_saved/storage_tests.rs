@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
-use wp_api::wp_com::reader_posts::ReaderPostTag;
+use wp_api::wp_com::reader_posts::{ReaderPost, ReaderPostTag};
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderSavedSource};
 use wp_mobile_cache::HookAction;
 
@@ -1295,4 +1295,213 @@ async fn the_saved_list_keeps_each_posts_site_icon_tags_and_comment_count() {
     );
     assert_eq!(without_icon.tags, Some(vec![]));
     assert_eq!(without_icon.comment_count, None);
+}
+
+/// A post as the app has it when the user taps bookmark: one it loaded from a Reader stream.
+fn stream_post(post_id: u64, title: &str) -> ReaderPost {
+    serde_json::from_value(json!({
+        "ID": post_id,
+        "site_ID": 123,
+        "is_external": false,
+        "title": title,
+        "excerpt": "An excerpt",
+        "date": "2026-11-01T10:00:00+00:00",
+        "author": { "ID": 7, "name": "An author" },
+        "featured_image": "https://example.com/image.jpg",
+        "site_name": "A site",
+        "site_URL": "https://example.com",
+        "site_icon": { "img": "https://example.com/icon.png" },
+        "tags": { "news": { "slug": "news", "name": "News" } },
+        "discussion": { "comment_count": 3, "comments_open": true },
+    }))
+    .unwrap()
+}
+
+#[tokio::test]
+async fn a_post_saved_with_its_details_shows_in_full_before_any_refresh() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+
+    // While the save is in flight, the list already shows the post.
+    let (release, held) = oneshot::channel();
+    executor.push(Step::Hold(held, 200, write_response(true, post_json(4), 1)));
+    let (result, ()) = futures::join!(
+        service.save_with_details(stream_post(4, "From the stream")),
+        async {
+            let items = collection.load_items().await.unwrap();
+            assert_eq!(titles(&items), vec![Some("From the stream".to_string())]);
+            release.send(()).unwrap();
+        }
+    );
+    assert_eq!(
+        result.unwrap(),
+        ReaderSavedOutcome::Synced { key: post_key(4) }
+    );
+    drop((collection, service));
+
+    // Offline, after a relaunch, the row is still complete.
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    let items = collection.load_items().await.unwrap();
+    let [item] = &items[..] else {
+        panic!("Expected the saved post, not {items:?}");
+    };
+    assert!(!item.is_pending, "the server has it");
+    assert_eq!(item.key, post_key(4));
+    let post = item
+        .post
+        .clone()
+        .expect("The details were stored with the save");
+    assert_eq!(post.identity, identity(4));
+    assert_eq!(post.title.as_deref(), Some("From the stream"));
+    assert_eq!(post.excerpt.as_deref(), Some("An excerpt"));
+    assert_eq!(post.author_name.as_deref(), Some("An author"));
+    assert_eq!(
+        post.featured_image.as_deref(),
+        Some("https://example.com/image.jpg")
+    );
+    assert_eq!(post.site_name.as_deref(), Some("A site"));
+    assert_eq!(post.site_url.as_deref(), Some("https://example.com"));
+    assert_eq!(
+        post.site_icon_url.as_deref(),
+        Some("https://example.com/icon.png")
+    );
+    assert_eq!(
+        post.tags.as_ref().map(|tags| tags.len()),
+        Some(1),
+        "{:?}",
+        post.tags
+    );
+    assert_eq!(post.comment_count, Some(3));
+    assert_eq!(post.date, Some("2026-11-01T10:00:00Z".parse().unwrap()));
+
+    // The saved list's copy replaces the app's.
+    executor.push(Step::Respond(200, keys_response(&[post_json(4)])));
+    let mut from_server = listed(4, "2026-11-05T00:00:00Z");
+    from_server["title"] = json!("From the server");
+    from_server["discussion"] = json!({ "comment_count": 8, "comments_open": true });
+    executor.push(Step::Respond(200, page(&[from_server], None)));
+    collection.refresh().await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let [item] = &items[..] else {
+        panic!("Expected the saved post, not {items:?}");
+    };
+    assert!(!item.is_pending);
+    let post = item.post.clone().unwrap();
+    assert_eq!(post.title.as_deref(), Some("From the server"));
+    assert_eq!(post.comment_count, Some(8));
+    assert_eq!(
+        post.author_name.as_deref(),
+        Some("An author"),
+        "A field the saved list leaves out keeps the app's"
+    );
+}
+
+#[tokio::test]
+async fn details_passed_with_a_save_dont_replace_what_the_server_sent() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(
+        200,
+        page(&[listed(1, "2026-11-01T00:00:00Z")], None),
+    ));
+    collection.refresh().await.unwrap();
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+    service.unsave(identity(1)).await.unwrap();
+
+    // The app's copy is older than the saved list's.
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service
+        .save_with_details(stream_post(1, "An older title"))
+        .await
+        .unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    assert_eq!(titles(&items), vec![Some("Post 1".to_string())]);
+    let post = items[0].post.clone().unwrap();
+    assert_eq!(
+        post.author_name.as_deref(),
+        Some("An author"),
+        "What the server left out is filled in"
+    );
+}
+
+#[tokio::test]
+async fn empty_tags_passed_with_a_save_dont_clear_the_stored_ones() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    let mut post = stream_post(1, "A post");
+    post.tags = Vec::new();
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service.save_with_details(post).await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    assert_eq!(
+        items[0].post.as_ref().unwrap().tags,
+        None,
+        "An app can't tell no tags from tags it doesn't have"
+    );
+}
+
+#[tokio::test]
+async fn a_failed_save_with_details_leaves_nothing_in_the_list() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(404, error_response()));
+
+    assert!(
+        service
+            .save_with_details(stream_post(4, "A post"))
+            .await
+            .is_err()
+    );
+
+    assert_eq!(collection.load_items().await.unwrap(), vec![]);
+    assert_ne!(
+        service.status(identity(4)).unwrap(),
+        ReaderSavedStatus::Saved
+    );
+    // The details stay, harmlessly: the list only shows a post through a save.
+    let stored: i64 = device.cache.execute(|connection| {
+        connection
+            .query_row("SELECT COUNT(*) FROM reader_posts", [], |row| row.get(0))
+            .unwrap()
+    });
+    assert_eq!(stored, 1);
+}
+
+#[tokio::test]
+async fn unsaving_a_post_saved_with_details_removes_it_from_the_list() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, write_response(true, post_json(4), 1)));
+    service
+        .save_with_details(stream_post(4, "A post"))
+        .await
+        .unwrap();
+    executor.push(Step::Respond(200, write_response(false, post_json(4), 0)));
+    service.unsave(identity(4)).await.unwrap();
+
+    assert_eq!(collection.load_items().await.unwrap(), vec![]);
+}
+
+#[tokio::test]
+async fn a_post_that_cant_be_saved_is_refused_with_its_details() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let mut post = stream_post(4, "A post");
+    post.identity = unsaveable_identity();
+
+    assert!(matches!(
+        service.save_with_details(post).await,
+        Err(ReaderSavedError::PostCannotBeSaved)
+    ));
+    assert!(executor.sent().is_empty());
 }
