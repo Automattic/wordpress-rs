@@ -61,6 +61,10 @@ On Linux you need:
 
 Then the same `make xcframework*` targets work.
 
+CI builds this way. The `apple-build` steps and the xcframework assembly run on
+Linux agents in the `swift` Docker image (`.buildkite/commands/run-in-swift-docker.sh`),
+and only signing runs on a Mac.
+
 These still need a Mac:
 
 - Running the Swift tests, which link the framework.

@@ -1,16 +1,18 @@
 #!/bin/bash
 
+# Builds the Rust libraries and Swift bindings for one Apple platform. Runs on a Linux agent: see
+# `commands/run-in-swift-docker.sh`.
+
 set -euo pipefail
 
 PLATFORM=$1
 
-echo "--- :rust: Installing Rust"
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
-
-source "$HOME/.cargo/env"
+if [[ "${INSIDE_SWIFT_DOCKER:-}" != "true" ]]; then
+    exec .buildkite/commands/run-in-swift-docker.sh env INSIDE_SWIFT_DOCKER=true "$0" "$PLATFORM"
+fi
 
 echo "--- :package: Installing Rust Toolchains"
-make setup-rust-$PLATFORM
+make setup-rust-"$PLATFORM"
 
 echo "--- :rust: Building $PLATFORM targets"
-make build-apple-$PLATFORM
+make build-apple-"$PLATFORM"
