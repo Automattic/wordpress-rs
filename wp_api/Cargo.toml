@@ -9,7 +9,7 @@ integration-tests = []
 reqwest-request-executor = ["dep:reqwest", "dep:tokio", "dep:hyper-util", "dep:rustls", "dep:hyper", "dep:h2"]
 
 [lib]
-crate-type = ["lib", "cdylib", "staticlib"]
+crate-type = ["lib"]
 name = "wp_api"
 
 [dependencies]
