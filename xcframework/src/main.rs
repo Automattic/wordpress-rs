@@ -1,12 +1,26 @@
+//! Assembles `target/libwordpressFFI.xcframework` from the per-target static libraries and Swift
+//! binding headers that `make build-apple-*` leaves in `target/<target>/<profile>/`.
+//!
+//! The xcframework is written directly rather than with `xcodebuild -create-xcframework` and
+//! `lipo`, so it can be assembled on Linux as well as macOS. `xcframework.rs` and `fat.rs` mirror
+//! what those tools produce.
+
 use anyhow::{Context, Result};
 use clap::*;
-use std::collections::HashMap;
-use std::fmt::Display;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod fat;
+mod xcframework;
+
+use xcframework::{Arch, Library, Platform, Variant};
+
 const XCFRAMEWORK_OUTPUT_PATH: &str = "target/libwordpressFFI.xcframework";
 const LIBRARY_FILENAME: &str = "libwp_mobile.a";
+// Headers go in a uniquely named subdirectory so the module map doesn't collide with other
+// xcframeworks in the same Xcode project: https://github.com/jessegrosjean/module-map-error
+const HEADERS_SUBDIRECTORY: &str = "libwordpressFFI";
 
 fn main() -> Result<()> {
     CreateXCFramework::parse().run()
@@ -33,357 +47,214 @@ pub struct CreateXCFramework {
 
 impl CreateXCFramework {
     fn run(&self) -> Result<()> {
-        let temp_dir = std::env::temp_dir().join("wp-rs-xcframework");
-        recreate_directory(&temp_dir)?;
-
-        XCFramework::new(&self.targets, &self.profile)?.create(&temp_dir)?;
-
-        Ok(())
-    }
-}
-
-// Represent a xcframework that contains static libraries for multiple platforms.
-//
-// Since `xcodebuild -create-xcframework` command requires its `-libraray` not
-// having duplicated platform. This type along with `LibraryGroup` and `Slice`
-// work together to make it easier to create a xcframework.
-struct XCFramework {
-    libraries: Vec<LibraryGroup>,
-}
-
-// Represent a group of static libraries that are built for the same platform.
-struct LibraryGroup {
-    id: LibraryGroupId,
-    slices: Vec<Slice>,
-}
-
-// Represent a thin static library which is built with `cargo build --target <target> --profile <profile>`
-struct Slice {
-    target: String,
-    profile: String,
-}
-
-impl XCFramework {
-    fn new(targets: &Vec<String>, profile: &str) -> Result<Self> {
-        let mut groups = HashMap::<LibraryGroupId, LibraryGroup>::new();
-        for target in targets {
-            let id = LibraryGroupId::from_target(target)?;
-            let id_clone = id.clone();
-            groups
-                .entry(id)
-                .or_insert(LibraryGroup {
-                    id: id_clone,
-                    slices: Vec::new(),
-                })
-                .slices
-                .push(Slice {
-                    target: target.clone(),
-                    profile: profile.to_owned(),
-                });
+        let mut libraries = BTreeMap::<(Platform, Variant), Vec<Slice>>::new();
+        for target in &self.targets {
+            let slice = Slice::new(target, &self.profile)?;
+            libraries
+                .entry((slice.platform, slice.variant))
+                .or_default()
+                .push(slice);
         }
 
-        Ok(Self {
-            libraries: groups.into_values().collect(),
-        })
-    }
-
-    fn create(&self, temp_dir: &Path) -> Result<PathBuf> {
-        self.preview();
-
-        let temp_dest = self.create_xcframework(temp_dir)?;
-        self.patch_xcframework(&temp_dest)?;
-
-        let dest = PathBuf::from(XCFRAMEWORK_OUTPUT_PATH);
-        recreate_directory(&dest)?;
-        std::fs::rename(temp_dest, &dest).with_context(|| "Failed to move xcframework")?;
-
-        println!("xcframework created at {}", dest.display());
-        Ok(dest)
-    }
-
-    fn preview(&self) {
         println!("Creating xcframework to include the following targets:");
-        for lib in &self.libraries {
-            println!("  Platform: {}", lib.id);
-            for slice in &lib.slices {
+        for ((platform, variant), slices) in &libraries {
+            println!("  Platform: {platform}{}", variant.suffix());
+            for slice in slices {
                 println!("    - {}", slice.target);
             }
         }
-    }
 
-    fn create_xcframework(&self, temp_dir: &Path) -> Result<PathBuf> {
-        let temp_dest = temp_dir.join("libwordpressFFI.xcframework");
-        std::fs::remove_dir_all(&temp_dest).ok();
+        let temp_dest = std::env::temp_dir()
+            .join("wp-rs-xcframework")
+            .join("libwordpressFFI.xcframework");
+        recreate_directory(&temp_dest)?;
 
-        let library_args: Result<Vec<(PathBuf, PathBuf)>> = self
-            .libraries
-            .iter()
-            .map(|library| {
-                let lib = library.create(temp_dir)?;
-                let header = library.headers_dir()?;
-                Ok((lib, header))
-            })
-            .collect();
-        let library_args = library_args?;
-
-        let library_args = library_args.iter().flat_map(|(lib, headers)| {
-            [
-                "-library".as_ref(),
-                lib.as_os_str(),
-                "-headers".as_ref(),
-                headers.as_os_str(),
-            ]
-        });
-        Command::new("xcodebuild")
-            .arg("-create-xcframework")
-            .args(library_args)
-            .arg("-output")
-            .arg(&temp_dest)
-            .successful_output()?;
-
-        Ok(temp_dest)
-    }
-
-    // Fixes an issue including the XCFramework in an Xcode project that already contains an XCFramework: https://github.com/jessegrosjean/module-map-error
-    fn patch_xcframework(&self, temp_dir: &Path) -> Result<()> {
-        println!("Patching XCFramework to have a unique header directory");
-
-        for dir_entry in std::fs::read_dir(temp_dir)? {
-            let path = dir_entry.expect("Invalid Path").path();
-            if path.is_dir() {
-                let headers_dir = temp_dir.join(&path).join("Headers");
-                let non_lib_files: Vec<PathBuf> = std::fs::read_dir(&headers_dir)?
-                    .flat_map(|f| f.ok())
-                    .filter_map(|f| {
-                        if f.path().ends_with(".a") {
-                            None
-                        } else {
-                            Some(f.path())
-                        }
-                    })
-                    .collect();
-
-                let new_headers_dir = headers_dir.join("libwordpressFFI");
-                recreate_directory(&new_headers_dir)?;
-
-                for file in non_lib_files {
-                    std::fs::rename(&file, new_headers_dir.join(file.file_name().unwrap()))?;
-                }
-            }
+        let mut entries = Vec::new();
+        for ((platform, variant), slices) in libraries {
+            entries.push(write_library(&temp_dest, platform, variant, &slices)?);
         }
+        xcframework::write_info_plist(&temp_dest, &entries)?;
 
+        let dest = PathBuf::from(XCFRAMEWORK_OUTPUT_PATH);
+        if dest.exists() {
+            std::fs::remove_dir_all(&dest)
+                .with_context(|| format!("Failed to remove {}", dest.display()))?;
+        }
+        move_dir(&temp_dest, &dest)?;
+
+        println!("xcframework created at {}", dest.display());
         Ok(())
     }
 }
 
-impl LibraryGroup {
-    fn create(&self, temp_dir: &Path) -> Result<PathBuf> {
-        let mut libraries: Vec<PathBuf> = Vec::new();
-        for slice in &self.slices {
-            libraries.push(slice.create(temp_dir)?);
-        }
-
-        let dir = temp_dir.join(self.id.to_string());
-        recreate_directory(&dir)?;
-
-        let dest = dir.join(LIBRARY_FILENAME);
-        Command::new("xcrun")
-            .arg("lipo")
-            .arg("-create")
-            .args(libraries)
-            .arg("-output")
-            .arg(&dest)
-            .successful_output()?;
-
-        Ok(dest)
+/// Writes one `<library identifier>/` directory: the (possibly fat) static library and its headers.
+fn write_library(
+    xcframework: &Path,
+    platform: Platform,
+    variant: Variant,
+    slices: &[Slice],
+) -> Result<Library> {
+    let mut archs: Vec<Arch> = slices.iter().map(|s| s.arch).collect();
+    archs.sort();
+    if let Some(pair) = archs.windows(2).find(|pair| pair[0] == pair[1]) {
+        anyhow::bail!(
+            "Two targets for {platform}{} have the same architecture ({})",
+            variant.suffix(),
+            pair[0]
+        );
     }
 
+    let library = Library {
+        platform,
+        variant,
+        archs,
+        binary: LIBRARY_FILENAME.to_string(),
+        headers: "Headers".to_string(),
+    };
+    let dir = xcframework.join(library.identifier());
+    std::fs::create_dir_all(&dir)?;
+
+    // Single-architecture libraries are wrapped in a one-slice fat file too, as `lipo -create`
+    // did, so the output is unchanged from the `xcodebuild`-based tool.
+    let dest = dir.join(LIBRARY_FILENAME);
+    let inputs = slices
+        .iter()
+        .map(|slice| {
+            let lib = slice.library()?;
+            let file = std::fs::File::open(&lib)
+                .with_context(|| format!("Failed to open {}", lib.display()))?;
+            Ok(fat::Input {
+                arch: slice.arch,
+                len: file.metadata()?.len(),
+                reader: Box::new(std::io::BufReader::new(file)),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut file = std::io::BufWriter::new(std::fs::File::create(&dest)?);
+    fat::write(&mut file, inputs).with_context(|| format!("Failed to write {}", dest.display()))?;
+
+    // Every slice of a library shares one set of headers; use the first.
+    let headers_src = slices[0].headers_dir()?;
+    let headers_dest = dir.join(&library.headers).join(HEADERS_SUBDIRECTORY);
+    std::fs::create_dir_all(&headers_dest)?;
+    for entry in std::fs::read_dir(&headers_src)? {
+        let path = entry?.path();
+        if path.is_file() {
+            std::fs::copy(&path, headers_dest.join(path.file_name().unwrap()))?;
+        }
+    }
+
+    Ok(library)
+}
+
+/// A thin static library built with `cargo rustc --target <target> --profile <profile>`.
+struct Slice {
+    target: String,
+    profile: String,
+    platform: Platform,
+    variant: Variant,
+    arch: Arch,
+}
+
+impl Slice {
+    fn new(target: &str, profile: &str) -> Result<Self> {
+        let llvm_target = llvm_target(target)?;
+        let (platform, variant, arch) = xcframework::classify(target, &llvm_target)?;
+        Ok(Self {
+            target: target.to_string(),
+            profile: profile.to_string(),
+            platform,
+            variant,
+            arch,
+        })
+    }
+
+    /// The directory where `cargo` puts this target's build products.
+    fn built_product_dir(&self) -> PathBuf {
+        let profile_dir = if self.profile == "dev" {
+            "debug"
+        } else {
+            &self.profile
+        };
+        ["target", &self.target, profile_dir].iter().collect()
+    }
+
+    fn library(&self) -> Result<PathBuf> {
+        let lib = self.built_product_dir().join(LIBRARY_FILENAME);
+        if !lib.exists() {
+            anyhow::bail!("Library not found: {}", lib.display())
+        }
+        Ok(lib)
+    }
+
+    // `scripts/swift-bindings.sh` writes `Headers`; the exact case matters on Linux.
     fn headers_dir(&self) -> Result<PathBuf> {
-        let slice = self
-            .slices
-            .first()
-            .with_context(|| "No slices in library group")?;
-        let path = slice.built_product_dir().join("swift-bindings/headers");
-        if !path.exists() {
+        let path = self.built_product_dir().join("swift-bindings/Headers");
+        if !path.is_dir() {
             anyhow::bail!("Headers not found: {}", path.display())
         }
         Ok(path)
     }
 }
 
-impl Slice {
-    fn create(&self, temp_dir: &Path) -> Result<PathBuf> {
-        let libs = self.built_libraries();
-
-        // If there are more static libraries (a.k.a cargo packages), we'll
-        // need to bundle them together into one static library.
-        // At the moment, we only have one libwp_mobile, so we can just copy it.
-        assert!(
-            libs.len() == 1,
-            "Expected exactly one library for each slice"
+/// Asks `rustc` for the LLVM triple of a target, which spells out simulator and Mac Catalyst
+/// variants (e.g. `arm64-apple-ios16.0.0-simulator`).
+fn llvm_target(target: &str) -> Result<String> {
+    let output = Command::new("rustc")
+        .env("RUSTC_BOOTSTRAP", "1")
+        .args([
+            "-Z",
+            "unstable-options",
+            "--print",
+            "target-spec-json",
+            "--target",
+        ])
+        .arg(target)
+        .output()
+        .context("Failed to run rustc")?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "rustc could not describe target {target}: {}",
+            String::from_utf8_lossy(&output.stderr)
         );
-
-        let lib = &libs[0];
-        if !lib.exists() {
-            anyhow::bail!("Library not found: {}", lib.display())
-        }
-
-        let dir = temp_dir.join(&self.target);
-        recreate_directory(&dir)?;
-
-        let dest = dir.join(LIBRARY_FILENAME);
-        std::fs::copy(lib, &dest)
-            .with_context(|| format!("Failed to copy {} to {}", lib.display(), dest.display()))?;
-
-        Ok(dest)
     }
-
-    /// Returns the directory where the built static libraries are located.
-    fn built_product_dir(&self) -> PathBuf {
-        let mut target_dir: PathBuf = ["target", &self.target].iter().collect();
-        if self.profile == "dev" {
-            target_dir.push("debug");
-        } else {
-            target_dir.push(&self.profile);
-        }
-
-        target_dir
-    }
-
-    fn built_libraries(&self) -> Vec<PathBuf> {
-        vec![self.built_product_dir().join(LIBRARY_FILENAME)]
-    }
+    let json = serde_json::from_slice::<serde_json::Value>(&output.stdout)
+        .context("Failed to parse rustc target spec as JSON")?;
+    json.get("llvm-target")
+        .and_then(|t| t.as_str())
+        .map(str::to_string)
+        .context("No llvm-target in rustc target spec")
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-struct LibraryGroupId {
-    os: ApplePlatform,
-    is_sim: bool,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-enum ApplePlatform {
-    MacOS,
-    #[allow(clippy::upper_case_acronyms)]
-    IOS,
-    MacCatalyst,
-    TvOS,
-    WatchOS,
-}
-
-impl TryFrom<&str> for ApplePlatform {
-    type Error = anyhow::Error;
-
-    fn try_from(s: &str) -> std::result::Result<Self, anyhow::Error> {
-        match s {
-            "darwin" => Ok(ApplePlatform::MacOS),
-            "ios" => Ok(ApplePlatform::IOS),
-            "tvos" => Ok(ApplePlatform::TvOS),
-            "watchos" => Ok(ApplePlatform::WatchOS),
-            _ => anyhow::bail!("Unknown Apple platform: {}", s),
-        }
-    }
-}
-
-impl Display for ApplePlatform {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let name = match self {
-            ApplePlatform::MacOS => "macos",
-            ApplePlatform::IOS => "ios",
-            ApplePlatform::MacCatalyst => "maccatalyst",
-            ApplePlatform::TvOS => "tvos",
-            ApplePlatform::WatchOS => "watchos",
-        };
-        write!(f, "{name}")
-    }
-}
-
-impl LibraryGroupId {
-    fn from_target(target: &str) -> Result<Self> {
-        let mut parts = target.split('-');
-        _ /* arch */= parts.next();
-        if parts.next() != Some("apple") {
-            anyhow::bail!("{} is not an Apple platform", target)
-        }
-
-        let os: ApplePlatform = parts
-            .next()
-            .with_context(|| format!("No OS in target: {target}"))?
-            .try_into()?;
-
-        let output = Command::new("rustc")
-            .env("RUSTC_BOOTSTRAP", "1")
-            .args([
-                "-Z",
-                "unstable-options",
-                "--print",
-                "target-spec-json",
-                "--target",
-            ])
-            .arg(target)
-            .successful_output()?;
-        let json = serde_json::from_slice::<serde_json::Value>(&output.stdout)
-            .with_context(|| "Failed to parse command output as JSON")?;
-        let llvm_target = json
-            .get("llvm-target")
-            .and_then(|t| t.as_str())
-            .with_context(|| "No llvm-target in command output")?;
-
-        // Mac Catalyst targets are named `<arch>-apple-ios-macabi`, but they're a separate platform
-        // from iOS. Grouping them with iOS would `lipo` two arm64 libraries together.
-        let os = if llvm_target.ends_with("-macabi") {
-            ApplePlatform::MacCatalyst
-        } else {
-            os
-        };
-
-        Ok(Self {
-            os,
-            is_sim: llvm_target.ends_with("-simulator"),
-        })
-    }
-}
-
-impl Display for LibraryGroupId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.os)?;
-
-        if self.is_sim {
-            write!(f, "-sim")
-        } else {
-            Ok(())
-        }
-    }
-}
-
-trait ExecuteCommand {
-    fn successful_output(&mut self) -> Result<std::process::Output>;
-}
-
-impl ExecuteCommand for Command {
-    fn successful_output(&mut self) -> Result<std::process::Output> {
-        let output = self
-            .output()
-            .with_context(|| format!("Command failed: $ {self:?}"))?;
-        if output.status.success() {
-            Ok(output)
-        } else {
-            anyhow::bail!(
-                "Command failed with exit code: {}\nstdout: {:?}\nstderr: {:?}\n$ {:?}",
-                output.status,
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr),
-                self
-            )
-        }
-    }
-}
-
-fn recreate_directory(dir: &PathBuf) -> Result<()> {
+fn recreate_directory(dir: &Path) -> Result<()> {
     if dir.exists() {
         std::fs::remove_dir_all(dir)
             .with_context(|| format!("Failed to remove directory at {dir:?}"))?;
     }
-
     std::fs::create_dir_all(dir).with_context(|| format!("Failed to create directory: {dir:?}"))
+}
+
+/// Moves a directory, falling back to copy-and-delete when `src` and `dest` are on different
+/// filesystems (common on Linux, where the temp dir is often a separate mount).
+fn move_dir(src: &Path, dest: &Path) -> Result<()> {
+    if std::fs::rename(src, dest).is_ok() {
+        return Ok(());
+    }
+    copy_dir(src, dest)?;
+    std::fs::remove_dir_all(src).with_context(|| format!("Failed to remove {}", src.display()))
+}
+
+fn copy_dir(src: &Path, dest: &Path) -> Result<()> {
+    std::fs::create_dir_all(dest)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let to = dest.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir(&entry.path(), &to)?;
+        } else {
+            std::fs::copy(entry.path(), &to)
+                .with_context(|| format!("Failed to copy to {}", to.display()))?;
+        }
+    }
+    Ok(())
 }
