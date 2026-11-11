@@ -2,8 +2,12 @@
 // target, so Apple targets can be built without the Apple SDK (e.g. on Linux).
 //
 // Prebuilt archives live in `prebuilt/<rust target>/libwrapper.a` and are produced on a Mac by
-// `build-prebuilt.sh`. `prebuilt/wrapper.c.sha256` records the source they were built from; a
-// mismatch fails the build rather than silently linking stale code.
+// `build-prebuilt.sh`. Two things are checked so a stale archive fails the build instead of being
+// linked silently:
+//
+// - `prebuilt/wrapper.c.sha256` records the source the archives were built from.
+// - `prebuilt/<rust target>/deployment-target` records the minimum OS version each archive was
+//   built for. It must match the deployment target this build uses, when one is set.
 
 use std::convert::TryInto;
 use std::path::PathBuf;
@@ -12,8 +16,8 @@ fn main() {
     println!("cargo:rerun-if-changed=wrapper.c");
     println!("cargo:rerun-if-changed=prebuilt");
 
-    let target = std::env::var("TARGET").unwrap();
-    let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    let target = std::env::var("TARGET").expect("TARGET is set by cargo");
+    let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("set by cargo"));
     let prebuilt_dir = manifest_dir.join("prebuilt").join(&target);
 
     if !prebuilt_dir.join("libwrapper.a").exists() {
@@ -21,8 +25,9 @@ fn main() {
         return;
     }
 
-    let source = std::fs::read(manifest_dir.join("wrapper.c")).unwrap();
-    let expected = std::fs::read_to_string(manifest_dir.join("prebuilt/wrapper.c.sha256")).unwrap();
+    let source = std::fs::read(manifest_dir.join("wrapper.c")).expect("wrapper.c is readable");
+    let expected = std::fs::read_to_string(manifest_dir.join("prebuilt/wrapper.c.sha256"))
+        .expect("prebuilt/wrapper.c.sha256 is readable");
     let actual = sha256_hex(&source);
     if expected.trim() != actual {
         panic!(
@@ -32,8 +37,46 @@ fn main() {
         );
     }
 
+    check_deployment_target(&target, &prebuilt_dir);
+
     println!("cargo:rustc-link-search=native={}", prebuilt_dir.display());
     println!("cargo:rustc-link-lib=static=wrapper");
+}
+
+// The archives are built for the deployment targets in Package.swift, and the Makefile exports
+// the same versions when it builds Apple targets. Builds that don't set one (e.g. `cargo test` on
+// a Mac) get rustc's default and are not checked.
+fn check_deployment_target(target: &str, prebuilt_dir: &std::path::Path) {
+    let variable = if target.ends_with("-darwin") {
+        "MACOSX_DEPLOYMENT_TARGET"
+    } else if target.contains("-ios") {
+        // Includes the simulator and Mac Catalyst (`-macabi`) targets.
+        "IPHONEOS_DEPLOYMENT_TARGET"
+    } else if target.contains("-tvos") {
+        "TVOS_DEPLOYMENT_TARGET"
+    } else if target.contains("-watchos") {
+        "WATCHOS_DEPLOYMENT_TARGET"
+    } else {
+        panic!(
+            "prebuilt/{0} exists, but {0} is not a known Apple target",
+            target
+        );
+    };
+    println!("cargo:rerun-if-env-changed={variable}");
+
+    let Ok(requested) = std::env::var(variable) else {
+        return;
+    };
+    let recorded_path = prebuilt_dir.join("deployment-target");
+    let recorded = std::fs::read_to_string(&recorded_path)
+        .unwrap_or_else(|e| panic!("Failed to read {}: {e}", recorded_path.display()));
+    if recorded.trim() != requested.trim() {
+        panic!(
+            "prebuilt/{target}/libwrapper.a was built for {variable}={}, but this build uses \
+             {variable}={requested}. Re-run build-prebuilt.sh on a Mac.",
+            recorded.trim()
+        );
+    }
 }
 
 // Minimal SHA-256 so the build script needs no extra dependencies.
