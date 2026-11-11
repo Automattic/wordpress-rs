@@ -76,6 +76,10 @@ steps:
           - "Catalyst"
           - "tvOS"
           - "watchOS"
+        # The android queue's m8i.2xlarge agents (8 vCPUs) build each platform within about 10% of a
+        # Mac's time. The default queue's m8i.xlarge agents (4 vCPUs) take about 35% longer.
+        agents:
+          queue: android
       - label: ":swift: :linux: Assemble xcframework"
         key: "xcframework-assemble"
         depends_on: "apple-build"
