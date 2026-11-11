@@ -5,7 +5,7 @@ use std::str::FromStr;
 use wp_api::date::WpGmtDateTime;
 use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
-use wp_api::wp_com::reader_posts::{ReaderPost, ReaderPostTag};
+use wp_api::wp_com::reader_posts::{ReaderPost, ReaderPostTag, reader_post_display_image_url};
 use wp_api::wp_com::reader_saved::{
     ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey, reader_saved_key_for_post,
 };
@@ -38,8 +38,14 @@ pub struct ReaderPostRecord {
     pub author_avatar_url: Option<String>,
     #[uniffi(default = None)]
     pub author_url: Option<String>,
+    /// The featured image the author set, as the server sends it. Most posts without one still
+    /// have an image to show: use [`Self::display_image_url`] for that.
     #[uniffi(default = None)]
     pub featured_image: Option<String>,
+    /// The image to show for the post: an editor's pick, else [`Self::featured_image`], else the
+    /// image the server picked from the post. See [`ReaderPost::display_image_url`].
+    #[uniffi(default = None)]
+    pub display_image_url: Option<String>,
     #[uniffi(default = None)]
     pub site_name: Option<String>,
     #[uniffi(default = None)]
@@ -81,6 +87,7 @@ impl ReaderPostRecord {
             author_avatar_url: None,
             author_url: None,
             featured_image: None,
+            display_image_url: None,
             site_name: None,
             site_url: None,
             feed_url: None,
@@ -107,6 +114,13 @@ impl ReaderPostRecord {
             author_avatar_url: author.and_then(|author| author.avatar_url.clone()),
             author_url: author.and_then(|author| author.url.clone()),
             featured_image: post.featured_image.clone(),
+            display_image_url: post.display_image_url.clone().or_else(|| {
+                reader_post_display_image_url(
+                    None,
+                    post.featured_image.as_deref(),
+                    post.featured_media.as_ref(),
+                )
+            }),
             site_name: post.site_name.clone(),
             site_url: post.site_url.clone(),
             feed_url: post.feed_url.clone(),
@@ -285,6 +299,59 @@ mod tests {
     #[case("other:1")]
     fn test_invalid_key_text_is_an_error(#[case] text: &str) {
         assert!(reader_saved_key_from_text(text).is_err());
+    }
+
+    fn reader_post(fields: serde_json::Value) -> ReaderPost {
+        let mut post = serde_json::json!({ "ID": 1, "site_ID": 2, "is_external": false });
+        post.as_object_mut()
+            .unwrap()
+            .extend(fields.as_object().unwrap().clone());
+        serde_json::from_value(post).unwrap()
+    }
+
+    #[test]
+    fn test_record_keeps_a_parsed_posts_display_image() {
+        let post = reader_post(serde_json::json!({
+            "featured_image": "",
+            "featured_media": { "uri": "https://example.com/media.jpg", "type": "image" },
+        }));
+        let record = ReaderPostRecord::from_reader_post(&post).unwrap();
+        assert_eq!(record.featured_image, None);
+        assert_eq!(
+            record.display_image_url.as_deref(),
+            Some("https://example.com/media.jpg")
+        );
+    }
+
+    /// A post an app builds itself may set only `featured_image` or `featured_media`.
+    #[rstest]
+    #[case::own_display_image(
+        Some("https://app/display.jpg"),
+        Some("https://app/featured.jpg"),
+        Some("https://app/display.jpg")
+    )]
+    #[case::featured_image(
+        None,
+        Some("https://app/featured.jpg"),
+        Some("https://app/featured.jpg")
+    )]
+    #[case::featured_media(None, None, Some("https://app/media.jpg"))]
+    fn test_record_falls_back_for_a_post_built_by_an_app(
+        #[case] display_image_url: Option<&str>,
+        #[case] featured_image: Option<&str>,
+        #[case] expected: Option<&str>,
+    ) {
+        let mut post = reader_post(serde_json::json!({}));
+        post.display_image_url = display_image_url.map(str::to_string);
+        post.featured_image = featured_image.map(str::to_string);
+        post.featured_media = Some(wp_api::wp_com::reader_posts::ReaderFeaturedMedia {
+            uri: Some("https://app/media.jpg".to_string()),
+            media_type: Some("image".to_string()),
+            width: None,
+            height: None,
+        });
+        let record = ReaderPostRecord::from_reader_post(&post).unwrap();
+        assert_eq!(record.display_image_url.as_deref(), expected);
     }
 
     #[test]

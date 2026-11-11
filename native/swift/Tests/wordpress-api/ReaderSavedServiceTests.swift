@@ -102,6 +102,7 @@ struct ReaderSavedServiceTests {
             siteName: "A site",
             siteIconUrl: "https://example.com/icon.png",
             featuredImage: "https://example.com/image.jpg",
+            displayImageUrl: "https://example.com/image.jpg",
             tags: [ReaderPostTag(slug: "news", name: "News")],
             commentCount: 3
         )
