@@ -1,4 +1,6 @@
 [workspace]
+# Patched copy of the `oslog` crate; see third_party/oslog/build.rs.
+exclude = ["third_party/oslog"]
 members = [
   "integration_test_credentials",
   "wp_api",
@@ -104,3 +106,7 @@ url = "2.5"
 uuid = "1.23"
 x509-cert = "0.3.0-pre.0"
 zeroize = "1"
+
+[patch.crates-io]
+# Links a prebuilt os_log wrapper so Apple targets build without the Apple SDK.
+oslog = { path = "third_party/oslog" }
