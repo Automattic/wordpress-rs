@@ -85,6 +85,10 @@ endif
 
 cargo_config_library = --config profile.$(CARGO_PROFILE).debug=true --config 'profile.$(CARGO_PROFILE).panic="abort"'
 
+# The Swift package compiles the os_log wrapper the Rust logger calls, so the libraries for the
+# xcframework leave it out. This keeps the Apple SDK out of the Rust build. See wp_api/build.rs.
+_build-apple-%: export WP_API_OS_LOG_FROM_SWIFT_PACKAGE=1
+
 # Set deployment targets for each platform
 _build-apple-%-darwin: export MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos)
 _build-apple-%-ios _build-apple-%-ios-sim: export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios)

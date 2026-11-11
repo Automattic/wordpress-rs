@@ -47,8 +47,11 @@ Xcode or the Apple SDK:
 
 - `wp_mobile` is built as a static library, which is never linked, so there is
   no Apple linker step.
-- The one piece of C, the `oslog` crate's `os_log` wrapper, links a prebuilt
-  archive from `third_party/oslog/prebuilt/` instead of being compiled.
+- The one piece of C, a wrapper around the `os_log` macro, is compiled by the
+  Swift package (`native/swift/Sources/wordpress-api-os-log`) when an app is
+  built. The Makefile sets `WP_API_OS_LOG_FROM_SWIFT_PACKAGE` so the Rust
+  libraries leave it out. Other builds for Apple targets, such as `cargo test`
+  on a Mac, compile it in `wp_api/build.rs`.
 - The `xcframework` tool writes the xcframework and fat libraries itself rather
   than calling `xcodebuild` and `lipo`.
 
@@ -70,9 +73,6 @@ These still need a Mac:
 - Running the Swift tests, which link the framework.
 - `make xcframework-package` and `make xcframework-sign`, which use `ditto` and
   `codesign`.
-- Regenerating the `os_log` wrapper archives. Run
-  `third_party/oslog/build-prebuilt.sh` after changing `wrapper.c` or a
-  deployment target in `Package.swift`. The build fails until you do.
 
 ## Verifying a UniFFI change
 

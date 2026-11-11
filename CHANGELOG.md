@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Internal:** `libwordpressFFI.xcframework` can now be built on Linux. The `oslog` crate links a prebuilt `os_log` wrapper instead of compiling it against the Apple SDK, `wp_api` no longer builds an unused `cdylib`/`staticlib`, and the `xcframework` tool writes the xcframework and fat libraries itself instead of running `xcodebuild` and `lipo`. CI now builds the Apple libraries and assembles the xcframework on Linux agents, and only signs it on a Mac. The xcframework's contents are unchanged.
+- **Internal:** `libwordpressFFI.xcframework` can now be built on Linux. The `oslog` crate is replaced by a small logger in `wp_api` whose `os_log` wrapper is compiled by the Swift package, so the Rust build never needs the Apple SDK, `wp_api` no longer builds an unused `cdylib`/`staticlib`, and the `xcframework` tool writes the xcframework and fat libraries itself instead of running `xcodebuild` and `lipo`. CI now builds the Apple libraries and assembles the xcframework on Linux agents, and only signs it on a Mac. The xcframework's contents are unchanged.
 - **Internal:** Added integration test covering the `MediaService::create_media` cache upsert and collection update path.
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.99.0` to `1.99.1`.
 - **Internal:** Updated code signing configuration to not require a provisioning profile.
