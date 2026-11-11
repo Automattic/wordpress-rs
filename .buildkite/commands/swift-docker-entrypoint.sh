@@ -4,9 +4,18 @@
 
 set -euo pipefail
 
-# Files the build writes into the mounted checkout would otherwise be owned by root, which the
-# agent can't clean up or overwrite in later jobs.
-trap 'chown -R "$HOST_UID:$HOST_GID" /app' EXIT
+# Without a user-namespace remap, files the build writes into the mounted checkout are owned by
+# the host's root, which the agent can't clean up or overwrite in later jobs, so hand them back.
+#
+# The CI agents remap: root here is already the agent user on the host, the files are already
+# its own, and changing their owner to a host uid isn't permitted. Detect that from the uid map,
+# where container uid 0 maps to a host uid other than 0.
+restore_ownership() {
+    if awk '$1 == 0 && $2 == 0 { found = 1 } END { exit !found }' /proc/self/uid_map; then
+        chown -R "$HOST_UID:$HOST_GID" /app
+    fi
+}
+trap restore_ownership EXIT
 
 echo "--- :linux: Installing build tools"
 apt-get update -qq
