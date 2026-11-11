@@ -40,6 +40,36 @@ The tvOS and watchOS slices build with `-Z build-std` on the pinned nightly
 toolchain, which `make setup-rust` installs. If you skipped that step, those
 targets fail with `can't find crate for 'core'`.
 
+### Building on Linux
+
+The xcframework builds on Linux as well as macOS. Nothing in the build needs
+Xcode or the Apple SDK:
+
+- `wp_mobile` is built as a static library, which is never linked, so there is
+  no Apple linker step.
+- The one piece of C, the `oslog` crate's `os_log` wrapper, links a prebuilt
+  archive from `third_party/oslog/prebuilt/` instead of being compiled.
+- The `xcframework` tool writes the xcframework and fat libraries itself rather
+  than calling `xcodebuild` and `lipo`.
+
+On Linux you need:
+
+- The Rust toolchains (`make setup-rust-<platform>`).
+- A C compiler for the host (e.g. `gcc`), which Rust build scripts link with.
+- A Swift toolchain, because binding generation runs `native/swift/Tools`.
+- `jq` and `make`.
+
+Then the same `make xcframework*` targets work.
+
+These still need a Mac:
+
+- Running the Swift tests, which link the framework.
+- `make xcframework-package` and `make xcframework-sign`, which use `ditto` and
+  `codesign`.
+- Regenerating the `os_log` wrapper archives. Run
+  `third_party/oslog/build-prebuilt.sh` after changing `wrapper.c` or a
+  deployment target in `Package.swift`. The build fails until you do.
+
 ## Verifying a UniFFI change
 
 When adding or changing an exported function, the fast path is:
