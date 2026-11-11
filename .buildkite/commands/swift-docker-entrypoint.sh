@@ -4,18 +4,22 @@
 
 set -euo pipefail
 
-# Without a user-namespace remap, files the build writes into the mounted checkout are owned by
-# the host's root, which the agent can't clean up or overwrite in later jobs, so hand them back.
+# Files the build writes into the mounted checkout belong to this container's root, and the agent
+# must be able to delete them, or the next job's checkout on that agent fails.
 #
-# The CI agents remap: root here is already the agent user on the host, the files are already
-# its own, and changing their owner to a host uid isn't permitted. Detect that from the uid map,
-# where container uid 0 maps to a host uid other than 0.
-restore_ownership() {
+# - Without a user-namespace remap (e.g. Docker Desktop), container root is host root, so hand
+#   the files back to the host user.
+# - The CI agents remap: container root is an unprivileged host uid that is neither the agent nor
+#   allowed to chown to it. Make everything this container created readable, writable and
+#   searchable by everyone instead, so the agent can delete it.
+restore_access() {
     if awk '$1 == 0 && $2 == 0 { found = 1 } END { exit !found }' /proc/self/uid_map; then
         chown -R "$HOST_UID:$HOST_GID" /app
+    else
+        find /app -xdev -user 0 -exec chmod a+rwX {} +
     fi
 }
-trap restore_ownership EXIT
+trap restore_access EXIT
 
 echo "--- :linux: Installing build tools"
 apt-get update -qq
