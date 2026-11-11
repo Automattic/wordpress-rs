@@ -58,21 +58,6 @@ pub enum Arch {
     Arm64_32,
 }
 
-impl Arch {
-    /// `(cputype, cpusubtype)` from `<mach/machine.h>`.
-    pub fn mach_cpu(&self) -> (u32, u32) {
-        const CPU_ARCH_ABI64: u32 = 0x0100_0000;
-        const CPU_ARCH_ABI64_32: u32 = 0x0200_0000;
-        const CPU_TYPE_X86: u32 = 7;
-        const CPU_TYPE_ARM: u32 = 12;
-        match self {
-            Arch::X86_64 => (CPU_TYPE_X86 | CPU_ARCH_ABI64, 3), // CPU_SUBTYPE_X86_ALL
-            Arch::Arm64 => (CPU_TYPE_ARM | CPU_ARCH_ABI64, 0),  // CPU_SUBTYPE_ARM64_ALL
-            Arch::Arm64_32 => (CPU_TYPE_ARM | CPU_ARCH_ABI64_32, 1), // CPU_SUBTYPE_ARM64_32_V8
-        }
-    }
-}
-
 impl Display for Arch {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {

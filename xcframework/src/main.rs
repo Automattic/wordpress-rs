@@ -1,9 +1,10 @@
 //! Assembles `target/libwordpressFFI.xcframework` from the per-target static libraries and Swift
 //! binding headers that `make build-apple-*` leaves in `target/<target>/<profile>/`.
 //!
-//! The xcframework is written directly rather than with `xcodebuild -create-xcframework` and
-//! `lipo`, so it can be assembled on Linux as well as macOS. `xcframework.rs` and `fat.rs` mirror
-//! what those tools produce.
+//! The xcframework is written directly rather than with `xcodebuild -create-xcframework`, so it
+//! can be assembled on Linux as well as macOS; `xcframework.rs` mirrors what `xcodebuild` produces.
+//! Fat libraries come from `lipo` on macOS and LLVM's `llvm-lipo` elsewhere, which write identical
+//! files. Set `LIPO` to use a different tool.
 
 use anyhow::{Context, Result};
 use clap::*;
@@ -11,7 +12,6 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-mod fat;
 mod xcframework;
 
 use xcframework::{Arch, Library, Platform, Variant};
@@ -114,24 +114,14 @@ fn write_library(
     let dir = xcframework.join(library.identifier());
     std::fs::create_dir_all(&dir)?;
 
-    // Single-architecture libraries are wrapped in a one-slice fat file too, as `lipo -create`
-    // did, so the output is unchanged from the `xcodebuild`-based tool.
+    // Single-architecture libraries are wrapped in a one-slice fat file too, as the
+    // `xcodebuild`-based tool did, so the output is unchanged.
     let dest = dir.join(LIBRARY_FILENAME);
     let inputs = slices
         .iter()
-        .map(|slice| {
-            let lib = slice.library()?;
-            let file = std::fs::File::open(&lib)
-                .with_context(|| format!("Failed to open {}", lib.display()))?;
-            Ok(fat::Input {
-                arch: slice.arch,
-                len: file.metadata()?.len(),
-                reader: Box::new(std::io::BufReader::new(file)),
-            })
-        })
+        .map(Slice::library)
         .collect::<Result<Vec<_>>>()?;
-    let mut file = std::io::BufWriter::new(std::fs::File::create(&dest)?);
-    fat::write(&mut file, inputs).with_context(|| format!("Failed to write {}", dest.display()))?;
+    lipo_create(&inputs, &dest)?;
 
     // Every slice of a library shares one set of headers; use the first.
     let headers_src = slices[0].headers_dir()?;
@@ -224,6 +214,39 @@ fn llvm_target(target: &str) -> Result<String> {
         .and_then(|t| t.as_str())
         .map(str::to_string)
         .context("No llvm-target in rustc target spec")
+}
+
+/// Combines thin static libraries into one fat library with `lipo -create`.
+///
+/// `llvm-lipo` reads the objects inside each library, so it must be at least as new as the LLVM
+/// that rustc used to build them. An older one fails with "Unknown attribute kind".
+fn lipo_create(inputs: &[PathBuf], dest: &Path) -> Result<()> {
+    let default = if cfg!(target_os = "macos") {
+        "lipo"
+    } else {
+        "llvm-lipo"
+    };
+    let lipo = std::env::var_os("LIPO").unwrap_or_else(|| default.into());
+    let status = Command::new(&lipo)
+        .arg("-create")
+        .args(inputs)
+        .arg("-output")
+        .arg(dest)
+        .status()
+        .with_context(|| {
+            format!(
+                "Failed to run {}. Install LLVM, or set LIPO to a lipo-compatible tool.",
+                lipo.to_string_lossy()
+            )
+        })?;
+    if !status.success() {
+        anyhow::bail!(
+            "{} failed to create {}",
+            lipo.to_string_lossy(),
+            dest.display()
+        );
+    }
+    Ok(())
 }
 
 fn recreate_directory(dir: &Path) -> Result<()> {

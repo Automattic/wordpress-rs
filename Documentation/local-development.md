@@ -52,8 +52,9 @@ Xcode or the Apple SDK:
   built. The Makefile sets `WP_API_OS_LOG_FROM_SWIFT_PACKAGE` so the Rust
   libraries leave it out. Other builds for Apple targets, such as `cargo test`
   on a Mac, compile it in `wp_api/build.rs`.
-- The `xcframework` tool writes the xcframework and fat libraries itself rather
-  than calling `xcodebuild` and `lipo`.
+- The `xcframework` tool writes the xcframework itself rather than calling
+  `xcodebuild`, and builds fat libraries with LLVM's `llvm-lipo`, which writes
+  the same files as Apple's `lipo`.
 
 On Linux you need:
 
@@ -61,6 +62,10 @@ On Linux you need:
 - A C compiler for the host (e.g. `gcc`), which Rust build scripts link with.
 - A Swift toolchain, because binding generation runs `native/swift/Tools`.
 - `jq` and `make`.
+- `llvm-lipo` from an LLVM at least as new as the one in `rustc -vV`. Ubuntu's
+  own packages are usually too old; get the matching `llvm-<major>` from
+  [apt.llvm.org](https://apt.llvm.org), then point `LIPO` at it, e.g.
+  `LIPO=llvm-lipo-23`. CI does this in `.buildkite/assemble-xcframework.sh`.
 
 Then the same `make xcframework*` targets work.
 
