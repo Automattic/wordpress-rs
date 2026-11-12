@@ -49,6 +49,7 @@ pub mod prelude;
 pub mod request;
 pub mod search_results;
 pub mod sidebars;
+pub mod site_icons;
 pub mod site_settings;
 pub mod ssl;
 pub mod taxonomies;

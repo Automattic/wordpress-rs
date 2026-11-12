@@ -380,6 +380,12 @@ public typealias PublicizeRequestDeleteConnectionResponse = WordPressAPIInternal
 public typealias MeConnectionsRequestListResponse = WordPressAPIInternal.MeConnectionsRequestListResponse
 public typealias MeConnectionsResponse = WordPressAPIInternal.MeConnectionsResponse
 
+// MARK: - Site Icons
+
+public typealias SiteIcon = WordPressAPIInternal.SiteIcon
+public typealias SiteIconKind = WordPressAPIInternal.SiteIconKind
+public typealias SiteIconSize = WordPressAPIInternal.SiteIconSize
+
 // MARK: - JSON helpers
 
 public typealias WpAdditionalFields = WordPressAPIInternal.WpAdditionalFields
