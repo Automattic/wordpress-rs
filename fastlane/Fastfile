@@ -204,8 +204,13 @@ end
 lane :publish_pr_xcframework do |options|
   pr_number = options[:pr_number] || UI.user_error!('pr_number is required')
   branch_name = "pr-build/#{pr_number}"
+  # Each build gets its own path. Builds of a PR used to share `pr-builds/<n>`, so the CDN kept
+  # serving an earlier build's xcframework after a rebuild replaced it, and every app pinned to the
+  # new build failed SwiftPM's checksum check. The build number, unlike the commit, also differs
+  # when the same commit is built again.
+  build_number = ENV['BUILDKITE_BUILD_NUMBER'] || UI.user_error!('BUILDKITE_BUILD_NUMBER is required')
   publish_xcframework_snapshot(
-    version: "pr-builds/#{pr_number}",
+    version: "pr-builds/#{pr_number}/#{build_number}",
     branch_name: branch_name
   )
   update_pr_xcframework_comment(pr_number: pr_number, branch_name: branch_name)
