@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
     deserialize_empty_vec_as_none, deserialize_null_as_empty_vec,
-    deserialize_null_or_empty_array_as_hashmap,
+    deserialize_null_or_empty_array_as_hashmap, deserialize_string_or_integer_or_null,
 };
 
 use super::WpComSiteId;
@@ -70,6 +70,8 @@ pub struct BotConversation {
     pub bot_slug: String,
     pub bot_version: String,
     pub created_at: WpGmtDateTime,
+    /// The server sends a number once a ticket exists, for example when the first message asks for a human.
+    #[serde(default, deserialize_with = "deserialize_string_or_integer_or_null")]
     pub zendesk_ticket_id: Option<String>,
     pub messages: Vec<BotMessage>,
 }
@@ -296,6 +298,36 @@ mod tests {
         let conversation: BotConversation =
             serde_json::from_str(json).expect("Failed to deserialize bot conversation");
         assert_eq!(conversation.chat_id, 1965886);
+    }
+
+    #[test]
+    fn test_bot_create_conversation_with_zendesk_ticket_deserialization() {
+        // When the first message asks for a human, the conversation is created with a Zendesk
+        // ticket, and `zendesk_ticket_id` is a number.
+        let json = include_str!(
+            "../../tests/wpcom/support_bots/create-conversation-response-with-ticket.json"
+        );
+        let conversation: BotConversation = serde_json::from_str(json)
+            .expect("Failed to deserialize bot conversation with a Zendesk ticket");
+        assert_eq!(conversation.zendesk_ticket_id.as_deref(), Some("12345678"));
+    }
+
+    #[rstest]
+    #[case(r#""12345678""#, Some("12345678"))]
+    #[case("12345678", Some("12345678"))]
+    #[case("null", None)]
+    fn test_bot_conversation_zendesk_ticket_id_deserialization(
+        #[case] value: &str,
+        #[case] expected: Option<&str>,
+    ) {
+        let json = include_str!("../../tests/wpcom/support_bots/create-conversation-response.json");
+        let mut conversation: serde_json::Value =
+            serde_json::from_str(json).expect("Failed to parse fixture");
+        conversation["zendesk_ticket_id"] =
+            serde_json::from_str(value).expect("Failed to parse value");
+        let conversation: BotConversation =
+            serde_json::from_value(conversation).expect("Failed to deserialize bot conversation");
+        assert_eq!(conversation.zendesk_ticket_id.as_deref(), expected);
     }
 
     #[test]
