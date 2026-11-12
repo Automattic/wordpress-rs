@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `isSiteUnreachable` is now `true` on Android when there is no route to the site's host (`NoRouteToHostException`, for example "host is unreachable"). The Kotlin executor classified it as the generic `HttpError`, though `ConnectionError` was meant to cover it, as it already does on Swift and reqwest.
 - **BREAKING:** Posts' and pages' `menu_order` is now a signed `Option<i64>` instead of `Option<u32>`, in `SparseAnyPost`, `PostCreateParams` and `PostUpdateParams`. WordPress stores `menu_order` as a signed integer, and negative values are commonly used to pin a page to the top of a list. Listing pages on such a site previously failed to parse the whole response (`invalid value: integer -1000, expected u32`), so the entire page list came back as an error. Swift and Kotlin now see `Int64?` where they saw `UInt32?`.
 
 ### Changed
