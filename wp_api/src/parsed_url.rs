@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fmt::Display;
-use url::Url;
+use url::{Position, Url};
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
@@ -137,6 +137,42 @@ impl ParsedUrl {
         self.inner.to_string()
     }
 
+    /// The URL as a string that only uses characters RFC 3986 allows.
+    ///
+    /// [`url`](Self::url) follows the WHATWG URL standard, which leaves some
+    /// characters as they are, such as `{`, `}`, `|`, `^`, `[` and `]` in a
+    /// query. Stricter parsers reject them: Foundation's `URL(string:)`
+    /// returns `nil` before iOS 17 and macOS 14, and Java's `URI` throws.
+    ///
+    /// This percent-encodes those characters in the path, query and fragment.
+    /// It also encodes a `%` that doesn't start an escape, and a `#` inside
+    /// the fragment. The result names the same resource; for a URL that is
+    /// already valid RFC 3986 it is the same as [`url`](Self::url).
+    pub fn rfc3986_url(&self) -> String {
+        let serialized = self.inner.as_str();
+        let (authority, rest) = serialized.split_at(self.inner[..Position::BeforePath].len());
+        let rest = rest.as_bytes();
+
+        let mut result = String::with_capacity(serialized.len());
+        result.push_str(authority);
+        let mut in_fragment = false;
+        for (index, &byte) in rest.iter().enumerate() {
+            let is_escape = byte == b'%'
+                && rest.get(index + 1).is_some_and(u8::is_ascii_hexdigit)
+                && rest.get(index + 2).is_some_and(u8::is_ascii_hexdigit);
+            let is_fragment_start = byte == b'#' && !in_fragment;
+            if is_fragment_start {
+                in_fragment = true;
+            }
+            if is_escape || is_fragment_start || is_rfc3986_path_query_or_fragment_char(byte) {
+                result.push(byte as char);
+            } else {
+                result.push_str(&format!("%{byte:02X}"));
+            }
+        }
+        result
+    }
+
     /// A user-facing URL string that omits unnecessary details.
     pub fn pretty_url(&self) -> String {
         if self.inner.path() == "/" {
@@ -148,6 +184,12 @@ impl ParsedUrl {
             self.inner.to_string()
         }
     }
+}
+
+/// Whether RFC 3986 allows `byte` as it is in a path, query or fragment:
+/// `unreserved`, `sub-delims`, `:`, `@`, `/` and `?`.
+fn is_rfc3986_path_query_or_fragment_char(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || b"-._~!$&'()*+,;=:@/?".contains(&byte)
 }
 
 #[derive(
@@ -257,6 +299,36 @@ mod tests {
     fn pretty_url(#[case] input: &str, #[case] expected_display: &str) {
         let url = ParsedUrl::parse(input).unwrap();
         assert_eq!(url.pretty_url(), expected_display);
+    }
+
+    #[rstest]
+    #[case::already_valid(
+        "https://user:pw@example.com:8080/a/b.png?x=1&y=a+b#frag",
+        "https://user:pw@example.com:8080/a/b.png?x=1&y=a+b#frag"
+    )]
+    #[case::ipv6_host("http://[2001:db8::1]:8080/", "http://[2001:db8::1]:8080/")]
+    #[case::query_characters(
+        "https://example.com/icon.png?v={hash}|2^x[0]",
+        "https://example.com/icon.png?v=%7Bhash%7D%7C2%5Ex%5B0%5D"
+    )]
+    #[case::path_characters("https://example.com/a|b^c[d]", "https://example.com/a%7Cb%5Ec%5Bd%5D")]
+    #[case::fragment_characters("https://example.com/#a{b}#c", "https://example.com/#a%7Bb%7D%23c")]
+    #[case::existing_escapes_kept(
+        "https://example.com/a%20b?q=%7B",
+        "https://example.com/a%20b?q=%7B"
+    )]
+    #[case::stray_percent("https://example.com/100%?q=%zz", "https://example.com/100%25?q=%25zz")]
+    #[case::non_ascii(
+        "https://example.com/café?q=é",
+        "https://example.com/caf%C3%A9?q=%C3%A9"
+    )]
+    #[case::cannot_be_a_base("mailto:someone@example.com", "mailto:someone@example.com")]
+    fn rfc3986_url(#[case] input: &str, #[case] expected: &str) {
+        let url = ParsedUrl::parse(input).unwrap();
+        assert_eq!(url.rfc3986_url(), expected);
+        // Encoding is stable: parsing the result again doesn't change it.
+        let reparsed = ParsedUrl::parse(&url.rfc3986_url()).unwrap();
+        assert_eq!(reparsed.rfc3986_url(), expected);
     }
 
     #[test]

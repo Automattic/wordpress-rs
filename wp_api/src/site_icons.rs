@@ -54,7 +54,7 @@ pub enum SiteIconSize {
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct SiteIcon {
     /// The icon's absolute `http` or `https` URL.
-    pub url: String,
+    pub url: Arc<ParsedUrl>,
     pub kind: SiteIconKind,
     /// The sizes the tag lists, in order. Empty when it lists none.
     pub sizes: Vec<SiteIconSize>,
@@ -86,7 +86,7 @@ pub fn site_icons(html: String, page_url: Arc<ParsedUrl>) -> Vec<SiteIcon> {
             let url = resolve(address, &base_url)?;
             let attributes = element.value();
             Some(SiteIcon {
-                url: url.into(),
+                url: Arc::new(url.into()),
                 kind,
                 sizes: attributes
                     .attr("sizes")
@@ -105,9 +105,16 @@ pub fn site_icons(html: String, page_url: Arc<ParsedUrl>) -> Vec<SiteIcon> {
 /// `/favicon.ico` at the root of `page_url`'s origin when `html` declares no
 /// icon an app can show.
 ///
+/// Returns `None` when `html` declares no icon an app can show and `page_url`
+/// isn't `http` or `https`, such as `about:blank` or a `file:` URL, because
+/// there is no origin to request `/favicon.ico` from.
+///
 /// It picks the smallest icon that is at least `size` pixels, so the image
 /// is sharp without downloading more than needed. When every icon is smaller,
-/// it picks the largest. An icon that doesn't list its size counts as:
+/// it picks the largest. An icon with `sizes="any"` scales, so it counts as
+/// exactly `size` pixels. An icon that doesn't list its size counts as the
+/// size at the end of its file name, such as `cropped-icon-270x270.png` (the
+/// way WordPress names them), or else as:
 ///
 /// - 180 pixels for an `apple-touch-icon`, the size Apple asks for.
 /// - 144 pixels for a Windows tile image, the smallest size Windows asks for.
@@ -121,53 +128,47 @@ pub fn site_icons(html: String, page_url: Arc<ParsedUrl>) -> Vec<SiteIcon> {
 /// SVG icons and mask icons are never picked, because the image decoders on
 /// Apple platforms and Android can't draw SVG. [`site_icons`] still lists them.
 #[uniffi::export]
-pub fn preferred_site_icon(html: String, page_url: Arc<ParsedUrl>, size: u32) -> SiteIcon {
-    let candidates: Vec<(SiteIcon, u32)> = site_icons(html, page_url.clone())
+pub fn preferred_site_icon(html: String, page_url: Arc<ParsedUrl>, size: u32) -> Option<SiteIcon> {
+    // The lowest key wins. In order, it sorts:
+    // 1. Icons of at least `size` pixels before smaller ones.
+    // 2. Among those, the smallest first; among smaller ones, the largest.
+    // 3. Then by kind, then by document order.
+    site_icons(html, page_url.clone())
         .into_iter()
-        .filter(is_drawable)
-        .map(|icon| {
-            let pixels = effective_size(&icon);
-            (icon, pixels)
-        })
-        .collect();
-
-    // Ties are settled by kind, then by document order: `min_by_key` and
-    // `max_by_key` disagree on which of two equal elements they return, so
-    // the document position is part of the key.
-    let rank = |(index, (icon, _)): &(usize, &(SiteIcon, u32))| (kind_rank(icon.kind), *index);
-    let large_enough = candidates
-        .iter()
         .enumerate()
-        .filter(|(_, (_, pixels))| *pixels >= size)
-        .min_by_key(|entry| (entry.1.1, rank(entry)));
-    let best = large_enough.or_else(|| {
-        candidates
-            .iter()
-            .enumerate()
-            .min_by_key(|entry| (std::cmp::Reverse(entry.1.1), rank(entry)))
-    });
-
-    match best {
-        Some((_, (icon, _))) => icon.clone(),
-        None => default_favicon(&page_url.inner),
-    }
+        .filter(|(_, icon)| !is_svg(icon))
+        .filter_map(|(index, icon)| {
+            let kind_rank = kind_rank(icon.kind)?;
+            let pixels = effective_size(&icon, size);
+            let fit = if pixels >= size {
+                pixels
+            } else {
+                u32::MAX - pixels
+            };
+            Some(((pixels < size, fit, kind_rank, index), icon))
+        })
+        .min_by_key(|(key, _)| *key)
+        .map(|(_, icon)| icon)
+        .or_else(|| default_favicon(&page_url.inner))
 }
 
-/// `/favicon.ico` at the root of `page_url`'s origin, as a browser requests it.
-fn default_favicon(page_url: &Url) -> SiteIcon {
-    let url = page_url
-        .join("/favicon.ico")
-        .expect("joining an absolute path to a parsed URL succeeds");
-    SiteIcon {
-        url: url.into(),
+/// `/favicon.ico` at the root of `page_url`'s origin, as a browser requests it,
+/// or `None` when `page_url` isn't `http` or `https`.
+fn default_favicon(page_url: &Url) -> Option<SiteIcon> {
+    let url = resolve("/favicon.ico", page_url)?;
+    Some(SiteIcon {
+        url: Arc::new(url.into()),
         kind: SiteIconKind::DefaultFavicon,
         sizes: Vec::new(),
         mime_type: None,
-    }
+    })
 }
 
 /// The URL relative addresses in `document` resolve against: the first
 /// `<base href>`, resolved against `page_url`, or `page_url` itself.
+///
+/// As in the HTML standard, a base that doesn't parse, or is a `data:` or
+/// `javascript:` URL, is ignored.
 fn document_base_url(document: &Html, page_url: &Url) -> Url {
     let selector = Selector::parse("base[href]").expect("the base selector is valid");
     document
@@ -175,6 +176,7 @@ fn document_base_url(document: &Html, page_url: &Url) -> Url {
         .next()
         .and_then(|base| base.value().attr("href"))
         .and_then(|href| page_url.join(href).ok())
+        .filter(|base| !matches!(base.scheme(), "data" | "javascript"))
         .unwrap_or_else(|| page_url.clone())
 }
 
@@ -237,30 +239,45 @@ fn parse_sizes(sizes: &str) -> Vec<SiteIconSize> {
             if entry.eq_ignore_ascii_case("any") {
                 return Some(SiteIconSize::Any);
             }
-            let (width, height) = entry.split_once(['x', 'X'])?;
-            let width: u32 = width.parse().ok().filter(|w| *w > 0)?;
-            let height: u32 = height.parse().ok().filter(|h| *h > 0)?;
+            let (width, height) = parse_dimensions(entry)?;
             Some(SiteIconSize::Pixels { width, height })
         })
         .collect()
 }
 
-fn is_drawable(icon: &SiteIcon) -> bool {
-    if icon.kind == SiteIconKind::MaskIcon {
-        return false;
-    }
-    if icon.mime_type.as_deref() == Some("image/svg+xml") {
-        return false;
-    }
-    let is_svg_file = Url::parse(&icon.url)
-        .map(|url| url.path().to_ascii_lowercase().ends_with(".svg"))
-        .unwrap_or(false);
-    !is_svg_file
+/// Parses `WxH`, such as `32x32` or `310X150`, into a non-zero width and height.
+fn parse_dimensions(text: &str) -> Option<(u32, u32)> {
+    let (width, height) = text.split_once(['x', 'X'])?;
+    let width: u32 = width.parse().ok().filter(|w| *w > 0)?;
+    let height: u32 = height.parse().ok().filter(|h| *h > 0)?;
+    Some((width, height))
 }
 
-/// The size in pixels an icon is ranked by: the largest it lists, measured
-/// by its shorter side, or a default for its kind when it lists none.
-fn effective_size(icon: &SiteIcon) -> u32 {
+/// Whether `icon` is an SVG, by its `type` or its file extension.
+fn is_svg(icon: &SiteIcon) -> bool {
+    // Compare the MIME type's essence, without parameters such as
+    // `; charset=utf-8`. `mime_type` is already lowercased.
+    let is_svg_type = icon
+        .mime_type
+        .as_deref()
+        .and_then(|mime_type| mime_type.split(';').next())
+        .is_some_and(|essence| essence.trim() == "image/svg+xml");
+    let path = icon.url.inner.path().to_ascii_lowercase();
+    let is_svg_file = path.ends_with(".svg") || path.ends_with(".svgz");
+    is_svg_type || is_svg_file
+}
+
+/// The size in pixels an icon is ranked by, when `requested` pixels are
+/// wanted. Sizes are measured by their shorter side. In order:
+///
+/// 1. `requested`, when the icon lists `any`: it scales to fit.
+/// 2. The largest size the icon lists.
+/// 3. The size at the end of its file name, such as `icon-270x270.png`.
+/// 4. A default for its kind.
+fn effective_size(icon: &SiteIcon, requested: u32) -> u32 {
+    if icon.sizes.contains(&SiteIconSize::Any) {
+        return requested;
+    }
     let listed = icon
         .sizes
         .iter()
@@ -269,19 +286,36 @@ fn effective_size(icon: &SiteIcon) -> u32 {
             SiteIconSize::Any => None,
         })
         .max();
-    listed.unwrap_or(match icon.kind {
-        SiteIconKind::AppleTouchIcon => 180,
-        SiteIconKind::TileImage => 144,
-        SiteIconKind::Icon | SiteIconKind::MaskIcon | SiteIconKind::DefaultFavicon => 16,
-    })
+    listed
+        .or_else(|| size_in_file_name(&icon.url.inner))
+        .unwrap_or(match icon.kind {
+            SiteIconKind::AppleTouchIcon => 180,
+            SiteIconKind::TileImage => 144,
+            SiteIconKind::Icon | SiteIconKind::MaskIcon | SiteIconKind::DefaultFavicon => 16,
+        })
 }
 
-fn kind_rank(kind: SiteIconKind) -> u8 {
+/// The shorter side of a `-WxH` or `_WxH` size at the end of `url`'s file
+/// name, before the extension: 270 for `cropped-icon-270x270.png`.
+fn size_in_file_name(url: &Url) -> Option<u32> {
+    let file_name = url.path_segments()?.next_back()?;
+    let stem = file_name
+        .rsplit_once('.')
+        .map_or(file_name, |(stem, _)| stem);
+    let (_, size) = stem.rsplit_once(['-', '_'])?;
+    let (width, height) = parse_dimensions(size)?;
+    Some(width.min(height))
+}
+
+/// How a kind ranks when two icons are the same size, lowest first, or `None`
+/// for a kind that is never picked. A mask icon is a shape for Safari to tint,
+/// not an image to show, and the default favicon is only the fallback.
+fn kind_rank(kind: SiteIconKind) -> Option<u8> {
     match kind {
-        SiteIconKind::AppleTouchIcon => 0,
-        SiteIconKind::Icon => 1,
-        SiteIconKind::TileImage => 2,
-        SiteIconKind::MaskIcon | SiteIconKind::DefaultFavicon => 3,
+        SiteIconKind::AppleTouchIcon => Some(0),
+        SiteIconKind::Icon => Some(1),
+        SiteIconKind::TileImage => Some(2),
+        SiteIconKind::MaskIcon | SiteIconKind::DefaultFavicon => None,
     }
 }
 
@@ -299,11 +333,12 @@ mod tests {
     }
 
     fn urls(html: &str) -> Vec<String> {
-        icons(html).into_iter().map(|icon| icon.url).collect()
+        icons(html).into_iter().map(|icon| icon.url.url()).collect()
     }
 
     fn preferred(html: &str, size: u32) -> SiteIcon {
         preferred_site_icon(html.to_string(), page("https://example.com/"), size)
+            .expect("an https page always has an icon")
     }
 
     /// What WordPress prints in `<head>` for a site with a site icon.
@@ -321,7 +356,7 @@ mod tests {
             icons(WORDPRESS_SITE_ICON),
             vec![
                 SiteIcon {
-                    url: "https://example.com/wp-content/uploads/cropped-icon-32x32.png".into(),
+                    url: page("https://example.com/wp-content/uploads/cropped-icon-32x32.png"),
                     kind: SiteIconKind::Icon,
                     sizes: vec![SiteIconSize::Pixels {
                         width: 32,
@@ -330,7 +365,7 @@ mod tests {
                     mime_type: None,
                 },
                 SiteIcon {
-                    url: "https://example.com/wp-content/uploads/cropped-icon-192x192.png".into(),
+                    url: page("https://example.com/wp-content/uploads/cropped-icon-192x192.png"),
                     kind: SiteIconKind::Icon,
                     sizes: vec![SiteIconSize::Pixels {
                         width: 192,
@@ -339,13 +374,13 @@ mod tests {
                     mime_type: None,
                 },
                 SiteIcon {
-                    url: "https://example.com/wp-content/uploads/cropped-icon-180x180.png".into(),
+                    url: page("https://example.com/wp-content/uploads/cropped-icon-180x180.png"),
                     kind: SiteIconKind::AppleTouchIcon,
                     sizes: vec![],
                     mime_type: None,
                 },
                 SiteIcon {
-                    url: "https://example.com/wp-content/uploads/cropped-icon-270x270.png".into(),
+                    url: page("https://example.com/wp-content/uploads/cropped-icon-270x270.png"),
                     kind: SiteIconKind::TileImage,
                     sizes: vec![],
                     mime_type: None,
@@ -387,7 +422,7 @@ mod tests {
         let found = icons(html);
         assert_eq!(found.len(), 1, "{found:?}");
         assert_eq!(found[0].kind, kind);
-        assert_eq!(found[0].url, "https://example.com/a.png");
+        assert_eq!(found[0].url.url(), "https://example.com/a.png");
     }
 
     #[rstest]
@@ -484,7 +519,7 @@ mod tests {
         let html = format!(r#"<link rel="icon" href="{href}">"#);
         let found = site_icons(html, page(page_url));
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].url, expected);
+        assert_eq!(found[0].url.url(), expected);
     }
 
     #[test]
@@ -540,8 +575,9 @@ mod tests {
     #[case::smallest_large_enough(180, "cropped-icon-180x180.png", SiteIconKind::AppleTouchIcon)]
     #[case::exact_size(192, "cropped-icon-192x192.png", SiteIconKind::Icon)]
     #[case::small(24, "cropped-icon-32x32.png", SiteIconKind::Icon)]
-    // The tile image is 270 pixels, but doesn't say so, so it counts as 144.
-    #[case::larger_than_all(512, "cropped-icon-192x192.png", SiteIconKind::Icon)]
+    // The tile image doesn't list its size, but its file name says 270 pixels.
+    #[case::between_icon_and_tile(256, "cropped-icon-270x270.png", SiteIconKind::TileImage)]
+    #[case::larger_than_all(512, "cropped-icon-270x270.png", SiteIconKind::TileImage)]
     fn picks_from_a_wordpress_site_icon(
         #[case] size: u32,
         #[case] file: &str,
@@ -549,7 +585,7 @@ mod tests {
     ) {
         let icon = preferred(WORDPRESS_SITE_ICON, size);
         assert_eq!(
-            icon.url,
+            icon.url.url(),
             format!("https://example.com/wp-content/uploads/{file}")
         );
         assert_eq!(icon.kind, kind);
@@ -564,25 +600,50 @@ mod tests {
         );
         assert_eq!(
             icon,
-            SiteIcon {
-                url: "https://example.com/favicon.ico".into(),
+            Some(SiteIcon {
+                url: page("https://example.com/favicon.ico"),
                 kind: SiteIconKind::DefaultFavicon,
                 sizes: vec![],
                 mime_type: None,
-            }
+            })
         );
     }
 
     #[test]
     fn falls_back_to_favicon_ico_for_an_empty_page() {
         let icon = preferred_site_icon(String::new(), page("http://example.com:8080/"), 180);
-        assert_eq!(icon.url, "http://example.com:8080/favicon.ico");
+        assert_eq!(
+            icon.map(|icon| icon.url.url()),
+            Some("http://example.com:8080/favicon.ico".to_string())
+        );
+    }
+
+    #[rstest]
+    #[case::about_blank("about:blank")]
+    #[case::data("data:text/html,hi")]
+    #[case::mailto("mailto:someone@example.com")]
+    #[case::file("file:///tmp/page.html")]
+    fn has_no_fallback_for_a_page_that_isnt_on_the_web(#[case] page_url: &str) {
+        assert_eq!(preferred_site_icon(String::new(), page(page_url), 32), None);
+    }
+
+    #[test]
+    fn picks_a_declared_icon_on_a_page_that_isnt_on_the_web() {
+        let icon = preferred_site_icon(
+            r#"<link rel="icon" href="https://example.com/a.png">"#.into(),
+            page("about:blank"),
+            32,
+        );
+        assert_eq!(
+            icon.map(|icon| icon.url.url()),
+            Some("https://example.com/a.png".to_string())
+        );
     }
 
     #[test]
     fn prefers_any_declared_icon_to_the_fallback() {
         let icon = preferred(r#"<link rel="shortcut icon" href="/favicon.png">"#, 180);
-        assert_eq!(icon.url, "https://example.com/favicon.png");
+        assert_eq!(icon.url.url(), "https://example.com/favicon.png");
         assert_eq!(icon.kind, SiteIconKind::Icon);
     }
 
@@ -590,42 +651,64 @@ mod tests {
     fn prefers_an_apple_touch_icon_to_an_icon_without_sizes() {
         let html = r#"<link rel="icon" href="/favicon.png">
             <link rel="apple-touch-icon" href="/touch.png">"#;
-        assert_eq!(preferred(html, 64).url, "https://example.com/touch.png");
+        assert_eq!(
+            preferred(html, 64).url.url(),
+            "https://example.com/touch.png"
+        );
     }
 
     #[test]
     fn prefers_an_apple_touch_icon_of_the_same_size() {
         let html = r#"<link rel="icon" href="/icon.png" sizes="180x180">
             <link rel="apple-touch-icon" href="/touch.png" sizes="180x180">"#;
-        assert_eq!(preferred(html, 180).url, "https://example.com/touch.png");
-        assert_eq!(preferred(html, 512).url, "https://example.com/touch.png");
+        assert_eq!(
+            preferred(html, 180).url.url(),
+            "https://example.com/touch.png"
+        );
+        assert_eq!(
+            preferred(html, 512).url.url(),
+            "https://example.com/touch.png"
+        );
     }
 
     #[test]
     fn picks_the_first_of_two_equal_icons() {
         let html = r#"<link rel="icon" href="/first.png" sizes="64x64">
             <link rel="icon" href="/second.png" sizes="64x64">"#;
-        assert_eq!(preferred(html, 32).url, "https://example.com/first.png");
-        assert_eq!(preferred(html, 128).url, "https://example.com/first.png");
+        assert_eq!(
+            preferred(html, 32).url.url(),
+            "https://example.com/first.png"
+        );
+        assert_eq!(
+            preferred(html, 128).url.url(),
+            "https://example.com/first.png"
+        );
     }
 
     #[test]
     fn ranks_an_ico_by_its_largest_size() {
         let html = r#"<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
             <link rel="icon" href="/icon-40.png" sizes="40x40">"#;
-        assert_eq!(preferred(html, 44).url, "https://example.com/favicon.ico");
+        assert_eq!(
+            preferred(html, 44).url.url(),
+            "https://example.com/favicon.ico"
+        );
     }
 
     #[rstest]
     #[case::svg_type(r#"<link rel="icon" href="/icon" type="image/svg+xml">"#)]
     #[case::svg_file(r#"<link rel="icon" href="/icon.SVG?v=2">"#)]
     #[case::svg_with_any_size(r#"<link rel="icon" href="/icon.svg" sizes="any">"#)]
+    #[case::svg_type_with_parameters(
+        r#"<link rel="icon" href="/icon" type="image/svg+xml; charset=utf-8" sizes="64x64">"#
+    )]
+    #[case::svgz_file(r#"<link rel="icon" href="/icon.svgz" sizes="64x64">"#)]
     #[case::mask_icon(r#"<link rel="mask-icon" href="/mask.png" color="black">"#)]
     fn never_picks_an_icon_apps_cant_draw(#[case] html: &str) {
         assert_eq!(preferred(html, 32).kind, SiteIconKind::DefaultFavicon);
         let with_png = format!(r#"{html}<link rel="icon" href="/fallback.png" sizes="16x16">"#);
         assert_eq!(
-            preferred(&with_png, 32).url,
+            preferred(&with_png, 32).url.url(),
             "https://example.com/fallback.png"
         );
     }
@@ -637,7 +720,7 @@ mod tests {
             <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
             <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">"#;
         assert_eq!(
-            preferred(html, 120).url,
+            preferred(html, 120).url.url(),
             "https://example.com/apple-touch-icon.png"
         );
     }
@@ -646,6 +729,65 @@ mod tests {
     fn ranks_a_wide_icon_by_its_shorter_side() {
         let html = r#"<link rel="icon" href="/wide.png" sizes="512x64">
             <link rel="icon" href="/square.png" sizes="128x128">"#;
-        assert_eq!(preferred(html, 100).url, "https://example.com/square.png");
+        assert_eq!(
+            preferred(html, 100).url.url(),
+            "https://example.com/square.png"
+        );
+    }
+
+    #[rstest]
+    #[case::data("data:text/plain,x")]
+    #[case::javascript("javascript:void(0)")]
+    #[case::data_in_capitals("DATA:text/plain,x")]
+    fn ignores_a_data_or_javascript_base(#[case] base: &str) {
+        // The HTML standard ignores these, and resolves against the page instead.
+        let html = format!(r#"<base href="{base}"><link rel="icon" href="/a.png">"#);
+        assert_eq!(urls(&html), vec!["https://example.com/a.png"]);
+    }
+
+    #[rstest]
+    // Every listed icon is smaller than the request, so the scalable one wins.
+    #[case::larger_than_all(180)]
+    // The scalable icon fits exactly, so it beats the larger 64-pixel icon.
+    #[case::between(48)]
+    fn ranks_an_icon_for_any_size_as_a_perfect_fit(#[case] size: u32) {
+        let html = r#"<link rel="icon" href="/i32.png" sizes="32x32">
+            <link rel="icon" href="/any.png" sizes="any">
+            <link rel="icon" href="/i64.png" sizes="64x64">"#;
+        assert_eq!(
+            preferred(html, size).url.url(),
+            "https://example.com/any.png"
+        );
+    }
+
+    #[rstest]
+    #[case::wordpress("https://example.com/cropped-icon-270x270.png", 270)]
+    #[case::underscore("https://example.com/favicon_96x96.png", 96)]
+    #[case::capital_x("https://example.com/tile-310X150.png", 150)]
+    #[case::query_ignored("https://example.com/tile-558x558.png?v=2", 558)]
+    #[case::no_size_in_name("https://example.com/mstile.png", 144)]
+    #[case::size_in_directory("https://example.com/64x64/tile.png", 144)]
+    #[case::no_separator("https://example.com/tile64x64.png", 144)]
+    fn ranks_an_unsized_icon_by_the_size_in_its_file_name(
+        #[case] url: &str,
+        #[case] expected: u32,
+    ) {
+        let icon = SiteIcon {
+            url: page(url),
+            kind: SiteIconKind::TileImage,
+            sizes: vec![],
+            mime_type: None,
+        };
+        assert_eq!(effective_size(&icon, 32), expected);
+    }
+
+    #[test]
+    fn prefers_listed_sizes_to_the_file_name() {
+        let html = r#"<link rel="icon" href="/icon-512x512.png" sizes="32x32">
+            <link rel="icon" href="/icon-64.png" sizes="64x64">"#;
+        assert_eq!(
+            preferred(html, 48).url.url(),
+            "https://example.com/icon-64.png"
+        );
     }
 }

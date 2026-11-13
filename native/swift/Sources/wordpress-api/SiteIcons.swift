@@ -17,17 +17,9 @@ extension SiteIcon {
     /// origin when `html` declares no icon an app can show.
     ///
     /// It picks the smallest icon of at least `size` pixels, or the largest when all are smaller. SVG and mask
-    /// icons are never picked.
-    public static func preferred(inHTML html: String, pageURL: URL, size: UInt32) throws -> SiteIcon {
+    /// icons are never picked. Returns `nil` when `html` declares no icon an app can show and `pageURL` isn't
+    /// `http` or `https`, such as `about:blank`.
+    public static func preferred(inHTML html: String, pageURL: URL, size: UInt32) throws -> SiteIcon? {
         preferredSiteIcon(html: html, pageUrl: try ParsedUrl.from(url: pageURL), size: size)
-    }
-
-    /// The icon's address.
-    public var asURL: URL {
-        guard let result = URL(string: url) else {
-            // The address comes from Rust's `url`, which `URL` can always parse.
-            fatalError("`SiteIcon.url` is not a `URL`: \(url)")
-        }
-        return result
     }
 }
