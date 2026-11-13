@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'open-uri'
+require 'tmpdir'
 require 'fluent_tools'
 
 PROJECT_ROOT = File.expand_path('..', __dir__)
@@ -109,7 +110,6 @@ lane :release do |options|
 
   validate
   update_swift_package
-  publish_to_s3
   publish_release_to_github
 end
 
@@ -156,10 +156,9 @@ lane :publish_release_to_github do
     message: "Update Package.swift to use version #{version}"
   )
 
-  # Re-resolve Swift package dependencies so Package.resolved matches the
-  # updated Package.swift (which now points to the remote binary target).
-  sh "cd #{PROJECT_ROOT} && swift package resolve"
-
+  # Package.resolved was re-resolved by `.buildkite/release.sh` while Package.swift
+  # still pointed at the local xcframework. Resolving here would try to download
+  # the GitHub release asset, which doesn't exist until `set_github_release` below.
   package_resolved_path = File.expand_path('./Package.resolved', PROJECT_ROOT)
   git_add(path: xcframework_bindings_file_path, force: true)
   git_add(path: package_resolved_path)
@@ -179,26 +178,40 @@ lane :publish_release_to_github do
     is_prerelease: version.include?('-'),
     upload_assets: [xcframework_file_path, xcframework_checksum_file_path]
   )
+
+  verify_release_download
 end
 
-lane :publish_to_s3 do
-  version = lane_context[LANE_VALUE_VERSION] || UI.user_error!('Missing version lane context')
-
-  upload_to_s3(
-    bucket: 'a8c-apps-public-artifacts',
-    key: File.join('wordpress-rs', version, File.basename(xcframework_file_path)),
-    file: xcframework_file_path,
-    auto_prefix: false,
-    if_exists: :fail
-  )
-
-  upload_to_s3(
-    bucket: 'a8c-apps-public-artifacts',
-    key: File.join('wordpress-rs', version, File.basename(xcframework_checksum_file_path)),
-    file: xcframework_checksum_file_path,
-    auto_prefix: false,
-    if_exists: :fail
-  )
+# Resolves the released Package.swift, which makes SwiftPM download the
+# xcframework from the GitHub release and verify its checksum, exactly as a
+# consumer of the release would. This runs after the release is public, so it
+# can't prevent a broken release, but it fails the release step straight away
+# rather than leaving the tag's own CI build to notice later.
+#
+# SwiftPM skips the download when its scratch directory already holds an
+# artifact with the same checksum, or its shared cache holds the URL, so it
+# resolves into empty temporary directories to force a real download.
+lane :verify_release_download do
+  attempts = 3
+  begin
+    Dir.mktmpdir('verify-release-download') do |tmp|
+      sh 'swift', 'package', 'resolve',
+         '--package-path', PROJECT_ROOT,
+         '--scratch-path', File.join(tmp, 'build'),
+         '--cache-path', File.join(tmp, 'cache')
+    end
+  rescue StandardError
+    attempts -= 1
+    if attempts.positive?
+      UI.important('Downloading the released xcframework failed, retrying in 30 seconds')
+      sleep 30
+      retry
+    end
+    UI.user_error!(
+      'The release is published, but its xcframework could not be downloaded or failed checksum verification. ' \
+      'Re-upload target/libwordpressFFI.xcframework.zip to the GitHub release, then check out the tag and run `bundle exec fastlane verify_release_download`.'
+    )
+  end
 end
 
 lane :publish_pr_xcframework do |options|
@@ -249,7 +262,7 @@ lane :publish_xcframework_snapshot do |options|
   file_path = File.expand_path('./Package.swift', PROJECT_ROOT)
   lines = File.readlines(file_path).map do |line|
     if line.start_with?('let libwordpressFFIVersion: WordPressRSVersion =')
-      "let libwordpressFFIVersion: WordPressRSVersion = .release(version: \"#{version}\", checksum: \"#{xcframework_checksum}\")"
+      "let libwordpressFFIVersion: WordPressRSVersion = .snapshot(version: \"#{version}\", checksum: \"#{xcframework_checksum}\")"
     else
       line
     end

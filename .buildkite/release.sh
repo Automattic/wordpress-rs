@@ -28,6 +28,15 @@ echo "--- :rust: Building XCFramework"
 make xcframework-package-sign
 make xcframework-package-checksum
 
+# Re-resolve Swift package dependencies while Package.swift still points at the
+# local xcframework. The release lane commits Package.resolved alongside the
+# bindings, but resolving after Package.swift points at the GitHub release asset
+# would 404: that asset is only uploaded once the tag exists. Binary targets are
+# not pinned in Package.resolved, so resolving against the local xcframework
+# produces the same file.
+echo "--- :swift: Resolving Swift package dependencies"
+swift package resolve
+
 echo "--- :wastebasket: Removing XCFramework build intermediates"
 rm -rf \
   target/*-apple-* \
