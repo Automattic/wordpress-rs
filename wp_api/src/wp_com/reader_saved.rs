@@ -136,7 +136,7 @@ impl TryFrom<RawReaderSavedKeyEntry> for ReaderSavedKeyEntry {
         let url = raw.key.url.clone();
         let key = ReaderSavedKey::try_from(raw.key)?;
         Ok(Self {
-            url: url.filter(|_| !matches!(key, ReaderSavedKey::Url { .. })),
+            url: url.filter(|url| !url.is_empty() && !matches!(key, ReaderSavedKey::Url { .. })),
             key,
             date_saved: raw.date_saved,
             id: raw.id,
@@ -211,18 +211,21 @@ pub struct ReaderSavePostResponse {
     pub key: ReaderSavedKey,
     /// How many posts are saved after this request.
     pub total: u64,
-    /// What the key resolved to. A URL can resolve to a WordPress.com post.
+    /// What the key resolved to. A URL can resolve to a WordPress.com post. `Unknown` when the
+    /// response leaves it out.
+    #[serde(default)]
     pub resolved: ReaderSavedResolution,
 }
 
 /// What a saved key resolved to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
 #[serde(rename_all = "snake_case")]
 pub enum ReaderSavedResolution {
     Post,
     FeedItem,
     Url,
     /// A kind this version doesn't know. A save that succeeded mustn't read as a failure.
+    #[default]
     #[serde(other)]
     Unknown,
 }
@@ -441,6 +444,16 @@ pub fn reader_saved_key_normalized(key: ReaderSavedKey) -> ReaderSavedKey {
 }
 
 impl ReaderSavedKey {
+    /// Whether the key has what the API needs: a nonzero ID, or a URL that isn't empty. Only such a
+    /// key reads back once it's stored.
+    pub fn is_complete(&self) -> bool {
+        match self {
+            Self::Post { blog_id, post_id } => blog_id.0 != 0 && post_id.0 > 0,
+            Self::FeedItem { feed_item_id } => feed_item_id.0 != 0,
+            Self::Url { url } => !url.is_empty(),
+        }
+    }
+
     /// See [`reader_saved_key_normalized`].
     pub fn normalized(&self) -> Self {
         match self {
@@ -682,6 +695,33 @@ mod tests {
     }
 
     #[test]
+    fn test_deserialize_key_entry_without_a_url() {
+        // An empty URL isn't one: kept, it would read as a key that can't be stored.
+        let entry: ReaderSavedKeyEntry = serde_json::from_value(json!({
+            "blog_id": 123, "post_id": 456, "url": "", "date_saved": "2026-11-02T00:00:00Z", "id": 11
+        }))
+        .unwrap();
+        assert_eq!(entry.key, post_key());
+        assert_eq!(entry.url, None);
+    }
+
+    #[rstest]
+    #[case::post(post_key(), true)]
+    #[case::feed_item(feed_item_key(789), true)]
+    #[case::url(url_key(), true)]
+    #[case::post_without_a_blog(ReaderSavedKey::Post { blog_id: WpComSiteId(0), post_id: PostId(456) }, false)]
+    #[case::post_without_a_post(ReaderSavedKey::Post { blog_id: WpComSiteId(123), post_id: PostId(0) }, false)]
+    #[case::negative_post(ReaderSavedKey::Post { blog_id: WpComSiteId(123), post_id: PostId(-1) }, false)]
+    #[case::feed_item_without_an_id(feed_item_key(0), false)]
+    #[case::empty_url(ReaderSavedKey::Url { url: String::new() }, false)]
+    fn test_key_is_complete(#[case] key: ReaderSavedKey, #[case] complete: bool) {
+        assert_eq!(key.is_complete(), complete);
+        // A complete key reads back as itself, and only a complete key reads back.
+        let reread = serde_json::from_value::<ReaderSavedKey>(serde_json::to_value(&key).unwrap());
+        assert_eq!(reread.ok(), complete.then_some(key));
+    }
+
+    #[test]
     fn test_keys_response_round_trips() {
         let json = include_str!("../../tests/wpcom/reader_saved/keys.json");
         let response: ReaderSavedKeysResponse = serde_json::from_str(json).unwrap();
@@ -895,6 +935,16 @@ mod tests {
         )
         .unwrap();
         assert_eq!(response.resolved, expected);
+    }
+
+    #[test]
+    fn test_deserialize_save_response_without_resolved() {
+        // Nothing reads it, so a response without it is still a successful save.
+        let response: ReaderSavePostResponse = serde_json::from_value(
+            json!({ "saved": true, "key": { "url": "https://example.com/" }, "total": 1 }),
+        )
+        .unwrap();
+        assert_eq!(response.resolved, ReaderSavedResolution::Unknown);
     }
 
     #[test]

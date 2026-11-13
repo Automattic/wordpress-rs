@@ -1177,6 +1177,49 @@ fn bulk_response(keys: &[Value], total: u64) -> Value {
     json!({ "results": results, "total": total })
 }
 
+#[rstest]
+#[case::empty_url(ReaderSavedKey::Url { url: String::new() })]
+#[case::zero_blog(ReaderSavedKey::Post { blog_id: WpComSiteId(0), post_id: PostId(1) })]
+#[case::zero_feed_item(ReaderSavedKey::FeedItem { feed_item_id: ReaderFeedItemId(0) })]
+#[tokio::test]
+async fn a_key_the_api_cant_take_is_refused_before_it_becomes_a_write(#[case] key: ReaderSavedKey) {
+    let (service, executor) = service();
+
+    let unsave = service.unsave_key(key.clone()).await;
+    if let ReaderSavedKey::Url { url } = key {
+        let save = service.save_url(url, None).await;
+        assert!(matches!(save, Err(ReaderSavedError::PostCannotBeSaved)));
+    }
+
+    assert!(matches!(unsave, Err(ReaderSavedError::PostCannotBeSaved)));
+    assert!(executor.sent().is_empty());
+    assert!(service.recent_saves().is_empty());
+}
+
+#[tokio::test]
+async fn import_leaves_out_a_key_with_a_zero_id_and_answers_it_as_the_server_would() {
+    let (service, executor) = service();
+    executor.push(Step::Respond(200, bulk_response(&[post_json(1)], 1)));
+    let zero = ReaderSavedBulkKey::FeedItem {
+        feed_item_id: ReaderFeedItemId(0),
+    };
+
+    let results = service
+        .import(vec![zero.clone(), bulk_post_key(1)])
+        .await
+        .unwrap();
+
+    assert_eq!(
+        executor.sent()[0].body,
+        Some(json!({ "keys": [{ "blog_id": 123, "post_id": 1 }], "source": "android" }))
+    );
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].key, None);
+    assert_eq!(results[0].error.as_deref(), Some("invalid_input"));
+    assert_eq!(results[1].key, Some(bulk_post_key(1)));
+    assert!(results[1].saved);
+}
+
 #[tokio::test]
 async fn importing_nothing_sends_nothing() {
     let (service, executor) = service();
@@ -1330,7 +1373,6 @@ async fn a_rejected_key_is_a_result_and_is_undone() {
             "results": [
                 { "key": post_json(1), "saved": true },
                 { "key": post_json(2), "saved": false, "error": "saved_limit_reached" },
-                { "key": { "post_id": 5 }, "saved": false, "error": "invalid_input" },
             ],
             "total": 1,
         }),
