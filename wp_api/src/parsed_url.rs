@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::Display;
+use std::sync::Arc;
 use url::Url;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
@@ -124,6 +125,14 @@ impl UrlExtension for Url {
     }
 }
 
+/// A single `name=value` query parameter, used to attach endpoint query
+/// parameters to a resolved REST URL across the UniFFI boundary.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct QueryPair {
+    pub name: String,
+    pub value: String,
+}
+
 #[uniffi::export]
 impl ParsedUrl {
     #[uniffi::constructor]
@@ -135,6 +144,51 @@ impl ParsedUrl {
 
     pub fn url(&self) -> String {
         self.inner.to_string()
+    }
+
+    /// Returns a copy of this URL with `pairs` appended to its query string,
+    /// preserving any query that is already present.
+    ///
+    /// This works uniformly on both REST API root forms produced by
+    /// `ApiUrlResolver::resolve`:
+    /// - **Path root** (`…/wp-json/wp/v2/themes`) gains `?context=edit&status=active`.
+    /// - **Query root** (`…/index.php?rest_route=%2Fwp%2Fv2%2Fthemes`) keeps its
+    ///   existing `rest_route` value and gains `&context=edit&status=active`.
+    ///
+    /// Pairs are appended in order and duplicate keys are kept (not
+    /// deduplicated). Names and values are serialized with
+    /// `application/x-www-form-urlencoded` encoding — the same encoding
+    /// `by_extending_rest_api_path` already uses — so a value like
+    /// `core,gutenberg` is written as `core%2Cgutenberg`. An empty `pairs`
+    /// returns the URL unchanged (no trailing `?` is added).
+    ///
+    /// # Panics
+    ///
+    /// Panics if any pair is named `rest_route`. WordPress lets a query-string
+    /// `rest_route` override the route on both root forms, so the request would
+    /// silently go to a different endpoint. Choose the route with
+    /// `ApiUrlResolver::resolve` instead.
+    pub fn by_appending_query_pairs(&self, pairs: Vec<QueryPair>) -> Arc<ParsedUrl> {
+        // Returning early keeps the URL byte-for-byte identical. `query_pairs_mut()`
+        // pushes a `?` as soon as it is called, even if nothing is appended, so we
+        // must avoid touching it when there is nothing to add.
+        if pairs.is_empty() {
+            return Arc::new(self.clone());
+        }
+
+        assert!(
+            pairs.iter().all(|pair| pair.name != "rest_route"),
+            "`rest_route` must not be passed to `by_appending_query_pairs`: it would override the route. Choose the route with `ApiUrlResolver::resolve` instead."
+        );
+
+        let mut url = self.inner.clone();
+        {
+            let mut query_pairs = url.query_pairs_mut();
+            for pair in &pairs {
+                query_pairs.append_pair(&pair.name, &pair.value);
+            }
+        }
+        Arc::new(ParsedUrl::new(url))
     }
 
     /// A user-facing URL string that omits unnecessary details.
@@ -309,5 +363,140 @@ mod tests {
             parsed.by_extending_rest_api_path(segments).as_str(),
             expected
         );
+    }
+
+    fn query_pairs(pairs: &[(&str, &str)]) -> Vec<QueryPair> {
+        pairs
+            .iter()
+            .map(|(name, value)| QueryPair {
+                name: name.to_string(),
+                value: value.to_string(),
+            })
+            .collect()
+    }
+
+    #[rstest]
+    // --- Golden cases from the issue's behavior spec ---
+    #[case::path_root_two_pairs(
+        "https://example.com/wp-json/wp/v2/themes",
+        vec![("context", "edit"), ("status", "active")],
+        "https://example.com/wp-json/wp/v2/themes?context=edit&status=active"
+    )]
+    #[case::query_root_two_pairs(
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes",
+        vec![("context", "edit"), ("status", "active")],
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes&context=edit&status=active"
+    )]
+    #[case::query_root_preserves_existing_debug(
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes&debug=1",
+        vec![("context", "edit"), ("status", "active")],
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes&debug=1&context=edit&status=active"
+    )]
+    // --- Path-root variations ---
+    #[case::path_root_single_pair(
+        "https://example.com/wp-json/wp/v2/themes",
+        vec![("context", "edit")],
+        "https://example.com/wp-json/wp/v2/themes?context=edit"
+    )]
+    #[case::path_root_trailing_slash(
+        "https://example.com/wp-json/wp/v2/themes/",
+        vec![("context", "edit")],
+        "https://example.com/wp-json/wp/v2/themes/?context=edit"
+    )]
+    #[case::path_root_with_existing_query(
+        "https://example.com/wp-json/wp/v2/themes?foo=bar",
+        vec![("context", "edit")],
+        "https://example.com/wp-json/wp/v2/themes?foo=bar&context=edit"
+    )]
+    #[case::api_root_only(
+        "https://example.com/wp-json",
+        vec![("context", "edit")],
+        "https://example.com/wp-json?context=edit"
+    )]
+    // --- Query-root variations ---
+    #[case::query_root_bare_slash_value(
+        "https://example.com/index.php?rest_route=%2F",
+        vec![("context", "edit")],
+        "https://example.com/index.php?rest_route=%2F&context=edit"
+    )]
+    #[case::query_root_single_pair(
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes",
+        vec![("status", "active")],
+        "https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes&status=active"
+    )]
+    // --- Encoding: a reserved character is form-urlencoded, matching `by_extending_rest_api_path` ---
+    #[case::reserved_comma_encoded(
+        "https://example.com/wp-json/wp/v2/themes",
+        vec![("exclude", "core,gutenberg")],
+        "https://example.com/wp-json/wp/v2/themes?exclude=core%2Cgutenberg"
+    )]
+    // --- Pairs are appended in order and duplicate keys are kept, not deduplicated ---
+    #[case::order_preserved_duplicates_kept(
+        "https://example.com/wp-json",
+        vec![("z", "1"), ("status", "active"), ("a", "2"), ("status", "inactive")],
+        "https://example.com/wp-json?z=1&status=active&a=2&status=inactive"
+    )]
+    fn by_appending_query_pairs(
+        #[case] input: &str,
+        #[case] pairs: Vec<(&str, &str)>,
+        #[case] expected: &str,
+    ) {
+        let parsed = ParsedUrl::parse(input).expect("valid url");
+        let result = parsed.by_appending_query_pairs(query_pairs(&pairs));
+        assert_eq!(result.url(), expected);
+    }
+
+    /// A `rest_route` pair would override the route WordPress serves, on both
+    /// root forms, so it is rejected rather than appended.
+    #[rstest]
+    #[case::path_root("https://example.com/wp-json/wp/v2/themes")]
+    #[case::query_root("https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes")]
+    #[should_panic(expected = "`rest_route` must not be passed")]
+    fn by_appending_rest_route_panics(#[case] input: &str) {
+        let parsed = ParsedUrl::parse(input).expect("valid url");
+        parsed.by_appending_query_pairs(query_pairs(&[
+            ("context", "edit"),
+            ("rest_route", "/wp/v2/users"),
+        ]));
+    }
+
+    /// Appending an empty `pairs` must return the URL byte-for-byte unchanged —
+    /// notably, it must not add a trailing `?` to a query-less URL.
+    #[rstest]
+    #[case::path_root_no_query("https://example.com/wp-json/wp/v2/themes")]
+    #[case::path_root_trailing_slash("https://example.com/wp-json/wp/v2/themes/")]
+    #[case::path_root_with_query("https://example.com/wp-json/wp/v2/themes?foo=bar")]
+    #[case::query_root("https://example.com/index.php?rest_route=%2Fwp%2Fv2%2Fthemes")]
+    #[case::query_root_with_extra("https://example.com/index.php?rest_route=%2F&debug=1")]
+    #[case::bare_host("https://example.com")]
+    #[case::with_fragment("https://example.com/wp-json?foo=bar#section")]
+    fn by_appending_empty_query_pairs_is_unchanged(#[case] input: &str) {
+        let parsed = ParsedUrl::parse(input).expect("valid url");
+        let result = parsed.by_appending_query_pairs(Vec::new());
+        assert_eq!(result.url(), parsed.url());
+        assert_eq!(*result, parsed);
+    }
+
+    /// A URL fragment must survive the append (the `url` crate detaches and
+    /// restores it around the query edit).
+    #[rstest]
+    #[case::fragment_no_query(
+        "https://example.com/wp-json/wp/v2/themes#section",
+        vec![("context", "edit")],
+        "https://example.com/wp-json/wp/v2/themes?context=edit#section"
+    )]
+    #[case::fragment_with_query(
+        "https://example.com/wp-json/wp/v2/themes?foo=bar#section",
+        vec![("context", "edit")],
+        "https://example.com/wp-json/wp/v2/themes?foo=bar&context=edit#section"
+    )]
+    fn by_appending_query_pairs_preserves_fragment(
+        #[case] input: &str,
+        #[case] pairs: Vec<(&str, &str)>,
+        #[case] expected: &str,
+    ) {
+        let parsed = ParsedUrl::parse(input).expect("valid url");
+        let result = parsed.by_appending_query_pairs(query_pairs(&pairs));
+        assert_eq!(result.url(), expected);
     }
 }
