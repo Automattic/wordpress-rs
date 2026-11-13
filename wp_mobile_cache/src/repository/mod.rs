@@ -6,8 +6,10 @@ pub mod list_metadata;
 pub mod media;
 pub mod post_types;
 pub mod posts;
+pub mod reader;
 pub mod sites;
 pub mod term_relationships;
+pub mod wordpress_com_accounts;
 
 #[cfg(test)]
 mod posts_constraint_tests;
