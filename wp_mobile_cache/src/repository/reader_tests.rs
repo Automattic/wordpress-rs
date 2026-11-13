@@ -65,7 +65,7 @@ fn test_reader_posts_columns() {
             "{column} is read but isn't in reader_posts"
         );
     }
-    assert_eq!(columns.len(), 58, "{columns:?}");
+    assert_eq!(columns.len(), 59, "{columns:?}");
 }
 
 #[test]
@@ -186,6 +186,52 @@ fn test_site_icon_tags_and_comment_count_round_trip() {
     assert_eq!(found.site_icon_url, full.site_icon_url);
     assert_eq!(found.tags, Some(vec![]));
     assert_eq!(found.comment_count, Some(13));
+}
+
+#[test]
+fn test_an_editorial_image_is_kept_and_shown_first() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let mut from_discover = post(456);
+    from_discover.display_image_url = Some("https://example.com/featured.jpg".to_string());
+    from_discover.editorial_image_url = Some("https://example.com/editorial.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &from_discover).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        found.display_image_url.as_deref(),
+        Some("https://example.com/editorial.jpg")
+    );
+
+    // A source without a pick, such as the saved list, sends a new featured image.
+    let mut from_list = post(456);
+    from_list.display_image_url = Some("https://example.com/new-featured.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &from_list).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        found.display_image_url.as_deref(),
+        Some("https://example.com/editorial.jpg"),
+        "The pick is still shown"
+    );
+    assert_eq!(
+        found.editorial_image_url.as_deref(),
+        Some("https://example.com/editorial.jpg")
+    );
+
+    // A new pick replaces it.
+    let mut new_pick = post(456);
+    new_pick.editorial_image_url = Some("https://example.com/new-editorial.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &new_pick).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        found.display_image_url.as_deref(),
+        Some("https://example.com/new-editorial.jpg")
+    );
 }
 
 #[test]

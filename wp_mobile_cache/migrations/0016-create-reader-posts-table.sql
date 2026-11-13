@@ -36,7 +36,8 @@ CREATE TABLE `reader_posts` (
   `is_jetpack` INTEGER,
   `organization_id` INTEGER,
   `featured_image` TEXT,
-  `display_image_url` TEXT,          -- the image to show: an editor's pick, else the featured image, else the server's `featured_media` image. See `reader_post_display_image_url` in wp_api
+  `display_image_url` TEXT,          -- the featured image, else the server's `featured_media` image, else the image an app passed with a save. Shown when there's no `editorial_image_url`
+  `editorial_image_url` TEXT,        -- an editor's pick from Discover. Kept once stored, since the saved list never sends it, and shown ahead of `display_image_url`
   `tags` TEXT,                        -- JSON
   `editorial_highlight_topic` TEXT,
   `xpost_site_id` INTEGER,

@@ -42,10 +42,16 @@ pub struct ReaderPostRecord {
     /// have an image to show: use [`Self::display_image_url`] for that.
     #[uniffi(default = None)]
     pub featured_image: Option<String>,
-    /// The image to show for the post: an editor's pick, else [`Self::featured_image`], else the
-    /// image the server picked from the post. See [`ReaderPost::display_image_url`].
+    /// The image to show for the post: [`Self::editorial_image_url`] when there is one, else
+    /// [`Self::featured_image`], else the image the server picked from the post. See
+    /// [`ReaderPost::display_image_url`].
     #[uniffi(default = None)]
     pub display_image_url: Option<String>,
+    /// The image an editor picked for the post in Discover. Once stored, a source that doesn't send
+    /// one leaves it, and [`Self::display_image_url`] is this image. See
+    /// [`ReaderPost::editorial_image_url`].
+    #[uniffi(default = None)]
+    pub editorial_image_url: Option<String>,
     #[uniffi(default = None)]
     pub site_name: Option<String>,
     #[uniffi(default = None)]
@@ -88,6 +94,7 @@ impl ReaderPostRecord {
             author_url: None,
             featured_image: None,
             display_image_url: None,
+            editorial_image_url: None,
             site_name: None,
             site_url: None,
             feed_url: None,
@@ -114,13 +121,20 @@ impl ReaderPostRecord {
             author_avatar_url: author.and_then(|author| author.avatar_url.clone()),
             author_url: author.and_then(|author| author.url.clone()),
             featured_image: post.featured_image.clone(),
-            display_image_url: post.display_image_url.clone().or_else(|| {
-                reader_post_display_image_url(
-                    None,
-                    post.featured_image.as_deref(),
-                    post.featured_media.as_ref(),
-                )
-            }),
+            // Stored without the editor's pick, which has its own column, so a source that sends no
+            // pick still updates the image shown when there isn't one.
+            display_image_url: post
+                .display_image_url
+                .clone()
+                .filter(|url| Some(url) != post.editorial_image_url.as_ref())
+                .or_else(|| {
+                    reader_post_display_image_url(
+                        None,
+                        post.featured_image.as_deref(),
+                        post.featured_media.as_ref(),
+                    )
+                }),
+            editorial_image_url: post.editorial_image_url.clone(),
             site_name: post.site_name.clone(),
             site_url: post.site_url.clone(),
             feed_url: post.feed_url.clone(),
@@ -320,6 +334,28 @@ mod tests {
         assert_eq!(
             record.display_image_url.as_deref(),
             Some("https://example.com/media.jpg")
+        );
+    }
+
+    #[test]
+    fn test_record_keeps_an_editorial_image_apart() {
+        let post = reader_post(serde_json::json!({
+            "editorial": { "image": "https://example.com/editorial.jpg" },
+            "featured_image": "https://example.com/featured.jpg",
+        }));
+        assert_eq!(
+            post.display_image_url.as_deref(),
+            Some("https://example.com/editorial.jpg")
+        );
+        let record = ReaderPostRecord::from_reader_post(&post).unwrap();
+        assert_eq!(
+            record.editorial_image_url.as_deref(),
+            Some("https://example.com/editorial.jpg")
+        );
+        assert_eq!(
+            record.display_image_url.as_deref(),
+            Some("https://example.com/featured.jpg"),
+            "Stored without the pick, which has its own column"
         );
     }
 

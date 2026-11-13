@@ -24,8 +24,8 @@ const POST_COLUMNS: &str = "p.rowid, p.identity_key, p.post_id, p.site_id, p.fee
     p.feed_item_id, p.is_external, p.url, p.global_id, p.title, p.excerpt, p.content, p.date, \
     p.modified, p.author_name, p.author_avatar_url, p.author_url, p.featured_image, p.site_name, \
     p.site_url, p.feed_url, p.like_count, p.i_like, p.is_following, p.site_icon_url, p.tags, \
-    p.comment_count, p.display_image_url";
-const POST_COLUMN_COUNT: usize = 28;
+    p.comment_count, p.display_image_url, p.editorial_image_url";
+const POST_COLUMN_COUNT: usize = 29;
 
 /// Reads a post from `POST_COLUMNS`, starting at column `offset`.
 fn post_from_row(row: &Row, offset: usize) -> Result<(RowId, ReaderPostRecord), SqliteDbError> {
@@ -36,6 +36,7 @@ fn post_from_row(row: &Row, offset: usize) -> Result<(RowId, ReaderPostRecord), 
             .transpose()
     };
     let identity_key: String = row.get(column(1))?;
+    let editorial_image_url: Option<String> = row.get(column(28))?;
     let record = ReaderPostRecord {
         key: reader_saved_key_from_text(&identity_key)?,
         identity: ReaderPostSaveIdentity {
@@ -71,7 +72,9 @@ fn post_from_row(row: &Row, offset: usize) -> Result<(RowId, ReaderPostRecord), 
                 SqliteDbError::SqliteError(format!("Invalid Reader post tags: {error}"))
             })?,
         comment_count: row.get(column(26))?,
-        display_image_url: row.get(column(27))?,
+        // An editor's pick is shown ahead of the stored image.
+        display_image_url: editorial_image_url.clone().or(row.get(column(27))?),
+        editorial_image_url,
     };
     Ok((row.get(column(0))?, record))
 }
@@ -140,7 +143,7 @@ impl ReaderPostRepository {
         prefer: Prefer,
     ) -> Result<RowId, SqliteDbError> {
         /// The columns a source may leave out.
-        const OPTIONAL_COLUMNS: [&str; 24] = [
+        const OPTIONAL_COLUMNS: [&str; 25] = [
             "site_id",
             "feed_id",
             "feed_item_id",
@@ -165,6 +168,7 @@ impl ReaderPostRepository {
             "tags",
             "comment_count",
             "display_image_url",
+            "editorial_image_url",
         ];
         let identity_key = reader_saved_key_text(&post.key);
         let tags = post
@@ -195,9 +199,9 @@ impl ReaderPostRepository {
                 url, global_id, title, excerpt, content, date, modified, author_name,
                 author_avatar_url, author_url, featured_image, site_name, site_url, feed_url,
                 like_count, i_like, is_following, site_icon_url, tags, comment_count,
-                display_image_url
+                display_image_url, editorial_image_url
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17,
-                ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)
+                ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29)
             ON CONFLICT(account_id, identity_key) DO UPDATE SET {}",
             updates.join(", ")
         );
@@ -232,6 +236,7 @@ impl ReaderPostRepository {
                 tags,
                 post.comment_count,
                 post.display_image_url,
+                post.editorial_image_url,
             ],
         )?;
         let mut statement = executor.prepare(
