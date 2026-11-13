@@ -33,7 +33,8 @@ pub enum ReaderSavedError {
     #[error("{0}")]
     Api(WpApiError),
 
-    /// The post doesn't have the IDs the API needs to save it.
+    /// The post doesn't have the IDs the API needs to save it, or the key has an ID of `0` or an
+    /// empty URL.
     #[error("This post can't be saved.")]
     PostCannotBeSaved,
 
@@ -213,17 +214,40 @@ impl ReaderSavedService {
     ///
     /// The import takes one place in line, like a tap: a save or unsave tapped while it runs is
     /// sent once every batch is done, so a later batch can't undo it.
+    ///
+    /// A key with an ID of `0` isn't sent. Its result is an `invalid_input` error, as the server
+    /// would give it.
     pub async fn import(
         &self,
         keys: Vec<ReaderSavedBulkKey>,
     ) -> Result<Vec<ReaderSavedBulkResult>, ReaderSavedError> {
+        let sendable: Vec<_> = keys
+            .iter()
+            .filter(|key| saved_key(key).is_complete())
+            .cloned()
+            .collect();
         let (mut pending, turn) = PendingWrites::begin(self, Vec::new(), true, false);
         turn.wait().await;
         let mut batches = Vec::new();
-        for batch in keys.chunks(MAX_BULK_KEYS).rev() {
+        for batch in sendable.chunks(MAX_BULK_KEYS).rev() {
             batches.push(self.import_batch(&mut pending, batch).await?);
         }
-        Ok(batches.into_iter().rev().flatten().collect())
+        // Each batch has one result per key it sent, so the results line up with the sent keys.
+        let mut sent = batches.into_iter().rev().flatten();
+        Ok(keys
+            .iter()
+            .filter_map(|key| {
+                if saved_key(key).is_complete() {
+                    sent.next()
+                } else {
+                    Some(ReaderSavedBulkResult {
+                        key: None,
+                        saved: false,
+                        error: Some("invalid_input".to_string()),
+                    })
+                }
+            })
+            .collect())
     }
 }
 
@@ -247,6 +271,10 @@ impl ReaderSavedService {
         key: ReaderSavedKey,
         page_details: Option<ReaderSavedPageDetails>,
     ) -> Result<ReaderSavedKey, ReaderSavedError> {
+        // The server would refuse it, and a key that can't be stored mustn't become a write.
+        if !key.is_complete() {
+            return Err(ReaderSavedError::PostCannotBeSaved);
+        }
         let (mut writes, turn) = PendingWrites::begin(self, vec![key.clone()], true, true);
         turn.wait().await;
         let params = ReaderSavePostParams {
@@ -264,6 +292,9 @@ impl ReaderSavedService {
     }
 
     async fn unsave_keys(&self, post: &[ReaderSavedKey]) -> Result<(), ReaderSavedError> {
+        if post.iter().any(|key| !key.is_complete()) {
+            return Err(ReaderSavedError::PostCannotBeSaved);
+        }
         // Picks the keys and starts their writes under one lock, so the post reads as unsaved
         // straight away.
         let (mut writes, turn) =

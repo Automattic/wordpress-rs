@@ -26,8 +26,9 @@
 //! - The saved keys stop at 1,000. Past that, which only accounts that saved more before the server's
 //!   cap can be, a post the keys don't have reads [`ReaderSavedStatus::Unknown`] unless this device
 //!   has had a write to it answered. A post in the saved list that reads `Unknown` is saved.
-//! - A post leaves [`ReaderSavedState::recent_saves`] once the saved list shows it. A later read of
-//!   the list that lags behind can leave it in neither, until the next read.
+//! - A post leaves [`ReaderSavedState::recent_saves`] once the saved list shows it, or once a
+//!   refresh finds it unsaved with no write left to it. A later read of the list that lags behind
+//!   can leave it in neither, until the next read.
 //! - The count is the newest total the server gave, adjusted for this device's writes since. A
 //!   refresh that lags can be off until the next one: by saves made elsewhere, and past the 1,000
 //!   keys by this device's writes to posts the keys don't have. A save given up on,
@@ -367,6 +368,41 @@ impl ReaderSavedState {
                     && snapshot.past_the_keys()
                     && !snapshot.stored.contains(&key))
         });
+
+        // A recent save that reads as unsaved, with no write left that could change that, never
+        // shows again: a new save tap adds it back. Without this, every post saved here and later
+        // unsaved would stay.
+        let recent = std::mem::take(&mut self.recent);
+        self.recent = recent
+            .into_iter()
+            .filter(|key| {
+                let post = self.stored_as_of(key);
+                self.status(std::slice::from_ref(key)) != ReaderSavedStatus::NotSaved
+                    || self
+                        .writes
+                        .iter()
+                        .any(|write| self.stored_as_of(&write.key) == post)
+            })
+            .collect();
+
+        // Where a key is stored only matters while the key, or what it's stored as, is saved or
+        // has a write or recent save. Without this, the map keeps every post ever saved under
+        // another key. Past the 1,000 keys, a saved post can be missing from them, so all stay.
+        let snapshot = self.snapshot.as_ref().expect("just set");
+        if !snapshot.past_the_keys() {
+            let used: HashSet<ReaderSavedKey> = self
+                .writes
+                .iter()
+                .map(|write| &write.key)
+                .chain(&self.recent)
+                .map(ReaderSavedKey::normalized)
+                .collect();
+            self.stored_as.retain(|key, stored| {
+                [key.normalized(), stored.normalized()]
+                    .iter()
+                    .any(|key| snapshot.keys.contains(key) || used.contains(key))
+            });
+        }
 
         // A refresh that started after a write's answer gives the count instead: its total agrees
         // with its own keys, which may already have writes sent after that answer.

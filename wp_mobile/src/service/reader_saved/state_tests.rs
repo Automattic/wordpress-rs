@@ -831,3 +831,64 @@ fn a_jetpack_post_stays_hidden_while_any_of_its_unsaves_may_be_missing_from_the_
     assert!(!state.should_show_listed_post(&[post(3), feed(4)], listed));
     assert!(state.should_show_listed_post(&[post(3), feed(4)], given_up + LAG * 2));
 }
+
+#[test]
+fn a_refresh_forgets_where_an_unsaved_post_was_stored() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    saved(&mut state, &feed(20), &post(2), now);
+    unsaved(&mut state, &post(2), now);
+
+    refresh(&mut state, now + LAG * 2, &[], 0);
+
+    assert!(state.stored_as.is_empty());
+    assert_eq!(state.keys_to_unsave(&[feed(20)]), vec![feed(20)]);
+}
+
+#[test]
+fn a_refresh_keeps_where_a_saved_post_is_stored() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    saved(&mut state, &feed(20), &post(2), now);
+
+    refresh(&mut state, now + LAG * 2, &[post(2)], 1);
+
+    assert_eq!(state.keys_to_unsave(&[feed(20)]), vec![feed(20), post(2)]);
+}
+
+#[test]
+fn a_refresh_past_the_keys_keeps_where_every_post_is_stored() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    saved(&mut state, &feed(20), &post(2), now);
+
+    // The post may be one of the saves past the keys the refresh got.
+    refresh(&mut state, now + LAG * 2, &[post(1)], 1001);
+
+    assert_eq!(state.keys_to_unsave(&[feed(20)]), vec![feed(20), post(2)]);
+}
+
+#[test]
+fn a_refresh_forgets_a_recent_save_since_unsaved() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    saved(&mut state, &post(1), &post(1), now);
+    unsaved(&mut state, &post(1), now);
+
+    refresh(&mut state, now + LAG * 2, &[], 0);
+
+    assert!(state.recent.is_empty());
+}
+
+#[test]
+fn a_refresh_keeps_a_recent_save_whose_unsave_is_in_flight() {
+    let now = Instant::now();
+    let mut state = loaded(now, &[]);
+    saved(&mut state, &post(1), &post(1), now);
+    let unsave = tap(&mut state, &post(1), false);
+
+    refresh(&mut state, now + LAG * 2, &[post(1)], 1);
+    state.fail_write(unsave);
+
+    assert_eq!(state.recent_saves(), vec![post(1)]);
+}
