@@ -10,6 +10,7 @@ use super::endpoint::{
     products_endpoint::{ProductsRequestBuilder, ProductsRequestExecutor},
     publicize_endpoint::{PublicizeRequestBuilder, PublicizeRequestExecutor},
     purchases_endpoint::{PurchasesRequestBuilder, PurchasesRequestExecutor},
+    reader_posts_endpoint::{ReaderPostsRequestBuilder, ReaderPostsRequestExecutor},
     reader_saved_endpoint::{ReaderSavedRequestBuilder, ReaderSavedRequestExecutor},
     shopping_cart_endpoint::{ShoppingCartRequestBuilder, ShoppingCartRequestExecutor},
     site_plans_endpoint::{SitePlansRequestBuilder, SitePlansRequestExecutor},
@@ -88,6 +89,7 @@ pub struct WpComApiRequestBuilder {
     products: Arc<ProductsRequestBuilder>,
     publicize: Arc<PublicizeRequestBuilder>,
     purchases: Arc<PurchasesRequestBuilder>,
+    reader_posts: Arc<ReaderPostsRequestBuilder>,
     reader_saved: Arc<ReaderSavedRequestBuilder>,
     shopping_cart: Arc<ShoppingCartRequestBuilder>,
     site_plans: Arc<SitePlansRequestBuilder>,
@@ -143,6 +145,7 @@ impl WpComApiRequestBuilder {
             products,
             publicize,
             purchases,
+            reader_posts,
             reader_saved,
             shopping_cart,
             site_plans,
@@ -205,6 +208,7 @@ pub struct WpComApiClient {
     products: Arc<ProductsRequestExecutor>,
     publicize: Arc<PublicizeRequestExecutor>,
     purchases: Arc<PurchasesRequestExecutor>,
+    reader_posts: Arc<ReaderPostsRequestExecutor>,
     reader_saved: Arc<ReaderSavedRequestExecutor>,
     shopping_cart: Arc<ShoppingCartRequestExecutor>,
     site_plans: Arc<SitePlansRequestExecutor>,
@@ -257,6 +261,7 @@ impl WpComApiClient {
             products,
             publicize,
             purchases,
+            reader_posts,
             reader_saved,
             shopping_cart,
             site_plans,
@@ -302,6 +307,7 @@ api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, products);
 api_client_generate_endpoint_impl!(WpComApi, publicize);
 api_client_generate_endpoint_impl!(WpComApi, purchases);
+api_client_generate_endpoint_impl!(WpComApi, reader_posts);
 api_client_generate_endpoint_impl!(WpComApi, reader_saved);
 api_client_generate_endpoint_impl!(WpComApi, shopping_cart);
 api_client_generate_endpoint_impl!(WpComApi, site_plans);
