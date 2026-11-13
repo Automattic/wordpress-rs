@@ -24,8 +24,10 @@ struct ReaderSavedPostRow: Identifiable {
         }
 
         let saved = item.dateSaved.map { "Saved \($0.formatted())" }
-        let pending = item.isPending ? "Not sent yet" : nil
-        subtitle = [item.post?.siteName, saved, pending, item.isLocalOnly ? "On this device only" : nil]
+        let pending =
+            item.isWaitingForRoom
+            ? "Waiting for room under the save limit" : item.isPending ? "Not sent yet" : nil
+        subtitle = [item.post?.siteName, saved, pending]
             .compactMap { $0 }
             .joined(separator: " · ")
     }

@@ -48,9 +48,12 @@ private fun ReaderSavedListItem.subtitle(): String {
     val saved = dateSaved?.let {
         "Saved " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(it)
     }
-    val pending = if (isPending) "Not sent yet" else null
-    val localOnly = if (isLocalOnly) "On this device only" else null
-    return listOfNotNull(post?.siteName, saved, pending, localOnly).joinToString(" · ")
+    val pending = when {
+        isWaitingForRoom -> "Waiting for room under the save limit"
+        isPending -> "Not sent yet"
+        else -> null
+    }
+    return listOfNotNull(post?.siteName, saved, pending).joinToString(" · ")
 }
 
 /**
