@@ -491,12 +491,17 @@ async fn a_save_refused_at_the_cap_is_undone_and_reported() {
 
     let result = service.save(identity(1)).await;
 
-    let Err(ReaderSavedError::Api(error)) = result else {
-        panic!("Expected an API error, got {result:?}");
-    };
-    assert!(error.to_string().contains("1000"), "{error}");
+    assert!(
+        matches!(result, Err(ReaderSavedError::TooManySaves)),
+        "{result:?}"
+    );
     assert_eq!(status(&service, identity(1)), NotSaved);
     assert_eq!(count(&service), Some(0));
+    assert_eq!(
+        service.saves_waiting_for_room().unwrap(),
+        0,
+        "A tap is undone, not kept waiting"
+    );
 }
 
 /// Any other forbidden answer, such as an expired token, may pass, so the save waits to be sent

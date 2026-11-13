@@ -2226,7 +2226,7 @@ fn past_the_key_limit_an_imported_save_that_timed_out_is_sent_again() {
         site_name: None,
         site_url: None,
     };
-    world.call(|service| async move { service.import_local_saves(vec![save]).await });
+    world.call(|service| async move { service.import_saves(vec![save]).await });
     assert_eq!(world.time_out_next_write(), "new P1");
 
     let before = world.sent_count();

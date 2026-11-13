@@ -1,8 +1,9 @@
 //! What the service keeps in the cache: across a relaunch, through an import, and as the saved list.
 
 use super::super::tests::{
-    ScriptedExecutor, Step, bulk_response, delegate, error_response, feed_json, identity,
-    keys_response, post_json, post_key, rss_identity, synced, unsaveable_identity, write_response,
+    ScriptedExecutor, Step, bulk_response, cap_response, delegate, error_response, feed_json,
+    identity, keys_response, post_json, post_key, rss_identity, synced, unsaveable_identity,
+    write_response,
 };
 use super::*;
 use crate::service::reader_saved::ReaderSavedStatus::{NotSaved, Saved, Unknown};
@@ -742,9 +743,10 @@ async fn a_post_unsaved_and_reloaded_at_once_stays_hidden() {
 
 // Importing local saves
 
-/// #1729's report had no `pending`.
+/// The server refuses a save past the account's cap. With no tap waiting on it, it stays saved and
+/// waits for room, rather than being undone.
 #[tokio::test]
-async fn import_local_saves_imports_once_and_keeps_what_the_server_refused() {
+async fn an_import_keeps_a_save_past_the_cap_waiting_for_room() {
     let device = Device::new();
     let (service, executor) = device.launch();
     synced(&service, &executor, &[]).await;
@@ -765,7 +767,7 @@ async fn import_local_saves_imports_once_and_keeps_what_the_server_refused() {
     ));
 
     let report = service
-        .import_local_saves(vec![
+        .import_saves(vec![
             local_save(identity(1), "One"),
             local_save(identity(2), "Two"),
             local_save(identity(1), "One again"),
@@ -778,10 +780,10 @@ async fn import_local_saves_imports_once_and_keeps_what_the_server_refused() {
     assert_eq!(
         report,
         ReaderSavedImportReport {
-            already_imported: false,
             imported: 2,
-            rejected: vec![post_key(2)],
+            rejected: vec![],
             pending: 0,
+            waiting_for_room: 1,
             unsaveable: 1,
         }
     );
@@ -792,30 +794,115 @@ async fn import_local_saves_imports_once_and_keeps_what_the_server_refused() {
         json!([post_json(2), post_json(1)])
     );
 
-    // The refused post stays saved here, and shows in the list.
     assert_eq!(status(&service, identity(2)), Saved);
+    assert_eq!(service.saves_waiting_for_room().unwrap(), 1);
     let items = service.clone().saved_posts().load_items().await.unwrap();
-    let local: Vec<_> = items.iter().filter(|item| item.is_local_only).collect();
-    assert_eq!(local.len(), 1);
+    let waiting: Vec<_> = items
+        .iter()
+        .filter(|item| item.is_waiting_for_room)
+        .collect();
+    assert_eq!(waiting.len(), 1);
+    assert!(waiting[0].is_pending);
     assert_eq!(
-        local[0].post.as_ref().unwrap().title.as_deref(),
+        waiting[0].post.as_ref().unwrap().title.as_deref(),
         Some("Two")
     );
-
-    // A second import sends nothing, even after a relaunch.
-    drop((items, service));
-    let (service, executor) = device.launch();
-    let report = service
-        .import_local_saves(vec![local_save(identity(3), "Three")])
-        .await
-        .unwrap();
-    assert!(report.already_imported);
-    assert!(executor.sent().is_empty());
-    assert_eq!(status(&service, identity(2)), Saved);
 }
 
-/// #1729 failed the import, which then ran again. Now the saves are on the device from the start,
-/// and a sync sends them.
+/// A sync asks once whether there's room, and says the account is full. An unsave goes first and
+/// makes room, and the save waiting for it goes next.
+#[tokio::test]
+async fn a_save_waiting_for_room_is_sent_once_an_unsave_makes_room() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[post_json(1)]).await;
+    executor.push(Step::Respond(403, cap_response()));
+    let report = service
+        .import_saves(vec![local_save(identity(2), "Two")])
+        .await
+        .unwrap();
+    assert_eq!(report.waiting_for_room, 1);
+
+    // Still full: one try, then the keys, and no second try after them.
+    executor.push(Step::Respond(403, cap_response()));
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    let result = service.sync().await;
+    assert!(
+        matches!(result, Err(ReaderSavedError::TooManySaves)),
+        "{result:?}"
+    );
+    assert_eq!(
+        executor.sent_short()[1..],
+        [
+            r#"new {"blog_id":123,"post_id":2}"#,
+            r#"new {"blog_id":123,"post_id":2}"#,
+            "keys",
+        ]
+    );
+    assert_eq!(status(&service, identity(2)), Saved);
+
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 999)));
+    executor.push(Step::Respond(200, write_response(true, post_json(2), 1000)));
+    service.unsave(identity(1)).await.unwrap();
+
+    assert_eq!(
+        executor.sent_short()[4..],
+        [
+            r#"delete {"blog_id":123,"post_id":1}"#,
+            r#"new {"blog_id":123,"post_id":2}"#,
+        ]
+    );
+    assert_eq!(service.saves_waiting_for_room().unwrap(), 0);
+    let items = service.clone().saved_posts().load_items().await.unwrap();
+    assert_eq!(keys_of(&items), vec![post_key(2)]);
+    assert!(!items[0].is_pending && !items[0].is_waiting_for_room);
+    synced(&service, &executor, &[post_json(2)]).await;
+}
+
+/// Tapping save on a post that's already saved and waiting mustn't make the cap undo it.
+#[tokio::test]
+async fn saving_a_post_waiting_for_room_leaves_it_waiting() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(403, cap_response()));
+    service
+        .import_saves(vec![local_save(identity(2), "Two")])
+        .await
+        .unwrap();
+
+    let outcome = service.save(identity(2)).await.unwrap();
+
+    assert!(
+        matches!(outcome, ReaderSavedOutcome::Pending { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(executor.sent().len(), 2, "Nothing more was sent");
+    assert_eq!(service.saves_waiting_for_room().unwrap(), 1);
+}
+
+/// The server never had it, so there's nothing to unsave there.
+#[tokio::test]
+async fn unsaving_a_save_waiting_for_room_removes_it_without_sending() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(403, cap_response()));
+    service
+        .import_saves(vec![local_save(rss_identity(7), "Feed")])
+        .await
+        .unwrap();
+    assert_eq!(status(&service, rss_identity(7)), Saved);
+
+    service.unsave(rss_identity(7)).await.unwrap();
+
+    assert_eq!(executor.sent().len(), 2);
+    assert_eq!(status(&service, rss_identity(7)), NotSaved);
+    assert!(shown(&service).await.is_empty());
+    assert_eq!(service.saves_waiting_for_room().unwrap(), 0);
+    synced(&service, &executor, &[]).await;
+}
+
 #[tokio::test]
 async fn an_import_that_cannot_reach_the_server_is_sent_by_a_later_sync() {
     let device = Device::new();
@@ -824,7 +911,7 @@ async fn an_import_that_cannot_reach_the_server_is_sent_by_a_later_sync() {
     executor.push(Step::Offline);
 
     let report = service
-        .import_local_saves(vec![local_save(identity(1), "One")])
+        .import_saves(vec![local_save(identity(1), "One")])
         .await
         .unwrap();
     assert_eq!((report.imported, report.pending), (0, 1));
@@ -835,12 +922,67 @@ async fn an_import_that_cannot_reach_the_server_is_sent_by_a_later_sync() {
     let items = service.clone().saved_posts().load_items().await.unwrap();
     assert_eq!(keys_of(&items), vec![post_key(1)]);
     assert!(!items[0].is_pending);
+}
 
-    let report = service
-        .import_local_saves(vec![local_save(identity(1), "One")])
+/// An import is a list of saves, so a second one of the same list, even after a relaunch, sends
+/// nothing, and one with more posts sends only those.
+#[tokio::test]
+async fn importing_again_sends_only_what_is_new() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service
+        .import_saves(vec![local_save(identity(1), "One")])
         .await
         .unwrap();
-    assert!(report.already_imported);
+
+    drop(service);
+    let (service, executor) = device.launch();
+    let report = service
+        .import_saves(vec![local_save(identity(1), "One")])
+        .await
+        .unwrap();
+    assert_eq!((report.imported, report.pending), (1, 0));
+    assert!(executor.sent().is_empty());
+
+    executor.push(Step::Respond(200, write_response(true, post_json(2), 2)));
+    let report = service
+        .import_saves(vec![
+            local_save(identity(2), "Two"),
+            local_save(identity(1), "One"),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(report.imported, 2);
+    assert_eq!(
+        executor.sent_short(),
+        [r#"new {"blog_id":123,"post_id":2}"#]
+    );
+}
+
+/// An import is an add, as a tap of save is.
+#[tokio::test]
+async fn importing_a_post_the_user_unsaved_saves_it_again() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[post_json(1)]).await;
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+    service.unsave(identity(1)).await.unwrap();
+    assert_eq!(status(&service, identity(1)), NotSaved);
+
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    let report = service
+        .import_saves(vec![local_save(identity(1), "One")])
+        .await
+        .unwrap();
+
+    assert_eq!(report.imported, 1);
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(
+        executor.sent_short()[2..],
+        [r#"new {"blog_id":123,"post_id":1}"#]
+    );
 }
 
 /// #1729 failed the import, and it ran again. Now a rate limit leaves the save queued.
@@ -855,7 +997,7 @@ async fn a_url_save_that_is_rate_limited_during_import_is_sent_by_a_later_sync()
     ));
 
     let report = service
-        .import_local_saves(vec![local_save(url_identity("https://example.com/a"), "A")])
+        .import_saves(vec![local_save(url_identity("https://example.com/a"), "A")])
         .await
         .unwrap();
     assert_eq!((report.imported, report.pending), (0, 1));
@@ -874,8 +1016,9 @@ async fn a_url_save_that_is_rate_limited_during_import_is_sent_by_a_later_sync()
     assert!(!service.clone().saved_posts().load_items().await.unwrap()[0].is_pending);
 }
 
+/// Refused for something other than the cap, an imported save is undone, as a tap's is.
 #[tokio::test]
-async fn a_url_the_server_refuses_is_kept_on_this_device() {
+async fn a_url_the_server_refuses_is_undone_and_reported() {
     let device = Device::new();
     let (service, executor) = device.launch();
     synced(&service, &executor, &[]).await;
@@ -885,40 +1028,15 @@ async fn a_url_the_server_refuses_is_kept_on_this_device() {
     ));
 
     let report = service
-        .import_local_saves(vec![local_save(url_identity("https://example.com/a"), "A")])
+        .import_saves(vec![local_save(url_identity("https://example.com/a"), "A")])
         .await
         .unwrap();
 
     let key = ReaderSavedKey::Url {
         url: "https://example.com/a".to_string(),
     };
-    assert_eq!(report.rejected, vec![key.clone()]);
-    let items = service.clone().saved_posts().load_items().await.unwrap();
-    assert_eq!(keys_of(&items), vec![key]);
-    assert!(items[0].is_local_only);
-}
-
-/// #1729 sent the unsave, and took a 404 as done. A save only this device has is removed without
-/// sending anything.
-#[tokio::test]
-async fn unsaving_a_local_only_save_removes_it() {
-    let device = Device::new();
-    let (service, executor) = device.launch();
-    synced(&service, &executor, &[]).await;
-    executor.push(Step::Respond(
-        400,
-        json!({ "code": "invalid_param", "message": "", "data": { "status": 400 } }),
-    ));
-    service
-        .import_local_saves(vec![local_save(rss_identity(7), "Feed")])
-        .await
-        .unwrap();
-    assert_eq!(status(&service, rss_identity(7)), Saved);
-
-    service.unsave(rss_identity(7)).await.unwrap();
-
-    assert_eq!(executor.sent().len(), 2);
-    assert_eq!(status(&service, rss_identity(7)), NotSaved);
+    assert_eq!(report.rejected, vec![key]);
+    assert_eq!((report.imported, report.waiting_for_room), (0, 0));
     assert!(shown(&service).await.is_empty());
 }
 
@@ -933,14 +1051,15 @@ async fn two_imports_at_once_send_the_saves_once() {
     executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
 
     let (first, second, ()) = futures::join!(
-        service.import_local_saves(vec![local_save(identity(1), "One")]),
-        service.import_local_saves(vec![local_save(identity(1), "One")]),
+        service.import_saves(vec![local_save(identity(1), "One")]),
+        service.import_saves(vec![local_save(identity(1), "One")]),
         async { release.send(()).unwrap() },
     );
 
-    let mut already = [first.unwrap(), second.unwrap()].map(|report| report.already_imported);
-    already.sort();
-    assert_eq!(already, [false, true]);
+    assert_eq!(
+        [first.unwrap(), second.unwrap()].map(|report| report.imported),
+        [1, 1]
+    );
     assert_eq!(executor.sent().len(), 2, "The keys, then one save");
 }
 
@@ -959,7 +1078,7 @@ async fn an_import_is_sent_in_batches_oldest_first() {
     executor.push(Step::Respond(200, bulk_response(&oldest, 100)));
     executor.push(Step::Respond(200, bulk_response(&newest, 150)));
 
-    let report = service.import_local_saves(saves).await.unwrap();
+    let report = service.import_saves(saves).await.unwrap();
 
     assert_eq!(report.imported, 150);
     let sent = executor.sent();
@@ -979,7 +1098,7 @@ async fn a_batch_with_the_wrong_number_of_results_waits_for_a_sync() {
     executor.push(Step::Respond(200, bulk_response(&[post_json(2)], 1)));
 
     let result = service
-        .import_local_saves(vec![
+        .import_saves(vec![
             local_save(identity(2), "Two"),
             local_save(identity(1), "One"),
         ])
@@ -1025,7 +1144,7 @@ async fn importing_a_local_save_doesnt_replace_what_the_saved_list_stored() {
     // Post 1 is already saved here, so the import adds nothing to send.
     let mut save = local_save(identity(1), "An older title");
     save.excerpt = Some("An excerpt only the device has".to_string());
-    service.import_local_saves(vec![save]).await.unwrap();
+    service.import_saves(vec![save]).await.unwrap();
 
     let items = collection.load_items().await.unwrap();
     let post = items[0].post.as_ref().unwrap();
@@ -1047,7 +1166,7 @@ async fn an_import_leaves_out_a_key_with_a_zero_id() {
     executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
 
     let report = service
-        .import_local_saves(vec![
+        .import_saves(vec![
             local_save(rss_identity(0), "Zero"),
             local_save(identity(1), "One"),
         ])
@@ -1108,32 +1227,4 @@ async fn a_sync_and_a_refresh_that_change_nothing_tell_the_saved_list_nothing() 
             .all(|table| *table == DbTable::ReaderPosts || *table == DbTable::ReaderStreams),
         "{seen:?}"
     );
-}
-
-/// Refused on import, then the server gets it, from another device or a later import: the keys
-/// return it, so it's no longer only on this device, and an unsave reaches the server.
-#[tokio::test]
-async fn a_local_only_save_the_keys_return_is_unsaved_on_the_server() {
-    let device = Device::new();
-    let (service, executor) = device.launch();
-    synced(&service, &executor, &[]).await;
-    executor.push(Step::Respond(
-        400,
-        json!({ "code": "invalid_param", "message": "", "data": { "status": 400 } }),
-    ));
-    let report = service
-        .import_local_saves(vec![local_save(identity(1), "One")])
-        .await
-        .unwrap();
-    assert_eq!(report.rejected, vec![post_key(1)]);
-
-    synced(&service, &executor, &[post_json(1)]).await;
-    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
-    service.unsave(identity(1)).await.unwrap();
-
-    assert_eq!(
-        executor.sent_short()[3..],
-        [r#"delete {"blog_id":123,"post_id":1}"#]
-    );
-    assert_eq!(status(&service, identity(1)), NotSaved);
 }

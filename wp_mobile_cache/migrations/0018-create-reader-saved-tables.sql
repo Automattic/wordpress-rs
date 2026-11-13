@@ -16,8 +16,8 @@ CREATE TABLE `reader_saved_posts` (
   `date_known` INTEGER NOT NULL DEFAULT 0, -- 1 if `date_saved` came from the server: the keys or a list page. A tap's date isn't the server's: a save of a post already saved keeps its old date
   `post_id` INTEGER,                  -- reader_posts.rowid
   `listed` INTEGER NOT NULL DEFAULT 0, -- shown in the saved list: the list sent it, or this device saved it
-  `imported` INTEGER NOT NULL DEFAULT 0, -- from the import of the device's old local saves
-  `local_only` INTEGER NOT NULL DEFAULT 0, -- refused on import, so kept on this device and never sent
+  `imported` INTEGER NOT NULL DEFAULT 0, -- from an import, so it can be sent in a bulk request
+  `waiting_for_room` INTEGER NOT NULL DEFAULT 0, -- refused for the account's save cap with no tap waiting on it, so kept saved and sent again once there's room
 
   FOREIGN KEY (account_id) REFERENCES wordpress_com_accounts(rowid) ON DELETE CASCADE,
   FOREIGN KEY (post_id) REFERENCES reader_posts(rowid) ON DELETE SET NULL
@@ -34,7 +34,6 @@ CREATE TABLE `reader_saved_state` (
   `keys_refreshed` INTEGER NOT NULL DEFAULT 0, -- 1 once a refresh of the saved keys has been applied
   `keys_complete` INTEGER NOT NULL DEFAULT 0,  -- 1 if the newest refresh returned every saved key: past 1,000 it doesn't
   `total` INTEGER,                    -- the newest total the server gave, from a refresh or a write's answer
-  `imported_local_saves` INTEGER NOT NULL DEFAULT 0,
 
   FOREIGN KEY (account_id) REFERENCES wordpress_com_accounts(rowid) ON DELETE CASCADE
 ) STRICT;

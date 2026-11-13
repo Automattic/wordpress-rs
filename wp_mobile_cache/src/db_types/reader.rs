@@ -154,15 +154,17 @@ pub struct DbReaderSavedRow {
     pub post_row_id: Option<RowId>,
     /// Shown in the saved list: the list sent it, or this device saved it.
     pub listed: bool,
+    /// From an import, so it can be sent in a bulk request.
     pub imported: bool,
-    /// Refused on import, so kept on this device and never sent.
-    pub local_only: bool,
+    /// The server refused the save for the account's save cap, with no tap waiting to hear it. It
+    /// stays saved, and is sent again once there's room.
+    pub waiting_for_room: bool,
 }
 
 impl DbReaderSavedRow {
-    /// Whether the server doesn't have what the user wants yet.
+    /// Whether the server doesn't have what the user wants yet, including a save waiting for room.
     pub fn is_pending(&self) -> bool {
-        !self.local_only && self.server != Some(self.saved)
+        self.server != Some(self.saved)
     }
 }
 
@@ -175,7 +177,6 @@ pub struct DbReaderSavedState {
     pub keys_complete: bool,
     /// The newest total the server gave.
     pub total: Option<u64>,
-    pub imported_local_saves: bool,
 }
 
 /// One entry of a refresh of the saved keys.

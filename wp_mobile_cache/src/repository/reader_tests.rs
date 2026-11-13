@@ -426,7 +426,7 @@ fn test_an_answer_merges_into_the_stored_keys_row_and_the_newer_tap_decides() {
 }
 
 #[test]
-fn test_a_refused_tap_is_undone_and_a_refused_import_is_kept_on_this_device() {
+fn test_a_refused_tap_and_a_refused_import_are_undone() {
     let conn = conn();
     let account = account(&conn, 1);
     let tapped =
@@ -438,13 +438,95 @@ fn test_a_refused_tap_is_undone_and_a_refused_import_is_kept_on_this_device() {
         "nothing was known about it"
     );
 
-    assert!(
-        ReaderSavedRepository::insert_imported(&conn, account, &post_key(2), None, None).unwrap()
-    );
+    assert!(ReaderSavedRepository::import_save(&conn, account, &post_key(2), None, None).unwrap());
     let imported = row_for(&conn, account, &post_key(2)).unwrap();
     refuse(&conn, imported.row_id);
-    let imported = row_for(&conn, account, &post_key(2)).unwrap();
-    assert!(imported.local_only && imported.saved && !imported.is_pending());
+    assert!(row_for(&conn, account, &post_key(2)).is_none());
+}
+
+#[test]
+fn test_a_save_waiting_for_room_stays_saved_and_pending_but_out_of_the_count() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::apply_keys(&conn, account, &[], 0, 1000).unwrap();
+    ReaderSavedRepository::import_save(&conn, account, &post_key(1), None, None).unwrap();
+    let row = row_for(&conn, account, &post_key(1)).unwrap();
+    assert_eq!(
+        ReaderSavedRepository::saved_count(&conn, account).unwrap(),
+        Some(1001),
+        "Pending, so counted until the server answers"
+    );
+
+    assert!(ReaderSavedRepository::set_waiting_for_room(&conn, row.row_id, row.seq).unwrap());
+
+    let row = row_for(&conn, account, &post_key(1)).unwrap();
+    assert!(row.waiting_for_room && row.saved && row.is_pending());
+    assert_eq!(
+        ReaderSavedRepository::count_waiting_for_room(&conn, account).unwrap(),
+        1
+    );
+    assert_eq!(
+        ReaderSavedRepository::saved_count(&conn, account).unwrap(),
+        Some(1000),
+        "The server won't have it until there's room"
+    );
+    assert_eq!(
+        ReaderSavedRepository::select_pending(&conn, account)
+            .unwrap()
+            .len(),
+        1,
+        "The service decides when to try it"
+    );
+
+    // A refresh that doesn't have it leaves it waiting.
+    ReaderSavedRepository::apply_keys(&conn, account, &[], 0, 1000).unwrap();
+    assert!(
+        row_for(&conn, account, &post_key(1))
+            .unwrap()
+            .waiting_for_room
+    );
+
+    // Once the server has it, it's no longer waiting.
+    ReaderSavedRepository::apply_answer(&conn, account, row.row_id, true, &post_key(1), Some(1000))
+        .unwrap();
+    let row = row_for(&conn, account, &post_key(1)).unwrap();
+    assert!(!row.waiting_for_room && !row.is_pending());
+}
+
+#[test]
+fn test_a_tap_made_since_a_cap_refusal_stands() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::import_save(&conn, account, &post_key(1), None, None).unwrap();
+    let sent = row_for(&conn, account, &post_key(1)).unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)]).unwrap();
+
+    assert!(!ReaderSavedRepository::set_waiting_for_room(&conn, sent.row_id, sent.seq).unwrap());
+    let row = row_for(&conn, account, &post_key(1)).unwrap();
+    assert!(!row.saved && !row.waiting_for_room);
+}
+
+#[test]
+fn test_an_import_saves_again_what_was_unsaved_and_leaves_what_is_saved() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[entry(post_key(1), "2026-11-01T00:00:00Z")],
+        1,
+        1,
+    )
+    .unwrap();
+    assert!(
+        !ReaderSavedRepository::import_save(&conn, account, &post_key(1), None, None).unwrap(),
+        "Already saved"
+    );
+
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)]).unwrap();
+    assert!(ReaderSavedRepository::import_save(&conn, account, &post_key(1), None, None).unwrap());
+    let row = row_for(&conn, account, &post_key(1)).unwrap();
+    assert!(row.saved && row.imported && row.listed);
 }
 
 #[test]
@@ -657,12 +739,12 @@ fn test_an_unsaved_rows_aliases_go_with_it() {
 }
 
 #[test]
-fn test_unsaving_a_local_only_save_removes_it() {
+fn test_unsaving_a_save_waiting_for_room_removes_it() {
     let conn = conn();
     let account = account(&conn, 1);
-    ReaderSavedRepository::insert_imported(&conn, account, &post_key(1), None, None).unwrap();
+    ReaderSavedRepository::import_save(&conn, account, &post_key(1), None, None).unwrap();
     let row = row_for(&conn, account, &post_key(1)).unwrap();
-    refuse(&conn, row.row_id);
+    ReaderSavedRepository::set_waiting_for_room(&conn, row.row_id, row.seq).unwrap();
     ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)]).unwrap();
     assert!(rows(&conn, account).is_empty());
 }
@@ -922,7 +1004,7 @@ fn test_the_list_adds_a_row_but_doesnt_change_one_that_is_there() {
 }
 
 #[test]
-fn test_the_list_is_newest_first_and_only_has_listed_or_local_only_saves() {
+fn test_the_list_is_newest_first_and_only_has_listed_saves() {
     let conn = conn();
     let account = account(&conn, 1);
     ReaderSavedRepository::apply_keys(
@@ -935,7 +1017,7 @@ fn test_the_list_is_newest_first_and_only_has_listed_or_local_only_saves() {
     .unwrap();
     ReaderSavedRepository::tap_save(&conn, account, &post_key(2), &[post_key(2)], None, &now())
         .unwrap();
-    ReaderSavedRepository::insert_imported(
+    ReaderSavedRepository::import_save(
         &conn,
         account,
         &post_key(3),
