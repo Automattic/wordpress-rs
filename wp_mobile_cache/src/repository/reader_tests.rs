@@ -269,166 +269,549 @@ fn test_reset_stale_fetching_states() {
     assert_eq!(stream.state, ListState::Idle);
 }
 
+// Saved posts
+
+fn feed_key(feed_item_id: u64) -> ReaderSavedKey {
+    ReaderSavedKey::FeedItem {
+        feed_item_id: ReaderFeedItemId(feed_item_id),
+    }
+}
+
+fn url_key(url: &str) -> ReaderSavedKey {
+    ReaderSavedKey::Url {
+        url: url.to_string(),
+    }
+}
+
+fn date(text: &str) -> WpGmtDateTime {
+    text.parse().unwrap()
+}
+
+fn entry(key: ReaderSavedKey, date_saved: &str) -> DbReaderSavedKey {
+    DbReaderSavedKey {
+        key,
+        date_saved: date(date_saved),
+        url: None,
+    }
+}
+
+fn row_for(conn: &Connection, account: RowId, key: &ReaderSavedKey) -> Option<DbReaderSavedRow> {
+    ReaderSavedRepository::select_rows_for_keys(conn, account, std::slice::from_ref(key))
+        .unwrap()
+        .into_iter()
+        .next()
+}
+
+fn rows(conn: &Connection, account: RowId) -> Vec<(String, bool, Option<bool>)> {
+    let mut statement = conn
+        .prepare(
+            "SELECT key, saved, server FROM reader_saved_posts WHERE account_id = ?1 ORDER BY key",
+        )
+        .unwrap();
+    statement
+        .query_map([account], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect()
+}
+
+fn now() -> WpGmtDateTime {
+    date("2026-11-12T00:00:00Z")
+}
+
 #[test]
-fn test_saved_state_round_trips() {
+fn test_saved_state_is_empty_before_anything() {
     let conn = conn();
     let account = account(&conn, 1);
     assert_eq!(
         ReaderSavedRepository::select_state(&conn, account).unwrap(),
         DbReaderSavedState::default()
     );
-
-    ReaderSavedRepository::write_local(&conn, account, "local").unwrap();
-    ReaderSavedRepository::replace_keys(&conn, account, &saved_keys(&[1])).unwrap();
-    ReaderSavedRepository::set_imported_local_saves(&conn, account).unwrap();
-    ReaderSavedRepository::write_local(&conn, account, "local 2").unwrap();
-
     assert_eq!(
-        ReaderSavedRepository::select_state(&conn, account).unwrap(),
-        DbReaderSavedState {
-            local: Some("local 2".to_string()),
-            imported_local_saves: true,
-        }
-    );
-}
-
-fn saved_key(post_id: i64, date_saved: &str) -> DbReaderSavedKey {
-    DbReaderSavedKey {
-        key: post_key(post_id),
-        save_id: post_id as u64 + 100,
-        date_saved: date_saved.parse().unwrap(),
-        url: Some(format!("https://example.com/{post_id}")),
-    }
-}
-
-/// Keys for these posts, the first saved newest.
-fn saved_keys(post_ids: &[i64]) -> DbReaderSavedKeys {
-    DbReaderSavedKeys {
-        refreshed_at_ms: 1_000,
-        returned: post_ids.len() as u64,
-        total: post_ids.len() as u64,
-        keys: post_ids
-            .iter()
-            .enumerate()
-            .map(|(index, post_id)| {
-                saved_key(*post_id, &format!("2026-11-{:02}T00:00:00Z", 20 - index))
-            })
-            .collect(),
-    }
-}
-
-#[test]
-fn test_saved_keys_are_none_before_a_refresh() {
-    let conn = conn();
-    let account = account(&conn, 1);
-    ReaderSavedRepository::write_local(&conn, account, "local").unwrap();
-
-    assert_eq!(
-        ReaderSavedRepository::select_keys(&conn, account).unwrap(),
+        ReaderSavedRepository::saved_count(&conn, account).unwrap(),
         None
     );
 }
 
 #[test]
-fn test_saved_keys_round_trip_newest_first() {
+fn test_a_tapped_save_is_pending_and_listed_until_answered() {
     let conn = conn();
     let account = account(&conn, 1);
-    let keys = DbReaderSavedKeys {
-        refreshed_at_ms: 1_234,
-        returned: 2,
-        total: 1_500,
-        keys: vec![
-            saved_key(2, "2026-11-01T00:00:00Z"),
-            saved_key(1, "2026-11-02T00:00:00Z"),
-        ],
-    };
-    ReaderSavedRepository::replace_keys(&conn, account, &keys).unwrap();
+    let row =
+        ReaderSavedRepository::tap_save(&conn, account, &post_key(1), &[post_key(1)], None, &now())
+            .unwrap();
+    let pending = ReaderSavedRepository::select_pending(&conn, account).unwrap();
+    assert_eq!(pending.len(), 1);
+    assert!(pending[0].saved && pending[0].listed && pending[0].server.is_none());
+    assert_eq!(pending[0].date_saved, Some(now()));
 
-    let stored = ReaderSavedRepository::select_keys(&conn, account)
-        .unwrap()
-        .unwrap();
-    assert_eq!(stored.refreshed_at_ms, 1_234);
-    assert_eq!(stored.returned, 2);
-    assert_eq!(stored.total, 1_500);
+    ReaderSavedRepository::apply_answer(&conn, account, row, true, &post_key(1), Some(1)).unwrap();
+    assert!(
+        ReaderSavedRepository::select_pending(&conn, account)
+            .unwrap()
+            .is_empty()
+    );
     assert_eq!(
-        stored.keys,
-        vec![keys.keys[1].clone(), keys.keys[0].clone()]
+        ReaderSavedRepository::saved_count(&conn, account).unwrap(),
+        Some(1)
     );
 }
 
 #[test]
-fn test_saved_keys_are_replaced_by_a_newer_refresh() {
+fn test_a_row_in_doubt_is_not_pending() {
     let conn = conn();
     let account = account(&conn, 1);
-    ReaderSavedRepository::replace_keys(&conn, account, &saved_keys(&[1, 2])).unwrap();
-    ReaderSavedRepository::replace_keys(&conn, account, &saved_keys(&[3])).unwrap();
-
-    let stored = ReaderSavedRepository::select_keys(&conn, account)
-        .unwrap()
-        .unwrap();
-    let keys: Vec<_> = stored.keys.into_iter().map(|key| key.key).collect();
-    assert_eq!(keys, vec![post_key(3)]);
+    let row =
+        ReaderSavedRepository::tap_save(&conn, account, &post_key(1), &[post_key(1)], None, &now())
+            .unwrap();
+    ReaderSavedRepository::set_in_doubt(&conn, row, true).unwrap();
+    assert!(
+        ReaderSavedRepository::select_pending(&conn, account)
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
-fn test_two_spellings_of_a_saved_url_are_stored_once() {
+fn test_an_answer_under_another_key_moves_the_row_and_keeps_the_key_sent_as_an_alias() {
     let conn = conn();
     let account = account(&conn, 1);
-    let url = |url: &str| DbReaderSavedKey {
-        key: ReaderSavedKey::Url {
-            url: url.to_string(),
-        },
-        save_id: 1,
-        date_saved: "2026-11-01T00:00:00Z".parse().unwrap(),
-        url: None,
-    };
-    let keys = DbReaderSavedKeys {
-        refreshed_at_ms: 1,
-        returned: 2,
-        total: 2,
-        keys: vec![url("https://example.com/a/"), url("https://example.com/a")],
-    };
-    ReaderSavedRepository::replace_keys(&conn, account, &keys).unwrap();
-
-    let stored = ReaderSavedRepository::select_keys(&conn, account)
-        .unwrap()
-        .unwrap();
-    assert_eq!(stored.keys.len(), 1);
-    assert_eq!(stored.returned, 2, "The count as the server returned it");
+    let url = url_key("https://example.com/p9");
+    let row = ReaderSavedRepository::tap_save(
+        &conn,
+        account,
+        &url,
+        std::slice::from_ref(&url),
+        None,
+        &now(),
+    )
+    .unwrap();
+    let kept =
+        ReaderSavedRepository::apply_answer(&conn, account, row, true, &post_key(9), None).unwrap();
+    assert_eq!(kept, row);
+    let stored = row_for(&conn, account, &url).unwrap();
+    assert_eq!(stored.key, post_key(9));
+    assert_eq!(stored.url_key, Some(url));
+    assert_eq!(stored.server, Some(true));
 }
 
 #[test]
-fn test_local_only_saves() {
+fn test_an_answer_merges_into_the_stored_keys_row_and_the_newer_tap_decides() {
     let conn = conn();
     let account = account(&conn, 1);
-    let mut stored = post(1);
-    stored.title = Some("Kept".to_string());
-    let row = ReaderPostRepository::upsert(&conn, account, &stored).unwrap();
-    ReaderSavedRepository::upsert_local_only(
+    // F4 is unsaved first, then post 3 saved: the save is the newer tap.
+    let unsave = ReaderSavedRepository::tap_unsave(&conn, account, &[feed_key(4)], true).unwrap();
+    ReaderSavedRepository::tap_save(&conn, account, &post_key(3), &[post_key(3)], None, &now())
+        .unwrap();
+    let kept =
+        ReaderSavedRepository::apply_answer(&conn, account, unsave[0], false, &post_key(3), None)
+            .unwrap();
+    let row = ReaderSavedRepository::select_row(&conn, kept)
+        .unwrap()
+        .unwrap();
+    assert_eq!(row.key, post_key(3));
+    assert_eq!(row.feed_item_key, Some(feed_key(4)));
+    assert!(row.saved, "the newer tap");
+    assert_eq!(row.server, Some(false), "the answer");
+    assert_eq!(rows(&conn, account).len(), 1);
+}
+
+#[test]
+fn test_a_refused_tap_is_undone_and_a_refused_import_is_kept_on_this_device() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let tapped =
+        ReaderSavedRepository::tap_save(&conn, account, &post_key(1), &[post_key(1)], None, &now())
+            .unwrap();
+    ReaderSavedRepository::apply_refusal(&conn, tapped).unwrap();
+    assert!(
+        row_for(&conn, account, &post_key(1)).is_none(),
+        "nothing was known about it"
+    );
+
+    assert!(
+        ReaderSavedRepository::insert_imported(&conn, account, &post_key(2), None, None).unwrap()
+    );
+    let imported = row_for(&conn, account, &post_key(2)).unwrap();
+    ReaderSavedRepository::apply_refusal(&conn, imported.row_id).unwrap();
+    let imported = row_for(&conn, account, &post_key(2)).unwrap();
+    assert!(imported.local_only && imported.saved && !imported.is_pending());
+}
+
+#[test]
+fn test_a_refused_unsave_goes_back_to_what_the_server_said() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[entry(post_key(1), "2026-11-01T00:00:00Z")],
+        1,
+        1,
+    )
+    .unwrap();
+    let rows_ = ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)], false).unwrap();
+    ReaderSavedRepository::apply_refusal(&conn, rows_[0]).unwrap();
+    assert!(row_for(&conn, account, &post_key(1)).unwrap().saved);
+}
+
+#[test]
+fn test_a_save_calls_off_a_pending_unsave_of_another_of_the_posts_rows() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[
+            entry(post_key(3), "2026-11-02T00:00:00Z"),
+            entry(feed_key(4), "2026-11-01T00:00:00Z"),
+        ],
+        2,
+        2,
+    )
+    .unwrap();
+    let keys = [post_key(3), feed_key(4)];
+    ReaderSavedRepository::tap_unsave(&conn, account, &keys, false).unwrap();
+    // A row this device only knows from its own unsave is removed.
+    ReaderSavedRepository::tap_unsave(&conn, account, &[feed_key(5)], true).unwrap();
+    ReaderSavedRepository::tap_save(&conn, account, &post_key(3), &keys, None, &now()).unwrap();
+    ReaderSavedRepository::tap_save(
+        &conn,
+        account,
+        &post_key(6),
+        &[post_key(6), feed_key(5)],
+        None,
+        &now(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        rows(&conn, account),
+        [
+            ("feed-item:4".to_string(), true, Some(true)),
+            ("post:123:3".to_string(), true, Some(true)),
+            ("post:123:6".to_string(), true, None),
+        ]
+    );
+}
+
+#[test]
+fn test_an_unsave_adds_rows_for_keys_without_one_only_when_asked() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let keys = [post_key(3), feed_key(4)];
+    assert!(
+        ReaderSavedRepository::tap_unsave(&conn, account, &keys, false)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        ReaderSavedRepository::tap_unsave(&conn, account, &keys, true)
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        ReaderSavedRepository::select_pending(&conn, account)
+            .unwrap()
+            .len(),
+        2
+    );
+}
+
+#[test]
+fn test_unsaving_a_local_only_save_removes_it() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::insert_imported(&conn, account, &post_key(1), None, None).unwrap();
+    let row = row_for(&conn, account, &post_key(1)).unwrap();
+    ReaderSavedRepository::apply_refusal(&conn, row.row_id).unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)], true).unwrap();
+    assert!(rows(&conn, account).is_empty());
+}
+
+#[test]
+fn test_a_complete_refresh_says_what_the_server_has_and_keeps_pending_rows() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[
+            entry(post_key(1), "2026-11-02T00:00:00Z"),
+            entry(post_key(2), "2026-11-01T00:00:00Z"),
+        ],
+        2,
+        2,
+    )
+    .unwrap();
+    // A save not sent yet, an unsave not sent yet, and a save in doubt.
+    ReaderSavedRepository::tap_save(&conn, account, &post_key(3), &[post_key(3)], None, &now())
+        .unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(2)], false).unwrap();
+    let doubt =
+        ReaderSavedRepository::tap_save(&conn, account, &post_key(4), &[post_key(4)], None, &now())
+            .unwrap();
+    ReaderSavedRepository::set_in_doubt(&conn, doubt, true).unwrap();
+
+    // Post 1 was unsaved elsewhere, and post 4 reached the server.
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[
+            entry(post_key(4), "2026-11-12T00:00:00Z"),
+            entry(post_key(2), "2026-11-01T00:00:00Z"),
+        ],
+        2,
+        2,
+    )
+    .unwrap();
+
+    assert_eq!(
+        rows(&conn, account),
+        [
+            ("post:123:2".to_string(), false, Some(true)),
+            ("post:123:3".to_string(), true, Some(false)),
+            ("post:123:4".to_string(), true, Some(true)),
+        ]
+    );
+    let pending: Vec<_> = ReaderSavedRepository::select_pending(&conn, account)
+        .unwrap()
+        .into_iter()
+        .map(|row| row.key)
+        .collect();
+    assert_eq!(pending, [post_key(3), post_key(2)]);
+    let state = ReaderSavedRepository::select_state(&conn, account).unwrap();
+    assert!(state.keys_refreshed && state.keys_complete);
+    assert_eq!(state.total, Some(2));
+    // 2, plus post 3 to save, less post 2 to unsave.
+    assert_eq!(
+        ReaderSavedRepository::saved_count(&conn, account).unwrap(),
+        Some(2)
+    );
+}
+
+/// An unsave timed out, then the user saved again: the row reads as agreeing with the server, but
+/// the late delete may have landed. And the other way round. Either way the last tap stands.
+#[test]
+fn test_a_refresh_keeps_the_last_tap_of_a_row_in_doubt() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let one = post_key(1);
+    let two = post_key(2);
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[entry(one.clone(), "2026-11-02T00:00:00Z")],
+        1,
+        1,
+    )
+    .unwrap();
+    let saved_again = row_for(&conn, account, &one).unwrap().row_id;
+    ReaderSavedRepository::tap_unsave(&conn, account, std::slice::from_ref(&one), false).unwrap();
+    ReaderSavedRepository::set_in_doubt(&conn, saved_again, true).unwrap();
+    ReaderSavedRepository::tap_save(
+        &conn,
+        account,
+        &one,
+        std::slice::from_ref(&one),
+        None,
+        &now(),
+    )
+    .unwrap();
+    // A save that timed out, then an unsave.
+    let unsaved_again = ReaderSavedRepository::tap_save(
+        &conn,
+        account,
+        &two,
+        std::slice::from_ref(&two),
+        None,
+        &now(),
+    )
+    .unwrap();
+    ReaderSavedRepository::apply_answer(&conn, account, unsaved_again, false, &two, None).unwrap();
+    ReaderSavedRepository::tap_save(
+        &conn,
+        account,
+        &two,
+        std::slice::from_ref(&two),
+        None,
+        &now(),
+    )
+    .unwrap();
+    ReaderSavedRepository::set_in_doubt(&conn, unsaved_again, true).unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, std::slice::from_ref(&two), false).unwrap();
+
+    // Both late requests landed: the server has post 2 and not post 1.
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[entry(two.clone(), "2026-11-12T00:00:00Z")],
+        1,
+        1,
+    )
+    .unwrap();
+
+    assert_eq!(
+        rows(&conn, account),
+        vec![
+            ("post:123:1".to_string(), true, Some(false)),
+            ("post:123:2".to_string(), false, Some(true)),
+        ],
+        "both are pending, as the user last tapped them"
+    );
+}
+
+#[test]
+fn test_past_the_key_limit_a_row_older_than_the_oldest_key_returned_is_left_alone() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[
+            entry(post_key(2), "2026-11-02T00:00:00Z"),
+            entry(post_key(1), "2026-11-01T00:00:00Z"),
+            entry(post_key(3), "2026-01-01T00:00:00Z"),
+        ],
+        3,
+        3,
+    )
+    .unwrap();
+
+    // Now 4 saves, and only 2 keys returned: posts 2 and 3 aren't, but only post 2 is newer than
+    // the oldest key returned.
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[
+            entry(post_key(5), "2026-11-04T00:00:00Z"),
+            entry(post_key(1), "2026-11-01T00:00:00Z"),
+        ],
+        2,
+        4,
+    )
+    .unwrap();
+
+    assert_eq!(
+        rows(&conn, account),
+        [
+            ("post:123:1".to_string(), true, Some(true)),
+            ("post:123:3".to_string(), true, Some(true)),
+            ("post:123:5".to_string(), true, Some(true)),
+        ]
+    );
+    assert!(
+        !ReaderSavedRepository::select_state(&conn, account)
+            .unwrap()
+            .keys_complete
+    );
+}
+
+#[test]
+fn test_a_refresh_merges_a_row_saved_by_url_into_its_post() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let url = url_key("https://example.com/p9");
+    let row = ReaderSavedRepository::tap_save(
+        &conn,
+        account,
+        &url,
+        std::slice::from_ref(&url),
+        None,
+        &now(),
+    )
+    .unwrap();
+    ReaderSavedRepository::set_in_doubt(&conn, row, true).unwrap();
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[DbReaderSavedKey {
+            key: post_key(9),
+            date_saved: now(),
+            url: Some("https://example.com/p9/".to_string()),
+        }],
+        1,
+        1,
+    )
+    .unwrap();
+
+    let stored = row_for(&conn, account, &url).unwrap();
+    assert_eq!(stored.key, post_key(9));
+    assert!(stored.saved && stored.server == Some(true) && !stored.in_doubt && stored.listed);
+    assert_eq!(rows(&conn, account).len(), 1);
+}
+
+#[test]
+fn test_the_list_adds_a_row_but_doesnt_change_one_that_is_there() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let one = ReaderPostRepository::upsert(&conn, account, &post(1)).unwrap();
+    let two = ReaderPostRepository::upsert(&conn, account, &post(2)).unwrap();
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[entry(post_key(2), "2026-11-01T00:00:00Z")],
+        1,
+        1,
+    )
+    .unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(2)], false).unwrap();
+
+    let listed = date("2026-11-05T00:00:00Z");
+    ReaderSavedRepository::apply_listed(
         &conn,
         account,
         &post_key(1),
-        Some(row),
-        Some("2026-01-01T00:00:00.000Z"),
+        &[post_key(1)],
+        one,
+        Some(&listed),
     )
     .unwrap();
-    ReaderSavedRepository::upsert_local_only(
+    ReaderSavedRepository::apply_listed(&conn, account, &post_key(2), &[post_key(2)], two, None)
+        .unwrap();
+
+    assert_eq!(
+        rows(&conn, account),
+        [
+            ("post:123:1".to_string(), true, Some(true)),
+            ("post:123:2".to_string(), false, Some(true)),
+        ]
+    );
+    let list = ReaderSavedRepository::select_list(&conn, account).unwrap();
+    assert_eq!(list.len(), 1, "post 2 is being unsaved");
+    assert_eq!(list[0].row.key, post_key(1));
+    assert_eq!(list[0].post.as_ref().unwrap().identity, identity(1));
+}
+
+#[test]
+fn test_the_list_is_newest_first_and_only_has_listed_or_local_only_saves() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::apply_keys(
         &conn,
         account,
-        &post_key(2),
-        None,
-        Some("2026-01-02T00:00:00.000Z"),
+        &[entry(post_key(1), "2026-11-01T00:00:00Z")],
+        1,
+        1,
     )
     .unwrap();
-
-    let saves = ReaderSavedRepository::select_local_only(&conn, account).unwrap();
-    assert_eq!(saves.len(), 2);
-    assert_eq!(saves[0].key, post_key(2));
-    assert_eq!(saves[0].post, None);
-    assert_eq!(saves[1].post, Some(stored));
-
-    assert!(ReaderSavedRepository::delete_local_only(&conn, account, &post_key(2)).unwrap());
-    assert!(!ReaderSavedRepository::delete_local_only(&conn, account, &post_key(2)).unwrap());
+    ReaderSavedRepository::tap_save(&conn, account, &post_key(2), &[post_key(2)], None, &now())
+        .unwrap();
+    ReaderSavedRepository::insert_imported(
+        &conn,
+        account,
+        &post_key(3),
+        None,
+        Some(&date("2026-10-01T00:00:00Z")),
+    )
+    .unwrap();
+    let keys: Vec<_> = ReaderSavedRepository::select_list(&conn, account)
+        .unwrap()
+        .into_iter()
+        .map(|item| item.row.key)
+        .collect();
+    assert_eq!(keys, [post_key(2), post_key(3)], "post 1 isn't listed yet");
 }
 
 #[test]
@@ -440,10 +823,14 @@ fn test_deleting_an_account_deletes_its_reader_data() {
         let row = ReaderPostRepository::upsert(&conn, account, &post(1)).unwrap();
         let stream = ReaderStreamRepository::get_or_create(&conn, account, "saved").unwrap();
         ReaderStreamRepository::upsert_item(&conn, stream.row_id, row, "a").unwrap();
-        ReaderSavedRepository::write_local(&conn, account, "{}").unwrap();
-        ReaderSavedRepository::replace_keys(&conn, account, &saved_keys(&[1])).unwrap();
-        ReaderSavedRepository::upsert_local_only(&conn, account, &post_key(1), Some(row), None)
-            .unwrap();
+        ReaderSavedRepository::apply_keys(
+            &conn,
+            account,
+            &[entry(post_key(1), "2026-11-01T00:00:00Z")],
+            1,
+            1,
+        )
+        .unwrap();
     }
 
     assert!(WordPressComAccountRepository::delete(&conn, WpComUserId(1)).unwrap());
@@ -453,8 +840,7 @@ fn test_deleting_an_account_deletes_its_reader_data() {
         "reader_streams",
         "reader_stream_items",
         "reader_saved_state",
-        "reader_saved_keys",
-        "reader_saved_local_only",
+        "reader_saved_posts",
     ] {
         assert_eq!(
             count(&conn, table),

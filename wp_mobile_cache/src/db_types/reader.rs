@@ -126,43 +126,66 @@ pub struct DbReaderStreamItem {
     pub sort_key: String,
 }
 
-/// A save the server refused on import, kept on this device.
+/// One save on the server, as far as this device knows, and what the user wants for it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DbReaderSavedLocalOnly {
+pub struct DbReaderSavedRow {
+    pub row_id: RowId,
+    /// The key the server stores, once an answer or a refresh says. Until then, the key sent.
     pub key: ReaderSavedKey,
-    pub post: Option<ReaderPostRecord>,
+    /// A URL key the server stores as [`Self::key`].
+    pub url_key: Option<ReaderSavedKey>,
+    /// The feed item key of a WordPress.com post saved under its IDs.
+    pub feed_item_key: Option<ReaderSavedKey>,
+    /// What the user wants.
+    pub saved: bool,
+    /// What the server last said, or `None` if it hasn't.
+    pub server: Option<bool>,
+    /// Sent without an answer, so it isn't sent again until a refresh says what the server has.
+    pub in_doubt: bool,
+    /// The order of the last tap on this device, or 0 for none.
+    pub seq: i64,
     pub date_saved: Option<WpGmtDateTime>,
+    pub post_row_id: Option<RowId>,
+    /// Shown in the saved list: the list sent it, or this device saved it.
+    pub listed: bool,
+    pub imported: bool,
+    /// Refused on import, so kept on this device and never sent.
+    pub local_only: bool,
 }
 
-/// What the saved posts service stored for an account besides its keys.
+impl DbReaderSavedRow {
+    /// Whether the server doesn't have what the user wants yet.
+    pub fn is_pending(&self) -> bool {
+        !self.local_only && self.server != Some(self.saved)
+    }
+}
+
+/// What the saved posts service knows about an account besides its rows.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct DbReaderSavedState {
-    /// The service's own record of this device's writes. The service owns its format.
-    pub local: Option<String>,
+    /// Whether a refresh of the saved keys has been applied.
+    pub keys_refreshed: bool,
+    /// Whether the newest refresh returned every saved key: past 1,000 it doesn't.
+    pub keys_complete: bool,
+    /// The newest total the server gave.
+    pub total: Option<u64>,
     pub imported_local_saves: bool,
 }
 
-/// One saved key, as `GET /wpcom/v2/read/saved/keys` returned it.
+/// One entry of a refresh of the saved keys.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DbReaderSavedKey {
     pub key: ReaderSavedKey,
-    pub save_id: u64,
     pub date_saved: WpGmtDateTime,
     /// The URL of a post saved by its IDs, when the server sent it.
     pub url: Option<String>,
 }
 
-/// The saved keys from the newest refresh applied, and that refresh.
+/// A row of the saved list, with its post when the cache has it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DbReaderSavedKeys {
-    /// When the refresh started, as milliseconds since the Unix epoch.
-    pub refreshed_at_ms: i64,
-    /// How many keys the refresh returned, before any normalized to the same key.
-    pub returned: u64,
-    /// The server's total, which goes past the 1,000 keys it returns.
-    pub total: u64,
-    /// Newest first. Keys that normalize to the same key are stored once.
-    pub keys: Vec<DbReaderSavedKey>,
+pub struct DbReaderSavedListItem {
+    pub row: DbReaderSavedRow,
+    pub post: Option<ReaderPostRecord>,
 }
 
 /// A key as stored text: `post:{blog_id}:{post_id}`, `feed-item:{feed_item_id}` or `url:{url}`,
