@@ -19,21 +19,21 @@ class SiteIconsTest {
         val icons = siteIcons(html, ParsedUrl.parse("https://example.com/blog/"))
         assertEquals(
             listOf("https://example.com/icon-32.png", "https://example.com/blog/touch.png"),
-            icons.map { it.url.url() }
+            icons.map { it.url }
         )
     }
 
     @Test
     fun picksTheIconForASize() {
         val icon = preferredSiteIcon(html, ParsedUrl.parse("https://example.com/blog/"), 120u)
-        assertEquals("https://example.com/blog/touch.png", icon?.url?.url())
+        assertEquals("https://example.com/blog/touch.png", icon?.url)
         assertEquals(SiteIconKind.APPLE_TOUCH_ICON, icon?.kind)
     }
 
     @Test
     fun fallsBackToFaviconIco() {
         val icon = preferredSiteIcon("<p>No icons</p>", ParsedUrl.parse("https://example.com/blog/"), 120u)
-        assertEquals("https://example.com/favicon.ico", icon?.url?.url())
+        assertEquals("https://example.com/favicon.ico", icon?.url)
     }
 
     @Test
@@ -48,9 +48,15 @@ class SiteIconsTest {
             ParsedUrl.parse("https://example.com/"),
             32u
         )
-        val url = icon?.url?.rfc3986Url()
+        val url = icon?.url
         assertEquals("https://example.com/icon.png?v=%7Bhash%7D%7C2%5Ex", url)
         // `java.net.URI` rejects the unencoded form, like Foundation's `URL` before iOS 17.
         assertEquals(url, java.net.URI(url).toString())
+    }
+
+    @Test
+    fun convertsAParsedUrlWithCharactersRfc3986DoesNotAllow() {
+        val url = ParsedUrl.parse("https://example.com/icon.png?v={hash}|2^x").toURL()
+        assertEquals("https://example.com/icon.png?v=%7Bhash%7D%7C2%5Ex", url.toString())
     }
 }

@@ -22,4 +22,13 @@ extension SiteIcon {
     public static func preferred(inHTML html: String, pageURL: URL, size: UInt32) throws -> SiteIcon? {
         preferredSiteIcon(html: html, pageUrl: try ParsedUrl.from(url: pageURL), size: size)
     }
+
+    /// The icon's address.
+    public var asURL: URL {
+        // `url` only uses the characters RFC 3986 allows, which `URL` accepts on every supported OS version.
+        guard let result = URL(string: url) else {
+            fatalError("`SiteIcon.url` is not a `URL`: \(url)")
+        }
+        return result
+    }
 }

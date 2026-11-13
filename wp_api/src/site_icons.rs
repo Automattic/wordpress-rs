@@ -15,8 +15,9 @@
 //! picks the one to show at a given size, and falls back to `/favicon.ico` when
 //! the page declares none that an app can show.
 
-use crate::parsed_url::ParsedUrl;
+use crate::parsed_url::{ParsedUrl, rfc3986_serialization};
 use scraper::{ElementRef, Html, Selector};
+use std::cmp::Reverse;
 use std::sync::Arc;
 use url::Url;
 
@@ -53,8 +54,10 @@ pub enum SiteIconSize {
 /// An icon a web page declares.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct SiteIcon {
-    /// The icon's absolute `http` or `https` URL.
-    pub url: Arc<ParsedUrl>,
+    /// The icon's absolute `http` or `https` URL. Characters RFC 3986 doesn't
+    /// allow, such as `{` or `|`, are percent-encoded, so strict parsers like
+    /// Foundation's `URL` and Java's `URI` accept it.
+    pub url: String,
     pub kind: SiteIconKind,
     /// The sizes the tag lists, in order. Empty when it lists none.
     pub sizes: Vec<SiteIconSize>,
@@ -70,34 +73,14 @@ pub struct SiteIcon {
 /// references in attributes are decoded, so `?a=1&amp;b=2` becomes `?a=1&b=2`.
 ///
 /// Icons whose address is empty, or isn't `http` or `https` (such as a `data:`
-/// URL), are left out. The list doesn't include the implicit `/favicon.ico`;
-/// [`preferred_site_icon`] falls back to it.
+/// URL), are left out, as are tags a browser ignores: those inside a
+/// `<template>`, an `<svg>` or a `<math>`. The list doesn't include the
+/// implicit `/favicon.ico`; [`preferred_site_icon`] falls back to it.
 #[uniffi::export]
 pub fn site_icons(html: String, page_url: Arc<ParsedUrl>) -> Vec<SiteIcon> {
-    let document = Html::parse_document(&html);
-    let base_url = document_base_url(&document, &page_url.inner);
-
-    let selector = Selector::parse("link[rel][href], meta[name][content]")
-        .expect("the icon selector is valid");
-    document
-        .select(&selector)
-        .filter_map(|element| {
-            let (kind, address) = icon_kind_and_address(element)?;
-            let url = resolve(address, &base_url)?;
-            let attributes = element.value();
-            Some(SiteIcon {
-                url: Arc::new(url.into()),
-                kind,
-                sizes: attributes
-                    .attr("sizes")
-                    .map(parse_sizes)
-                    .unwrap_or_default(),
-                mime_type: attributes
-                    .attr("type")
-                    .map(|t| t.trim().to_ascii_lowercase())
-                    .filter(|t| !t.is_empty()),
-            })
-        })
+    declared_icons(&html, &page_url.inner)
+        .into_iter()
+        .map(|declared| declared.icon)
         .collect()
 }
 
@@ -111,19 +94,25 @@ pub fn site_icons(html: String, page_url: Arc<ParsedUrl>) -> Vec<SiteIcon> {
 ///
 /// It picks the smallest icon that is at least `size` pixels, so the image
 /// is sharp without downloading more than needed. When every icon is smaller,
-/// it picks the largest. An icon with `sizes="any"` scales, so it counts as
-/// exactly `size` pixels. An icon that doesn't list its size counts as the
-/// size at the end of its file name, such as `cropped-icon-270x270.png` (the
-/// way WordPress names them), or else as:
+/// it picks the largest. An icon that doesn't list a size in pixels counts as
+/// the size at the end of its file name, such as `cropped-icon-270x270.png`
+/// (the way WordPress names them), or else as:
 ///
 /// - 180 pixels for an `apple-touch-icon`, the size Apple asks for.
 /// - 144 pixels for a Windows tile image, the smallest size Windows asks for.
 /// - 16 pixels for any other icon, the size of a classic favicon.
 ///
+/// `sizes="any"` doesn't count as a size: it's meant for SVG icons, which are
+/// never picked, and an `.ico` that lists it doesn't scale.
+///
+/// A Windows tile image is made for a Start tile, often on a transparent or
+/// coloured background, so it's only picked when no other icon is large
+/// enough, or when every icon is too small and it's the largest.
+///
 /// When two icons are the same size, an `apple-touch-icon` wins over an
-/// `icon`, which wins over a tile image, and then the first in the document
-/// wins. Apple touch icons are square and opaque, so they look right on any
-/// background.
+/// `icon`, which wins over a tile image. Apple touch icons are square and
+/// opaque, so they look right on any background. Then, as in the HTML
+/// standard, the last in the document wins.
 ///
 /// SVG icons and mask icons are never picked, because the image decoders on
 /// Apple platforms and Android can't draw SVG. [`site_icons`] still lists them.
@@ -131,25 +120,62 @@ pub fn site_icons(html: String, page_url: Arc<ParsedUrl>) -> Vec<SiteIcon> {
 pub fn preferred_site_icon(html: String, page_url: Arc<ParsedUrl>, size: u32) -> Option<SiteIcon> {
     // The lowest key wins. In order, it sorts:
     // 1. Icons of at least `size` pixels before smaller ones.
-    // 2. Among those, the smallest first; among smaller ones, the largest.
-    // 3. Then by kind, then by document order.
-    site_icons(html, page_url.clone())
+    // 2. Among those, icons before tile images.
+    // 3. The smallest first among those large enough; the largest first
+    //    among smaller ones.
+    // 4. Then by kind, then the last in the document first.
+    declared_icons(&html, &page_url.inner)
         .into_iter()
         .enumerate()
-        .filter(|(_, icon)| !is_svg(icon))
-        .filter_map(|(index, icon)| {
-            let kind_rank = kind_rank(icon.kind)?;
-            let pixels = effective_size(&icon, size);
-            let fit = if pixels >= size {
-                pixels
-            } else {
-                u32::MAX - pixels
-            };
-            Some(((pixels < size, fit, kind_rank, index), icon))
+        .filter(|(_, declared)| !is_svg(declared))
+        .filter_map(|(index, declared)| {
+            let kind_rank = kind_rank(declared.icon.kind)?;
+            let pixels = effective_size(&declared);
+            let too_small = pixels < size;
+            let tile_that_fits = !too_small && declared.icon.kind == SiteIconKind::TileImage;
+            let fit = if too_small { u32::MAX - pixels } else { pixels };
+            let key = (too_small, tile_that_fits, fit, kind_rank, Reverse(index));
+            Some((key, declared.icon))
         })
         .min_by_key(|(key, _)| *key)
         .map(|(_, icon)| icon)
         .or_else(|| default_favicon(&page_url.inner))
+}
+
+/// An icon `html` declares, with its address still parsed.
+struct DeclaredIcon {
+    url: Url,
+    icon: SiteIcon,
+}
+
+fn declared_icons(html: &str, page_url: &Url) -> Vec<DeclaredIcon> {
+    let document = Html::parse_document(html);
+    let base_url = document_base_url(&document, page_url);
+
+    let selector = Selector::parse("link[rel][href], meta[name][content]")
+        .expect("the icon selector is valid");
+    document
+        .select(&selector)
+        .filter(|element| is_active_html_element(*element))
+        .filter_map(|element| {
+            let (kind, address) = icon_kind_and_address(element)?;
+            let url = resolve(address, &base_url)?;
+            let attributes = element.value();
+            let icon = SiteIcon {
+                url: rfc3986_serialization(&url),
+                kind,
+                sizes: attributes
+                    .attr("sizes")
+                    .map(parse_sizes)
+                    .unwrap_or_default(),
+                mime_type: attributes
+                    .attr("type")
+                    .map(|t| t.trim().to_ascii_lowercase())
+                    .filter(|t| !t.is_empty()),
+            };
+            Some(DeclaredIcon { url, icon })
+        })
+        .collect()
 }
 
 /// `/favicon.ico` at the root of `page_url`'s origin, as a browser requests it,
@@ -157,7 +183,7 @@ pub fn preferred_site_icon(html: String, page_url: Arc<ParsedUrl>, size: u32) ->
 fn default_favicon(page_url: &Url) -> Option<SiteIcon> {
     let url = resolve("/favicon.ico", page_url)?;
     Some(SiteIcon {
-        url: Arc::new(url.into()),
+        url: rfc3986_serialization(&url),
         kind: SiteIconKind::DefaultFavicon,
         sizes: Vec::new(),
         mime_type: None,
@@ -168,16 +194,29 @@ fn default_favicon(page_url: &Url) -> Option<SiteIcon> {
 /// `<base href>`, resolved against `page_url`, or `page_url` itself.
 ///
 /// As in the HTML standard, a base that doesn't parse, or is a `data:` or
-/// `javascript:` URL, is ignored.
+/// `javascript:` URL, is ignored, and so is one a browser ignores because
+/// it's inside a `<template>` or an `<svg>`.
 fn document_base_url(document: &Html, page_url: &Url) -> Url {
     let selector = Selector::parse("base[href]").expect("the base selector is valid");
     document
         .select(&selector)
-        .next()
+        .find(|base| is_active_html_element(*base))
         .and_then(|base| base.value().attr("href"))
         .and_then(|href| page_url.join(href).ok())
         .filter(|base| !matches!(base.scheme(), "data" | "javascript"))
         .unwrap_or_else(|| page_url.clone())
+}
+
+/// Whether a browser acts on `element`: it's an HTML element, not an SVG or
+/// MathML one, and it isn't inside a `<template>`, whose contents are inert.
+fn is_active_html_element(element: ElementRef<'_>) -> bool {
+    let is_html = &*element.value().name.ns == "http://www.w3.org/1999/xhtml";
+    let in_template = element.ancestors().any(|node| {
+        node.value()
+            .as_element()
+            .is_some_and(|ancestor| ancestor.name() == "template")
+    });
+    is_html && !in_template
 }
 
 fn icon_kind_and_address(element: ElementRef<'_>) -> Option<(SiteIconKind, &str)> {
@@ -253,8 +292,9 @@ fn parse_dimensions(text: &str) -> Option<(u32, u32)> {
     Some((width, height))
 }
 
-/// Whether `icon` is an SVG, by its `type` or its file extension.
-fn is_svg(icon: &SiteIcon) -> bool {
+/// Whether an icon is an SVG, by its `type` or its file extension.
+fn is_svg(declared: &DeclaredIcon) -> bool {
+    let icon = &declared.icon;
     // Compare the MIME type's essence, without parameters such as
     // `; charset=utf-8`. `mime_type` is already lowercased.
     let is_svg_type = icon
@@ -262,22 +302,19 @@ fn is_svg(icon: &SiteIcon) -> bool {
         .as_deref()
         .and_then(|mime_type| mime_type.split(';').next())
         .is_some_and(|essence| essence.trim() == "image/svg+xml");
-    let path = icon.url.inner.path().to_ascii_lowercase();
+    let path = declared.url.path().to_ascii_lowercase();
     let is_svg_file = path.ends_with(".svg") || path.ends_with(".svgz");
     is_svg_type || is_svg_file
 }
 
-/// The size in pixels an icon is ranked by, when `requested` pixels are
-/// wanted. Sizes are measured by their shorter side. In order:
+/// The size in pixels an icon is ranked by, measured by its shorter side.
+/// In order:
 ///
-/// 1. `requested`, when the icon lists `any`: it scales to fit.
-/// 2. The largest size the icon lists.
-/// 3. The size at the end of its file name, such as `icon-270x270.png`.
-/// 4. A default for its kind.
-fn effective_size(icon: &SiteIcon, requested: u32) -> u32 {
-    if icon.sizes.contains(&SiteIconSize::Any) {
-        return requested;
-    }
+/// 1. The largest size in pixels the icon lists.
+/// 2. The size at the end of its file name, such as `icon-270x270.png`.
+/// 3. A default for its kind.
+fn effective_size(declared: &DeclaredIcon) -> u32 {
+    let icon = &declared.icon;
     let listed = icon
         .sizes
         .iter()
@@ -287,7 +324,7 @@ fn effective_size(icon: &SiteIcon, requested: u32) -> u32 {
         })
         .max();
     listed
-        .or_else(|| size_in_file_name(&icon.url.inner))
+        .or_else(|| size_in_file_name(&declared.url))
         .unwrap_or(match icon.kind {
             SiteIconKind::AppleTouchIcon => 180,
             SiteIconKind::TileImage => 144,
@@ -333,7 +370,7 @@ mod tests {
     }
 
     fn urls(html: &str) -> Vec<String> {
-        icons(html).into_iter().map(|icon| icon.url.url()).collect()
+        icons(html).into_iter().map(|icon| icon.url).collect()
     }
 
     fn preferred(html: &str, size: u32) -> SiteIcon {
@@ -356,7 +393,7 @@ mod tests {
             icons(WORDPRESS_SITE_ICON),
             vec![
                 SiteIcon {
-                    url: page("https://example.com/wp-content/uploads/cropped-icon-32x32.png"),
+                    url: "https://example.com/wp-content/uploads/cropped-icon-32x32.png".into(),
                     kind: SiteIconKind::Icon,
                     sizes: vec![SiteIconSize::Pixels {
                         width: 32,
@@ -365,7 +402,7 @@ mod tests {
                     mime_type: None,
                 },
                 SiteIcon {
-                    url: page("https://example.com/wp-content/uploads/cropped-icon-192x192.png"),
+                    url: "https://example.com/wp-content/uploads/cropped-icon-192x192.png".into(),
                     kind: SiteIconKind::Icon,
                     sizes: vec![SiteIconSize::Pixels {
                         width: 192,
@@ -374,13 +411,13 @@ mod tests {
                     mime_type: None,
                 },
                 SiteIcon {
-                    url: page("https://example.com/wp-content/uploads/cropped-icon-180x180.png"),
+                    url: "https://example.com/wp-content/uploads/cropped-icon-180x180.png".into(),
                     kind: SiteIconKind::AppleTouchIcon,
                     sizes: vec![],
                     mime_type: None,
                 },
                 SiteIcon {
-                    url: page("https://example.com/wp-content/uploads/cropped-icon-270x270.png"),
+                    url: "https://example.com/wp-content/uploads/cropped-icon-270x270.png".into(),
                     kind: SiteIconKind::TileImage,
                     sizes: vec![],
                     mime_type: None,
@@ -422,7 +459,7 @@ mod tests {
         let found = icons(html);
         assert_eq!(found.len(), 1, "{found:?}");
         assert_eq!(found[0].kind, kind);
-        assert_eq!(found[0].url.url(), "https://example.com/a.png");
+        assert_eq!(found[0].url, "https://example.com/a.png");
     }
 
     #[rstest]
@@ -519,7 +556,7 @@ mod tests {
         let html = format!(r#"<link rel="icon" href="{href}">"#);
         let found = site_icons(html, page(page_url));
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].url.url(), expected);
+        assert_eq!(found[0].url, expected);
     }
 
     #[test]
@@ -585,7 +622,7 @@ mod tests {
     ) {
         let icon = preferred(WORDPRESS_SITE_ICON, size);
         assert_eq!(
-            icon.url.url(),
+            icon.url,
             format!("https://example.com/wp-content/uploads/{file}")
         );
         assert_eq!(icon.kind, kind);
@@ -601,7 +638,7 @@ mod tests {
         assert_eq!(
             icon,
             Some(SiteIcon {
-                url: page("https://example.com/favicon.ico"),
+                url: "https://example.com/favicon.ico".into(),
                 kind: SiteIconKind::DefaultFavicon,
                 sizes: vec![],
                 mime_type: None,
@@ -613,7 +650,7 @@ mod tests {
     fn falls_back_to_favicon_ico_for_an_empty_page() {
         let icon = preferred_site_icon(String::new(), page("http://example.com:8080/"), 180);
         assert_eq!(
-            icon.map(|icon| icon.url.url()),
+            icon.map(|icon| icon.url),
             Some("http://example.com:8080/favicon.ico".to_string())
         );
     }
@@ -635,7 +672,7 @@ mod tests {
             32,
         );
         assert_eq!(
-            icon.map(|icon| icon.url.url()),
+            icon.map(|icon| icon.url),
             Some("https://example.com/a.png".to_string())
         );
     }
@@ -643,7 +680,7 @@ mod tests {
     #[test]
     fn prefers_any_declared_icon_to_the_fallback() {
         let icon = preferred(r#"<link rel="shortcut icon" href="/favicon.png">"#, 180);
-        assert_eq!(icon.url.url(), "https://example.com/favicon.png");
+        assert_eq!(icon.url, "https://example.com/favicon.png");
         assert_eq!(icon.kind, SiteIconKind::Icon);
     }
 
@@ -651,48 +688,38 @@ mod tests {
     fn prefers_an_apple_touch_icon_to_an_icon_without_sizes() {
         let html = r#"<link rel="icon" href="/favicon.png">
             <link rel="apple-touch-icon" href="/touch.png">"#;
-        assert_eq!(
-            preferred(html, 64).url.url(),
-            "https://example.com/touch.png"
-        );
+        assert_eq!(preferred(html, 64).url, "https://example.com/touch.png");
     }
 
     #[test]
     fn prefers_an_apple_touch_icon_of_the_same_size() {
         let html = r#"<link rel="icon" href="/icon.png" sizes="180x180">
             <link rel="apple-touch-icon" href="/touch.png" sizes="180x180">"#;
-        assert_eq!(
-            preferred(html, 180).url.url(),
-            "https://example.com/touch.png"
-        );
-        assert_eq!(
-            preferred(html, 512).url.url(),
-            "https://example.com/touch.png"
-        );
+        assert_eq!(preferred(html, 180).url, "https://example.com/touch.png");
+        assert_eq!(preferred(html, 512).url, "https://example.com/touch.png");
     }
 
     #[test]
-    fn picks_the_first_of_two_equal_icons() {
+    fn picks_the_last_of_two_equal_icons() {
+        // The HTML standard says to use the last of several equally good icons.
         let html = r#"<link rel="icon" href="/first.png" sizes="64x64">
             <link rel="icon" href="/second.png" sizes="64x64">"#;
-        assert_eq!(
-            preferred(html, 32).url.url(),
-            "https://example.com/first.png"
-        );
-        assert_eq!(
-            preferred(html, 128).url.url(),
-            "https://example.com/first.png"
-        );
+        assert_eq!(preferred(html, 32).url, "https://example.com/second.png");
+        assert_eq!(preferred(html, 128).url, "https://example.com/second.png");
+    }
+
+    #[test]
+    fn picks_a_site_icon_printed_after_a_theme_default() {
+        let html = r#"<link rel="shortcut icon" href="/theme-default.ico">
+            <link rel="icon" href="/site.png">"#;
+        assert_eq!(preferred(html, 32).url, "https://example.com/site.png");
     }
 
     #[test]
     fn ranks_an_ico_by_its_largest_size() {
         let html = r#"<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
             <link rel="icon" href="/icon-40.png" sizes="40x40">"#;
-        assert_eq!(
-            preferred(html, 44).url.url(),
-            "https://example.com/favicon.ico"
-        );
+        assert_eq!(preferred(html, 44).url, "https://example.com/favicon.ico");
     }
 
     #[rstest]
@@ -708,7 +735,7 @@ mod tests {
         assert_eq!(preferred(html, 32).kind, SiteIconKind::DefaultFavicon);
         let with_png = format!(r#"{html}<link rel="icon" href="/fallback.png" sizes="16x16">"#);
         assert_eq!(
-            preferred(&with_png, 32).url.url(),
+            preferred(&with_png, 32).url,
             "https://example.com/fallback.png"
         );
     }
@@ -720,7 +747,7 @@ mod tests {
             <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
             <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">"#;
         assert_eq!(
-            preferred(html, 120).url.url(),
+            preferred(html, 120).url,
             "https://example.com/apple-touch-icon.png"
         );
     }
@@ -729,10 +756,7 @@ mod tests {
     fn ranks_a_wide_icon_by_its_shorter_side() {
         let html = r#"<link rel="icon" href="/wide.png" sizes="512x64">
             <link rel="icon" href="/square.png" sizes="128x128">"#;
-        assert_eq!(
-            preferred(html, 100).url.url(),
-            "https://example.com/square.png"
-        );
+        assert_eq!(preferred(html, 100).url, "https://example.com/square.png");
     }
 
     #[rstest]
@@ -746,18 +770,65 @@ mod tests {
     }
 
     #[rstest]
-    // Every listed icon is smaller than the request, so the scalable one wins.
-    #[case::larger_than_all(180)]
-    // The scalable icon fits exactly, so it beats the larger 64-pixel icon.
-    #[case::between(48)]
-    fn ranks_an_icon_for_any_size_as_a_perfect_fit(#[case] size: u32) {
-        let html = r#"<link rel="icon" href="/i32.png" sizes="32x32">
-            <link rel="icon" href="/any.png" sizes="any">
-            <link rel="icon" href="/i64.png" sizes="64x64">"#;
+    #[case(32)]
+    #[case(64)]
+    #[case(120)]
+    #[case(256)]
+    fn ignores_any_on_an_icon_that_doesnt_scale(#[case] size: u32) {
+        // From "How to Favicon in 2021": `sizes="any"` on the `.ico` only tells
+        // browsers to prefer the SVG. An `.ico` doesn't scale.
+        let html = r#"<link rel="icon" href="/favicon.ico" sizes="any">
+            <link rel="icon" href="/icon.svg" type="image/svg+xml">
+            <link rel="apple-touch-icon" href="/apple-touch-icon.png">"#;
         assert_eq!(
-            preferred(html, size).url.url(),
-            "https://example.com/any.png"
+            preferred(html, size).url,
+            "https://example.com/apple-touch-icon.png"
         );
+    }
+
+    #[rstest]
+    #[case(64)]
+    #[case(120)]
+    #[case(144)]
+    fn prefers_an_icon_to_a_tile_image_that_also_fits(#[case] size: u32) {
+        // RealFaviconGenerator's markup.
+        let html = r##"<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+            <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+            <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+            <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+            <meta name="msapplication-TileImage" content="/mstile-144x144.png">"##;
+        assert_eq!(
+            preferred(html, size).url,
+            "https://example.com/apple-touch-icon.png"
+        );
+    }
+
+    #[rstest]
+    // No icon fits, so the largest wins, even though it's a tile image.
+    #[case::larger_than_all(512)]
+    // Only the tile image fits.
+    #[case::only_the_tile_fits(200)]
+    fn picks_a_tile_image_when_nothing_else_will_do(#[case] size: u32) {
+        assert_eq!(
+            preferred(WORDPRESS_SITE_ICON, size).url,
+            "https://example.com/wp-content/uploads/cropped-icon-270x270.png"
+        );
+    }
+
+    #[test]
+    fn ignores_icons_inside_template_and_svg() {
+        let html = r#"<template><link rel="icon" href="/template.png"></template>
+            <svg><link rel="icon" href="/svg.png"></svg>
+            <math><link rel="icon" href="/math.png"></math>
+            <link rel="icon" href="/real.png">"#;
+        assert_eq!(urls(html), vec!["https://example.com/real.png"]);
+    }
+
+    #[test]
+    fn ignores_a_base_inside_template() {
+        let html = r#"<template><base href="https://evil.example/x/"></template>
+            <link rel="icon" href="real.png">"#;
+        assert_eq!(urls(html), vec!["https://example.com/real.png"]);
     }
 
     #[rstest]
@@ -772,22 +843,35 @@ mod tests {
         #[case] url: &str,
         #[case] expected: u32,
     ) {
-        let icon = SiteIcon {
-            url: page(url),
-            kind: SiteIconKind::TileImage,
-            sizes: vec![],
-            mime_type: None,
+        let declared = DeclaredIcon {
+            url: Url::parse(url).expect("test URLs are valid"),
+            icon: SiteIcon {
+                url: url.into(),
+                kind: SiteIconKind::TileImage,
+                sizes: vec![],
+                mime_type: None,
+            },
         };
-        assert_eq!(effective_size(&icon, 32), expected);
+        assert_eq!(effective_size(&declared), expected);
     }
 
     #[test]
     fn prefers_listed_sizes_to_the_file_name() {
         let html = r#"<link rel="icon" href="/icon-512x512.png" sizes="32x32">
             <link rel="icon" href="/icon-64.png" sizes="64x64">"#;
-        assert_eq!(
-            preferred(html, 48).url.url(),
-            "https://example.com/icon-64.png"
-        );
+        assert_eq!(preferred(html, 48).url, "https://example.com/icon-64.png");
+    }
+
+    #[rstest]
+    #[case::query(
+        r#"<link rel="icon" href="/icon.png?v={hash}|2^x">"#,
+        "https://example.com/icon.png?v=%7Bhash%7D%7C2%5Ex"
+    )]
+    #[case::host_placeholder(
+        r#"<link rel="icon" href="https://{{cdn}}/favicon.png">"#,
+        "https://%7B%7Bcdn%7D%7D/favicon.png"
+    )]
+    fn encodes_characters_rfc3986_doesnt_allow(#[case] html: &str, #[case] expected: &str) {
+        assert_eq!(urls(html), vec![expected]);
     }
 }

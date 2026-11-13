@@ -6,4 +6,4 @@ import java.net.URL
 
 operator fun ParsedUrl.Companion.invoke(url: URL) = parse(url.toString())
 
-fun ParsedUrl.toURL(): URL = URI(this.url()).toURL()
+fun ParsedUrl.toURL(): URL = URI(this.rfc3986Url()).toURL()

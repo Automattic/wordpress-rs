@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::Display;
+use std::fmt::Write;
 use url::{Position, Url};
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
@@ -141,36 +142,17 @@ impl ParsedUrl {
     ///
     /// [`url`](Self::url) follows the WHATWG URL standard, which leaves some
     /// characters as they are, such as `{`, `}`, `|`, `^`, `[` and `]` in a
-    /// query. Stricter parsers reject them: Foundation's `URL(string:)`
-    /// returns `nil` before iOS 17 and macOS 14, and Java's `URI` throws.
+    /// query, or `{` in a host. Stricter parsers reject them: Foundation's
+    /// `URL(string:)` returns `nil` (for a host, on every OS version), and
+    /// Java's `URI` throws.
     ///
-    /// This percent-encodes those characters in the path, query and fragment.
-    /// It also encodes a `%` that doesn't start an escape, and a `#` inside
-    /// the fragment. The result names the same resource; for a URL that is
-    /// already valid RFC 3986 it is the same as [`url`](Self::url).
+    /// This percent-encodes those characters anywhere in the URL, except the
+    /// brackets around an IPv6 address. It also encodes a `%` that doesn't
+    /// start an escape, and a `#` inside the fragment. The result names the
+    /// same resource; for a URL that is already valid RFC 3986 it is the same
+    /// as [`url`](Self::url).
     pub fn rfc3986_url(&self) -> String {
-        let serialized = self.inner.as_str();
-        let (authority, rest) = serialized.split_at(self.inner[..Position::BeforePath].len());
-        let rest = rest.as_bytes();
-
-        let mut result = String::with_capacity(serialized.len());
-        result.push_str(authority);
-        let mut in_fragment = false;
-        for (index, &byte) in rest.iter().enumerate() {
-            let is_escape = byte == b'%'
-                && rest.get(index + 1).is_some_and(u8::is_ascii_hexdigit)
-                && rest.get(index + 2).is_some_and(u8::is_ascii_hexdigit);
-            let is_fragment_start = byte == b'#' && !in_fragment;
-            if is_fragment_start {
-                in_fragment = true;
-            }
-            if is_escape || is_fragment_start || is_rfc3986_path_query_or_fragment_char(byte) {
-                result.push(byte as char);
-            } else {
-                result.push_str(&format!("%{byte:02X}"));
-            }
-        }
-        result
+        rfc3986_serialization(&self.inner)
     }
 
     /// A user-facing URL string that omits unnecessary details.
@@ -184,6 +166,37 @@ impl ParsedUrl {
             self.inner.to_string()
         }
     }
+}
+
+/// `url` as a string that only uses characters RFC 3986 allows. See
+/// [`ParsedUrl::rfc3986_url`].
+pub(crate) fn rfc3986_serialization(url: &Url) -> String {
+    let serialized = url.as_str();
+    let path_start = url[..Position::BeforePath].len();
+    let bytes = serialized.as_bytes();
+
+    let mut result = String::with_capacity(serialized.len());
+    let mut in_fragment = false;
+    for (index, &byte) in bytes.iter().enumerate() {
+        let in_authority = index < path_start;
+        let is_escape = byte == b'%'
+            && bytes.get(index + 1).is_some_and(u8::is_ascii_hexdigit)
+            && bytes.get(index + 2).is_some_and(u8::is_ascii_hexdigit);
+        let is_fragment_start = !in_authority && byte == b'#' && !in_fragment;
+        if is_fragment_start {
+            in_fragment = true;
+        }
+        let is_allowed = is_rfc3986_path_query_or_fragment_char(byte)
+            // `url` only leaves brackets in the authority around an IPv6
+            // address; it encodes them in the user name and password.
+            || (in_authority && matches!(byte, b'[' | b']'));
+        if is_escape || is_fragment_start || is_allowed {
+            result.push(byte as char);
+        } else {
+            write!(result, "%{byte:02X}").expect("writing to a String succeeds");
+        }
+    }
+    result
 }
 
 /// Whether RFC 3986 allows `byte` as it is in a path, query or fragment:
@@ -323,6 +336,9 @@ mod tests {
         "https://example.com/caf%C3%A9?q=%C3%A9"
     )]
     #[case::cannot_be_a_base("mailto:someone@example.com", "mailto:someone@example.com")]
+    #[case::host_placeholder("https://{{cdn}}/favicon.png", "https://%7B%7Bcdn%7D%7D/favicon.png")]
+    #[case::host_quote_and_backtick("https://a\"b`c/", "https://a%22b%60c/")]
+    #[case::userinfo_stray_percent("https://us%er@example.com/", "https://us%25er@example.com/")]
     fn rfc3986_url(#[case] input: &str, #[case] expected: &str) {
         let url = ParsedUrl::parse(input).unwrap();
         assert_eq!(url.rfc3986_url(), expected);
