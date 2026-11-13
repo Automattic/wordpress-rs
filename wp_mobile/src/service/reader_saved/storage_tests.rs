@@ -1005,3 +1005,107 @@ async fn a_batch_with_the_wrong_number_of_results_waits_for_a_sync() {
     );
     assert_eq!(service.saved_count().unwrap(), Some(2));
 }
+
+// Carried over from #1729's last commits
+
+/// The device's copy of a post can be older than the one the saved list stored, so the import only
+/// fills in what the list's copy doesn't have.
+#[tokio::test]
+async fn importing_a_local_save_doesnt_replace_what_the_saved_list_stored() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(
+        200,
+        page(&[listed(1, "2026-11-01T00:00:00Z")], None),
+    ));
+    collection.refresh().await.unwrap();
+
+    // Post 1 is already saved here, so the import adds nothing to send.
+    let mut save = local_save(identity(1), "An older title");
+    save.excerpt = Some("An excerpt only the device has".to_string());
+    service.import_local_saves(vec![save]).await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let post = items[0].post.as_ref().unwrap();
+    assert_eq!(post.title.as_deref(), Some("Post 1"));
+    assert_eq!(
+        post.excerpt.as_deref(),
+        Some("An excerpt only the device has")
+    );
+    assert_eq!(executor.sent().len(), 2);
+}
+
+/// A key with an ID of `0` would be refused, so it isn't imported or sent, as the server would
+/// answer it with `invalid_input`.
+#[tokio::test]
+async fn an_import_leaves_out_a_key_with_a_zero_id() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+
+    let report = service
+        .import_local_saves(vec![
+            local_save(rss_identity(0), "Zero"),
+            local_save(identity(1), "One"),
+        ])
+        .await
+        .unwrap();
+
+    assert_eq!((report.imported, report.unsaveable), (1, 1));
+    assert_eq!(
+        executor.sent_short()[1..],
+        [r#"new {"blog_id":123,"post_id":1}"#]
+    );
+    assert_eq!(shown(&service).await, vec![post_key(1)]);
+}
+
+#[derive(Default)]
+struct Hooks(Mutex<Vec<DbTable>>);
+
+impl wp_mobile_cache::DatabaseDelegate for Hooks {
+    fn did_update(&self, update_hook: UpdateHook) {
+        self.0.lock().unwrap().push(update_hook.table);
+    }
+}
+
+/// The collection reloads when its tables change, so a sync or a list refresh that changes nothing
+/// mustn't say they did. Only `reader_posts` is written, because each page stores its posts.
+#[tokio::test]
+async fn a_sync_and_a_refresh_that_change_nothing_tell_the_saved_list_nothing() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    let mut with_url = post_json(1);
+    with_url["url"] = json!("https://example.com/post-1");
+    let keys = keys_response(&[with_url, post_json(2), feed_json(7)]);
+    let listed = page(
+        &[
+            listed(2, "2026-11-02T00:00:00Z"),
+            listed(1, "2026-11-01T00:00:00Z"),
+        ],
+        None,
+    );
+    executor.push(Step::Respond(200, keys.clone()));
+    executor.push(Step::Respond(200, listed.clone()));
+    collection.refresh().await.unwrap();
+
+    let hooks = Arc::new(Hooks::default());
+    device.cache.start_listening_for_updates(hooks.clone());
+    executor.push(Step::Respond(200, keys.clone()));
+    service.sync().await.unwrap();
+    assert_eq!(*hooks.0.lock().unwrap(), Vec::<DbTable>::new());
+
+    executor.push(Step::Respond(200, keys));
+    executor.push(Step::Respond(200, listed));
+    collection.refresh().await.unwrap();
+    let seen = hooks.0.lock().unwrap().clone();
+    device.cache.stop_listening_for_updates();
+    assert!(
+        seen.iter()
+            .all(|table| *table == DbTable::ReaderPosts || *table == DbTable::ReaderStreams),
+        "{seen:?}"
+    );
+}

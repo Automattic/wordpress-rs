@@ -18,6 +18,11 @@
 //!
 //! - A request in doubt that the server applies after a newer opposite tap was answered undoes that
 //!   tap on the server.
+//! - Reads are taken to include every write answered before they started, as they did in every live
+//!   trial (15 of 15 on 2026-11-12). A read that lagged behind an answered save would take that
+//!   save out of the list until the next sync, and one that lagged behind an answered unsave would
+//!   bring the post back. Accepted until it's seen in production: the server's planned
+//!   `read_token`, sent with a read, would close it.
 //! - The saved keys stop at 1,000. Past that, which only accounts that saved more before the
 //!   server's cap can be, a post the keys don't have reads as not saved until the list shows it.
 //! - The count is the newest total the server gave, moved by what's pending, so it can be off until
@@ -65,7 +70,8 @@ pub enum ReaderSavedError {
     #[error("{0}")]
     Api(WpApiError),
 
-    /// The post doesn't have the IDs the API needs to save it.
+    /// The post doesn't have the IDs the API needs to save it, or a key has an ID of `0` or an empty
+    /// URL.
     #[error("This post can't be saved.")]
     PostCannotBeSaved,
 
@@ -188,7 +194,7 @@ impl ReaderSavedService {
         let main = reader_saved_key_for_post(post.clone())
             .ok_or(ReaderSavedError::PostCannotBeSaved)?
             .normalized();
-        let keys = normalized(&reader_saved_keys_for_post(post));
+        let keys = complete(&reader_saved_keys_for_post(post))?;
         self.save_keys(main, keys).await
     }
 
@@ -199,6 +205,7 @@ impl ReaderSavedService {
         page_details: Option<ReaderSavedPageDetails>,
     ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
         let key = ReaderSavedKey::Url { url }.normalized();
+        complete(std::slice::from_ref(&key))?;
         if let Some(details) = page_details {
             self.page_details
                 .lock()
@@ -213,10 +220,7 @@ impl ReaderSavedService {
         &self,
         post: ReaderPostSaveIdentity,
     ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
-        let keys = normalized(&reader_saved_keys_for_post(post));
-        if keys.is_empty() {
-            return Err(ReaderSavedError::PostCannotBeSaved);
-        }
+        let keys = complete(&reader_saved_keys_for_post(post))?;
         self.unsave_keys(keys).await
     }
 
@@ -226,7 +230,8 @@ impl ReaderSavedService {
         &self,
         key: ReaderSavedKey,
     ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
-        self.unsave_keys(vec![key.normalized()]).await
+        let keys = complete(std::slice::from_ref(&key))?;
+        self.unsave_keys(keys).await
     }
 
     /// Sends what the server doesn't have yet, then reloads the saved keys. Call it at launch, when
@@ -294,8 +299,10 @@ impl ReaderSavedService {
         let now = self.now();
         let row = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
-            let post = ReaderPostRepository::select_by_key(&transaction, self.account, &main)?
-                .map(|(row, _)| row);
+            // Where #1734's details go: `ReaderPostRepository::fill_missing` them here, in the tap's
+            // transaction, and pass their row on.
+            let post =
+                ReaderPostRepository::select_row_id_by_key(&transaction, self.account, &main)?;
             let row = ReaderSavedRepository::tap_save(
                 &transaction,
                 self.account,
@@ -317,9 +324,11 @@ impl ReaderSavedService {
         }
         let rows = self.rows_for(std::slice::from_ref(&main))?;
         Ok(match rows.iter().find(|row| row.saved) {
-            Some(row) if row.server == Some(true) || row.local_only => ReaderSavedOutcome::Synced {
-                key: row.key.clone(),
-            },
+            Some(row) if (row.server == Some(true) && !row.tapped) || row.local_only => {
+                ReaderSavedOutcome::Synced {
+                    key: row.key.clone(),
+                }
+            }
             Some(row) => sent.pending_reason(row),
             // An unsave tapped since decides.
             None => ReaderSavedOutcome::Pending {
@@ -334,15 +343,7 @@ impl ReaderSavedService {
     ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
         let waiting = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
-            // Past the keys a refresh returned, or before any, a key without a row may still be
-            // saved, so it's sent too.
-            let state = ReaderSavedRepository::select_state(&transaction, self.account)?;
-            let rows = ReaderSavedRepository::tap_unsave(
-                &transaction,
-                self.account,
-                &keys,
-                !state.keys_complete,
-            )?;
+            let rows = ReaderSavedRepository::tap_unsave(&transaction, self.account, &keys)?;
             transaction.commit().map_err(SqliteDbError::from)?;
             Ok::<_, SqliteDbError>(rows)
         })?;
@@ -356,7 +357,10 @@ impl ReaderSavedService {
         }
         let rows = self.rows_for(&keys)?;
         Ok(
-            match rows.iter().find(|row| row.is_pending() || row.saved) {
+            match rows
+                .iter()
+                .find(|row| row.is_pending() || row.tapped || row.saved)
+            {
                 Some(row) if !row.saved => sent.pending_reason(row),
                 // A save tapped since decides.
                 Some(row) => ReaderSavedOutcome::Synced {
@@ -684,6 +688,15 @@ impl Sent {
 
 fn normalized(keys: &[ReaderSavedKey]) -> Vec<ReaderSavedKey> {
     keys.iter().map(ReaderSavedKey::normalized).collect()
+}
+
+/// The keys, normalized, or [`ReaderSavedError::PostCannotBeSaved`] if there are none or one has an
+/// ID of `0` or an empty URL: the server would refuse it, and it mustn't become a row to send.
+fn complete(keys: &[ReaderSavedKey]) -> Result<Vec<ReaderSavedKey>, ReaderSavedError> {
+    if keys.is_empty() || keys.iter().any(|key| !key.is_complete()) {
+        return Err(ReaderSavedError::PostCannotBeSaved);
+    }
+    Ok(normalized(keys))
 }
 
 /// Whether a failed request may still have been applied: the request may have reached the server,

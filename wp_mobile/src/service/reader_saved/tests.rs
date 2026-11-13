@@ -692,6 +692,46 @@ async fn a_saved_url_can_be_unsaved_with_another_spelling() {
     assert_eq!(executor.sent().len(), 3);
 }
 
+#[rstest]
+#[case::empty_url(ReaderSavedKey::Url { url: String::new() })]
+#[case::zero_blog(ReaderSavedKey::Post { blog_id: WpComSiteId(0), post_id: PostId(1) })]
+#[case::zero_feed_item(ReaderSavedKey::FeedItem { feed_item_id: ReaderFeedItemId(0) })]
+#[tokio::test]
+async fn a_key_the_api_cant_take_is_refused_before_it_becomes_a_row(#[case] key: ReaderSavedKey) {
+    let (service, executor) = service();
+
+    let unsave = service.unsave_key(key.clone()).await;
+    let rows = service.rows_for(std::slice::from_ref(&key)).unwrap();
+    if let ReaderSavedKey::Url { url } = key {
+        let save = service.save_url(url, None).await;
+        assert!(matches!(save, Err(ReaderSavedError::PostCannotBeSaved)));
+    }
+
+    assert!(matches!(unsave, Err(ReaderSavedError::PostCannotBeSaved)));
+    assert!(executor.sent().is_empty());
+    assert!(rows.is_empty());
+    assert!(service.saved_list_items().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_post_with_a_zero_id_cannot_be_saved_or_unsaved() {
+    let (service, executor) = service();
+    let zero = ReaderPostSaveIdentity {
+        site_id: Some(WpComSiteId(0)),
+        ..identity(1)
+    };
+
+    assert!(matches!(
+        service.save(zero.clone()).await,
+        Err(ReaderSavedError::PostCannotBeSaved)
+    ));
+    assert!(matches!(
+        service.unsave(zero).await,
+        Err(ReaderSavedError::PostCannotBeSaved)
+    ));
+    assert!(executor.sent().is_empty());
+}
+
 // Unsaving
 
 #[tokio::test]
@@ -714,16 +754,25 @@ async fn unsave_sends_the_key_and_source() {
     assert_eq!(status(&service, identity(1)), NotSaved);
 }
 
-/// The keys returned every save, and say the post is saved under its feed item alone.
+/// The keys may be out of date, so every key the post may be saved under is sent.
 #[tokio::test]
-async fn unsave_sends_only_the_keys_the_post_is_saved_under() {
+async fn unsave_sends_every_key_the_post_may_be_saved_under() {
     let (service, executor) = service();
     synced(&service, &executor, &[feed_json(2)]).await;
+    // The feed item's row first. The post isn't saved under its blog and post IDs, so deleting
+    // those does nothing.
     executor.push(Step::Respond(200, write_response(false, feed_json(2), 0)));
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
 
     service.unsave(jetpack_identity(1, 2)).await.unwrap();
 
-    assert_eq!(executor.sent_short()[1..], [r#"delete {"feed_item_id":2}"#]);
+    assert_eq!(
+        executor.sent_short()[1..],
+        [
+            r#"delete {"feed_item_id":2}"#,
+            r#"delete {"blog_id":123,"post_id":1}"#
+        ]
+    );
     assert_eq!(status(&service, jetpack_identity(1, 2)), NotSaved);
     assert_eq!(count(&service), Some(0));
 }
@@ -762,16 +811,20 @@ async fn unsave_before_a_sync_sends_every_key() {
     assert_eq!(status(&service, jetpack_identity(1, 2)), NotSaved);
 }
 
-/// The keys returned every save and the post isn't one, so there's nothing to send.
+/// The keys say the post isn't saved, but they may be out of date, so the unsave is still sent.
 #[tokio::test]
-async fn unsaving_a_post_the_keys_say_is_not_saved_sends_nothing() {
+async fn unsaving_a_post_the_keys_say_is_not_saved_still_sends_it() {
     let (service, executor) = service();
     synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
 
     let outcome = service.unsave(identity(1)).await.unwrap();
 
     assert_eq!(outcome, ReaderSavedOutcome::Synced { key: post_key(1) });
-    assert_eq!(executor.sent().len(), 1);
+    assert_eq!(
+        executor.sent_short()[1..],
+        [r#"delete {"blog_id":123,"post_id":1}"#]
+    );
 }
 
 #[tokio::test]

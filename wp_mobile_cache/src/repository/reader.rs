@@ -231,6 +231,38 @@ impl ReaderPostRepository {
     }
 }
 
+impl ReaderPostRepository {
+    /// The row of the post stored under a key, as [`Self::select_by_key`] finds it, without reading
+    /// the post.
+    pub fn select_row_id_by_key(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        key: &ReaderSavedKey,
+    ) -> Result<Option<RowId>, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT rowid FROM reader_posts WHERE account_id = ?1 AND identity_key = ?2",
+        )?;
+        let exact = statement
+            .query_row(params![account, reader_saved_key_text(key)], |row| {
+                row.get(0)
+            })
+            .optional()?;
+        if exact.is_some() {
+            return Ok(exact);
+        }
+        let ReaderSavedKey::FeedItem { feed_item_id } = key else {
+            return Ok(None);
+        };
+        let mut statement = executor.prepare(
+            "SELECT rowid FROM reader_posts WHERE account_id = ?1 AND feed_item_id = ?2
+            ORDER BY rowid LIMIT 1",
+        )?;
+        Ok(statement
+            .query_row(params![account, feed_item_id.0], |row| row.get(0))
+            .optional()?)
+    }
+}
+
 /// Reader streams, such as the saved list, and the posts in them.
 pub struct ReaderStreamRepository;
 
@@ -466,8 +498,8 @@ impl ReaderStreamRepository {
 pub struct ReaderSavedRepository;
 
 const ROW_COLUMNS: &str = "s.rowid, s.key, s.url_key, s.feed_item_key, s.saved, s.server, \
-    s.in_doubt, s.seq, s.date_saved, s.post_id, s.listed, s.imported, s.local_only";
-const ROW_COLUMN_COUNT: usize = 13;
+    s.in_doubt, s.seq, s.date_saved, s.post_id, s.listed, s.imported, s.local_only, s.tapped";
+const ROW_COLUMN_COUNT: usize = 14;
 
 fn saved_row_from_row(row: &Row) -> Result<DbReaderSavedRow, SqliteDbError> {
     let key = |index: usize| -> Result<Option<ReaderSavedKey>, SqliteDbError> {
@@ -492,6 +524,7 @@ fn saved_row_from_row(row: &Row) -> Result<DbReaderSavedRow, SqliteDbError> {
         listed: row.get(10)?,
         imported: row.get(11)?,
         local_only: row.get(12)?,
+        tapped: row.get(13)?,
     })
 }
 
@@ -605,7 +638,7 @@ impl ReaderSavedRepository {
         Ok(rows)
     }
 
-    /// Rows to send, oldest tap first: pending, not in doubt, and not local only.
+    /// Rows to send, oldest tap first: pending or tapped, not in doubt, and not local only.
     pub fn select_pending(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -613,7 +646,8 @@ impl ReaderSavedRepository {
         Self::select_where(
             executor,
             account,
-            "s.local_only = 0 AND s.in_doubt = 0 AND (s.server IS NULL OR s.server != s.saved)",
+            "s.local_only = 0 AND s.in_doubt = 0
+                AND (s.tapped = 1 OR s.server IS NULL OR s.server != s.saved)",
             &[],
         )
     }
@@ -671,8 +705,8 @@ impl ReaderSavedRepository {
             if let Some(column) = alias_column(alias) {
                 executor.execute(
                     &format!(
-                        "UPDATE reader_saved_posts SET {column} = COALESCE({column}, ?2)
-                        WHERE rowid = ?1"
+                        "UPDATE reader_saved_posts SET {column} = ?2
+                        WHERE rowid = ?1 AND {column} IS NULL"
                     ),
                     params![row_id, text],
                 )?;
@@ -701,7 +735,7 @@ impl ReaderSavedRepository {
                 executor.execute(
                     "UPDATE reader_saved_posts SET
                         date_saved = CASE WHEN saved THEN date_saved ELSE ?3 END,
-                        saved = 1, seq = ?2, listed = 1
+                        saved = 1, seq = ?2, listed = 1, tapped = 1
                     WHERE rowid = ?1",
                     params![row.row_id, seq, reader_date_text(now)],
                 )?;
@@ -710,7 +744,7 @@ impl ReaderSavedRepository {
             None => {
                 let row_id = Self::insert(executor, account, main, true, None, seq, true)?;
                 executor.execute(
-                    "UPDATE reader_saved_posts SET date_saved = ?2 WHERE rowid = ?1",
+                    "UPDATE reader_saved_posts SET date_saved = ?2, tapped = 1 WHERE rowid = ?1",
                     params![row_id, reader_date_text(now)],
                 )?;
                 row_id
@@ -729,7 +763,7 @@ impl ReaderSavedRepository {
                 None => Self::delete(executor, other.row_id)?,
                 Some(server) => {
                     executor.execute(
-                        "UPDATE reader_saved_posts SET saved = ?2 WHERE rowid = ?1",
+                        "UPDATE reader_saved_posts SET saved = ?2, tapped = 0 WHERE rowid = ?1",
                         params![other.row_id, server],
                     )?;
                 }
@@ -738,14 +772,13 @@ impl ReaderSavedRepository {
         Ok(row_id)
     }
 
-    /// A tap of unsave: every row the post may be saved under wants it unsaved. A save only this
-    /// device has is removed. With `add_missing`, a key without a row gets one, so it's sent too:
-    /// for when the saved keys may not have them all. Returns the rows to wait for.
+    /// A tap of unsave: every row the post may be saved under wants it unsaved, and a key without a
+    /// row gets one, so every key is sent: the keys may be out of date. A save only this device has
+    /// is removed. Returns the rows to wait for.
     pub fn tap_unsave(
         executor: &impl QueryExecutor,
         account: RowId,
         keys: &[ReaderSavedKey],
-        add_missing: bool,
     ) -> Result<Vec<RowId>, SqliteDbError> {
         let seq = Self::next_seq(executor, account)?;
         let rows = Self::select_rows_for_keys(executor, account, keys)?;
@@ -756,29 +789,30 @@ impl ReaderSavedRepository {
                 continue;
             }
             executor.execute(
-                "UPDATE reader_saved_posts SET saved = 0, seq = ?2 WHERE rowid = ?1",
+                "UPDATE reader_saved_posts SET saved = 0, seq = ?2, tapped = 1 WHERE rowid = ?1",
                 params![row.row_id, seq],
             )?;
             waiting.push(row.row_id);
         }
-        if add_missing {
-            for key in keys {
-                let text = reader_saved_key_text(key);
-                let matched = rows.iter().any(|row| {
-                    [
-                        Some(&row.key),
-                        row.url_key.as_ref(),
-                        row.feed_item_key.as_ref(),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .any(|other| reader_saved_key_text(other) == text)
-                });
-                if !matched {
-                    waiting.push(Self::insert(
-                        executor, account, key, false, None, seq, false,
-                    )?);
-                }
+        for key in keys {
+            let text = reader_saved_key_text(key);
+            let matched = rows.iter().any(|row| {
+                [
+                    Some(&row.key),
+                    row.url_key.as_ref(),
+                    row.feed_item_key.as_ref(),
+                ]
+                .into_iter()
+                .flatten()
+                .any(|other| reader_saved_key_text(other) == text)
+            });
+            if !matched {
+                let row_id = Self::insert(executor, account, key, false, None, seq, false)?;
+                executor.execute(
+                    "UPDATE reader_saved_posts SET tapped = 1 WHERE rowid = ?1",
+                    [row_id],
+                )?;
+                waiting.push(row_id);
             }
         }
         Ok(waiting)
@@ -822,6 +856,7 @@ impl ReaderSavedRepository {
                 seq = MAX(seq, ?2),
                 listed = MAX(listed, ?4),
                 local_only = MAX(local_only, ?5),
+                tapped = MAX(tapped, ?8),
                 date_saved = COALESCE(date_saved, ?6),
                 post_id = COALESCE(post_id, ?7)
             WHERE rowid = ?1",
@@ -833,6 +868,7 @@ impl ReaderSavedRepository {
                 from.local_only,
                 from.date_saved.as_ref().map(reader_date_text),
                 from.post_row_id,
+                from.tapped,
             ],
         )?;
         Self::delete(executor, from.row_id)
@@ -885,7 +921,7 @@ impl ReaderSavedRepository {
         };
         let row_id = Self::rekey(executor, account, &row, stored)?;
         executor.execute(
-            "UPDATE reader_saved_posts SET server = ?2, in_doubt = 0 WHERE rowid = ?1",
+            "UPDATE reader_saved_posts SET server = ?2, in_doubt = 0, tapped = 0 WHERE rowid = ?1",
             params![row_id, saved],
         )?;
         Ok(row_id)
@@ -902,7 +938,8 @@ impl ReaderSavedRepository {
         };
         if row.imported && row.saved {
             executor.execute(
-                "UPDATE reader_saved_posts SET local_only = 1, in_doubt = 0 WHERE rowid = ?1",
+                "UPDATE reader_saved_posts SET local_only = 1, in_doubt = 0, tapped = 0
+                WHERE rowid = ?1",
                 [row_id],
             )?;
             return Ok(());
@@ -911,7 +948,8 @@ impl ReaderSavedRepository {
             None => Self::delete(executor, row_id),
             Some(server) => {
                 executor.execute(
-                    "UPDATE reader_saved_posts SET saved = ?2, in_doubt = 0 WHERE rowid = ?1",
+                    "UPDATE reader_saved_posts SET saved = ?2, in_doubt = 0, tapped = 0
+                    WHERE rowid = ?1",
                     params![row_id, server],
                 )?;
                 Ok(())
@@ -927,7 +965,8 @@ impl ReaderSavedRepository {
     /// one may just be past the end. A row that agreed with the server follows it; a pending one
     /// stays pending. So does one in doubt, even if it reads as agreeing: its request may have
     /// landed since, so what the server last said is out of date, and the user's last tap stands.
-    /// Rows the server and the user agree are unsaved are removed.
+    /// A refresh answers a request in doubt, so its tap is done. Rows the server and the user agree
+    /// are unsaved, with no tap to send, are removed.
     pub fn apply_keys(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -939,8 +978,10 @@ impl ReaderSavedRepository {
         let mut seen = Vec::new();
         for entry in keys {
             let text = reader_saved_key_text(&entry.key);
+            // An empty URL isn't one.
+            let url = entry.url.as_ref().filter(|url| !url.is_empty());
             // A row saved by the URL is the same save.
-            if let Some(url) = &entry.url {
+            if let Some(url) = url {
                 let url_key = ReaderSavedKey::Url { url: url.clone() };
                 let url_text = reader_saved_key_text(&url_key);
                 if url_text != text {
@@ -953,11 +994,16 @@ impl ReaderSavedRepository {
             let row_id = match existing.into_iter().next() {
                 Some(row) => {
                     let agreed = !row.in_doubt && row.server == Some(row.saved);
+                    // Only a row this changes is written, so a refresh that changes nothing
+                    // tells nobody the list changed. The date is filled in, not replaced: the
+                    // list's pages give it too, and the two mustn't take turns changing it.
                     executor.execute(
                         "UPDATE reader_saved_posts SET
-                            server = 1, in_doubt = 0, date_saved = ?2,
+                            server = 1, in_doubt = 0, date_saved = COALESCE(date_saved, ?2),
+                            tapped = CASE WHEN in_doubt THEN 0 ELSE tapped END,
                             saved = CASE WHEN ?3 THEN 1 ELSE saved END
-                        WHERE rowid = ?1",
+                        WHERE rowid = ?1 AND (server IS NOT 1 OR in_doubt != 0
+                            OR date_saved IS NULL OR (?3 AND saved != 1))",
                         params![row.row_id, reader_date_text(&entry.date_saved), agreed],
                     )?;
                     row.row_id
@@ -972,7 +1018,7 @@ impl ReaderSavedRepository {
                     row_id
                 }
             };
-            if let Some(url) = &entry.url {
+            if let Some(url) = url {
                 Self::add_aliases(
                     executor,
                     row_id,
@@ -997,22 +1043,26 @@ impl ReaderSavedRepository {
                 "UPDATE reader_saved_posts SET
                     saved = CASE WHEN in_doubt = 0 AND server IS NOT NULL AND server = saved
                         THEN 0 ELSE saved END,
-                    server = 0, in_doubt = 0
+                    server = 0, in_doubt = 0,
+                    tapped = CASE WHEN in_doubt THEN 0 ELSE tapped END
                 WHERE account_id = ?1 AND local_only = 0 AND rowid NOT IN ({seen_list})
-                    AND (?2 OR date_saved IS NULL OR date_saved >= ?3)"
+                    AND (?2 OR date_saved IS NULL OR date_saved >= ?3)
+                    AND (server IS NOT 0 OR in_doubt != 0)"
             ),
             params![account, complete, oldest],
         )?;
         executor.execute(
             "DELETE FROM reader_saved_posts
-            WHERE account_id = ?1 AND local_only = 0 AND saved = 0 AND server = 0",
+            WHERE account_id = ?1 AND local_only = 0 AND saved = 0 AND server = 0 AND tapped = 0",
             [account],
         )?;
         executor.execute(
             "INSERT INTO reader_saved_state (account_id, keys_refreshed, keys_complete, total)
             VALUES (?1, 1, ?2, ?3)
             ON CONFLICT(account_id) DO UPDATE SET
-                keys_refreshed = 1, keys_complete = excluded.keys_complete, total = excluded.total",
+                keys_refreshed = 1, keys_complete = excluded.keys_complete, total = excluded.total
+            WHERE keys_refreshed != 1 OR keys_complete != excluded.keys_complete
+                OR total IS NOT excluded.total",
             params![account, complete, total],
         )?;
         Ok(())
@@ -1037,7 +1087,8 @@ impl ReaderSavedRepository {
         executor.execute(
             "UPDATE reader_saved_posts SET
                 listed = 1, post_id = ?2, date_saved = COALESCE(?3, date_saved)
-            WHERE rowid = ?1",
+            WHERE rowid = ?1 AND (listed != 1 OR post_id IS NOT ?2
+                OR (?3 IS NOT NULL AND date_saved IS NOT ?3))",
             params![row_id, post, date_saved.map(reader_date_text)],
         )?;
         Self::add_aliases(executor, row_id, main, keys)
