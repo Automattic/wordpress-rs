@@ -1518,7 +1518,7 @@ async fn details_passed_with_a_save_dont_replace_what_the_server_sent() {
 }
 
 #[tokio::test]
-async fn empty_tags_passed_with_a_save_dont_clear_the_stored_ones() {
+async fn empty_tags_passed_with_a_save_are_stored_as_unknown() {
     let device = Device::new();
     let (service, executor) = device.launch();
     let collection = service.clone().saved_posts();
@@ -1533,6 +1533,28 @@ async fn empty_tags_passed_with_a_save_dont_clear_the_stored_ones() {
         None,
         "An app can't tell no tags from tags it doesn't have"
     );
+}
+
+#[tokio::test]
+async fn empty_tags_passed_with_a_save_dont_clear_the_stored_ones() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    let mut from_list = listed(1, "2026-11-01T00:00:00Z");
+    from_list["tags"] = json!({ "news": { "slug": "news", "name": "News" } });
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(200, page(&[from_list], None)));
+    collection.refresh().await.unwrap();
+
+    let mut post = stream_post(1, "A post");
+    post.tags = Vec::new();
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service.save_with_details(post).await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let tags = items[0].post.as_ref().unwrap().tags.as_ref().unwrap();
+    let slugs: Vec<_> = tags.iter().map(|tag| tag.slug.as_str()).collect();
+    assert_eq!(slugs, vec!["news"]);
 }
 
 #[tokio::test]
