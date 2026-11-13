@@ -8,8 +8,48 @@ final class WPComService: ObservableObject {
 
     private let loginManager: LoginManager
 
+    /// One per account, shared by every screen: each instance only knows its own writes.
+    private var readerSaved: (service: ReaderSavedService, cache: WordPressApiCache)?
+
     init(loginManager: LoginManager) {
         self.loginManager = loginManager
+    }
+
+    /// The account's saved posts service, and the cache it keeps them in. The cache is a file, so
+    /// the list is still there after a relaunch, before any refresh.
+    func sharedReaderSavedService() async throws -> (service: ReaderSavedService, cache: WordPressApiCache) {
+        if let readerSaved {
+            return readerSaved
+        }
+        let client = try await WPComApiClient.instance(loginManager: self.loginManager)
+        let userID = try await wpComUserID(client: client)
+
+        let directory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let cache = try WordPressApiCache(path: directory.appendingPathComponent("reader-saved-posts.sqlite").path)
+        _ = try cache.performMigrations()
+        cache.startListeningForUpdates()
+
+        let service = try client.makeReaderSavedService(source: .ios, cache: cache, userID: userID)
+        readerSaved = (service, cache)
+        return (service, cache)
+    }
+
+    /// The account's WordPress.com user ID: from `/me` the first time, and remembered after that, as
+    /// an app would have it, so the saved posts screen opens offline.
+    private func wpComUserID(client: WPComApiClient) async throws -> UInt64 {
+        let accountID = try loginManager.getWpComAccountID() ?? 0
+        let key = "reader-saved-posts.user-id.\(accountID)"
+        if let stored = UserDefaults.standard.object(forKey: key) as? UInt64 {
+            return stored
+        }
+        let userID = try await client.me.get().data.id
+        UserDefaults.standard.set(userID, forKey: key)
+        return userID
     }
 
     public func loadRootListItems() async throws -> [RootListData] {
@@ -59,6 +99,20 @@ final class WPComService: ObservableObject {
                             )
                         }
                 }
+            ),
+
+            RootListData.view(
+                "Saved Posts",
+                {
+                    AnyView(
+                        ReaderSavedPostsView(
+                            viewModel: ReaderSavedPostsViewModel {
+                                try await self.sharedReaderSavedService()
+                            }
+                        )
+                    )
+                },
+                .posts
             ),
 
             // System

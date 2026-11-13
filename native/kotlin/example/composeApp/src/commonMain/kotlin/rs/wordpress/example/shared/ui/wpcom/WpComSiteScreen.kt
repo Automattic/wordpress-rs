@@ -26,6 +26,7 @@ fun WpComSiteScreen(
     onSupportConversationsClicked: () -> Unit,
     onUnifiedConversationsClicked: () -> Unit,
     onBotConversationsClicked: () -> Unit,
+    onReaderSavedPostsClicked: () -> Unit,
     onBackClicked: () -> Unit = {}
 ) {
     Scaffold(
@@ -77,6 +78,15 @@ fun WpComSiteScreen(
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                     },
                     modifier = Modifier.clickable(onClick = onBotConversationsClicked)
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Saved Posts") },
+                    trailingContent = {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable(onClick = onReaderSavedPostsClicked)
                 )
             }
         }
