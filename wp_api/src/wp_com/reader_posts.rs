@@ -95,7 +95,10 @@ pub struct ReaderPost {
     /// [`Self::featured_image`], then [`Self::featured_media`] when it's an image.
     #[uniffi(default = None)]
     pub display_image_url: Option<String>,
-    pub tags: Vec<ReaderPostTag>,
+    /// In the order the API sends them. `None` when the response left out `tags`, and empty when
+    /// the post has none.
+    #[uniffi(default = None)]
+    pub tags: Option<Vec<ReaderPostTag>>,
     /// Set when the post is a cross-post of another.
     #[uniffi(default = None)]
     pub cross_post: Option<ReaderCrossPost>,
@@ -367,7 +370,7 @@ struct RawReaderPost {
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
     editorial: Option<RawEditorial>,
     #[serde(default, deserialize_with = "deserialize_tags")]
-    tags: Vec<ReaderPostTag>,
+    tags: Option<Vec<ReaderPostTag>>,
     #[serde(default, deserialize_with = "deserialize_metadata")]
     metadata: Vec<RawMetadata>,
     #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
@@ -609,11 +612,12 @@ where
 
 /// `tags`, an object of tags by slug, in the order the API sends them, which is the order the web
 /// Reader shows them in. Going through `serde_json::Value` would sort them by slug. With no tags,
-/// it's `[]`, and the API sends that as an empty object or array, `""`, `false` or `null`.
+/// it's `[]`, and the API sends that as an empty object or array, `""`, `false` or `null`. Only a
+/// response without the key at all reads as `None`.
 ///
 /// A tag without a slug or a name is left out, so one malformed tag doesn't fail the post, and with
 /// it a whole page of a stream.
-fn deserialize_tags<'de, D>(deserializer: D) -> Result<Vec<ReaderPostTag>, D::Error>
+fn deserialize_tags<'de, D>(deserializer: D) -> Result<Option<Vec<ReaderPostTag>>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -663,7 +667,7 @@ where
         }
     }
 
-    deserializer.deserialize_any(TagsVisitor)
+    deserializer.deserialize_any(TagsVisitor).map(Some)
 }
 
 /// `metadata`, a list of entries. PHP sends a list as an object when its keys aren't in sequence,
@@ -727,7 +731,7 @@ mod tests {
         assert_eq!(post.site_name.as_deref(), Some("WordPress.com Blog"));
         assert_eq!(post.site_locale.as_deref(), Some("en"));
         assert!(post.site_icon_url.is_some());
-        assert!(!post.tags.is_empty());
+        assert!(post.tags.as_ref().is_some_and(|tags| !tags.is_empty()));
         assert!(post.author.as_ref().and_then(|a| a.name.as_ref()).is_some());
         assert!(post.comment_count.is_some());
         assert_eq!(post.site_is_private, Some(false));
@@ -748,7 +752,7 @@ mod tests {
         ));
         assert_eq!(post.site_name.as_deref(), Some("xkcd.com"));
         assert_eq!(post.site_icon_url, None);
-        assert!(post.tags.is_empty());
+        assert_eq!(post.tags, Some(vec![]));
         assert_eq!(post.site_locale, None, "Not asked for with meta=site");
     }
 
@@ -765,7 +769,12 @@ mod tests {
             }"#,
         )
         .unwrap();
-        let slugs: Vec<_> = post.tags.iter().map(|tag| tag.slug.as_str()).collect();
+        let slugs: Vec<_> = post
+            .tags
+            .iter()
+            .flatten()
+            .map(|tag| tag.slug.as_str())
+            .collect();
         assert_eq!(slugs, vec!["zebra", "apple"]);
     }
 
@@ -777,7 +786,13 @@ mod tests {
     #[case::null(json!(null))]
     fn test_no_tags(#[case] tags: serde_json::Value) {
         let post = parse(json!({ "ID": 9, "site_ID": 123, "is_external": false, "tags": tags }));
-        assert!(post.tags.is_empty());
+        assert_eq!(post.tags, Some(vec![]));
+    }
+
+    #[test]
+    fn test_tags_left_out_are_not_known() {
+        let post = parse(json!({ "ID": 9, "site_ID": 123, "is_external": false }));
+        assert_eq!(post.tags, None, "Not the same as a post with no tags");
     }
 
     #[test]
@@ -790,7 +805,12 @@ mod tests {
                 "no-slug": { "name": "No slug" },
             },
         }));
-        let slugs: Vec<_> = post.tags.iter().map(|tag| tag.slug.as_str()).collect();
+        let slugs: Vec<_> = post
+            .tags
+            .iter()
+            .flatten()
+            .map(|tag| tag.slug.as_str())
+            .collect();
         assert_eq!(slugs, vec!["news"]);
     }
 
@@ -819,7 +839,7 @@ mod tests {
         }));
         assert_eq!(post.identity.site_id, Some(WpComSiteId(123)));
         assert_eq!(post.site_icon_url, None);
-        assert!(post.tags.is_empty());
+        assert_eq!(post.tags, Some(vec![]));
         assert_eq!(post.i_like, Some(true));
         assert_eq!(post.cross_post, None);
         assert_eq!(post.author.as_ref().unwrap().id, Some(7));

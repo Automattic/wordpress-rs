@@ -128,7 +128,7 @@ impl ReaderPostRecord {
             i_like: post.i_like,
             is_following: post.is_following,
             site_icon_url: post.site_icon_url.clone(),
-            tags: Some(post.tags.clone()),
+            tags: post.tags.clone(),
             comment_count: post.comment_count,
             ..Self::from_identity(post.identity.clone())?
         })

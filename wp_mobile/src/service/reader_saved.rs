@@ -223,8 +223,8 @@ impl ReaderSavedService {
     /// so the saved list shows the post in full straight away, offline too, rather than only its key
     /// until the next refresh. They only fill in what the cache doesn't have yet: what the server
     /// sent for the post wins, and so does what the saved list sends later. Leave out a field the app
-    /// doesn't have rather than guessing it. Empty `tags` are read as not known, since an app can't
-    /// tell them apart from a post that has none.
+    /// doesn't have rather than guessing it: `tags` is `None` when the app doesn't know them, and
+    /// empty only when the post has none.
     ///
     /// If the server refuses the save, it's undone as with [`Self::save`], and the details stay in
     /// the cache, where the saved list doesn't show them.
@@ -236,11 +236,8 @@ impl ReaderSavedService {
             .ok_or(ReaderSavedError::PostCannotBeSaved)?
             .normalized();
         let keys = complete(&reader_saved_keys_for_post(post.identity.clone()))?;
-        let mut details =
+        let details =
             ReaderPostRecord::from_reader_post(&post).ok_or(ReaderSavedError::PostCannotBeSaved)?;
-        if details.tags.as_ref().is_some_and(Vec::is_empty) {
-            details.tags = None;
-        }
         self.save_keys(main, keys, Some(&details)).await
     }
 

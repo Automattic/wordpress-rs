@@ -745,7 +745,7 @@ mod tests {
             })
         );
         assert_eq!(url_save.post.site_icon_url, None);
-        assert!(url_save.post.tags.is_empty());
+        assert_eq!(url_save.post.tags, Some(vec![]));
         assert_eq!(url_save.post.comment_count, Some(0));
 
         assert_eq!(
@@ -753,7 +753,7 @@ mod tests {
             Some(feed_item_key(6240876261))
         );
         assert_eq!(xkcd.post.site_icon_url, None, "xkcd's feed has no image");
-        assert!(xkcd.post.tags.is_empty());
+        assert_eq!(xkcd.post.tags, Some(vec![]));
 
         assert_eq!(
             reader_saved_key_for_post(verge.post.identity.clone()),
@@ -778,8 +778,14 @@ mod tests {
             post.post.site_icon_url.as_deref(),
             Some("https://en-blog.files.wordpress.com/2026/01/wp_favicon_512x512px.png?w=96")
         );
-        assert_eq!(post.post.tags.len(), 3);
-        assert!(post.post.tags.iter().all(|tag| !tag.name.is_empty()));
+        assert_eq!(post.post.tags.as_ref().map(Vec::len), Some(3));
+        assert!(
+            post.post
+                .tags
+                .iter()
+                .flatten()
+                .all(|tag| !tag.name.is_empty())
+        );
         assert_eq!(post.post.comment_count, Some(2));
         assert_eq!(post.post.site_locale.as_deref(), Some("en"));
         assert_eq!(
