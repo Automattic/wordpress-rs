@@ -40,6 +40,45 @@ The tvOS and watchOS slices build with `-Z build-std` on the pinned nightly
 toolchain, which `make setup-rust` installs. If you skipped that step, those
 targets fail with `can't find crate for 'core'`.
 
+### Building on Linux
+
+The xcframework builds on Linux as well as macOS. Nothing in the build needs
+Xcode or the Apple SDK:
+
+- `wp_mobile` is built as a static library, which is never linked, so there is
+  no Apple linker step.
+- The one piece of C, a wrapper around the `os_log` macro, is compiled by the
+  Swift package (`native/swift/Sources/wordpress-api-os-log`) when an app is
+  built. The Makefile sets `WP_API_OS_LOG_FROM_SWIFT_PACKAGE` so the Rust
+  libraries leave it out. Other builds for Apple targets, such as `cargo test`
+  on a Mac, compile it in `wp_api/build.rs`.
+- The `xcframework` tool writes the xcframework itself rather than calling
+  `xcodebuild`, and builds fat libraries with LLVM's `llvm-lipo`, which writes
+  the same files as Apple's `lipo`.
+
+On Linux you need:
+
+- The Rust toolchains (`make setup-rust-<platform>`).
+- A C compiler for the host (e.g. `gcc`), which Rust build scripts link with.
+- A Swift toolchain, because binding generation runs `native/swift/Tools`.
+- `jq` and `make`.
+- `llvm-lipo` from an LLVM at least as new as the one in `rustc -vV`. Ubuntu's
+  own packages are usually too old; get the matching `llvm-<major>` from
+  [apt.llvm.org](https://apt.llvm.org), then point `LIPO` at it, e.g.
+  `LIPO=llvm-lipo-23`. CI does this in `.buildkite/assemble-xcframework.sh`.
+
+Then the same `make xcframework*` targets work.
+
+CI builds this way. The `apple-build` steps and the xcframework assembly run on
+Linux agents in the `swift` Docker image (`.buildkite/commands/run-in-swift-docker.sh`),
+and only signing runs on a Mac.
+
+These still need a Mac:
+
+- Running the Swift tests, which link the framework.
+- `make xcframework-package` and `make xcframework-sign`, which use `ditto` and
+  `codesign`.
+
 ## Verifying a UniFFI change
 
 When adding or changing an exported function, the fast path is:

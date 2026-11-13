@@ -85,6 +85,10 @@ endif
 
 cargo_config_library = --config profile.$(CARGO_PROFILE).debug=true --config 'profile.$(CARGO_PROFILE).panic="abort"'
 
+# The Swift package compiles the os_log wrapper the Rust logger calls, so the libraries for the
+# xcframework leave it out. This keeps the Apple SDK out of the Rust build. See wp_api/build.rs.
+_build-apple-%: export WP_API_OS_LOG_FROM_SWIFT_PACKAGE=1
+
 # Set deployment targets for each platform
 _build-apple-%-darwin: export MACOSX_DEPLOYMENT_TARGET=$(swift_package_platform_macos)
 _build-apple-%-ios _build-apple-%-ios-sim: export IPHONEOS_DEPLOYMENT_TARGET=$(swift_package_platform_ios)
@@ -98,7 +102,8 @@ _build-apple-%-tvos _build-apple-%-tvos-sim _build-apple-%-watchos _build-apple-
 
 # Build the library for a specific target
 _build-apple-%:
-	cargo $(CARGO_OPTS) $(cargo_config_library) build --target $* --features export-uncancellable-endpoints --package wp_mobile --profile $(CARGO_PROFILE) --no-default-features
+	@# `cargo rustc --crate-type staticlib` skips wp_mobile's cdylib, whose link step needs the Apple SDK.
+	cargo $(CARGO_OPTS) $(cargo_config_library) rustc --crate-type staticlib --target $* --features export-uncancellable-endpoints --package wp_mobile --profile $(CARGO_PROFILE) --no-default-features
 	./scripts/swift-bindings.sh target/$*/$(CARGO_PROFILE_DIRNAME)/libwp_mobile.a
 
 # Build the library for one single platform, including real device and simulator.

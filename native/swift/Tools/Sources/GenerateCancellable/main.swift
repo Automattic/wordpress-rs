@@ -190,7 +190,9 @@ class ExtensionGenerator {
     func generateExtensionsCode() -> String {
         var extensions: [ExtensionDeclSyntax] = []
 
-        for (className, classAnalysis) in analysis {
+        // Sorted, because Swift seeds Dictionary hashing per process: iterating `analysis`
+        // directly writes the extensions in a different order on every run.
+        for (className, classAnalysis) in analysis.sorted(by: { $0.key < $1.key }) {
             logger.debug("Generating extension for class: \(className)")
 
             let extensionMembers = generateExtensionMembers(for: classAnalysis)

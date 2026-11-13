@@ -61,7 +61,9 @@ steps:
   - group: ":swift: Swift Wrapper"
     key: "swift"
     steps:
-      - label: ":rust: :darwin: Build {{matrix}}"
+      # The Apple libraries and the xcframework are built on Linux; nothing needs the Apple SDK.
+      # Only signing, which needs the distribution certificate and `codesign`, runs on a Mac.
+      - label: ":rust: :linux: Build {{matrix}}"
         key: "apple-build"
         command: .buildkite/build-apple-platform.sh {{matrix}}
         artifact_paths:
@@ -74,26 +76,26 @@ steps:
           - "Catalyst"
           - "tvOS"
           - "watchOS"
-        plugins: [$CI_TOOLKIT]
+        # The android queue's m8i.2xlarge agents (8 vCPUs) build each platform within about 10% of a
+        # Mac's time. The default queue's m8i.xlarge agents (4 vCPUs) take about 35% longer.
         agents:
-          queue: mac
-      - label: ":swift: :darwin: Assemble xcframework"
-        key: "xcframework"
+          queue: android
+      - label: ":swift: :linux: Assemble xcframework"
+        key: "xcframework-assemble"
         depends_on: "apple-build"
+        command: .buildkite/assemble-xcframework.sh
+        artifact_paths:
+          - target/libwordpressFFI.xcframework.tar.gz
+      - label: ":swift: :darwin: Sign xcframework"
+        key: "xcframework"
+        depends_on: "xcframework-assemble"
         command: |
-          echo "--- :rust: Installing Rust"
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y
-
-          source "/Users/builder/.cargo/env"
-
           echo "--- :ruby: Installing Ruby tools"
           install_gems
           echo "--- :xcode: Setting up code signing"
           bundle exec fastlane set_up_signing_release
 
-          echo "--- :swift: Assembling XCFramework"
-          .buildkite/assemble-xcframework.sh
-          make xcframework-package-checksum
+          .buildkite/sign-xcframework.sh
 
         artifact_paths:
           - target/libwordpressFFI.xcframework.zip

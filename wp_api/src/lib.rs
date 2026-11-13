@@ -38,6 +38,8 @@ pub mod nav_menu_items;
 pub mod nav_menus;
 pub mod navigation_revisions;
 pub mod navigations;
+#[cfg(target_vendor = "apple")]
+mod os_log;
 pub mod parsed_url;
 pub mod pattern_directory;
 pub mod plugins;
@@ -460,7 +462,7 @@ pub fn setup_logger(app_id: String) {
 
     #[cfg(target_vendor = "apple")]
     {
-        match oslog::OsLogger::new(&app_id).level_filter(log_level).init() {
+        match os_log::OsLogger::init(&app_id, log_level) {
             Ok(_) => println!("Logger initialized successfully."),
             Err(e) => println!("Failed to initialize logger: {e}"),
         }

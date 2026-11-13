@@ -9,7 +9,7 @@ integration-tests = []
 reqwest-request-executor = ["dep:reqwest", "dep:tokio", "dep:hyper-util", "dep:rustls", "dep:hyper", "dep:h2"]
 
 [lib]
-crate-type = ["lib", "cdylib", "staticlib"]
+crate-type = ["lib"]
 name = "wp_api"
 
 [dependencies]
@@ -57,10 +57,8 @@ rstest_reuse = { workspace = true }
 tokio = { workspace = true, features = [ "full" ] }
 
 [build-dependencies]
+cc = { workspace = true }
 uniffi = { workspace = true , features = [ "build", "cli" ] }
-
-[target.'cfg(target_vendor = "apple")'.dependencies]
-oslog = { workspace = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = { workspace = true }

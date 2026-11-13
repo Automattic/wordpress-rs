@@ -52,7 +52,8 @@ var package = Package(
         .target(
             name: "WordPressAPIInternal",
             dependencies: [
-                .target(name: libwordpressFFI.name)
+                .target(name: libwordpressFFI.name),
+                .target(name: "WordPressAPIOSLog")
             ],
             path: "native/swift/Sources/wordpress-api-wrapper",
             exclude: [
@@ -64,6 +65,13 @@ var package = Package(
             linkerSettings: [
                 .linkedLibrary("sqlite3", .when(platforms: [.iOS, .macCatalyst, .macOS, .tvOS, .watchOS]))
             ]
+        ),
+        // The `os_log` wrapper the Rust logger calls. `libwordpressFFI` references it but doesn't
+        // contain it, so the Apple SDK isn't needed to build the xcframework. Anything linking
+        // `libwordpressFFI` without this package must provide `wp_api_os_log_with_type` itself.
+        .target(
+            name: "WordPressAPIOSLog",
+            path: "native/swift/Sources/wordpress-api-os-log"
         ),
         .target(
             name: "WordPressApiCache",

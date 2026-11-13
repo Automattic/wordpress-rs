@@ -24,7 +24,9 @@ function generate_localized_error_extension {
     local package_name=$1
     local swift_binding=$2
 
-    error_types=$(grep -r "impl WpSupportsLocalization for" "${package_name}/src" | grep -o "for [A-Za-z0-9]*" | cut -d' ' -f2)
+    # Sorted, because `grep -r` visits files in filesystem order, which differs between macOS and
+    # Linux. Unsorted, the same source generates the extensions in a different order on each.
+    error_types=$(grep -r "impl WpSupportsLocalization for" "${package_name}/src" | grep -o "for [A-Za-z0-9]*" | cut -d' ' -f2 | LC_ALL=C sort)
 
     for error_type in $error_types; do
         cat <<EOF >> "$swift_binding"
