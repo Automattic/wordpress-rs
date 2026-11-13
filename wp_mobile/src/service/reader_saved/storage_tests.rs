@@ -1518,6 +1518,47 @@ async fn details_passed_with_a_save_dont_replace_what_the_server_sent() {
 }
 
 #[tokio::test]
+async fn a_post_saved_from_discover_keeps_its_editorial_image_through_a_refresh() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    let from_discover = json!({
+        "ID": 1,
+        "site_ID": 123,
+        "is_external": false,
+        "title": "A post",
+        "editorial": { "image": "https://example.com/editorial.jpg" },
+        "featured_image": "https://example.com/featured.jpg",
+    });
+    let post: ReaderPost = serde_json::from_value(from_discover).unwrap();
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service.save_with_details(post).await.unwrap();
+
+    // The saved list never sends `editorial`.
+    let mut from_list = listed(1, "2026-11-01T00:00:00Z");
+    from_list["featured_image"] = json!("https://example.com/featured.jpg");
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(200, page(&[from_list], None)));
+    collection.refresh().await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let post = items[0].post.as_ref().unwrap();
+    assert_eq!(
+        post.title.as_deref(),
+        Some("Post 1"),
+        "The refresh was stored"
+    );
+    assert_eq!(
+        post.display_image_url.as_deref(),
+        Some("https://example.com/editorial.jpg")
+    );
+    assert_eq!(
+        post.featured_image.as_deref(),
+        Some("https://example.com/featured.jpg")
+    );
+}
+
+#[tokio::test]
 async fn tags_left_out_of_a_save_are_stored_as_not_known() {
     assert_tags_passed_with_a_save_are_stored(None).await;
 }

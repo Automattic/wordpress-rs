@@ -95,6 +95,14 @@ pub struct ReaderPost {
     /// [`Self::featured_image`], then [`Self::featured_media`] when it's an image.
     #[uniffi(default = None)]
     pub display_image_url: Option<String>,
+    /// The image an editor picked for the post in Discover, from `editorial.image`. `None` when the
+    /// response has no `editorial`, which the saved list never sends, or when the pick is a
+    /// `wp.com/mshots/` screenshot, which the apps never show.
+    ///
+    /// The cache keeps it once it has it, and shows it ahead of any other image, so a refresh from
+    /// a source without `editorial` doesn't swap the post's image back to its featured image.
+    #[uniffi(default = None)]
+    pub editorial_image_url: Option<String>,
     /// In the order the API sends them. `None` when the response left out `tags`, and empty when
     /// the post has none.
     #[uniffi(default = None)]
@@ -218,13 +226,17 @@ pub fn reader_post_display_image_url(
     let featured_media_image = featured_media
         .filter(|media| media.media_type.as_deref() == Some("image"))
         .and_then(|media| media.uri.as_deref());
-    editorial_image
-        .filter(|url| !url.contains("wp.com/mshots/"))
+    reader_post_editorial_image_url(editorial_image)
         .into_iter()
         .chain(featured_image)
         .chain(featured_media_image)
         .find(|url| !url.is_empty())
         .map(str::to_string)
+}
+
+/// `editorial.image`, unless it's empty or a `wp.com/mshots/` screenshot of the page.
+fn reader_post_editorial_image_url(editorial_image: Option<&str>) -> Option<&str> {
+    editorial_image.filter(|url| !url.is_empty() && !url.contains("wp.com/mshots/"))
 }
 
 /// A tag on a [`ReaderPost`].
@@ -488,13 +500,17 @@ impl TryFrom<RawReaderPost> for ReaderPost {
             .or_else(|| raw.site_icon.as_ref().and_then(|icon| icon.ico.clone()))
             .or_else(|| meta_site_icon.and_then(|icon| icon.ico.clone()));
         let site_locale = meta_site.and_then(|site| site.locale.clone());
+        let editorial_image = raw
+            .editorial
+            .as_ref()
+            .and_then(|editorial| editorial.image.as_deref());
         let display_image_url = reader_post_display_image_url(
-            raw.editorial
-                .as_ref()
-                .and_then(|editorial| editorial.image.as_deref()),
+            editorial_image,
             raw.featured_image.as_deref(),
             raw.featured_media.as_ref(),
         );
+        let editorial_image_url =
+            reader_post_editorial_image_url(editorial_image).map(str::to_string);
         Ok(Self {
             identity: raw.identity,
             global_id: raw.global_id,
@@ -519,6 +535,7 @@ impl TryFrom<RawReaderPost> for ReaderPost {
             featured_image: raw.featured_image,
             featured_media: raw.featured_media,
             display_image_url,
+            editorial_image_url,
             tags: raw.tags,
             cross_post: cross_post(&metadata),
             like_count: raw.like_count,
@@ -946,6 +963,26 @@ mod tests {
             "featured_media": featured_media,
         }));
         assert_eq!(post.display_image_url.as_deref(), expected);
+    }
+
+    #[rstest::rstest]
+    #[case::picked(json!({ "image": "https://editorial/img.jpg" }), Some("https://editorial/img.jpg"))]
+    #[case::mshots(json!({ "image": MSHOTS }), None)]
+    #[case::empty(json!({ "image": "" }), None)]
+    #[case::no_image(json!({}), None)]
+    #[case::not_sent(json!(null), None)]
+    fn test_editorial_image_url(
+        #[case] editorial: serde_json::Value,
+        #[case] expected: Option<&str>,
+    ) {
+        let post = parse(json!({
+            "ID": 1,
+            "site_ID": 2,
+            "is_external": false,
+            "editorial": editorial,
+            "featured_image": "https://featured/img.jpg",
+        }));
+        assert_eq!(post.editorial_image_url.as_deref(), expected);
     }
 
     #[test]
