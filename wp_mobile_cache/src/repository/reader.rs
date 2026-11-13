@@ -113,6 +113,26 @@ impl ReaderPostRepository {
         Self::store(executor, account, post, Prefer::Stored)
     }
 
+    /// Like [`Self::fill_missing`], into the stored post `row`, whatever key it's stored under. For
+    /// details of a post found under another key, such as a Jetpack post's feed item copy that's
+    /// stored as its WordPress.com post, so they don't make a second row for the same post.
+    pub fn fill_missing_at(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        row: RowId,
+        post: &ReaderPostRecord,
+    ) -> Result<RowId, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT identity_key FROM reader_posts WHERE rowid = ?1 AND account_id = ?2",
+        )?;
+        let identity_key: String = statement.query_row(params![row, account], |row| row.get(0))?;
+        let post = ReaderPostRecord {
+            key: reader_saved_key_from_text(&identity_key)?,
+            ..post.clone()
+        };
+        Self::store(executor, account, &post, Prefer::Stored)
+    }
+
     fn store(
         executor: &impl QueryExecutor,
         account: RowId,

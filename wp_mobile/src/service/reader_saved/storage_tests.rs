@@ -1614,3 +1614,45 @@ async fn a_post_that_cant_be_saved_is_refused_with_its_details() {
     ));
     assert!(executor.sent().is_empty());
 }
+
+/// The saved list stored a Jetpack post as its WordPress.com post, with its feed item. Saving its
+/// feed item copy with details fills in that row, instead of a second row for the same post that
+/// the save would then show.
+#[tokio::test]
+async fn details_saved_with_a_jetpack_posts_feed_item_copy_fill_in_its_stored_post() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, keys_response(&[post_json(3)])));
+    let mut jetpack_post = listed(3, "2026-11-01T00:00:00Z");
+    jetpack_post["feed_ID"] = json!(5);
+    jetpack_post["feed_item_ID"] = json!(4);
+    executor.push(Step::Respond(200, page(&[jetpack_post], None)));
+    collection.refresh().await.unwrap();
+
+    let feed_item_copy: ReaderPost = serde_json::from_value(json!({
+        "ID": 4,
+        "feed_ID": 5,
+        "feed_item_ID": 4,
+        "is_external": true,
+        "title": "From the feed",
+        "author": { "name": "A feed author" },
+    }))
+    .unwrap();
+    executor.push(Step::Respond(200, write_response(true, post_json(3), 1)));
+    service.save_with_details(feed_item_copy).await.unwrap();
+
+    let stored: i64 = device.cache.execute(|connection| {
+        connection
+            .query_row("SELECT COUNT(*) FROM reader_posts", [], |row| row.get(0))
+            .unwrap()
+    });
+    assert_eq!(stored, 1, "one row for the post");
+    let items = collection.load_items().await.unwrap();
+    assert_eq!(titles(&items), vec![Some("Post 3".to_string())]);
+    assert_eq!(
+        items[0].post.as_ref().unwrap().author_name.as_deref(),
+        Some("A feed author"),
+        "What the list left out is filled in"
+    );
+}

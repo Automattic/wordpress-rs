@@ -371,15 +371,23 @@ impl ReaderSavedService {
         let now = self.now();
         let row = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
-            let post = match details {
-                Some(details) => Some(ReaderPostRepository::fill_missing(
+            // A Jetpack post's feed item copy may already be stored as its WordPress.com post, so
+            // the details fill in that row rather than starting a second one.
+            let stored =
+                ReaderPostRepository::select_row_id_by_key(&transaction, self.account, &main)?;
+            let post = match (details, stored) {
+                (Some(details), Some(row)) => Some(ReaderPostRepository::fill_missing_at(
+                    &transaction,
+                    self.account,
+                    row,
+                    details,
+                )?),
+                (Some(details), None) => Some(ReaderPostRepository::fill_missing(
                     &transaction,
                     self.account,
                     details,
                 )?),
-                None => {
-                    ReaderPostRepository::select_row_id_by_key(&transaction, self.account, &main)?
-                }
+                (None, stored) => stored,
             };
             let row = ReaderSavedRepository::tap_save(
                 &transaction,
