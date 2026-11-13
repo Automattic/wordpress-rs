@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WordPress.com support bots: creating a conversation no longer fails to parse when the server returns `zendesk_ticket_id` as a number (`invalid type: integer, expected a string`). It does when the first message asks for a human, so the ticket was created but the apps showed an error, and each retry created another ticket. `BotConversation.zendesk_ticket_id` is still `Option<String>`, and now reads a number, a string or `null`.
 - **BREAKING:** Posts' and pages' `menu_order` is now a signed `Option<i64>` instead of `Option<u32>`, in `SparseAnyPost`, `PostCreateParams` and `PostUpdateParams`. WordPress stores `menu_order` as a signed integer, and negative values are commonly used to pin a page to the top of a list. Listing pages on such a site previously failed to parse the whole response (`invalid value: integer -1000, expected u32`), so the entire page list came back as an error. Swift and Kotlin now see `Int64?` where they saw `UInt32?`.
 
+### Fixed
+
+- A media upload file that exists but can't be read is now reported as `MediaFileUnreadable` on both platforms, and `MediaFileNotFound` is reserved for a path with nothing at it. Swift reported every field-construction failure (including permission and sandbox denials) as `MediaFileNotFound`, and Kotlin did the same for a directory or a file without read permission, while the other platform reported `MediaFileUnreadable` for the same input. The rustdoc for both variants now describes this split, which is by what's at the path rather than by when the read failed.
+
 ### Changed
 
 - **Internal:** Added integration test covering the `MediaService::create_media` cache upsert and collection update path.

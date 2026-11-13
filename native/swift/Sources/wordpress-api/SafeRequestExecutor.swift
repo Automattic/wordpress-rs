@@ -664,6 +664,30 @@ extension WpNetworkRequest: NetworkRequestContent {
 }
 
 extension MultipartFormError {
+    /// The executor error for a file field that couldn't be constructed.
+    ///
+    /// Only a path with nothing at it is `.MediaFileNotFound`. Anything else — a permission or
+    /// sandbox denial, an I/O error on an external volume — means something is there that can't be
+    /// read, which is `.MediaFileUnreadable`. See #1500.
+    func fieldConstructionError(filePath: String) -> RequestExecutionError {
+        if case let .inaccessibleFile(underlyingError, _) = self, isNoSuchFile(underlyingError) {
+            return .MediaFileNotFound(filePath: filePath)
+        }
+        return .MediaFileUnreadable(filePath: filePath)
+    }
+
+    private func isNoSuchFile(_ error: Error) -> Bool {
+        let error = error as NSError
+        switch error.domain {
+        case NSCocoaErrorDomain where error.code == CocoaError.fileReadNoSuchFile.rawValue:
+            return true
+        case NSPOSIXErrorDomain where [ENOENT, ENOTDIR].contains(Int32(error.code)):
+            return true
+        default:
+            return (error.userInfo[NSUnderlyingErrorKey] as? Error).map(isNoSuchFile) ?? false
+        }
+    }
+
     /// The executor error this serialization failure maps to, or `nil` to fall through
     /// to `.genericError`. A file-backed field with a read failure (non-nil `filePath`)
     /// becomes `.MediaFileUnreadable`; an in-memory field (nil path) or `.impossible`
@@ -718,8 +742,8 @@ extension WpMultipartFormRequest: NetworkRequestContent {
                             mimeType: mimeType
                         )
                     )
-                } catch {
-                    throw RequestExecutionError.MediaFileNotFound(filePath: file.filePath)
+                } catch let error as MultipartFormError {
+                    throw error.fieldConstructionError(filePath: file.filePath)
                 }
             }
         }
