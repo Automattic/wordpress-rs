@@ -1,35 +1,52 @@
-//! Saved Reader posts, kept in step with what this device has just changed.
+//! Saved Reader posts, kept on this device and sent to the server in the background.
 //!
-//! The saved posts API's reads can lag behind its writes, so an app that refetches after a save can
-//! briefly see the post unsaved again. [`ReaderSavedService`] applies each change straight away and
-//! keeps it on top of what the server returns until the server has had time to catch up. See
-//! [`state`] for the rules.
+//! The cache holds one row per save on the server, as far as this device knows, with what the user
+//! wants for it and what the server last said. A tap changes the row straight away, in the cache,
+//! and the service then sends every row the server doesn't agree with yet. The rows are the saved
+//! list, so a post saved here shows in it until it's unsaved, whatever a refresh or a page says.
+//!
+//! Everything that uses the network goes through one lane, in order: sending rows, reading the
+//! saved keys, and loading pages of the saved list. So a read on this device always starts after
+//! every answer it could have missed.
+//!
+//! A request that gets no answer, such as one that timed out or was cancelled, leaves its row in
+//! doubt: the server may have applied it. It isn't sent again until a refresh of the saved keys
+//! says what the server has. Then it's sent again if it's still needed, which is safe because
+//! saving and unsaving are idempotent.
+//!
+//! Known limits:
+//!
+//! - A request in doubt that the server applies after a newer opposite tap was answered undoes that
+//!   tap on the server.
+//! - The saved keys stop at 1,000. Past that, which only accounts that saved more before the
+//!   server's cap can be, a post the keys don't have reads as not saved until the list shows it.
+//! - The count is the newest total the server gave, moved by what's pending, so it can be off until
+//!   the next refresh.
+//! - A page saved by URL sends its details only while the app is running: a retry after a relaunch
+//!   sends the URL alone.
 
-use futures::FutureExt;
-use futures::channel::oneshot;
-use futures::future::Shared;
-use std::collections::HashSet;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Instant, SystemTime};
+use futures::lock::Mutex as AsyncMutex;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
+use wp_api::date::WpGmtDateTime;
 use wp_api::prelude::{RequestExecutionErrorReason, WpApiClientDelegate, WpApiError, WpErrorCode};
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_saved::{
     ReaderPostSaveIdentity, ReaderSavePostParams, ReaderSavedBulkKey, ReaderSavedBulkParams,
-    ReaderSavedBulkResult, ReaderSavedKey, ReaderSavedKeysResponse, ReaderSavedPageDetails,
-    ReaderSavedPostsParams, ReaderSavedPostsResponse, ReaderSavedSource, ReaderUnsavePostParams,
+    ReaderSavedKey, ReaderSavedPageDetails, ReaderSavedSource, ReaderUnsavePostParams,
     reader_saved_key_for_post, reader_saved_keys_for_post,
 };
-use wp_mobile_cache::db_types::reader::{DbReaderSavedKey, DbReaderSavedKeys};
-use wp_mobile_cache::repository::reader::ReaderSavedRepository;
+use wp_mobile_cache::db_types::reader::{
+    DbReaderSavedKey, DbReaderSavedRow, reader_saved_key_text,
+};
+use wp_mobile_cache::repository::reader::{ReaderPostRepository, ReaderSavedRepository};
 use wp_mobile_cache::repository::wordpress_com_accounts::WordPressComAccountRepository;
 use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 
-mod state;
 mod storage;
 
-pub use state::ReaderSavedStatus;
-use state::{Now, PERSISTED_FORMAT, ReaderSavedState, Tap, WriteId};
 pub use storage::{
     ReaderLocalSave, ReaderSavedImportReport, ReaderSavedListInfo, ReaderSavedListItem,
     ReaderSavedPageResult, ReaderSavedPostsCollection,
@@ -38,29 +55,27 @@ pub use storage::{
 /// The most keys `POST /wpcom/v2/read/saved/bulk` takes in a call.
 const MAX_BULK_KEYS: usize = 100;
 
+/// How many times one sync sends a row, so a server that keeps changing its answer can't keep it
+/// busy.
+const MAX_SENDS_PER_ROW: u32 = 3;
+
 #[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum ReaderSavedError {
     #[error("{0}")]
     Api(WpApiError),
 
-    /// The post doesn't have the IDs the API needs to save it, or the key has an ID of `0` or an
-    /// empty URL.
+    /// The post doesn't have the IDs the API needs to save it.
     #[error("This post can't be saved.")]
     PostCannotBeSaved,
 
     /// An import batch got back a different number of results than the keys it sent, so no result
-    /// can be matched to its key. The server may have saved any of them, so they read as saved until
-    /// a refresh can include them.
+    /// can be matched to its key. The server may have saved any of them, so they wait for a refresh.
     #[error("The server returned {received} results for {sent} posts.")]
     UnexpectedImportResults { sent: u64, received: u64 },
 
     #[error("{0}")]
     Database(SqliteDbError),
-
-    /// The saved list was refreshed while its next page loaded, so the page was discarded.
-    #[error("The saved list was refreshed while the next page loaded.")]
-    StaleLoadMore,
 }
 
 impl From<WpApiError> for ReaderSavedError {
@@ -75,6 +90,25 @@ impl From<SqliteDbError> for ReaderSavedError {
     }
 }
 
+/// Whether a post is saved, as far as this device knows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ReaderSavedStatus {
+    Saved,
+    NotSaved,
+    /// The saved keys haven't loaded yet, and this device hasn't changed the post.
+    Unknown,
+}
+
+/// What became of a save or an unsave. Both show straight away either way.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum ReaderSavedOutcome {
+    /// The server has it. `key` is the key the server stores the post under, or did.
+    Synced { key: ReaderSavedKey },
+    /// It's on this device, and goes to the server with a later sync: the device is offline, or the
+    /// server's answer didn't arrive. `reason` says why.
+    Pending { reason: String },
+}
+
 /// Told when what [`ReaderSavedService`] knows about saved posts changes, on whichever thread made
 /// the change.
 #[uniffi::export(with_foreign)]
@@ -84,54 +118,38 @@ pub trait ReaderSavedObserver: Send + Sync {
 
 /// The current account's saved Reader posts.
 ///
-/// Saves belong to the account rather than a site, so this is separate from `WpService`. What it
-/// knows is kept in the cache, under the account, so after a relaunch a post reads as it did before,
-/// and a change made just before the app quit still wins over a server that hasn't caught up. Call
-/// [`Self::refresh`] after launch to catch up with changes made elsewhere.
+/// Saves belong to the account rather than a site, so this is separate from `WpService`. It keeps
+/// everything in the cache, under the account: a save or unsave shows straight away and survives a
+/// relaunch, and one the server hasn't got yet is sent by a later call. Call [`Self::sync`] at
+/// launch, when the app comes to the foreground, and when the device comes back online.
 ///
-/// [`WpApiCache::remove_wordpress_com_account`] deletes it all. Drop the service first: one still
-/// holding the removed account stops storing anything.
+/// [`WpApiCache::remove_wordpress_com_account`] deletes it all.
 ///
-/// Create one per account and share it. It sends one write at a time, in the order the user tapped,
-/// so the server ends up as the user last asked; a second instance could undo a change made through
-/// the first.
-///
-/// On Android, call the writes from a scope that outlives the screen, or with
-/// `withContext(NonCancellable)`. A write cancelled after its request is sent may still reach the
-/// server after the next one, which would leave the server out of order.
+/// Create one per account and share it: it sends one request at a time, and a second instance
+/// would send alongside it.
 #[derive(uniffi::Object)]
 pub struct ReaderSavedService {
     client: WpComApiClient,
     source: ReaderSavedSource,
-    inner: Mutex<Inner>,
-    observer: Mutex<Option<Arc<dyn ReaderSavedObserver>>>,
-    clock: Clock,
-    wall_clock: WallClock,
     cache: Arc<WpApiCache>,
     /// The account's row in the cache.
     account: RowId,
-    /// Held while the state is stored, so the newest state is the one left in the cache. Holds the
-    /// generation of the server's keys last stored, so an older refresh can't replace a newer one.
-    stored_keys: Mutex<u64>,
-    /// Held while local saves are imported.
-    importing: futures::lock::Mutex<()>,
+    observer: Mutex<Option<Arc<dyn ReaderSavedObserver>>>,
+    /// Held by everything that uses the network, so it happens one thing at a time.
+    lane: AsyncMutex<()>,
+    /// The details of pages saved by URL this launch, by key, for when their save is sent.
+    page_details: Mutex<HashMap<String, ReaderSavedPageDetails>>,
+    /// Rows the server refused this launch, and why, until the tap waiting on them takes it. The
+    /// call that sends a row isn't always the tap's: any call holding the lane sends every row.
+    refusals: Mutex<Vec<(Vec<RowId>, WpApiError)>>,
+    clock: Clock,
 }
 
-type Clock = Arc<dyn Fn() -> Instant + Send + Sync>;
-type WallClock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
-
-#[derive(Default)]
-struct Inner {
-    state: ReaderSavedState,
-    /// The taps whose writes may not have finished.
-    queue: Queue,
-    /// Saves the server refused on import, normalized. They stay saved on this device.
-    local_only: HashSet<ReaderSavedKey>,
-}
+type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 
 #[uniffi::export]
 impl ReaderSavedService {
-    /// Loads what the cache has for the account. `cache` must have had its migrations run.
+    /// Uses what the cache has for the account. `cache` must have had its migrations run.
     #[uniffi::constructor]
     pub fn new(
         delegate: WpApiClientDelegate,
@@ -139,14 +157,7 @@ impl ReaderSavedService {
         cache: Arc<WpApiCache>,
         user_id: WpComUserId,
     ) -> Result<Self, ReaderSavedError> {
-        Self::with_clocks(
-            delegate,
-            source,
-            cache,
-            user_id,
-            Arc::new(Instant::now),
-            Arc::new(SystemTime::now),
-        )
+        Self::with_clock(delegate, source, cache, user_id, Arc::new(SystemTime::now))
     }
 
     pub fn set_observer(&self, observer: Option<Arc<dyn ReaderSavedObserver>>) {
@@ -154,560 +165,474 @@ impl ReaderSavedService {
     }
 
     /// Whether a post is saved. Doesn't touch the network.
-    ///
-    /// Past 1,000 saves, a post the saved keys don't include reads `Unknown`. One the saved list
-    /// shows is saved.
-    ///
-    /// A save the server refused on import is saved: it stays saved on this device.
-    pub fn status(&self, post: ReaderPostSaveIdentity) -> ReaderSavedStatus {
-        let keys = reader_saved_keys_for_post(post);
-        let inner = self.inner();
-        let status = inner.state.status(&keys);
-        if status != ReaderSavedStatus::Saved
-            && keys
-                .iter()
-                .any(|key| inner.local_only.contains(&key.normalized()))
-        {
-            return ReaderSavedStatus::Saved;
-        }
-        status
-    }
-
-    /// How many saves there are, or `None` until the first refresh or answered write. A post saved
-    /// under two keys counts twice, as the server counts it.
-    pub fn saved_count(&self) -> Option<u64> {
-        self.state().saved_count()
-    }
-
-    /// The posts this device saved that the saved list hasn't shown yet, newest first. A write
-    /// doesn't return the post, so show these above the list. Imports aren't included.
-    pub fn recent_saves(&self) -> Vec<ReaderSavedKey> {
-        self.state().recent_saves()
-    }
-
-    /// Reloads the saved keys. Changes this device made recently stay in place.
-    pub async fn refresh(&self) -> Result<(), ReaderSavedError> {
-        let ticket = self.state().begin_refresh(self.now());
-        let response = self.client.reader_saved().list_keys().await?.data;
-
-        let keys = response
-            .keys
-            .iter()
-            .map(|entry| (entry.key.clone(), entry.url.clone()));
-        let applied = {
-            let mut state = self.state();
-            let before = state.snapshot_generation();
-            state.apply_refresh(ticket, keys, response.total);
-            let generation = state.snapshot_generation();
-            (generation != before).then(|| {
-                let started = state
-                    .snapshot_started_ms(self.now_on_both_clocks())
-                    .expect("a refresh was just applied");
-                (generation, started)
-            })
-        };
-        if let Some((generation, started)) = applied {
-            self.store_keys(generation, started, &response);
-        }
-        self.changed();
-        Ok(())
-    }
-
-    /// A page of the saved list, without the posts this device recently unsaved. The posts are
-    /// stored, so [`Self::saved_posts`] shows them.
-    ///
-    /// Only a missing `next_page_handle` means the end of the list: a page can be short, or even
-    /// empty, with more to come. `found` comes straight from the server, so prefer
-    /// [`Self::saved_count`] for a count.
-    pub async fn list_posts(
+    pub fn status(
         &self,
-        params: ReaderSavedPostsParams,
-    ) -> Result<ReaderSavedPostsResponse, ReaderSavedError> {
-        let response = self.fetch_posts(&params).await?;
-        self.store_listed_posts(&response, storage::Page::Any)?;
-        Ok(response)
+        post: ReaderPostSaveIdentity,
+    ) -> Result<ReaderSavedStatus, ReaderSavedError> {
+        self.status_of(&reader_saved_keys_for_post(post))
     }
 
-    /// Saves a post, and returns the key the server stored.
+    /// How many saves there are, or `None` until the first refresh or answer. A post saved under
+    /// two keys counts twice, as the server counts it.
+    pub fn saved_count(&self) -> Result<Option<u64>, ReaderSavedError> {
+        Ok(self
+            .cache
+            .execute(|connection| ReaderSavedRepository::saved_count(connection, self.account))?)
+    }
+
+    /// Saves a post. It reads as saved, and shows in the saved list, straight away.
     pub async fn save(
         &self,
         post: ReaderPostSaveIdentity,
-    ) -> Result<ReaderSavedKey, ReaderSavedError> {
-        let key = reader_saved_key_for_post(post).ok_or(ReaderSavedError::PostCannotBeSaved)?;
-        self.save_key(key, None, true).await
+    ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
+        let main = reader_saved_key_for_post(post.clone())
+            .ok_or(ReaderSavedError::PostCannotBeSaved)?
+            .normalized();
+        let keys = normalized(&reader_saved_keys_for_post(post));
+        self.save_keys(main, keys).await
     }
 
-    /// Saves a page by URL, and returns the key the server stored: the URL of a WordPress.com post
-    /// resolves to the post.
+    /// Saves a page by URL. The URL of a WordPress.com post is saved as the post.
     pub async fn save_url(
         &self,
         url: String,
         page_details: Option<ReaderSavedPageDetails>,
-    ) -> Result<ReaderSavedKey, ReaderSavedError> {
-        self.save_key(ReaderSavedKey::Url { url }, page_details, true)
-            .await
+    ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
+        let key = ReaderSavedKey::Url { url }.normalized();
+        if let Some(details) = page_details {
+            self.page_details
+                .lock()
+                .expect("page details lock poisoned")
+                .insert(reader_saved_key_text(&key), details);
+        }
+        self.save_keys(key.clone(), vec![key]).await
     }
 
-    /// Unsaves a post from every key it may be saved under. The post reads as unsaved straight
-    /// away.
-    ///
-    /// Every key is tried, and the first error is returned. Keys that succeeded stay unsaved.
-    pub async fn unsave(&self, post: ReaderPostSaveIdentity) -> Result<(), ReaderSavedError> {
-        let keys = reader_saved_keys_for_post(post);
+    /// Unsaves a post from every key it may be saved under. It reads as unsaved straight away.
+    pub async fn unsave(
+        &self,
+        post: ReaderPostSaveIdentity,
+    ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
+        let keys = normalized(&reader_saved_keys_for_post(post));
         if keys.is_empty() {
             return Err(ReaderSavedError::PostCannotBeSaved);
         }
-        self.unsave_keys(&keys).await
+        self.unsave_keys(keys).await
     }
 
-    /// Unsaves a key the server returned, such as one from [`Self::recent_saves`]. If the server
-    /// stores the post under another key, that's unsaved too.
-    pub async fn unsave_key(&self, key: ReaderSavedKey) -> Result<(), ReaderSavedError> {
-        self.unsave_keys(&[key]).await
-    }
-
-    /// Imports a device's local saves, given newest first, and returns a result per key in the same
-    /// order. A key the server rejected is a result with an `error`, not a failure of the import.
-    ///
-    /// Sends batches of 100, oldest first, so the list stays in order. Near the 1,000 save cap that
-    /// means the newest keys are the ones refused.
-    ///
-    /// Stops at the first batch that fails and returns its error, including one that gets back a
-    /// different number of results than keys. Saving a post twice does nothing, so it's safe to
-    /// import everything again.
-    ///
-    /// The import takes one place in line, like a tap: a save or unsave tapped while it runs is
-    /// sent once every batch is done, so a later batch can't undo it.
-    ///
-    /// A key with an ID of `0` isn't sent. Its result is an `invalid_input` error, as the server
-    /// would give it.
-    pub async fn import(
+    /// Unsaves a key, such as a saved list item's. If the server stores it as another key, that's
+    /// unsaved too.
+    pub async fn unsave_key(
         &self,
-        keys: Vec<ReaderSavedBulkKey>,
-    ) -> Result<Vec<ReaderSavedBulkResult>, ReaderSavedError> {
-        let sendable: Vec<_> = keys
-            .iter()
-            .filter(|key| saved_key(key).is_complete())
-            .cloned()
-            .collect();
-        let (mut pending, turn) = PendingWrites::begin(self, Vec::new(), true, false);
-        turn.wait().await;
-        let mut batches = Vec::new();
-        for batch in sendable.chunks(MAX_BULK_KEYS).rev() {
-            batches.push(self.import_batch(&mut pending, batch).await?);
-        }
-        // Each batch has one result per key it sent, so the results line up with the sent keys.
-        let mut sent = batches.into_iter().rev().flatten();
-        Ok(keys
-            .iter()
-            .filter_map(|key| {
-                if saved_key(key).is_complete() {
-                    sent.next()
-                } else {
-                    Some(ReaderSavedBulkResult {
-                        key: None,
-                        saved: false,
-                        error: Some("invalid_input".to_string()),
-                    })
-                }
-            })
-            .collect())
+        key: ReaderSavedKey,
+    ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
+        self.unsave_keys(vec![key.normalized()]).await
+    }
+
+    /// Sends what the server doesn't have yet, then reloads the saved keys. Call it at launch, when
+    /// the app comes to the foreground, and when the device comes back online.
+    pub async fn sync(&self) -> Result<(), ReaderSavedError> {
+        let _lane = self.lane.lock().await;
+        self.sync_in_lane().await
     }
 }
 
 impl ReaderSavedService {
-    fn with_clocks(
+    fn with_clock(
         delegate: WpApiClientDelegate,
         source: ReaderSavedSource,
         cache: Arc<WpApiCache>,
         user_id: WpComUserId,
         clock: Clock,
-        wall_clock: WallClock,
     ) -> Result<Self, ReaderSavedError> {
-        let (account, stored, keys, local_only) = cache.execute(|connection| {
-            let account = WordPressComAccountRepository::get_or_create(connection, user_id)?;
-            let stored = ReaderSavedRepository::select_state(connection, account)?;
-            let keys = ReaderSavedRepository::select_keys(connection, account)?;
-            let local_only = ReaderSavedRepository::select_local_only(connection, account)?;
-            Ok::<_, SqliteDbError>((account, stored, keys, local_only))
+        let account = cache.execute(|connection| {
+            WordPressComAccountRepository::get_or_create(connection, user_id)
         })?;
-        let now = Now {
-            instant: clock(),
-            wall: wall_clock(),
-        };
-        let state = ReaderSavedState::restore(
-            parse_stored(stored.local.as_deref(), |local: &state::PersistedLocal| {
-                local.format
-            }),
-            keys.map(|keys| state::PersistedSnapshot {
-                started: keys.refreshed_at_ms,
-                keys: keys
-                    .keys
-                    .into_iter()
-                    .map(|key| (key.key, key.url))
-                    .collect(),
-                returned: keys.returned,
-                total: keys.total,
-            }),
-            now,
-        );
-        let stored_keys = state.snapshot_generation();
         Ok(Self {
             client: WpComApiClient::new(delegate),
             source,
-            inner: Mutex::new(Inner {
-                state,
-                queue: Queue::default(),
-                local_only: local_only
-                    .into_iter()
-                    .map(|save| save.key.normalized())
-                    .collect(),
-            }),
-            observer: Mutex::default(),
-            clock,
-            wall_clock,
             cache,
             account,
-            stored_keys: Mutex::new(stored_keys),
-            importing: futures::lock::Mutex::new(()),
+            observer: Mutex::default(),
+            lane: AsyncMutex::new(()),
+            page_details: Mutex::default(),
+            refusals: Mutex::default(),
+            clock,
         })
     }
 
-    /// A service on a new in-memory cache, for tests that drive the clock.
-    #[cfg(test)]
-    fn with_clock(delegate: WpApiClientDelegate, source: ReaderSavedSource, clock: Clock) -> Self {
-        Self::with_clocks(
-            delegate,
-            source,
-            storage::migrated_in_memory_cache(),
-            WpComUserId(1),
-            clock,
-            Arc::new(SystemTime::now),
+    fn now(&self) -> WpGmtDateTime {
+        WpGmtDateTime(chrono::DateTime::<chrono::Utc>::from((self.clock)()))
+    }
+
+    /// Whether a post is saved, given every key it may be saved under.
+    fn status_of(&self, keys: &[ReaderSavedKey]) -> Result<ReaderSavedStatus, ReaderSavedError> {
+        if keys.is_empty() {
+            return Ok(ReaderSavedStatus::NotSaved);
+        }
+        let keys = normalized(keys);
+        let (rows, state) = self.cache.execute(|connection| {
+            Ok::<_, SqliteDbError>((
+                ReaderSavedRepository::select_rows_for_keys(connection, self.account, &keys)?,
+                ReaderSavedRepository::select_state(connection, self.account)?,
+            ))
+        })?;
+        Ok(if rows.iter().any(|row| row.saved) {
+            ReaderSavedStatus::Saved
+        } else if state.keys_refreshed || !rows.is_empty() {
+            ReaderSavedStatus::NotSaved
+        } else {
+            ReaderSavedStatus::Unknown
+        })
+    }
+
+    async fn save_keys(
+        &self,
+        main: ReaderSavedKey,
+        keys: Vec<ReaderSavedKey>,
+    ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
+        let now = self.now();
+        let row = self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            let post = ReaderPostRepository::select_by_key(&transaction, self.account, &main)?
+                .map(|(row, _)| row);
+            let row = ReaderSavedRepository::tap_save(
+                &transaction,
+                self.account,
+                &main,
+                &keys,
+                post,
+                &now,
+            )?;
+            transaction.commit().map_err(SqliteDbError::from)?;
+            Ok::<_, SqliteDbError>(row)
+        })?;
+        self.forget_refusals(&[row]);
+        self.notify();
+
+        let _lane = self.lane.lock().await;
+        let sent = self.send_pending().await?;
+        if let Some(error) = self.take_refusal(&[row]) {
+            return Err(ReaderSavedError::Api(error));
+        }
+        let rows = self.rows_for(std::slice::from_ref(&main))?;
+        Ok(match rows.iter().find(|row| row.saved) {
+            Some(row) if row.server == Some(true) || row.local_only => ReaderSavedOutcome::Synced {
+                key: row.key.clone(),
+            },
+            Some(row) => sent.pending_reason(row),
+            // An unsave tapped since decides.
+            None => ReaderSavedOutcome::Pending {
+                reason: "The save was changed before it was sent.".to_string(),
+            },
+        })
+    }
+
+    async fn unsave_keys(
+        &self,
+        keys: Vec<ReaderSavedKey>,
+    ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
+        let waiting = self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            // Past the keys a refresh returned, or before any, a key without a row may still be
+            // saved, so it's sent too.
+            let state = ReaderSavedRepository::select_state(&transaction, self.account)?;
+            let rows = ReaderSavedRepository::tap_unsave(
+                &transaction,
+                self.account,
+                &keys,
+                !state.keys_complete,
+            )?;
+            transaction.commit().map_err(SqliteDbError::from)?;
+            Ok::<_, SqliteDbError>(rows)
+        })?;
+        self.forget_refusals(&waiting);
+        self.notify();
+
+        let _lane = self.lane.lock().await;
+        let sent = self.send_pending().await?;
+        if let Some(error) = self.take_refusal(&waiting) {
+            return Err(ReaderSavedError::Api(error));
+        }
+        let rows = self.rows_for(&keys)?;
+        Ok(
+            match rows.iter().find(|row| row.is_pending() || row.saved) {
+                Some(row) if !row.saved => sent.pending_reason(row),
+                // A save tapped since decides.
+                Some(row) => ReaderSavedOutcome::Synced {
+                    key: row.key.clone(),
+                },
+                None => ReaderSavedOutcome::Synced {
+                    key: rows.first().map_or(keys[0].clone(), |row| row.key.clone()),
+                },
+            },
         )
-        .expect("an in-memory cache works")
     }
 
-    fn now(&self) -> Instant {
-        (self.clock)()
+    fn rows_for(&self, keys: &[ReaderSavedKey]) -> Result<Vec<DbReaderSavedRow>, ReaderSavedError> {
+        Ok(self.cache.execute(|connection| {
+            ReaderSavedRepository::select_rows_for_keys(connection, self.account, keys)
+        })?)
     }
 
-    fn now_on_both_clocks(&self) -> Now {
-        Now {
-            instant: self.now(),
-            wall: (self.wall_clock)(),
+    /// Sends pending rows, then reads the saved keys, then sends what that shows is still needed.
+    /// Call it holding the lane.
+    async fn sync_in_lane(&self) -> Result<(), ReaderSavedError> {
+        let sent = self.send_pending().await?;
+        sent.log();
+        let response = self.client.reader_saved().list_keys().await?.data;
+        let returned = response.keys.len() as u64;
+        let keys: Vec<_> = response
+            .keys
+            .into_iter()
+            .map(|entry| DbReaderSavedKey {
+                key: entry.key,
+                date_saved: entry.date_saved,
+                url: entry.url,
+            })
+            .collect();
+        self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            ReaderSavedRepository::apply_keys(
+                &transaction,
+                self.account,
+                &keys,
+                returned,
+                response.total,
+            )?;
+            transaction.commit().map_err(SqliteDbError::from)
+        })?;
+        self.notify();
+        self.send_pending().await?.log();
+        Ok(())
+    }
+
+    /// Sends every pending row, oldest tap first, until none is left or the device is offline. Call
+    /// it holding the lane.
+    async fn send_pending(&self) -> Result<Sent, ReaderSavedError> {
+        let mut sent = Sent::default();
+        let mut sends: HashMap<RowId, u32> = HashMap::new();
+        loop {
+            let pending = self.cache.execute(|connection| {
+                ReaderSavedRepository::select_pending(connection, self.account)
+            })?;
+            let Some(row) = pending
+                .iter()
+                .find(|row| sends.get(&row.row_id).copied().unwrap_or(0) < MAX_SENDS_PER_ROW)
+                .cloned()
+            else {
+                return Ok(sent);
+            };
+            let batch: Vec<_> = if row.imported && row.saved && bulk_key(&row.key).is_some() {
+                pending
+                    .into_iter()
+                    .filter(|other| other.imported && other.saved && bulk_key(&other.key).is_some())
+                    .take(MAX_BULK_KEYS)
+                    .collect()
+            } else {
+                vec![row]
+            };
+            for row in &batch {
+                *sends.entry(row.row_id).or_default() += 1;
+            }
+            let go_on = if batch.len() > 1 {
+                self.send_bulk(&batch, &mut sent).await?
+            } else {
+                self.send_row(&batch[0], &mut sent).await?
+            };
+            self.notify();
+            if !go_on {
+                return Ok(sent);
+            }
         }
     }
 
-    /// Fetches a page of the saved list, without the posts this device recently unsaved.
-    async fn fetch_posts(
+    /// Sends one row. Returns whether to go on to the next.
+    async fn send_row(
         &self,
-        params: &ReaderSavedPostsParams,
-    ) -> Result<ReaderSavedPostsResponse, ReaderSavedError> {
-        let started = self.now();
-        let mut response = self.client.reader_saved().list_posts(params).await?.data;
-        let mut changed = false;
-        {
-            let mut state = self.state();
-            response.posts.retain(|post| {
-                let keys = reader_saved_keys_for_post(post.identity.clone());
-                let should_show = state.should_show_listed_post(&keys, started);
-                if should_show {
-                    changed |= state.note_listed_post(&keys);
-                }
-                should_show
-            });
-        }
-        if changed {
-            self.changed();
-        }
-        Ok(response)
-    }
-
-    /// Saves a key. `recent` is whether it goes in recent saves: an import's don't, because the
-    /// device already had them.
-    async fn save_key(
-        &self,
-        key: ReaderSavedKey,
-        page_details: Option<ReaderSavedPageDetails>,
-        recent: bool,
-    ) -> Result<ReaderSavedKey, ReaderSavedError> {
-        // The server would refuse it, and a key that can't be stored mustn't become a write.
-        if !key.is_complete() {
-            return Err(ReaderSavedError::PostCannotBeSaved);
-        }
-        let (mut writes, turn) = PendingWrites::begin(self, vec![key.clone()], true, recent);
-        turn.wait().await;
-        let params = ReaderSavePostParams {
-            key: key.clone(),
-            source: self.source,
-            page_details,
-        };
-        writes.mark_all_sent();
-        let result = self.client.reader_saved().save(&params).await;
-        let write = writes.forget_all()[0].1;
-        let answer = result.map(|response| (response.data.key, Some(response.data.total)));
-        let returned = answer.as_ref().ok().map(|(key, _)| key.clone());
-        self.finish_write(write, answer)?;
-        let returned = returned.unwrap_or(key.clone());
-        // The server has it now, so it's no longer only on this device.
-        self.remove_local_only(&[key, returned.clone()]);
-        Ok(returned)
-    }
-
-    async fn unsave_keys(&self, post: &[ReaderSavedKey]) -> Result<(), ReaderSavedError> {
-        if post.iter().any(|key| !key.is_complete()) {
-            return Err(ReaderSavedError::PostCannotBeSaved);
-        }
-        // A save only this device has is gone as soon as it's unsaved here.
-        self.remove_local_only(post);
-
-        // Picks the keys and starts their writes under one lock, so the post reads as unsaved
-        // straight away.
-        let (mut writes, turn) =
-            PendingWrites::begin_with(self, false, true, |state| state.keys_to_unsave(post));
-        turn.wait().await;
-
-        // A write that went before this one may have shown the post is stored under another key.
-        if writes.add(|state| state.keys_to_unsave(post)) {
-            self.changed();
-        }
-
-        let mut first_error = None;
-        for (key, write) in writes.unsent() {
-            let known_saved = self.state().known_saved_under(&key);
+        row: &DbReaderSavedRow,
+        sent: &mut Sent,
+    ) -> Result<bool, ReaderSavedError> {
+        self.set_in_doubt(&[row.row_id], true)?;
+        let result = if row.saved {
+            let page_details = self
+                .page_details
+                .lock()
+                .expect("page details lock poisoned")
+                .get(&reader_saved_key_text(&row.key))
+                .cloned();
+            let params = ReaderSavePostParams {
+                key: row.key.clone(),
+                source: self.source,
+                page_details,
+            };
+            self.client
+                .reader_saved()
+                .save(&params)
+                .await
+                .map(|response| (response.data.key, response.data.total))
+        } else {
             let params = ReaderUnsavePostParams {
-                key: key.clone(),
+                key: row.key.clone(),
                 source: self.source,
             };
-            writes.mark_sent(write);
-            let result = self
-                .client
+            self.client
                 .reader_saved()
                 .unsave(&params)
                 .await
-                .map(|response| (response.data.key, Some(response.data.total)));
-            writes.forget(write);
-            // The post isn't saved under a key the server can't find, unless this device has seen
-            // it saved there: a feed item stops resolving once it's pruned.
-            let result = match result {
-                Err(error) if !known_saved && is_post_not_found(&error) => Ok((key, None)),
-                result => result,
-            };
-            if let Err(error) = self.finish_write(write, result) {
-                first_error.get_or_insert(error);
+                .map(|response| (response.data.key, response.data.total))
+        };
+        let answer = match result {
+            Ok((stored, total)) => Ok((stored, Some(total))),
+            // Nothing can be saved under a feed item the server can't find, unless this device has
+            // seen it saved there: a feed item stops resolving once it's pruned.
+            Err(error) if !row.saved && row.server != Some(true) && is_post_not_found(&error) => {
+                Ok((row.key.clone(), None))
             }
+            Err(error) => Err(error),
+        };
+        match answer {
+            Ok((stored, total)) => {
+                self.cache.execute(|connection| {
+                    let transaction = connection.transaction()?;
+                    ReaderSavedRepository::apply_answer(
+                        &transaction,
+                        self.account,
+                        row.row_id,
+                        row.saved,
+                        &stored,
+                        total,
+                    )?;
+                    transaction.commit().map_err(SqliteDbError::from)
+                })?;
+                if row.saved {
+                    self.page_details
+                        .lock()
+                        .expect("page details lock poisoned")
+                        .remove(&reader_saved_key_text(&row.key));
+                }
+                Ok(true)
+            }
+            Err(error) => self.failed(&[row.row_id], error, sent),
         }
-        first_error.map_or(Ok(()), Err)
     }
 
-    /// Sends one batch of an import, whose turn has come. Its writes start now, so a batch not sent
-    /// yet changes nothing.
-    async fn import_batch(
+    /// Sends imported saves in one bulk request. Returns whether to go on.
+    async fn send_bulk(
         &self,
-        pending: &mut PendingWrites<'_>,
-        keys: &[ReaderSavedBulkKey],
-    ) -> Result<Vec<ReaderSavedBulkResult>, ReaderSavedError> {
-        // The keys are newest first, so their writes start oldest first.
-        let saved_keys: Vec<_> = keys.iter().rev().map(saved_key).collect();
-        let mut writes = pending.start(saved_keys);
-        self.changed();
-
+        rows: &[DbReaderSavedRow],
+        sent: &mut Sent,
+    ) -> Result<bool, ReaderSavedError> {
+        let row_ids: Vec<_> = rows.iter().map(|row| row.row_id).collect();
+        self.set_in_doubt(&row_ids, true)?;
+        // The rows are oldest first, and the API takes the newest first.
         let params = ReaderSavedBulkParams {
-            keys: keys.to_vec(),
+            keys: rows
+                .iter()
+                .rev()
+                .filter_map(|row| bulk_key(&row.key))
+                .collect(),
             source: self.source,
         };
-        for write in &writes {
-            pending.mark_sent(*write);
-        }
-        let result = self.client.reader_saved().bulk_save(&params).await;
-        for write in &writes {
-            pending.forget(*write);
-        }
-        let response = match result {
+        let response = match self.client.reader_saved().bulk_save(&params).await {
             Ok(response) => response.data,
-            Err(error) => {
-                {
-                    let mut state = self.state();
-                    let now = self.now();
-                    for write in writes {
-                        state.finish_with_error(write, &error, now);
-                    }
-                }
-                self.changed();
-                return Err(error.into());
-            }
+            Err(error) => return self.failed(&row_ids, error, sent),
         };
-
-        // Results are matched to keys by position, which only works with one result per key. With
-        // any other number, one left out shifts the rest onto the wrong keys, and a post would be
-        // recorded as stored under another post's key. The server may have saved any of them.
-        if response.results.len() != keys.len() {
-            {
-                let mut state = self.state();
-                let now = self.now();
-                for write in writes {
-                    state.abandon_write(write, now);
-                }
-            }
-            self.changed();
-            return Err(ReaderSavedError::UnexpectedImportResults {
-                sent: keys.len() as u64,
+        // Results are matched to keys by position, which only works with one per key. The server
+        // may have saved any of them, so they stay in doubt.
+        if response.results.len() != rows.len() {
+            sent.unexpected = Some(ReaderSavedError::UnexpectedImportResults {
+                sent: rows.len() as u64,
                 received: response.results.len() as u64,
             });
+            return Ok(false);
         }
-        writes.reverse();
-        let results = response.results;
-
-        // Answered oldest first, the order the server applied them, so the total is the newest's.
-        {
-            let mut state = self.state();
-            let now = self.now();
-            for (write, result) in writes.iter().zip(&results).rev() {
-                match result {
-                    ReaderSavedBulkResult {
-                        key: Some(stored_key),
-                        saved: true,
-                        ..
-                    } => state.complete_write(
-                        *write,
-                        &saved_key(stored_key),
-                        Some(response.total),
-                        now,
-                    ),
-                    _ => state.fail_write(*write),
+        self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            ReaderSavedRepository::set_total(&transaction, self.account, response.total)?;
+            for (row, result) in rows.iter().rev().zip(&response.results) {
+                match (&result.key, result.saved) {
+                    (Some(stored), true) => {
+                        ReaderSavedRepository::apply_answer(
+                            &transaction,
+                            self.account,
+                            row.row_id,
+                            true,
+                            &saved_key(stored),
+                            None,
+                        )?;
+                    }
+                    _ => ReaderSavedRepository::apply_refusal(&transaction, row.row_id)?,
                 }
             }
-        }
-        self.changed();
-        Ok(results)
-    }
-
-    /// Records a write's answer: the key the server stored and the total it reported, or an error.
-    fn finish_write(
-        &self,
-        write: WriteId,
-        answer: Result<(ReaderSavedKey, Option<u64>), WpApiError>,
-    ) -> Result<(), ReaderSavedError> {
-        let result = match answer {
-            Ok((stored_key, total)) => {
-                let now = self.now();
-                self.state().complete_write(write, &stored_key, total, now);
-                Ok(())
-            }
-            Err(error) => {
-                let now = self.now();
-                self.state().finish_with_error(write, &error, now);
-                Err(error.into())
-            }
-        };
-        self.changed();
-        result
-    }
-
-    fn inner(&self) -> MutexGuard<'_, Inner> {
-        self.inner.lock().expect("state lock poisoned")
-    }
-
-    fn state(&self) -> StateGuard<'_> {
-        StateGuard(self.inner())
-    }
-
-    /// Stores the state and tells the observer. Call it after every change, never with the state
-    /// locked.
-    fn changed(&self) {
-        self.store_state();
-        self.notify();
-    }
-
-    /// Stores the state in the cache, so the next launch starts from it.
-    ///
-    /// A failure is logged rather than returned. It doesn't change what this launch knows, and it
-    /// can follow a change the server has already made, which an error would misreport as failed.
-    /// What it costs is the next launch starting from an older state: `Unknown` until a refresh,
-    /// or a write that loses to a server that hasn't caught up.
-    fn store_state(&self) {
-        let _serial = self.stored_keys.lock().expect("stored keys lock poisoned");
-        let local = self.state().persisted_local(self.now_on_both_clocks());
-        let result = serde_json::to_string(&local)
-            .map_err(stored_state_error)
-            .and_then(|local| {
-                self.cache
-                    .execute(|connection| {
-                        ReaderSavedRepository::write_local(&*connection, self.account, &local)
-                    })
-                    .map_err(ReaderSavedError::from)
-            });
-        if let Err(error) = result {
-            log::error!("Couldn't store the saved posts state: {error}");
-        }
-    }
-
-    /// Stores the keys of a refresh just applied, unless a newer refresh's are stored already.
-    ///
-    /// A failure is logged, as in [`Self::store_state`]. The next launch then starts from the
-    /// keys of an older refresh, until it refreshes.
-    fn store_keys(&self, generation: u64, started: i64, response: &ReaderSavedKeysResponse) {
-        let mut stored = self.stored_keys.lock().expect("stored keys lock poisoned");
-        if *stored >= generation {
-            return;
-        }
-        let keys = DbReaderSavedKeys {
-            refreshed_at_ms: started,
-            returned: response.keys.len() as u64,
-            total: response.total,
-            keys: response
-                .keys
-                .iter()
-                .map(|entry| DbReaderSavedKey {
-                    key: entry.key.clone(),
-                    save_id: entry.id.0,
-                    date_saved: entry.date_saved,
-                    url: entry.url.clone(),
-                })
-                .collect(),
-        };
-        let result = self.cache.execute(|connection| {
-            let transaction =
-                wp_mobile_cache::repository::TransactionManager::transaction(connection)?;
-            ReaderSavedRepository::replace_keys(&transaction, self.account, &keys)?;
             transaction.commit().map_err(SqliteDbError::from)
-        });
-        match result {
-            Ok(()) => *stored = generation,
-            Err(error) => log::error!("Couldn't store the saved keys: {error}"),
+        })?;
+        Ok(true)
+    }
+
+    /// Records a request that failed. Returns whether to go on to the next row.
+    fn failed(
+        &self,
+        rows: &[RowId],
+        error: WpApiError,
+        sent: &mut Sent,
+    ) -> Result<bool, ReaderSavedError> {
+        if is_refused(&error) {
+            self.cache.execute(|connection| {
+                let transaction = connection.transaction()?;
+                for row in rows {
+                    ReaderSavedRepository::apply_refusal(&transaction, *row)?;
+                }
+                transaction.commit().map_err(SqliteDbError::from)
+            })?;
+            log::warn!("The server refused a saved post change: {error}");
+            self.refusals
+                .lock()
+                .expect("refusals lock poisoned")
+                .push((rows.to_vec(), error));
+            Ok(true)
+        } else if may_have_been_applied(&error) {
+            // It stays in doubt until a refresh says. The next row may still get through.
+            sent.in_doubt = Some(error);
+            Ok(true)
+        } else {
+            // It never reached the server, and nothing else will now.
+            self.set_in_doubt(rows, false)?;
+            sent.unsent = Some(error);
+            Ok(false)
         }
     }
 
-    /// Removes saves only this device has, under any of these keys.
-    fn remove_local_only(&self, keys: &[ReaderSavedKey]) {
-        let keys: Vec<_> = keys
+    /// Drops what's known about earlier refusals of rows a new tap changed.
+    fn forget_refusals(&self, rows: &[RowId]) {
+        self.refusals
+            .lock()
+            .expect("refusals lock poisoned")
+            .retain(|(refused, _)| !refused.iter().any(|row| rows.contains(row)));
+    }
+
+    /// Why the server refused one of these rows, if it did since they were tapped.
+    fn take_refusal(&self, rows: &[RowId]) -> Option<WpApiError> {
+        let mut refusals = self.refusals.lock().expect("refusals lock poisoned");
+        let index = refusals
             .iter()
-            .map(ReaderSavedKey::normalized)
-            .filter(|key| self.inner().local_only.contains(key))
-            .collect();
-        if keys.is_empty() {
-            return;
-        }
-        {
-            let mut inner = self.inner();
-            for key in &keys {
-                inner.local_only.remove(key);
-            }
-        }
-        let result = self.cache.execute(|connection| {
-            keys.iter().try_for_each(|key| {
-                ReaderSavedRepository::delete_local_only(&*connection, self.account, key)
-                    .map(|_| ())
-            })
-        });
-        // Logged, not returned, for the same reason as in `store_state`.
-        if let Err(error) = result {
-            log::error!("Couldn't remove a local-only save: {error}");
-        }
-        self.notify();
+            .position(|(refused, _)| refused.iter().any(|row| rows.contains(row)))?;
+        Some(refusals.remove(index).1)
     }
 
-    /// Never called with the state locked, because the observer is app code that reads it back.
+    fn set_in_doubt(&self, rows: &[RowId], in_doubt: bool) -> Result<(), ReaderSavedError> {
+        self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            for row in rows {
+                ReaderSavedRepository::set_in_doubt(&transaction, *row, in_doubt)?;
+            }
+            transaction.commit().map_err(SqliteDbError::from)
+        })?;
+        Ok(())
+    }
+
+    /// Never called with a lock the observer's calls take, because the observer is app code that
+    /// reads the state back.
     fn notify(&self) {
         let observer = self
             .observer
@@ -720,41 +645,53 @@ impl ReaderSavedService {
     }
 }
 
-struct StateGuard<'a>(MutexGuard<'a, Inner>);
-
-impl std::ops::Deref for StateGuard<'_> {
-    type Target = ReaderSavedState;
-    fn deref(&self) -> &ReaderSavedState {
-        &self.0.state
-    }
+/// What a round of sending did.
+#[derive(Debug, Default)]
+struct Sent {
+    /// A request that didn't reach the server, which stopped the round.
+    unsent: Option<WpApiError>,
+    /// A request whose answer didn't arrive.
+    in_doubt: Option<WpApiError>,
+    unexpected: Option<ReaderSavedError>,
 }
 
-impl std::ops::DerefMut for StateGuard<'_> {
-    fn deref_mut(&mut self) -> &mut ReaderSavedState {
-        &mut self.0.state
-    }
-}
-
-impl ReaderSavedState {
-    /// Records a write that failed: undone if the server refused it or never got it, but left to
-    /// stand until a read if it may have been applied.
-    fn finish_with_error(&mut self, write: WriteId, error: &WpApiError, now: Instant) {
-        if may_have_been_applied(error) {
-            self.abandon_write(write, now);
+impl Sent {
+    fn pending_reason(&self, row: &DbReaderSavedRow) -> ReaderSavedOutcome {
+        let reason = if row.in_doubt {
+            match &self.in_doubt {
+                Some(error) => format!("No answer arrived, so it waits for a refresh: {error}"),
+                None => "No answer arrived, so it waits for a refresh.".to_string(),
+            }
         } else {
-            self.fail_write(write);
+            match &self.unsent {
+                Some(error) => format!("It wasn't sent: {error}"),
+                None => "It wasn't sent yet.".to_string(),
+            }
+        };
+        ReaderSavedOutcome::Pending { reason }
+    }
+
+    /// Logs what went wrong for rows that aren't a tap's, which wait for a later sync.
+    fn log(&self) {
+        if let Some(error) = &self.unsent {
+            log::warn!("Couldn't send a saved post change: {error}");
+        }
+        if let Some(error) = &self.unexpected {
+            log::warn!("{error}");
         }
     }
 }
 
-/// Whether a failed write may still have been applied: the request may have reached the server,
+fn normalized(keys: &[ReaderSavedKey]) -> Vec<ReaderSavedKey> {
+    keys.iter().map(ReaderSavedKey::normalized).collect()
+}
+
+/// Whether a failed request may still have been applied: the request may have reached the server,
 /// and the server didn't say it refused it. That's a timeout, a connection lost or cancelled
-/// mid-request, an answer that couldn't be read, or a server error (5xx) from WordPress.com or a
-/// proxy in front of it.
+/// mid-request, an answer that couldn't be read, or a server error (5xx).
 ///
-/// Errors from before the request was sent are undone: no network, a host that doesn't resolve, a
-/// refused connection, TLS. So is any 4xx answer. iOS reports a connection lost mid-request as
-/// offline too, so that's undone, and the next refresh corrects it if the server applied it.
+/// Errors from before the request was sent didn't reach it: no network, a host that doesn't
+/// resolve, a refused connection, TLS. Nor did an answer that says it wasn't applied.
 fn may_have_been_applied(error: &WpApiError) -> bool {
     use RequestExecutionErrorReason as Reason;
     match error {
@@ -784,6 +721,26 @@ fn may_have_been_applied(error: &WpApiError) -> bool {
     }
 }
 
+/// Whether the server refused a request, rather than it failing on the way. An answer that may pass,
+/// such as a rate limit or an expired token, isn't a refusal: the row is sent again later. The one
+/// forbidden answer that won't pass is the account's save cap.
+fn is_refused(error: &WpApiError) -> bool {
+    /// Unauthorized, forbidden, request timeout, too many requests.
+    const TEMPORARY: [u32; 4] = [401, 403, 408, 429];
+    match error {
+        WpApiError::WpError {
+            error_code: WpErrorCode::CustomError(code),
+            ..
+        } if code == "saved_limit_reached" => true,
+        WpApiError::WpError { status_code, .. }
+        | WpApiError::InvalidHttpStatusCode { status_code, .. }
+        | WpApiError::UnknownError { status_code, .. } => {
+            (400..500).contains(status_code) && !TEMPORARY.contains(status_code)
+        }
+        _ => false,
+    }
+}
+
 fn is_post_not_found(error: &WpApiError) -> bool {
     matches!(
         error,
@@ -794,201 +751,16 @@ fn is_post_not_found(error: &WpApiError) -> bool {
     )
 }
 
-/// A tap's place in line. It waits for every earlier tap's writes that haven't finished, so the
-/// server applies writes in the order the user made them. Waiting for all of them, rather than the
-/// last, matters when one in between is cancelled before it's sent.
-struct Turn {
-    /// Dropped when the tap's writes finish or are cancelled.
-    _done: oneshot::Sender<()>,
-    before: Vec<Shared<oneshot::Receiver<()>>>,
-}
-
-/// The taps whose writes may not have finished, oldest first.
-type Queue = Vec<Shared<oneshot::Receiver<()>>>;
-
-impl Turn {
-    fn take(queue: &mut Queue) -> Self {
-        queue.retain(|earlier| earlier.clone().now_or_never().is_none());
-        let (done, finished) = oneshot::channel();
-        let before = queue.clone();
-        queue.push(finished.shared());
-        Self {
-            _done: done,
-            before,
-        }
-    }
-
-    async fn wait(&self) {
-        for earlier in &self.before {
-            // Cancelled is how an earlier tap says it's done.
-            let _ = earlier.clone().await;
-        }
-    }
-}
-
-/// A tap's writes that haven't finished. Dropping it, as Kotlin does when it cancels a call, undoes
-/// the ones never sent. One already sent may have reached the server, so it stands until a read can
-/// say. Swift, as of UniFFI 0.32, doesn't cancel: a cancelled Swift task still waits for the call.
-struct PendingWrites<'a> {
-    service: &'a ReaderSavedService,
-    tap: Tap,
-    saved: bool,
-    /// Each write, and whether its request has been sent.
-    writes: Vec<(ReaderSavedKey, WriteId, bool)>,
-}
-
-impl<'a> PendingWrites<'a> {
-    /// Starts a write for each key, all at once, so the change shows straight away, and takes the
-    /// tap's turn. `recent` is whether saves go in recent saves: an import's don't, because the
-    /// device already had them.
-    fn begin(
-        service: &'a ReaderSavedService,
-        keys: Vec<ReaderSavedKey>,
-        saved: bool,
-        recent: bool,
-    ) -> (Self, Turn) {
-        Self::begin_with(service, saved, recent, |_| keys)
-    }
-
-    /// Like [`Self::begin`], choosing the keys from the state under the same lock.
-    fn begin_with(
-        service: &'a ReaderSavedService,
-        saved: bool,
-        recent: bool,
-        choose: impl FnOnce(&ReaderSavedState) -> Vec<ReaderSavedKey>,
-    ) -> (Self, Turn) {
-        let (pending, turn) = {
-            let mut inner = service.inner();
-            let tap = inner.state.begin_tap();
-            let mut pending = Self {
-                service,
-                tap,
-                saved,
-                writes: Vec::new(),
-            };
-            for key in choose(&inner.state) {
-                let write = inner.state.begin_write(tap, &key, saved);
-                if saved && recent {
-                    inner.state.note_save_tap(&key);
-                }
-                pending.writes.push((key, write, false));
-            }
-            let turn = Turn::take(&mut inner.queue);
-            (pending, turn)
-        };
-        service.changed();
-        (pending, turn)
-    }
-
-    /// Starts a write for each key, in the same tap.
-    fn start(&mut self, keys: Vec<ReaderSavedKey>) -> Vec<WriteId> {
-        let mut state = self.service.state();
-        keys.into_iter()
-            .map(|key| {
-                let write = state.begin_write(self.tap, &key, self.saved);
-                self.writes.push((key, write, false));
-                write
-            })
-            .collect()
-    }
-
-    /// Starts a write, in the same tap, for each key chosen that doesn't have one yet. Returns
-    /// whether it started any.
-    fn add(&mut self, choose: impl FnOnce(&ReaderSavedState) -> Vec<ReaderSavedKey>) -> bool {
-        let mut state = self.service.state();
-        let before = self.writes.len();
-        for key in choose(&state) {
-            if !self
-                .writes
-                .iter()
-                .any(|(other, _, _)| other.normalized() == key.normalized())
-            {
-                let write = state.begin_write(self.tap, &key, self.saved);
-                self.writes.push((key, write, false));
-            }
-        }
-        self.writes.len() != before
-    }
-
-    fn unsent(&self) -> Vec<(ReaderSavedKey, WriteId)> {
-        self.writes
-            .iter()
-            .filter(|(_, _, sent)| !sent)
-            .map(|(key, write, _)| (key.clone(), *write))
-            .collect()
-    }
-
-    /// Records that a write's request is about to go out.
-    fn mark_sent(&mut self, write: WriteId) {
-        for (_, other, sent) in &mut self.writes {
-            if *other == write {
-                *sent = true;
-            }
-        }
-    }
-
-    fn mark_all_sent(&mut self) {
-        for (_, _, sent) in &mut self.writes {
-            *sent = true;
-        }
-    }
-
-    /// Stops tracking a write, because the caller is about to finish it.
-    fn forget(&mut self, write: WriteId) {
-        self.writes.retain(|(_, other, _)| *other != write);
-    }
-
-    fn forget_all(&mut self) -> Vec<(ReaderSavedKey, WriteId)> {
-        std::mem::take(&mut self.writes)
-            .into_iter()
-            .map(|(key, write, _)| (key, write))
-            .collect()
-    }
-}
-
-impl Drop for PendingWrites<'_> {
-    fn drop(&mut self) {
-        if self.writes.is_empty() {
-            return;
-        }
-        let now = self.service.now();
-        {
-            let mut state = self.service.state();
-            for (_, write, sent) in &self.writes {
-                if *sent {
-                    state.abandon_write(*write, now);
-                } else {
-                    state.fail_write(*write);
-                }
-            }
-        }
-        self.service.changed();
-    }
-}
-
-fn stored_state_error(error: serde_json::Error) -> ReaderSavedError {
-    ReaderSavedError::Database(SqliteDbError::SqliteError(format!(
-        "Couldn't encode the saved posts state: {error}"
-    )))
-}
-
-/// Reads a stored state. One that can't be read, or that an older or newer version of the library
-/// stored, is left out, which only costs what a fresh install has.
-fn parse_stored<T: serde::de::DeserializeOwned>(
-    stored: Option<&str>,
-    format: impl Fn(&T) -> u32,
-) -> Option<T> {
-    let stored = stored?;
-    match serde_json::from_str::<T>(stored) {
-        Ok(value) if format(&value) == PERSISTED_FORMAT => Some(value),
-        Ok(_) => {
-            log::warn!("Ignoring a saved posts state stored in another format");
-            None
-        }
-        Err(error) => {
-            log::warn!("Ignoring a saved posts state that can't be read: {error}");
-            None
-        }
+fn bulk_key(key: &ReaderSavedKey) -> Option<ReaderSavedBulkKey> {
+    match key {
+        ReaderSavedKey::Post { blog_id, post_id } => Some(ReaderSavedBulkKey::Post {
+            blog_id: *blog_id,
+            post_id: *post_id,
+        }),
+        ReaderSavedKey::FeedItem { feed_item_id } => Some(ReaderSavedBulkKey::FeedItem {
+            feed_item_id: *feed_item_id,
+        }),
+        ReaderSavedKey::Url { .. } => None,
     }
 }
 

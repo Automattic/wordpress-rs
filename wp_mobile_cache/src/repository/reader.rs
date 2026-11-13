@@ -4,7 +4,7 @@
 use crate::{
     RowId, SqliteDbError,
     db_types::reader::{
-        DbReaderSavedKey, DbReaderSavedKeys, DbReaderSavedLocalOnly, DbReaderSavedState,
+        DbReaderSavedKey, DbReaderSavedListItem, DbReaderSavedRow, DbReaderSavedState,
         DbReaderStream, DbReaderStreamItem, ReaderPostRecord, reader_date_from_text,
         reader_date_text, reader_saved_key_from_text, reader_saved_key_text,
     },
@@ -12,6 +12,7 @@ use crate::{
     repository::QueryExecutor,
 };
 use rusqlite::{OptionalExtension, Row, params};
+use wp_api::date::WpGmtDateTime;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::reader_saved::{
     ReaderFeedId, ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey,
@@ -453,8 +454,55 @@ impl ReaderStreamRepository {
     }
 }
 
-/// What the saved posts service keeps across launches.
+/// The saved posts of an account: one row per save on the server, as far as this device knows,
+/// and what the user wants for it.
+///
+/// A row is pending while what the user wants differs from what the server last said. The service
+/// sends pending rows, one at a time, until they agree. A row sent without an answer is in doubt:
+/// the server may or may not have applied it, so it isn't sent again until a refresh of the keys
+/// says what the server has.
+///
+/// Call the methods that change more than one row inside a transaction.
 pub struct ReaderSavedRepository;
+
+const ROW_COLUMNS: &str = "s.rowid, s.key, s.url_key, s.feed_item_key, s.saved, s.server, \
+    s.in_doubt, s.seq, s.date_saved, s.post_id, s.listed, s.imported, s.local_only";
+const ROW_COLUMN_COUNT: usize = 13;
+
+fn saved_row_from_row(row: &Row) -> Result<DbReaderSavedRow, SqliteDbError> {
+    let key = |index: usize| -> Result<Option<ReaderSavedKey>, SqliteDbError> {
+        row.get::<_, Option<String>>(index)?
+            .map(|text| reader_saved_key_from_text(&text))
+            .transpose()
+    };
+    Ok(DbReaderSavedRow {
+        row_id: row.get(0)?,
+        key: reader_saved_key_from_text(&row.get::<_, String>(1)?)?,
+        url_key: key(2)?,
+        feed_item_key: key(3)?,
+        saved: row.get(4)?,
+        server: row.get(5)?,
+        in_doubt: row.get(6)?,
+        seq: row.get(7)?,
+        date_saved: row
+            .get::<_, Option<String>>(8)?
+            .map(|text| reader_date_from_text(&text))
+            .transpose()?,
+        post_row_id: row.get(9)?,
+        listed: row.get(10)?,
+        imported: row.get(11)?,
+        local_only: row.get(12)?,
+    })
+}
+
+/// The alias column a key goes in when the server stores it as another key.
+fn alias_column(key: &ReaderSavedKey) -> Option<&'static str> {
+    match key {
+        ReaderSavedKey::Url { .. } => Some("url_key"),
+        ReaderSavedKey::FeedItem { .. } => Some("feed_item_key"),
+        ReaderSavedKey::Post { .. } => None,
+    }
+}
 
 impl ReaderSavedRepository {
     pub fn select_state(
@@ -462,114 +510,33 @@ impl ReaderSavedRepository {
         account: RowId,
     ) -> Result<DbReaderSavedState, SqliteDbError> {
         let mut statement = executor.prepare(
-            "SELECT local, imported_local_saves FROM reader_saved_state WHERE account_id = ?1",
+            "SELECT keys_refreshed, keys_complete, total, imported_local_saves
+            FROM reader_saved_state WHERE account_id = ?1",
         )?;
         Ok(statement
             .query_row([account], |row| {
                 Ok(DbReaderSavedState {
-                    local: row.get(0)?,
-                    imported_local_saves: row.get(1)?,
+                    keys_refreshed: row.get(0)?,
+                    keys_complete: row.get(1)?,
+                    total: row.get(2)?,
+                    imported_local_saves: row.get(3)?,
                 })
             })
             .optional()?
             .unwrap_or_default())
     }
 
-    pub fn write_local(
+    pub fn set_total(
         executor: &impl QueryExecutor,
         account: RowId,
-        local: &str,
+        total: u64,
     ) -> Result<(), SqliteDbError> {
         executor.execute(
-            "INSERT INTO reader_saved_state (account_id, local) VALUES (?1, ?2)
-            ON CONFLICT(account_id) DO UPDATE SET local = excluded.local",
-            params![account, local],
+            "INSERT INTO reader_saved_state (account_id, total) VALUES (?1, ?2)
+            ON CONFLICT(account_id) DO UPDATE SET total = excluded.total",
+            params![account, total],
         )?;
         Ok(())
-    }
-
-    /// Replaces the saved keys with a newer refresh's.
-    pub fn replace_keys(
-        executor: &impl QueryExecutor,
-        account: RowId,
-        keys: &DbReaderSavedKeys,
-    ) -> Result<(), SqliteDbError> {
-        executor.execute(
-            "DELETE FROM reader_saved_keys WHERE account_id = ?1",
-            [account],
-        )?;
-        let mut insert = executor.prepare(
-            "INSERT INTO reader_saved_keys (account_id, key, save_id, date_saved, url)
-            VALUES (?1, ?2, ?3, ?4, ?5)
-            ON CONFLICT(account_id, key) DO NOTHING",
-        )?;
-        for key in &keys.keys {
-            insert.execute(params![
-                account,
-                reader_saved_key_text(&key.key),
-                key.save_id,
-                reader_date_text(&key.date_saved),
-                key.url,
-            ])?;
-        }
-        executor.execute(
-            "INSERT INTO reader_saved_state (account_id, keys_refreshed_at_ms, keys_returned, keys_total)
-            VALUES (?1, ?2, ?3, ?4)
-            ON CONFLICT(account_id) DO UPDATE SET
-                keys_refreshed_at_ms = excluded.keys_refreshed_at_ms,
-                keys_returned = excluded.keys_returned,
-                keys_total = excluded.keys_total",
-            params![account, keys.refreshed_at_ms, keys.returned, keys.total],
-        )?;
-        Ok(())
-    }
-
-    /// The saved keys from the newest refresh, newest first, or `None` before the first refresh.
-    pub fn select_keys(
-        executor: &impl QueryExecutor,
-        account: RowId,
-    ) -> Result<Option<DbReaderSavedKeys>, SqliteDbError> {
-        let mut statement = executor.prepare(
-            "SELECT keys_refreshed_at_ms, keys_returned, keys_total FROM reader_saved_state
-            WHERE account_id = ?1 AND keys_refreshed_at_ms IS NOT NULL",
-        )?;
-        let Some((refreshed_at_ms, returned, total)) = statement
-            .query_row([account], |row| {
-                Ok((
-                    row.get::<_, i64>(0)?,
-                    row.get::<_, u64>(1)?,
-                    row.get::<_, u64>(2)?,
-                ))
-            })
-            .optional()?
-        else {
-            return Ok(None);
-        };
-        let mut statement = executor.prepare(
-            "SELECT key, save_id, date_saved, url FROM reader_saved_keys
-            WHERE account_id = ?1
-            ORDER BY date_saved DESC, rowid ASC",
-        )?;
-        let rows = statement.query_map([account], |row| {
-            Ok((|| -> Result<DbReaderSavedKey, SqliteDbError> {
-                let key: String = row.get(0)?;
-                let date_saved: String = row.get(2)?;
-                Ok(DbReaderSavedKey {
-                    key: reader_saved_key_from_text(&key)?,
-                    save_id: row.get(1)?,
-                    date_saved: reader_date_from_text(&date_saved)?,
-                    url: row.get(3)?,
-                })
-            })())
-        })?;
-        let keys =
-            collect_rows(rows.map(|row| row.map_err(SqliteDbError::from).and_then(|row| row)))?;
-        Ok(Some(DbReaderSavedKeys {
-            refreshed_at_ms,
-            returned,
-            total,
-            keys,
-        }))
     }
 
     pub fn set_imported_local_saves(
@@ -584,63 +551,558 @@ impl ReaderSavedRepository {
         Ok(())
     }
 
-    pub fn upsert_local_only(
+    pub fn select_row(
+        executor: &impl QueryExecutor,
+        row_id: RowId,
+    ) -> Result<Option<DbReaderSavedRow>, SqliteDbError> {
+        let sql = format!("SELECT {ROW_COLUMNS} FROM reader_saved_posts s WHERE s.rowid = ?1");
+        let mut statement = executor.prepare(&sql)?;
+        statement
+            .query_row([row_id], |row| Ok(saved_row_from_row(row)))
+            .optional()?
+            .transpose()
+    }
+
+    fn select_where(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        condition: &str,
+        params: &[&dyn rusqlite::ToSql],
+    ) -> Result<Vec<DbReaderSavedRow>, SqliteDbError> {
+        let sql = format!(
+            "SELECT {ROW_COLUMNS} FROM reader_saved_posts s WHERE s.account_id = ?1 AND ({condition})
+            ORDER BY s.seq, s.rowid"
+        );
+        let mut statement = executor.prepare(&sql)?;
+        let mut all: Vec<&dyn rusqlite::ToSql> = vec![&account];
+        all.extend_from_slice(params);
+        let rows = statement.query_map(all.as_slice(), |row| Ok(saved_row_from_row(row)))?;
+        collect_rows(rows.map(|row| row.map_err(SqliteDbError::from).and_then(|row| row)))
+    }
+
+    /// The rows a post may be saved under, given its keys: a row stored under one of them, or one
+    /// the server stores one of them as.
+    pub fn select_rows_for_keys(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        keys: &[ReaderSavedKey],
+    ) -> Result<Vec<DbReaderSavedRow>, SqliteDbError> {
+        let mut rows: Vec<DbReaderSavedRow> = Vec::new();
+        for key in keys {
+            let text = reader_saved_key_text(key);
+            let found = Self::select_where(
+                executor,
+                account,
+                "s.key = ?2 OR s.url_key = ?2 OR s.feed_item_key = ?2",
+                &[&text],
+            )?;
+            for row in found {
+                if !rows.iter().any(|other| other.row_id == row.row_id) {
+                    rows.push(row);
+                }
+            }
+        }
+        Ok(rows)
+    }
+
+    /// Rows to send, oldest tap first: pending, not in doubt, and not local only.
+    pub fn select_pending(
+        executor: &impl QueryExecutor,
+        account: RowId,
+    ) -> Result<Vec<DbReaderSavedRow>, SqliteDbError> {
+        Self::select_where(
+            executor,
+            account,
+            "s.local_only = 0 AND s.in_doubt = 0 AND (s.server IS NULL OR s.server != s.saved)",
+            &[],
+        )
+    }
+
+    fn next_seq(executor: &impl QueryExecutor, account: RowId) -> Result<i64, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT COALESCE(MAX(seq), 0) + 1 FROM reader_saved_posts WHERE account_id = ?1",
+        )?;
+        Ok(statement.query_row([account], |row| row.get(0))?)
+    }
+
+    fn insert(
         executor: &impl QueryExecutor,
         account: RowId,
         key: &ReaderSavedKey,
+        saved: bool,
+        server: Option<bool>,
+        seq: i64,
+        listed: bool,
+    ) -> Result<RowId, SqliteDbError> {
+        executor.execute(
+            "INSERT INTO reader_saved_posts (account_id, key, saved, server, seq, listed)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                account,
+                reader_saved_key_text(key),
+                saved,
+                server,
+                seq,
+                listed
+            ],
+        )?;
+        Ok(executor.last_insert_rowid())
+    }
+
+    fn delete(executor: &impl QueryExecutor, row_id: RowId) -> Result<(), SqliteDbError> {
+        executor.execute("DELETE FROM reader_saved_posts WHERE rowid = ?1", [row_id])?;
+        Ok(())
+    }
+
+    /// Records the other keys of a row, such as the feed item of a Jetpack post, where it hasn't
+    /// got one.
+    pub fn add_aliases(
+        executor: &impl QueryExecutor,
+        row_id: RowId,
+        key: &ReaderSavedKey,
+        aliases: &[ReaderSavedKey],
+    ) -> Result<(), SqliteDbError> {
+        let key = reader_saved_key_text(key);
+        for alias in aliases {
+            let text = reader_saved_key_text(alias);
+            if text == key {
+                continue;
+            }
+            if let Some(column) = alias_column(alias) {
+                executor.execute(
+                    &format!(
+                        "UPDATE reader_saved_posts SET {column} = COALESCE({column}, ?2)
+                        WHERE rowid = ?1"
+                    ),
+                    params![row_id, text],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// A tap of save. `main` is the key to save the post under, and `keys` every key it may be
+    /// saved under. The post's row for `main` wants it saved, and leaves the list only once it's
+    /// unsaved. A pending unsave of another of its rows is called off. Returns the row.
+    pub fn tap_save(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        main: &ReaderSavedKey,
+        keys: &[ReaderSavedKey],
         post: Option<RowId>,
-        date_saved: Option<&str>,
+        now: &WpGmtDateTime,
+    ) -> Result<RowId, SqliteDbError> {
+        let seq = Self::next_seq(executor, account)?;
+        let primary = Self::select_rows_for_keys(executor, account, std::slice::from_ref(main))?
+            .into_iter()
+            .next();
+        let row_id = match &primary {
+            Some(row) => {
+                executor.execute(
+                    "UPDATE reader_saved_posts SET
+                        date_saved = CASE WHEN saved THEN date_saved ELSE ?3 END,
+                        saved = 1, seq = ?2, listed = 1
+                    WHERE rowid = ?1",
+                    params![row.row_id, seq, reader_date_text(now)],
+                )?;
+                row.row_id
+            }
+            None => {
+                let row_id = Self::insert(executor, account, main, true, None, seq, true)?;
+                executor.execute(
+                    "UPDATE reader_saved_posts SET date_saved = ?2 WHERE rowid = ?1",
+                    params![row_id, reader_date_text(now)],
+                )?;
+                row_id
+            }
+        };
+        executor.execute(
+            "UPDATE reader_saved_posts SET post_id = COALESCE(post_id, ?2) WHERE rowid = ?1",
+            params![row_id, post],
+        )?;
+        Self::add_aliases(executor, row_id, main, keys)?;
+        for other in Self::select_rows_for_keys(executor, account, keys)? {
+            if other.row_id == row_id || other.saved || other.local_only {
+                continue;
+            }
+            match other.server {
+                None => Self::delete(executor, other.row_id)?,
+                Some(server) => {
+                    executor.execute(
+                        "UPDATE reader_saved_posts SET saved = ?2 WHERE rowid = ?1",
+                        params![other.row_id, server],
+                    )?;
+                }
+            }
+        }
+        Ok(row_id)
+    }
+
+    /// A tap of unsave: every row the post may be saved under wants it unsaved. A save only this
+    /// device has is removed. With `add_missing`, a key without a row gets one, so it's sent too:
+    /// for when the saved keys may not have them all. Returns the rows to wait for.
+    pub fn tap_unsave(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        keys: &[ReaderSavedKey],
+        add_missing: bool,
+    ) -> Result<Vec<RowId>, SqliteDbError> {
+        let seq = Self::next_seq(executor, account)?;
+        let rows = Self::select_rows_for_keys(executor, account, keys)?;
+        let mut waiting = Vec::new();
+        for row in &rows {
+            if row.local_only {
+                Self::delete(executor, row.row_id)?;
+                continue;
+            }
+            executor.execute(
+                "UPDATE reader_saved_posts SET saved = 0, seq = ?2 WHERE rowid = ?1",
+                params![row.row_id, seq],
+            )?;
+            waiting.push(row.row_id);
+        }
+        if add_missing {
+            for key in keys {
+                let text = reader_saved_key_text(key);
+                let matched = rows.iter().any(|row| {
+                    [
+                        Some(&row.key),
+                        row.url_key.as_ref(),
+                        row.feed_item_key.as_ref(),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .any(|other| reader_saved_key_text(other) == text)
+                });
+                if !matched {
+                    waiting.push(Self::insert(
+                        executor, account, key, false, None, seq, false,
+                    )?);
+                }
+            }
+        }
+        Ok(waiting)
+    }
+
+    pub fn set_in_doubt(
+        executor: &impl QueryExecutor,
+        row_id: RowId,
+        in_doubt: bool,
     ) -> Result<(), SqliteDbError> {
         executor.execute(
-            "INSERT INTO reader_saved_local_only (account_id, key, post_id, date_saved)
-            VALUES (?1, ?2, ?3, ?4)
-            ON CONFLICT(account_id, key) DO UPDATE SET
-                post_id = COALESCE(excluded.post_id, post_id),
-                date_saved = COALESCE(excluded.date_saved, date_saved)",
-            params![account, reader_saved_key_text(key), post, date_saved],
+            "UPDATE reader_saved_posts SET in_doubt = ?2 WHERE rowid = ?1",
+            params![row_id, in_doubt],
         )?;
         Ok(())
     }
 
-    pub fn delete_local_only(
+    /// Merges a row into another for the same save. The newer tap decides what the user wants,
+    /// and the row kept says what the server has.
+    fn merge(
+        executor: &impl QueryExecutor,
+        from: &DbReaderSavedRow,
+        into: &DbReaderSavedRow,
+    ) -> Result<(), SqliteDbError> {
+        Self::add_aliases(
+            executor,
+            into.row_id,
+            &into.key,
+            &[
+                Some(from.key.clone()),
+                from.url_key.clone(),
+                from.feed_item_key.clone(),
+            ]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>(),
+        )?;
+        executor.execute(
+            "UPDATE reader_saved_posts SET
+                saved = CASE WHEN ?2 > seq THEN ?3 ELSE saved END,
+                seq = MAX(seq, ?2),
+                listed = MAX(listed, ?4),
+                local_only = MAX(local_only, ?5),
+                date_saved = COALESCE(date_saved, ?6),
+                post_id = COALESCE(post_id, ?7)
+            WHERE rowid = ?1",
+            params![
+                into.row_id,
+                from.seq,
+                from.saved,
+                from.listed,
+                from.local_only,
+                from.date_saved.as_ref().map(reader_date_text),
+                from.post_row_id,
+            ],
+        )?;
+        Self::delete(executor, from.row_id)
+    }
+
+    /// Moves a row to the key the server stores it as, merging it into that key's row if there is
+    /// one. Returns the row it ends up in.
+    fn rekey(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        row: &DbReaderSavedRow,
+        stored: &ReaderSavedKey,
+    ) -> Result<RowId, SqliteDbError> {
+        let stored_text = reader_saved_key_text(stored);
+        if reader_saved_key_text(&row.key) == stored_text {
+            return Ok(row.row_id);
+        }
+        let existing = Self::select_where(executor, account, "s.key = ?2", &[&stored_text])?;
+        match existing.into_iter().next() {
+            Some(into) => {
+                Self::merge(executor, row, &into)?;
+                Ok(into.row_id)
+            }
+            None => {
+                executor.execute(
+                    "UPDATE reader_saved_posts SET key = ?2 WHERE rowid = ?1",
+                    params![row.row_id, stored_text],
+                )?;
+                Self::add_aliases(executor, row.row_id, stored, std::slice::from_ref(&row.key))?;
+                Ok(row.row_id)
+            }
+        }
+    }
+
+    /// Records the server's answer to a row it was sent: that `stored` is now `saved`. Returns
+    /// the row, which is the stored key's.
+    pub fn apply_answer(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        row_id: RowId,
+        saved: bool,
+        stored: &ReaderSavedKey,
+        total: Option<u64>,
+    ) -> Result<RowId, SqliteDbError> {
+        if let Some(total) = total {
+            Self::set_total(executor, account, total)?;
+        }
+        let Some(row) = Self::select_row(executor, row_id)? else {
+            return Ok(row_id);
+        };
+        let row_id = Self::rekey(executor, account, &row, stored)?;
+        executor.execute(
+            "UPDATE reader_saved_posts SET server = ?2, in_doubt = 0 WHERE rowid = ?1",
+            params![row_id, saved],
+        )?;
+        Ok(row_id)
+    }
+
+    /// Records that the server refused what a row asked for. A tap is undone. An imported save is
+    /// kept on this device instead.
+    pub fn apply_refusal(
+        executor: &impl QueryExecutor,
+        row_id: RowId,
+    ) -> Result<(), SqliteDbError> {
+        let Some(row) = Self::select_row(executor, row_id)? else {
+            return Ok(());
+        };
+        if row.imported && row.saved {
+            executor.execute(
+                "UPDATE reader_saved_posts SET local_only = 1, in_doubt = 0 WHERE rowid = ?1",
+                [row_id],
+            )?;
+            return Ok(());
+        }
+        match row.server {
+            None => Self::delete(executor, row_id),
+            Some(server) => {
+                executor.execute(
+                    "UPDATE reader_saved_posts SET saved = ?2, in_doubt = 0 WHERE rowid = ?1",
+                    params![row_id, server],
+                )?;
+                Ok(())
+            }
+        }
+    }
+
+    /// Applies a refresh of the saved keys: newest first, `returned` of them before any normalized
+    /// to the same key, out of `total`.
+    ///
+    /// A key returned is saved on the server. A key not returned isn't, if the refresh returned
+    /// them all, or if the row is no older than the oldest key returned: past 1,000 keys, an older
+    /// one may just be past the end. A row that agreed with the server follows it; a pending one
+    /// stays pending. So does one in doubt, even if it reads as agreeing: its request may have
+    /// landed since, so what the server last said is out of date, and the user's last tap stands.
+    /// Rows the server and the user agree are unsaved are removed.
+    pub fn apply_keys(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        keys: &[DbReaderSavedKey],
+        returned: u64,
+        total: u64,
+    ) -> Result<(), SqliteDbError> {
+        let complete = returned >= total;
+        let mut seen = Vec::new();
+        for entry in keys {
+            let text = reader_saved_key_text(&entry.key);
+            // A row saved by the URL is the same save.
+            if let Some(url) = &entry.url {
+                let url_key = ReaderSavedKey::Url { url: url.clone() };
+                let url_text = reader_saved_key_text(&url_key);
+                if url_text != text {
+                    for row in Self::select_where(executor, account, "s.key = ?2", &[&url_text])? {
+                        Self::rekey(executor, account, &row, &entry.key)?;
+                    }
+                }
+            }
+            let existing = Self::select_where(executor, account, "s.key = ?2", &[&text])?;
+            let row_id = match existing.into_iter().next() {
+                Some(row) => {
+                    let agreed = !row.in_doubt && row.server == Some(row.saved);
+                    executor.execute(
+                        "UPDATE reader_saved_posts SET
+                            server = 1, in_doubt = 0, date_saved = ?2,
+                            saved = CASE WHEN ?3 THEN 1 ELSE saved END
+                        WHERE rowid = ?1",
+                        params![row.row_id, reader_date_text(&entry.date_saved), agreed],
+                    )?;
+                    row.row_id
+                }
+                None => {
+                    let row_id =
+                        Self::insert(executor, account, &entry.key, true, Some(true), 0, false)?;
+                    executor.execute(
+                        "UPDATE reader_saved_posts SET date_saved = ?2 WHERE rowid = ?1",
+                        params![row_id, reader_date_text(&entry.date_saved)],
+                    )?;
+                    row_id
+                }
+            };
+            if let Some(url) = &entry.url {
+                Self::add_aliases(
+                    executor,
+                    row_id,
+                    &entry.key,
+                    &[ReaderSavedKey::Url { url: url.clone() }],
+                )?;
+            }
+            seen.push(row_id);
+        }
+
+        let oldest = keys
+            .iter()
+            .map(|entry| reader_date_text(&entry.date_saved))
+            .min();
+        let seen_list = seen
+            .iter()
+            .map(|row| row.0.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        executor.execute(
+            &format!(
+                "UPDATE reader_saved_posts SET
+                    saved = CASE WHEN in_doubt = 0 AND server IS NOT NULL AND server = saved
+                        THEN 0 ELSE saved END,
+                    server = 0, in_doubt = 0
+                WHERE account_id = ?1 AND local_only = 0 AND rowid NOT IN ({seen_list})
+                    AND (?2 OR date_saved IS NULL OR date_saved >= ?3)"
+            ),
+            params![account, complete, oldest],
+        )?;
+        executor.execute(
+            "DELETE FROM reader_saved_posts
+            WHERE account_id = ?1 AND local_only = 0 AND saved = 0 AND server = 0",
+            [account],
+        )?;
+        executor.execute(
+            "INSERT INTO reader_saved_state (account_id, keys_refreshed, keys_complete, total)
+            VALUES (?1, 1, ?2, ?3)
+            ON CONFLICT(account_id) DO UPDATE SET
+                keys_refreshed = 1, keys_complete = excluded.keys_complete, total = excluded.total",
+            params![account, complete, total],
+        )?;
+        Ok(())
+    }
+
+    /// Records that the saved list sent a post: it's saved, and shows in the list. `keys` are the
+    /// keys it may be saved under, `main` first. A row that's already there keeps what the user
+    /// wants and what the server said.
+    pub fn apply_listed(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        main: &ReaderSavedKey,
+        keys: &[ReaderSavedKey],
+        post: RowId,
+        date_saved: Option<&WpGmtDateTime>,
+    ) -> Result<(), SqliteDbError> {
+        let rows = Self::select_rows_for_keys(executor, account, keys)?;
+        let row_id = match rows.first() {
+            Some(row) => row.row_id,
+            None => Self::insert(executor, account, main, true, Some(true), 0, true)?,
+        };
+        executor.execute(
+            "UPDATE reader_saved_posts SET
+                listed = 1, post_id = ?2, date_saved = COALESCE(?3, date_saved)
+            WHERE rowid = ?1",
+            params![row_id, post, date_saved.map(reader_date_text)],
+        )?;
+        Self::add_aliases(executor, row_id, main, keys)
+    }
+
+    /// Adds an imported save, unless the key has a row already. Returns whether it added one.
+    pub fn insert_imported(
         executor: &impl QueryExecutor,
         account: RowId,
         key: &ReaderSavedKey,
+        post: Option<RowId>,
+        date_saved: Option<&WpGmtDateTime>,
     ) -> Result<bool, SqliteDbError> {
-        let deleted = executor.execute(
-            "DELETE FROM reader_saved_local_only WHERE account_id = ?1 AND key = ?2",
-            params![account, reader_saved_key_text(key)],
+        if !Self::select_rows_for_keys(executor, account, std::slice::from_ref(key))?.is_empty() {
+            return Ok(false);
+        }
+        let seq = Self::next_seq(executor, account)?;
+        let row_id = Self::insert(executor, account, key, true, None, seq, true)?;
+        executor.execute(
+            "UPDATE reader_saved_posts SET imported = 1, post_id = ?2, date_saved = ?3
+            WHERE rowid = ?1",
+            params![row_id, post, date_saved.map(reader_date_text)],
         )?;
-        Ok(deleted > 0)
+        Ok(true)
     }
 
-    /// Local-only saves, newest first, with their posts when stored.
-    pub fn select_local_only(
+    /// The newest total the server gave, moved by what's pending: `None` before any.
+    pub fn saved_count(
         executor: &impl QueryExecutor,
         account: RowId,
-    ) -> Result<Vec<DbReaderSavedLocalOnly>, SqliteDbError> {
+    ) -> Result<Option<u64>, SqliteDbError> {
+        let Some(total) = Self::select_state(executor, account)?.total else {
+            return Ok(None);
+        };
+        let mut statement = executor.prepare(
+            "SELECT COALESCE(SUM(CASE
+                WHEN server IS NULL THEN saved
+                ELSE saved - server END), 0)
+            FROM reader_saved_posts WHERE account_id = ?1 AND local_only = 0",
+        )?;
+        let delta: i64 = statement.query_row([account], |row| row.get(0))?;
+        Ok(Some((total as i64 + delta).max(0) as u64))
+    }
+
+    /// The saved list: rows saved and listed, or kept on this device, newest first, with their
+    /// posts.
+    pub fn select_list(
+        executor: &impl QueryExecutor,
+        account: RowId,
+    ) -> Result<Vec<DbReaderSavedListItem>, SqliteDbError> {
         let sql = format!(
-            "SELECT l.key, l.date_saved, l.post_id, {POST_COLUMNS} FROM reader_saved_local_only l
-            LEFT JOIN reader_posts p ON p.rowid = l.post_id
-            WHERE l.account_id = ?1
-            ORDER BY l.date_saved IS NULL, l.date_saved DESC, l.rowid ASC"
+            "SELECT {ROW_COLUMNS}, {POST_COLUMNS} FROM reader_saved_posts s
+            LEFT JOIN reader_posts p ON p.rowid = s.post_id
+            WHERE s.account_id = ?1 AND s.saved = 1 AND (s.listed = 1 OR s.local_only = 1)
+            ORDER BY s.date_saved IS NULL, s.date_saved DESC, s.seq DESC, s.rowid DESC"
         );
         let mut statement = executor.prepare(&sql)?;
         let rows = statement.query_map([account], |row| {
-            Ok((|| -> Result<DbReaderSavedLocalOnly, SqliteDbError> {
-                let key: String = row.get(0)?;
-                let date_saved: Option<String> = row.get(1)?;
-                let post_row: Option<RowId> = row.get(2)?;
-                Ok(DbReaderSavedLocalOnly {
-                    key: reader_saved_key_from_text(&key)?,
-                    date_saved: date_saved
-                        .map(|text| reader_date_from_text(&text))
-                        .transpose()?,
-                    post: match post_row {
-                        Some(_) => Some(post_from_row(row, 3)?.1),
-                        None => None,
-                    },
-                })
+            Ok((|| -> Result<DbReaderSavedListItem, SqliteDbError> {
+                let saved = saved_row_from_row(row)?;
+                let post = match saved.post_row_id {
+                    Some(_) => Some(post_from_row(row, ROW_COLUMN_COUNT)?.1),
+                    None => None,
+                };
+                Ok(DbReaderSavedListItem { row: saved, post })
             })())
         })?;
         collect_rows(rows.map(|row| row.map_err(SqliteDbError::from).and_then(|row| row)))

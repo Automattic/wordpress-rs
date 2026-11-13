@@ -22,17 +22,16 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 })
             }
         }),
-        Trial::test("reader_saved::service_refresh_and_list", {
+        Trial::test("reader_saved::service_sync", {
             let ctx = Arc::clone(&ctx);
             move || {
                 ctx.runtime.block_on(async {
                     let service = saved_service(&ctx, migrated_cache()?)?;
-                    service.refresh().await.map_err(|e| e.to_string())?;
-                    service
-                        .list_posts(ReaderSavedPostsParams::default())
-                        .await
-                        .map_err(|e| e.to_string())?;
-                    assert!(service.saved_count().is_some());
+                    service.sync().await.map_err(|e| e.to_string())?;
+                    let count = service.saved_count().map_err(|e| e.to_string())?;
+                    if count.is_none() {
+                        return Err("No count after a sync".into());
+                    }
                     Ok(())
                 })
             }
@@ -46,7 +45,10 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let collection = Arc::clone(&service).saved_posts();
                     let page = collection.refresh().await.map_err(|e| e.to_string())?;
                     let items = collection.load_items().await.map_err(|e| e.to_string())?;
-                    let count = service.saved_count().ok_or("No count after a refresh")?;
+                    let count = service
+                        .saved_count()
+                        .map_err(|e| e.to_string())?
+                        .ok_or("No count after a refresh")?;
                     if count > 0 && items.is_empty() {
                         return Err(format!("{count} saves, but the list is empty").into());
                     }
@@ -59,11 +61,12 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     // A new service on the same cache, as after a relaunch, knows the same
                     // without a request.
                     let service = Arc::new(saved_service(&ctx, cache)?);
-                    if service.saved_count() != Some(count) {
+                    if service.saved_count().map_err(|e| e.to_string())? != Some(count) {
                         return Err("The count wasn't kept".into());
                     }
                     if let Some(post) = first.and_then(|item| item.post)
-                        && service.status(post.identity) != ReaderSavedStatus::Saved
+                        && service.status(post.identity).map_err(|e| e.to_string())?
+                            != ReaderSavedStatus::Saved
                     {
                         return Err("A listed post isn't saved after a relaunch".into());
                     }

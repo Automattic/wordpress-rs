@@ -16,7 +16,6 @@ use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderFeedItemId};
 pub(super) const KEYS_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/keys";
 pub(super) const NEW_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/new";
 pub(super) const DELETE_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/delete";
-pub(super) const BULK_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/bulk";
 pub(super) const LIST_URL: &str = "https://public-api.wordpress.com/rest/v1.2/read/saved";
 
 pub(super) enum Step {
@@ -34,6 +33,23 @@ pub(super) struct Sent {
     pub(super) method: RequestMethod,
     pub(super) url: String,
     pub(super) body: Option<Value>,
+}
+
+impl Sent {
+    /// The request in short: `keys`, `list`, `bulk`, or `new` or `delete` with its body.
+    pub(super) fn short(&self) -> String {
+        let endpoint = self.url.split('?').next().unwrap_or_default();
+        let name = endpoint.rsplit('/').next().unwrap_or_default();
+        match (name, &self.body) {
+            ("new" | "delete", Some(body)) => {
+                let mut body = body.clone();
+                body.as_object_mut().unwrap().remove("source");
+                format!("{name} {body}")
+            }
+            ("saved", _) => "list".to_string(),
+            _ => name.to_string(),
+        }
+    }
 }
 
 /// Plays back a script of responses, and records every request.
@@ -58,6 +74,10 @@ impl ScriptedExecutor {
 
     pub(super) fn sent(&self) -> Vec<Sent> {
         self.sent.lock().unwrap().clone()
+    }
+
+    pub(super) fn sent_short(&self) -> Vec<String> {
+        self.sent().iter().map(Sent::short).collect()
     }
 }
 
@@ -126,18 +146,22 @@ impl RequestExecutor for ScriptedExecutor {
     fn cancel(&self, _: Arc<RequestContext>) {}
 }
 
+pub(super) fn delegate(executor: Arc<dyn RequestExecutor>) -> WpApiClientDelegate {
+    WpApiClientDelegate {
+        auth_provider: Arc::new(WpAuthenticationProvider::none()),
+        request_executor: executor,
+        middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+        app_notifier: Arc::new(EmptyAppNotifier),
+        language_provider: None,
+    }
+}
+
 pub(super) fn service_with(
     source: ReaderSavedSource,
 ) -> (ReaderSavedService, Arc<ScriptedExecutor>) {
     let executor = Arc::new(ScriptedExecutor::default());
     let service = ReaderSavedService::new(
-        WpApiClientDelegate {
-            auth_provider: Arc::new(WpAuthenticationProvider::none()),
-            request_executor: executor.clone(),
-            middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
-            app_notifier: Arc::new(EmptyAppNotifier),
-            language_provider: None,
-        },
+        delegate(executor.clone()),
         source,
         storage::migrated_in_memory_cache(),
         WpComUserId(1),
@@ -200,13 +224,6 @@ pub(super) fn feed_key(feed_item_id: u64) -> ReaderSavedKey {
     }
 }
 
-pub(super) fn bulk_post_key(post_id: i64) -> ReaderSavedBulkKey {
-    ReaderSavedBulkKey::Post {
-        blog_id: WpComSiteId(123),
-        post_id: PostId(post_id),
-    }
-}
-
 pub(super) fn post_json(post_id: u64) -> Value {
     json!({ "blog_id": 123, "post_id": post_id })
 }
@@ -241,6 +258,14 @@ pub(super) fn write_response(saved: bool, key: Value, total: u64) -> Value {
     json!({ "saved": saved, "key": key, "total": total, "resolved": resolved })
 }
 
+pub(super) fn bulk_response(keys: &[Value], total: u64) -> Value {
+    let results: Vec<_> = keys
+        .iter()
+        .map(|key| json!({ "key": key, "saved": true }))
+        .collect();
+    json!({ "results": results, "total": total })
+}
+
 pub(super) fn listed_post(post_id: u64) -> Value {
     json!({ "ID": post_id, "site_ID": 123, "is_external": false, "title": format!("Post {post_id}") })
 }
@@ -259,33 +284,52 @@ pub(super) fn error_response() -> Value {
     json!({ "code": "post_not_found", "message": "Post not found.", "data": { "status": 404 } })
 }
 
-pub(super) async fn refreshed(
+pub(super) fn cap_response() -> Value {
+    json!({ "code": "saved_limit_reached", "message": "You can save up to 1000 posts." })
+}
+
+/// Syncs, with the server holding `keys` and nothing pending.
+pub(super) async fn synced(
     service: &ReaderSavedService,
     executor: &ScriptedExecutor,
     keys: &[Value],
 ) {
     executor.push(Step::Respond(200, keys_response(keys)));
-    service.refresh().await.unwrap();
+    service.sync().await.unwrap();
 }
 
-// Refreshing
+fn status(service: &ReaderSavedService, post: ReaderPostSaveIdentity) -> ReaderSavedStatus {
+    service.status(post).unwrap()
+}
+
+fn count(service: &ReaderSavedService) -> Option<u64> {
+    service.saved_count().unwrap()
+}
+
+fn is_pending(outcome: &ReaderSavedOutcome) -> bool {
+    matches!(outcome, ReaderSavedOutcome::Pending { .. })
+}
+
+use ReaderSavedStatus::{NotSaved, Saved, Unknown};
+
+// Syncing
 
 #[tokio::test]
-async fn a_post_is_unknown_before_a_refresh() {
+async fn a_post_is_unknown_before_a_sync() {
     let (service, _) = service();
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Unknown);
-    assert_eq!(service.saved_count(), None);
+    assert_eq!(status(&service, identity(1)), Unknown);
+    assert_eq!(count(&service), None);
 }
 
 #[tokio::test]
-async fn a_refresh_loads_the_keys() {
+async fn a_sync_loads_the_keys() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1), feed_json(2)]).await;
+    synced(&service, &executor, &[post_json(1), feed_json(2)]).await;
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(identity(3)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.saved_count(), Some(2));
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(status(&service, rss_identity(2)), Saved);
+    assert_eq!(status(&service, identity(3)), NotSaved);
+    assert_eq!(count(&service), Some(2));
 
     let sent = executor.sent();
     assert_eq!(sent.len(), 1);
@@ -294,43 +338,62 @@ async fn a_refresh_loads_the_keys() {
 }
 
 #[tokio::test]
-async fn a_failed_refresh_reports_the_error_and_keeps_the_keys() {
+async fn a_failed_sync_reports_the_error_and_keeps_the_keys() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
+    synced(&service, &executor, &[post_json(1)]).await;
 
     executor.push(Step::Respond(500, error_response()));
 
     assert!(matches!(
-        service.refresh().await,
+        service.sync().await,
         Err(ReaderSavedError::Api(_))
     ));
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    assert_eq!(status(&service, identity(1)), Saved);
 }
 
 #[tokio::test]
-async fn a_refresh_that_cannot_reach_the_server_reports_it() {
+async fn a_sync_that_cannot_reach_the_server_reports_it() {
     let (service, executor) = service();
     executor.push(Step::Offline);
 
     assert!(matches!(
-        service.refresh().await,
+        service.sync().await,
         Err(ReaderSavedError::Api(_))
     ));
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Unknown);
+    assert_eq!(status(&service, identity(1)), Unknown);
 }
 
 #[tokio::test]
-async fn a_refresh_with_a_malformed_response_fails_rather_than_emptying_the_list() {
+async fn a_sync_with_a_malformed_response_fails_rather_than_emptying_the_list() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
+    synced(&service, &executor, &[post_json(1)]).await;
 
     executor.push(Step::Respond(
         200,
         json!({ "keys": [{ "id": 1 }], "total": 1 }),
     ));
 
-    assert!(service.refresh().await.is_err());
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    assert!(service.sync().await.is_err());
+    assert_eq!(status(&service, identity(1)), Saved);
+}
+
+/// A sync sends what's pending before it reads the keys, so the read has it.
+#[tokio::test]
+async fn a_sync_sends_what_is_pending_before_it_reads() {
+    let (service, executor) = service();
+    executor.push(Step::Offline);
+    let outcome = service.save(identity(1)).await.unwrap();
+    assert!(is_pending(&outcome), "{outcome:?}");
+
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    synced(&service, &executor, &[post_json(1)]).await;
+
+    assert_eq!(
+        executor.sent_short()[1..],
+        [r#"new {"blog_id":123,"post_id":1}"#, "keys"]
+    );
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(count(&service), Some(1));
 }
 
 // Status
@@ -338,29 +401,22 @@ async fn a_refresh_with_a_malformed_response_fails_rather_than_emptying_the_list
 #[tokio::test]
 async fn a_jetpack_post_is_saved_under_either_key() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[feed_json(2)]).await;
+    synced(&service, &executor, &[feed_json(2)]).await;
 
-    assert_eq!(
-        service.status(jetpack_identity(1, 2)),
-        ReaderSavedStatus::Saved
-    );
+    assert_eq!(status(&service, jetpack_identity(1, 2)), Saved);
 }
 
 #[tokio::test]
 async fn a_post_without_ids_is_not_saved() {
     let (service, _) = service();
-    assert_eq!(
-        service.status(unsaveable_identity()),
-        ReaderSavedStatus::NotSaved
-    );
+    assert_eq!(status(&service, unsaveable_identity()), NotSaved);
 }
 
 #[tokio::test]
 async fn status_does_not_touch_the_network() {
     let (service, executor) = service();
-    service.status(identity(1));
-    service.saved_count();
-    service.recent_saves();
+    service.status(identity(1)).unwrap();
+    service.saved_count().unwrap();
     assert!(executor.sent().is_empty());
 }
 
@@ -374,9 +430,9 @@ async fn save_sends_the_key_and_source(#[case] source: ReaderSavedSource, #[case
     let (service, executor) = service_with(source);
     executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
 
-    let key = service.save(identity(1)).await.unwrap();
+    let outcome = service.save(identity(1)).await.unwrap();
 
-    assert_eq!(key, post_key(1));
+    assert_eq!(outcome, ReaderSavedOutcome::Synced { key: post_key(1) });
     let sent = executor.sent();
     assert_eq!(sent[0].method, RequestMethod::POST);
     assert!(sent[0].url.starts_with(NEW_URL), "{}", sent[0].url);
@@ -412,91 +468,133 @@ async fn a_post_without_ids_cannot_be_saved_and_sends_nothing() {
 #[tokio::test]
 async fn a_save_shows_while_the_request_is_in_flight() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     let (release, held) = oneshot::channel();
     executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
 
     let (result, ()) = futures::join!(service.save(identity(1)), async {
-        assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-        assert_eq!(service.saved_count(), Some(1));
+        assert_eq!(status(&service, identity(1)), Saved);
+        assert_eq!(count(&service), Some(1));
         release.send(()).unwrap();
     });
 
     result.unwrap();
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    assert_eq!(status(&service, identity(1)), Saved);
 }
 
+/// The account's save cap is the one forbidden answer that won't pass.
 #[tokio::test]
-async fn a_refused_save_is_undone_and_reported() {
+async fn a_save_refused_at_the_cap_is_undone_and_reported() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(
-        403,
-        json!({ "code": "saved_limit_reached", "message": "You can save up to 1000 posts." }),
-    ));
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(403, cap_response()));
 
     let result = service.save(identity(1)).await;
 
     let Err(ReaderSavedError::Api(error)) = result else {
-        panic!("Expected an API error");
+        panic!("Expected an API error, got {result:?}");
     };
     assert!(error.to_string().contains("1000"), "{error}");
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.saved_count(), Some(0));
+    assert_eq!(status(&service, identity(1)), NotSaved);
+    assert_eq!(count(&service), Some(0));
+}
+
+/// Any other forbidden answer, such as an expired token, may pass, so the save waits to be sent
+/// again.
+#[tokio::test]
+async fn a_save_forbidden_for_another_reason_stays_queued() {
+    let (service, executor) = service();
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(
+        403,
+        json!({ "code": "rest_forbidden", "message": "Sorry, you are not allowed to do that." }),
+    ));
+
+    let outcome = service.save(identity(1)).await.unwrap();
+
+    assert!(is_pending(&outcome), "{outcome:?}");
+    assert_eq!(status(&service, identity(1)), Saved);
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    synced(&service, &executor, &[post_json(1)]).await;
+    assert_eq!(executor.sent().len(), 4, "sent again by the sync");
 }
 
 #[tokio::test]
-async fn a_save_that_cannot_reach_the_server_is_undone() {
+async fn a_save_that_cannot_reach_the_server_is_queued() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     executor.push(Step::Offline);
 
-    assert!(service.save(identity(1)).await.is_err());
+    let outcome = service.save(identity(1)).await.unwrap();
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert!(service.recent_saves().is_empty());
+    assert!(is_pending(&outcome), "{outcome:?}");
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(count(&service), Some(1));
 }
 
-/// The server answered, so it may have applied the save: it stands until a read can say.
+/// The server answered, so it may have applied the save: a sync says.
 #[tokio::test]
-async fn a_save_whose_answer_cannot_be_read_stands_until_a_read() {
+async fn a_save_whose_answer_cannot_be_read_waits_for_a_sync() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     executor.push(Step::Respond(200, json!({ "unexpected": true })));
 
-    assert!(service.save(identity(1)).await.is_err());
+    let outcome = service.save(identity(1)).await.unwrap();
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    assert!(is_pending(&outcome), "{outcome:?}");
+    assert_eq!(status(&service, identity(1)), Saved);
 }
 
 #[tokio::test]
-async fn a_save_that_times_out_stands_until_a_read() {
+async fn a_save_answered_with_a_server_error_waits_for_a_sync() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(502, json!({})));
+
+    let outcome = service.save(identity(1)).await.unwrap();
+
+    assert!(is_pending(&outcome), "{outcome:?}");
+    assert_eq!(status(&service, identity(1)), Saved);
+}
+
+/// The timed-out save isn't sent again until the keys say the server doesn't have it.
+#[tokio::test]
+async fn a_save_that_times_out_is_sent_again_once_a_sync_says_the_server_lacks_it() {
+    let (service, executor) = service();
+    synced(&service, &executor, &[]).await;
     executor.push(Step::TimedOut);
 
-    assert!(service.save(identity(1)).await.is_err());
+    let outcome = service.save(identity(1)).await.unwrap();
+    assert!(is_pending(&outcome), "{outcome:?}");
+    assert_eq!(status(&service, identity(1)), Saved);
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    refreshed(&service, &executor, &[]).await;
+    executor.push(Step::Respond(200, keys_response(&[])));
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service.sync().await.unwrap();
+
     assert_eq!(
-        service.status(identity(1)),
-        ReaderSavedStatus::Saved,
-        "a refresh straight away may predate it"
+        executor.sent_short()[1..],
+        [
+            r#"new {"blog_id":123,"post_id":1}"#,
+            "keys",
+            r#"new {"blog_id":123,"post_id":1}"#
+        ]
     );
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(count(&service), Some(1));
 }
 
 #[tokio::test]
 async fn a_save_stored_under_another_key_shows_under_that_key() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
 
-    let key = service.save(rss_identity(7)).await.unwrap();
+    let outcome = service.save(rss_identity(7)).await.unwrap();
 
-    assert_eq!(key, post_key(1));
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.recent_saves(), vec![post_key(1)]);
+    assert_eq!(outcome, ReaderSavedOutcome::Synced { key: post_key(1) });
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(status(&service, rss_identity(7)), Saved);
 }
 
 // Saving URLs
@@ -530,39 +628,68 @@ async fn save_url_sends_the_page_details() {
     );
 }
 
+/// The details last until the save is answered, so a retry within the launch sends them too.
+#[tokio::test]
+async fn a_url_save_sent_again_still_sends_the_page_details() {
+    let (service, executor) = service();
+    executor.push(Step::Offline);
+    service
+        .save_url(
+            "https://example.com/page".to_string(),
+            Some(ReaderSavedPageDetails {
+                title: Some("A page".to_string()),
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+
+    executor.push(Step::Respond(
+        200,
+        write_response(true, json!({ "url": "https://example.com/page" }), 1),
+    ));
+    executor.push(Step::Respond(200, keys_response(&[])));
+    service.sync().await.unwrap();
+
+    assert_eq!(executor.sent()[0].body, executor.sent()[1].body);
+}
+
 #[tokio::test]
 async fn a_url_of_a_wp_com_post_returns_the_post_key() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
 
-    let key = service
+    let outcome = service
         .save_url("https://example.com/post".to_string(), None)
         .await
         .unwrap();
 
-    assert_eq!(key, post_key(1));
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    assert_eq!(outcome, ReaderSavedOutcome::Synced { key: post_key(1) });
+    assert_eq!(status(&service, identity(1)), Saved);
 }
 
 #[tokio::test]
 async fn a_saved_url_can_be_unsaved_with_another_spelling() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     let page = json!({ "url": "https://example.com/page" });
     executor.push(Step::Respond(200, write_response(true, page.clone(), 1)));
     executor.push(Step::Respond(200, write_response(false, page, 0)));
 
-    let key = service
+    let ReaderSavedOutcome::Synced { key } = service
         .save_url("https://example.com/page/?utm_source=x".to_string(), None)
         .await
-        .unwrap();
-    assert_eq!(service.saved_count(), Some(1));
+        .unwrap()
+    else {
+        panic!("Expected the save to sync");
+    };
+    assert_eq!(count(&service), Some(1));
 
     service.unsave_key(key).await.unwrap();
 
-    assert_eq!(service.saved_count(), Some(0));
-    assert!(service.recent_saves().is_empty());
+    assert_eq!(count(&service), Some(0));
+    assert_eq!(executor.sent().len(), 3);
 }
 
 // Unsaving
@@ -570,11 +697,12 @@ async fn a_saved_url_can_be_unsaved_with_another_spelling() {
 #[tokio::test]
 async fn unsave_sends_the_key_and_source() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
+    synced(&service, &executor, &[post_json(1)]).await;
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
 
-    service.unsave(identity(1)).await.unwrap();
+    let outcome = service.unsave(identity(1)).await.unwrap();
 
+    assert_eq!(outcome, ReaderSavedOutcome::Synced { key: post_key(1) });
     let sent = executor.sent();
     let request = sent.last().unwrap();
     assert!(request.url.starts_with(DELETE_URL), "{}", request.url);
@@ -583,80 +711,67 @@ async fn unsave_sends_the_key_and_source() {
         request.body,
         Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" }))
     );
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert_eq!(status(&service, identity(1)), NotSaved);
 }
 
+/// The keys returned every save, and say the post is saved under its feed item alone.
 #[tokio::test]
-async fn unsave_sends_every_key_the_post_may_be_saved_under() {
+async fn unsave_sends_only_the_keys_the_post_is_saved_under() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[feed_json(2)]).await;
-    // The post isn't saved under its blog and post IDs: deleting those does nothing.
-    executor.push(Step::Respond(200, write_response(false, post_json(1), 1)));
+    synced(&service, &executor, &[feed_json(2)]).await;
     executor.push(Step::Respond(200, write_response(false, feed_json(2), 0)));
 
     service.unsave(jetpack_identity(1, 2)).await.unwrap();
 
-    let bodies: Vec<_> = executor.sent()[1..]
-        .iter()
-        .map(|sent| sent.body.clone())
-        .collect();
-    assert_eq!(
-        bodies,
-        vec![
-            Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" })),
-            Some(json!({ "feed_item_id": 2, "source": "android" })),
-        ]
-    );
-    assert_eq!(
-        service.status(jetpack_identity(1, 2)),
-        ReaderSavedStatus::NotSaved
-    );
-    assert_eq!(service.saved_count(), Some(0));
+    assert_eq!(executor.sent_short()[1..], [r#"delete {"feed_item_id":2}"#]);
+    assert_eq!(status(&service, jetpack_identity(1, 2)), NotSaved);
+    assert_eq!(count(&service), Some(0));
 }
 
 #[tokio::test]
 async fn unsave_removes_every_key_that_matched() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1), feed_json(2)]).await;
+    synced(&service, &executor, &[post_json(1), feed_json(2)]).await;
     executor.push(Step::Respond(200, write_response(false, post_json(1), 1)));
     executor.push(Step::Respond(200, write_response(false, feed_json(2), 0)));
 
     service.unsave(jetpack_identity(1, 2)).await.unwrap();
 
     assert_eq!(executor.sent().len(), 3);
-    assert_eq!(
-        service.status(jetpack_identity(1, 2)),
-        ReaderSavedStatus::NotSaved
-    );
-    assert_eq!(service.saved_count(), Some(0));
+    assert_eq!(status(&service, jetpack_identity(1, 2)), NotSaved);
+    assert_eq!(count(&service), Some(0));
 }
 
-/// Before the first refresh nothing says which key the post is saved under, and missing one
-/// leaves it saved.
+/// Before the first sync nothing says which key the post is saved under, and missing one leaves it
+/// saved.
 #[tokio::test]
-async fn unsave_before_a_refresh_sends_every_key() {
+async fn unsave_before_a_sync_sends_every_key() {
     let (service, executor) = service();
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
     executor.push(Step::Respond(200, write_response(false, feed_json(2), 0)));
 
     service.unsave(jetpack_identity(1, 2)).await.unwrap();
 
-    let bodies: Vec<_> = executor
-        .sent()
-        .iter()
-        .map(|sent| sent.body.clone())
-        .collect();
     assert_eq!(
-        bodies,
-        vec![
-            Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" })),
-            Some(json!({ "feed_item_id": 2, "source": "android" })),
+        executor.sent_short(),
+        [
+            r#"delete {"blog_id":123,"post_id":1}"#,
+            r#"delete {"feed_item_id":2}"#
         ]
     );
-    assert_eq!(
-        service.status(jetpack_identity(1, 2)),
-        ReaderSavedStatus::NotSaved
-    );
+    assert_eq!(status(&service, jetpack_identity(1, 2)), NotSaved);
+}
+
+/// The keys returned every save and the post isn't one, so there's nothing to send.
+#[tokio::test]
+async fn unsaving_a_post_the_keys_say_is_not_saved_sends_nothing() {
+    let (service, executor) = service();
+    synced(&service, &executor, &[]).await;
+
+    let outcome = service.unsave(identity(1)).await.unwrap();
+
+    assert_eq!(outcome, ReaderSavedOutcome::Synced { key: post_key(1) });
+    assert_eq!(executor.sent().len(), 1);
 }
 
 #[tokio::test]
@@ -672,7 +787,7 @@ async fn a_post_without_ids_cannot_be_unsaved_and_sends_nothing() {
 #[tokio::test]
 async fn an_unsave_shows_while_the_request_is_in_flight() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
+    synced(&service, &executor, &[post_json(1)]).await;
     let (release, held) = oneshot::channel();
     executor.push(Step::Hold(
         held,
@@ -681,8 +796,8 @@ async fn an_unsave_shows_while_the_request_is_in_flight() {
     ));
 
     let (result, ()) = futures::join!(service.unsave(identity(1)), async {
-        assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-        assert_eq!(service.saved_count(), Some(0));
+        assert_eq!(status(&service, identity(1)), NotSaved);
+        assert_eq!(count(&service), Some(0));
         release.send(()).unwrap();
     });
 
@@ -692,7 +807,7 @@ async fn an_unsave_shows_while_the_request_is_in_flight() {
 #[tokio::test]
 async fn unsaving_a_post_under_two_keys_shows_straight_away() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1), feed_json(2)]).await;
+    synced(&service, &executor, &[post_json(1), feed_json(2)]).await;
     let (release, held) = oneshot::channel();
     executor.push(Step::Hold(
         held,
@@ -702,44 +817,72 @@ async fn unsaving_a_post_under_two_keys_shows_straight_away() {
     executor.push(Step::Respond(200, write_response(false, feed_json(2), 0)));
 
     let (result, ()) = futures::join!(service.unsave(jetpack_identity(1, 2)), async {
-        assert_eq!(
-            service.status(jetpack_identity(1, 2)),
-            ReaderSavedStatus::NotSaved
-        );
-        assert_eq!(service.saved_count(), Some(0));
+        assert_eq!(status(&service, jetpack_identity(1, 2)), NotSaved);
+        assert_eq!(count(&service), Some(0));
         release.send(()).unwrap();
     });
 
     result.unwrap();
 }
 
+/// An unsave tapped offline waits on the device, and the next sync sends it.
+#[tokio::test]
+async fn an_unsave_that_cannot_reach_the_server_is_sent_by_the_next_sync() {
+    let (service, executor) = service();
+    synced(&service, &executor, &[post_json(1)]).await;
+    executor.push(Step::Offline);
+
+    let outcome = service.unsave(identity(1)).await.unwrap();
+    assert!(is_pending(&outcome), "{outcome:?}");
+    assert_eq!(status(&service, identity(1)), NotSaved);
+    assert_eq!(count(&service), Some(0));
+
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+    synced(&service, &executor, &[]).await;
+
+    assert_eq!(
+        executor.sent_short()[1..],
+        [
+            r#"delete {"blog_id":123,"post_id":1}"#,
+            r#"delete {"blog_id":123,"post_id":1}"#,
+            "keys"
+        ]
+    );
+    assert_eq!(status(&service, identity(1)), NotSaved);
+}
+
 // Cancellation: Kotlin cancels a call by dropping its future. Swift doesn't.
 
+/// The tap is on the device the moment it's made, so cancelling the call that waits to send it
+/// doesn't undo it: the call holding the lane sends it.
 #[tokio::test]
-async fn a_save_cancelled_before_it_is_sent_is_undone() {
+async fn a_save_cancelled_while_waiting_its_turn_is_still_sent() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    let (_release, held) = oneshot::channel::<()>();
+    synced(&service, &executor, &[]).await;
+    let (release, held) = oneshot::channel();
     executor.push(Step::Hold(held, 200, write_response(true, post_json(2), 1)));
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 2)));
 
     let mut earlier = Box::pin(service.save(identity(2)));
     let mut save = Box::pin(service.save(identity(1)));
     assert!(futures::poll!(earlier.as_mut()).is_pending());
     assert!(futures::poll!(save.as_mut()).is_pending());
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-
     drop(save);
+    assert_eq!(status(&service, identity(1)), Saved);
 
-    assert_eq!(executor.sent().len(), 2, "only the earlier save was sent");
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.recent_saves(), vec![post_key(2)]);
+    release.send(()).unwrap();
+    earlier.await.unwrap();
+
+    assert_eq!(executor.sent().len(), 3);
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(count(&service), Some(2));
 }
 
-/// Its request went out, so the server may have applied it.
+/// Its request went out, so the server may have applied it: it waits for a sync.
 #[tokio::test]
-async fn a_save_cancelled_after_it_is_sent_stands_until_a_read() {
+async fn a_save_cancelled_after_it_is_sent_waits_for_a_sync() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     let (_release, held) = oneshot::channel::<()>();
     executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
 
@@ -747,14 +890,20 @@ async fn a_save_cancelled_after_it_is_sent_stands_until_a_read() {
     assert!(futures::poll!(save.as_mut()).is_pending());
     drop(save);
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.saved_count(), Some(1));
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(count(&service), Some(1));
+
+    // The server applied it, and a sync says so: nothing is sent again.
+    synced(&service, &executor, &[post_json(1)]).await;
+    assert_eq!(executor.sent().len(), 3);
+    assert_eq!(status(&service, identity(1)), Saved);
 }
 
+/// The delete of the post key went out, and the feed item's waits for the next call that sends.
 #[tokio::test]
-async fn a_cancelled_unsave_is_undone_for_the_keys_not_yet_sent() {
+async fn a_cancelled_unsave_keeps_both_keys_unsaved() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1), feed_json(2)]).await;
+    synced(&service, &executor, &[post_json(1), feed_json(2)]).await;
     let (_release, held) = oneshot::channel::<()>();
     executor.push(Step::Hold(
         held,
@@ -764,33 +913,30 @@ async fn a_cancelled_unsave_is_undone_for_the_keys_not_yet_sent() {
 
     let mut unsave = Box::pin(service.unsave(jetpack_identity(1, 2)));
     assert!(futures::poll!(unsave.as_mut()).is_pending());
-    assert_eq!(
-        service.status(jetpack_identity(1, 2)),
-        ReaderSavedStatus::NotSaved
-    );
-
     drop(unsave);
 
-    // The post key's delete went out and stands; the feed item's never did.
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::Saved);
-    assert_eq!(service.saved_count(), Some(1));
-}
+    assert_eq!(status(&service, identity(1)), NotSaved);
+    assert_eq!(status(&service, rss_identity(2)), NotSaved);
+    assert_eq!(count(&service), Some(0));
 
-#[tokio::test]
-async fn a_cancelled_import_stands_until_a_read() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    let (_release, held) = oneshot::channel::<()>();
-    executor.push(Step::Hold(held, 200, bulk_response(&[post_json(1)], 1)));
+    // The server didn't get the post key's delete. The sync sends the feed item's, and then the
+    // post key's again, now the keys say it's needed.
+    executor.push(Step::Respond(200, write_response(false, feed_json(2), 1)));
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+    service.sync().await.unwrap();
 
-    let mut import = Box::pin(service.import(vec![bulk_post_key(1)]));
-    assert!(futures::poll!(import.as_mut()).is_pending());
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-
-    drop(import);
-
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
+    assert_eq!(
+        executor.sent_short()[1..],
+        [
+            r#"delete {"blog_id":123,"post_id":1}"#,
+            r#"delete {"feed_item_id":2}"#,
+            "keys",
+            r#"delete {"blog_id":123,"post_id":1}"#
+        ]
+    );
+    assert_eq!(status(&service, jetpack_identity(1, 2)), NotSaved);
+    assert_eq!(count(&service), Some(0));
 }
 
 /// A feed item stops resolving once it's pruned, so the server can't find a save the device knows
@@ -798,145 +944,93 @@ async fn a_cancelled_import_stands_until_a_read() {
 #[tokio::test]
 async fn a_feed_item_the_server_cannot_find_is_an_error_when_it_was_saved_there() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[feed_json(2)]).await;
+    synced(&service, &executor, &[feed_json(2)]).await;
     executor.push(Step::Respond(404, error_response()));
 
     assert!(service.unsave(rss_identity(2)).await.is_err());
 
-    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::Saved);
+    assert_eq!(status(&service, rss_identity(2)), Saved);
 }
 
+/// Before a sync, so the delete is sent.
 #[tokio::test]
 async fn a_feed_item_the_server_cannot_find_counts_as_unsaved_when_it_was_not_saved_there() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
     executor.push(Step::Respond(404, error_response()));
 
     service.unsave(rss_identity(2)).await.unwrap();
 
-    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::NotSaved);
+    assert_eq!(executor.sent().len(), 1);
+    assert_eq!(status(&service, rss_identity(2)), NotSaved);
 }
 
 #[tokio::test]
-async fn a_failed_unsave_is_undone_and_reported() {
+async fn a_refused_unsave_is_undone_and_reported() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
+    synced(&service, &executor, &[post_json(1)]).await;
     executor.push(Step::Respond(400, error_response()));
 
     assert!(service.unsave(identity(1)).await.is_err());
 
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.saved_count(), Some(1));
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(count(&service), Some(1));
 }
 
 #[tokio::test]
-async fn a_partly_failed_unsave_tries_every_key_and_keeps_the_one_that_failed() {
+async fn a_partly_refused_unsave_tries_every_key_and_keeps_the_one_refused() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1), feed_json(2)]).await;
+    synced(&service, &executor, &[post_json(1), feed_json(2)]).await;
     executor.push(Step::Respond(400, error_response()));
     executor.push(Step::Respond(200, write_response(false, feed_json(2), 1)));
 
     assert!(service.unsave(jetpack_identity(1, 2)).await.is_err());
 
     assert_eq!(executor.sent().len(), 3);
-    assert_eq!(
-        service.status(jetpack_identity(1, 2)),
-        ReaderSavedStatus::Saved
-    );
-    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.saved_count(), Some(1));
+    assert_eq!(status(&service, jetpack_identity(1, 2)), Saved);
+    assert_eq!(status(&service, rss_identity(2)), NotSaved);
+    assert_eq!(count(&service), Some(1));
 }
 
-// Stale reads, through the whole service
+// One lane: a sync and a tap never overlap on the network
 
+/// The sync waits for the unsave in flight, then reads, so its read includes the unsave.
 #[tokio::test]
-async fn a_stale_refresh_cannot_bring_back_an_unsaved_post() {
+async fn a_sync_waits_for_a_write_in_flight() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
-    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
-    service.unsave(identity(1)).await.unwrap();
-
-    refreshed(&service, &executor, &[post_json(1)]).await;
-
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.saved_count(), Some(0));
-}
-
-#[tokio::test]
-async fn a_stale_refresh_cannot_remove_a_saved_post() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
-    service.save(identity(1)).await.unwrap();
-
-    refreshed(&service, &executor, &[]).await;
-
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.saved_count(), Some(1));
-}
-
-#[tokio::test]
-async fn a_refresh_landing_during_a_slow_unsave_cannot_undo_it() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
+    synced(&service, &executor, &[post_json(1)]).await;
     let (release, held) = oneshot::channel();
     executor.push(Step::Hold(
         held,
         200,
         write_response(false, post_json(1), 0),
     ));
-    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(200, keys_response(&[])));
 
-    let (result, ()) = futures::join!(service.unsave(identity(1)), async {
-        service.refresh().await.unwrap();
-        assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-        release.send(()).unwrap();
-    });
+    let mut unsave = Box::pin(service.unsave(identity(1)));
+    let mut sync = Box::pin(service.sync());
+    assert!(futures::poll!(unsave.as_mut()).is_pending());
+    assert!(futures::poll!(sync.as_mut()).is_pending());
+    assert_eq!(executor.sent().len(), 2, "the sync hasn't read yet");
+    assert_eq!(status(&service, identity(1)), NotSaved);
 
-    result.unwrap();
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    release.send(()).unwrap();
+    let (unsave, sync) = futures::join!(unsave, sync);
+    unsave.unwrap();
+    sync.unwrap();
+
+    assert_eq!(
+        executor.sent_short(),
+        ["keys", r#"delete {"blog_id":123,"post_id":1}"#, "keys"]
+    );
+    assert_eq!(status(&service, identity(1)), NotSaved);
 }
 
-#[tokio::test]
-async fn a_refresh_started_before_a_write_cannot_undo_it_when_it_lands() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
-    let (release, held) = oneshot::channel();
-    executor.push(Step::Hold(held, 200, keys_response(&[post_json(1)])));
-    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
-
-    let (refresh, ()) = futures::join!(service.refresh(), async {
-        service.unsave(identity(1)).await.unwrap();
-        release.send(()).unwrap();
-    });
-
-    refresh.unwrap();
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-}
-
-#[tokio::test]
-async fn a_slow_older_refresh_cannot_replace_a_newer_one() {
-    let (service, executor) = service();
-    let (release, held) = oneshot::channel();
-    executor.push(Step::Hold(held, 200, keys_response(&[post_json(1)])));
-    executor.push(Step::Respond(200, keys_response(&[post_json(2)])));
-
-    let (older, ()) = futures::join!(service.refresh(), async {
-        service.refresh().await.unwrap();
-        release.send(()).unwrap();
-    });
-
-    older.unwrap();
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.status(identity(2)), ReaderSavedStatus::Saved);
-}
-
-/// The server applies a post's writes in the order it receives them, so the unsave isn't sent
-/// until the save has been answered.
+/// The server applies a post's writes in the order it receives them, and the unsave goes once the
+/// save is answered.
 #[tokio::test]
 async fn a_write_waits_for_the_posts_earlier_write_to_finish() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     let (release, held) = oneshot::channel();
     executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
@@ -946,7 +1040,7 @@ async fn a_write_waits_for_the_posts_earlier_write_to_finish() {
     assert!(futures::poll!(save.as_mut()).is_pending());
     assert!(futures::poll!(unsave.as_mut()).is_pending());
     assert_eq!(executor.sent().len(), 2, "only the save has been sent");
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert_eq!(status(&service, identity(1)), NotSaved);
 
     release.send(()).unwrap();
     let (save, unsave) = futures::join!(save, unsave);
@@ -956,18 +1050,19 @@ async fn a_write_waits_for_the_posts_earlier_write_to_finish() {
     let sent = executor.sent();
     assert!(sent[1].url.starts_with(NEW_URL), "{}", sent[1].url);
     assert!(sent[2].url.starts_with(DELETE_URL), "{}", sent[2].url);
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.saved_count(), Some(0));
-    assert!(service.recent_saves().is_empty());
+    assert_eq!(sent.len(), 3);
+    assert_eq!(status(&service, identity(1)), NotSaved);
+    assert_eq!(count(&service), Some(0));
 }
 
+/// The cancelled save may have reached the server, so its row is in doubt, and the unsave waits
+/// for a sync to say what the server has.
 #[tokio::test]
-async fn a_cancelled_write_lets_the_posts_next_write_go() {
+async fn an_unsave_behind_a_cancelled_save_waits_for_a_sync() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     let (_release, held) = oneshot::channel::<()>();
     executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
-    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
 
     let mut save = Box::pin(service.save(identity(1)));
     let mut unsave = Box::pin(service.unsave(identity(1)));
@@ -975,578 +1070,73 @@ async fn a_cancelled_write_lets_the_posts_next_write_go() {
     assert!(futures::poll!(unsave.as_mut()).is_pending());
 
     drop(save);
-    unsave.await.unwrap();
+    let outcome = unsave.await.unwrap();
 
-    assert_eq!(executor.sent().len(), 3);
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
+    assert!(is_pending(&outcome), "{outcome:?}");
+    assert_eq!(executor.sent().len(), 2);
+    assert_eq!(status(&service, identity(1)), NotSaved);
+
+    // The server applied the save, and the sync sends the unsave.
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+    service.sync().await.unwrap();
+    assert_eq!(executor.sent().len(), 4);
+    assert_eq!(status(&service, identity(1)), NotSaved);
+    assert_eq!(count(&service), Some(0));
 }
 
-/// A save the server stores under another key, with an unsave queued behind it: the unsave also
-/// sends the key the save was stored under.
+/// A save the server stores under another key, with an unsave queued behind it. The answer moves
+/// the row to the stored key, so the unsave goes to that key alone.
 #[tokio::test]
 async fn a_queued_unsave_also_unsaves_the_key_the_save_was_stored_under() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     let (release, held) = oneshot::channel();
     executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
-    // The feed item resolves to the post, which the delete removes; the post's own delete then
-    // finds nothing.
-    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
 
     let mut save = Box::pin(service.save(rss_identity(7)));
     let mut unsave = Box::pin(service.unsave(rss_identity(7)));
     assert!(futures::poll!(save.as_mut()).is_pending());
     assert!(futures::poll!(unsave.as_mut()).is_pending());
-    assert_eq!(service.status(rss_identity(7)), ReaderSavedStatus::NotSaved);
+    assert_eq!(status(&service, rss_identity(7)), NotSaved);
 
     release.send(()).unwrap();
     let (save, unsave) = futures::join!(save, unsave);
     save.unwrap();
     unsave.unwrap();
 
-    let bodies: Vec<_> = executor.sent()[2..]
-        .iter()
-        .map(|sent| sent.body.clone())
-        .collect();
     assert_eq!(
-        bodies,
-        vec![
-            Some(json!({ "feed_item_id": 7, "source": "android" })),
-            Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" })),
+        executor.sent_short()[1..],
+        [
+            r#"new {"feed_item_id":7}"#,
+            r#"delete {"blog_id":123,"post_id":1}"#
         ]
     );
-    assert_eq!(service.status(rss_identity(7)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.saved_count(), Some(0));
-    assert!(service.recent_saves().is_empty());
+    assert_eq!(status(&service, rss_identity(7)), NotSaved);
+    assert_eq!(status(&service, identity(1)), NotSaved);
+    assert_eq!(count(&service), Some(0));
 }
 
 #[tokio::test]
 async fn unsave_key_also_unsaves_the_key_the_server_stores_the_post_under() {
     let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
     executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
-    // The feed item resolves to the post, which the delete removes; the post's own delete then
-    // finds nothing.
-    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
     service.save(rss_identity(7)).await.unwrap();
 
     service.unsave_key(feed_key(7)).await.unwrap();
 
-    let bodies: Vec<_> = executor.sent()[2..]
-        .iter()
-        .map(|sent| sent.body.clone())
-        .collect();
     assert_eq!(
-        bodies,
-        vec![
-            Some(json!({ "feed_item_id": 7, "source": "android" })),
-            Some(json!({ "blog_id": 123, "post_id": 1, "source": "android" })),
+        executor.sent_short()[1..],
+        [
+            r#"new {"feed_item_id":7}"#,
+            r#"delete {"blog_id":123,"post_id":1}"#
         ]
     );
-    assert_eq!(service.status(rss_identity(7)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.saved_count(), Some(0));
-}
-
-// The saved list
-
-#[tokio::test]
-async fn list_posts_sends_the_params() {
-    let (service, executor) = service();
-    executor.push(Step::Respond(200, json!({ "posts": [] })));
-
-    service
-        .list_posts(ReaderSavedPostsParams {
-            page_handle: Some("abc".to_string()),
-            number: Some(20),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-    let sent = executor.sent();
-    assert_eq!(sent[0].method, RequestMethod::GET);
-    assert!(sent[0].url.starts_with(LIST_URL), "{}", sent[0].url);
-    assert!(sent[0].url.contains("page_handle=abc"), "{}", sent[0].url);
-    assert!(sent[0].url.contains("number=20"), "{}", sent[0].url);
-}
-
-#[tokio::test]
-async fn list_posts_returns_the_page() {
-    let (service, executor) = service();
-    executor.push(Step::Respond(
-        200,
-        json!({ "posts": [listed_post(1)], "found": 7, "next_page_handle": "next" }),
-    ));
-
-    let page = service
-        .list_posts(ReaderSavedPostsParams::default())
-        .await
-        .unwrap();
-
-    assert_eq!(page.posts.len(), 1);
-    assert_eq!(page.found, Some(7));
-    assert_eq!(page.next_page_handle.as_deref(), Some("next"));
-}
-
-#[tokio::test]
-async fn list_posts_hides_a_post_just_unsaved() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1), post_json(2)]).await;
-    executor.push(Step::Respond(200, write_response(false, post_json(1), 1)));
-    service.unsave(identity(1)).await.unwrap();
-    executor.push(Step::Respond(
-        200,
-        json!({ "posts": [listed_post(1), listed_post(2)], "next_page_handle": "next" }),
-    ));
-
-    let page = service
-        .list_posts(ReaderSavedPostsParams::default())
-        .await
-        .unwrap();
-
-    assert_eq!(page.posts.len(), 1);
-    assert_eq!(page.posts[0].identity.id, 2);
-    assert_eq!(page.next_page_handle.as_deref(), Some("next"));
-}
-
-#[tokio::test]
-async fn listing_a_hidden_post_does_not_mark_it_saved() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
-    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
-    service.unsave(identity(1)).await.unwrap();
-    executor.push(Step::Respond(200, json!({ "posts": [listed_post(1)] })));
-
-    service
-        .list_posts(ReaderSavedPostsParams::default())
-        .await
-        .unwrap();
-
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-}
-
-#[tokio::test]
-async fn the_saved_list_does_not_change_a_post_s_status() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(
-        200,
-        json!({ "posts": [listed_post(1), listed_rss_post(2)] }),
-    ));
-
-    service
-        .list_posts(ReaderSavedPostsParams::default())
-        .await
-        .unwrap();
-
-    // It doesn't say which key the post is saved under, so the keys decide.
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::NotSaved);
-}
-
-#[tokio::test]
-async fn a_short_page_can_still_have_a_handle() {
-    let (service, executor) = service();
-    executor.push(Step::Respond(
-        200,
-        json!({ "posts": [], "next_page_handle": "next" }),
-    ));
-
-    let page = service
-        .list_posts(ReaderSavedPostsParams::default())
-        .await
-        .unwrap();
-
-    assert!(page.posts.is_empty());
-    assert_eq!(page.next_page_handle.as_deref(), Some("next"));
-}
-
-#[tokio::test]
-async fn a_failed_list_reports_the_error() {
-    let (service, executor) = service();
-    executor.push(Step::Respond(
-        400,
-        json!({ "error": "invalid_page_handle", "message": "The page_handle is not valid." }),
-    ));
-
-    let result = service.list_posts(ReaderSavedPostsParams::default()).await;
-
-    assert!(matches!(result, Err(ReaderSavedError::Api(_))));
-}
-
-// Importing
-
-pub(super) fn bulk_response(keys: &[Value], total: u64) -> Value {
-    let results: Vec<_> = keys
-        .iter()
-        .map(|key| json!({ "key": key, "saved": true }))
-        .collect();
-    json!({ "results": results, "total": total })
-}
-
-#[rstest]
-#[case::empty_url(ReaderSavedKey::Url { url: String::new() })]
-#[case::zero_blog(ReaderSavedKey::Post { blog_id: WpComSiteId(0), post_id: PostId(1) })]
-#[case::zero_feed_item(ReaderSavedKey::FeedItem { feed_item_id: ReaderFeedItemId(0) })]
-#[tokio::test]
-async fn a_key_the_api_cant_take_is_refused_before_it_becomes_a_write(#[case] key: ReaderSavedKey) {
-    let (service, executor) = service();
-
-    let unsave = service.unsave_key(key.clone()).await;
-    if let ReaderSavedKey::Url { url } = key {
-        let save = service.save_url(url, None).await;
-        assert!(matches!(save, Err(ReaderSavedError::PostCannotBeSaved)));
-    }
-
-    assert!(matches!(unsave, Err(ReaderSavedError::PostCannotBeSaved)));
-    assert!(executor.sent().is_empty());
-    assert!(service.recent_saves().is_empty());
-}
-
-#[tokio::test]
-async fn import_leaves_out_a_key_with_a_zero_id_and_answers_it_as_the_server_would() {
-    let (service, executor) = service();
-    executor.push(Step::Respond(200, bulk_response(&[post_json(1)], 1)));
-    let zero = ReaderSavedBulkKey::FeedItem {
-        feed_item_id: ReaderFeedItemId(0),
-    };
-
-    let results = service
-        .import(vec![zero.clone(), bulk_post_key(1)])
-        .await
-        .unwrap();
-
-    assert_eq!(
-        executor.sent()[0].body,
-        Some(json!({ "keys": [{ "blog_id": 123, "post_id": 1 }], "source": "android" }))
-    );
-    assert_eq!(results.len(), 2);
-    assert_eq!(results[0].key, None);
-    assert_eq!(results[0].error.as_deref(), Some("invalid_input"));
-    assert_eq!(results[1].key, Some(bulk_post_key(1)));
-    assert!(results[1].saved);
-}
-
-#[tokio::test]
-async fn importing_nothing_sends_nothing() {
-    let (service, executor) = service();
-
-    assert!(service.import(vec![]).await.unwrap().is_empty());
-
-    assert!(executor.sent().is_empty());
-}
-
-#[tokio::test]
-async fn import_sends_the_keys_and_source() {
-    let (service, executor) = service_with(ReaderSavedSource::Ios);
-    executor.push(Step::Respond(200, bulk_response(&[post_json(1)], 1)));
-
-    service.import(vec![bulk_post_key(1)]).await.unwrap();
-
-    let sent = executor.sent();
-    assert_eq!(sent[0].method, RequestMethod::POST);
-    assert!(sent[0].url.starts_with(BULK_URL), "{}", sent[0].url);
-    assert_eq!(
-        sent[0].body,
-        Some(json!({ "keys": [{ "blog_id": 123, "post_id": 1 }], "source": "ios" }))
-    );
-}
-
-#[rstest]
-#[case::one_full_batch(100, vec![100])]
-#[case::one_over(101, vec![1, 100])]
-#[case::two_full_batches(200, vec![100, 100])]
-#[case::many(250, vec![50, 100, 100])]
-#[tokio::test]
-async fn import_splits_keys_into_batches_oldest_first(
-    #[case] count: u64,
-    #[case] batch_sizes: Vec<usize>,
-) {
-    let (service, executor) = service();
-    let keys: Vec<_> = (1..=count).map(|id| bulk_post_key(id as i64)).collect();
-
-    // Newest first, so the last keys go first.
-    let mut remaining = count;
-    for size in &batch_sizes {
-        let first = remaining - *size as u64 + 1;
-        let batch: Vec<_> = (first..=remaining).map(post_json).collect();
-        executor.push(Step::Respond(200, bulk_response(&batch, count)));
-        remaining -= *size as u64;
-    }
-
-    let results = service.import(keys).await.unwrap();
-
-    let sent = executor.sent();
-    let sizes: Vec<_> = sent
-        .iter()
-        .map(|request| {
-            request.body.as_ref().unwrap()["keys"]
-                .as_array()
-                .unwrap()
-                .len()
-        })
-        .collect();
-    assert_eq!(sizes, batch_sizes);
-
-    // The oldest keys go first, so the newest end up at the top of the list.
-    assert_eq!(
-        sent[0].body.as_ref().unwrap()["keys"]
-            .as_array()
-            .unwrap()
-            .last(),
-        Some(&post_json(count))
-    );
-
-    // Results come back in the order the keys were given.
-    let expected: Vec<_> = (1..=count)
-        .map(|id| Some(bulk_post_key(id as i64)))
-        .collect();
-    let keys: Vec<_> = results.into_iter().map(|result| result.key).collect();
-    assert_eq!(keys, expected);
-}
-
-/// The device already had them, so they don't need showing above the list.
-#[tokio::test]
-async fn imported_posts_are_not_recent_saves() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(
-        200,
-        bulk_response(&[post_json(1), post_json(2), post_json(3)], 3),
-    ));
-
-    service
-        .import(vec![bulk_post_key(1), bulk_post_key(2), bulk_post_key(3)])
-        .await
-        .unwrap();
-
-    assert!(service.recent_saves().is_empty());
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-}
-
-#[tokio::test]
-async fn imported_posts_show_as_saved() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(
-        200,
-        bulk_response(&[post_json(1), post_json(2)], 2),
-    ));
-
-    service
-        .import(vec![bulk_post_key(1), bulk_post_key(2)])
-        .await
-        .unwrap();
-
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(identity(2)), ReaderSavedStatus::Saved);
-    assert_eq!(service.saved_count(), Some(2));
-}
-
-#[tokio::test]
-async fn imported_posts_show_as_saved_while_the_request_is_in_flight() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    let (release, held) = oneshot::channel();
-    executor.push(Step::Hold(held, 200, bulk_response(&[post_json(1)], 1)));
-
-    let (result, ()) = futures::join!(service.import(vec![bulk_post_key(1)]), async {
-        assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-        release.send(()).unwrap();
-    });
-
-    result.unwrap();
-}
-
-#[tokio::test]
-async fn a_stale_refresh_after_an_import_cannot_remove_the_posts() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(200, bulk_response(&[post_json(1)], 1)));
-    service.import(vec![bulk_post_key(1)]).await.unwrap();
-
-    refreshed(&service, &executor, &[]).await;
-
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-}
-
-#[tokio::test]
-async fn a_rejected_key_is_a_result_and_is_undone() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(
-        200,
-        json!({
-            "results": [
-                { "key": post_json(1), "saved": true },
-                { "key": post_json(2), "saved": false, "error": "saved_limit_reached" },
-            ],
-            "total": 1,
-        }),
-    ));
-
-    let results = service
-        .import(vec![
-            bulk_post_key(1),
-            bulk_post_key(2),
-            ReaderSavedBulkKey::Post {
-                blog_id: WpComSiteId(0),
-                post_id: PostId(5),
-            },
-        ])
-        .await
-        .unwrap();
-
-    assert_eq!(results.len(), 3);
-    assert_eq!(results[1].error.as_deref(), Some("saved_limit_reached"));
-    assert_eq!(results[2].key, None);
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(identity(2)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.saved_count(), Some(1));
-}
-
-#[tokio::test]
-async fn an_imported_feed_item_can_be_stored_as_a_post() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(200, bulk_response(&[post_json(1)], 1)));
-
-    service
-        .import(vec![ReaderSavedBulkKey::FeedItem {
-            feed_item_id: ReaderFeedItemId(7),
-        }])
-        .await
-        .unwrap();
-
-    // The feed item the post was saved by still reads as saved, under the key the server stored.
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(rss_identity(7)), ReaderSavedStatus::Saved);
-    assert_eq!(service.saved_count(), Some(1));
-}
-
-#[tokio::test]
-async fn a_failed_batch_stops_the_import_and_undoes_its_keys() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
-    let first_batch: Vec<_> = (101..=150).map(post_json).collect();
-    executor.push(Step::Respond(200, bulk_response(&first_batch, 50)));
-    executor.push(Step::Respond(400, error_response()));
-
-    let result = service.import(keys).await;
-
-    assert!(matches!(result, Err(ReaderSavedError::Api(_))));
-    assert_eq!(executor.sent().len(), 3);
-    assert_eq!(service.status(identity(150)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(identity(101)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(identity(100)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.saved_count(), Some(50));
-}
-
-#[tokio::test]
-async fn a_failed_first_batch_saves_nothing() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Offline);
-
-    assert!(service.import(vec![bulk_post_key(1)]).await.is_err());
-
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert!(service.recent_saves().is_empty());
-}
-
-/// Results are matched to keys by position, so with one left out from the middle, every result
-/// after it would land on the wrong key.
-#[tokio::test]
-async fn a_result_missing_from_the_middle_fails_the_batch_and_matches_nothing() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    // Sent newest first, as 3, 2, 1. The server leaves out 2's result.
-    executor.push(Step::Respond(
-        200,
-        bulk_response(&[post_json(3), post_json(1)], 2),
-    ));
-
-    let result = service
-        .import(vec![bulk_post_key(3), bulk_post_key(2), bulk_post_key(1)])
-        .await;
-
-    assert!(matches!(
-        result,
-        Err(ReaderSavedError::UnexpectedImportResults {
-            sent: 3,
-            received: 2
-        })
-    ));
-    // The server may have saved any of them, so they stand until a read can say.
-    for post in 1..=3 {
-        assert_eq!(service.status(identity(post)), ReaderSavedStatus::Saved);
-    }
-
-    // Post 2 isn't taken to be stored as post 1, so unsaving it leaves post 1 alone.
-    executor.push(Step::Respond(200, write_response(false, post_json(2), 2)));
-    service.unsave(identity(2)).await.unwrap();
-    let unsaves: Vec<_> = executor.sent()[2..]
-        .iter()
-        .map(|sent| sent.body.clone())
-        .collect();
-    assert_eq!(
-        unsaves,
-        vec![Some(
-            json!({ "blog_id": 123, "post_id": 2, "source": "android" })
-        )]
-    );
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-}
-
-#[tokio::test]
-async fn a_result_missing_from_the_end_fails_the_batch_and_stops_the_import() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
-    // The newest batch, 101 to 150, goes first and comes back without 150's result.
-    let short: Vec<_> = (101..=149).map(post_json).collect();
-    executor.push(Step::Respond(200, bulk_response(&short, 49)));
-
-    let result = service.import(keys).await;
-
-    assert!(matches!(
-        result,
-        Err(ReaderSavedError::UnexpectedImportResults {
-            sent: 50,
-            received: 49
-        })
-    ));
-    assert_eq!(executor.sent().len(), 2, "the older batch isn't sent");
-    assert_eq!(service.status(identity(150)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(identity(101)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(identity(100)), ReaderSavedStatus::NotSaved);
-}
-
-#[tokio::test]
-async fn too_many_results_fail_the_batch() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(
-        200,
-        bulk_response(&[post_json(1), post_json(2)], 2),
-    ));
-
-    let result = service.import(vec![bulk_post_key(1)]).await;
-
-    assert!(matches!(
-        result,
-        Err(ReaderSavedError::UnexpectedImportResults {
-            sent: 1,
-            received: 2
-        })
-    ));
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(identity(2)), ReaderSavedStatus::NotSaved);
+    assert_eq!(status(&service, rss_identity(7)), NotSaved);
+    assert_eq!(count(&service), Some(0));
 }
 
 // The observer
@@ -1554,6 +1144,12 @@ async fn too_many_results_fail_the_batch() {
 #[derive(Default)]
 pub(super) struct CountingObserver {
     count: AtomicUsize,
+}
+
+impl CountingObserver {
+    pub(super) fn count(&self) -> usize {
+        self.count.load(Ordering::SeqCst)
+    }
 }
 
 impl ReaderSavedObserver for CountingObserver {
@@ -1569,24 +1165,24 @@ pub(super) fn observed(service: &ReaderSavedService) -> Arc<CountingObserver> {
 }
 
 #[tokio::test]
-async fn the_observer_hears_about_a_refresh() {
+async fn the_observer_hears_about_a_sync() {
     let (service, executor) = service();
     let observer = observed(&service);
 
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
 
-    assert_eq!(observer.count.load(Ordering::SeqCst), 1);
+    assert_eq!(observer.count(), 1);
 }
 
 #[tokio::test]
-async fn the_observer_does_not_hear_about_a_failed_refresh() {
+async fn the_observer_does_not_hear_about_a_failed_sync() {
     let (service, executor) = service();
     let observer = observed(&service);
     executor.push(Step::Respond(500, error_response()));
 
-    assert!(service.refresh().await.is_err());
+    assert!(service.sync().await.is_err());
 
-    assert_eq!(observer.count.load(Ordering::SeqCst), 0);
+    assert_eq!(observer.count(), 0);
 }
 
 #[tokio::test]
@@ -1597,7 +1193,7 @@ async fn the_observer_hears_when_a_save_starts_and_finishes() {
 
     service.save(identity(1)).await.unwrap();
 
-    assert_eq!(observer.count.load(Ordering::SeqCst), 2);
+    assert_eq!(observer.count(), 2);
 }
 
 #[tokio::test]
@@ -1608,26 +1204,12 @@ async fn the_observer_hears_about_a_rollback() {
 
     assert!(service.save(identity(1)).await.is_err());
 
-    assert_eq!(observer.count.load(Ordering::SeqCst), 2);
+    assert_eq!(observer.count(), 2);
 }
 
+/// A cancelled write changes nothing the apps show: the tap stands.
 #[tokio::test]
-async fn the_observer_hears_nothing_from_a_list_that_changes_nothing() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
-    let observer = observed(&service);
-    executor.push(Step::Respond(200, json!({ "posts": [listed_post(1)] })));
-
-    service
-        .list_posts(ReaderSavedPostsParams::default())
-        .await
-        .unwrap();
-
-    assert_eq!(observer.count.load(Ordering::SeqCst), 0);
-}
-
-#[tokio::test]
-async fn the_observer_hears_about_a_cancelled_write() {
+async fn the_observer_hears_only_the_tap_of_a_cancelled_write() {
     let (service, executor) = service();
     let observer = observed(&service);
     let (_release, held) = oneshot::channel::<()>();
@@ -1637,7 +1219,7 @@ async fn the_observer_hears_about_a_cancelled_write() {
     assert!(futures::poll!(save.as_mut()).is_pending());
     drop(save);
 
-    assert_eq!(observer.count.load(Ordering::SeqCst), 2);
+    assert_eq!(observer.count(), 1);
 }
 
 #[tokio::test]
@@ -1646,9 +1228,9 @@ async fn the_observer_stops_hearing_once_removed() {
     let observer = observed(&service);
     service.set_observer(None);
 
-    refreshed(&service, &executor, &[]).await;
+    synced(&service, &executor, &[]).await;
 
-    assert_eq!(observer.count.load(Ordering::SeqCst), 0);
+    assert_eq!(observer.count(), 0);
 }
 
 /// Apps read the state back from inside the callback, which would deadlock if it ran with a lock
@@ -1664,7 +1246,7 @@ impl ReaderSavedObserver for ReadingObserver {
         self.statuses
             .lock()
             .unwrap()
-            .push(service.status(identity(1)));
+            .push(service.status(identity(1)).unwrap());
     }
 }
 
@@ -1679,23 +1261,16 @@ async fn the_observer_can_read_the_state_back() {
     service.set_observer(Some(observer.clone()));
     executor.push(Step::Respond(200, keys_response(&[])));
     executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
     executor.push(Step::Respond(200, json!({ "posts": [listed_post(1)] })));
 
-    service.refresh().await.unwrap();
+    service.sync().await.unwrap();
     service.save(identity(1)).await.unwrap();
-    service
-        .list_posts(ReaderSavedPostsParams::default())
-        .await
-        .unwrap();
+    service.clone().saved_posts().refresh().await.unwrap();
 
     assert_eq!(
         *observer.statuses.lock().unwrap(),
-        vec![
-            ReaderSavedStatus::NotSaved,
-            ReaderSavedStatus::Saved,
-            ReaderSavedStatus::Saved,
-            ReaderSavedStatus::Saved,
-        ]
+        vec![NotSaved, Saved, Saved, Saved, Saved]
     );
 
     // Breaks the reference cycle between the service and its observer.
@@ -1708,127 +1283,29 @@ async fn the_observer_can_read_the_state_back() {
 async fn a_full_session_stays_consistent() {
     let (service, executor) = service();
 
-    refreshed(&service, &executor, &[post_json(1), feed_json(2)]).await;
-    assert_eq!(service.saved_count(), Some(2));
+    synced(&service, &executor, &[post_json(1), feed_json(2)]).await;
+    assert_eq!(count(&service), Some(2));
 
     executor.push(Step::Respond(200, write_response(true, post_json(3), 3)));
     service.save(identity(3)).await.unwrap();
-    assert_eq!(service.recent_saves(), vec![post_key(3)]);
 
     executor.push(Step::Respond(200, write_response(false, feed_json(2), 2)));
     service.unsave(rss_identity(2)).await.unwrap();
 
-    // A list from before both writes.
-    executor.push(Step::Respond(
-        200,
-        json!({ "posts": [listed_post(1), listed_rss_post(2)], "found": 2 }),
-    ));
-    let page = service
-        .list_posts(ReaderSavedPostsParams::default())
-        .await
-        .unwrap();
-    assert_eq!(page.posts.len(), 1);
-    assert_eq!(page.posts[0].identity.id, 1);
+    // The keys read after both writes.
+    synced(&service, &executor, &[post_json(3), post_json(1)]).await;
 
-    // Keys from before both writes.
-    refreshed(&service, &executor, &[post_json(1), feed_json(2)]).await;
-
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(rss_identity(2)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.status(identity(3)), ReaderSavedStatus::Saved);
-    assert_eq!(service.saved_count(), Some(2));
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(status(&service, rss_identity(2)), NotSaved);
+    assert_eq!(status(&service, identity(3)), Saved);
+    assert_eq!(count(&service), Some(2));
+    assert_eq!(executor.sent().len(), 4);
 }
 
 #[path = "scenario_tests.rs"]
 mod scenarios;
 
-// An import takes one place in line
-
-/// The unsave is tapped while the import's first batch is in flight, and post 1 is in the second.
-#[tokio::test]
-async fn an_unsave_tapped_during_an_import_waits_for_every_batch() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[post_json(1)]).await;
-    // 101 keys, newest first: post 1 is in the second, newest batch.
-    let keys: Vec<_> = (1..=101).map(bulk_post_key).collect();
-    let (release, held) = oneshot::channel();
-    executor.push(Step::Hold(held, 200, bulk_response(&[post_json(101)], 2)));
-    let newest: Vec<_> = (1..=100).map(post_json).collect();
-    executor.push(Step::Respond(200, bulk_response(&newest, 101)));
-    executor.push(Step::Respond(200, write_response(false, post_json(1), 100)));
-
-    let mut import = Box::pin(service.import(keys));
-    assert!(futures::poll!(import.as_mut()).is_pending());
-    let mut unsave = Box::pin(service.unsave(identity(1)));
-    assert!(futures::poll!(unsave.as_mut()).is_pending());
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-
-    release.send(()).unwrap();
-    let (imported, unsaved) = futures::join!(import, unsave);
-    imported.unwrap();
-    unsaved.unwrap();
-
-    let sent: Vec<_> = executor
-        .sent()
-        .iter()
-        .map(|sent| sent.url.rsplit('/').next().unwrap().to_string())
-        .collect();
-    assert_eq!(sent, ["keys", "bulk", "bulk", "delete"]);
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.saved_count(), Some(100));
-}
-
-/// Cancelled while its first batch is in flight: that batch may have been applied, the second was
-/// never sent, and the tap waiting behind the import goes ahead.
-#[tokio::test]
-async fn a_cancelled_import_keeps_the_batch_sent_and_lets_a_waiting_tap_go() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
-    let (_release, held) = oneshot::channel::<()>();
-    let first: Vec<_> = (101..=150).map(post_json).collect();
-    executor.push(Step::Hold(held, 200, bulk_response(&first, 50)));
-    executor.push(Step::Respond(200, write_response(true, post_json(500), 51)));
-
-    let mut import = Box::pin(service.import(keys));
-    assert!(futures::poll!(import.as_mut()).is_pending());
-    let mut save = Box::pin(service.save(identity(500)));
-    assert!(futures::poll!(save.as_mut()).is_pending());
-    assert_eq!(service.status(identity(100)), ReaderSavedStatus::NotSaved);
-
-    drop(import);
-    save.await.unwrap();
-
-    assert_eq!(service.status(identity(150)), ReaderSavedStatus::Saved);
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::NotSaved);
-    assert_eq!(service.status(identity(500)), ReaderSavedStatus::Saved);
-    assert_eq!(executor.sent().len(), 3);
-}
-
-/// The first batch's total includes its own 50 saves, and the second batch's 100 are still to
-/// come.
-#[tokio::test]
-async fn the_count_during_an_import_counts_each_save_once() {
-    let (service, executor) = service();
-    let existing: Vec<_> = (1001..=1010).map(post_json).collect();
-    refreshed(&service, &executor, &existing).await;
-    let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
-    let first: Vec<_> = (101..=150).map(post_json).collect();
-    executor.push(Step::Respond(200, bulk_response(&first, 60)));
-    let (release, held) = oneshot::channel();
-    let second: Vec<_> = (1..=100).map(post_json).collect();
-    executor.push(Step::Hold(held, 200, bulk_response(&second, 160)));
-
-    let (result, ()) = futures::join!(service.import(keys), async {
-        tokio::task::yield_now().await;
-        assert_eq!(service.saved_count(), Some(160));
-        release.send(()).unwrap();
-    });
-    result.unwrap();
-    assert_eq!(service.saved_count(), Some(160));
-}
-
-// Which errors may have been applied
+// Which errors may have been applied, and which are refusals
 
 pub(super) fn execution_failed(reason: RequestExecutionErrorReason) -> WpApiError {
     WpApiError::RequestExecutionFailed {
@@ -1841,8 +1318,12 @@ pub(super) fn execution_failed(reason: RequestExecutionErrorReason) -> WpApiErro
 }
 
 pub(super) fn answered(status_code: u32) -> WpApiError {
+    answered_with(status_code, "x")
+}
+
+pub(super) fn answered_with(status_code: u32, code: &str) -> WpApiError {
     WpApiError::WpError {
-        error_code: WpErrorCode::CustomError("x".to_string()),
+        error_code: WpErrorCode::CustomError(code.to_string()),
         error_message: String::new(),
         status_code,
         response: String::new(),
@@ -1893,73 +1374,26 @@ pub(super) fn cloudflare(status_code: u32) -> WpApiError {
 )]
 #[case::bad_request(answered(400), false)]
 #[case::not_found(unknown(404), false)]
-fn a_failed_write_stands_only_if_it_may_have_been_applied(
+fn a_failed_request_is_in_doubt_only_if_it_may_have_been_applied(
     #[case] error: WpApiError,
-    #[case] stands: bool,
+    #[case] in_doubt: bool,
 ) {
-    assert_eq!(may_have_been_applied(&error), stands);
+    assert_eq!(may_have_been_applied(&error), in_doubt);
 }
 
-#[tokio::test]
-async fn a_save_answered_with_a_server_error_stands_until_a_read() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    executor.push(Step::Respond(502, json!({})));
-
-    assert!(service.save(identity(1)).await.is_err());
-
-    assert_eq!(service.status(identity(1)), ReaderSavedStatus::Saved);
-}
-
-// The count after a refresh during an import
-
-/// 150 keys: the first batch (50) is answered with a total of 50. The second (100) times out, but
-/// the server applied it. A refresh straight after reads all 150.
-#[tokio::test]
-async fn the_count_after_a_refresh_that_has_a_timed_out_import_batch() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
-    let first: Vec<_> = (101..=150).map(post_json).collect();
-    executor.push(Step::Respond(200, bulk_response(&first, 50)));
-    executor.push(Step::TimedOut);
-
-    assert!(service.import(keys).await.is_err());
-    assert_eq!(service.saved_count(), Some(150), "before the refresh");
-
-    let all: Vec<_> = (1..=150).map(post_json).collect();
-    refreshed(&service, &executor, &all).await;
-    assert_eq!(service.saved_count(), Some(150), "the server holds 150");
-}
-
-/// The same with the second batch still in flight: the server applied it, and a refresh lands
-/// before its answer.
-#[tokio::test]
-async fn the_count_while_an_import_batch_a_refresh_already_has_is_in_flight() {
-    let (service, executor) = service();
-    refreshed(&service, &executor, &[]).await;
-    let keys: Vec<_> = (1..=150).map(bulk_post_key).collect();
-    let first: Vec<_> = (101..=150).map(post_json).collect();
-    executor.push(Step::Respond(200, bulk_response(&first, 50)));
-    let (release, held) = oneshot::channel();
-    let second: Vec<_> = (1..=100).map(post_json).collect();
-    executor.push(Step::Hold(held, 200, bulk_response(&second, 150)));
-    let all: Vec<_> = (1..=150).map(post_json).collect();
-
-    let (result, during) = futures::join!(service.import(keys), async {
-        tokio::task::yield_now().await;
-        assert_eq!(service.saved_count(), Some(150));
-        executor.push(Step::Respond(200, keys_response(&all)));
-        service.refresh().await.unwrap();
-        let during = service.saved_count();
-        release.send(()).unwrap();
-        during
-    });
-    result.unwrap();
-    assert_eq!(service.saved_count(), Some(150), "after the answer");
-    assert_eq!(
-        during,
-        Some(150),
-        "while the second batch's answer is on its way"
-    );
+#[rstest]
+#[case::bad_request(answered(400), true)]
+#[case::not_found(unknown(404), true)]
+#[case::at_the_cap(answered_with(403, "saved_limit_reached"), true)]
+#[case::forbidden(answered_with(403, "rest_forbidden"), false)]
+#[case::unauthorized(answered(401), false)]
+#[case::request_timeout(answered(408), false)]
+#[case::rate_limited(answered(429), false)]
+#[case::server_error(answered(500), false)]
+#[case::offline(execution_failed(RequestExecutionErrorReason::DeviceIsOfflineError { error_message: String::new() }), false)]
+fn only_an_answer_that_will_not_pass_is_a_refusal(
+    #[case] error: WpApiError,
+    #[case] refused: bool,
+) {
+    assert_eq!(is_refused(&error), refused);
 }

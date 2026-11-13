@@ -121,12 +121,10 @@ pub enum DbTable {
     ReaderStreams,
     /// Posts in Reader streams, with their order
     ReaderStreamItems,
-    /// What the saved posts service knows, kept across launches
+    /// What the saved posts service knows about an account besides its saved posts
     ReaderSavedState,
-    /// The saved keys from the newest refresh
-    ReaderSavedKeys,
-    /// Saves the server refused on import, kept on this device
-    ReaderSavedLocalOnly,
+    /// Saved posts, one per save on the server, with what the user wants for each
+    ReaderSavedPosts,
 }
 
 impl DbTable {
@@ -154,8 +152,7 @@ impl DbTable {
             DbTable::ReaderStreams => "reader_streams",
             DbTable::ReaderStreamItems => "reader_stream_items",
             DbTable::ReaderSavedState => "reader_saved_state",
-            DbTable::ReaderSavedKeys => "reader_saved_keys",
-            DbTable::ReaderSavedLocalOnly => "reader_saved_local_only",
+            DbTable::ReaderSavedPosts => "reader_saved_posts",
         }
     }
 }
@@ -196,8 +193,7 @@ impl TryFrom<&str> for DbTable {
             "reader_streams" => Ok(DbTable::ReaderStreams),
             "reader_stream_items" => Ok(DbTable::ReaderStreamItems),
             "reader_saved_state" => Ok(DbTable::ReaderSavedState),
-            "reader_saved_keys" => Ok(DbTable::ReaderSavedKeys),
-            "reader_saved_local_only" => Ok(DbTable::ReaderSavedLocalOnly),
+            "reader_saved_posts" => Ok(DbTable::ReaderSavedPosts),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
