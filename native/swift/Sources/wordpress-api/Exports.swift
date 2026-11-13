@@ -321,6 +321,7 @@ public typealias ReaderSavedImportReport = WordPressAPIInternal.ReaderSavedImpor
 public typealias ReaderPostRecord = WordPressAPIInternal.ReaderPostRecord
 public typealias ListState = WordPressAPIInternal.ListState
 public typealias ReaderSavedStatus = WordPressAPIInternal.ReaderSavedStatus
+public typealias ReaderSavedOutcome = WordPressAPIInternal.ReaderSavedOutcome
 public typealias ReaderSaveId = WordPressAPIInternal.ReaderSaveId
 public typealias ReaderCrossPost = WordPressAPIInternal.ReaderCrossPost
 public typealias ReaderDateRange = WordPressAPIInternal.ReaderDateRange

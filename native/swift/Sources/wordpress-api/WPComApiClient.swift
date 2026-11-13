@@ -98,15 +98,16 @@ public final class WPComApiClient: Sendable {
         internalClient.readerSaved()
     }
 
-    /// Creates the account's saved Reader posts service, which stays in step with what this device
-    /// has just changed. Prefer it over `readerSaved` for anything a user sees, because the API's
-    /// reads can lag behind its writes.
+    /// Creates the account's saved Reader posts service. Prefer it over `readerSaved` for anything a
+    /// user sees: a save or unsave shows straight away and survives a relaunch, and one the server
+    /// hasn't got yet is sent by a later call.
     ///
-    /// What it knows is kept in `cache` under `userID`, so it survives a relaunch. The cache's
-    /// migrations must have run. Call `WordPressApiCache.removeWordpressComAccount(userId:)` on
-    /// sign-out to delete it.
+    /// What it knows is kept in `cache` under `userID`. The cache's migrations must have run. Call
+    /// `sync()` at launch, when the app comes to the foreground, and when the device comes back
+    /// online. Call `WordPressApiCache.removeWordpressComAccount(userId:)` on sign-out to delete it.
     ///
-    /// Create one per account and share it: each instance only knows its own writes.
+    /// Create one per account and share it: it sends one request at a time, and a second instance
+    /// would send alongside it.
     public func makeReaderSavedService(
         source: ReaderSavedSource,
         cache: WordPressApiCache,
