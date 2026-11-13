@@ -23,6 +23,8 @@ use wp_mobile_cache::WpApiCache;
 
 const U9: &str = "https://example.com/p9";
 const U10: &str = "https://example.com/rss10";
+/// The URL of the Jetpack post, post 3. The keys give it, as the live API gives a post's URL.
+const U3: &str = "https://jetpack.example.com/p3";
 
 /// When the keys say most saves were made.
 const SAVED_DATE: &str = "2026-11-02T10:15:00+00:00";
@@ -102,9 +104,9 @@ impl FakeServer {
             return respond(404, error_response());
         }
         let stored = Self::stored_as(sent);
+        // A new save is the newest, so the keys return it. Saving a post already saved keeps its
+        // date, as the live API did on 2026-11-13, so one past the keys stays past them.
         self.saved.insert(stored.to_string());
-        // A save is the newest, so the keys return it.
-        self.hidden.remove(stored);
         respond(200, write_response(true, json_of(stored), self.total()))
     }
 
@@ -148,6 +150,7 @@ impl FakeServer {
                 entry["id"] = json!(index + 1);
                 entry["date_saved"] = json!(SAVED_DATE);
                 match name.as_str() {
+                    "P3" => entry["url"] = json!(U3),
                     "P9" => entry["url"] = json!(U9),
                     "F10" => entry["url"] = json!(U10),
                     _ => {}
@@ -163,7 +166,8 @@ impl FakeServer {
         for name in &self.saved {
             let mut post = match name.as_str() {
                 "P3" | "F4" => json!({
-                    "ID": 3, "site_ID": 123, "feed_ID": 5, "feed_item_ID": 4, "is_external": false
+                    "ID": 3, "site_ID": 123, "feed_ID": 5, "feed_item_ID": 4, "is_external": false,
+                    "URL": U3
                 }),
                 name if name.starts_with('P') => listed_post(name[1..].parse().unwrap()),
                 name => listed_rss_post(name[1..].parse().unwrap()),
@@ -1361,7 +1365,8 @@ fn a_listed_jetpack_post_unsaved_by_its_post_key_reads_unsaved_with_both_keys() 
     assert!(world.list_shown().is_empty());
 }
 
-/// #1729 also sent `delete F4`. The list told the device F4 is post 3's, and the post is saved once.
+/// The list says F4 is post 3's, but F4 can also be a separate older save, so its delete is sent
+/// too. The server answers that it's post 3, and the count goes down by one.
 #[test]
 fn unsaving_a_listed_jetpack_post_takes_one_off_the_count() {
     let mut world = World::new();
@@ -1374,7 +1379,7 @@ fn unsaving_a_listed_jetpack_post_takes_one_off_the_count() {
     world.unsave(jetpack());
     world.answer_writes();
 
-    assert_eq!(world.sent_since(before), ["delete P3"]);
+    assert_eq!(world.sent_since(before), ["delete P3", "delete F4"]);
     assert_eq!(world.server.total(), 1);
     assert_eq!(world.count(), Some(1));
 }
@@ -1732,50 +1737,60 @@ fn past_the_key_limit_a_sync_that_has_a_timed_out_unsave_counts_it_once() {
 }
 
 /// New risk: past the 1,000 keys a sync can't tell a save older than every key returned from one
-/// that was unsaved, so it leaves those rows alone. A row no older than the oldest key returned
-/// would have been returned, so it isn't saved on the server.
+/// that was unsaved, so it leaves those rows alone. A row the server dated no older than the
+/// oldest key returned would have been returned, so it isn't saved on the server.
 #[test]
 fn past_the_key_limit_a_sync_decides_only_rows_no_older_than_the_oldest_key_returned() {
     let mut world = World::new();
     past_the_keys_with(&mut world, &["P1"]);
     world.list_refresh();
-    world.save(identity(7));
-    world.answer_writes();
     assert_eq!(world.status(identity(1)), Saved, "the list showed it");
-    assert_eq!(world.status(identity(7)), Saved);
+    assert_eq!(world.status(identity(1500)), Saved);
 
-    // Post 7 is unsaved on the web, and post 1 stays saved, past the end of the keys.
-    world.server.saved.remove("P7");
+    // Post 1500 is unsaved on the web, and post 1 stays saved, past the end of the keys.
+    world.server.saved.remove("P1500");
     world.sync();
 
     assert_eq!(world.status(identity(1)), Saved, "older than every key");
-    assert_eq!(
-        world.status(identity(7)),
-        NotSaved,
-        "newer, so it'd be there"
-    );
-    assert_eq!(world.shown().first().map(String::as_str), Some("P2000"));
+    assert_eq!(world.status(identity(1500)), NotSaved, "it'd be there");
     assert!(world.shown().contains(&"P1".to_string()));
-    assert!(!world.shown().contains(&"P7".to_string()));
-    assert_eq!(world.count(), Some(1001));
+    assert!(!world.shown().contains(&"P1500".to_string()));
+    assert_eq!(world.count(), Some(1000));
 }
 
-/// New risk: a save made here that the keys don't return, past the 1,000 keys, while the server
-/// does have it. The date rule says it was unsaved elsewhere, so the device drops it. This can't
-/// happen with the live API, whose newest save is always among the keys returned.
+/// A known limit past the 1,000 keys: a save made here has only the tap's date until the keys or a
+/// page give the server's, so a sync that doesn't return it can't tell whether it was unsaved
+/// elsewhere or was an old save, and leaves it saved.
 #[test]
-fn past_the_key_limit_a_save_the_keys_wrongly_leave_out_reads_unsaved() {
+fn past_the_key_limit_a_save_made_here_and_unsaved_elsewhere_stays_saved_until_a_page_says() {
     let mut world = World::new();
     past_the_keys_with(&mut world, &["P1"]);
     world.sync();
     world.save(identity(7));
     world.answer_writes();
 
-    world.server.hidden.insert("P7".to_string());
+    world.server.saved.remove("P7");
+    world.sync();
+    assert_eq!(world.status(identity(7)), Saved, "it can't tell");
+}
+
+/// Past the 1,000 keys, saving a post already saved there keeps its old date on the server, as
+/// the live API did on 2026-11-13, so the keys still don't return it. It stays saved.
+#[test]
+fn past_the_key_limit_saving_an_old_post_again_keeps_it_saved() {
+    let mut world = World::new();
+    past_the_keys_with(&mut world, &["P1"]);
+    world.sync();
+    assert_eq!(world.status(identity(1)), NotSaved);
+
+    world.save(identity(1));
+    world.answer_writes();
     world.sync();
 
-    assert_eq!(world.status(identity(7)), NotSaved);
-    assert!(world.server.has("P7"));
+    assert!(world.server.hidden.contains("P1"), "still past the keys");
+    assert_eq!(world.status(identity(1)), Saved);
+    assert_eq!(world.shown(), ["P1"]);
+    assert_eq!(world.count(), Some(1001));
 }
 
 // The saved list
@@ -2017,4 +2032,291 @@ fn a_sync_that_shows_a_post_unsaved_forgets_the_url_it_was_saved_by() {
     assert_eq!(world.sent_since(before), ["new U9"]);
     assert!(world.server.has("P9"));
     assert_eq!(world.status(identity(9)), Saved);
+}
+
+// Found in the x-high review of the outbox
+
+/// Saved here and synced, then unsaved on the web. A sync is reading the keys when the user
+/// taps save. The sync's keys don't have P1, so the tapped row is flipped to unsaved, and the
+/// tap is then sent as a delete.
+#[test]
+fn a_save_tapped_during_a_sync_of_a_post_unsaved_elsewhere_stays_saved() {
+    let mut world = World::new();
+    world.server.saved.insert("P1".to_string());
+    world.sync();
+    world.server.saved.remove("P1");
+    let before = world.sent_count();
+    world.start_sync();
+    assert_eq!(world.sent_since(before), ["keys"]);
+    world.save(identity(1));
+    assert_eq!(world.status(identity(1)), Saved, "shows at once");
+
+    world.answer_since(before, &[]);
+
+    assert_eq!(
+        (
+            world.sent_since(before),
+            world.server.has("P1"),
+            world.status(identity(1)),
+            world.shown()
+        ),
+        (
+            vec!["keys".to_string(), "new P1".to_string()],
+            true,
+            Saved,
+            vec!["P1".to_string()]
+        )
+    );
+}
+
+/// The same with an unsave and its undo, both tapped while the sync reads the keys.
+#[test]
+fn an_unsave_undone_during_a_sync_of_a_post_unsaved_elsewhere_stays_saved() {
+    let mut world = World::new();
+    world.server.saved.insert("P1".to_string());
+    world.sync();
+    world.server.saved.remove("P1");
+    let before = world.sent_count();
+    world.start_sync();
+    world.unsave(identity(1));
+    world.save(identity(1));
+
+    world.answer_since(before, &[]);
+
+    assert_eq!(
+        (
+            world.server.has("P1"),
+            world.status(identity(1)),
+            world.shown()
+        ),
+        (true, Saved, vec!["P1".to_string()]),
+        "sent {:?}",
+        world.sent_since(before)
+    );
+}
+
+/// The same through a URL, as a share extension saves: the row knows U9 is post 9.
+#[test]
+fn a_url_save_during_a_sync_of_a_post_unsaved_elsewhere_stays_saved() {
+    let mut world = World::new();
+    world.server.saved.insert("P9".to_string());
+    world.sync();
+    world.server.saved.remove("P9");
+    let before = world.sent_count();
+    world.start_sync();
+    world.save_url(U9);
+
+    world.answer_since(before, &[]);
+
+    assert_eq!(
+        (world.server.has("P9"), world.status(identity(9))),
+        (true, Saved),
+        "sent {:?}",
+        world.sent_since(before)
+    );
+}
+
+/// The mirror image: an unsave tapped during a sync, on a row the server last said was
+/// unsaved but that was saved again on the web, is sent as a save.
+#[test]
+fn an_unsave_tapped_during_a_sync_of_a_post_saved_elsewhere_stays_unsaved() {
+    let mut world = World::new();
+    world.server.saved.insert("P1".to_string());
+    world.sync();
+    world.unsave(identity(1));
+    world.answer_writes();
+    world.server.saved.insert("P1".to_string());
+    let before = world.sent_count();
+    world.start_sync();
+    world.unsave(identity(1));
+
+    world.answer_since(before, &[]);
+
+    assert_eq!(
+        (world.server.has("P1"), world.status(identity(1))),
+        (false, NotSaved),
+        "sent {:?}",
+        world.sent_since(before)
+    );
+}
+
+/// Saved while offline, so the server's state is unknown. Back online: unsave, and undo it
+/// with a save while the delete is in flight. The delete is refused. The refusal reverts the row
+/// to what the server last said, which is nothing, so the row and the save are deleted.
+#[test]
+fn a_save_tapped_while_an_unsave_in_flight_is_refused_is_kept() {
+    let mut world = World::new();
+    world.sync();
+    world.set_offline(true);
+    world.save(identity(1));
+    world.set_offline(false);
+    let before = world.sent_count();
+    world.unsave(identity(1));
+    assert_eq!(world.sent_since(before), ["delete P1"]);
+    world.save(identity(1));
+
+    world.answer_writes_refusing("delete P1", before);
+    world.sync();
+
+    assert_eq!(
+        (
+            world.status(identity(1)),
+            world.shown(),
+            world.server.has("P1")
+        ),
+        (Saved, vec!["P1".to_string()], true),
+        "sent {:?}",
+        world.sent_since(before)
+    );
+}
+
+/// The server answers one key with 403 every time. Every send round stops at that row, which
+/// is always first, so a later save is never sent.
+#[test]
+fn a_key_the_server_forbids_does_not_block_later_saves() {
+    let forbidden = || {
+        respond(
+            403,
+            json!({ "code": "unauthorized", "message": "", "data": { "status": 403 } }),
+        )
+    };
+    // Answers every request held, including those they lead to. `new P1` is always forbidden.
+    let settle = |world: &mut World| {
+        while let Some(held) = world.take_held(|_| true) {
+            if held.what == "new P1" {
+                let _ = held.reply.send(forbidden());
+                world.pool.run_until_stalled();
+            } else {
+                world.answer(held, false);
+            }
+        }
+    };
+    let mut world = World::new();
+    world.sync();
+    world.save(identity(1));
+    settle(&mut world);
+    world.save(identity(2));
+    settle(&mut world);
+    for _ in 0..3 {
+        world.start_sync();
+        settle(&mut world);
+    }
+
+    assert!(
+        world.server.has("P2"),
+        "pending {}, sent {:?}",
+        world.pending(identity(2)),
+        world.executor.sent.lock().unwrap()
+    );
+}
+
+/// Past 1,000 keys, an imported save dated before the oldest key returned times out without
+/// reaching the server. It's in doubt, and no sync ever decides it, so it's never sent again.
+#[test]
+fn past_the_key_limit_an_imported_save_that_timed_out_is_sent_again() {
+    let mut world = World::new();
+    past_the_keys_with(&mut world, &["P2"]);
+    world.sync();
+    let save = ReaderLocalSave {
+        identity: identity(1),
+        date_saved: Some(OLD_SAVED_DATE.parse().unwrap()),
+        title: None,
+        excerpt: None,
+        featured_image: None,
+        site_name: None,
+        site_url: None,
+    };
+    world.call(|service| async move { service.import_local_saves(vec![save]).await });
+    assert_eq!(world.time_out_next_write(), "new P1");
+
+    let before = world.sent_count();
+    for _ in 0..3 {
+        world.sync();
+    }
+
+    assert!(
+        world.server.has("P1"),
+        "pending {}, sent {:?}",
+        world.pending(identity(1)),
+        world.sent_since(before)
+    );
+}
+
+/// Past 1,000 keys, the unsave of an old post the list showed times out without reaching the
+/// server. No sync decides it, so it's never sent again, and the server keeps the post.
+#[test]
+fn past_the_key_limit_an_old_unsave_that_timed_out_is_sent_again() {
+    let mut world = World::new();
+    past_the_keys_with(&mut world, &["P1"]);
+    world.list_refresh();
+    assert_eq!(world.status(identity(1)), Saved);
+    world.unsave(identity(1));
+    assert_eq!(world.time_out_next_write(), "delete P1");
+
+    let before = world.sent_count();
+    for _ in 0..3 {
+        world.sync();
+    }
+
+    assert!(
+        !world.server.has("P1"),
+        "pending {}, sent {:?}",
+        world.pending(identity(1)),
+        world.sent_since(before)
+    );
+}
+
+/// Saved elsewhere under post 3. The list returns it by its feed item while its WordPress.com
+/// copy fails to load. Its URL is the one the keys gave post 3, so it's the same save, and a sync
+/// leaves it in the list. Without a URL nothing links the two, and a sync takes the feed item's row
+/// out of the list until a page has post 3 again: a known limit.
+#[test]
+fn a_jetpack_post_the_list_returns_by_its_feed_item_stays_listed_after_a_sync() {
+    let mut world = World::new();
+    world.server.saved.insert("P3".to_string());
+    world.sync();
+    world.start_list_refresh();
+    let keys = world.take_held(|held| held.what == "keys").unwrap();
+    world.answer(keys, false);
+    let list = world.take_held(|held| held.what == "list").unwrap();
+    let _ = list.reply.send(respond(
+        200,
+        json!({ "posts": [external_view_of_post_3()] }),
+    ));
+    world.pool.run_until_stalled();
+    assert_eq!(world.shown(), ["P3"], "the row the keys made");
+
+    world.sync();
+
+    assert_eq!(world.status(jetpack()), Saved);
+    assert!(!world.shown().is_empty(), "a saved post left the list");
+}
+
+/// An older save under feed item 4 that this device doesn't know about yet. The user saves the
+/// Jetpack post here, which gives its row the alias F4, then unsaves it. Only `delete P3` is sent,
+/// so the F4 save stays, and the next sync brings the post back.
+#[test]
+fn before_a_sync_unsaving_a_jetpack_post_saved_here_also_removes_its_older_feed_item_save() {
+    let mut world = World::new();
+    world.server.saved.insert("F4".to_string());
+    world.save(jetpack());
+    world.answer_writes();
+    world.unsave(jetpack());
+    world.answer_writes();
+    world.sync();
+
+    assert_eq!(
+        (world.status(jetpack()), world.server.saved.is_empty()),
+        (NotSaved, true),
+        "sent {:?}",
+        world.sent_since(0)
+    );
+}
+
+/// Post 3 as the list returns it while its WordPress.com copy fails to load: by its feed item,
+/// with its URL.
+fn external_view_of_post_3() -> Value {
+    let mut post = listed_rss_post(4);
+    post["URL"] = json!(U3);
+    post
 }

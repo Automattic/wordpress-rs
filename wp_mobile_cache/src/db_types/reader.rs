@@ -148,6 +148,9 @@ pub struct DbReaderSavedRow {
     /// The order of the last tap on this device, or 0 for none.
     pub seq: i64,
     pub date_saved: Option<WpGmtDateTime>,
+    /// Whether [`Self::date_saved`] came from the server. A tap's date doesn't: saving a post
+    /// already saved keeps its old date there.
+    pub date_known: bool,
     pub post_row_id: Option<RowId>,
     /// Shown in the saved list: the list sent it, or this device saved it.
     pub listed: bool,

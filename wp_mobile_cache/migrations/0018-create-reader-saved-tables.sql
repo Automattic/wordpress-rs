@@ -13,6 +13,7 @@ CREATE TABLE `reader_saved_posts` (
   `tapped` INTEGER NOT NULL DEFAULT 0, -- a tap's request isn't answered yet, so it's sent even if the row matches what the server last said
   `seq` INTEGER NOT NULL DEFAULT 0,   -- the order of the last tap on this device, 0 for none. The newer tap wins a merge
   `date_saved` TEXT,
+  `date_known` INTEGER NOT NULL DEFAULT 0, -- 1 if `date_saved` came from the server: the keys or a list page. A tap's date isn't the server's: a save of a post already saved keeps its old date
   `post_id` INTEGER,                  -- reader_posts.rowid
   `listed` INTEGER NOT NULL DEFAULT 0, -- shown in the saved list: the list sent it, or this device saved it
   `imported` INTEGER NOT NULL DEFAULT 0, -- from the import of the device's old local saves
