@@ -36,10 +36,8 @@ struct ReaderSavedServiceTests {
         let cache = try openCache(at: temporaryDatabase())
         let service = try client.makeReaderSavedService(source: .ios, cache: cache, userID: 1)
 
-        #expect(service.status(post: identity(1)) == .unknown)
-        #expect(service.savedCount() == nil)
-        #expect(service.recentSaves().isEmpty)
-        #expect(service.localOnlyKeys().isEmpty)
+        #expect(try service.status(post: identity(1)) == .unknown)
+        #expect(try service.savedCount() == nil)
 
         let collection = service.savedPosts()
         let items: [ReaderSavedListItem] = try await collection.loadItems()
@@ -76,6 +74,30 @@ struct ReaderSavedServiceTests {
         #expect(try await !service.importLocalSaves(saves: []).alreadyImported)
     }
 
+    #if !os(Linux)
+    @Test
+    func aSaveMadeOfflineIsPendingAndShowsAtOnce() async throws {
+        let cache = try openCache(at: temporaryDatabase())
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OfflineURLProtocol.self]
+        let offline = WPComApiClient(
+            urlSession: URLSession(configuration: configuration),
+            authentication: .none
+        )
+        let service = try offline.makeReaderSavedService(source: .ios, cache: cache, userID: 1)
+
+        let outcome: ReaderSavedOutcome = try await service.save(post: identity(1))
+
+        guard case .pending = outcome else {
+            Issue.record("Expected the save to wait, got \(outcome)")
+            return
+        }
+        #expect(try service.status(post: identity(1)) == .saved)
+        let items = try await service.savedPosts().loadItems()
+        #expect(items.map(\.isPending) == [true])
+    }
+    #endif
+
     @Test
     func aCacheWithoutMigrationsIsADatabaseError() throws {
         let cache = try WordPressApiCache(path: temporaryDatabase().path)
@@ -88,3 +110,18 @@ struct ReaderSavedServiceTests {
         }
     }
 }
+
+#if !os(Linux)
+/// Fails every request as a device without a connection does, so nothing reaches the network.
+private final class OfflineURLProtocol: URLProtocol {
+    override static func canInit(with request: URLRequest) -> Bool { true }
+
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+    }
+
+    override func stopLoading() {}
+}
+#endif
