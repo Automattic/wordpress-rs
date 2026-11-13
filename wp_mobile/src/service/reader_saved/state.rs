@@ -155,6 +155,9 @@ pub(super) struct ReaderSavedState {
     answered_total: Option<AnsweredTotal>,
     /// Keys whose unsave a refresh included and pruned, and when reads start to include it. A read
     /// of the saved list that started before then may still predate the unsave.
+    ///
+    /// Not stored: that time is never after the refresh that adds it, so only a read already in
+    /// flight can predate it, and a relaunch ends those.
     unsaved_before: HashMap<ReaderSavedKey, Instant>,
     next_tap: u64,
     next_write_id: u64,
@@ -717,7 +720,6 @@ pub(super) struct PersistedLocal {
     recent: Vec<ReaderSavedKey>,
     stored_as: Vec<(ReaderSavedKey, ReaderSavedKey)>,
     answered_total: Option<PersistedAnsweredTotal>,
-    unsaved_before: Vec<(ReaderSavedKey, i64)>,
     next_tap: u64,
     next_write_id: u64,
 }
@@ -796,11 +798,6 @@ impl ReaderSavedState {
                 tap: answered.includes.0.0,
                 id: answered.includes.1.0,
             }),
-            unsaved_before: self
-                .unsaved_before
-                .iter()
-                .map(|(key, from)| (key.clone(), now.wall_ms(*from)))
-                .collect(),
             next_tap: self.next_tap,
             next_write_id: self.next_write_id,
         }
@@ -879,11 +876,6 @@ impl ReaderSavedState {
                 at: now.instant(answered.at),
                 includes: (Tap(answered.tap), WriteId(answered.id)),
             });
-            state.unsaved_before = local
-                .unsaved_before
-                .into_iter()
-                .map(|(key, from)| (key, now.instant(from)))
-                .collect();
             let last = state.writes.iter().map(Write::order).max();
             state.next_tap = local.next_tap.max(last.map_or(0, |(tap, _)| tap.0 + 1));
             state.next_write_id = local.next_write_id.max(last.map_or(0, |(_, id)| id.0 + 1));
