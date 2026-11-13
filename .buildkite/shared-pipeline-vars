@@ -4,7 +4,7 @@
 # to set up some variables that will be interpolated in the `.yml` pipeline before uploading it.
 
 XCODE_VERSION="26.6"
-CI_TOOLKIT_PLUGIN_VERSION="3.7.1"
+CI_TOOLKIT_PLUGIN_VERSION="7.1.1"
 TEST_COLLECTOR_VERSION="v1.10.2"
 
 export IMAGE_ID="xcode-$XCODE_VERSION"
