@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import rs.wordpress.cache.kotlin.createObservableCollection
 import uniffi.wp_api.ReaderSavedKey
-import uniffi.wp_mobile.ReaderSavedException
 import uniffi.wp_mobile.ReaderSavedListItem
 import uniffi.wp_mobile.ReaderSavedService
 import java.text.SimpleDateFormat
@@ -46,14 +45,12 @@ private fun ReaderSavedListItem.title(): String =
     post?.title ?: post?.identity?.url ?: (key as? ReaderSavedKey.Url)?.url ?: key.toString()
 
 private fun ReaderSavedListItem.subtitle(): String {
-    val saved = when {
-        isRecent -> "Saved just now"
-        else -> dateSaved?.let {
-            "Saved " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(it)
-        }
+    val saved = dateSaved?.let {
+        "Saved " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(it)
     }
+    val pending = if (isPending) "Not sent yet" else null
     val localOnly = if (isLocalOnly) "On this device only" else null
-    return listOfNotNull(post?.siteName, saved, localOnly).joinToString(" · ")
+    return listOfNotNull(post?.siteName, saved, pending, localOnly).joinToString(" · ")
 }
 
 /**
@@ -97,8 +94,6 @@ fun WpComReaderSavedPostsScreen(
             error = null
             try {
                 request()
-            } catch (e: ReaderSavedException.StaleLoadMore) {
-                // A refresh started while the page loaded, and replaced it.
             } catch (e: Exception) {
                 error = e.toString()
             }
