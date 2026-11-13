@@ -79,6 +79,8 @@ pub struct ReaderLocalSave {
     pub title: Option<String>,
     #[uniffi(default = None)]
     pub excerpt: Option<String>,
+    /// The image the app shows for the post. It's stored as both the featured image and the display
+    /// image.
     #[uniffi(default = None)]
     pub featured_image: Option<String>,
     #[uniffi(default = None)]
@@ -145,6 +147,7 @@ impl ReaderSavedService {
                 record.title = save.title.clone();
                 record.excerpt = save.excerpt.clone();
                 record.featured_image = save.featured_image.clone();
+                record.display_image_url = save.featured_image.clone();
                 record.site_name = save.site_name.clone();
                 record.site_url = save.site_url.clone();
                 // The import's copy may be older than what the saved list already stored.
@@ -224,7 +227,7 @@ impl ReaderSavedService {
             let stream =
                 ReaderStreamRepository::get_or_create(&transaction, self.account, SAVED_STREAM)?;
             for post in &response.posts {
-                let Some(record) = ReaderPostRecord::from_saved_post(post) else {
+                let Some(record) = ReaderPostRecord::from_reader_post(&post.post) else {
                     continue;
                 };
                 let row = ReaderPostRepository::upsert(&transaction, self.account, &record)?;
@@ -232,12 +235,13 @@ impl ReaderSavedService {
                 // Jetpack post the list returns by its feed item while its WordPress.com copy
                 // fails to load, since the keys give that row the URL.
                 let url = post
+                    .post
                     .identity
                     .url
                     .clone()
                     .map(|url| ReaderSavedKey::Url { url })
                     .filter(ReaderSavedKey::is_complete);
-                let keys: Vec<_> = reader_saved_keys_for_post(post.identity.clone())
+                let keys: Vec<_> = reader_saved_keys_for_post(post.post.identity.clone())
                     .into_iter()
                     .chain(url)
                     .map(|key| key.normalized())
@@ -290,7 +294,7 @@ impl ReaderSavedService {
             let response = self
                 .client
                 .reader_saved()
-                .list_posts(&ReaderSavedPostsParams::default())
+                .list_posts(&saved_list_params(None))
                 .await?
                 .data;
             self.store_page(&response, true)?;
@@ -315,11 +319,12 @@ impl ReaderSavedService {
         };
         self.set_list_state(ListState::FetchingNextPage, None)?;
         let result = async {
-            let params = ReaderSavedPostsParams {
-                page_handle: Some(page_handle),
-                ..Default::default()
-            };
-            let response = self.client.reader_saved().list_posts(&params).await?.data;
+            let response = self
+                .client
+                .reader_saved()
+                .list_posts(&saved_list_params(Some(page_handle)))
+                .await?
+                .data;
             self.store_page(&response, false)?;
             Ok(page_result(&response))
         }
@@ -380,6 +385,16 @@ impl ReaderSavedService {
                 last_refreshed_at: None,
             },
         })
+    }
+}
+
+/// What the saved list asks for: `meta=site,feed` gives every post its site's icon, including an
+/// RSS post, which otherwise has none.
+fn saved_list_params(page_handle: Option<String>) -> ReaderSavedPostsParams {
+    ReaderSavedPostsParams {
+        page_handle,
+        meta: Some("site,feed".to_string()),
+        ..Default::default()
     }
 }
 

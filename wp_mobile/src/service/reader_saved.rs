@@ -38,13 +38,14 @@ use wp_api::date::WpGmtDateTime;
 use wp_api::prelude::{RequestExecutionErrorReason, WpApiClientDelegate, WpApiError, WpErrorCode};
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::me::WpComUserId;
+use wp_api::wp_com::reader_posts::ReaderPost;
 use wp_api::wp_com::reader_saved::{
     ReaderPostSaveIdentity, ReaderSavePostParams, ReaderSavedBulkKey, ReaderSavedBulkParams,
     ReaderSavedKey, ReaderSavedPageDetails, ReaderSavedSource, ReaderUnsavePostParams,
     reader_saved_key_for_post, reader_saved_keys_for_post,
 };
 use wp_mobile_cache::db_types::reader::{
-    DbReaderSavedKey, DbReaderSavedRow, reader_saved_key_text,
+    DbReaderSavedKey, DbReaderSavedRow, ReaderPostRecord, reader_saved_key_text,
 };
 use wp_mobile_cache::repository::reader::{ReaderPostRepository, ReaderSavedRepository};
 use wp_mobile_cache::repository::wordpress_com_accounts::WordPressComAccountRepository;
@@ -213,7 +214,31 @@ impl ReaderSavedService {
             .ok_or(ReaderSavedError::PostCannotBeSaved)?
             .normalized();
         let keys = complete(&reader_saved_keys_for_post(post))?;
-        self.save_keys(main, keys).await
+        self.save_keys(main, keys, None).await
+    }
+
+    /// Saves a post the app already has, such as one from a Reader stream or the post screen.
+    ///
+    /// Like [`Self::save`], but the post's details are stored in the same transaction as the save,
+    /// so the saved list shows the post in full straight away, offline too, rather than only its key
+    /// until the next refresh. They only fill in what the cache doesn't have yet: what the server
+    /// sent for the post wins, and so does what the saved list sends later. Leave out a field the app
+    /// doesn't have rather than guessing it: `tags` is `None` when the app doesn't know them, and
+    /// empty only when the post has none.
+    ///
+    /// If the server refuses the save, it's undone as with [`Self::save`], and the details stay in
+    /// the cache, where the saved list doesn't show them.
+    pub async fn save_with_details(
+        &self,
+        post: ReaderPost,
+    ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
+        let main = reader_saved_key_for_post(post.identity.clone())
+            .ok_or(ReaderSavedError::PostCannotBeSaved)?
+            .normalized();
+        let keys = complete(&reader_saved_keys_for_post(post.identity.clone()))?;
+        let details =
+            ReaderPostRecord::from_reader_post(&post).ok_or(ReaderSavedError::PostCannotBeSaved)?;
+        self.save_keys(main, keys, Some(&details)).await
     }
 
     /// Saves a page by URL. The URL of a WordPress.com post is saved as the post.
@@ -230,7 +255,7 @@ impl ReaderSavedService {
                 .expect("page details lock poisoned")
                 .insert(reader_saved_key_text(&key), details);
         }
-        self.save_keys(key.clone(), vec![key]).await
+        self.save_keys(key.clone(), vec![key], None).await
     }
 
     /// Unsaves a post from every key it may be saved under. It reads as unsaved straight away.
@@ -317,10 +342,18 @@ impl ReaderSavedService {
         })
     }
 
+    /// Saves `main`, under every key in `keys`. `details` is the post, which is stored in the tap's
+    /// transaction, so the saved list never shows the save without it.
+    ///
+    /// The details aren't removed if the save is refused and undone. The saved list only shows a
+    /// stored post through a save, so they don't show anywhere. The row may also belong to another
+    /// stream or a save made since, so removing it could take away a post that's still shown, and
+    /// what it holds is real data about the post either way.
     async fn save_keys(
         &self,
         main: ReaderSavedKey,
         keys: Vec<ReaderSavedKey>,
+        details: Option<&ReaderPostRecord>,
     ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
         // Already saved, and waiting for room: a tap would make a refusal undo it.
         if self
@@ -335,10 +368,24 @@ impl ReaderSavedService {
         let now = self.now();
         let row = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
-            // Where #1734's details go: `ReaderPostRepository::fill_missing` them here, in the tap's
-            // transaction, and pass their row on.
-            let post =
+            // A Jetpack post's feed item copy may already be stored as its WordPress.com post, so
+            // the details fill in that row rather than starting a second one.
+            let stored =
                 ReaderPostRepository::select_row_id_by_key(&transaction, self.account, &main)?;
+            let post = match (details, stored) {
+                (Some(details), Some(row)) => Some(ReaderPostRepository::fill_missing_at(
+                    &transaction,
+                    self.account,
+                    row,
+                    details,
+                )?),
+                (Some(details), None) => Some(ReaderPostRepository::fill_missing(
+                    &transaction,
+                    self.account,
+                    details,
+                )?),
+                (None, stored) => stored,
+            };
             let row = ReaderSavedRepository::tap_save(
                 &transaction,
                 self.account,

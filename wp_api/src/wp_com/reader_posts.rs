@@ -7,6 +7,7 @@
 
 use crate::{
     date::{WpGmtDateTime, deserialize_optional_wp_gmt_date_time},
+    html_entities::decode_html_entities,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -15,8 +16,11 @@ use crate::{
         reader_saved::{ReaderPostSaveIdentity, deserialize_optional_text},
     },
 };
-use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
-use std::collections::BTreeMap;
+use serde::{
+    Deserialize, Deserializer, Serialize,
+    de::{DeserializeOwned, IgnoredAny, MapAccess, SeqAccess, Visitor},
+};
+use std::fmt;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
     deserialize_null_as_empty_vec, deserialize_optional_bool_or_int,
@@ -62,6 +66,9 @@ pub struct ReaderPost {
     pub site_url: Option<String>,
     #[uniffi(default = None)]
     pub feed_url: Option<String>,
+    /// The site's icon: `site_icon.img`, else the icon in `meta=site`, else an RSS feed's image
+    /// from `meta=feed`. `site_icon.ico`, often a small favicon, is the last resort. Feeds that
+    /// publish no image have none.
     #[uniffi(default = None)]
     pub site_icon_url: Option<String>,
     /// The site's language, such as `en`. Only sent when the stream is asked for `meta=site`.
@@ -80,7 +87,26 @@ pub struct ReaderPost {
     pub featured_image: Option<String>,
     #[uniffi(default = None)]
     pub featured_media: Option<ReaderFeaturedMedia>,
-    pub tags: Vec<ReaderPostTag>,
+    /// The image to show for the post, picked the way the Reader apps pick it. See
+    /// [`reader_post_display_image_url`] for which wins.
+    ///
+    /// Parsing a response sets it. When you build a post yourself, such as one to pass to a save,
+    /// set it to the image you show for the post. Left `None`, the cache falls back to
+    /// [`Self::featured_image`], then [`Self::featured_media`] when it's an image.
+    #[uniffi(default = None)]
+    pub display_image_url: Option<String>,
+    /// The image an editor picked for the post in Discover, from `editorial.image`. `None` when the
+    /// response has no `editorial`, which the saved list never sends, or when the pick is a
+    /// `wp.com/mshots/` screenshot, which the apps never show.
+    ///
+    /// The cache keeps it once it has it, and shows it ahead of any other image, so a refresh from
+    /// a source without `editorial` doesn't swap the post's image back to its featured image.
+    #[uniffi(default = None)]
+    pub editorial_image_url: Option<String>,
+    /// In the order the API sends them. `None` when the response left out `tags`, and empty when
+    /// the post has none.
+    #[uniffi(default = None)]
+    pub tags: Option<Vec<ReaderPostTag>>,
     /// Set when the post is a cross-post of another.
     #[uniffi(default = None)]
     pub cross_post: Option<ReaderCrossPost>,
@@ -181,6 +207,36 @@ pub struct ReaderFeaturedMedia {
     #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
     #[uniffi(default = None)]
     pub height: Option<u64>,
+}
+
+/// The image to show for a post, as the Reader apps pick it:
+///
+/// 1. `editorial.image`, which an editor picked for a post in Discover, unless it's a `wp.com/mshots/`
+///    screenshot of the page, which the apps never show.
+/// 2. `featured_image`, the image the author set.
+/// 3. `featured_media.uri`, when `featured_media` is an image rather than a video. The server fills
+///    it in from the post's images when the author set none.
+///
+/// Empty values are skipped. The saved list doesn't send `editorial`.
+pub fn reader_post_display_image_url(
+    editorial_image: Option<&str>,
+    featured_image: Option<&str>,
+    featured_media: Option<&ReaderFeaturedMedia>,
+) -> Option<String> {
+    let featured_media_image = featured_media
+        .filter(|media| media.media_type.as_deref() == Some("image"))
+        .and_then(|media| media.uri.as_deref());
+    reader_post_editorial_image_url(editorial_image)
+        .into_iter()
+        .chain(featured_image)
+        .chain(featured_media_image)
+        .find(|url| !url.is_empty())
+        .map(str::to_string)
+}
+
+/// `editorial.image`, unless it's empty or a `wp.com/mshots/` screenshot of the page.
+fn reader_post_editorial_image_url(editorial_image: Option<&str>) -> Option<&str> {
+    editorial_image.filter(|url| !url.is_empty() && !url.contains("wp.com/mshots/"))
 }
 
 /// A tag on a [`ReaderPost`].
@@ -324,9 +380,11 @@ struct RawReaderPost {
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
     featured_media: Option<ReaderFeaturedMedia>,
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
-    tags: Option<BTreeMap<String, ReaderPostTag>>,
-    #[serde(default, deserialize_with = "deserialize_object_or_empty")]
-    metadata: Option<Vec<RawMetadata>>,
+    editorial: Option<RawEditorial>,
+    #[serde(default, deserialize_with = "deserialize_tags")]
+    tags: Option<Vec<ReaderPostTag>>,
+    #[serde(default, deserialize_with = "deserialize_metadata")]
+    metadata: Vec<RawMetadata>,
     #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
     like_count: Option<u64>,
     #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
@@ -357,6 +415,13 @@ struct RawReaderPost {
     railcar: Option<serde_json::Value>,
 }
 
+/// `editorial`, which Discover sends for a post an editor picked. Only its image is kept.
+#[derive(Deserialize)]
+struct RawEditorial {
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    image: Option<String>,
+}
+
 #[derive(Deserialize)]
 struct RawSiteIcon {
     #[serde(default, deserialize_with = "deserialize_optional_text")]
@@ -365,7 +430,8 @@ struct RawSiteIcon {
     ico: Option<String>,
 }
 
-/// `meta`, of which only the site's locale is kept. `meta=site` adds the whole site here.
+/// `meta`, of which only the site's locale and icon and the feed's image are kept. `meta=site` adds
+/// the whole site here, and `meta=feed` the whole feed.
 #[derive(Deserialize)]
 struct RawMeta {
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
@@ -376,12 +442,23 @@ struct RawMeta {
 struct RawMetaData {
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
     site: Option<RawMetaSite>,
+    #[serde(default, deserialize_with = "deserialize_object_or_empty")]
+    feed: Option<RawMetaFeed>,
 }
 
 #[derive(Deserialize)]
 struct RawMetaSite {
     #[serde(default, deserialize_with = "deserialize_optional_text")]
     locale: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_object_or_empty")]
+    icon: Option<RawSiteIcon>,
+}
+
+#[derive(Deserialize)]
+struct RawMetaFeed {
+    /// HTML-escaped: `&` arrives as `&amp;`.
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    image: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -404,8 +481,36 @@ impl TryFrom<RawReaderPost> for ReaderPost {
     type Error = String;
 
     fn try_from(raw: RawReaderPost) -> Result<Self, Self::Error> {
-        let metadata = raw.metadata.unwrap_or_default();
+        let metadata = raw.metadata;
         let discussion = raw.discussion;
+        let meta = raw.meta.and_then(|meta| meta.data);
+        let meta_site = meta.as_ref().and_then(|data| data.site.as_ref());
+        let meta_site_icon = meta_site.and_then(|site| site.icon.as_ref());
+        let feed_image = meta
+            .as_ref()
+            .and_then(|data| data.feed.as_ref())
+            .and_then(|feed| feed.image.clone())
+            .map(decode_html_entities);
+        let site_icon_url = raw
+            .site_icon
+            .as_ref()
+            .and_then(|icon| icon.img.clone())
+            .or_else(|| meta_site_icon.and_then(|icon| icon.img.clone()))
+            .or(feed_image)
+            .or_else(|| raw.site_icon.as_ref().and_then(|icon| icon.ico.clone()))
+            .or_else(|| meta_site_icon.and_then(|icon| icon.ico.clone()));
+        let site_locale = meta_site.and_then(|site| site.locale.clone());
+        let editorial_image = raw
+            .editorial
+            .as_ref()
+            .and_then(|editorial| editorial.image.as_deref());
+        let display_image_url = reader_post_display_image_url(
+            editorial_image,
+            raw.featured_image.as_deref(),
+            raw.featured_media.as_ref(),
+        );
+        let editorial_image_url =
+            reader_post_editorial_image_url(editorial_image).map(str::to_string);
         Ok(Self {
             identity: raw.identity,
             global_id: raw.global_id,
@@ -421,19 +526,17 @@ impl TryFrom<RawReaderPost> for ReaderPost {
             site_name: raw.site_name,
             site_url: raw.site_url,
             feed_url: raw.feed_url,
-            site_icon_url: raw.site_icon.and_then(|icon| icon.img.or(icon.ico)),
-            site_locale: raw
-                .meta
-                .and_then(|meta| meta.data)
-                .and_then(|data| data.site)
-                .and_then(|site| site.locale),
+            site_icon_url,
+            site_locale,
             site_is_private: raw.site_is_private,
             site_is_atomic: raw.site_is_atomic,
             is_jetpack: raw.is_jetpack,
             organization_id: raw.organization_id,
             featured_image: raw.featured_image,
             featured_media: raw.featured_media,
-            tags: raw.tags.unwrap_or_default().into_values().collect(),
+            display_image_url,
+            editorial_image_url,
+            tags: raw.tags,
             cross_post: cross_post(&metadata),
             like_count: raw.like_count,
             i_like: raw.i_like,
@@ -524,6 +627,93 @@ where
     }
 }
 
+/// `tags`, an object of tags by slug, in the order the API sends them, which is the order the web
+/// Reader shows them in. Going through `serde_json::Value` would sort them by slug. With no tags,
+/// it's `[]`, and the API sends that as an empty object or array, `""`, `false` or `null`. Only a
+/// response without the key at all reads as `None`.
+///
+/// A tag without a slug or a name is left out, so one malformed tag doesn't fail the post, and with
+/// it a whole page of a stream.
+fn deserialize_tags<'de, D>(deserializer: D) -> Result<Option<Vec<ReaderPostTag>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct TagsVisitor;
+
+    impl<'de> Visitor<'de> for TagsVisitor {
+        type Value = Vec<ReaderPostTag>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("an object of tags by slug")
+        }
+
+        fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+            let mut tags = Vec::new();
+            while let Some((_, tag)) = map.next_entry::<IgnoredAny, serde_json::Value>()? {
+                tags.extend(serde_json::from_value::<ReaderPostTag>(tag).ok());
+            }
+            Ok(tags)
+        }
+
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            let mut tags = Vec::new();
+            while let Some(tag) = seq.next_element::<serde_json::Value>()? {
+                tags.extend(serde_json::from_value::<ReaderPostTag>(tag).ok());
+            }
+            Ok(tags)
+        }
+
+        fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Self::Value, E> {
+            if text.is_empty() {
+                Ok(Vec::new())
+            } else {
+                Err(E::invalid_value(serde::de::Unexpected::Str(text), &self))
+            }
+        }
+
+        fn visit_bool<E: serde::de::Error>(self, _: bool) -> Result<Self::Value, E> {
+            Ok(Vec::new())
+        }
+
+        fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+            Ok(Vec::new())
+        }
+
+        fn visit_none<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+            Ok(Vec::new())
+        }
+    }
+
+    deserializer.deserialize_any(TagsVisitor).map(Some)
+}
+
+/// `metadata`, a list of entries. PHP sends a list as an object when its keys aren't in sequence,
+/// so an object's values are read as the list. With none, it's empty, and the API sends that as an
+/// empty object or array, `""`, `false` or `null`.
+fn deserialize_metadata<'de, D>(deserializer: D) -> Result<Vec<RawMetadata>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
+    let entries = match value {
+        Some(serde_json::Value::Array(entries)) => entries,
+        Some(serde_json::Value::Object(fields)) => {
+            fields.into_iter().map(|(_, entry)| entry).collect()
+        }
+        None | Some(serde_json::Value::Null) | Some(serde_json::Value::Bool(false)) => Vec::new(),
+        Some(serde_json::Value::String(text)) if text.is_empty() => Vec::new(),
+        Some(other) => {
+            return Err(serde::de::Error::custom(format!(
+                "expected a list of metadata, not {other}"
+            )));
+        }
+    };
+    entries
+        .into_iter()
+        .map(|entry| serde_json::from_value(entry).map_err(serde::de::Error::custom))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -531,6 +721,7 @@ mod tests {
     use crate::wp_com::reader_saved::{
         ReaderFeedItemId, ReaderSavedKey, reader_saved_key_for_post,
     };
+    use rstest::rstest;
     use serde_json::json;
 
     fn parse(value: serde_json::Value) -> ReaderPost {
@@ -557,7 +748,7 @@ mod tests {
         assert_eq!(post.site_name.as_deref(), Some("WordPress.com Blog"));
         assert_eq!(post.site_locale.as_deref(), Some("en"));
         assert!(post.site_icon_url.is_some());
-        assert!(!post.tags.is_empty());
+        assert!(post.tags.as_ref().is_some_and(|tags| !tags.is_empty()));
         assert!(post.author.as_ref().and_then(|a| a.name.as_ref()).is_some());
         assert!(post.comment_count.is_some());
         assert_eq!(post.site_is_private, Some(false));
@@ -578,8 +769,74 @@ mod tests {
         ));
         assert_eq!(post.site_name.as_deref(), Some("xkcd.com"));
         assert_eq!(post.site_icon_url, None);
-        assert!(post.tags.is_empty());
+        assert_eq!(post.tags, Some(vec![]));
         assert_eq!(post.site_locale, None, "Not asked for with meta=site");
+    }
+
+    #[test]
+    fn test_tags_keep_the_order_the_api_sends() {
+        // From a string: `json!` would sort the keys.
+        let post: ReaderPost = serde_json::from_str(
+            r#"{
+                "ID": 9, "site_ID": 123, "is_external": false,
+                "tags": {
+                    "zebra": { "slug": "zebra", "name": "Zebra" },
+                    "apple": { "slug": "apple", "name": "Apple" }
+                }
+            }"#,
+        )
+        .unwrap();
+        let slugs: Vec<_> = post
+            .tags
+            .iter()
+            .flatten()
+            .map(|tag| tag.slug.as_str())
+            .collect();
+        assert_eq!(slugs, vec!["zebra", "apple"]);
+    }
+
+    #[rstest]
+    #[case::empty_string(json!(""))]
+    #[case::empty_object(json!({}))]
+    #[case::empty_array(json!([]))]
+    #[case::false_(json!(false))]
+    #[case::null(json!(null))]
+    fn test_no_tags(#[case] tags: serde_json::Value) {
+        let post = parse(json!({ "ID": 9, "site_ID": 123, "is_external": false, "tags": tags }));
+        assert_eq!(post.tags, Some(vec![]));
+    }
+
+    #[test]
+    fn test_tags_left_out_are_not_known() {
+        let post = parse(json!({ "ID": 9, "site_ID": 123, "is_external": false }));
+        assert_eq!(post.tags, None, "Not the same as a post with no tags");
+    }
+
+    #[test]
+    fn test_a_tag_without_a_slug_or_name_is_left_out() {
+        let post = parse(json!({
+            "ID": 9, "site_ID": 123, "is_external": false,
+            "tags": {
+                "news": { "slug": "news", "name": "News" },
+                "no-name": { "slug": "no-name" },
+                "no-slug": { "name": "No slug" },
+            },
+        }));
+        let slugs: Vec<_> = post
+            .tags
+            .iter()
+            .flatten()
+            .map(|tag| tag.slug.as_str())
+            .collect();
+        assert_eq!(slugs, vec!["news"]);
+    }
+
+    #[test]
+    fn test_a_non_empty_string_for_tags_is_an_error() {
+        let result = serde_json::from_value::<ReaderPost>(
+            json!({ "ID": 9, "site_ID": 123, "is_external": false, "tags": "news" }),
+        );
+        assert!(result.is_err());
     }
 
     #[test]
@@ -599,7 +856,7 @@ mod tests {
         }));
         assert_eq!(post.identity.site_id, Some(WpComSiteId(123)));
         assert_eq!(post.site_icon_url, None);
-        assert!(post.tags.is_empty());
+        assert_eq!(post.tags, Some(vec![]));
         assert_eq!(post.i_like, Some(true));
         assert_eq!(post.cross_post, None);
         assert_eq!(post.author.as_ref().unwrap().id, Some(7));
@@ -612,6 +869,120 @@ mod tests {
         assert_eq!(post.featured_media, None);
         assert_eq!(post.comment_count, Some(4));
         assert_eq!(post.date, None);
+    }
+
+    #[rstest::rstest]
+    #[case::own_icon(
+        json!({ "img": "https://a/img.png", "ico": "https://a/favicon.ico" }),
+        json!({ "site": { "icon": { "img": "https://site/img.png" } }, "feed": { "image": "https://feed/img.png" } }),
+        Some("https://a/img.png")
+    )]
+    #[case::site_meta_icon(
+        json!({ "ico": "https://a/favicon.ico" }),
+        json!({ "site": { "icon": { "img": "https://site/img.png" } }, "feed": { "image": "https://feed/img.png" } }),
+        Some("https://site/img.png")
+    )]
+    #[case::feed_image_unescaped(
+        json!([]),
+        json!({ "feed": { "image": "https://feed/img.png?w=150&amp;h=150" } }),
+        Some("https://feed/img.png?w=150&h=150")
+    )]
+    #[case::favicon_last(
+        json!({ "ico": "https://a/favicon.ico" }),
+        json!({ "feed": { "image": "" } }),
+        Some("https://a/favicon.ico")
+    )]
+    #[case::site_meta_favicon_last(
+        json!([]),
+        json!({ "site": { "icon": { "ico": "https://site/favicon.ico" } }, "feed": {} }),
+        Some("https://site/favicon.ico")
+    )]
+    #[case::none(json!([]), json!([]), None)]
+    fn test_site_icon_url(
+        #[case] site_icon: serde_json::Value,
+        #[case] meta_data: serde_json::Value,
+        #[case] expected: Option<&str>,
+    ) {
+        let post = parse(json!({
+            "ID": 1,
+            "site_ID": 2,
+            "is_external": false,
+            "site_icon": site_icon,
+            "meta": { "data": meta_data },
+        }));
+        assert_eq!(post.site_icon_url.as_deref(), expected);
+    }
+
+    const MSHOTS: &str = "https://s0.wp.com/mshots/v1/https%3A%2F%2Fexample.com%2Fpost?w=252";
+
+    #[rstest::rstest]
+    #[case::editorial_first(
+        json!({ "image": "https://editorial/img.jpg" }),
+        json!("https://featured/img.jpg"),
+        json!({ "uri": "https://media/img.jpg", "type": "image" }),
+        Some("https://editorial/img.jpg")
+    )]
+    #[case::editorial_mshots_skipped(
+        json!({ "image": MSHOTS }),
+        json!("https://featured/img.jpg"),
+        json!({ "uri": "https://media/img.jpg", "type": "image" }),
+        Some("https://featured/img.jpg")
+    )]
+    #[case::featured_image(
+        json!({ "image": "" }),
+        json!("https://featured/img.jpg"),
+        json!({ "uri": "https://media/img.jpg", "type": "image" }),
+        Some("https://featured/img.jpg")
+    )]
+    #[case::featured_media_image(
+        json!(null),
+        json!(""),
+        json!({ "uri": "https://media/img.jpg", "type": "image" }),
+        Some("https://media/img.jpg")
+    )]
+    #[case::featured_media_not_an_image(
+        json!(null),
+        json!(""),
+        json!({ "uri": "https://media/video.mp4", "type": "video" }),
+        None
+    )]
+    #[case::editorial_mshots_and_nothing_else(json!({ "image": MSHOTS }), json!(""), json!([]), None)]
+    #[case::none(json!(null), json!(null), json!(null), None)]
+    fn test_display_image_url(
+        #[case] editorial: serde_json::Value,
+        #[case] featured_image: serde_json::Value,
+        #[case] featured_media: serde_json::Value,
+        #[case] expected: Option<&str>,
+    ) {
+        let post = parse(json!({
+            "ID": 1,
+            "site_ID": 2,
+            "is_external": false,
+            "editorial": editorial,
+            "featured_image": featured_image,
+            "featured_media": featured_media,
+        }));
+        assert_eq!(post.display_image_url.as_deref(), expected);
+    }
+
+    #[rstest::rstest]
+    #[case::picked(json!({ "image": "https://editorial/img.jpg" }), Some("https://editorial/img.jpg"))]
+    #[case::mshots(json!({ "image": MSHOTS }), None)]
+    #[case::empty(json!({ "image": "" }), None)]
+    #[case::no_image(json!({}), None)]
+    #[case::not_sent(json!(null), None)]
+    fn test_editorial_image_url(
+        #[case] editorial: serde_json::Value,
+        #[case] expected: Option<&str>,
+    ) {
+        let post = parse(json!({
+            "ID": 1,
+            "site_ID": 2,
+            "is_external": false,
+            "editorial": editorial,
+            "featured_image": "https://featured/img.jpg",
+        }));
+        assert_eq!(post.editorial_image_url.as_deref(), expected);
     }
 
     #[test]
@@ -651,6 +1022,24 @@ mod tests {
                 post_url: Some("https://example.com/p".to_string()),
                 comment_url: None,
             })
+        );
+    }
+
+    /// PHP sends a list whose keys aren't in sequence as an object.
+    #[test]
+    fn test_metadata_sent_as_an_object() {
+        let post = parse(json!({
+            "ID": 1,
+            "site_ID": 2,
+            "is_external": false,
+            "metadata": {
+                "0": { "id": "1", "key": "xpost_origin", "value": "123:456" },
+                "2": { "id": "3", "key": "_xpost_original_permalink", "value": "https://example.com/p" },
+            },
+        }));
+        assert_eq!(
+            post.cross_post.and_then(|cross_post| cross_post.post_id),
+            Some(456)
         );
     }
 

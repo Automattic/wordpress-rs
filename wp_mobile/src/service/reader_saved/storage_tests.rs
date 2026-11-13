@@ -14,6 +14,7 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
+use wp_api::wp_com::reader_posts::{ReaderFeaturedMedia, ReaderPost, ReaderPostTag};
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderSavedSource};
 use wp_mobile_cache::HookAction;
 
@@ -1226,5 +1227,513 @@ async fn a_sync_and_a_refresh_that_change_nothing_tell_the_saved_list_nothing() 
         seen.iter()
             .all(|table| *table == DbTable::ReaderPosts || *table == DbTable::ReaderStreams),
         "{seen:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_saved_list_keeps_each_posts_site_icon_tags_and_comment_count() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(
+        200,
+        keys_response(&[post_json(1), post_json(2)]),
+    ));
+    let mut post = listed(2, "2026-11-02T00:00:00Z");
+    post["site_icon"] =
+        json!({ "img": "https://example.com/icon.png", "ico": "https://example.com/favicon.ico" });
+    post["tags"] = json!({ "news": { "slug": "news", "name": "News", "post_count": 3 } });
+    post["discussion"] = json!({ "comment_count": 5, "comments_open": true });
+    executor.push(Step::Respond(200, page(&[post], Some("next"))));
+    collection.refresh().await.unwrap();
+
+    // Like an RSS post: no icon of its own, but its feed has an image.
+    let mut without_icon = listed(1, "2026-11-01T00:00:00Z");
+    without_icon["site_icon"] = json!([]);
+    without_icon["tags"] = json!({});
+    without_icon["meta"] =
+        json!({ "data": { "feed": { "image": "https://example.com/feed.png?w=150&amp;h=150" } } });
+    executor.push(Step::Respond(200, page(&[without_icon], None)));
+    collection.load_next_page().await.unwrap();
+
+    let sent = executor.sent();
+    let [_, first_page, next_page] = &sent[..] else {
+        panic!("Expected the keys and two pages, not {sent:?}");
+    };
+    for request in [first_page, next_page] {
+        assert!(request.url.contains("meta=site%2Cfeed"), "{}", request.url);
+    }
+    drop((collection, service));
+
+    // Offline, the details are still there.
+    let (service, _) = device.launch();
+    let items = service.saved_posts().load_items().await.unwrap();
+    let posts: Vec<_> = items
+        .iter()
+        .map(|item| item.post.clone().unwrap())
+        .collect();
+    let [post, without_icon] = &posts[..] else {
+        panic!("Expected two posts, not {posts:?}");
+    };
+    assert_eq!(
+        post.site_icon_url.as_deref(),
+        Some("https://example.com/icon.png")
+    );
+    assert_eq!(
+        post.tags,
+        Some(vec![ReaderPostTag {
+            slug: "news".to_string(),
+            name: "News".to_string(),
+            display_name: None,
+            post_count: Some(3),
+        }])
+    );
+    assert_eq!(post.comment_count, Some(5));
+    assert_eq!(
+        without_icon.site_icon_url.as_deref(),
+        Some("https://example.com/feed.png?w=150&h=150")
+    );
+    assert_eq!(without_icon.tags, Some(vec![]));
+    assert_eq!(without_icon.comment_count, None);
+}
+
+#[tokio::test]
+async fn the_saved_list_shows_an_image_for_a_post_without_a_featured_image() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(
+        200,
+        keys_response(&[post_json(1), post_json(2)]),
+    ));
+    // Like a post whose author set no featured image: the server picks one from the post.
+    let mut from_media = listed(2, "2026-11-02T00:00:00Z");
+    from_media["featured_image"] = json!("");
+    from_media["featured_media"] = json!({
+        "uri": "https://example.com/from-post.jpg",
+        "width": 2560,
+        "height": 1706,
+        "type": "image",
+    });
+    let mut featured = listed(1, "2026-11-01T00:00:00Z");
+    featured["featured_image"] = json!("https://example.com/featured.jpg");
+    executor.push(Step::Respond(200, page(&[from_media, featured], None)));
+    collection.refresh().await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let images: Vec<_> = items
+        .iter()
+        .map(|item| {
+            let post = item.post.as_ref().unwrap();
+            (post.featured_image.clone(), post.display_image_url.clone())
+        })
+        .collect();
+    assert_eq!(
+        images,
+        vec![
+            (None, Some("https://example.com/from-post.jpg".to_string())),
+            (
+                Some("https://example.com/featured.jpg".to_string()),
+                Some("https://example.com/featured.jpg".to_string())
+            ),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_post_saved_with_only_featured_media_shows_its_image() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    // As the app builds it: the image it shows, as an image `featured_media`, and no display image.
+    let mut post = stream_post(4, "A post");
+    post.featured_image = None;
+    post.display_image_url = None;
+    post.featured_media = Some(ReaderFeaturedMedia {
+        uri: Some("https://example.com/from-app.jpg".to_string()),
+        media_type: Some("image".to_string()),
+        width: None,
+        height: None,
+    });
+    executor.push(Step::Respond(200, write_response(true, post_json(4), 1)));
+    service.save_with_details(post).await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let post = items[0].post.as_ref().unwrap();
+    assert_eq!(post.featured_image, None);
+    assert_eq!(
+        post.display_image_url.as_deref(),
+        Some("https://example.com/from-app.jpg")
+    );
+
+    // The saved list's copy, which has none, keeps it.
+    executor.push(Step::Respond(200, keys_response(&[post_json(4)])));
+    executor.push(Step::Respond(
+        200,
+        page(&[listed(4, "2026-11-05T00:00:00Z")], None),
+    ));
+    collection.refresh().await.unwrap();
+    let items = collection.load_items().await.unwrap();
+    assert_eq!(
+        items[0].post.as_ref().unwrap().display_image_url.as_deref(),
+        Some("https://example.com/from-app.jpg")
+    );
+}
+
+/// A post as the app has it when the user taps bookmark: one it loaded from a Reader stream.
+fn stream_post(post_id: u64, title: &str) -> ReaderPost {
+    serde_json::from_value(json!({
+        "ID": post_id,
+        "site_ID": 123,
+        "is_external": false,
+        "title": title,
+        "excerpt": "An excerpt",
+        "date": "2026-11-01T10:00:00+00:00",
+        "author": { "ID": 7, "name": "An author" },
+        "featured_image": "https://example.com/image.jpg",
+        "site_name": "A site",
+        "site_URL": "https://example.com",
+        "site_icon": { "img": "https://example.com/icon.png" },
+        "tags": { "news": { "slug": "news", "name": "News" } },
+        "discussion": { "comment_count": 3, "comments_open": true },
+    }))
+    .unwrap()
+}
+
+#[tokio::test]
+async fn a_post_saved_with_its_details_shows_in_full_before_any_refresh() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+
+    // While the save is in flight, the list already shows the post.
+    let (release, held) = oneshot::channel();
+    executor.push(Step::Hold(held, 200, write_response(true, post_json(4), 1)));
+    let (result, ()) = futures::join!(
+        service.save_with_details(stream_post(4, "From the stream")),
+        async {
+            let items = collection.load_items().await.unwrap();
+            assert_eq!(titles(&items), vec![Some("From the stream".to_string())]);
+            release.send(()).unwrap();
+        }
+    );
+    assert_eq!(
+        result.unwrap(),
+        ReaderSavedOutcome::Synced { key: post_key(4) }
+    );
+    drop((collection, service));
+
+    // Offline, after a relaunch, the row is still complete.
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    let items = collection.load_items().await.unwrap();
+    let [item] = &items[..] else {
+        panic!("Expected the saved post, not {items:?}");
+    };
+    assert!(!item.is_pending, "the server has it");
+    assert_eq!(item.key, post_key(4));
+    let post = item
+        .post
+        .clone()
+        .expect("The details were stored with the save");
+    assert_eq!(post.identity, identity(4));
+    assert_eq!(post.title.as_deref(), Some("From the stream"));
+    assert_eq!(post.excerpt.as_deref(), Some("An excerpt"));
+    assert_eq!(post.author_name.as_deref(), Some("An author"));
+    assert_eq!(
+        post.featured_image.as_deref(),
+        Some("https://example.com/image.jpg")
+    );
+    assert_eq!(
+        post.display_image_url.as_deref(),
+        Some("https://example.com/image.jpg")
+    );
+    assert_eq!(post.site_name.as_deref(), Some("A site"));
+    assert_eq!(post.site_url.as_deref(), Some("https://example.com"));
+    assert_eq!(
+        post.site_icon_url.as_deref(),
+        Some("https://example.com/icon.png")
+    );
+    assert_eq!(
+        post.tags.as_ref().map(|tags| tags.len()),
+        Some(1),
+        "{:?}",
+        post.tags
+    );
+    assert_eq!(post.comment_count, Some(3));
+    assert_eq!(post.date, Some("2026-11-01T10:00:00Z".parse().unwrap()));
+
+    // The saved list's copy replaces the app's.
+    executor.push(Step::Respond(200, keys_response(&[post_json(4)])));
+    let mut from_server = listed(4, "2026-11-05T00:00:00Z");
+    from_server["title"] = json!("From the server");
+    from_server["discussion"] = json!({ "comment_count": 8, "comments_open": true });
+    executor.push(Step::Respond(200, page(&[from_server], None)));
+    collection.refresh().await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let [item] = &items[..] else {
+        panic!("Expected the saved post, not {items:?}");
+    };
+    assert!(!item.is_pending);
+    let post = item.post.clone().unwrap();
+    assert_eq!(post.title.as_deref(), Some("From the server"));
+    assert_eq!(post.comment_count, Some(8));
+    assert_eq!(
+        post.author_name.as_deref(),
+        Some("An author"),
+        "A field the saved list leaves out keeps the app's"
+    );
+}
+
+#[tokio::test]
+async fn details_passed_with_a_save_dont_replace_what_the_server_sent() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(
+        200,
+        page(&[listed(1, "2026-11-01T00:00:00Z")], None),
+    ));
+    collection.refresh().await.unwrap();
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+    service.unsave(identity(1)).await.unwrap();
+
+    // The app's copy is older than the saved list's.
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service
+        .save_with_details(stream_post(1, "An older title"))
+        .await
+        .unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    assert_eq!(titles(&items), vec![Some("Post 1".to_string())]);
+    let post = items[0].post.clone().unwrap();
+    assert_eq!(
+        post.author_name.as_deref(),
+        Some("An author"),
+        "What the server left out is filled in"
+    );
+}
+
+#[tokio::test]
+async fn a_post_saved_from_discover_keeps_its_editorial_image_through_a_refresh() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    let from_discover = json!({
+        "ID": 1,
+        "site_ID": 123,
+        "is_external": false,
+        "title": "A post",
+        "editorial": { "image": "https://example.com/editorial.jpg" },
+        "featured_image": "https://example.com/featured.jpg",
+    });
+    let post: ReaderPost = serde_json::from_value(from_discover).unwrap();
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service.save_with_details(post).await.unwrap();
+
+    // The saved list never sends `editorial`.
+    let mut from_list = listed(1, "2026-11-01T00:00:00Z");
+    from_list["featured_image"] = json!("https://example.com/featured.jpg");
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(200, page(&[from_list], None)));
+    collection.refresh().await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let post = items[0].post.as_ref().unwrap();
+    assert_eq!(
+        post.title.as_deref(),
+        Some("Post 1"),
+        "The refresh was stored"
+    );
+    assert_eq!(
+        post.display_image_url.as_deref(),
+        Some("https://example.com/editorial.jpg")
+    );
+    assert_eq!(
+        post.featured_image.as_deref(),
+        Some("https://example.com/featured.jpg")
+    );
+}
+
+#[tokio::test]
+async fn tags_left_out_of_a_save_are_stored_as_not_known() {
+    assert_tags_passed_with_a_save_are_stored(None).await;
+}
+
+#[tokio::test]
+async fn empty_tags_passed_with_a_save_are_stored_as_none() {
+    assert_tags_passed_with_a_save_are_stored(Some(vec![])).await;
+}
+
+async fn assert_tags_passed_with_a_save_are_stored(tags: Option<Vec<ReaderPostTag>>) {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    let mut post = stream_post(1, "A post");
+    post.tags = tags.clone();
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service.save_with_details(post).await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    assert_eq!(items[0].post.as_ref().unwrap().tags, tags);
+}
+
+#[tokio::test]
+async fn a_refresh_without_tags_keeps_the_stored_ones() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service
+        .save_with_details(stream_post(1, "A post"))
+        .await
+        .unwrap();
+
+    // `listed` sends no `tags` key.
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(
+        200,
+        page(&[listed(1, "2026-11-01T00:00:00Z")], None),
+    ));
+    collection.refresh().await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let post = items[0].post.as_ref().unwrap();
+    assert_eq!(
+        post.title.as_deref(),
+        Some("Post 1"),
+        "The refresh was stored"
+    );
+    let slugs: Vec<_> = post
+        .tags
+        .iter()
+        .flatten()
+        .map(|tag| tag.slug.as_str())
+        .collect();
+    assert_eq!(slugs, vec!["news"]);
+}
+
+#[tokio::test]
+async fn empty_tags_passed_with_a_save_dont_clear_the_stored_ones() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    let mut from_list = listed(1, "2026-11-01T00:00:00Z");
+    from_list["tags"] = json!({ "news": { "slug": "news", "name": "News" } });
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(200, page(&[from_list], None)));
+    collection.refresh().await.unwrap();
+
+    let mut post = stream_post(1, "A post");
+    post.tags = Some(Vec::new());
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
+    service.save_with_details(post).await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let tags = items[0].post.as_ref().unwrap().tags.as_ref().unwrap();
+    let slugs: Vec<_> = tags.iter().map(|tag| tag.slug.as_str()).collect();
+    assert_eq!(slugs, vec!["news"]);
+}
+
+#[tokio::test]
+async fn a_failed_save_with_details_leaves_nothing_in_the_list() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(404, error_response()));
+
+    assert!(
+        service
+            .save_with_details(stream_post(4, "A post"))
+            .await
+            .is_err()
+    );
+
+    assert_eq!(collection.load_items().await.unwrap(), vec![]);
+    assert_ne!(
+        service.status(identity(4)).unwrap(),
+        ReaderSavedStatus::Saved
+    );
+    // The details stay, harmlessly: the list only shows a post through a save.
+    let stored: i64 = device.cache.execute(|connection| {
+        connection
+            .query_row("SELECT COUNT(*) FROM reader_posts", [], |row| row.get(0))
+            .unwrap()
+    });
+    assert_eq!(stored, 1);
+}
+
+#[tokio::test]
+async fn unsaving_a_post_saved_with_details_removes_it_from_the_list() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, write_response(true, post_json(4), 1)));
+    service
+        .save_with_details(stream_post(4, "A post"))
+        .await
+        .unwrap();
+    executor.push(Step::Respond(200, write_response(false, post_json(4), 0)));
+    service.unsave(identity(4)).await.unwrap();
+
+    assert_eq!(collection.load_items().await.unwrap(), vec![]);
+}
+
+#[tokio::test]
+async fn a_post_that_cant_be_saved_is_refused_with_its_details() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let mut post = stream_post(4, "A post");
+    post.identity = unsaveable_identity();
+
+    assert!(matches!(
+        service.save_with_details(post).await,
+        Err(ReaderSavedError::PostCannotBeSaved)
+    ));
+    assert!(executor.sent().is_empty());
+}
+
+/// The saved list stored a Jetpack post as its WordPress.com post, with its feed item. Saving its
+/// feed item copy with details fills in that row, instead of a second row for the same post that
+/// the save would then show.
+#[tokio::test]
+async fn details_saved_with_a_jetpack_posts_feed_item_copy_fill_in_its_stored_post() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, keys_response(&[post_json(3)])));
+    let mut jetpack_post = listed(3, "2026-11-01T00:00:00Z");
+    jetpack_post["feed_ID"] = json!(5);
+    jetpack_post["feed_item_ID"] = json!(4);
+    executor.push(Step::Respond(200, page(&[jetpack_post], None)));
+    collection.refresh().await.unwrap();
+
+    let feed_item_copy: ReaderPost = serde_json::from_value(json!({
+        "ID": 4,
+        "feed_ID": 5,
+        "feed_item_ID": 4,
+        "is_external": true,
+        "title": "From the feed",
+        "author": { "name": "A feed author" },
+    }))
+    .unwrap();
+    executor.push(Step::Respond(200, write_response(true, post_json(3), 1)));
+    service.save_with_details(feed_item_copy).await.unwrap();
+
+    let stored: i64 = device.cache.execute(|connection| {
+        connection
+            .query_row("SELECT COUNT(*) FROM reader_posts", [], |row| row.get(0))
+            .unwrap()
+    });
+    assert_eq!(stored, 1, "one row for the post");
+    let items = collection.load_items().await.unwrap();
+    assert_eq!(titles(&items), vec![Some("Post 3".to_string())]);
+    assert_eq!(
+        items[0].post.as_ref().unwrap().author_name.as_deref(),
+        Some("A feed author"),
+        "What the list left out is filled in"
     );
 }

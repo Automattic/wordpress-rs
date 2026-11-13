@@ -6,6 +6,7 @@ use crate::{
 use rusqlite::Connection;
 use wp_api::posts::PostId;
 use wp_api::wp_com::me::WpComUserId;
+use wp_api::wp_com::reader_posts::ReaderPostTag;
 
 fn conn() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
@@ -64,7 +65,7 @@ fn test_reader_posts_columns() {
             "{column} is read but isn't in reader_posts"
         );
     }
-    assert_eq!(columns.len(), 57, "{columns:?}");
+    assert_eq!(columns.len(), 59, "{columns:?}");
 }
 
 #[test]
@@ -108,6 +109,178 @@ fn test_upsert_keeps_fields_a_slimmer_source_leaves_out() {
         "New server state replaces the old"
     );
     assert_eq!(count(&conn, "reader_posts"), 1);
+}
+
+#[test]
+fn test_fill_missing_only_fills_fields_the_stored_post_lacks() {
+    let conn = conn();
+    let account = account(&conn, 1);
+
+    // Nothing stored yet: every field is stored.
+    let mut from_app = post(456);
+    from_app.title = Some("App title".to_string());
+    from_app.author_name = Some("App author".to_string());
+    let first = ReaderPostRepository::fill_missing(&conn, account, &from_app).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found, from_app);
+
+    // The server's copy replaces the app's.
+    let mut from_server = post(456);
+    from_server.title = Some("Server title".to_string());
+    from_server.comment_count = Some(2);
+    ReaderPostRepository::upsert(&conn, account, &from_server).unwrap();
+
+    // The app's details don't replace the server's, but fill in what it left out.
+    let mut again = post(456);
+    again.title = Some("Older app title".to_string());
+    again.comment_count = Some(1);
+    again.featured_image = Some("https://example.com/image.jpg".to_string());
+    let second = ReaderPostRepository::fill_missing(&conn, account, &again).unwrap();
+
+    assert_eq!(first, second);
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.title.as_deref(), Some("Server title"));
+    assert_eq!(found.comment_count, Some(2));
+    assert_eq!(found.author_name.as_deref(), Some("App author"));
+    assert_eq!(
+        found.featured_image.as_deref(),
+        Some("https://example.com/image.jpg")
+    );
+    assert_eq!(count(&conn, "reader_posts"), 1);
+}
+
+#[test]
+fn test_site_icon_tags_and_comment_count_round_trip() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let tag = |slug: &str| ReaderPostTag {
+        slug: slug.to_string(),
+        name: slug.to_uppercase(),
+        display_name: Some(format!("#{slug}")),
+        post_count: Some(7),
+    };
+    let mut full = post(456);
+    full.site_icon_url = Some("https://example.com/icon.png".to_string());
+    full.tags = Some(vec![tag("news"), tag("rust")]);
+    full.comment_count = Some(12);
+    ReaderPostRepository::upsert(&conn, account, &full).unwrap();
+
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found, full);
+
+    // A source that doesn't send them keeps them, and one that sends no tags clears them.
+    ReaderPostRepository::upsert(&conn, account, &post(456)).unwrap();
+    let mut untagged = post(456);
+    untagged.tags = Some(vec![]);
+    untagged.comment_count = Some(13);
+    ReaderPostRepository::upsert(&conn, account, &untagged).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.site_icon_url, full.site_icon_url);
+    assert_eq!(found.tags, Some(vec![]));
+    assert_eq!(found.comment_count, Some(13));
+}
+
+#[test]
+fn test_an_editorial_image_is_kept_and_shown_first() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let mut from_discover = post(456);
+    from_discover.display_image_url = Some("https://example.com/featured.jpg".to_string());
+    from_discover.editorial_image_url = Some("https://example.com/editorial.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &from_discover).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        found.display_image_url.as_deref(),
+        Some("https://example.com/editorial.jpg")
+    );
+
+    // A source without a pick, such as the saved list, sends a new featured image.
+    let mut from_list = post(456);
+    from_list.display_image_url = Some("https://example.com/new-featured.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &from_list).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        found.display_image_url.as_deref(),
+        Some("https://example.com/editorial.jpg"),
+        "The pick is still shown"
+    );
+    assert_eq!(
+        found.editorial_image_url.as_deref(),
+        Some("https://example.com/editorial.jpg")
+    );
+
+    // A new pick replaces it.
+    let mut new_pick = post(456);
+    new_pick.editorial_image_url = Some("https://example.com/new-editorial.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &new_pick).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        found.display_image_url.as_deref(),
+        Some("https://example.com/new-editorial.jpg")
+    );
+}
+
+#[test]
+fn test_display_image_round_trips_and_keeps_the_server_copy() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let mut from_server = post(456);
+    from_server.display_image_url = Some("https://example.com/server.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &from_server).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found, from_server);
+
+    // A source that leaves it out keeps it.
+    ReaderPostRepository::upsert(&conn, account, &post(456)).unwrap();
+    // The app's copy doesn't replace it.
+    let mut from_app = post(456);
+    from_app.display_image_url = Some("https://example.com/app.jpg".to_string());
+    ReaderPostRepository::fill_missing(&conn, account, &from_app).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        found.display_image_url.as_deref(),
+        Some("https://example.com/server.jpg")
+    );
+
+    // A newer server copy replaces it.
+    let mut newer = post(456);
+    newer.display_image_url = Some("https://example.com/newer.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &newer).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        found.display_image_url.as_deref(),
+        Some("https://example.com/newer.jpg")
+    );
+
+    // The app fills it in for a post that has none.
+    let mut other = post(789);
+    other.display_image_url = Some("https://example.com/app.jpg".to_string());
+    ReaderPostRepository::upsert(&conn, account, &post(789)).unwrap();
+    ReaderPostRepository::fill_missing(&conn, account, &other).unwrap();
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(789))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.display_image_url, other.display_image_url);
 }
 
 #[test]
