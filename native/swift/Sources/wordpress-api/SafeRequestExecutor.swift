@@ -742,7 +742,21 @@ extension WpMultipartFormRequest: NetworkRequestContent {
         // leak. Idempotent with upload's own `defer`: a second `removeItem` on an already-deleted
         // file is a harmless no-op.
         defer { body.removeTemporaryFileIfNeeded() }
-        return try await upload(body: body, with: request, session: session, delegate: delegate)
+
+        let mediaFilePath = self.form().lazy
+            .compactMap { field -> String? in
+                if case let .file(_, file) = field { file.filePath } else { nil }
+            }
+            .first
+        let bodyLength = try body.length(reportingFailureAgainst: mediaFilePath)
+
+        return try await upload(
+            body: body,
+            bodyLength: bodyLength,
+            with: request,
+            session: session,
+            delegate: delegate
+        )
     }
 }
 
@@ -755,19 +769,34 @@ extension WpMultipartFormRequest: NetworkRequestContent {
 /// `multipartFormDataStream`) and can only be removed here, after the upload completes on any path —
 /// success, failure, or cancellation. Without this, every large upload leaks a temp file (#1540).
 ///
+/// On Apple platforms the task is delegate-based rather than completion-handler-based, so that a
+/// server that answers before the body is fully sent (for example, a proxy rejecting a large upload
+/// with a `413`) is returned to the caller instead of timing out. See `UploadTaskDelegate`.
+///
+/// `bodyLength` is the size of `body` in bytes. If it's `nil`, it's read here, and a failure to read
+/// it is thrown.
+///
 /// This is a free function rather than a method because it needs no state from the request, which
 /// also lets tests drive it directly against a stubbed `URLSession`.
 func upload(
     body: MultipartFormContent,
+    bodyLength: Int64? = nil,
     with request: URLRequest,
     session: URLSession,
     delegate: URLSessionTaskDelegate?
 ) async throws -> (Data, URLResponse) {
     defer { body.removeTemporaryFileIfNeeded() }
 
+    #if !os(Linux)
+    let bodyLength = try bodyLength ?? body.length()
+    #endif
+
     let cancellation = TaskCancellation()
     return try await withTaskCancellationHandler {
         let result: Result<(Data, URLResponse), Error> = await withCheckedContinuation { continuation in
+            #if os(Linux)
+            // FoundationNetworking's per-task delegate support differs, and the early-response hang
+            // `UploadTaskDelegate` works around is an Apple `URLSession` behaviour.
             let completion = completionHandler(continuation)
             let task =
                 switch body {
@@ -777,22 +806,33 @@ func upload(
                     session.uploadTask(with: request, fromFile: file, completionHandler: completion)
                 }
             cancellation.task = task
-
-            // See https://github.com/Automattic/wordpress-rs/pull/1046
-            #if !os(Linux)
-            task.delegate = delegate
-            #endif
-
+            task.resume()
+            #else
+            let task =
+                switch body {
+                case let .inMemory(data):
+                    session.uploadTask(with: request, from: data)
+                case let .onDisk(file):
+                    session.uploadTask(with: request, fromFile: file)
+                }
+            task.delegate = UploadTaskDelegate(
+                forwardingTo: delegate,
+                bodyLength: bodyLength,
+                continuation: continuation
+            )
+            // After the delegate is set: this cancels the task at once if the caller already has.
+            cancellation.task = task
             task.resume()
 
-            #if !os(Linux)
             delegate?.urlSession?(session, didCreateTask: task)
             #endif
         }
 
+        #if os(Linux)
         if let task = cancellation.task {
             notifyTaskResult(delegate: delegate, session: session, task: task, result: result)
         }
+        #endif
 
         return try result.get()
     } onCancel: {
@@ -800,23 +840,282 @@ func upload(
     }
 }
 
+extension MultipartFormContent {
+    /// The size of the body in bytes. Throws if the temp file's size can't be read.
+    func length() throws -> Int64 {
+        switch self {
+        case let .inMemory(data):
+            return Int64(data.count)
+        case let .onDisk(url):
+            guard let size = try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber else {
+                throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: url.path])
+            }
+            return size.int64Value
+        }
+    }
+
+    /// `length()`, with a failure reported as `.MediaFileUnreadable` for `mediaFilePath`, the media
+    /// file the body was serialized from.
+    ///
+    /// The temp file was written a moment ago, so this failing is unlikely. If it does, Foundation's
+    /// own error names the temp file, which means nothing to the user. With no `mediaFilePath`, that
+    /// error is thrown as it is.
+    func length(reportingFailureAgainst mediaFilePath: String?) throws -> Int64 {
+        do {
+            return try length()
+        } catch {
+            guard let mediaFilePath else { throw error }
+            throw RequestExecutionError.MediaFileUnreadable(filePath: mediaFilePath)
+        }
+    }
+}
+
+#if !os(Linux)
+/// The per-task delegate for `upload(body:with:session:delegate:)`. It collects the response, and
+/// returns it as soon as it's complete if the server answered before the request body was fully sent.
+///
+/// A server or proxy can reject an upload before reading all of it — Cloudflare answers an oversized
+/// upload with a `413` after about 1–2 MB. Over HTTP/3 (and over HTTP/1.1 when the server keeps the
+/// connection open), `URLSession` receives that response but never completes the task: it keeps
+/// waiting to send the rest of the body, then fails with `URLError.timedOut` once the request
+/// timeout elapses. A completion-handler task only ever sees that timeout. A delegate-based task is
+/// told about the response, so this delegate keeps it, cancels the task, and returns the response as
+/// a success. The Rust layer then classifies its status code as it would any other response.
+///
+/// Only a rejection — a status outside `2xx` — is returned early. A server can't accept an upload it
+/// hasn't read, so an early-looking `2xx` is one whose sent-byte counts lagged the socket, and the
+/// task completes it normally.
+///
+/// Every callback is forwarded to `forwarding` (the executor's `RequestExecutorDelegate`), which
+/// handles TLS trust, records redirects and notifies the app's delegate. Because `URLSession`
+/// delivers `didReceive response`, `didReceive data` and `didCompleteWithError` itself, the manual
+/// `notifyTaskResult(...)` replay isn't used on this path, so the app's delegate sees each event once.
+///
+/// When an early response is returned, `URLSession` later reports the cancellation (or whatever
+/// error ended the stalled upload). The app's delegate is told the task completed without an error
+/// instead, so it records the same outcome the caller received: the server's response.
+///
+/// Two kinds of early response still time out, because `URLSession` never delivers them to this
+/// delegate (seen over HTTP/1.1):
+/// - one with neither a `Content-Length` nor a `Content-Type`, which it holds back to sniff its
+///   type from more of the body;
+/// - one with an empty body, after which it reports the whole request body as sent.
+/// Proxies' error pages have a body and a `Content-Type`.
+///
+/// Over HTTP/1.1, cancelling the stalled upload can also break the *next* request on the session if
+/// the server kept the connection alive: `URLSession` hands that request the cancelled upload's
+/// connection, and it fails with `URLError.networkConnectionLost`. Servers normally send
+/// `Connection: close` with a rejection (nginx does), which avoids it; setting it on the request
+/// doesn't. HTTP/2 and HTTP/3 multiplex streams, so this doesn't apply to them.
+///
+/// Returning early removes an `.onDisk` body's temp file while the cancelled task may still have it
+/// open. That's harmless: unlinking an open file leaves it readable through the open descriptor.
+private final class UploadTaskDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    /// How long to wait for more of an early response's body when it has no `Content-Length`. Error
+    /// pages from proxies are small and arrive with their headers, so this only bounds a wait that
+    /// shouldn't happen; it's well below the 60 s default request timeout it replaces.
+    static let earlyResponseQuietPeriod: DispatchTimeInterval = .seconds(1)
+
+    private let forwarding: URLSessionTaskDelegate?
+    private let bodyLength: Int64
+
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Result<(Data, URLResponse), Error>, Never>?
+    private var outcome: Result<(Data, URLResponse), Error>?
+    private var response: URLResponse?
+    private var data = Data()
+    private var totalBytesSent: Int64 = 0
+    private var isEarlyResponse = false
+    private var quietPeriod: DispatchWorkItem?
+
+    init(
+        forwardingTo forwarding: URLSessionTaskDelegate?,
+        bodyLength: Int64,
+        continuation: CheckedContinuation<Result<(Data, URLResponse), Error>, Never>
+    ) {
+        self.forwarding = forwarding
+        self.bodyLength = bodyLength
+        self.continuation = continuation
+    }
+
+    /// Resumes the caller with `result`, unless it has already been resumed.
+    private func finish(_ result: Result<(Data, URLResponse), Error>) {
+        let continuation: CheckedContinuation<Result<(Data, URLResponse), Error>, Never>? = lock.withLock {
+            guard outcome == nil else { return nil }
+            outcome = result
+            quietPeriod?.cancel()
+            quietPeriod = nil
+            defer { self.continuation = nil }
+            return self.continuation
+        }
+        continuation?.resume(returning: result)
+    }
+
+    /// Whether the request body has been fully sent. `countOfBytesExpectedToSend` can still be `0`
+    /// when the response arrives, so compare against the body's own length.
+    ///
+    /// The sent-byte counts can lag the socket, so a server that did read the whole body can still
+    /// look like it answered early. That's why a `2xx` is never treated as early: returning it
+    /// early would trust the quiet period to judge when its body is complete, and a success body
+    /// that pauses for longer than that would be cut short.
+    private func isBodyFullySent(_ task: URLSessionTask) -> Bool {
+        let sent = max(task.countOfBytesSent, lock.withLock { totalBytesSent })
+        return sent >= bodyLength
+    }
+
+    /// If the server answered before the body was fully sent, returns its response once its body is
+    /// complete: when `Content-Length` bytes have arrived, or, without a `Content-Length`, after a
+    /// quiet period with no new data. A body that stops short of its `Content-Length` is left to
+    /// `didCompleteWithError`, which returns what arrived once the task fails or times out.
+    private func returnEarlyResponseIfComplete(_ task: URLSessionTask) {
+        enum Completeness { case complete, unknown, incomplete }
+        let completeness: Completeness? = lock.withLock {
+            guard outcome == nil, isEarlyResponse, let response else { return nil }
+            quietPeriod?.cancel()
+            quietPeriod = nil
+            let expectedLength = response.expectedContentLength
+            guard expectedLength >= 0 else { return .unknown }
+            return Int64(data.count) >= expectedLength ? .complete : .incomplete
+        }
+
+        let work = DispatchWorkItem { [weak self, weak task] in
+            self?.returnEarlyResponse(cancelling: task)
+        }
+        switch completeness {
+        case .complete:
+            work.perform()
+        case .unknown:
+            lock.withLock { quietPeriod = work }
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.earlyResponseQuietPeriod, execute: work)
+        case .incomplete, nil:
+            break
+        }
+    }
+
+    private func returnEarlyResponse(cancelling task: URLSessionTask?) {
+        guard let (data, response) = lock.withLock({ self.response.map { (self.data, $0) } }) else { return }
+        // Resume the caller before cancelling, so the cancellation `URLSession` reports for it finds
+        // the outcome already decided.
+        finish(.success((data, response)))
+        task?.cancel()
+    }
+
+    // Callbacks this class doesn't implement — challenges, redirects, connectivity, metrics,
+    // informational responses — go straight to `forwarding`, which implements them. `URLSession`
+    // asks `responds(to:)` about each callback once per task, so a callback `forwarding` doesn't
+    // implement goes to the session's delegate, or gets `URLSession`'s default handling.
+    override func responds(to aSelector: Selector!) -> Bool {
+        super.responds(to: aSelector) || forwarding?.responds(to: aSelector) == true
+    }
+
+    override func forwardingTarget(for aSelector: Selector!) -> Any? {
+        if let forwarding, forwarding.responds(to: aSelector) {
+            return forwarding
+        }
+        return super.forwardingTarget(for: aSelector)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64,
+        totalBytesExpectedToSend: Int64
+    ) {
+        lock.withLock { self.totalBytesSent = max(self.totalBytesSent, totalBytesSent) }
+        forwarding?.urlSession?(
+            session,
+            task: task,
+            didSendBodyData: bytesSent,
+            totalBytesSent: totalBytesSent,
+            totalBytesExpectedToSend: totalBytesExpectedToSend
+        )
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        let isRejection = (response as? HTTPURLResponse).map { !(200..<300).contains($0.statusCode) } ?? false
+        let isEarlyResponse = isRejection && !isBodyFullySent(dataTask)
+        lock.withLock {
+            self.response = response
+            self.isEarlyResponse = isEarlyResponse
+        }
+
+        (forwarding as? URLSessionDataDelegate)?.urlSession?(
+            session,
+            dataTask: dataTask,
+            didReceive: response,
+            completionHandler: { _ in }
+        )
+        completionHandler(.allow)
+
+        returnEarlyResponseIfComplete(dataTask)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        lock.withLock { self.data.append(data) }
+        (forwarding as? URLSessionDataDelegate)?.urlSession?(session, dataTask: dataTask, didReceive: data)
+        returnEarlyResponseIfComplete(dataTask)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+        let (response, data, isEarlyResponse) = lock.withLock { (self.response, self.data, self.isEarlyResponse) }
+
+        if let error {
+            // An early response is preferred over the error that later ended the stalled upload
+            // (`-1001`, `-1005`, …) — unless the caller cancelled the request.
+            let isCancellation = (error as? URLError)?.code == .cancelled
+            if isEarlyResponse, let response, !isCancellation {
+                finish(.success((data, response)))
+            } else {
+                finish(.failure(error))
+            }
+        } else if let response = task.response ?? response {
+            finish(.success((data, response)))
+        } else {
+            finish(.failure(URLError(.badServerResponse)))
+        }
+
+        // Report the outcome the caller received, which may have been decided before this callback
+        // (an early response), rather than the raw error.
+        let reportedError: Error? =
+            switch lock.withLock({ outcome }) {
+            case .failure(let error): error
+            case .success, .none: nil
+            }
+        forwarding?.urlSession?(session, task: task, didCompleteWithError: reportedError)
+    }
+}
+#endif
+
 private class TaskCancellation: @unchecked Sendable {
     private let lock = NSLock()
     private var _task: URLSessionTask?
+    private var isCancelled = false
 
+    /// The task to cancel. A task set after `cancel()` — when the Swift task was already cancelled
+    /// before the request started — is cancelled straight away, rather than left to run until it
+    /// times out.
     var task: URLSessionTask? {
         get {
             lock.withLock { _task }
         }
         set {
-            lock.withLock { _task = newValue }
+            lock.withLock {
+                _task = newValue
+                if isCancelled { newValue?.cancel() }
+            }
         }
     }
 
     func cancel() {
         lock.withLock {
+            isCancelled = true
             _task?.cancel()
-            _task = nil
         }
     }
 }
