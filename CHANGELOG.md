@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WordPress.com support bots: creating a conversation no longer fails to parse when the server returns `zendesk_ticket_id` as a number (`invalid type: integer, expected a string`). It does when the first message asks for a human, so the ticket was created but the apps showed an error, and each retry created another ticket. `BotConversation.zendesk_ticket_id` is still `Option<String>`, and now reads a number, a string or `null`.
 - **BREAKING:** Posts' and pages' `menu_order` is now a signed `Option<i64>` instead of `Option<u32>`, in `SparseAnyPost`, `PostCreateParams` and `PostUpdateParams`. WordPress stores `menu_order` as a signed integer, and negative values are commonly used to pin a page to the top of a list. Listing pages on such a site previously failed to parse the whole response (`invalid value: integer -1000, expected u32`), so the entire page list came back as an error. Swift and Kotlin now see `Int64?` where they saw `UInt32?`.
 
+### Fixed
+
+- Swift: `WpRequestExecutor.cancel(context:)` now cancels every request made for the context, including ones started after the call. Cancelling during a `RetryAfterMiddleware` backoff (or anywhere no request was in flight for a second) previously cancelled nothing, so the retry went out and the call succeeded. Cancellation also now works on Linux, where it was compiled out.
+- Swift: a request started from an already-cancelled `Task` now fails with `CancellationError` instead of running to completion.
+
 ### Changed
 
 - **Internal:** Added integration test covering the `MediaService::create_media` cache upsert and collection update path.
