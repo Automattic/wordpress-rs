@@ -147,7 +147,10 @@ pub struct ReaderSavedService {
     page_details: Mutex<HashMap<String, ReaderSavedPageDetails>>,
     /// Rows the server refused this launch, and why, until the tap waiting on them takes it. The
     /// call that sends a row isn't always the tap's: any call holding the lane sends every row.
+    /// Kept only while a tap waits on one of the rows.
     refusals: Mutex<Vec<(Vec<RowId>, WpApiError)>>,
+    /// The rows taps are waiting on, and how many taps wait on each.
+    waiting: Mutex<HashMap<RowId, usize>>,
     clock: Clock,
 }
 
@@ -262,6 +265,7 @@ impl ReaderSavedService {
             lane: AsyncMutex::new(()),
             page_details: Mutex::default(),
             refusals: Mutex::default(),
+            waiting: Mutex::default(),
             clock,
         })
     }
@@ -315,6 +319,7 @@ impl ReaderSavedService {
             Ok::<_, SqliteDbError>(row)
         })?;
         self.forget_refusals(&[row]);
+        let _waiting = Waiting::new(self, vec![row]);
         self.notify();
 
         let _lane = self.lane.lock().await;
@@ -348,6 +353,7 @@ impl ReaderSavedService {
             Ok::<_, SqliteDbError>(rows)
         })?;
         self.forget_refusals(&waiting);
+        let _waiting = Waiting::new(self, waiting.clone());
         self.notify();
 
         let _lane = self.lane.lock().await;
@@ -439,24 +445,31 @@ impl ReaderSavedService {
             for row in &batch {
                 *sends.entry(row.row_id).or_default() += 1;
             }
-            let go_on = if batch.len() > 1 {
+            let flow = if batch.len() > 1 {
                 self.send_bulk(&batch, &mut sent).await?
             } else {
                 self.send_row(&batch[0], &mut sent).await?
             };
             self.notify();
-            if !go_on {
-                return Ok(sent);
+            match flow {
+                Flow::Next => {}
+                // Not sent again this round, so it can't hold up the rows after it.
+                Flow::Skip => {
+                    for row in &batch {
+                        sends.insert(row.row_id, MAX_SENDS_PER_ROW);
+                    }
+                }
+                Flow::Stop => return Ok(sent),
             }
         }
     }
 
-    /// Sends one row. Returns whether to go on to the next.
+    /// Sends one row.
     async fn send_row(
         &self,
         row: &DbReaderSavedRow,
         sent: &mut Sent,
-    ) -> Result<bool, ReaderSavedError> {
+    ) -> Result<Flow, ReaderSavedError> {
         self.set_in_doubt(&[row.row_id], true)?;
         let result = if row.saved {
             let page_details = self
@@ -515,18 +528,18 @@ impl ReaderSavedService {
                         .expect("page details lock poisoned")
                         .remove(&reader_saved_key_text(&row.key));
                 }
-                Ok(true)
+                Ok(Flow::Next)
             }
-            Err(error) => self.failed(&[row.row_id], error, sent),
+            Err(error) => self.failed(std::slice::from_ref(row), error, sent),
         }
     }
 
-    /// Sends imported saves in one bulk request. Returns whether to go on.
+    /// Sends imported saves in one bulk request.
     async fn send_bulk(
         &self,
         rows: &[DbReaderSavedRow],
         sent: &mut Sent,
-    ) -> Result<bool, ReaderSavedError> {
+    ) -> Result<Flow, ReaderSavedError> {
         let row_ids: Vec<_> = rows.iter().map(|row| row.row_id).collect();
         self.set_in_doubt(&row_ids, true)?;
         // The rows are oldest first, and the API takes the newest first.
@@ -540,7 +553,7 @@ impl ReaderSavedService {
         };
         let response = match self.client.reader_saved().bulk_save(&params).await {
             Ok(response) => response.data,
-            Err(error) => return self.failed(&row_ids, error, sent),
+            Err(error) => return self.failed(rows, error, sent),
         };
         // Results are matched to keys by position, which only works with one per key. The server
         // may have saved any of them, so they stay in doubt.
@@ -549,7 +562,7 @@ impl ReaderSavedService {
                 sent: rows.len() as u64,
                 received: response.results.len() as u64,
             });
-            return Ok(false);
+            return Ok(Flow::Stop);
         }
         self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
@@ -566,44 +579,67 @@ impl ReaderSavedService {
                             None,
                         )?;
                     }
-                    _ => ReaderSavedRepository::apply_refusal(&transaction, row.row_id)?,
+                    _ => {
+                        ReaderSavedRepository::apply_refusal(&transaction, row.row_id, row.seq)?;
+                    }
                 }
             }
             transaction.commit().map_err(SqliteDbError::from)
         })?;
-        Ok(true)
+        Ok(Flow::Next)
     }
 
-    /// Records a request that failed. Returns whether to go on to the next row.
+    /// Records a request that failed, and says what to do next.
     fn failed(
         &self,
-        rows: &[RowId],
+        rows: &[DbReaderSavedRow],
         error: WpApiError,
         sent: &mut Sent,
-    ) -> Result<bool, ReaderSavedError> {
+    ) -> Result<Flow, ReaderSavedError> {
+        let row_ids: Vec<_> = rows.iter().map(|row| row.row_id).collect();
         if is_refused(&error) {
-            self.cache.execute(|connection| {
+            let undone = self.cache.execute(|connection| {
                 let transaction = connection.transaction()?;
+                let mut undone = Vec::new();
                 for row in rows {
-                    ReaderSavedRepository::apply_refusal(&transaction, *row)?;
+                    if ReaderSavedRepository::apply_refusal(&transaction, row.row_id, row.seq)? {
+                        undone.push(row.row_id);
+                    }
                 }
-                transaction.commit().map_err(SqliteDbError::from)
+                transaction.commit().map_err(SqliteDbError::from)?;
+                Ok::<_, SqliteDbError>(undone)
             })?;
             log::warn!("The server refused a saved post change: {error}");
-            self.refusals
-                .lock()
-                .expect("refusals lock poisoned")
-                .push((rows.to_vec(), error));
-            Ok(true)
+            // Only a tap waiting on the rows hears why, and only if a newer tap didn't replace
+            // what was refused.
+            let waiting = self.waiting.lock().expect("waiting lock poisoned");
+            let undone: Vec<_> = undone
+                .into_iter()
+                .filter(|row| waiting.contains_key(row))
+                .collect();
+            if !undone.is_empty() {
+                self.refusals
+                    .lock()
+                    .expect("refusals lock poisoned")
+                    .push((undone, error));
+            }
+            Ok(Flow::Next)
         } else if may_have_been_applied(&error) {
             // It stays in doubt until a refresh says. The next row may still get through.
             sent.in_doubt = Some(error);
-            Ok(true)
-        } else {
-            // It never reached the server, and nothing else will now.
-            self.set_in_doubt(rows, false)?;
+            Ok(Flow::Next)
+        } else if is_answered_for_this_request(&error) {
+            // The server answered this request alone, as with a forbidden post, so the rows after
+            // it may still get through. It's tried again next round.
+            self.set_in_doubt(&row_ids, false)?;
             sent.unsent = Some(error);
-            Ok(false)
+            Ok(Flow::Skip)
+        } else {
+            // It never reached the server, or nothing else will get through now: offline, signed
+            // out, or rate limited.
+            self.set_in_doubt(&row_ids, false)?;
+            sent.unsent = Some(error);
+            Ok(Flow::Stop)
         }
     }
 
@@ -646,6 +682,53 @@ impl ReaderSavedService {
         if let Some(observer) = observer {
             observer.saved_posts_changed();
         }
+    }
+}
+
+/// What to do after a request.
+enum Flow {
+    /// Go on to the next row.
+    Next,
+    /// Go on, and don't send these rows again this round.
+    Skip,
+    /// Stop the round.
+    Stop,
+}
+
+/// Marks rows a tap waits on, while it waits, so a refusal of them is kept for it. Dropping it,
+/// including when Kotlin cancels the call, drops what's left of their refusals.
+struct Waiting<'a> {
+    service: &'a ReaderSavedService,
+    rows: Vec<RowId>,
+}
+
+impl<'a> Waiting<'a> {
+    fn new(service: &'a ReaderSavedService, rows: Vec<RowId>) -> Self {
+        let mut waiting = service.waiting.lock().expect("waiting lock poisoned");
+        for row in &rows {
+            *waiting.entry(*row).or_default() += 1;
+        }
+        drop(waiting);
+        Self { service, rows }
+    }
+}
+
+impl Drop for Waiting<'_> {
+    fn drop(&mut self) {
+        let mut waiting = self.service.waiting.lock().expect("waiting lock poisoned");
+        for row in &self.rows {
+            if let Some(count) = waiting.get_mut(row) {
+                *count -= 1;
+                if *count == 0 {
+                    waiting.remove(row);
+                }
+            }
+        }
+        self.service
+            .refusals
+            .lock()
+            .expect("refusals lock poisoned")
+            .retain(|(rows, _)| rows.iter().any(|row| waiting.contains_key(row)));
     }
 }
 
@@ -749,6 +832,19 @@ fn is_refused(error: &WpApiError) -> bool {
         | WpApiError::InvalidHttpStatusCode { status_code, .. }
         | WpApiError::UnknownError { status_code, .. } => {
             (400..500).contains(status_code) && !TEMPORARY.contains(status_code)
+        }
+        _ => false,
+    }
+}
+
+/// Whether the server answered with an error about this request alone, which may pass, such as a
+/// forbidden post. Not an expired sign-in or a rate limit: those stop every request.
+fn is_answered_for_this_request(error: &WpApiError) -> bool {
+    match error {
+        WpApiError::WpError { status_code, .. }
+        | WpApiError::InvalidHttpStatusCode { status_code, .. }
+        | WpApiError::UnknownError { status_code, .. } => {
+            (400..500).contains(status_code) && ![401, 429].contains(status_code)
         }
         _ => false,
     }

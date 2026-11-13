@@ -315,6 +315,15 @@ fn rows(conn: &Connection, account: RowId) -> Vec<(String, bool, Option<bool>)> 
         .collect()
 }
 
+/// Refuses a row as it is now, with no tap since it was sent.
+fn refuse(conn: &Connection, row_id: RowId) {
+    let seq = ReaderSavedRepository::select_row(conn, row_id)
+        .unwrap()
+        .unwrap()
+        .seq;
+    ReaderSavedRepository::apply_refusal(conn, row_id, seq).unwrap();
+}
+
 fn now() -> WpGmtDateTime {
     date("2026-11-12T00:00:00Z")
 }
@@ -423,7 +432,7 @@ fn test_a_refused_tap_is_undone_and_a_refused_import_is_kept_on_this_device() {
     let tapped =
         ReaderSavedRepository::tap_save(&conn, account, &post_key(1), &[post_key(1)], None, &now())
             .unwrap();
-    ReaderSavedRepository::apply_refusal(&conn, tapped).unwrap();
+    refuse(&conn, tapped);
     assert!(
         row_for(&conn, account, &post_key(1)).is_none(),
         "nothing was known about it"
@@ -433,7 +442,7 @@ fn test_a_refused_tap_is_undone_and_a_refused_import_is_kept_on_this_device() {
         ReaderSavedRepository::insert_imported(&conn, account, &post_key(2), None, None).unwrap()
     );
     let imported = row_for(&conn, account, &post_key(2)).unwrap();
-    ReaderSavedRepository::apply_refusal(&conn, imported.row_id).unwrap();
+    refuse(&conn, imported.row_id);
     let imported = row_for(&conn, account, &post_key(2)).unwrap();
     assert!(imported.local_only && imported.saved && !imported.is_pending());
 }
@@ -451,7 +460,7 @@ fn test_a_refused_unsave_goes_back_to_what_the_server_said() {
     )
     .unwrap();
     let rows_ = ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)]).unwrap();
-    ReaderSavedRepository::apply_refusal(&conn, rows_[0]).unwrap();
+    refuse(&conn, rows_[0]);
     assert!(row_for(&conn, account, &post_key(1)).unwrap().saved);
 }
 
@@ -653,7 +662,7 @@ fn test_unsaving_a_local_only_save_removes_it() {
     let account = account(&conn, 1);
     ReaderSavedRepository::insert_imported(&conn, account, &post_key(1), None, None).unwrap();
     let row = row_for(&conn, account, &post_key(1)).unwrap();
-    ReaderSavedRepository::apply_refusal(&conn, row.row_id).unwrap();
+    refuse(&conn, row.row_id);
     ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)]).unwrap();
     assert!(rows(&conn, account).is_empty());
 }

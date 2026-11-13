@@ -1044,6 +1044,40 @@ async fn a_partly_refused_unsave_tries_every_key_and_keeps_the_one_refused() {
     assert_eq!(count(&service), Some(1));
 }
 
+/// A refusal is kept only for a tap waiting to hear it, so one a sync meets, with no tap waiting,
+/// isn't kept for the life of the service.
+#[tokio::test]
+async fn a_refusal_no_tap_waits_for_is_not_kept() {
+    let (service, executor) = service();
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Offline);
+    service.save(identity(1)).await.unwrap();
+
+    executor.push(Step::Respond(400, error_response()));
+    executor.push(Step::Respond(200, keys_response(&[])));
+    service.sync().await.unwrap();
+
+    assert_eq!(status(&service, identity(1)), NotSaved);
+    assert!(service.refusals.lock().unwrap().is_empty());
+    assert!(service.waiting.lock().unwrap().is_empty());
+}
+
+/// A tap cancelled while it waits stops waiting, so a refusal of its row isn't kept either.
+#[tokio::test]
+async fn a_cancelled_tap_stops_waiting() {
+    let (service, executor) = service();
+    synced(&service, &executor, &[]).await;
+    let (_release, held) = oneshot::channel::<()>();
+    executor.push(Step::Hold(held, 200, write_response(true, post_json(1), 1)));
+
+    let mut save = Box::pin(service.save(identity(1)));
+    assert!(futures::poll!(save.as_mut()).is_pending());
+    assert_eq!(service.waiting.lock().unwrap().len(), 1);
+    drop(save);
+
+    assert!(service.waiting.lock().unwrap().is_empty());
+}
+
 // One lane: a sync and a tap never overlap on the network
 
 /// The sync waits for the unsave in flight, then reads, so its read includes the unsave.
@@ -1177,6 +1211,8 @@ async fn unsave_key_also_unsaves_the_key_the_server_stores_the_post_under() {
     synced(&service, &executor, &[]).await;
     executor.push(Step::Respond(200, write_response(true, post_json(1), 1)));
     executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+    // The feed item can also be a separate older save, so it's sent too.
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
     service.save(rss_identity(7)).await.unwrap();
 
     service.unsave_key(feed_key(7)).await.unwrap();
@@ -1185,7 +1221,8 @@ async fn unsave_key_also_unsaves_the_key_the_server_stores_the_post_under() {
         executor.sent_short()[1..],
         [
             r#"new {"feed_item_id":7}"#,
-            r#"delete {"blog_id":123,"post_id":1}"#
+            r#"delete {"blog_id":123,"post_id":1}"#,
+            r#"delete {"feed_item_id":7}"#
         ]
     );
     assert_eq!(status(&service, rss_identity(7)), NotSaved);

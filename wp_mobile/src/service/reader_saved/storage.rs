@@ -217,9 +217,19 @@ impl ReaderSavedService {
                     continue;
                 };
                 let row = ReaderPostRepository::upsert(&transaction, self.account, &record)?;
+                // The post's URL is the same save, as the server stores it: it finds the row of a
+                // Jetpack post the list returns by its feed item while its WordPress.com copy
+                // fails to load, since the keys give that row the URL.
+                let url = post
+                    .identity
+                    .url
+                    .clone()
+                    .map(|url| ReaderSavedKey::Url { url })
+                    .filter(ReaderSavedKey::is_complete);
                 let keys: Vec<_> = reader_saved_keys_for_post(post.identity.clone())
-                    .iter()
-                    .map(ReaderSavedKey::normalized)
+                    .into_iter()
+                    .chain(url)
+                    .map(|key| key.normalized())
                     .collect();
                 ReaderSavedRepository::apply_listed(
                     &transaction,

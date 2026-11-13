@@ -1109,3 +1109,31 @@ async fn a_sync_and_a_refresh_that_change_nothing_tell_the_saved_list_nothing() 
         "{seen:?}"
     );
 }
+
+/// Refused on import, then the server gets it, from another device or a later import: the keys
+/// return it, so it's no longer only on this device, and an unsave reaches the server.
+#[tokio::test]
+async fn a_local_only_save_the_keys_return_is_unsaved_on_the_server() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(
+        400,
+        json!({ "code": "invalid_param", "message": "", "data": { "status": 400 } }),
+    ));
+    let report = service
+        .import_local_saves(vec![local_save(identity(1), "One")])
+        .await
+        .unwrap();
+    assert_eq!(report.rejected, vec![post_key(1)]);
+
+    synced(&service, &executor, &[post_json(1)]).await;
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+    service.unsave(identity(1)).await.unwrap();
+
+    assert_eq!(
+        executor.sent_short()[3..],
+        [r#"delete {"blog_id":123,"post_id":1}"#]
+    );
+    assert_eq!(status(&service, identity(1)), NotSaved);
+}
