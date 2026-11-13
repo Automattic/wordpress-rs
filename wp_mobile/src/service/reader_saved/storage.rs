@@ -24,13 +24,13 @@ use wp_mobile_cache::{DbTable, SqliteDbError, UpdateHook};
 /// The saved list's key in `reader_streams`.
 const SAVED_STREAM: &str = "saved";
 
-/// The tables the saved list is read from.
-const SAVED_LIST_TABLES: [DbTable; 6] = [
+/// The tables the saved list is read from. Not `reader_saved_keys`: a refresh rewrites every key,
+/// and the state it changes is written to `reader_saved_state` too.
+const SAVED_LIST_TABLES: [DbTable; 5] = [
     DbTable::ReaderPosts,
     DbTable::ReaderStreams,
     DbTable::ReaderStreamItems,
     DbTable::ReaderSavedState,
-    DbTable::ReaderSavedKeys,
     DbTable::ReaderSavedLocalOnly,
 ];
 
@@ -212,7 +212,8 @@ impl ReaderSavedService {
                 record.featured_image = save.featured_image.clone();
                 record.site_name = save.site_name.clone();
                 record.site_url = save.site_url.clone();
-                let row = ReaderPostRepository::upsert(&transaction, self.account, &record)?;
+                // The device's copy may be older than what the saved list already stored.
+                let row = ReaderPostRepository::fill_missing(&transaction, self.account, &record)?;
                 if rejected_keys.contains(&key.normalized()) {
                     ReaderSavedRepository::upsert_local_only(
                         &transaction,
@@ -338,7 +339,7 @@ impl ReaderSavedService {
                 return Ok(Vec::new());
             };
             Ok::<_, SqliteDbError>(
-                ReaderStreamRepository::select_items(&*connection, stream.row_id)?
+                ReaderStreamRepository::select_item_identities(&*connection, stream.row_id)?
                     .into_iter()
                     .map(|item| (stream.row_id, item))
                     .collect::<Vec<_>>(),
@@ -346,10 +347,10 @@ impl ReaderSavedService {
         })?;
         let unsaved: Vec<_> = items
             .into_iter()
-            .filter(|(_, item)| {
+            .filter(|(_, (_, identity))| {
                 // An unsave still in flight can fail and leave the post saved, so it stays.
-                let keys = reader_saved_keys_for_post(item.post.identity.clone());
-                self.status(item.post.identity.clone()) == ReaderSavedStatus::NotSaved
+                let keys = reader_saved_keys_for_post(identity.clone());
+                self.status(identity.clone()) == ReaderSavedStatus::NotSaved
                     && !self.state().has_pending_write(&keys)
             })
             .collect();
@@ -358,8 +359,8 @@ impl ReaderSavedService {
         }
         self.cache.execute(|connection| {
             let transaction = TransactionManager::transaction(connection)?;
-            for (stream, item) in &unsaved {
-                ReaderStreamRepository::remove_item(&transaction, *stream, item.post_row_id)?;
+            for (stream, (post_row_id, _)) in &unsaved {
+                ReaderStreamRepository::remove_item(&transaction, *stream, *post_row_id)?;
             }
             transaction.commit().map_err(SqliteDbError::from)
         })?;

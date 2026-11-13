@@ -686,12 +686,13 @@ fn the_collection_is_relevant_to_the_reader_tables_only() {
         DbTable::ReaderStreams,
         DbTable::ReaderStreamItems,
         DbTable::ReaderSavedState,
-        DbTable::ReaderSavedKeys,
         DbTable::ReaderSavedLocalOnly,
     ] {
         assert!(collection.is_relevant_update(&hook(table)), "{table}");
     }
+    // A refresh rewrites every key, and also writes the state it changes.
     for table in [
+        DbTable::ReaderSavedKeys,
         DbTable::PostsEditContext,
         DbTable::ListMetadataItems,
         DbTable::WordPressComAccounts,
@@ -701,6 +702,35 @@ fn the_collection_is_relevant_to_the_reader_tables_only() {
 }
 
 // Importing local saves
+
+#[tokio::test]
+async fn importing_a_local_save_doesnt_replace_what_the_saved_list_stored() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, keys_response(&[post_json(1)])));
+    executor.push(Step::Respond(
+        200,
+        page(&[listed(1, "2026-11-01T00:00:00Z")], None),
+    ));
+    collection.refresh().await.unwrap();
+    executor.push(Step::Respond(
+        200,
+        json!({ "results": [{ "key": post_json(1), "saved": true }], "total": 1 }),
+    ));
+
+    let mut save = local_save(identity(1), "An older title");
+    save.excerpt = Some("An excerpt only the device has".to_string());
+    service.import_local_saves(vec![save]).await.unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    let post = items[0].post.as_ref().unwrap();
+    assert_eq!(post.title.as_deref(), Some("Post 1"));
+    assert_eq!(
+        post.excerpt.as_deref(),
+        Some("An excerpt only the device has")
+    );
+}
 
 #[tokio::test]
 async fn import_local_saves_imports_once_and_keeps_what_the_server_refused() {

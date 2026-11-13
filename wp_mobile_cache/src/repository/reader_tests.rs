@@ -186,6 +186,37 @@ fn test_stream_items_are_newest_first() {
         .map(|item| item.post.identity.id)
         .collect();
     assert_eq!(ids, vec![3, 2, 1]);
+
+    let items = ReaderStreamRepository::select_items(&conn, stream.row_id).unwrap();
+    let identities = ReaderStreamRepository::select_item_identities(&conn, stream.row_id).unwrap();
+    let expected: Vec<_> = items
+        .into_iter()
+        .map(|item| (item.post_row_id, item.post.identity))
+        .collect();
+    assert_eq!(identities, expected);
+}
+
+#[test]
+fn test_fill_missing_keeps_what_is_stored() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let mut from_server = post(456);
+    from_server.title = Some("Server title".to_string());
+    let row = ReaderPostRepository::upsert(&conn, account, &from_server).unwrap();
+
+    let mut from_app = post(456);
+    from_app.title = Some("Older app title".to_string());
+    from_app.excerpt = Some("An excerpt".to_string());
+    assert_eq!(
+        ReaderPostRepository::fill_missing(&conn, account, &from_app).unwrap(),
+        row
+    );
+
+    let (_, found) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.title.as_deref(), Some("Server title"));
+    assert_eq!(found.excerpt.as_deref(), Some("An excerpt"));
 }
 
 #[test]

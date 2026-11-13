@@ -73,6 +73,13 @@ fn collect_rows<T>(
 /// Reader posts, one row per post per account.
 pub struct ReaderPostRepository;
 
+/// Which value a field keeps when a post is stored over one already stored, and both have it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Prefer {
+    Incoming,
+    Stored,
+}
+
 impl ReaderPostRepository {
     /// Stores a post under its key. A field the post doesn't have keeps what's stored, so a source
     /// that sends part of a post doesn't erase what another sent.
@@ -81,8 +88,64 @@ impl ReaderPostRepository {
         account: RowId,
         post: &ReaderPostRecord,
     ) -> Result<RowId, SqliteDbError> {
+        Self::store(executor, account, post, Prefer::Incoming)
+    }
+
+    /// Stores a post under its key, only filling in fields the stored post doesn't have. For details
+    /// an app passes along, which may be older than what a server response already stored.
+    pub fn fill_missing(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        post: &ReaderPostRecord,
+    ) -> Result<RowId, SqliteDbError> {
+        Self::store(executor, account, post, Prefer::Stored)
+    }
+
+    fn store(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        post: &ReaderPostRecord,
+        prefer: Prefer,
+    ) -> Result<RowId, SqliteDbError> {
+        /// The columns a source may leave out.
+        const OPTIONAL_COLUMNS: [&str; 20] = [
+            "site_id",
+            "feed_id",
+            "feed_item_id",
+            "url",
+            "global_id",
+            "title",
+            "excerpt",
+            "content",
+            "date",
+            "modified",
+            "author_name",
+            "author_avatar_url",
+            "author_url",
+            "featured_image",
+            "site_name",
+            "site_url",
+            "feed_url",
+            "like_count",
+            "i_like",
+            "is_following",
+        ];
         let identity_key = reader_saved_key_text(&post.key);
-        executor.execute(
+        let mut updates: Vec<String> = Vec::new();
+        if prefer == Prefer::Incoming {
+            updates.push("post_id = excluded.post_id".to_string());
+            updates.push("is_external = excluded.is_external".to_string());
+        }
+        for column in OPTIONAL_COLUMNS {
+            updates.push(match prefer {
+                Prefer::Incoming => format!("{column} = COALESCE(excluded.{column}, {column})"),
+                Prefer::Stored => format!("{column} = COALESCE({column}, excluded.{column})"),
+            });
+        }
+        if prefer == Prefer::Incoming {
+            updates.push("fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')".to_string());
+        }
+        let sql = format!(
             "INSERT INTO reader_posts (
                 account_id, identity_key, post_id, site_id, feed_id, feed_item_id, is_external,
                 url, global_id, title, excerpt, content, date, modified, author_name,
@@ -90,30 +153,11 @@ impl ReaderPostRepository {
                 like_count, i_like, is_following
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17,
                 ?18, ?19, ?20, ?21, ?22, ?23, ?24)
-            ON CONFLICT(account_id, identity_key) DO UPDATE SET
-                post_id = excluded.post_id,
-                site_id = COALESCE(excluded.site_id, site_id),
-                feed_id = COALESCE(excluded.feed_id, feed_id),
-                feed_item_id = COALESCE(excluded.feed_item_id, feed_item_id),
-                is_external = excluded.is_external,
-                url = COALESCE(excluded.url, url),
-                global_id = COALESCE(excluded.global_id, global_id),
-                title = COALESCE(excluded.title, title),
-                excerpt = COALESCE(excluded.excerpt, excerpt),
-                content = COALESCE(excluded.content, content),
-                date = COALESCE(excluded.date, date),
-                modified = COALESCE(excluded.modified, modified),
-                author_name = COALESCE(excluded.author_name, author_name),
-                author_avatar_url = COALESCE(excluded.author_avatar_url, author_avatar_url),
-                author_url = COALESCE(excluded.author_url, author_url),
-                featured_image = COALESCE(excluded.featured_image, featured_image),
-                site_name = COALESCE(excluded.site_name, site_name),
-                site_url = COALESCE(excluded.site_url, site_url),
-                feed_url = COALESCE(excluded.feed_url, feed_url),
-                like_count = COALESCE(excluded.like_count, like_count),
-                i_like = COALESCE(excluded.i_like, i_like),
-                is_following = COALESCE(excluded.is_following, is_following),
-                fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')",
+            ON CONFLICT(account_id, identity_key) DO UPDATE SET {}",
+            updates.join(", ")
+        );
+        executor.execute(
+            &sql,
             params![
                 account,
                 identity_key,
@@ -363,6 +407,35 @@ impl ReaderStreamRepository {
             }))
         })?;
         collect_rows(rows.map(|row| row.map_err(SqliteDbError::from).and_then(|row| row)))
+    }
+
+    /// Each item's post row and identity, in the order of [`Self::select_items`], without reading
+    /// the rest of each post.
+    pub fn select_item_identities(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+    ) -> Result<Vec<(RowId, ReaderPostSaveIdentity)>, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT p.rowid, p.post_id, p.site_id, p.feed_id, p.feed_item_id, p.is_external, p.url
+            FROM reader_stream_items i
+            JOIN reader_posts p ON p.rowid = i.post_id
+            WHERE i.stream_id = ?1
+            ORDER BY i.sort_key DESC, i.rowid ASC",
+        )?;
+        let rows = statement.query_map([stream], |row| {
+            Ok((
+                row.get(0)?,
+                ReaderPostSaveIdentity {
+                    id: row.get(1)?,
+                    site_id: row.get::<_, Option<u64>>(2)?.map(WpComSiteId),
+                    feed_id: row.get::<_, Option<u64>>(3)?.map(ReaderFeedId),
+                    feed_item_id: row.get::<_, Option<u64>>(4)?.map(ReaderFeedItemId),
+                    is_external: row.get(5)?,
+                    url: row.get(6)?,
+                },
+            ))
+        })?;
+        rows.map(|row| row.map_err(SqliteDbError::from)).collect()
     }
 
     /// Resets streams left fetching when the app quit. Called after migrations.
