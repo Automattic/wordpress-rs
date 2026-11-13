@@ -23,8 +23,9 @@ struct ReaderSavedPostRow: Identifiable {
             self.title = String(describing: item.key)
         }
 
-        let saved = item.isRecent ? "Saved just now" : item.dateSaved.map { "Saved \($0.formatted())" }
-        subtitle = [item.post?.siteName, saved, item.isLocalOnly ? "On this device only" : nil]
+        let saved = item.dateSaved.map { "Saved \($0.formatted())" }
+        let pending = item.isPending ? "Not sent yet" : nil
+        subtitle = [item.post?.siteName, saved, pending, item.isLocalOnly ? "On this device only" : nil]
             .compactMap { $0 }
             .joined(separator: " · ")
     }
@@ -74,11 +75,7 @@ final class ReaderSavedPostsViewModel {
 
     func loadMore() async {
         await perform {
-            do {
-                _ = try await self.loadedCollection().loadNextPage()
-            } catch ReaderSavedError.StaleLoadMore {
-                // A refresh started while the page loaded, and replaced it.
-            }
+            _ = try await self.loadedCollection().loadNextPage()
         }
     }
 
@@ -97,9 +94,9 @@ final class ReaderSavedPostsViewModel {
             let service = try await self.loadedService()
             // The post's identity covers every key it may be saved under.
             if let post = row.post {
-                try await service.unsave(post: post)
+                _ = try await service.unsave(post: post)
             } else {
-                try await service.unsaveKey(key: row.id)
+                _ = try await service.unsaveKey(key: row.id)
             }
         }
     }
@@ -108,7 +105,7 @@ final class ReaderSavedPostsViewModel {
         guard let collection, let service else { return }
         rows = try await collection.loadItems().map(ReaderSavedPostRow.init)
         hasMore = try collection.listInfo().hasMore ?? false
-        total = service.savedCount()
+        total = try service.savedCount()
     }
 
     private func loadedService() async throws -> ReaderSavedService {
