@@ -48,30 +48,15 @@ struct ReaderSavedServiceTests {
     }
 
     @Test
-    func theImportIsRememberedAcrossLaunchesUntilSignOut() async throws {
-        let url = temporaryDatabase()
-        defer { try? FileManager.default.removeItem(at: url) }
-
-        do {
-            let cache = try openCache(at: url)
-            let service = try client.makeReaderSavedService(source: .ios, cache: cache, userID: 1)
-            let report: ReaderSavedImportReport = try await service.importLocalSaves(saves: [])
-            #expect(!report.alreadyImported)
-        }
-
-        do {
-            let cache = try openCache(at: url)
-            let service = try client.makeReaderSavedService(source: .ios, cache: cache, userID: 1)
-            let saves: [ReaderLocalSave] = []
-            #expect(try await service.importLocalSaves(saves: saves).alreadyImported)
-
-            #expect(try cache.removeWordpressComAccount(userId: 1))
-            #expect(try !cache.removeWordpressComAccount(userId: 1))
-        }
-
-        let cache = try openCache(at: url)
+    func anEmptyImportSendsNothingAndNothingWaitsForRoom() async throws {
+        let cache = try openCache(at: temporaryDatabase())
         let service = try client.makeReaderSavedService(source: .ios, cache: cache, userID: 1)
-        #expect(try await !service.importLocalSaves(saves: []).alreadyImported)
+        let saves: [ReaderLocalSave] = []
+        let report: ReaderSavedImportReport = try await service.importSaves(saves: saves)
+        #expect(report.imported == 0)
+        #expect(report.waitingForRoom == 0)
+        #expect(try service.savesWaitingForRoom() == 0)
+        #expect(try cache.removeWordpressComAccount(userId: 1))
     }
 
     #if !os(Linux)

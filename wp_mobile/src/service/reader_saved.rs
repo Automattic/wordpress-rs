@@ -75,6 +75,13 @@ pub enum ReaderSavedError {
     #[error("This post can't be saved.")]
     PostCannotBeSaved,
 
+    /// The account has reached its save cap. A tap's save is undone. Saves without a tap waiting on
+    /// them, such as an import's or one made offline, stay saved, and are sent once there's room:
+    /// [`ReaderSavedService::sync`] returns this while any are waiting, and
+    /// [`ReaderSavedService::saves_waiting_for_room`] says how many.
+    #[error("You've reached the limit of saved posts.")]
+    TooManySaves,
+
     /// An import batch got back a different number of results than the keys it sent, so no result
     /// can be matched to its key. The server may have saved any of them, so they wait for a refresh.
     #[error("The server returned {received} results for {sent} posts.")]
@@ -148,7 +155,7 @@ pub struct ReaderSavedService {
     /// Rows the server refused this launch, and why, until the tap waiting on them takes it. The
     /// call that sends a row isn't always the tap's: any call holding the lane sends every row.
     /// Kept only while a tap waits on one of the rows.
-    refusals: Mutex<Vec<(Vec<RowId>, WpApiError)>>,
+    refusals: Mutex<Vec<(Vec<RowId>, Refusal)>>,
     /// The rows taps are waiting on, and how many taps wait on each.
     waiting: Mutex<HashMap<RowId, usize>>,
     clock: Clock,
@@ -187,6 +194,14 @@ impl ReaderSavedService {
         Ok(self
             .cache
             .execute(|connection| ReaderSavedRepository::saved_count(connection, self.account))?)
+    }
+
+    /// How many saves wait for room under the account's save cap. They read as saved, and are sent
+    /// once the user unsaves enough to make room.
+    pub fn saves_waiting_for_room(&self) -> Result<u64, ReaderSavedError> {
+        Ok(self.cache.execute(|connection| {
+            ReaderSavedRepository::count_waiting_for_room(connection, self.account)
+        })?)
     }
 
     /// Saves a post. It reads as saved, and shows in the saved list, straight away.
@@ -239,9 +254,16 @@ impl ReaderSavedService {
 
     /// Sends what the server doesn't have yet, then reloads the saved keys. Call it at launch, when
     /// the app comes to the foreground, and when the device comes back online.
+    ///
+    /// Returns [`ReaderSavedError::TooManySaves`] after doing all that if saves are still waiting
+    /// for room under the account's save cap.
     pub async fn sync(&self) -> Result<(), ReaderSavedError> {
         let _lane = self.lane.lock().await;
-        self.sync_in_lane().await
+        self.sync_in_lane().await?;
+        if self.saves_waiting_for_room()? > 0 {
+            return Err(ReaderSavedError::TooManySaves);
+        }
+        Ok(())
     }
 }
 
@@ -300,6 +322,16 @@ impl ReaderSavedService {
         main: ReaderSavedKey,
         keys: Vec<ReaderSavedKey>,
     ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
+        // Already saved, and waiting for room: a tap would make a refusal undo it.
+        if self
+            .rows_for(&keys)?
+            .iter()
+            .any(|row| row.saved && row.waiting_for_room)
+        {
+            return Ok(ReaderSavedOutcome::Pending {
+                reason: ReaderSavedError::TooManySaves.to_string(),
+            });
+        }
         let now = self.now();
         let row = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
@@ -325,15 +357,13 @@ impl ReaderSavedService {
         let _lane = self.lane.lock().await;
         let sent = self.send_pending().await?;
         if let Some(error) = self.take_refusal(&[row]) {
-            return Err(ReaderSavedError::Api(error));
+            return Err(error);
         }
         let rows = self.rows_for(std::slice::from_ref(&main))?;
         Ok(match rows.iter().find(|row| row.saved) {
-            Some(row) if (row.server == Some(true) && !row.tapped) || row.local_only => {
-                ReaderSavedOutcome::Synced {
-                    key: row.key.clone(),
-                }
-            }
+            Some(row) if row.server == Some(true) && !row.tapped => ReaderSavedOutcome::Synced {
+                key: row.key.clone(),
+            },
             Some(row) => sent.pending_reason(row),
             // An unsave tapped since decides.
             None => ReaderSavedOutcome::Pending {
@@ -359,7 +389,7 @@ impl ReaderSavedService {
         let _lane = self.lane.lock().await;
         let sent = self.send_pending().await?;
         if let Some(error) = self.take_refusal(&waiting) {
-            return Err(ReaderSavedError::Api(error));
+            return Err(error);
         }
         let rows = self.rows_for(&keys)?;
         Ok(
@@ -390,6 +420,11 @@ impl ReaderSavedService {
     async fn sync_in_lane(&self) -> Result<(), ReaderSavedError> {
         let sent = self.send_pending().await?;
         sent.log();
+        // A full account was asked once already: the keys don't make room.
+        let room = match sent.room {
+            Room::Full => Room::Full,
+            Room::Unknown | Room::Available => Room::Unknown,
+        };
         let response = self.client.reader_saved().list_keys().await?.data;
         let returned = response.keys.len() as u64;
         let keys: Vec<_> = response
@@ -413,43 +448,84 @@ impl ReaderSavedService {
             transaction.commit().map_err(SqliteDbError::from)
         })?;
         self.notify();
-        self.send_pending().await?.log();
+        self.send_pending_from(room).await?.log();
         Ok(())
     }
 
     /// Sends every pending row, oldest tap first, until none is left or the device is offline. Call
     /// it holding the lane.
+    ///
+    /// Saves waiting for room under the account's save cap go last, after every unsave, which is
+    /// what makes room. Then the oldest is sent alone: if the server still refuses it, the rest
+    /// wait for a later round, so a full account costs one request per round, not one per save.
     async fn send_pending(&self) -> Result<Sent, ReaderSavedError> {
+        self.send_pending_from(Room::Unknown).await
+    }
+
+    /// [`Self::send_pending`], knowing `room` already.
+    async fn send_pending_from(&self, mut room: Room) -> Result<Sent, ReaderSavedError> {
         let mut sent = Sent::default();
         let mut sends: HashMap<RowId, u32> = HashMap::new();
         loop {
+            sent.room = room;
             let pending = self.cache.execute(|connection| {
                 ReaderSavedRepository::select_pending(connection, self.account)
             })?;
+            let under_cap = |row: &DbReaderSavedRow| {
+                sends.get(&row.row_id).copied().unwrap_or(0) < MAX_SENDS_PER_ROW
+            };
+            let eligible = |row: &DbReaderSavedRow| {
+                under_cap(row) && (!row.waiting_for_room || room == Room::Available)
+            };
+            let probe = room == Room::Unknown;
             let Some(row) = pending
                 .iter()
-                .find(|row| sends.get(&row.row_id).copied().unwrap_or(0) < MAX_SENDS_PER_ROW)
+                .find(|row| eligible(row))
                 .cloned()
+                .or_else(|| {
+                    probe
+                        .then(|| pending.iter().find(|row| under_cap(row)).cloned())
+                        .flatten()
+                })
             else {
                 return Ok(sent);
             };
-            let batch: Vec<_> = if row.imported && row.saved && bulk_key(&row.key).is_some() {
-                pending
-                    .into_iter()
-                    .filter(|other| other.imported && other.saved && bulk_key(&other.key).is_some())
-                    .take(MAX_BULK_KEYS)
-                    .collect()
-            } else {
-                vec![row]
-            };
+            // A save waiting for room that isn't eligible is the one sent to find out if there's
+            // room now.
+            let probing = !eligible(&row);
+            let batch: Vec<_> =
+                if !probing && row.imported && row.saved && bulk_key(&row.key).is_some() {
+                    pending
+                        .into_iter()
+                        .filter(|other| {
+                            eligible(other)
+                                && other.imported
+                                && other.saved
+                                && bulk_key(&other.key).is_some()
+                        })
+                        .take(MAX_BULK_KEYS)
+                        .collect()
+                } else {
+                    vec![row]
+                };
             for row in &batch {
                 *sends.entry(row.row_id).or_default() += 1;
             }
+            let refused_for_limit = sent.refused_for_limit;
             let flow = if batch.len() > 1 {
                 self.send_bulk(&batch, &mut sent).await?
             } else {
                 self.send_row(&batch[0], &mut sent).await?
             };
+            if sent.refused_for_limit > refused_for_limit {
+                room = Room::Full;
+            } else if probing && matches!(flow, Flow::Next) {
+                room = Room::Available;
+            } else if probing {
+                // No answer about room, so the rest wait for a later round.
+                room = Room::Full;
+            }
+            sent.room = room;
             self.notify();
             match flow {
                 Flow::Next => {}
@@ -579,6 +655,7 @@ impl ReaderSavedService {
                             None,
                         )?;
                     }
+                    _ if result.error.as_deref() == Some(SAVED_LIMIT_REACHED) => {}
                     _ => {
                         ReaderSavedRepository::apply_refusal(&transaction, row.row_id, row.seq)?;
                     }
@@ -586,6 +663,18 @@ impl ReaderSavedService {
             }
             transaction.commit().map_err(SqliteDbError::from)
         })?;
+        let over_limit: Vec<_> = rows
+            .iter()
+            .rev()
+            .zip(&response.results)
+            .filter(|(_, result)| {
+                !result.saved && result.error.as_deref() == Some(SAVED_LIMIT_REACHED)
+            })
+            .map(|(row, _)| row.clone())
+            .collect();
+        if !over_limit.is_empty() {
+            self.refused_for_limit(&over_limit, sent)?;
+        }
         Ok(Flow::Next)
     }
 
@@ -597,7 +686,10 @@ impl ReaderSavedService {
         sent: &mut Sent,
     ) -> Result<Flow, ReaderSavedError> {
         let row_ids: Vec<_> = rows.iter().map(|row| row.row_id).collect();
-        if is_refused(&error) {
+        if is_limit_reached(&error) {
+            self.refused_for_limit(rows, sent)?;
+            Ok(Flow::Next)
+        } else if is_refused(&error) {
             let undone = self.cache.execute(|connection| {
                 let transaction = connection.transaction()?;
                 let mut undone = Vec::new();
@@ -621,7 +713,7 @@ impl ReaderSavedService {
                 self.refusals
                     .lock()
                     .expect("refusals lock poisoned")
-                    .push((undone, error));
+                    .push((undone, Refusal::Api(Box::new(error))));
             }
             Ok(Flow::Next)
         } else if may_have_been_applied(&error) {
@@ -643,6 +735,40 @@ impl ReaderSavedService {
         }
     }
 
+    /// Records saves the server refused for the account's save cap. A tap waiting on one is undone,
+    /// and hears why. Any other waits for room.
+    fn refused_for_limit(
+        &self,
+        rows: &[DbReaderSavedRow],
+        sent: &mut Sent,
+    ) -> Result<(), ReaderSavedError> {
+        sent.refused_for_limit += 1;
+        let waiting = self.waiting.lock().expect("waiting lock poisoned").clone();
+        let undone = self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            let mut undone = Vec::new();
+            for row in rows {
+                if waiting.contains_key(&row.row_id) {
+                    if ReaderSavedRepository::apply_refusal(&transaction, row.row_id, row.seq)? {
+                        undone.push(row.row_id);
+                    }
+                } else {
+                    ReaderSavedRepository::set_waiting_for_room(&transaction, row.row_id, row.seq)?;
+                }
+            }
+            transaction.commit().map_err(SqliteDbError::from)?;
+            Ok::<_, SqliteDbError>(undone)
+        })?;
+        log::warn!("The server refused a save: the account has reached its save limit.");
+        if !undone.is_empty() {
+            self.refusals
+                .lock()
+                .expect("refusals lock poisoned")
+                .push((undone, Refusal::TooManySaves));
+        }
+        Ok(())
+    }
+
     /// Drops what's known about earlier refusals of rows a new tap changed.
     fn forget_refusals(&self, rows: &[RowId]) {
         self.refusals
@@ -652,12 +778,15 @@ impl ReaderSavedService {
     }
 
     /// Why the server refused one of these rows, if it did since they were tapped.
-    fn take_refusal(&self, rows: &[RowId]) -> Option<WpApiError> {
+    fn take_refusal(&self, rows: &[RowId]) -> Option<ReaderSavedError> {
         let mut refusals = self.refusals.lock().expect("refusals lock poisoned");
         let index = refusals
             .iter()
             .position(|(refused, _)| refused.iter().any(|row| rows.contains(row)))?;
-        Some(refusals.remove(index).1)
+        Some(match refusals.remove(index).1 {
+            Refusal::TooManySaves => ReaderSavedError::TooManySaves,
+            Refusal::Api(error) => ReaderSavedError::Api(*error),
+        })
     }
 
     fn set_in_doubt(&self, rows: &[RowId], in_doubt: bool) -> Result<(), ReaderSavedError> {
@@ -693,6 +822,23 @@ enum Flow {
     Skip,
     /// Stop the round.
     Stop,
+}
+
+/// Whether the account has room for another save, as far as this round of sending knows.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+enum Room {
+    /// Not asked yet this round.
+    #[default]
+    Unknown,
+    Available,
+    /// The server refused a save for the cap this round.
+    Full,
+}
+
+/// Why the server refused a tap's row.
+enum Refusal {
+    TooManySaves,
+    Api(Box<WpApiError>),
 }
 
 /// Marks rows a tap waits on, while it waits, so a refusal of them is kept for it. Dropping it,
@@ -740,6 +886,10 @@ struct Sent {
     /// A request whose answer didn't arrive.
     in_doubt: Option<WpApiError>,
     unexpected: Option<ReaderSavedError>,
+    /// How many requests the server refused, wholly or in part, for the account's save cap.
+    refused_for_limit: u32,
+    /// What the round found out about room under the account's save cap.
+    room: Room,
 }
 
 impl Sent {
@@ -827,7 +977,7 @@ fn is_refused(error: &WpApiError) -> bool {
         WpApiError::WpError {
             error_code: WpErrorCode::CustomError(code),
             ..
-        } if code == "saved_limit_reached" => true,
+        } if code == SAVED_LIMIT_REACHED => true,
         WpApiError::WpError { status_code, .. }
         | WpApiError::InvalidHttpStatusCode { status_code, .. }
         | WpApiError::UnknownError { status_code, .. } => {
@@ -848,6 +998,19 @@ fn is_answered_for_this_request(error: &WpApiError) -> bool {
         }
         _ => false,
     }
+}
+
+/// The error code for a save past the account's save cap.
+const SAVED_LIMIT_REACHED: &str = "saved_limit_reached";
+
+fn is_limit_reached(error: &WpApiError) -> bool {
+    matches!(
+        error,
+        WpApiError::WpError {
+            error_code: WpErrorCode::CustomError(code),
+            ..
+        } if code == SAVED_LIMIT_REACHED
+    )
 }
 
 fn is_post_not_found(error: &WpApiError) -> bool {

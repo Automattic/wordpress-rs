@@ -498,7 +498,8 @@ impl ReaderStreamRepository {
 pub struct ReaderSavedRepository;
 
 const ROW_COLUMNS: &str = "s.rowid, s.key, s.url_key, s.feed_item_key, s.saved, s.server, \
-    s.in_doubt, s.seq, s.date_saved, s.post_id, s.listed, s.imported, s.local_only, s.tapped, s.date_known";
+    s.in_doubt, s.seq, s.date_saved, s.post_id, s.listed, s.imported, s.waiting_for_room, s.tapped, \
+    s.date_known";
 const ROW_COLUMN_COUNT: usize = 15;
 
 fn saved_row_from_row(row: &Row) -> Result<DbReaderSavedRow, SqliteDbError> {
@@ -523,7 +524,7 @@ fn saved_row_from_row(row: &Row) -> Result<DbReaderSavedRow, SqliteDbError> {
         post_row_id: row.get(9)?,
         listed: row.get(10)?,
         imported: row.get(11)?,
-        local_only: row.get(12)?,
+        waiting_for_room: row.get(12)?,
         tapped: row.get(13)?,
         date_known: row.get(14)?,
     })
@@ -544,8 +545,7 @@ impl ReaderSavedRepository {
         account: RowId,
     ) -> Result<DbReaderSavedState, SqliteDbError> {
         let mut statement = executor.prepare(
-            "SELECT keys_refreshed, keys_complete, total, imported_local_saves
-            FROM reader_saved_state WHERE account_id = ?1",
+            "SELECT keys_refreshed, keys_complete, total FROM reader_saved_state WHERE account_id = ?1",
         )?;
         Ok(statement
             .query_row([account], |row| {
@@ -553,7 +553,6 @@ impl ReaderSavedRepository {
                     keys_refreshed: row.get(0)?,
                     keys_complete: row.get(1)?,
                     total: row.get(2)?,
-                    imported_local_saves: row.get(3)?,
                 })
             })
             .optional()?
@@ -569,18 +568,6 @@ impl ReaderSavedRepository {
             "INSERT INTO reader_saved_state (account_id, total) VALUES (?1, ?2)
             ON CONFLICT(account_id) DO UPDATE SET total = excluded.total",
             params![account, total],
-        )?;
-        Ok(())
-    }
-
-    pub fn set_imported_local_saves(
-        executor: &impl QueryExecutor,
-        account: RowId,
-    ) -> Result<(), SqliteDbError> {
-        executor.execute(
-            "INSERT INTO reader_saved_state (account_id, imported_local_saves) VALUES (?1, 1)
-            ON CONFLICT(account_id) DO UPDATE SET imported_local_saves = 1",
-            [account],
         )?;
         Ok(())
     }
@@ -639,7 +626,8 @@ impl ReaderSavedRepository {
         Ok(rows)
     }
 
-    /// Rows to send, oldest tap first: pending or tapped, not in doubt, and not local only.
+    /// Rows to send, oldest tap first: pending or tapped, and not in doubt. Saves waiting for room
+    /// are among them: the service decides when to try them.
     pub fn select_pending(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -647,8 +635,7 @@ impl ReaderSavedRepository {
         Self::select_where(
             executor,
             account,
-            "s.local_only = 0 AND s.in_doubt = 0
-                AND (s.tapped = 1 OR s.server IS NULL OR s.server != s.saved)",
+            "s.in_doubt = 0 AND (s.tapped = 1 OR s.server IS NULL OR s.server != s.saved)",
             &[],
         )
     }
@@ -758,7 +745,7 @@ impl ReaderSavedRepository {
         )?;
         Self::add_aliases(executor, row_id, main, keys)?;
         for other in Self::select_rows_for_keys(executor, account, keys)? {
-            if other.row_id == row_id || other.saved || other.local_only {
+            if other.row_id == row_id || other.saved {
                 continue;
             }
             match other.server {
@@ -775,8 +762,9 @@ impl ReaderSavedRepository {
     }
 
     /// A tap of unsave: every row the post may be saved under wants it unsaved, and a key without a
-    /// row gets one, so every key is sent: the keys may be out of date. A save only this device has
-    /// is removed. Returns the rows to wait for.
+    /// row gets one, so every key is sent: the keys may be out of date. A save waiting for room that
+    /// the server never had is removed, as there's nothing to unsave there. Returns the rows to wait
+    /// for.
     pub fn tap_unsave(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -786,7 +774,7 @@ impl ReaderSavedRepository {
         let rows = Self::select_rows_for_keys(executor, account, keys)?;
         let mut waiting = Vec::new();
         for row in &rows {
-            if row.local_only {
+            if row.waiting_for_room && row.server != Some(true) {
                 Self::delete(executor, row.row_id)?;
                 continue;
             }
@@ -858,7 +846,7 @@ impl ReaderSavedRepository {
                 saved = CASE WHEN ?2 > seq THEN ?3 ELSE saved END,
                 seq = MAX(seq, ?2),
                 listed = MAX(listed, ?4),
-                local_only = MAX(local_only, ?5),
+                waiting_for_room = MAX(waiting_for_room, ?5),
                 tapped = MAX(tapped, ?8),
                 date_known = CASE WHEN date_saved IS NULL THEN ?9 ELSE date_known END,
                 date_saved = COALESCE(date_saved, ?6),
@@ -869,7 +857,7 @@ impl ReaderSavedRepository {
                 from.seq,
                 from.saved,
                 from.listed,
-                from.local_only,
+                from.waiting_for_room,
                 from.date_saved.as_ref().map(reader_date_text),
                 from.post_row_id,
                 from.tapped,
@@ -926,15 +914,14 @@ impl ReaderSavedRepository {
         };
         let row_id = Self::rekey(executor, account, &row, stored)?;
         executor.execute(
-            "UPDATE reader_saved_posts SET server = ?2, in_doubt = 0, tapped = 0, local_only = 0
+            "UPDATE reader_saved_posts SET server = ?2, in_doubt = 0, tapped = 0, waiting_for_room = 0
             WHERE rowid = ?1",
             params![row_id, saved],
         )?;
         Ok(row_id)
     }
 
-    /// Records that the server refused what a row asked for. A tap is undone. An imported save is
-    /// kept on this device instead.
+    /// Records that the server refused what a row asked for: it's undone.
     ///
     /// `sent_seq` is the row's [`DbReaderSavedRow::seq`] when it was sent. A tap made since is
     /// newer than what was refused, so it stands, and is sent next. Returns whether the refusal
@@ -951,14 +938,6 @@ impl ReaderSavedRepository {
             Self::set_in_doubt(executor, row_id, false)?;
             return Ok(false);
         }
-        if row.imported && row.saved {
-            executor.execute(
-                "UPDATE reader_saved_posts SET local_only = 1, in_doubt = 0, tapped = 0
-                WHERE rowid = ?1",
-                [row_id],
-            )?;
-            return Ok(true);
-        }
         match row.server {
             None => Self::delete(executor, row_id)?,
             Some(server) => {
@@ -970,6 +949,43 @@ impl ReaderSavedRepository {
             }
         }
         Ok(true)
+    }
+
+    /// Records that the server refused a save for the account's save cap, with no tap waiting to
+    /// hear it. The save stays, and is sent again once there's room.
+    ///
+    /// `sent_seq` is as for [`Self::apply_refusal`]: a tap made since stands. Returns whether the
+    /// row now waits.
+    pub fn set_waiting_for_room(
+        executor: &impl QueryExecutor,
+        row_id: RowId,
+        sent_seq: i64,
+    ) -> Result<bool, SqliteDbError> {
+        let Some(row) = Self::select_row(executor, row_id)? else {
+            return Ok(false);
+        };
+        if row.seq != sent_seq || !row.saved {
+            Self::set_in_doubt(executor, row_id, false)?;
+            return Ok(false);
+        }
+        executor.execute(
+            "UPDATE reader_saved_posts SET waiting_for_room = 1, in_doubt = 0, tapped = 0
+            WHERE rowid = ?1",
+            [row_id],
+        )?;
+        Ok(true)
+    }
+
+    /// How many saves wait for room under the account's save cap.
+    pub fn count_waiting_for_room(
+        executor: &impl QueryExecutor,
+        account: RowId,
+    ) -> Result<u64, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT COUNT(*) FROM reader_saved_posts
+            WHERE account_id = ?1 AND saved = 1 AND waiting_for_room = 1",
+        )?;
+        Ok(statement.query_row([account], |row| row.get(0))?)
     }
 
     /// Applies a refresh of the saved keys: newest first, `returned` of them before any normalized
@@ -1017,13 +1033,13 @@ impl ReaderSavedRepository {
                     // list's pages give it too, and the two mustn't take turns changing it.
                     executor.execute(
                         "UPDATE reader_saved_posts SET
-                            server = 1, in_doubt = 0, local_only = 0,
+                            server = 1, in_doubt = 0, waiting_for_room = 0,
                             date_saved = CASE WHEN date_known THEN COALESCE(date_saved, ?2)
                                 ELSE ?2 END,
                             date_known = 1,
                             tapped = CASE WHEN in_doubt THEN 0 ELSE tapped END,
                             saved = CASE WHEN ?3 THEN 1 ELSE saved END
-                        WHERE rowid = ?1 AND (server IS NOT 1 OR in_doubt != 0 OR local_only != 0
+                        WHERE rowid = ?1 AND (server IS NOT 1 OR in_doubt != 0 OR waiting_for_room != 0
                             OR date_saved IS NULL OR date_known = 0 OR (?3 AND saved != 1))",
                         params![row.row_id, reader_date_text(&entry.date_saved), agreed],
                     )?;
@@ -1066,7 +1082,7 @@ impl ReaderSavedRepository {
                         AND server = saved THEN 0 ELSE saved END,
                     server = 0, in_doubt = 0,
                     tapped = CASE WHEN in_doubt THEN 0 ELSE tapped END
-                WHERE account_id = ?1 AND local_only = 0 AND rowid NOT IN ({seen_list})
+                WHERE account_id = ?1 AND rowid NOT IN ({seen_list})
                     AND (?2 OR date_saved IS NULL OR (date_known = 1 AND date_saved >= ?3))
                     AND (server IS NOT 0 OR in_doubt != 0)"
             ),
@@ -1083,7 +1099,7 @@ impl ReaderSavedRepository {
         )?;
         executor.execute(
             "DELETE FROM reader_saved_posts
-            WHERE account_id = ?1 AND local_only = 0 AND saved = 0 AND server = 0 AND tapped = 0",
+            WHERE account_id = ?1 AND saved = 0 AND server = 0 AND tapped = 0",
             [account],
         )?;
         executor.execute(
@@ -1125,21 +1141,34 @@ impl ReaderSavedRepository {
         Self::add_aliases(executor, row_id, main, keys)
     }
 
-    /// Adds an imported save, unless the key has a row already. Returns whether it added one.
-    pub fn insert_imported(
+    /// Adds an imported save, as a save would: a post already saved is left as it is, and one
+    /// unsaved, or with an unsave pending, is saved again. Returns whether it changed anything.
+    pub fn import_save(
         executor: &impl QueryExecutor,
         account: RowId,
         key: &ReaderSavedKey,
         post: Option<RowId>,
         date_saved: Option<&WpGmtDateTime>,
     ) -> Result<bool, SqliteDbError> {
-        if !Self::select_rows_for_keys(executor, account, std::slice::from_ref(key))?.is_empty() {
+        let rows = Self::select_rows_for_keys(executor, account, std::slice::from_ref(key))?;
+        if rows.iter().any(|row| row.saved) {
             return Ok(false);
         }
         let seq = Self::next_seq(executor, account)?;
-        let row_id = Self::insert(executor, account, key, true, None, seq, true)?;
+        let row_id = match rows.first() {
+            Some(row) => {
+                executor.execute(
+                    "UPDATE reader_saved_posts SET saved = 1, seq = ?2, listed = 1, date_known = 0
+                    WHERE rowid = ?1",
+                    params![row.row_id, seq],
+                )?;
+                row.row_id
+            }
+            None => Self::insert(executor, account, key, true, None, seq, true)?,
+        };
         executor.execute(
-            "UPDATE reader_saved_posts SET imported = 1, post_id = ?2, date_saved = ?3
+            "UPDATE reader_saved_posts SET imported = 1, post_id = COALESCE(post_id, ?2),
+                date_saved = COALESCE(?3, date_saved)
             WHERE rowid = ?1",
             params![row_id, post, date_saved.map(reader_date_text)],
         )?;
@@ -1158,14 +1187,13 @@ impl ReaderSavedRepository {
             "SELECT COALESCE(SUM(CASE
                 WHEN server IS NULL THEN saved
                 ELSE saved - server END), 0)
-            FROM reader_saved_posts WHERE account_id = ?1 AND local_only = 0",
+            FROM reader_saved_posts WHERE account_id = ?1 AND waiting_for_room = 0",
         )?;
         let delta: i64 = statement.query_row([account], |row| row.get(0))?;
         Ok(Some((total as i64 + delta).max(0) as u64))
     }
 
-    /// The saved list: rows saved and listed, or kept on this device, newest first, with their
-    /// posts.
+    /// The saved list: rows saved and listed, newest first, with their posts.
     pub fn select_list(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -1173,7 +1201,7 @@ impl ReaderSavedRepository {
         let sql = format!(
             "SELECT {ROW_COLUMNS}, {POST_COLUMNS} FROM reader_saved_posts s
             LEFT JOIN reader_posts p ON p.rowid = s.post_id
-            WHERE s.account_id = ?1 AND s.saved = 1 AND (s.listed = 1 OR s.local_only = 1)
+            WHERE s.account_id = ?1 AND s.saved = 1 AND s.listed = 1
             ORDER BY s.date_saved IS NULL, s.date_saved DESC, s.seq DESC, s.rowid DESC"
         );
         let mut statement = executor.prepare(&sql)?;

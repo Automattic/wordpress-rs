@@ -1,4 +1,4 @@
-//! The saved list, the collection apps observe it through, and the import of local saves.
+//! The saved list, the collection apps observe it through, and imports of saves.
 
 use super::{ReaderSavedError, ReaderSavedService};
 use std::collections::HashSet;
@@ -42,8 +42,8 @@ pub struct ReaderSavedListItem {
     pub post: Option<ReaderPostRecord>,
     /// Saved on this device, and the server hasn't confirmed it yet.
     pub is_pending: bool,
-    /// Refused by the server on import, so only saved on this device.
-    pub is_local_only: bool,
+    /// Pending because the account has reached its save cap. It's sent once there's room.
+    pub is_waiting_for_room: bool,
 }
 
 /// What a page of the saved list did.
@@ -67,9 +67,9 @@ pub struct ReaderSavedListInfo {
     pub last_refreshed_at: Option<WpGmtDateTime>,
 }
 
-/// A post saved on this device, to import with [`ReaderSavedService::import_local_saves`]. The
-/// fields besides the identity are shown until the server sends the post, and for good if the
-/// server refuses the save.
+/// A save to import with [`ReaderSavedService::import_saves`], such as one the app kept on the
+/// device before saves were synced, or read from a file. The fields besides the identity are shown
+/// until the server sends the post.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct ReaderLocalSave {
     pub identity: ReaderPostSaveIdentity,
@@ -87,17 +87,17 @@ pub struct ReaderLocalSave {
     pub site_url: Option<String>,
 }
 
-/// What [`ReaderSavedService::import_local_saves`] did.
+/// What [`ReaderSavedService::import_saves`] did.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct ReaderSavedImportReport {
-    /// The account's local saves were imported before, so nothing was added.
-    pub already_imported: bool,
-    /// Saves the server has.
+    /// Saves the server has, including ones it had before.
     pub imported: u64,
-    /// Saves the server refused, such as past its 1,000 save cap. They stay saved on this device.
+    /// Saves the server refused, such as a post it can't find. They were undone.
     pub rejected: Vec<ReaderSavedKey>,
     /// Saves still waiting to be sent, which a later sync sends.
     pub pending: u64,
+    /// Saves past the account's save cap. They stay saved, and are sent once there's room.
+    pub waiting_for_room: u64,
     /// Posts missing the IDs the API needs, or with an ID of `0` or an empty URL. They can't be
     /// imported or kept.
     pub unsaveable: u64,
@@ -110,13 +110,16 @@ impl ReaderSavedService {
         Arc::new(ReaderSavedPostsCollection { service: self })
     }
 
-    /// Adds the posts this device saved before saves were synced, given newest first, and sends
-    /// them. Runs once per account: after that, it returns `already_imported` without adding
-    /// anything.
+    /// Imports saves, given newest first, such as a device's saves from before saves were synced
+    /// or a list the app read from a file. Each is a save: a post already saved stays as it is,
+    /// and one unsaved is saved again, so importing the same list twice changes nothing. Call it
+    /// whenever there's a list to import.
     ///
     /// The saves are in the cache before anything is sent, so they show in the saved list, and a
-    /// later sync sends any this one couldn't. A save the server refuses stays saved on this device.
-    pub async fn import_local_saves(
+    /// later sync sends any this one couldn't. A save the server refuses is undone, and listed in
+    /// [`ReaderSavedImportReport::rejected`]. One past the account's save cap stays saved instead,
+    /// and is sent once there's room: see [`Self::saves_waiting_for_room`].
+    pub async fn import_saves(
         &self,
         saves: Vec<ReaderLocalSave>,
     ) -> Result<ReaderSavedImportReport, ReaderSavedError> {
@@ -124,10 +127,7 @@ impl ReaderSavedService {
         let mut keys = Vec::new();
         let added = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
-            if ReaderSavedRepository::select_state(&transaction, self.account)?.imported_local_saves
-            {
-                return Ok(false);
-            }
+            let mut added = false;
             // Oldest first, so the newest are sent last and stay newest.
             for save in saves.into_iter().rev() {
                 // A key the server would refuse isn't sent, as it would answer `invalid_input`.
@@ -147,54 +147,65 @@ impl ReaderSavedService {
                 record.featured_image = save.featured_image.clone();
                 record.site_name = save.site_name.clone();
                 record.site_url = save.site_url.clone();
-                // The device's copy may be older than what the saved list already stored.
+                // The import's copy may be older than what the saved list already stored.
                 let post = ReaderPostRepository::fill_missing(&transaction, self.account, &record)?;
-                if ReaderSavedRepository::insert_imported(
+                added |= ReaderSavedRepository::import_save(
                     &transaction,
                     self.account,
                     &key,
                     Some(post),
                     save.date_saved.as_ref(),
-                )? {
+                )?;
+                if !keys.contains(&key) {
                     keys.push(key);
                 }
             }
-            ReaderSavedRepository::set_imported_local_saves(&transaction, self.account)?;
             transaction.commit().map_err(SqliteDbError::from)?;
-            Ok::<_, SqliteDbError>(true)
+            Ok::<_, SqliteDbError>(added)
         })?;
-        if !added {
-            return Ok(ReaderSavedImportReport {
-                already_imported: true,
-                imported: 0,
-                rejected: Vec::new(),
-                pending: 0,
-                unsaveable: 0,
-            });
+        if added {
+            self.notify();
         }
-        self.notify();
 
         let sent = {
             let _lane = self.lane.lock().await;
             self.send_pending().await?
         };
         let rows = self.rows_for(&keys)?;
-        let rejected: Vec<_> = rows
+        // A key without a saved row was undone: the server refused it.
+        let rejected: Vec<_> = keys
             .iter()
-            .filter(|row| row.local_only)
-            .map(|row| row.key.clone())
+            .filter(|key| {
+                !rows.iter().any(|row| {
+                    row.saved
+                        && [
+                            Some(&row.key),
+                            row.url_key.as_ref(),
+                            row.feed_item_key.as_ref(),
+                        ]
+                        .into_iter()
+                        .flatten()
+                        .any(|other| other == *key)
+                })
+            })
+            .cloned()
             .collect();
-        let pending = rows.iter().filter(|row| row.is_pending()).count() as u64;
+        let saved: Vec<_> = rows.iter().filter(|row| row.saved).collect();
+        let waiting_for_room = saved.iter().filter(|row| row.waiting_for_room).count() as u64;
+        let pending = saved
+            .iter()
+            .filter(|row| row.is_pending() && !row.waiting_for_room)
+            .count() as u64;
         if let Some(error) = sent.unexpected {
             return Err(error);
         }
         // Saves that couldn't be sent are in `pending`, and a later sync sends them.
         sent.log();
         Ok(ReaderSavedImportReport {
-            already_imported: false,
-            imported: rows.len() as u64 - rejected.len() as u64 - pending,
+            imported: (keys.len() - rejected.len()) as u64 - pending - waiting_for_room,
             rejected,
             pending,
+            waiting_for_room,
             unsaveable,
         })
     }
@@ -330,8 +341,8 @@ impl ReaderSavedService {
         result
     }
 
-    /// The saved list from the cache, newest first: what this device saved, what the list sent,
-    /// and what only this device has. A post this device is unsaving is left out.
+    /// The saved list from the cache, newest first: what this device saved and what the list sent.
+    /// A post this device is unsaving is left out.
     pub(super) fn saved_list_items(&self) -> Result<Vec<ReaderSavedListItem>, ReaderSavedError> {
         let items = self
             .cache
@@ -343,7 +354,7 @@ impl ReaderSavedService {
             .filter(|item| item.row.post_row_id.is_none_or(|post| shown.insert(post)))
             .map(|item| ReaderSavedListItem {
                 is_pending: item.row.is_pending(),
-                is_local_only: item.row.local_only,
+                is_waiting_for_room: item.row.waiting_for_room,
                 key: item.row.key,
                 date_saved: item.row.date_saved,
                 post: item.post,
