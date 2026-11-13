@@ -16,8 +16,11 @@ use crate::{
         reader_saved::{ReaderPostSaveIdentity, deserialize_optional_text},
     },
 };
-use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
-use std::collections::BTreeMap;
+use serde::{
+    Deserialize, Deserializer, Serialize,
+    de::{DeserializeOwned, IgnoredAny, MapAccess, SeqAccess, Visitor},
+};
+use std::fmt;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
     deserialize_null_as_empty_vec, deserialize_optional_bool_or_int,
@@ -363,8 +366,8 @@ struct RawReaderPost {
     featured_media: Option<ReaderFeaturedMedia>,
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
     editorial: Option<RawEditorial>,
-    #[serde(default, deserialize_with = "deserialize_object_or_empty")]
-    tags: Option<BTreeMap<String, ReaderPostTag>>,
+    #[serde(default, deserialize_with = "deserialize_tags")]
+    tags: Vec<ReaderPostTag>,
     #[serde(default, deserialize_with = "deserialize_object_or_empty")]
     metadata: Option<Vec<RawMetadata>>,
     #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
@@ -513,7 +516,7 @@ impl TryFrom<RawReaderPost> for ReaderPost {
             featured_image: raw.featured_image,
             featured_media: raw.featured_media,
             display_image_url,
-            tags: raw.tags.unwrap_or_default().into_values().collect(),
+            tags: raw.tags,
             cross_post: cross_post(&metadata),
             like_count: raw.like_count,
             i_like: raw.i_like,
@@ -604,6 +607,54 @@ where
     }
 }
 
+/// `tags`, an object of tags by slug, in the order the API sends them, which is the order the web
+/// Reader shows them in. Going through `serde_json::Value` would sort them by slug. With no tags,
+/// it's `[]`.
+fn deserialize_tags<'de, D>(deserializer: D) -> Result<Vec<ReaderPostTag>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct TagsVisitor;
+
+    impl<'de> Visitor<'de> for TagsVisitor {
+        type Value = Vec<ReaderPostTag>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("an object of tags by slug")
+        }
+
+        fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+            let mut tags = Vec::new();
+            while let Some((_, tag)) = map.next_entry::<IgnoredAny, ReaderPostTag>()? {
+                tags.push(tag);
+            }
+            Ok(tags)
+        }
+
+        fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            let mut tags = Vec::new();
+            while let Some(tag) = seq.next_element::<ReaderPostTag>()? {
+                tags.push(tag);
+            }
+            Ok(tags)
+        }
+
+        fn visit_bool<E: serde::de::Error>(self, _: bool) -> Result<Self::Value, E> {
+            Ok(Vec::new())
+        }
+
+        fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+            Ok(Vec::new())
+        }
+
+        fn visit_none<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+            Ok(Vec::new())
+        }
+    }
+
+    deserializer.deserialize_any(TagsVisitor)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -660,6 +711,23 @@ mod tests {
         assert_eq!(post.site_icon_url, None);
         assert!(post.tags.is_empty());
         assert_eq!(post.site_locale, None, "Not asked for with meta=site");
+    }
+
+    #[test]
+    fn test_tags_keep_the_order_the_api_sends() {
+        // From a string: `json!` would sort the keys.
+        let post: ReaderPost = serde_json::from_str(
+            r#"{
+                "ID": 9, "site_ID": 123, "is_external": false,
+                "tags": {
+                    "zebra": { "slug": "zebra", "name": "Zebra" },
+                    "apple": { "slug": "apple", "name": "Apple" }
+                }
+            }"#,
+        )
+        .unwrap();
+        let slugs: Vec<_> = post.tags.iter().map(|tag| tag.slug.as_str()).collect();
+        assert_eq!(slugs, vec!["zebra", "apple"]);
     }
 
     #[test]
