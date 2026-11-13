@@ -339,9 +339,19 @@ mod tests {
     #[case::host_placeholder("https://{{cdn}}/favicon.png", "https://%7B%7Bcdn%7D%7D/favicon.png")]
     #[case::host_quote_and_backtick("https://a\"b`c/", "https://a%22b%60c/")]
     #[case::userinfo_stray_percent("https://us%er@example.com/", "https://us%25er@example.com/")]
+    #[case::query_backtick_and_backslash(
+        "https://example.com/?a`b\\c",
+        "https://example.com/?a%60b%5Cc"
+    )]
+    #[case::opaque_path("foo:a{b}|c", "foo:a%7Bb%7D%7Cc")]
     fn rfc3986_url(#[case] input: &str, #[case] expected: &str) {
         let url = ParsedUrl::parse(input).unwrap();
         assert_eq!(url.rfc3986_url(), expected);
+        // An RFC 3986 parser we didn't write accepts it.
+        assert!(
+            iri_string::types::UriStr::new(expected).is_ok(),
+            "{expected} isn't valid RFC 3986"
+        );
         // Encoding is stable: parsing the result again doesn't change it.
         let reparsed = ParsedUrl::parse(&url.rfc3986_url()).unwrap();
         assert_eq!(reparsed.rfc3986_url(), expected);

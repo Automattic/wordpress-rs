@@ -52,6 +52,7 @@ wp_serde_helper = { path = "../wp_serde_helper" }
 x509-cert = { workspace = true }
 
 [dev-dependencies]
+iri-string = { workspace = true }
 rstest = { workspace = true }
 rstest_reuse = { workspace = true }
 tokio = { workspace = true, features = [ "full" ] }
