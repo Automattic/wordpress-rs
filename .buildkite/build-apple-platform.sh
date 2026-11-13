@@ -18,4 +18,5 @@ restore_swiftpm_cache --package-resolved native/swift/Tools/Package.resolved
 echo "--- :rust: Building $PLATFORM targets"
 make build-apple-$PLATFORM
 
+echo "--- :swift: Saving Swift Package Manager cache"
 save_swiftpm_cache --package-resolved native/swift/Tools/Package.resolved

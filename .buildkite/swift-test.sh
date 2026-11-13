@@ -38,4 +38,5 @@ for platform in "iOS" "macOS" "Catalyst" "tvOS" "watchOS"; do
     $func $platform
 done
 
+echo "--- :swift: Saving Swift Package Manager cache"
 save_swiftpm_cache --package-resolved Package.resolved
