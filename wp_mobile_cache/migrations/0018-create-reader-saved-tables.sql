@@ -1,5 +1,6 @@
 -- One row per save on the server, as far as this device knows, and what the user wants for it.
--- A row is pending while `saved` differs from `server`: the service sends it until they agree.
+-- A row is pending while `saved` differs from `server`: the service sends it until they agree. A
+-- tapped row is sent once more even if they agree, because the server may have changed since.
 CREATE TABLE `reader_saved_posts` (
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
   `account_id` INTEGER NOT NULL,
@@ -9,6 +10,7 @@ CREATE TABLE `reader_saved_posts` (
   `saved` INTEGER NOT NULL,           -- what the user wants
   `server` INTEGER,                   -- what the server last said: 1 saved, 0 not saved, NULL not known
   `in_doubt` INTEGER NOT NULL DEFAULT 0, -- sent without an answer, so not sent again until a refresh says what the server has
+  `tapped` INTEGER NOT NULL DEFAULT 0, -- a tap's request isn't answered yet, so it's sent even if the row matches what the server last said
   `seq` INTEGER NOT NULL DEFAULT 0,   -- the order of the last tap on this device, 0 for none. The newer tap wins a merge
   `date_saved` TEXT,
   `post_id` INTEGER,                  -- reader_posts.rowid

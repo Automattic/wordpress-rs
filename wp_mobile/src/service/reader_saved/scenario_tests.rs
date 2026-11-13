@@ -852,11 +852,10 @@ fn end(
 /// A row whose status, count, server or requests differ from #1729's ends with a tag for why:
 ///
 /// - `A`: a list refresh syncs first, so it reads the keys before the page.
-/// - `K`: a post's taps collapse into its row, and a tap that matches what the server last said,
-///   or a request in flight is about to say, sends nothing.
+/// - `K`: a post's taps collapse into its row, so a tap made while a request for the row is in
+///   flight is settled by that request's answer, and sends nothing more if it matches.
 /// - `C`: a cancelled tap isn't undone. It's on the device, and is sent when the lane is free.
 /// - `W`: a sync or a list refresh waits behind the request in flight, so it hasn't sent yet.
-/// - `U`: the keys returned every save and don't have the post, so an unsave has nothing to send.
 /// - `N`: `Unknown` is gone past the 1,000 keys: a post they don't have reads `NotSaved`.
 /// - `L`: the saved list showed the post, which marks it saved, so it reads `Saved`.
 /// - `#`: the count is the newest total plus what's pending, so it's off until the next sync.
@@ -897,23 +896,23 @@ fn rows() -> Vec<(Start, Action, End)> {
 
         (KnownUnsaved,              Save,                    end(Saved,    s(1),    t, f, t, &["new P1"])),
         (KnownUnsaved,              SaveRefused,             end(NotSaved, s(0),    f, f, f, &["new P1"])),
-        (KnownUnsaved,              Unsave,                  end(NotSaved, s(0),    f, f, f, &[])), // U
-        (KnownUnsaved,              UnsaveRefused,           end(NotSaved, s(0),    f, f, f, &[])), // U
+        (KnownUnsaved,              Unsave,                  end(NotSaved, s(0),    f, f, f, &["delete P1"])),
+        (KnownUnsaved,              UnsaveRefused,           end(NotSaved, s(0),    f, f, f, &["delete P1"])),
         (KnownUnsaved,              SaveCancelledAndLost,    end(Saved,    s(1),    t, t, f, &["new P1"])),
         (KnownUnsaved,              SaveCancelledButApplied, end(Saved,    s(1),    t, t, t, &["new P1"])),
-        (KnownUnsaved,              UnsaveCancelledAndLost,  end(NotSaved, s(0),    f, f, f, &[])), // U
+        (KnownUnsaved,              UnsaveCancelledAndLost,  end(NotSaved, s(0),    f, t, f, &["delete P1"])),
         (KnownUnsaved,              Sync,                    end(NotSaved, s(0),    f, f, f, &["keys"])),
         (KnownUnsaved,              SyncFails,               end(NotSaved, s(0),    f, f, f, &["keys"])),
         (KnownUnsaved,              ListLoads,               end(NotSaved, s(0),    f, f, f, &["keys", "list"])), // A
         (KnownUnsaved,              ListFails,               end(NotSaved, s(0),    f, f, f, &["keys", "list"])), // A
         (KnownUnsaved,              Relaunch,                end(NotSaved, s(0),    f, f, f, &[])),
 
-        (KnownSaved,                Save,                    end(Saved,    s(1),    t, f, t, &[])), // K
-        (KnownSaved,                SaveRefused,             end(Saved,    s(1),    t, f, t, &[])), // K
+        (KnownSaved,                Save,                    end(Saved,    s(1),    t, f, t, &["new P1"])),
+        (KnownSaved,                SaveRefused,             end(Saved,    s(1),    t, f, t, &["new P1"])),
         (KnownSaved,                Unsave,                  end(NotSaved, s(0),    f, f, f, &["delete P1"])),
         (KnownSaved,                UnsaveRefused,           end(Saved,    s(1),    f, f, t, &["delete P1"])),
-        (KnownSaved,                SaveCancelledAndLost,    end(Saved,    s(1),    t, f, t, &[])), // K
-        (KnownSaved,                SaveCancelledButApplied, end(Saved,    s(1),    t, f, t, &[])), // K
+        (KnownSaved,                SaveCancelledAndLost,    end(Saved,    s(1),    t, f, t, &["new P1"])),
+        (KnownSaved,                SaveCancelledButApplied, end(Saved,    s(1),    t, f, t, &["new P1"])),
         (KnownSaved,                UnsaveCancelledAndLost,  end(NotSaved, s(0),    f, t, t, &["delete P1"])),
         (KnownSaved,                Sync,                    end(Saved,    s(1),    f, f, t, &["keys"])),
         (KnownSaved,                SyncFails,               end(Saved,    s(1),    f, f, t, &["keys"])),
@@ -921,13 +920,12 @@ fn rows() -> Vec<(Start, Action, End)> {
         (KnownSaved,                ListFails,               end(Saved,    s(1),    f, f, t, &["keys", "list"])), // A
         (KnownSaved,                Relaunch,                end(Saved,    s(1),    f, f, t, &[])),
 
-        // The device still thinks the server has it, so a save sends nothing until a sync says.
-        (SavedButUnsavedElsewhere,  Save,                    end(Saved,    s(1),    t, f, f, &[])), // K
-        (SavedButUnsavedElsewhere,  SaveRefused,             end(Saved,    s(1),    t, f, f, &[])), // K
+        (SavedButUnsavedElsewhere,  Save,                    end(Saved,    s(1),    t, f, t, &["new P1"])),
+        (SavedButUnsavedElsewhere,  SaveRefused,             end(Saved,    s(1),    t, f, f, &["new P1"])),
         (SavedButUnsavedElsewhere,  Unsave,                  end(NotSaved, s(0),    f, f, f, &["delete P1"])),
         (SavedButUnsavedElsewhere,  UnsaveRefused,           end(Saved,    s(1),    f, f, f, &["delete P1"])),
-        (SavedButUnsavedElsewhere,  SaveCancelledAndLost,    end(Saved,    s(1),    t, f, f, &[])), // K
-        (SavedButUnsavedElsewhere,  SaveCancelledButApplied, end(Saved,    s(1),    t, f, f, &[])), // K
+        (SavedButUnsavedElsewhere,  SaveCancelledAndLost,    end(Saved,    s(1),    t, f, f, &["new P1"])),
+        (SavedButUnsavedElsewhere,  SaveCancelledButApplied, end(Saved,    s(1),    t, f, t, &["new P1"])),
         (SavedButUnsavedElsewhere,  UnsaveCancelledAndLost,  end(NotSaved, s(0),    f, t, f, &["delete P1"])),
         (SavedButUnsavedElsewhere,  Sync,                    end(NotSaved, s(0),    f, f, f, &["keys"])),
         (SavedButUnsavedElsewhere,  SyncFails,               end(Saved,    s(1),    f, f, f, &["keys"])),
@@ -937,24 +935,24 @@ fn rows() -> Vec<(Start, Action, End)> {
 
         (UnsavedButSavedElsewhere,  Save,                    end(Saved,    s(1),    t, f, t, &["new P1"])),
         (UnsavedButSavedElsewhere,  SaveRefused,             end(NotSaved, s(0),    f, f, t, &["new P1"])),
-        (UnsavedButSavedElsewhere,  Unsave,                  end(NotSaved, s(0),    f, f, t, &[])), // U
-        (UnsavedButSavedElsewhere,  UnsaveRefused,           end(NotSaved, s(0),    f, f, t, &[])), // U
+        (UnsavedButSavedElsewhere,  Unsave,                  end(NotSaved, s(0),    f, f, f, &["delete P1"])),
+        (UnsavedButSavedElsewhere,  UnsaveRefused,           end(NotSaved, s(0),    f, f, t, &["delete P1"])),
         (UnsavedButSavedElsewhere,  SaveCancelledAndLost,    end(Saved,    s(1),    t, t, t, &["new P1"])),
         (UnsavedButSavedElsewhere,  SaveCancelledButApplied, end(Saved,    s(1),    t, t, t, &["new P1"])),
-        (UnsavedButSavedElsewhere,  UnsaveCancelledAndLost,  end(NotSaved, s(0),    f, f, t, &[])), // U
+        (UnsavedButSavedElsewhere,  UnsaveCancelledAndLost,  end(NotSaved, s(0),    f, t, t, &["delete P1"])),
         (UnsavedButSavedElsewhere,  Sync,                    end(Saved,    s(1),    f, f, t, &["keys"])),
         (UnsavedButSavedElsewhere,  SyncFails,               end(NotSaved, s(0),    f, f, t, &["keys"])),
         (UnsavedButSavedElsewhere,  ListLoads,               end(Saved,    s(1),    t, f, t, &["keys", "list"])), // A
         (UnsavedButSavedElsewhere,  ListFails,               end(Saved,    s(1),    f, f, t, &["keys", "list"])), // A
         (UnsavedButSavedElsewhere,  Relaunch,                end(NotSaved, s(0),    f, f, t, &[])),
 
-        // The total the count follows predates the page, so it's 0 until a sync.
-        (ListedButNotInTheKeys,     Save,                    end(Saved,    s(0),    t, f, t, &[])), // K #
-        (ListedButNotInTheKeys,     SaveRefused,             end(Saved,    s(0),    t, f, t, &[])), // K #
+        // The total the count follows predates the page, so it's off until a sync.
+        (ListedButNotInTheKeys,     Save,                    end(Saved,    s(1),    t, f, t, &["new P1"])),
+        (ListedButNotInTheKeys,     SaveRefused,             end(Saved,    s(0),    t, f, t, &["new P1"])), // L
         (ListedButNotInTheKeys,     Unsave,                  end(NotSaved, s(0),    f, f, f, &["delete P1"])),
         (ListedButNotInTheKeys,     UnsaveRefused,           end(Saved,    s(0),    t, f, t, &["delete P1"])), // L
-        (ListedButNotInTheKeys,     SaveCancelledAndLost,    end(Saved,    s(0),    t, f, t, &[])), // K #
-        (ListedButNotInTheKeys,     SaveCancelledButApplied, end(Saved,    s(0),    t, f, t, &[])), // K #
+        (ListedButNotInTheKeys,     SaveCancelledAndLost,    end(Saved,    s(0),    t, f, t, &["new P1"])), // #
+        (ListedButNotInTheKeys,     SaveCancelledButApplied, end(Saved,    s(0),    t, f, t, &["new P1"])), // #
         (ListedButNotInTheKeys,     UnsaveCancelledAndLost,  end(NotSaved, s(0),    f, t, t, &["delete P1"])),
         (ListedButNotInTheKeys,     Sync,                    end(Saved,    s(1),    t, f, t, &["keys"])),
         (ListedButNotInTheKeys,     SyncFails,               end(Saved,    s(0),    t, f, t, &["keys"])), // L
@@ -1006,12 +1004,12 @@ fn rows() -> Vec<(Start, Action, End)> {
         (SaveThenUnsaveQueued,      ListFails,               end(NotSaved, s(0),    f, t, f, &[])), // W
         (SaveThenUnsaveQueued,      Relaunch,                end(NotSaved, s(0),    f, t, f, &[])),
 
-        (JustSaved,                 Save,                    end(Saved,    s(1),    t, f, t, &[])), // K
-        (JustSaved,                 SaveRefused,             end(Saved,    s(1),    t, f, t, &[])), // K
+        (JustSaved,                 Save,                    end(Saved,    s(1),    t, f, t, &["new P1"])),
+        (JustSaved,                 SaveRefused,             end(Saved,    s(1),    t, f, t, &["new P1"])),
         (JustSaved,                 Unsave,                  end(NotSaved, s(0),    f, f, f, &["delete P1"])),
         (JustSaved,                 UnsaveRefused,           end(Saved,    s(1),    t, f, t, &["delete P1"])),
-        (JustSaved,                 SaveCancelledAndLost,    end(Saved,    s(1),    t, f, t, &[])), // K
-        (JustSaved,                 SaveCancelledButApplied, end(Saved,    s(1),    t, f, t, &[])), // K
+        (JustSaved,                 SaveCancelledAndLost,    end(Saved,    s(1),    t, f, t, &["new P1"])),
+        (JustSaved,                 SaveCancelledButApplied, end(Saved,    s(1),    t, f, t, &["new P1"])),
         (JustSaved,                 UnsaveCancelledAndLost,  end(NotSaved, s(0),    f, t, t, &["delete P1"])),
         (JustSaved,                 Sync,                    end(Saved,    s(1),    t, f, t, &["keys"])),
         (JustSaved,                 SyncFails,               end(Saved,    s(1),    t, f, t, &["keys"])),
@@ -1021,11 +1019,11 @@ fn rows() -> Vec<(Start, Action, End)> {
 
         (JustUnsaved,               Save,                    end(Saved,    s(1),    t, f, t, &["new P1"])),
         (JustUnsaved,               SaveRefused,             end(NotSaved, s(0),    f, f, f, &["new P1"])),
-        (JustUnsaved,               Unsave,                  end(NotSaved, s(0),    f, f, f, &[])), // K
-        (JustUnsaved,               UnsaveRefused,           end(NotSaved, s(0),    f, f, f, &[])), // K
+        (JustUnsaved,               Unsave,                  end(NotSaved, s(0),    f, f, f, &["delete P1"])),
+        (JustUnsaved,               UnsaveRefused,           end(NotSaved, s(0),    f, f, f, &["delete P1"])),
         (JustUnsaved,               SaveCancelledAndLost,    end(Saved,    s(1),    t, t, f, &["new P1"])),
         (JustUnsaved,               SaveCancelledButApplied, end(Saved,    s(1),    t, t, t, &["new P1"])),
-        (JustUnsaved,               UnsaveCancelledAndLost,  end(NotSaved, s(0),    f, f, f, &[])), // K
+        (JustUnsaved,               UnsaveCancelledAndLost,  end(NotSaved, s(0),    f, f, f, &["delete P1"])),
         (JustUnsaved,               Sync,                    end(NotSaved, s(0),    f, f, f, &["keys"])),
         (JustUnsaved,               SyncFails,               end(NotSaved, s(0),    f, f, f, &["keys"])),
         (JustUnsaved,               ListLoads,               end(NotSaved, s(0),    f, f, f, &["keys", "list"])), // A
@@ -1046,12 +1044,12 @@ fn rows() -> Vec<(Start, Action, End)> {
         (PastTheKeyLimit,           ListFails,               end(NotSaved, s(1001), f, f, t, &["keys", "list"])), // A N
         (PastTheKeyLimit,           Relaunch,                end(NotSaved, s(1001), f, f, t, &[])), // N
 
-        (PastTheKeyLimitAndListed,  Save,                    end(Saved,    s(1001), t, f, t, &[])), // K L
-        (PastTheKeyLimitAndListed,  SaveRefused,             end(Saved,    s(1001), t, f, t, &[])), // K L
+        (PastTheKeyLimitAndListed,  Save,                    end(Saved,    s(1001), t, f, t, &["new P1"])), // L
+        (PastTheKeyLimitAndListed,  SaveRefused,             end(Saved,    s(1001), t, f, t, &["new P1"])), // L
         (PastTheKeyLimitAndListed,  Unsave,                  end(NotSaved, s(1000), f, f, f, &["delete P1"])),
         (PastTheKeyLimitAndListed,  UnsaveRefused,           end(Saved,    s(1001), t, f, t, &["delete P1"])), // L
-        (PastTheKeyLimitAndListed,  SaveCancelledAndLost,    end(Saved,    s(1001), t, f, t, &[])), // K L
-        (PastTheKeyLimitAndListed,  SaveCancelledButApplied, end(Saved,    s(1001), t, f, t, &[])), // K L
+        (PastTheKeyLimitAndListed,  SaveCancelledAndLost,    end(Saved,    s(1001), t, f, t, &["new P1"])), // L
+        (PastTheKeyLimitAndListed,  SaveCancelledButApplied, end(Saved,    s(1001), t, f, t, &["new P1"])), // L
         (PastTheKeyLimitAndListed,  UnsaveCancelledAndLost,  end(NotSaved, s(1000), f, t, t, &["delete P1"])), // #
         // The row is older than every key returned, so a sync can't say and leaves it.
         (PastTheKeyLimitAndListed,  Sync,                    end(Saved,    s(1001), t, f, t, &["keys"])), // L
@@ -1238,9 +1236,10 @@ fn saving_a_jetpack_post_sends_its_post_key() {
     assert_eq!(world.status(jetpack()), Saved);
 }
 
-/// #1729 also sent `delete P3`. The keys returned every save, and the post is saved under F4 alone.
+/// An unsave sends every key the post may be saved under, since the keys may be out of date: the
+/// row the keys have first, then the key without a row.
 #[test]
-fn a_jetpack_post_saved_under_its_feed_item_reads_saved_and_unsaves_that_key() {
+fn a_jetpack_post_saved_under_its_feed_item_reads_saved_and_unsaves_both_keys() {
     let mut world = World::new();
     world.server.saved.insert("F4".to_string());
     world.sync();
@@ -1250,7 +1249,7 @@ fn a_jetpack_post_saved_under_its_feed_item_reads_saved_and_unsaves_that_key() {
     world.unsave(jetpack());
     world.answer_writes();
 
-    assert_eq!(world.sent_since(1), ["delete F4"]);
+    assert_eq!(world.sent_since(1), ["delete F4", "delete P3"]);
     assert!(world.server.saved.is_empty());
     assert_eq!(world.status(jetpack()), NotSaved);
     assert_eq!(world.count(), Some(0));
@@ -1301,10 +1300,10 @@ fn saving_the_external_view_of_a_jetpack_post_saves_the_post() {
 }
 
 /// The keys don't say which feed item a post save came from, so the external view of a post saved
-/// elsewhere reads as not saved. #1729 still sent `delete F4` when it was unsaved from there; now
-/// there's nothing to send, because the keys are complete and the view reads not saved.
+/// elsewhere reads as not saved. An unsave tapped there is still sent, and the server's answer says
+/// it was post 3.
 #[test]
-fn the_external_view_of_a_jetpack_post_saved_elsewhere_reads_not_saved() {
+fn the_external_view_of_a_jetpack_post_saved_elsewhere_reads_not_saved_but_unsaves() {
     let mut world = World::new();
     world.server.saved.insert("P3".to_string());
     world.sync();
@@ -1317,8 +1316,30 @@ fn the_external_view_of_a_jetpack_post_saved_elsewhere_reads_not_saved() {
     world.unsave(jetpack_external());
     world.answer_writes();
 
-    assert_eq!(world.sent_since(1), Vec::<String>::new());
-    assert_eq!(world.status(jetpack()), Saved);
+    assert_eq!(world.sent_since(1), ["delete F4"]);
+    assert!(world.server.saved.is_empty());
+    assert_eq!(world.status(jetpack()), NotSaved);
+}
+
+/// Saved here, then unsaved on the web. Before a sync says so, the user saves it again: the device
+/// thinks the server has it, but the tap is sent anyway, and puts it back.
+#[test]
+fn saving_again_a_post_unsaved_on_the_web_since_the_last_sync_saves_it() {
+    let mut world = World::new();
+    world.sync();
+    world.save(identity(1));
+    world.answer_writes();
+    world.server.saved.remove("P1");
+
+    let before = world.sent_count();
+    world.save(identity(1));
+    world.answer_writes();
+
+    assert_eq!(world.sent_since(before), ["new P1"]);
+    assert!(world.server.has("P1"));
+    world.sync();
+    assert_eq!(world.status(identity(1)), Saved);
+    assert_eq!(world.shown(), ["P1"]);
 }
 
 /// The saved list shows the post with both keys, but it's saved under its main key alone, so an
@@ -1484,8 +1505,7 @@ fn unsaving_a_url_sends_the_post_it_is_stored_as() {
     assert_eq!(world.status(identity(9)), NotSaved);
 }
 
-/// The row keeps the URL once it's unsaved, so saving the URL again saves post 9. #1729 checked
-/// that a repeated unsave sent both keys; a repeated unsave now sends nothing.
+/// The row keeps the URL once it's unsaved, so a second unsave and a save of the URL go to post 9.
 #[test]
 fn an_unsaved_url_still_knows_its_post_next_time() {
     let mut world = World::new();
@@ -1497,12 +1517,11 @@ fn an_unsaved_url_still_knows_its_post_next_time() {
     let before = world.sent_count();
     world.unsave_key("U9");
     world.answer_writes();
-    assert_eq!(world.sent_since(before), Vec::<String>::new());
 
     world.save_url(U9);
     world.answer_writes();
 
-    assert_eq!(world.sent_since(before), ["new P9"]);
+    assert_eq!(world.sent_since(before), ["delete P9", "new P9"]);
     assert_eq!(world.status(identity(9)), Saved);
 }
 
@@ -1846,9 +1865,9 @@ fn a_sync_that_maps_a_url_does_not_let_an_older_unsave_undo_an_answered_save() {
 }
 
 /// Post 9 is saved here and answered, and a sync says U9 is post 9. A second save, through U9, is
-/// already what the row wants, so nothing is sent and nothing can be refused. #1729 sent it.
+/// sent as the post and refused. The post is still saved, so it stays in the list.
 #[test]
-fn a_second_save_through_the_url_sends_nothing_and_keeps_the_post_in_the_list() {
+fn a_refused_second_save_through_the_url_keeps_the_post_in_the_list() {
     let mut world = World::new();
     world.sync();
     world.save(identity(9));
@@ -1858,8 +1877,8 @@ fn a_second_save_through_the_url_sends_nothing_and_keeps_the_post_in_the_list() 
 
     let before = world.sent_count();
     world.save_url(U9);
-    world.answer_writes_refusing("new U9", before);
-    assert_eq!(world.sent_since(before), Vec::<String>::new());
+    world.answer_writes_refusing("new P9", before);
+    assert_eq!(world.sent_since(before), ["new P9"]);
     assert!(world.server.has("P9"));
     assert_eq!(world.status(identity(9)), Saved);
     assert_eq!(world.shown(), ["P9"]);
@@ -1977,4 +1996,25 @@ fn an_unsave_queued_while_offline_is_sent_once_online() {
     assert!(!world.server.has("P1"));
     assert!(!world.pending(identity(1)));
     assert_eq!(world.status(identity(1)), NotSaved);
+}
+
+/// Once a sync shows a post unsaved with nothing pending, its row goes, and with it the URL it was
+/// saved by. A later save of the URL is sent as the URL, and the server says again what it is.
+#[test]
+fn a_sync_that_shows_a_post_unsaved_forgets_the_url_it_was_saved_by() {
+    let mut world = World::new();
+    world.sync();
+    world.save_url(U9);
+    world.answer_writes();
+    world.unsave_key("U9");
+    world.answer_writes();
+    world.sync();
+
+    let before = world.sent_count();
+    world.save_url(U9);
+    world.answer_writes();
+
+    assert_eq!(world.sent_since(before), ["new U9"]);
+    assert!(world.server.has("P9"));
+    assert_eq!(world.status(identity(9)), Saved);
 }

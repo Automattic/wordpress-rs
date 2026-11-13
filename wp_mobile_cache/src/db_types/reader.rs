@@ -142,6 +142,9 @@ pub struct DbReaderSavedRow {
     pub server: Option<bool>,
     /// Sent without an answer, so it isn't sent again until a refresh says what the server has.
     pub in_doubt: bool,
+    /// A tap's request isn't answered yet, so it's sent even if [`Self::saved`] matches
+    /// [`Self::server`]: the server may have changed since it last said.
+    pub tapped: bool,
     /// The order of the last tap on this device, or 0 for none.
     pub seq: i64,
     pub date_saved: Option<WpGmtDateTime>,

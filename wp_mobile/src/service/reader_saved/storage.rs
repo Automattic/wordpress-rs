@@ -98,7 +98,8 @@ pub struct ReaderSavedImportReport {
     pub rejected: Vec<ReaderSavedKey>,
     /// Saves still waiting to be sent, which a later sync sends.
     pub pending: u64,
-    /// Posts missing the IDs the API needs. They can't be imported or kept.
+    /// Posts missing the IDs the API needs, or with an ID of `0` or an empty URL. They can't be
+    /// imported or kept.
     pub unsaveable: u64,
 }
 
@@ -129,7 +130,10 @@ impl ReaderSavedService {
             }
             // Oldest first, so the newest are sent last and stay newest.
             for save in saves.into_iter().rev() {
-                let Some(key) = reader_saved_key_for_post(save.identity.clone()) else {
+                // A key the server would refuse isn't sent, as it would answer `invalid_input`.
+                let Some(key) = reader_saved_key_for_post(save.identity.clone())
+                    .filter(ReaderSavedKey::is_complete)
+                else {
                     unsaveable += 1;
                     continue;
                 };
@@ -143,7 +147,8 @@ impl ReaderSavedService {
                 record.featured_image = save.featured_image.clone();
                 record.site_name = save.site_name.clone();
                 record.site_url = save.site_url.clone();
-                let post = ReaderPostRepository::upsert(&transaction, self.account, &record)?;
+                // The device's copy may be older than what the saved list already stored.
+                let post = ReaderPostRepository::fill_missing(&transaction, self.account, &record)?;
                 if ReaderSavedRepository::insert_imported(
                     &transaction,
                     self.account,

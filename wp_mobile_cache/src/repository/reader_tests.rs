@@ -400,7 +400,7 @@ fn test_an_answer_merges_into_the_stored_keys_row_and_the_newer_tap_decides() {
     let conn = conn();
     let account = account(&conn, 1);
     // F4 is unsaved first, then post 3 saved: the save is the newer tap.
-    let unsave = ReaderSavedRepository::tap_unsave(&conn, account, &[feed_key(4)], true).unwrap();
+    let unsave = ReaderSavedRepository::tap_unsave(&conn, account, &[feed_key(4)]).unwrap();
     ReaderSavedRepository::tap_save(&conn, account, &post_key(3), &[post_key(3)], None, &now())
         .unwrap();
     let kept =
@@ -450,7 +450,7 @@ fn test_a_refused_unsave_goes_back_to_what_the_server_said() {
         1,
     )
     .unwrap();
-    let rows_ = ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)], false).unwrap();
+    let rows_ = ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)]).unwrap();
     ReaderSavedRepository::apply_refusal(&conn, rows_[0]).unwrap();
     assert!(row_for(&conn, account, &post_key(1)).unwrap().saved);
 }
@@ -471,9 +471,9 @@ fn test_a_save_calls_off_a_pending_unsave_of_another_of_the_posts_rows() {
     )
     .unwrap();
     let keys = [post_key(3), feed_key(4)];
-    ReaderSavedRepository::tap_unsave(&conn, account, &keys, false).unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, &keys).unwrap();
     // A row this device only knows from its own unsave is removed.
-    ReaderSavedRepository::tap_unsave(&conn, account, &[feed_key(5)], true).unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, &[feed_key(5)]).unwrap();
     ReaderSavedRepository::tap_save(&conn, account, &post_key(3), &keys, None, &now()).unwrap();
     ReaderSavedRepository::tap_save(
         &conn,
@@ -496,17 +496,12 @@ fn test_a_save_calls_off_a_pending_unsave_of_another_of_the_posts_rows() {
 }
 
 #[test]
-fn test_an_unsave_adds_rows_for_keys_without_one_only_when_asked() {
+fn test_an_unsave_adds_rows_for_keys_without_one() {
     let conn = conn();
     let account = account(&conn, 1);
     let keys = [post_key(3), feed_key(4)];
-    assert!(
-        ReaderSavedRepository::tap_unsave(&conn, account, &keys, false)
-            .unwrap()
-            .is_empty()
-    );
     assert_eq!(
-        ReaderSavedRepository::tap_unsave(&conn, account, &keys, true)
+        ReaderSavedRepository::tap_unsave(&conn, account, &keys)
             .unwrap()
             .len(),
         2
@@ -519,6 +514,138 @@ fn test_an_unsave_adds_rows_for_keys_without_one_only_when_asked() {
     );
 }
 
+/// The server may have changed since it last said, so a tap is sent even when the row agrees.
+#[test]
+fn test_a_tap_is_sent_even_when_the_row_matches_what_the_server_said() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderSavedRepository::apply_keys(
+        &conn,
+        account,
+        &[entry(post_key(1), "2026-11-02T00:00:00Z")],
+        1,
+        1,
+    )
+    .unwrap();
+    assert!(
+        ReaderSavedRepository::select_pending(&conn, account)
+            .unwrap()
+            .is_empty()
+    );
+
+    let row =
+        ReaderSavedRepository::tap_save(&conn, account, &post_key(1), &[post_key(1)], None, &now())
+            .unwrap();
+    let pending = ReaderSavedRepository::select_pending(&conn, account).unwrap();
+    assert_eq!(pending.len(), 1);
+    assert!(pending[0].tapped && !pending[0].is_pending());
+
+    ReaderSavedRepository::apply_answer(&conn, account, row, true, &post_key(1), Some(1)).unwrap();
+    assert!(
+        ReaderSavedRepository::select_pending(&conn, account)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+/// What each table is told when the keys refresh.
+fn hooks(conn: &mut Connection) -> std::sync::Arc<std::sync::Mutex<Vec<String>>> {
+    let seen: std::sync::Arc<std::sync::Mutex<Vec<String>>> = Default::default();
+    let sink = seen.clone();
+    conn.update_hook(Some(
+        move |_: rusqlite::hooks::Action, _: &str, table: &str, _: i64| {
+            sink.lock().unwrap().push(table.to_string());
+        },
+    ));
+    seen
+}
+
+/// The list reads `reader_saved_posts`, so a refresh that changes nothing mustn't tell it it did.
+#[test]
+fn test_a_refresh_that_changes_nothing_writes_nothing() {
+    let mut conn = conn();
+    let account = account(&conn, 1);
+    let mut with_url = entry(post_key(1), "2026-11-02T00:00:00Z");
+    with_url.url = Some("https://example.com/p1".to_string());
+    let keys = [with_url, entry(feed_key(4), "2026-11-01T00:00:00Z")];
+    ReaderSavedRepository::apply_keys(&conn, account, &keys, 2, 2).unwrap();
+    // A row past what the refresh says, already unsaved on the server and pending a save.
+    ReaderSavedRepository::tap_save(&conn, account, &post_key(7), &[post_key(7)], None, &now())
+        .unwrap();
+    ReaderSavedRepository::apply_keys(&conn, account, &keys, 2, 2).unwrap();
+    let row = row_for(&conn, account, &post_key(7)).unwrap();
+    ReaderSavedRepository::apply_answer(&conn, account, row.row_id, false, &post_key(7), None)
+        .unwrap();
+    ReaderSavedRepository::apply_keys(&conn, account, &keys, 2, 2).unwrap();
+
+    let seen = hooks(&mut conn);
+    ReaderSavedRepository::apply_keys(&conn, account, &keys, 2, 2).unwrap();
+
+    assert_eq!(*seen.lock().unwrap(), Vec::<String>::new());
+}
+
+#[test]
+fn test_a_refresh_that_changes_a_row_writes_that_row_only() {
+    let mut conn = conn();
+    let account = account(&conn, 1);
+    let keys = [
+        entry(post_key(1), "2026-11-02T00:00:00Z"),
+        entry(post_key(2), "2026-11-01T00:00:00Z"),
+    ];
+    ReaderSavedRepository::apply_keys(&conn, account, &keys, 2, 2).unwrap();
+
+    let seen = hooks(&mut conn);
+    ReaderSavedRepository::apply_keys(&conn, account, &keys[..1], 1, 1).unwrap();
+
+    // Post 2 is marked unsaved, then removed, and the total changes.
+    assert_eq!(
+        *seen.lock().unwrap(),
+        [
+            "reader_saved_posts",
+            "reader_saved_posts",
+            "reader_saved_state"
+        ]
+    );
+}
+
+#[test]
+fn test_an_empty_url_in_the_keys_is_no_url() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let mut entry = entry(post_key(1), "2026-11-02T00:00:00Z");
+    entry.url = Some(String::new());
+    ReaderSavedRepository::apply_keys(&conn, account, &[entry], 1, 1).unwrap();
+    assert_eq!(row_for(&conn, account, &post_key(1)).unwrap().url_key, None);
+}
+
+/// A post saved by URL, then unsaved, and a refresh says it's gone: its URL goes with the row, so
+/// a later save of the URL starts afresh.
+#[test]
+fn test_an_unsaved_rows_aliases_go_with_it() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let url = url_key("https://example.com/p9");
+    let row = ReaderSavedRepository::tap_save(
+        &conn,
+        account,
+        &url,
+        std::slice::from_ref(&url),
+        None,
+        &now(),
+    )
+    .unwrap();
+    let row = ReaderSavedRepository::apply_answer(&conn, account, row, true, &post_key(9), Some(1))
+        .unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(9)]).unwrap();
+    ReaderSavedRepository::apply_answer(&conn, account, row, false, &post_key(9), Some(0)).unwrap();
+    assert!(row_for(&conn, account, &url).is_some());
+
+    ReaderSavedRepository::apply_keys(&conn, account, &[], 0, 0).unwrap();
+
+    assert!(row_for(&conn, account, &url).is_none());
+    assert!(rows(&conn, account).is_empty());
+}
+
 #[test]
 fn test_unsaving_a_local_only_save_removes_it() {
     let conn = conn();
@@ -526,7 +653,7 @@ fn test_unsaving_a_local_only_save_removes_it() {
     ReaderSavedRepository::insert_imported(&conn, account, &post_key(1), None, None).unwrap();
     let row = row_for(&conn, account, &post_key(1)).unwrap();
     ReaderSavedRepository::apply_refusal(&conn, row.row_id).unwrap();
-    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)], true).unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)]).unwrap();
     assert!(rows(&conn, account).is_empty());
 }
 
@@ -548,7 +675,7 @@ fn test_a_complete_refresh_says_what_the_server_has_and_keeps_pending_rows() {
     // A save not sent yet, an unsave not sent yet, and a save in doubt.
     ReaderSavedRepository::tap_save(&conn, account, &post_key(3), &[post_key(3)], None, &now())
         .unwrap();
-    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(2)], false).unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(2)]).unwrap();
     let doubt =
         ReaderSavedRepository::tap_save(&conn, account, &post_key(4), &[post_key(4)], None, &now())
             .unwrap();
@@ -608,7 +735,7 @@ fn test_a_refresh_keeps_the_last_tap_of_a_row_in_doubt() {
     )
     .unwrap();
     let saved_again = row_for(&conn, account, &one).unwrap().row_id;
-    ReaderSavedRepository::tap_unsave(&conn, account, std::slice::from_ref(&one), false).unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, std::slice::from_ref(&one)).unwrap();
     ReaderSavedRepository::set_in_doubt(&conn, saved_again, true).unwrap();
     ReaderSavedRepository::tap_save(
         &conn,
@@ -640,7 +767,7 @@ fn test_a_refresh_keeps_the_last_tap_of_a_row_in_doubt() {
     )
     .unwrap();
     ReaderSavedRepository::set_in_doubt(&conn, unsaved_again, true).unwrap();
-    ReaderSavedRepository::tap_unsave(&conn, account, std::slice::from_ref(&two), false).unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, std::slice::from_ref(&two)).unwrap();
 
     // Both late requests landed: the server has post 2 and not post 1.
     ReaderSavedRepository::apply_keys(
@@ -756,7 +883,7 @@ fn test_the_list_adds_a_row_but_doesnt_change_one_that_is_there() {
         1,
     )
     .unwrap();
-    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(2)], false).unwrap();
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(2)]).unwrap();
 
     let listed = date("2026-11-05T00:00:00Z");
     ReaderSavedRepository::apply_listed(
