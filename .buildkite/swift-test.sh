@@ -6,6 +6,9 @@ set -euo pipefail
 
 export SKIP_PACKAGE_WP_API=true
 
+echo "--- :swift: Restoring Swift Package Manager cache"
+restore_swiftpm_cache --package-resolved Package.resolved
+
 function run_tests() {
     local platform; platform=$1
     echo "--- :swift: Testing on $platform"
@@ -34,3 +37,5 @@ func=$1
 for platform in "iOS" "macOS" "Catalyst" "tvOS" "watchOS"; do
     $func $platform
 done
+
+save_swiftpm_cache --package-resolved Package.resolved
