@@ -311,7 +311,8 @@ fn is_svg(declared: &DeclaredIcon) -> bool {
 /// In order:
 ///
 /// 1. The largest size in pixels the icon lists.
-/// 2. The size at the end of its file name, such as `icon-270x270.png`.
+/// 2. The size at the end of its file name, such as `icon-270x270.png` or
+///    `icon-32x32@2x.png`.
 /// 3. A default for its kind.
 fn effective_size(declared: &DeclaredIcon) -> u32 {
     let icon = &declared.icon;
@@ -334,14 +335,27 @@ fn effective_size(declared: &DeclaredIcon) -> u32 {
 
 /// The shorter side of a `-WxH` or `_WxH` size at the end of `url`'s file
 /// name, before the extension: 270 for `cropped-icon-270x270.png`.
+///
+/// A trailing `@2x` or `@3x` follows Apple's convention, where the size is in
+/// points and the scale multiplies it: 64 for `icon-32x32@2x.png`.
 fn size_in_file_name(url: &Url) -> Option<u32> {
     let file_name = url.path_segments()?.next_back()?;
     let stem = file_name
         .rsplit_once('.')
         .map_or(file_name, |(stem, _)| stem);
+    let (stem, scale) = match stem.rsplit_once('@') {
+        Some((stem, scale)) => {
+            let scale: u32 = scale.strip_suffix(['x', 'X'])?.parse().ok()?;
+            (stem, scale)
+        }
+        None => (stem, 1),
+    };
     let (_, size) = stem.rsplit_once(['-', '_'])?;
     let (width, height) = parse_dimensions(size)?;
-    Some(width.min(height))
+    width
+        .min(height)
+        .checked_mul(scale)
+        .filter(|pixels| *pixels > 0)
 }
 
 /// How a kind ranks when two icons are the same size, lowest first, or `None`
@@ -839,6 +853,13 @@ mod tests {
     #[case::no_size_in_name("https://example.com/mstile.png", 144)]
     #[case::size_in_directory("https://example.com/64x64/tile.png", 144)]
     #[case::no_separator("https://example.com/tile64x64.png", 144)]
+    // Apple's convention: the size is in points, and `@2x` doubles it.
+    #[case::at_1x("https://example.com/icon-32x32@1x.png", 32)]
+    #[case::at_2x("https://example.com/icon-32x32@2x.png", 64)]
+    #[case::at_3x("https://example.com/icon-32x32@3x.png", 96)]
+    #[case::scale_without_size("https://example.com/icon@2x.png", 144)]
+    #[case::scale_of_zero("https://example.com/icon-32x32@0x.png", 144)]
+    #[case::scale_that_overflows("https://example.com/icon-4294967295x4294967295@2x.png", 144)]
     fn ranks_an_unsized_icon_by_the_size_in_its_file_name(
         #[case] url: &str,
         #[case] expected: u32,
