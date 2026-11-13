@@ -138,23 +138,6 @@ impl ParsedUrl {
         self.inner.to_string()
     }
 
-    /// The URL as a string that only uses characters RFC 3986 allows.
-    ///
-    /// [`url`](Self::url) follows the WHATWG URL standard, which leaves some
-    /// characters as they are, such as `{`, `}`, `|`, `^`, `[` and `]` in a
-    /// query, or `{` in a host. Stricter parsers reject them: Foundation's
-    /// `URL(string:)` returns `nil` (for a host, on every OS version), and
-    /// Java's `URI` throws.
-    ///
-    /// This percent-encodes those characters anywhere in the URL, except the
-    /// brackets around an IPv6 address. It also encodes a `%` that doesn't
-    /// start an escape, and a `#` inside the fragment. The result names the
-    /// same resource; for a URL that is already valid RFC 3986 it is the same
-    /// as [`url`](Self::url).
-    pub fn rfc3986_url(&self) -> String {
-        rfc3986_serialization(&self.inner)
-    }
-
     /// A user-facing URL string that omits unnecessary details.
     pub fn pretty_url(&self) -> String {
         if self.inner.path() == "/" {
@@ -168,8 +151,17 @@ impl ParsedUrl {
     }
 }
 
-/// `url` as a string that only uses characters RFC 3986 allows. See
-/// [`ParsedUrl::rfc3986_url`].
+/// `url` as a string that only uses characters RFC 3986 allows.
+///
+/// `url` follows the WHATWG URL standard, which leaves some characters as they
+/// are, such as `{`, `}`, `|`, `^`, `[` and `]` in a query, or `{` in a host.
+/// Stricter parsers reject them: Foundation's `URL(string:)` returns `nil`
+/// (for a host, on every OS version), and Java's `URI` throws.
+///
+/// This percent-encodes those characters anywhere in the URL, except the
+/// brackets around an IPv6 address. It also encodes a `%` that doesn't start
+/// an escape, and a `#` inside the fragment. The result names the same
+/// resource; for a URL that is already valid RFC 3986 it is unchanged.
 pub(crate) fn rfc3986_serialization(url: &Url) -> String {
     let serialized = url.as_str();
     let path_start = url[..Position::BeforePath].len();
@@ -344,17 +336,17 @@ mod tests {
         "https://example.com/?a%60b%5Cc"
     )]
     #[case::opaque_path("foo:a{b}|c", "foo:a%7Bb%7D%7Cc")]
-    fn rfc3986_url(#[case] input: &str, #[case] expected: &str) {
-        let url = ParsedUrl::parse(input).unwrap();
-        assert_eq!(url.rfc3986_url(), expected);
+    fn rfc3986_serialization(#[case] input: &str, #[case] expected: &str) {
+        let url = Url::parse(input).unwrap();
+        assert_eq!(super::rfc3986_serialization(&url), expected);
         // An RFC 3986 parser we didn't write accepts it.
         assert!(
             iri_string::types::UriStr::new(expected).is_ok(),
             "{expected} isn't valid RFC 3986"
         );
         // Encoding is stable: parsing the result again doesn't change it.
-        let reparsed = ParsedUrl::parse(&url.rfc3986_url()).unwrap();
-        assert_eq!(reparsed.rfc3986_url(), expected);
+        let reparsed = Url::parse(expected).unwrap();
+        assert_eq!(super::rfc3986_serialization(&reparsed), expected);
     }
 
     #[test]

@@ -14,11 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WordPress.com Reader saved posts: `GET /rest/v1.2/read/saved` and `GET /wpcom/v2/read/saved/keys` to read a user's saves, `POST /wpcom/v2/read/saved/new`, `/delete` and `/bulk` to change them, and `reader_saved_key_for_post` / `reader_saved_keys_for_post` to pick the key a post is saved under. Swift gets them through `WPComApiClient.readerSaved` and `ReaderPostSaveIdentity.savedKey` / `.savedKeys`.
 - `decode_html_entities` decodes the HTML character references in a field the API returns as HTML, such as a post title (`&#8211;` → `–`), the way a browser decodes text content. Swift gets it as `String.decodingHTMLEntities()`.
 - `site_icons` lists the icons a web page declares (`<link rel="icon">`, `apple-touch-icon`, `mask-icon`, `msapplication-TileImage`), with their sizes and types, resolved against the page's address and `<base href>` and percent-encoded so strict URL parsers accept them. `preferred_site_icon` picks the one to show at a given size, skipping SVG and mask icons and ranking an icon without `sizes` by a `-WxH` file name (as WordPress names them), and falls back to `/favicon.ico` at the origin's root (or returns nothing when the page isn't on `http` or `https`). Swift gets them as `SiteIcon.all(inHTML:pageURL:)`, `SiteIcon.preferred(inHTML:pageURL:size:)` and `SiteIcon.asURL`.
-- `ParsedUrl.rfc3986_url()` returns the URL with the characters RFC 3986 doesn't allow percent-encoded.
 
 ### Fixed
 
-- Swift's `ParsedUrl.asURL()` no longer crashes on a URL containing characters RFC 3986 doesn't allow, such as `{` or `|` (before iOS 17 and macOS 14), or `{` in a host (on every version). Kotlin's `ParsedUrl.toURL()` no longer throws on them. Both now use `ParsedUrl.rfc3986_url()`.
 - **BREAKING:** Posts' and pages' `menu_order` is now a signed `Option<i64>` instead of `Option<u32>`, in `SparseAnyPost`, `PostCreateParams` and `PostUpdateParams`. WordPress stores `menu_order` as a signed integer, and negative values are commonly used to pin a page to the top of a list. Listing pages on such a site previously failed to parse the whole response (`invalid value: integer -1000, expected u32`), so the entire page list came back as an error. Swift and Kotlin now see `Int64?` where they saw `UInt32?`.
 
 ### Changed

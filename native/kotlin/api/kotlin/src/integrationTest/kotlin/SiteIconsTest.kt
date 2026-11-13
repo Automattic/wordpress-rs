@@ -53,10 +53,4 @@ class SiteIconsTest {
         // `java.net.URI` rejects the unencoded form, like Foundation's `URL` before iOS 17.
         assertEquals(url, java.net.URI(url).toString())
     }
-
-    @Test
-    fun convertsAParsedUrlWithCharactersRfc3986DoesNotAllow() {
-        val url = ParsedUrl.parse("https://example.com/icon.png?v={hash}|2^x").toURL()
-        assertEquals("https://example.com/icon.png?v=%7Bhash%7D%7C2%5Ex", url.toString())
-    }
 }
