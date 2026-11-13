@@ -368,8 +368,8 @@ struct RawReaderPost {
     editorial: Option<RawEditorial>,
     #[serde(default, deserialize_with = "deserialize_tags")]
     tags: Vec<ReaderPostTag>,
-    #[serde(default, deserialize_with = "deserialize_object_or_empty")]
-    metadata: Option<Vec<RawMetadata>>,
+    #[serde(default, deserialize_with = "deserialize_metadata")]
+    metadata: Vec<RawMetadata>,
     #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
     like_count: Option<u64>,
     #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
@@ -466,7 +466,7 @@ impl TryFrom<RawReaderPost> for ReaderPost {
     type Error = String;
 
     fn try_from(raw: RawReaderPost) -> Result<Self, Self::Error> {
-        let metadata = raw.metadata.unwrap_or_default();
+        let metadata = raw.metadata;
         let discussion = raw.discussion;
         let meta = raw.meta.and_then(|meta| meta.data);
         let meta_site = meta.as_ref().and_then(|data| data.site.as_ref());
@@ -609,7 +609,10 @@ where
 
 /// `tags`, an object of tags by slug, in the order the API sends them, which is the order the web
 /// Reader shows them in. Going through `serde_json::Value` would sort them by slug. With no tags,
-/// it's `[]`.
+/// it's `[]`, and the API sends that as an empty object or array, `""`, `false` or `null`.
+///
+/// A tag without a slug or a name is left out, so one malformed tag doesn't fail the post, and with
+/// it a whole page of a stream.
 fn deserialize_tags<'de, D>(deserializer: D) -> Result<Vec<ReaderPostTag>, D::Error>
 where
     D: Deserializer<'de>,
@@ -625,18 +628,26 @@ where
 
         fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
             let mut tags = Vec::new();
-            while let Some((_, tag)) = map.next_entry::<IgnoredAny, ReaderPostTag>()? {
-                tags.push(tag);
+            while let Some((_, tag)) = map.next_entry::<IgnoredAny, serde_json::Value>()? {
+                tags.extend(serde_json::from_value::<ReaderPostTag>(tag).ok());
             }
             Ok(tags)
         }
 
         fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
             let mut tags = Vec::new();
-            while let Some(tag) = seq.next_element::<ReaderPostTag>()? {
-                tags.push(tag);
+            while let Some(tag) = seq.next_element::<serde_json::Value>()? {
+                tags.extend(serde_json::from_value::<ReaderPostTag>(tag).ok());
             }
             Ok(tags)
+        }
+
+        fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Self::Value, E> {
+            if text.is_empty() {
+                Ok(Vec::new())
+            } else {
+                Err(E::invalid_value(serde::de::Unexpected::Str(text), &self))
+            }
         }
 
         fn visit_bool<E: serde::de::Error>(self, _: bool) -> Result<Self::Value, E> {
@@ -655,6 +666,33 @@ where
     deserializer.deserialize_any(TagsVisitor)
 }
 
+/// `metadata`, a list of entries. PHP sends a list as an object when its keys aren't in sequence,
+/// so an object's values are read as the list. With none, it's empty, and the API sends that as an
+/// empty object or array, `""`, `false` or `null`.
+fn deserialize_metadata<'de, D>(deserializer: D) -> Result<Vec<RawMetadata>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
+    let entries = match value {
+        Some(serde_json::Value::Array(entries)) => entries,
+        Some(serde_json::Value::Object(fields)) => {
+            fields.into_iter().map(|(_, entry)| entry).collect()
+        }
+        None | Some(serde_json::Value::Null) | Some(serde_json::Value::Bool(false)) => Vec::new(),
+        Some(serde_json::Value::String(text)) if text.is_empty() => Vec::new(),
+        Some(other) => {
+            return Err(serde::de::Error::custom(format!(
+                "expected a list of metadata, not {other}"
+            )));
+        }
+    };
+    entries
+        .into_iter()
+        .map(|entry| serde_json::from_value(entry).map_err(serde::de::Error::custom))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -662,6 +700,7 @@ mod tests {
     use crate::wp_com::reader_saved::{
         ReaderFeedItemId, ReaderSavedKey, reader_saved_key_for_post,
     };
+    use rstest::rstest;
     use serde_json::json;
 
     fn parse(value: serde_json::Value) -> ReaderPost {
@@ -728,6 +767,39 @@ mod tests {
         .unwrap();
         let slugs: Vec<_> = post.tags.iter().map(|tag| tag.slug.as_str()).collect();
         assert_eq!(slugs, vec!["zebra", "apple"]);
+    }
+
+    #[rstest]
+    #[case::empty_string(json!(""))]
+    #[case::empty_object(json!({}))]
+    #[case::empty_array(json!([]))]
+    #[case::false_(json!(false))]
+    #[case::null(json!(null))]
+    fn test_no_tags(#[case] tags: serde_json::Value) {
+        let post = parse(json!({ "ID": 9, "site_ID": 123, "is_external": false, "tags": tags }));
+        assert!(post.tags.is_empty());
+    }
+
+    #[test]
+    fn test_a_tag_without_a_slug_or_name_is_left_out() {
+        let post = parse(json!({
+            "ID": 9, "site_ID": 123, "is_external": false,
+            "tags": {
+                "news": { "slug": "news", "name": "News" },
+                "no-name": { "slug": "no-name" },
+                "no-slug": { "name": "No slug" },
+            },
+        }));
+        let slugs: Vec<_> = post.tags.iter().map(|tag| tag.slug.as_str()).collect();
+        assert_eq!(slugs, vec!["news"]);
+    }
+
+    #[test]
+    fn test_a_non_empty_string_for_tags_is_an_error() {
+        let result = serde_json::from_value::<ReaderPost>(
+            json!({ "ID": 9, "site_ID": 123, "is_external": false, "tags": "news" }),
+        );
+        assert!(result.is_err());
     }
 
     #[test]
@@ -893,6 +965,24 @@ mod tests {
                 post_url: Some("https://example.com/p".to_string()),
                 comment_url: None,
             })
+        );
+    }
+
+    /// PHP sends a list whose keys aren't in sequence as an object.
+    #[test]
+    fn test_metadata_sent_as_an_object() {
+        let post = parse(json!({
+            "ID": 1,
+            "site_ID": 2,
+            "is_external": false,
+            "metadata": {
+                "0": { "id": "1", "key": "xpost_origin", "value": "123:456" },
+                "2": { "id": "3", "key": "_xpost_original_permalink", "value": "https://example.com/p" },
+            },
+        }));
+        assert_eq!(
+            post.cross_post.and_then(|cross_post| cross_post.post_id),
+            Some(456)
         );
     }
 
