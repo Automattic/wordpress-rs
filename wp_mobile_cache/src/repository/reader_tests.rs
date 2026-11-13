@@ -52,8 +52,7 @@ fn count(conn: &Connection, table: &str) -> i64 {
 
 #[test]
 fn test_reader_posts_columns() {
-    // Phase 2 fills the rest of these from the full Reader post, without a migration. Only
-    // `display_image_url`, which 0019 adds, has no column in 0016.
+    // Phase 2 fills the rest of these from the full Reader post, without a migration.
     let columns = get_table_column_names(&conn(), "reader_posts");
     let read: Vec<&str> = POST_COLUMNS
         .split(',')

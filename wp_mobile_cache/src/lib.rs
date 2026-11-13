@@ -501,7 +501,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 19] = [
+static MIGRATION_QUERIES: [&str; 18] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -520,7 +520,6 @@ static MIGRATION_QUERIES: [&str; 19] = [
     include_str!("../migrations/0016-create-reader-posts-table.sql"),
     include_str!("../migrations/0017-create-reader-streams-tables.sql"),
     include_str!("../migrations/0018-create-reader-saved-tables.sql"),
-    include_str!("../migrations/0019-add-display-image-to-reader-posts.sql"),
 ];
 
 pub struct MigrationManager<'a> {
@@ -927,54 +926,6 @@ mod tests {
             });
             assert_eq!(db_table.table_name(), table);
         }
-    }
-
-    /// Reader posts stored before 0019 show their featured image.
-    #[test]
-    fn test_display_image_migration_fills_in_the_featured_image() {
-        let conn = Connection::open_in_memory().unwrap();
-        enable_foreign_keys(&conn).unwrap();
-        register_url_functions(&conn).unwrap();
-        let mut manager = MigrationManager::new(&conn).unwrap();
-        manager.create_migrations_table().unwrap();
-        for (index, migration) in MIGRATION_QUERIES[..18].iter().enumerate() {
-            conn.execute_batch(migration).unwrap();
-            manager.insert_migration(index as i64 + 1).unwrap();
-        }
-        let account = WordPressComAccountRepository::get_or_create(&conn, WpComUserId(1)).unwrap();
-        for (post_id, featured_image) in [(1, Some("https://example.com/image.jpg")), (2, None)] {
-            conn.execute(
-                "INSERT INTO reader_posts (account_id, identity_key, post_id, featured_image)
-                VALUES (?1, ?2, ?3, ?4)",
-                rusqlite::params![
-                    account,
-                    format!("post:2:{post_id}"),
-                    post_id,
-                    featured_image
-                ],
-            )
-            .unwrap();
-        }
-
-        let ran = MigrationManager::new(&conn)
-            .unwrap()
-            .perform_migrations()
-            .unwrap();
-
-        assert_eq!(ran, 1);
-        let display_image = |post_id: i64| -> Option<String> {
-            conn.query_row(
-                "SELECT display_image_url FROM reader_posts WHERE post_id = ?1",
-                [post_id],
-                |row| row.get(0),
-            )
-            .unwrap()
-        };
-        assert_eq!(
-            display_image(1).as_deref(),
-            Some("https://example.com/image.jpg")
-        );
-        assert_eq!(display_image(2), None);
     }
 
     /// An app updating from a version whose cache stopped at 0014 keeps its data, and gets the
