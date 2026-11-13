@@ -556,7 +556,8 @@ fn hooks(conn: &mut Connection) -> std::sync::Arc<std::sync::Mutex<Vec<String>>>
         move |_: rusqlite::hooks::Action, _: &str, table: &str, _: i64| {
             sink.lock().unwrap().push(table.to_string());
         },
-    ));
+    ))
+    .unwrap();
     seen
 }
 
