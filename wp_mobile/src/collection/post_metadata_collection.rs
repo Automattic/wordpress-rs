@@ -326,6 +326,7 @@ impl PostMetadataCollectionWithEditContext {
 enum MembershipAction {
     Remove,
     Insert,
+    Update,
 }
 
 impl PostMetadataCollectionWithEditContext {
@@ -347,7 +348,7 @@ impl PostMetadataCollectionWithEditContext {
     /// # Arguments
     /// * `post_id` - WordPress post ID that changed
     pub(crate) fn update_post_membership(&self, post_id: i64) -> Result<(), CollectionError> {
-        // Phase 1: Lightweight membership check — only check whether this
+        // Phase 1: Lightweight membership check: only check whether this
         // single post is in the list, rather than fetching all entity IDs.
         let is_in_list = self
             .service
@@ -374,11 +375,13 @@ impl PostMetadataCollectionWithEditContext {
                 Some(MembershipAction::Remove)
             } else if !is_in_list && matches_filter {
                 Some(MembershipAction::Insert)
+            } else if is_in_list && matches_filter {
+                Some(MembershipAction::Update)
             } else {
                 None
             }
         } else if is_in_list {
-            // The post no longer exists in the database — remove it from the list.
+            // The post no longer exists in the database: remove it from the list.
             Some(MembershipAction::Remove)
         } else {
             None
@@ -400,11 +403,13 @@ impl PostMetadataCollectionWithEditContext {
                         err_message: e.to_string(),
                     })
             }
-            MembershipAction::Insert => self.insert_post_into_list(post_id),
+            MembershipAction::Insert | MembershipAction::Update => {
+                self.insert_post_into_list(post_id)
+            }
         }
     }
 
-    /// Insert a post into the stored list, maintaining sort order.
+    /// Insert or update a post in the stored list, maintaining sort order.
     ///
     /// Reads full metadata fresh so we have the latest snapshot, then
     /// rewrites the list to maintain sort order via rowid.
@@ -417,7 +422,11 @@ impl PostMetadataCollectionWithEditContext {
                 err_message: e.to_string(),
             })?
             .unwrap_or_default();
-        let current_ids: Vec<i64> = current_metadata.iter().map(|m| m.id).collect();
+        let current_ids: Vec<i64> = current_metadata
+            .iter()
+            .map(|m| m.id)
+            .filter(|&id| id != post_id)
+            .collect();
         let metadata_by_id: HashMap<i64, &EntityMetadata> =
             current_metadata.iter().map(|m| (m.id, m)).collect();
 
@@ -450,17 +459,25 @@ impl PostMetadataCollectionWithEditContext {
             &metadata_by_id,
         ) {
             Some(items) => items,
-            // A full list refresh would be needed because ordering/membership
-            // could not be resolved locally. Three scenarios trigger this:
-            // - The filter uses non-deterministic ordering (e.g. relevance search),
-            //   so there is no reliable way to compute an insertion position.
-            // - The sort key data needed to compare against existing items is missing
-            //   from the local cache.
-            // - The database write for the local insert failed.
-            //
-            // The most common trigger is relevance-based search ordering.
-            // No action is taken here for now.
-            None => return Ok(()),
+            None => {
+                // If ordering cannot be determined locally (e.g. relevance search or missing
+                // sort-key data for existing items), and the post was already in the list,
+                // update its metadata in-place preserving its existing position.
+                if current_metadata.iter().any(|m| m.id == post_id) {
+                    current_metadata
+                        .iter()
+                        .map(|m| {
+                            if m.id == post_id {
+                                Self::post_to_item_input(post_to_insert)
+                            } else {
+                                Self::id_to_item_input(m.id, &posts_by_id, &metadata_by_id)
+                            }
+                        })
+                        .collect()
+                } else {
+                    return Ok(());
+                }
+            }
         };
 
         self.service
@@ -555,5 +572,184 @@ impl PostMetadataCollectionWithEditContext {
         result.insert(insert_at, Self::post_to_item_input(post_to_insert));
 
         Some(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sync::{CollectionItem, DbEntityState};
+    use wp_api::prelude::WpGmtDateTime;
+
+    #[test]
+    fn test_post_metadata_collection_item_from_collection_item_with_modified_gmt() {
+        let modified_gmt = "2026-10-20 12:34:56"
+            .parse::<WpGmtDateTime>()
+            .expect("Valid datetime string should parse");
+        let metadata = EntityMetadata::new(42, Some(modified_gmt), Some(10), Some(5));
+        let collection_item = CollectionItem::new(metadata, DbEntityState::Fresh);
+
+        let item = PostMetadataCollectionItem::from((collection_item, None));
+
+        assert_eq!(item.id, 42);
+        assert_eq!(item.modified_gmt, Some(modified_gmt));
+        assert_eq!(item.parent, Some(10));
+        assert_eq!(item.menu_order, Some(5));
+        assert!(matches!(item.state, PostItemState::Missing));
+    }
+
+    #[test]
+    fn test_post_metadata_collection_item_from_collection_item_without_modified_gmt() {
+        let metadata = EntityMetadata::new(42, None, None, None);
+        let collection_item = CollectionItem::new(metadata, DbEntityState::Missing);
+
+        let item = PostMetadataCollectionItem::from((collection_item, None));
+
+        assert_eq!(item.id, 42);
+        assert_eq!(item.modified_gmt, None);
+        assert_eq!(item.parent, None);
+        assert_eq!(item.menu_order, None);
+        assert!(matches!(item.state, PostItemState::Missing));
+    }
+
+    #[test]
+    fn test_post_metadata_collection_item_retains_list_metadata_time_when_entity_time_differs() {
+        let list_time = "2026-10-20 12:00:00"
+            .parse::<WpGmtDateTime>()
+            .expect("Valid datetime string should parse");
+        let post_time = "2026-10-20 15:00:00"
+            .parse::<WpGmtDateTime>()
+            .expect("Valid datetime string should parse");
+
+        let metadata = EntityMetadata::new(42, Some(list_time), Some(10), Some(5));
+        let collection_item = CollectionItem::new(metadata, DbEntityState::Stale);
+
+        let mut post = wp_mobile_cache::test_fixtures::posts::PostBuilder::minimal()
+            .with_id(42)
+            .build();
+        post.modified_gmt = post_time;
+        let full_entity = crate::FullEntityAnyPostWithEditContext {
+            entity_id: wp_mobile_cache::entity::EntityId {
+                db_site: wp_mobile_cache::db_types::db_site::DbSite {
+                    row_id: wp_mobile_cache::RowId(1),
+                    site_type: wp_mobile_cache::db_types::db_site::DbSiteType::SelfHosted,
+                    mapped_site_id: wp_mobile_cache::RowId(1),
+                },
+                table: wp_mobile_cache::DbTable::PostsEditContext,
+                rowid: wp_mobile_cache::RowId(1),
+            },
+            data: post,
+        };
+
+        let item = PostMetadataCollectionItem::from((collection_item, Some(full_entity)));
+
+        assert_eq!(item.id, 42);
+        assert_eq!(item.modified_gmt, Some(list_time));
+        if let PostItemState::Stale { data } = item.state {
+            assert_eq!(data.data.modified_gmt, post_time);
+        } else {
+            panic!("Expected Stale state, got {:?}", item.state);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_modified_gmt_updated_after_local_edit_of_listed_post() {
+        use crate::service::posts::PostService;
+        use crate::testing::mock_api_client;
+        use rusqlite::Connection;
+        use std::sync::Arc;
+        use wp_mobile_cache::context::EditContext;
+        use wp_mobile_cache::{
+            MigrationManager, WpApiCache,
+            db_types::self_hosted_site::SelfHostedSite,
+            repository::{
+                list_metadata::ListMetadataRepository, posts::PostRepository, sites::SiteRepository,
+            },
+            test_fixtures::posts::PostBuilder,
+        };
+
+        let mut conn = Connection::open_in_memory().unwrap();
+        MigrationManager::new(&conn)
+            .unwrap()
+            .perform_migrations()
+            .unwrap();
+        let db_site = SiteRepository
+            .upsert_self_hosted_site(
+                &mut conn,
+                &SelfHostedSite {
+                    url: "https://test.local".to_string(),
+                    api_root: "https://test.local/wp-json".to_string(),
+                },
+            )
+            .unwrap()
+            .db_site;
+        let cache = Arc::new(WpApiCache::try_from(conn).unwrap());
+        let db_site = Arc::new(db_site);
+        let service = Arc::new(PostService::new(
+            mock_api_client(),
+            db_site.clone(),
+            cache.clone(),
+        ));
+        let collection = service.create_post_metadata_collection_with_edit_context(
+            PostEndpointType::Posts,
+            PostListFilter::default(),
+            20,
+        );
+
+        let t1: WpGmtDateTime = "2024-01-01T00:00:00Z".parse().unwrap();
+        let t2: WpGmtDateTime = "2026-11-04T12:00:00Z".parse().unwrap();
+
+        // List was synced while the post's modified_gmt was T1.
+        let mut post = PostBuilder::minimal().with_id(42).build();
+        post.modified_gmt = t1;
+        cache
+            .execute(|conn| {
+                PostRepository::<EditContext>::new().upsert(conn, &db_site, &post)?;
+                let list_id = ListMetadataRepository::get_or_create(
+                    conn,
+                    &db_site,
+                    collection.core.key(),
+                    20,
+                )?;
+                ListMetadataRepository::set_items_by_list_metadata_id(
+                    conn,
+                    list_id,
+                    &[ListMetadataItemInput {
+                        entity_id: 42,
+                        modified_gmt: Some(t1),
+                        parent: None,
+                        menu_order: None,
+                    }],
+                )
+            })
+            .unwrap();
+
+        // The user edits the post: the server returns modified_gmt = T2, which
+        // update_post upserts and then calls notify_collections(42).
+        post.modified_gmt = t2;
+        cache
+            .execute(|conn| PostRepository::<EditContext>::new().upsert(conn, &db_site, &post))
+            .unwrap();
+        collection.update_post_membership(42).unwrap();
+
+        let items = collection.load_items().await.unwrap();
+        assert_eq!(items.len(), 1);
+        let data_modified_gmt = match &items[0].state {
+            PostItemState::FetchingWithData { data }
+            | PostItemState::Fresh { data }
+            | PostItemState::Stale { data }
+            | PostItemState::FailedWithData { data, .. } => data.data.modified_gmt,
+            other => panic!("expected cached data, got {other:?}"),
+        };
+
+        assert_eq!(
+            data_modified_gmt, t2,
+            "cached post has the edited timestamp"
+        );
+        assert_eq!(
+            items[0].modified_gmt,
+            Some(t2),
+            "item.modified_gmt should match the edited post, but the list metadata row was never updated"
+        );
     }
 }

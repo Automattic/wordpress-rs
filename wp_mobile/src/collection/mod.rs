@@ -104,6 +104,7 @@ macro_rules! wp_mobile_item_state {
 ///
 /// ## Collection Item Struct (`$item_name`)
 /// - `id: i64`: The entity ID
+/// - `modified_gmt: Option<WpGmtDateTime>`: Last modified time in GMT (from list metadata)
 /// - `parent: Option<i64>`: Parent entity ID (from list metadata, for hierarchical types)
 /// - `menu_order: Option<i64>`: Menu order (from list metadata, for hierarchical types)
 /// - `state: $state_name`: The combined state and data
@@ -127,14 +128,24 @@ macro_rules! wp_mobile_metadata_item {
         /// The `state` enum encodes both the sync status and data availability,
         /// making it impossible to have inconsistent combinations.
         ///
-        /// The `parent` and `menu_order` fields come from the list metadata store,
+        /// The `modified_gmt`, `parent` and `menu_order` fields come from the list metadata store,
         /// making them available immediately without waiting for full entity data
         /// to be fetched. This enables building hierarchical views (like page trees)
-        /// as soon as the list structure is known.
+        /// and date-sorted lists as soon as the list structure is known (when `modified_gmt` is present).
         #[derive(uniffi::Record, Debug)]
         pub struct $item_name {
             /// The entity ID
             pub id: i64,
+
+            /// Last modified time in GMT (from list metadata, when present)
+            ///
+            /// This value comes from the list metadata, so it is available immediately
+            /// without waiting for the full entity data to be fetched.
+            ///
+            /// Note: this field is optional and may be `None` if the list metadata
+            /// omitted it or if the row was populated via a fallback path without timestamps.
+            /// When full entity data is available (`Fresh`), callers can use `data.modified_gmt`.
+            pub modified_gmt: Option<$crate::wp_api::date::WpGmtDateTime>,
 
             /// Parent entity ID (from list metadata, for hierarchical post types like pages)
             ///
@@ -208,13 +219,14 @@ macro_rules! wp_mobile_metadata_item {
         impl From<($crate::sync::CollectionItem, Option<$full_entity_type>)> for $item_name {
             /// Convert CollectionItem + optional cached data into MetadataCollectionItem.
             ///
-            /// Extracts metadata fields (id, parent, menu_order) and converts the state+data
+            /// Extracts metadata fields (id, modified_gmt, parent, menu_order) and converts the state+data
             /// into a type-safe ItemState.
             fn from(
                 (item, data): ($crate::sync::CollectionItem, Option<$full_entity_type>),
             ) -> Self {
                 $item_name {
                     id: item.id(),
+                    modified_gmt: item.metadata.modified_gmt,
                     parent: item.metadata.parent,
                     menu_order: item.metadata.menu_order,
                     state: $state_name::from((item.state, data)),
