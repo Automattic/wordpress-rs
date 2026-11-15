@@ -5459,6 +5459,7 @@ dependencies = [
  "hyper 1.11.1",
  "hyper-util",
  "indoc",
+ "iri-string",
  "itertools",
  "log",
  "oslog",
