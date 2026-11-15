@@ -40,8 +40,8 @@ use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_saved::{
     ReaderPostSaveIdentity, ReaderSavePostParams, ReaderSavedBulkKey, ReaderSavedBulkParams,
-    ReaderSavedKey, ReaderSavedPageDetails, ReaderSavedSource, ReaderUnsavePostParams,
-    reader_saved_key_for_post, reader_saved_keys_for_post,
+    ReaderSavedBulkResult, ReaderSavedKey, ReaderSavedPageDetails, ReaderSavedSource,
+    ReaderUnsavePostParams, reader_saved_key_for_post, reader_saved_keys_for_post,
 };
 use wp_mobile_cache::db_types::reader::{
     DbReaderSavedKey, DbReaderSavedRow, reader_saved_key_text,
@@ -86,6 +86,11 @@ pub enum ReaderSavedError {
     /// can be matched to its key. The server may have saved any of them, so they wait for a refresh.
     #[error("The server returned {received} results for {sent} posts.")]
     UnexpectedImportResults { sent: u64, received: u64 },
+
+    /// An import batch got back results that can't all be matched to the keys it sent, such as
+    /// two for the same key. The server may have saved any of them, so they wait for a refresh.
+    #[error("The server's results don't match the posts sent to it.")]
+    UnmatchedImportResults,
 
     #[error("{0}")]
     Database(SqliteDbError),
@@ -493,21 +498,20 @@ impl ReaderSavedService {
             // A save waiting for room that isn't eligible is the one sent to find out if there's
             // room now.
             let probing = !eligible(&row);
-            let batch: Vec<_> =
-                if !probing && row.imported && row.saved && bulk_key(&row.key).is_some() {
-                    pending
-                        .into_iter()
-                        .filter(|other| {
-                            eligible(other)
-                                && other.imported
-                                && other.saved
-                                && bulk_key(&other.key).is_some()
-                        })
-                        .take(MAX_BULK_KEYS)
-                        .collect()
-                } else {
-                    vec![row]
-                };
+            let bulkable =
+                |row: &DbReaderSavedRow| row.imported && row.saved && bulk_key(&row.key).is_some();
+            // A batch ends at the first row it can't take, such as a URL, so the server gets the
+            // saves in the order they were made.
+            let batch: Vec<_> = if !probing && bulkable(&row) {
+                pending
+                    .into_iter()
+                    .filter(|other| eligible(other))
+                    .take_while(|other| bulkable(other))
+                    .take(MAX_BULK_KEYS)
+                    .collect()
+            } else {
+                vec![row]
+            };
             for row in &batch {
                 *sends.entry(row.row_id).or_default() += 1;
             }
@@ -631,8 +635,7 @@ impl ReaderSavedService {
             Ok(response) => response.data,
             Err(error) => return self.failed(rows, error, sent),
         };
-        // Results are matched to keys by position, which only works with one per key. The server
-        // may have saved any of them, so they stay in doubt.
+        // Without one result per key, the server may have saved any of them, so they stay in doubt.
         if response.results.len() != rows.len() {
             sent.unexpected = Some(ReaderSavedError::UnexpectedImportResults {
                 sent: rows.len() as u64,
@@ -640,10 +643,14 @@ impl ReaderSavedService {
             });
             return Ok(Flow::Stop);
         }
+        let Some(pairs) = match_bulk_results(rows, &response.results) else {
+            sent.unexpected = Some(ReaderSavedError::UnmatchedImportResults);
+            return Ok(Flow::Stop);
+        };
         self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
             ReaderSavedRepository::set_total(&transaction, self.account, response.total)?;
-            for (row, result) in rows.iter().rev().zip(&response.results) {
+            for &(row, result) in &pairs {
                 match (&result.key, result.saved) {
                     (Some(stored), true) => {
                         ReaderSavedRepository::apply_answer(
@@ -663,14 +670,12 @@ impl ReaderSavedService {
             }
             transaction.commit().map_err(SqliteDbError::from)
         })?;
-        let over_limit: Vec<_> = rows
+        let over_limit: Vec<_> = pairs
             .iter()
-            .rev()
-            .zip(&response.results)
             .filter(|(_, result)| {
                 !result.saved && result.error.as_deref() == Some(SAVED_LIMIT_REACHED)
             })
-            .map(|(row, _)| row.clone())
+            .map(|(row, _)| (*row).clone())
             .collect();
         if !over_limit.is_empty() {
             self.refused_for_limit(&over_limit, sent)?;
@@ -1021,6 +1026,44 @@ fn is_post_not_found(error: &WpApiError) -> bool {
             ..
         } if code == "post_not_found"
     )
+}
+
+/// Pairs each bulk result with the row it answers: by its key when that's a key sent, as the
+/// server can repeat or reorder them, and otherwise by its position, as a key the server resolved
+/// to another, or a rejected one, is in the place of the key sent. `rows` are oldest first, and the
+/// results newest first, as sent. `None` when a row would get two results, as then which one
+/// answers it isn't known.
+fn match_bulk_results<'a>(
+    rows: &'a [DbReaderSavedRow],
+    results: &'a [ReaderSavedBulkResult],
+) -> Option<Vec<(&'a DbReaderSavedRow, &'a ReaderSavedBulkResult)>> {
+    let sent: Vec<_> = rows.iter().rev().collect();
+    let sent_keys: Vec<_> = sent.iter().map(|row| bulk_key(&row.key)).collect();
+    let mut answered = vec![false; sent.len()];
+    let mut pairs = Vec::with_capacity(sent.len());
+    let mut unmatched = Vec::new();
+    for (position, result) in results.iter().enumerate() {
+        let index = result
+            .key
+            .as_ref()
+            .and_then(|key| sent_keys.iter().position(|sent| sent.as_ref() == Some(key)));
+        match index {
+            Some(index) if answered[index] => return None,
+            Some(index) => {
+                answered[index] = true;
+                pairs.push((sent[index], result));
+            }
+            None => unmatched.push((position, result)),
+        }
+    }
+    for (position, result) in unmatched {
+        if answered[position] {
+            return None;
+        }
+        answered[position] = true;
+        pairs.push((sent[position], result));
+    }
+    Some(pairs)
 }
 
 fn bulk_key(key: &ReaderSavedKey) -> Option<ReaderSavedBulkKey> {

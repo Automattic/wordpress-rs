@@ -2,8 +2,8 @@
 
 use super::super::tests::{
     ScriptedExecutor, Step, bulk_response, cap_response, delegate, error_response, feed_json,
-    identity, keys_response, post_json, post_key, rss_identity, synced, unsaveable_identity,
-    write_response,
+    feed_key, identity, keys_response, post_json, post_key, rss_identity, synced,
+    unsaveable_identity, write_response,
 };
 use super::*;
 use crate::service::reader_saved::ReaderSavedStatus::{NotSaved, Saved, Unknown};
@@ -883,27 +883,6 @@ async fn saving_a_post_waiting_for_room_leaves_it_waiting() {
 
 /// The server never had it, so there's nothing to unsave there.
 #[tokio::test]
-async fn unsaving_a_save_waiting_for_room_removes_it_without_sending() {
-    let device = Device::new();
-    let (service, executor) = device.launch();
-    synced(&service, &executor, &[]).await;
-    executor.push(Step::Respond(403, cap_response()));
-    service
-        .import_saves(vec![local_save(rss_identity(7), "Feed")])
-        .await
-        .unwrap();
-    assert_eq!(status(&service, rss_identity(7)), Saved);
-
-    service.unsave(rss_identity(7)).await.unwrap();
-
-    assert_eq!(executor.sent().len(), 2);
-    assert_eq!(status(&service, rss_identity(7)), NotSaved);
-    assert!(shown(&service).await.is_empty());
-    assert_eq!(service.saves_waiting_for_room().unwrap(), 0);
-    synced(&service, &executor, &[]).await;
-}
-
-#[tokio::test]
 async fn an_import_that_cannot_reach_the_server_is_sent_by_a_later_sync() {
     let device = Device::new();
     let (service, executor) = device.launch();
@@ -1227,4 +1206,200 @@ async fn a_sync_and_a_refresh_that_change_nothing_tell_the_saved_list_nothing() 
             .all(|table| *table == DbTable::ReaderPosts || *table == DbTable::ReaderStreams),
         "{seen:?}"
     );
+}
+
+// From the review of the outbox
+
+/// Another device may have made room and saved it since, so the unsave goes to the server.
+#[tokio::test]
+async fn unsaving_a_save_waiting_for_room_sends_the_unsave() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    executor.push(Step::Respond(403, cap_response()));
+    service
+        .import_saves(vec![local_save(identity(1), "One")])
+        .await
+        .unwrap();
+    assert_eq!(service.saves_waiting_for_room().unwrap(), 1);
+    executor.push(Step::Respond(200, write_response(false, post_json(1), 0)));
+
+    let outcome = service.unsave(identity(1)).await.unwrap();
+
+    assert_eq!(outcome, ReaderSavedOutcome::Synced { key: post_key(1) });
+    assert_eq!(
+        executor.sent_short().last().unwrap(),
+        r#"delete {"blog_id":123,"post_id":1}"#
+    );
+    assert_eq!(status(&service, identity(1)), NotSaved);
+    assert_eq!(service.saves_waiting_for_room().unwrap(), 0);
+    synced(&service, &executor, &[]).await;
+    assert_eq!(status(&service, identity(1)), NotSaved);
+}
+
+/// The server never had it, so it has no post to unsave, and that's the unsave done.
+#[tokio::test]
+async fn an_unsave_the_server_has_no_post_for_is_done() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    executor.push(Step::Respond(403, cap_response()));
+    service
+        .import_saves(vec![local_save(rss_identity(7), "Feed")])
+        .await
+        .unwrap();
+    executor.push(Step::Respond(
+        404,
+        json!({ "code": "post_not_found", "message": "Post not found.", "data": { "status": 404 } }),
+    ));
+
+    let outcome = service.unsave(rss_identity(7)).await.unwrap();
+
+    assert_eq!(outcome, ReaderSavedOutcome::Synced { key: feed_key(7) });
+    assert_eq!(status(&service, rss_identity(7)), NotSaved);
+    assert!(shown(&service).await.is_empty());
+}
+
+#[tokio::test]
+async fn bulk_results_in_another_order_answer_the_keys_they_name() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[]).await;
+    // Sent newest first, as [2, 1].
+    executor.push(Step::Respond(
+        200,
+        bulk_response(&[post_json(1), post_json(2)], 2),
+    ));
+
+    service
+        .import_saves(vec![
+            local_save(identity(2), "Two"),
+            local_save(identity(1), "One"),
+        ])
+        .await
+        .unwrap();
+
+    let rows = service.rows_for(&[post_key(1), post_key(2)]).unwrap();
+    assert_eq!(
+        rows.iter().map(|row| row.key.clone()).collect::<Vec<_>>(),
+        [post_key(1), post_key(2)]
+    );
+    assert!(rows.iter().all(|row| row.server == Some(true)));
+    assert_eq!(shown(&service).await.len(), 2);
+}
+
+/// Two results for one key leave the other unanswered, so the batch waits for a sync, as one with
+/// a result missing does.
+#[tokio::test]
+async fn bulk_results_that_repeat_a_key_wait_for_a_sync() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(
+        200,
+        bulk_response(&[post_json(2), post_json(2)], 2),
+    ));
+
+    let result = service
+        .import_saves(vec![
+            local_save(identity(2), "Two"),
+            local_save(identity(1), "One"),
+        ])
+        .await;
+
+    assert!(matches!(
+        result,
+        Err(ReaderSavedError::UnmatchedImportResults)
+    ));
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(status(&service, identity(2)), Saved);
+    assert_eq!(
+        service.rows_for(&[post_key(1), post_key(2)]).unwrap().len(),
+        2
+    );
+
+    executor.push(Step::Respond(200, keys_response(&[post_json(2)])));
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 2)));
+    service.sync().await.unwrap();
+    assert_eq!(service.saved_count().unwrap(), Some(2));
+}
+
+/// A key the server resolved to another is in the place of the key sent.
+#[tokio::test]
+async fn a_bulk_result_for_a_resolved_key_answers_the_key_in_its_place() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[]).await;
+    // Sent as [feed item 7, post 1]; the feed item is post 3.
+    executor.push(Step::Respond(
+        200,
+        bulk_response(&[post_json(3), post_json(1)], 2),
+    ));
+
+    service
+        .import_saves(vec![
+            local_save(rss_identity(7), "Seven"),
+            local_save(identity(1), "One"),
+        ])
+        .await
+        .unwrap();
+
+    assert_eq!(status(&service, rss_identity(7)), Saved);
+    assert_eq!(status(&service, identity(3)), Saved);
+    assert_eq!(status(&service, identity(1)), Saved);
+    assert_eq!(shown(&service).await.len(), 2);
+}
+
+/// The server orders saves by when it gets them, so a batch of posts ends at a URL between them.
+#[tokio::test]
+async fn a_mixed_import_reaches_the_server_in_order() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[]).await;
+    let b = json!({ "url": "https://example.com/b" });
+    let d = json!({ "url": "https://example.com/d" });
+    executor.push(Step::Respond(200, write_response(true, d, 1)));
+    executor.push(Step::Respond(200, write_response(true, post_json(3), 2)));
+    executor.push(Step::Respond(200, write_response(true, b, 3)));
+    executor.push(Step::Respond(200, write_response(true, post_json(1), 4)));
+
+    // Newest first.
+    service
+        .import_saves(vec![
+            local_save(identity(1), "A"),
+            local_save(url_identity("https://example.com/b"), "B"),
+            local_save(identity(3), "C"),
+            local_save(url_identity("https://example.com/d"), "D"),
+        ])
+        .await
+        .unwrap();
+
+    assert_eq!(
+        executor.sent_short()[1..],
+        [
+            r#"new {"url":"https://example.com/d"}"#,
+            r#"new {"blog_id":123,"post_id":3}"#,
+            r#"new {"url":"https://example.com/b"}"#,
+            r#"new {"blog_id":123,"post_id":1}"#,
+        ]
+    );
+}
+
+/// Past the end of a capped read, a key with the oldest date returned may be the next one.
+#[tokio::test]
+async fn a_capped_read_leaves_a_post_saved_with_its_oldest_date_alone() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(
+        &service,
+        &executor,
+        &[post_json(1), post_json(2), post_json(3)],
+    )
+    .await;
+    // Two keys of three, all with the same date.
+    let mut capped = keys_response(&[post_json(1), post_json(2)]);
+    capped["total"] = json!(3);
+    executor.push(Step::Respond(200, capped));
+
+    service.sync().await.unwrap();
+
+    assert_eq!(status(&service, identity(3)), Saved);
 }

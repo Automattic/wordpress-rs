@@ -739,14 +739,28 @@ fn test_an_unsaved_rows_aliases_go_with_it() {
 }
 
 #[test]
-fn test_unsaving_a_save_waiting_for_room_removes_it() {
+fn test_unsaving_a_save_waiting_for_room_sends_the_unsave() {
     let conn = conn();
     let account = account(&conn, 1);
     ReaderSavedRepository::import_save(&conn, account, &post_key(1), None, None).unwrap();
     let row = row_for(&conn, account, &post_key(1)).unwrap();
     ReaderSavedRepository::set_waiting_for_room(&conn, row.row_id, row.seq).unwrap();
-    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)]).unwrap();
-    assert!(rows(&conn, account).is_empty());
+
+    let waiting = ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)]).unwrap();
+
+    // Another device may have saved it since, so the unsave is sent, and needs no room.
+    assert_eq!(waiting, [row.row_id]);
+    let row = row_for(&conn, account, &post_key(1)).unwrap();
+    assert!(!row.saved && row.tapped && !row.waiting_for_room);
+    assert_eq!(
+        ReaderSavedRepository::count_waiting_for_room(&conn, account).unwrap(),
+        0
+    );
+    let pending = ReaderSavedRepository::select_pending(&conn, account).unwrap();
+    assert_eq!(
+        pending.iter().map(|row| row.row_id).collect::<Vec<_>>(),
+        [row.row_id]
+    );
 }
 
 #[test]

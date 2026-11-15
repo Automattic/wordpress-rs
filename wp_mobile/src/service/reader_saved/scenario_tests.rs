@@ -30,6 +30,8 @@ const U3: &str = "https://jetpack.example.com/p3";
 const SAVED_DATE: &str = "2026-11-02T10:15:00+00:00";
 /// When the saves past the 1,000 keys were made: before every key returned.
 const OLD_SAVED_DATE: &str = "2026-10-01T00:00:00+00:00";
+/// When the saves in [`FakeServer::newer`] were made: after every other key returned.
+const NEWER_SAVED_DATE: &str = "2026-11-03T08:00:00+00:00";
 
 fn key(name: &str) -> ReaderSavedKey {
     let number = || name[1..].parse::<u64>().unwrap();
@@ -73,6 +75,8 @@ struct FakeServer {
     saved: BTreeSet<String>,
     /// Saved keys past the 1,000 the keys endpoint returns: the oldest.
     hidden: BTreeSet<String>,
+    /// Saved keys newer than the rest, which are all saved at once.
+    newer: BTreeSet<String>,
 }
 
 impl FakeServer {
@@ -135,6 +139,8 @@ impl FakeServer {
     fn date_of(&self, name: &str) -> &'static str {
         if self.hidden.contains(name) {
             OLD_SAVED_DATE
+        } else if self.newer.contains(name) {
+            NEWER_SAVED_DATE
         } else {
             SAVED_DATE
         }
@@ -148,7 +154,7 @@ impl FakeServer {
             .map(|(index, name)| {
                 let mut entry = json_of(name);
                 entry["id"] = json!(index + 1);
-                entry["date_saved"] = json!(SAVED_DATE);
+                entry["date_saved"] = json!(self.date_of(name));
                 match name.as_str() {
                     "P3" => entry["url"] = json!(U3),
                     "P9" => entry["url"] = json!(U9),
@@ -1737,12 +1743,14 @@ fn past_the_key_limit_a_sync_that_has_a_timed_out_unsave_counts_it_once() {
 }
 
 /// New risk: past the 1,000 keys a sync can't tell a save older than every key returned from one
-/// that was unsaved, so it leaves those rows alone. A row the server dated no older than the
-/// oldest key returned would have been returned, so it isn't saved on the server.
+/// that was unsaved, so it leaves those rows alone. A row the server dated newer than the oldest
+/// key returned would have been returned, so it isn't saved on the server. One with the same date
+/// may be the next key, so it's left alone too.
 #[test]
-fn past_the_key_limit_a_sync_decides_only_rows_no_older_than_the_oldest_key_returned() {
+fn past_the_key_limit_a_sync_decides_only_rows_newer_than_the_oldest_key_returned() {
     let mut world = World::new();
     past_the_keys_with(&mut world, &["P1"]);
+    world.server.newer.insert("P1500".to_string());
     world.list_refresh();
     assert_eq!(world.status(identity(1)), Saved, "the list showed it");
     assert_eq!(world.status(identity(1500)), Saved);

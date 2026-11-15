@@ -762,9 +762,9 @@ impl ReaderSavedRepository {
     }
 
     /// A tap of unsave: every row the post may be saved under wants it unsaved, and a key without a
-    /// row gets one, so every key is sent: the keys may be out of date. A save waiting for room that
-    /// the server never had is removed, as there's nothing to unsave there. Returns the rows to wait
-    /// for.
+    /// row gets one, so every key is sent: the keys may be out of date. That includes a save waiting
+    /// for room, which another device may have saved since, and which stops waiting, as an unsave
+    /// needs no room. Returns the rows to wait for.
     pub fn tap_unsave(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -774,12 +774,9 @@ impl ReaderSavedRepository {
         let rows = Self::select_rows_for_keys(executor, account, keys)?;
         let mut waiting = Vec::new();
         for row in &rows {
-            if row.waiting_for_room && row.server != Some(true) {
-                Self::delete(executor, row.row_id)?;
-                continue;
-            }
             executor.execute(
-                "UPDATE reader_saved_posts SET saved = 0, seq = ?2, tapped = 1 WHERE rowid = ?1",
+                "UPDATE reader_saved_posts SET saved = 0, seq = ?2, tapped = 1, waiting_for_room = 0
+                WHERE rowid = ?1",
                 params![row.row_id, seq],
             )?;
             waiting.push(row.row_id);
@@ -992,8 +989,9 @@ impl ReaderSavedRepository {
     /// to the same key, out of `total`.
     ///
     /// A key returned is saved on the server. A key not returned isn't, if the refresh returned
-    /// them all, or if the server gave the row a date no older than the oldest key returned: past
-    /// 1,000 keys, an older one may just be past the end. So may a row with only a tap's date,
+    /// them all, or if the server gave the row a date newer than the oldest key returned: past
+    /// 1,000 keys, an older one may just be past the end, and so may one with the same date, as
+    /// the keys don't say how ties are ordered. So may a row with only a tap's date,
     /// since saving a post already saved keeps its old date on the server, so those are left
     /// alone. A row that agreed with the server, with no tap since, follows it; a pending one
     /// stays pending. So does one in doubt, even if it reads as agreeing: its request may have
@@ -1083,7 +1081,7 @@ impl ReaderSavedRepository {
                     server = 0, in_doubt = 0,
                     tapped = CASE WHEN in_doubt THEN 0 ELSE tapped END
                 WHERE account_id = ?1 AND rowid NOT IN ({seen_list})
-                    AND (?2 OR date_saved IS NULL OR (date_known = 1 AND date_saved >= ?3))
+                    AND (?2 OR date_saved IS NULL OR (date_known = 1 AND date_saved > ?3))
                     AND (server IS NOT 0 OR in_doubt != 0)"
             ),
             params![account, complete, oldest],
