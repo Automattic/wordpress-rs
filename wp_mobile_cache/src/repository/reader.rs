@@ -497,9 +497,10 @@ impl ReaderStreamRepository {
 /// Call the methods that change more than one row inside a transaction.
 pub struct ReaderSavedRepository;
 
-const ROW_COLUMNS: &str = "s.rowid, s.key, s.url_key, s.feed_item_key, s.saved, s.server, \
-    s.in_doubt, s.seq, s.date_saved, s.post_id, s.listed, s.imported, s.waiting_for_room, s.tapped, \
-    s.date_known";
+const ROW_COLUMNS: &str = "s.rowid, s.key, \
+    (SELECT json_group_array(u.url_key) FROM reader_saved_post_urls u WHERE u.saved_post_id = s.rowid), \
+    s.feed_item_key, s.saved, s.server, s.in_doubt, s.seq, s.date_saved, s.post_id, s.listed, \
+    s.imported, s.waiting_for_room, s.tapped, s.date_known";
 const ROW_COLUMN_COUNT: usize = 15;
 
 fn saved_row_from_row(row: &Row) -> Result<DbReaderSavedRow, SqliteDbError> {
@@ -511,7 +512,11 @@ fn saved_row_from_row(row: &Row) -> Result<DbReaderSavedRow, SqliteDbError> {
     Ok(DbReaderSavedRow {
         row_id: row.get(0)?,
         key: reader_saved_key_from_text(&row.get::<_, String>(1)?)?,
-        url_key: key(2)?,
+        url_keys: serde_json::from_str::<Vec<String>>(&row.get::<_, String>(2)?)
+            .map_err(|error| SqliteDbError::SqliteError(error.to_string()))?
+            .iter()
+            .map(|text| reader_saved_key_from_text(text))
+            .collect::<Result<_, _>>()?,
         feed_item_key: key(3)?,
         saved: row.get(4)?,
         server: row.get(5)?,
@@ -528,15 +533,6 @@ fn saved_row_from_row(row: &Row) -> Result<DbReaderSavedRow, SqliteDbError> {
         tapped: row.get(13)?,
         date_known: row.get(14)?,
     })
-}
-
-/// The alias column a key goes in when the server stores it as another key.
-fn alias_column(key: &ReaderSavedKey) -> Option<&'static str> {
-    match key {
-        ReaderSavedKey::Url { .. } => Some("url_key"),
-        ReaderSavedKey::FeedItem { .. } => Some("feed_item_key"),
-        ReaderSavedKey::Post { .. } => None,
-    }
 }
 
 impl ReaderSavedRepository {
@@ -614,7 +610,8 @@ impl ReaderSavedRepository {
             let found = Self::select_where(
                 executor,
                 account,
-                "s.key = ?2 OR s.url_key = ?2 OR s.feed_item_key = ?2",
+                "s.key = ?2 OR s.feed_item_key = ?2 OR s.rowid IN
+                    (SELECT saved_post_id FROM reader_saved_post_urls WHERE url_key = ?2)",
                 &[&text],
             )?;
             for row in found {
@@ -676,8 +673,8 @@ impl ReaderSavedRepository {
         Ok(())
     }
 
-    /// Records the other keys of a row, such as the feed item of a Jetpack post, where it hasn't
-    /// got one.
+    /// Records the other keys of a row: every URL the server stores as it, and the feed item of a
+    /// Jetpack post, where it hasn't got one.
     pub fn add_aliases(
         executor: &impl QueryExecutor,
         row_id: RowId,
@@ -690,14 +687,23 @@ impl ReaderSavedRepository {
             if text == key {
                 continue;
             }
-            if let Some(column) = alias_column(alias) {
-                executor.execute(
-                    &format!(
-                        "UPDATE reader_saved_posts SET {column} = ?2
-                        WHERE rowid = ?1 AND {column} IS NULL"
-                    ),
-                    params![row_id, text],
-                )?;
+            match alias {
+                // A post can have several URLs, so every one is kept.
+                ReaderSavedKey::Url { .. } => {
+                    executor.execute(
+                        "INSERT OR IGNORE INTO reader_saved_post_urls (saved_post_id, url_key)
+                        VALUES (?1, ?2)",
+                        params![row_id, text],
+                    )?;
+                }
+                ReaderSavedKey::FeedItem { .. } => {
+                    executor.execute(
+                        "UPDATE reader_saved_posts SET feed_item_key = ?2
+                        WHERE rowid = ?1 AND feed_item_key IS NULL",
+                        params![row_id, text],
+                    )?;
+                }
+                ReaderSavedKey::Post { .. } => {}
             }
         }
         Ok(())
@@ -784,15 +790,11 @@ impl ReaderSavedRepository {
         for key in keys {
             let text = reader_saved_key_text(key);
             let matched = rows.iter().any(|row| {
-                [
-                    Some(&row.key),
-                    // The server stores a URL as the post, but a feed item can be a separate,
-                    // older save of it, so the feed item is sent too.
-                    row.url_key.as_ref(),
-                ]
-                .into_iter()
-                .flatten()
-                .any(|other| reader_saved_key_text(other) == text)
+                // The server stores a URL as the post, but a feed item can be a separate, older
+                // save of it, so the feed item is sent too.
+                std::iter::once(&row.key)
+                    .chain(&row.url_keys)
+                    .any(|other| reader_saved_key_text(other) == text)
             });
             if !matched {
                 let row_id = Self::insert(executor, account, key, false, None, seq, false)?;
@@ -829,14 +831,10 @@ impl ReaderSavedRepository {
             executor,
             into.row_id,
             &into.key,
-            &[
-                Some(from.key.clone()),
-                from.url_key.clone(),
-                from.feed_item_key.clone(),
-            ]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>(),
+            &std::iter::once(from.key.clone())
+                .chain(from.url_keys.iter().cloned())
+                .chain(from.feed_item_key.clone())
+                .collect::<Vec<_>>(),
         )?;
         executor.execute(
             "UPDATE reader_saved_posts SET

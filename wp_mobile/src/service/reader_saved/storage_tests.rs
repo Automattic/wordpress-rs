@@ -1403,3 +1403,41 @@ async fn a_capped_read_leaves_a_post_saved_with_its_oldest_date_alone() {
 
     assert_eq!(status(&service, identity(3)), Saved);
 }
+
+/// The server stores several URLs of one post as the post, as the live API did on 2026-11-15 for a
+/// post's own domain, its wordpress.com address and its `?p=` link. Each reads as saved.
+#[tokio::test]
+async fn two_urls_the_server_stores_as_one_post_both_read_saved() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    synced(&service, &executor, &[]).await;
+    executor.push(Step::Respond(200, write_response(true, post_json(5), 1)));
+    executor.push(Step::Respond(200, write_response(true, post_json(5), 1)));
+    let a = "https://example.com/2026/11/12/a-post/";
+    let b = "https://example.wordpress.com/?p=5";
+
+    for url in [a, b] {
+        service.save_url(url.to_string(), None).await.unwrap();
+    }
+
+    let url_status = |url: &str| {
+        service
+            .status_of(&[ReaderSavedKey::Url {
+                url: url.to_string(),
+            }])
+            .unwrap()
+    };
+    assert_eq!((url_status(a), url_status(b)), (Saved, Saved));
+    assert_eq!(service.saved_count().unwrap(), Some(1));
+
+    // A relaunch reads them back from the cache.
+    let (service, _) = device.launch();
+    let url_status = |url: &str| {
+        service
+            .status_of(&[ReaderSavedKey::Url {
+                url: url.to_string(),
+            }])
+            .unwrap()
+    };
+    assert_eq!((url_status(a), url_status(b)), (Saved, Saved));
+}

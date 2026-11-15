@@ -132,8 +132,8 @@ pub struct DbReaderSavedRow {
     pub row_id: RowId,
     /// The key the server stores, once an answer or a refresh says. Until then, the key sent.
     pub key: ReaderSavedKey,
-    /// A URL key the server stores as [`Self::key`].
-    pub url_key: Option<ReaderSavedKey>,
+    /// The URL keys the server stores as [`Self::key`]. A post can have several.
+    pub url_keys: Vec<ReaderSavedKey>,
     /// The feed item key of a WordPress.com post saved under its IDs.
     pub feed_item_key: Option<ReaderSavedKey>,
     /// What the user wants.

@@ -400,8 +400,39 @@ fn test_an_answer_under_another_key_moves_the_row_and_keeps_the_key_sent_as_an_a
     assert_eq!(kept, row);
     let stored = row_for(&conn, account, &url).unwrap();
     assert_eq!(stored.key, post_key(9));
-    assert_eq!(stored.url_key, Some(url));
+    assert_eq!(stored.url_keys, [url]);
     assert_eq!(stored.server, Some(true));
+}
+
+/// The server stores several URLs of one post as the post, such as its own domain's and its
+/// wordpress.com address, as the live API did on 2026-11-15. The row keeps every one.
+#[test]
+fn test_two_urls_answered_as_one_post_are_both_kept() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let first = url_key("https://nick.blog/2026/11/12/start-today");
+    let second = url_key("https://nickmomrik.wordpress.com/2026/11/12/start-today");
+    for url in [&first, &second] {
+        let row = ReaderSavedRepository::tap_save(
+            &conn,
+            account,
+            url,
+            std::slice::from_ref(url),
+            None,
+            &now(),
+        )
+        .unwrap();
+        ReaderSavedRepository::apply_answer(&conn, account, row, true, &post_key(9), None).unwrap();
+    }
+
+    assert_eq!(rows(&conn, account).len(), 1);
+    let stored = row_for(&conn, account, &second).unwrap();
+    assert_eq!(stored.key, post_key(9));
+    assert_eq!(stored.url_keys, [first.clone(), second]);
+    assert_eq!(
+        row_for(&conn, account, &first).unwrap().row_id,
+        stored.row_id
+    );
 }
 
 #[test]
@@ -707,7 +738,12 @@ fn test_an_empty_url_in_the_keys_is_no_url() {
     let mut entry = entry(post_key(1), "2026-11-02T00:00:00Z");
     entry.url = Some(String::new());
     ReaderSavedRepository::apply_keys(&conn, account, &[entry], 1, 1).unwrap();
-    assert_eq!(row_for(&conn, account, &post_key(1)).unwrap().url_key, None);
+    assert!(
+        row_for(&conn, account, &post_key(1))
+            .unwrap()
+            .url_keys
+            .is_empty()
+    );
 }
 
 /// A post saved by URL, then unsaved, and a refresh says it's gone: its URL goes with the row, so

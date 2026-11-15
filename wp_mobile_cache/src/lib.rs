@@ -125,6 +125,8 @@ pub enum DbTable {
     ReaderSavedState,
     /// Saved posts, one per save on the server, with what the user wants for each
     ReaderSavedPosts,
+    /// The URLs the server stores as a saved post
+    ReaderSavedPostUrls,
 }
 
 impl DbTable {
@@ -153,6 +155,7 @@ impl DbTable {
             DbTable::ReaderStreamItems => "reader_stream_items",
             DbTable::ReaderSavedState => "reader_saved_state",
             DbTable::ReaderSavedPosts => "reader_saved_posts",
+            DbTable::ReaderSavedPostUrls => "reader_saved_post_urls",
         }
     }
 }
@@ -194,6 +197,7 @@ impl TryFrom<&str> for DbTable {
             "reader_stream_items" => Ok(DbTable::ReaderStreamItems),
             "reader_saved_state" => Ok(DbTable::ReaderSavedState),
             "reader_saved_posts" => Ok(DbTable::ReaderSavedPosts),
+            "reader_saved_post_urls" => Ok(DbTable::ReaderSavedPostUrls),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }

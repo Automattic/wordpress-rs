@@ -178,14 +178,10 @@ impl ReaderSavedService {
             .filter(|key| {
                 !rows.iter().any(|row| {
                     row.saved
-                        && [
-                            Some(&row.key),
-                            row.url_key.as_ref(),
-                            row.feed_item_key.as_ref(),
-                        ]
-                        .into_iter()
-                        .flatten()
-                        .any(|other| other == *key)
+                        && std::iter::once(&row.key)
+                            .chain(&row.url_keys)
+                            .chain(&row.feed_item_key)
+                            .any(|other| other == *key)
                 })
             })
             .cloned()

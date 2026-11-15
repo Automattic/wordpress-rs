@@ -5,7 +5,6 @@ CREATE TABLE `reader_saved_posts` (
   `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
   `account_id` INTEGER NOT NULL,
   `key` TEXT NOT NULL,                -- normalized, e.g. post:123:456. The key the server stores, once an answer or a refresh says
-  `url_key` TEXT,                     -- a URL key the server stores as this key, e.g. url:https://...
   `feed_item_key` TEXT,               -- the feed item key of a WordPress.com post saved under its IDs
   `saved` INTEGER NOT NULL,           -- what the user wants
   `server` INTEGER,                   -- what the server last said: 1 saved, 0 not saved, NULL not known
@@ -24,9 +23,21 @@ CREATE TABLE `reader_saved_posts` (
 ) STRICT;
 
 CREATE UNIQUE INDEX idx_reader_saved_posts_key ON reader_saved_posts(account_id, key);
-CREATE INDEX idx_reader_saved_posts_url_key ON reader_saved_posts(account_id, url_key);
 CREATE INDEX idx_reader_saved_posts_feed_item_key ON reader_saved_posts(account_id, feed_item_key);
 CREATE INDEX idx_reader_saved_posts_date ON reader_saved_posts(account_id, date_saved);
+
+-- The URLs the server stores as a saved post's key: a post can have several, such as its own domain's
+-- and its wordpress.com address, or a ?p= link.
+CREATE TABLE `reader_saved_post_urls` (
+  `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
+  `saved_post_id` INTEGER NOT NULL,   -- reader_saved_posts.rowid
+  `url_key` TEXT NOT NULL,            -- normalized, e.g. url:https://...
+
+  FOREIGN KEY (saved_post_id) REFERENCES reader_saved_posts(rowid) ON DELETE CASCADE
+) STRICT;
+
+CREATE UNIQUE INDEX idx_reader_saved_post_urls_post ON reader_saved_post_urls(saved_post_id, url_key);
+CREATE INDEX idx_reader_saved_post_urls_url ON reader_saved_post_urls(url_key);
 
 -- What the saved posts service knows about an account besides its rows.
 CREATE TABLE `reader_saved_state` (
