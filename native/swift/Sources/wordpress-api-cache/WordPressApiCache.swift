@@ -85,6 +85,15 @@ public final class WordPressApiCache: Sendable {
         try self.cache.removeWordpressComSite(siteId: siteId)
     }
 
+    /// Remove a WordPress.com account and everything cached for it, such as its Reader posts and
+    /// saved posts. Call it when the user signs out.
+    ///
+    /// Returns `true` if the account was found and removed, `false` if nothing was cached for it.
+    @discardableResult
+    public func removeWordpressComAccount(userId: WpComUserId) throws -> Bool {
+        try self.cache.removeWordpressComAccount(userId: userId)
+    }
+
     deinit {
         self.cache.stopListeningForUpdates()
 

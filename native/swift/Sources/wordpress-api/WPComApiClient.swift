@@ -1,5 +1,6 @@
 import Foundation
 import WordPressAPIInternal
+import WordPressApiCache
 
 #if os(Linux)
 import FoundationNetworking
@@ -95,6 +96,24 @@ public final class WPComApiClient: Sendable {
 
     public var readerSaved: ReaderSavedRequestExecutor {
         internalClient.readerSaved()
+    }
+
+    /// Creates the account's saved Reader posts service. Prefer it over `readerSaved` for anything a
+    /// user sees: a save or unsave shows straight away and survives a relaunch, and one the server
+    /// hasn't got yet is sent by a later call.
+    ///
+    /// What it knows is kept in `cache` under `userID`. The cache's migrations must have run. Call
+    /// `sync()` at launch, when the app comes to the foreground, and when the device comes back
+    /// online. Call `WordPressApiCache.removeWordpressComAccount(userId:)` on sign-out to delete it.
+    ///
+    /// Create one per account and share it: it sends one request at a time, and a second instance
+    /// would send alongside it.
+    public func makeReaderSavedService(
+        source: ReaderSavedSource,
+        cache: WordPressApiCache,
+        userID: WpComUserId
+    ) throws -> ReaderSavedService {
+        try ReaderSavedService(delegate: delegate, source: source, cache: cache.cache, userId: userID)
     }
 
     public var supportBots: SupportBotsRequestExecutor {

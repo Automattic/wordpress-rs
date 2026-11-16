@@ -13,6 +13,7 @@ use wp_mobile_cache::WpApiCache;
 
 pub struct TestContext {
     pub client: WpComApiClient,
+    pub delegate: WpApiClientDelegate,
     pub service: WpService,
     pub site_id: WpComSiteId,
     pub token: String,
@@ -59,13 +60,14 @@ impl TestContext {
             SiteInfo::WordPressCom {
                 site_id: WpComSiteId(site_id),
             },
-            delegate,
+            delegate.clone(),
             cache.clone(),
         )
         .expect("Failed to create WpService");
 
         Self {
             client,
+            delegate,
             service,
             site_id: WpComSiteId(site_id),
             token,

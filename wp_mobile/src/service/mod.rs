@@ -13,6 +13,7 @@ pub mod metadata;
 pub mod mock_post_service;
 pub mod post_types;
 pub mod posts;
+pub mod reader_saved;
 pub mod sites;
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
