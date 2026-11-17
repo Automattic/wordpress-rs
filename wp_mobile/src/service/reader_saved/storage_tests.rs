@@ -1727,6 +1727,38 @@ async fn blank_fields_in_an_import_are_filled_in_by_a_save_with_details() {
 }
 
 #[tokio::test]
+async fn details_saved_with_a_save_waiting_for_room_are_stored_without_a_request() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(403, cap_response()));
+    service
+        .import_saves(vec![local_save(identity(1), "One")])
+        .await
+        .unwrap();
+    assert_eq!(service.saves_waiting_for_room().unwrap(), 1);
+    let sent = executor.sent_short().len();
+
+    let outcome = service
+        .save_with_details(stream_post(1, "From the stream"))
+        .await
+        .unwrap();
+
+    assert!(matches!(outcome, ReaderSavedOutcome::Pending { .. }));
+    assert_eq!(executor.sent_short().len(), sent, "nothing is sent");
+    assert_eq!(service.saves_waiting_for_room().unwrap(), 1);
+    let items = collection.load_items().await.unwrap();
+    assert_eq!(
+        titles(&items),
+        vec![Some("One".to_string())],
+        "the import's title is kept"
+    );
+    let post = items[0].post.clone().unwrap();
+    assert_eq!(post.author_name.as_deref(), Some("An author"));
+    assert_eq!(post.tags.as_ref().map(|tags| tags.len()), Some(1));
+}
+
+#[tokio::test]
 async fn details_passed_with_a_save_dont_replace_what_the_server_sent() {
     let device = Device::new();
     let (service, executor) = device.launch();

@@ -47,6 +47,7 @@ use wp_api::wp_com::reader_saved::{
 use wp_mobile_cache::db_types::reader::{
     DbReaderSavedKey, DbReaderSavedRow, ReaderPostRecord, reader_saved_key_text,
 };
+use wp_mobile_cache::repository::QueryExecutor;
 use wp_mobile_cache::repository::reader::{ReaderPostRepository, ReaderSavedRepository};
 use wp_mobile_cache::repository::wordpress_com_accounts::WordPressComAccountRepository;
 use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
@@ -354,18 +355,54 @@ impl ReaderSavedService {
     /// stored post through a save, so they don't show anywhere. The row may also belong to another
     /// stream or a save made since, so removing it could take away a post that's still shown, and
     /// what it holds is real data about the post either way.
+    /// Fills in the stored post a save's details belong to, and returns its row: the stored post's,
+    /// or the details' own if there's none. Without details, returns the stored post's row, if any.
+    fn store_details(
+        &self,
+        transaction: &impl QueryExecutor,
+        main: &ReaderSavedKey,
+        details: Option<&ReaderPostRecord>,
+    ) -> Result<Option<RowId>, SqliteDbError> {
+        // A Jetpack post's feed item copy may already be stored as its WordPress.com post, so the
+        // details fill in that row rather than starting a second one.
+        let stored = ReaderPostRepository::select_row_id_by_key(transaction, self.account, main)?;
+        Ok(match (details, stored) {
+            (Some(details), Some(row)) => Some(ReaderPostRepository::fill_missing_at(
+                transaction,
+                self.account,
+                row,
+                details,
+            )?),
+            (Some(details), None) => Some(ReaderPostRepository::fill_missing(
+                transaction,
+                self.account,
+                details,
+            )?),
+            (None, stored) => stored,
+        })
+    }
+
     async fn save_keys(
         &self,
         main: ReaderSavedKey,
         keys: Vec<ReaderSavedKey>,
         details: Option<&ReaderPostRecord>,
     ) -> Result<ReaderSavedOutcome, ReaderSavedError> {
-        // Already saved, and waiting for room: a tap would make a refusal undo it.
+        // Already saved, and waiting for room: a tap would make a refusal undo it. The details are
+        // still stored, without a tap or a request.
         if self
             .rows_for(&keys)?
             .iter()
             .any(|row| row.saved && row.waiting_for_room)
         {
+            if let Some(details) = details {
+                self.cache.execute(|connection| {
+                    let transaction = connection.transaction()?;
+                    self.store_details(&transaction, &main, Some(details))?;
+                    transaction.commit().map_err(SqliteDbError::from)
+                })?;
+                self.notify();
+            }
             return Ok(ReaderSavedOutcome::Pending {
                 reason: ReaderSavedError::TooManySaves.to_string(),
             });
@@ -373,24 +410,7 @@ impl ReaderSavedService {
         let now = self.now();
         let row = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
-            // A Jetpack post's feed item copy may already be stored as its WordPress.com post, so
-            // the details fill in that row rather than starting a second one.
-            let stored =
-                ReaderPostRepository::select_row_id_by_key(&transaction, self.account, &main)?;
-            let post = match (details, stored) {
-                (Some(details), Some(row)) => Some(ReaderPostRepository::fill_missing_at(
-                    &transaction,
-                    self.account,
-                    row,
-                    details,
-                )?),
-                (Some(details), None) => Some(ReaderPostRepository::fill_missing(
-                    &transaction,
-                    self.account,
-                    details,
-                )?),
-                (None, stored) => stored,
-            };
+            let post = self.store_details(&transaction, &main, details)?;
             let row = ReaderSavedRepository::tap_save(
                 &transaction,
                 self.account,
