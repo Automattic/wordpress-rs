@@ -217,6 +217,11 @@ final class LoginManager: ObservableObject {
         self.isLoggedInToWpCom = true
     }
 
+    /// The signed-in WordPress.com account's ID in the account store, which isn't its user ID.
+    public func getWpComAccountID() throws -> UInt64? {
+        try self.wpComAccount?.id()
+    }
+
     public func getWpComLoginCredentials() throws -> WpAuthentication? {
         switch try self.wpComAccount {
         case .wpCom(_, _, let password, _):
