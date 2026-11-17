@@ -36,7 +36,14 @@ struct SafeRequestExecutorTests {
     // Compiled out on Linux: the stub leans on `URLProtocol`/`URLSession` timeout machinery that
     // swift-corelibs-foundation handles differently, and the classification bug is Apple-only.
     // `.timeLimit` bounds a hang if a future toolchain ever stops enforcing the request timeout.
+    //
+    // Excluded on watchOS (this test and its end-to-end companion below): on the watchOS 27.2
+    // simulator the session's `protocolClasses` stub isn't dependably consulted when the full suite
+    // runs, so the request reaches the real `example.com` and gets a 404 instead of timing out. The
+    // classification is platform-agnostic and stays covered on macOS, iOS, and tvOS. The watchOS
+    // simulator leg of build #6883 caught this.
     #if !os(Linux)
+    #if !os(watchOS)
     @Test("A URLSession timeout is classified as .httpTimeoutError", .timeLimit(.minutes(1)))
     func testTimeoutIsClassifiedAsHttpTimeoutError() async throws {
         let configuration = URLSessionConfiguration.ephemeral
@@ -100,6 +107,7 @@ struct SafeRequestExecutorTests {
             }
         }
     }
+    #endif // !os(watchOS)
 
     // End-to-end companion for `MediaFileUnreadable` (#1546), mirroring the timeout test above and
     // Kotlin's `MockWebServer` executor test. A directory at the upload path passes field
@@ -154,9 +162,9 @@ struct SafeRequestExecutorTests {
     // (cellular policy, roaming, an in-progress call), so injecting the `URLError` is the only way to
     // exercise the branch.
     //
-    // Excluded on watchOS: unlike a natural `.timedOut` (which round-trips fine there), watchOS's URL
-    // loading system does not faithfully deliver these cellular-radio codes when they are *injected*
-    // via `URLProtocolClient`, so the stub can't drive the branch on that platform. The classifier
+    // Excluded on watchOS: watchOS's URL loading system does not faithfully deliver these
+    // cellular-radio codes when they are *injected* via `URLProtocolClient`, so the stub can't drive
+    // the branch on that platform. The classifier
     // itself is platform-agnostic (`errorIsDeviceIsOffline` has no `#if`), and is exercised on macOS,
     // iOS, and tvOS. The watchOS simulator leg of build #6181 caught this.
     #if !os(watchOS)
@@ -190,6 +198,8 @@ struct SafeRequestExecutorTests {
 }
 
 #if !os(Linux)
+// Only used by the watchOS-excluded tests above, so gated identically to avoid unused-type warnings.
+#if !os(watchOS)
 /// A `NetworkRequestContent` that issues its request through the executor's session, so the
 /// session's own timeout produces the `URLError.timedOut` under test.
 private struct TimingOutRequest: NetworkRequestContent {
@@ -222,8 +232,6 @@ private final class NeverRespondingURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
-// Only used by the watchOS-excluded test above, so gated identically to avoid an unused-type warning.
-#if !os(watchOS)
 /// A `URLProtocol` that fails every request with the `URLError.Code` carried in a request header,
 /// letting a test drive a specific OS error code through the real URLSession completion path
 /// without depending on device state (cellular policy, roaming, an in-progress call) it can't set.
