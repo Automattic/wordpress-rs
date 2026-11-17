@@ -84,6 +84,39 @@ struct ReaderSavedServiceTests {
     #endif
 
     @Test
+    func aPostIsSavedWithTheDetailsTheAppHas() async throws {
+        let cache = try openCache(at: temporaryDatabase())
+        let service = try client.makeReaderSavedService(source: .ios, cache: cache, userID: 1)
+        // A post without a site can't be saved, so this is refused before any request.
+        let post = ReaderPost(
+            identity: ReaderPostSaveIdentity(
+                id: 1,
+                siteId: nil,
+                feedId: nil,
+                feedItemId: nil,
+                isExternal: false,
+                url: nil
+            ),
+            title: "A post",
+            author: ReaderPostAuthor(name: "An author"),
+            siteName: "A site",
+            siteIconUrl: "https://example.com/icon.png",
+            featuredImage: "https://example.com/image.jpg",
+            displayImageUrl: "https://example.com/image.jpg",
+            tags: [ReaderPostTag(slug: "news", name: "News")],
+            commentCount: 3
+        )
+
+        await #expect {
+            _ = try await service.saveWithDetails(post: post)
+        } throws: { error in
+            guard case .PostCannotBeSaved = error as? ReaderSavedError else { return false }
+            return true
+        }
+        #expect(try await service.savedPosts().loadItems().isEmpty)
+    }
+
+    @Test
     func aCacheWithoutMigrationsIsADatabaseError() throws {
         let cache = try WordPressApiCache(path: temporaryDatabase().path)
 

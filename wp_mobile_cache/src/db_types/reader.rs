@@ -5,9 +5,9 @@ use std::str::FromStr;
 use wp_api::date::WpGmtDateTime;
 use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::reader_posts::{ReaderPost, ReaderPostTag, reader_post_display_image_url};
 use wp_api::wp_com::reader_saved::{
-    ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey, ReaderSavedPost,
-    reader_saved_key_for_post,
+    ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey, reader_saved_key_for_post,
 };
 
 /// A Reader post as the cache stores it.
@@ -38,8 +38,20 @@ pub struct ReaderPostRecord {
     pub author_avatar_url: Option<String>,
     #[uniffi(default = None)]
     pub author_url: Option<String>,
+    /// The featured image the author set, as the server sends it. Most posts without one still
+    /// have an image to show: use [`Self::display_image_url`] for that.
     #[uniffi(default = None)]
     pub featured_image: Option<String>,
+    /// The image to show for the post: [`Self::editorial_image_url`] when there is one, else
+    /// [`Self::featured_image`], else the image the server picked from the post. See
+    /// [`ReaderPost::display_image_url`].
+    #[uniffi(default = None)]
+    pub display_image_url: Option<String>,
+    /// The image an editor picked for the post in Discover. Once stored, a source that doesn't send
+    /// one leaves it, and [`Self::display_image_url`] is this image. See
+    /// [`ReaderPost::editorial_image_url`].
+    #[uniffi(default = None)]
+    pub editorial_image_url: Option<String>,
     #[uniffi(default = None)]
     pub site_name: Option<String>,
     #[uniffi(default = None)]
@@ -52,6 +64,16 @@ pub struct ReaderPostRecord {
     pub i_like: Option<bool>,
     #[uniffi(default = None)]
     pub is_following: Option<bool>,
+    /// The site's icon, or an RSS feed's image. See [`ReaderPost::site_icon_url`] for which wins.
+    #[uniffi(default = None)]
+    pub site_icon_url: Option<String>,
+    /// `None` when the source didn't send tags, and empty when the post has none.
+    #[uniffi(default = None)]
+    pub tags: Option<Vec<ReaderPostTag>>,
+    /// The server sends `0` for a post that can't have comments, such as an RSS post or a page
+    /// saved by URL.
+    #[uniffi(default = None)]
+    pub comment_count: Option<u64>,
 }
 
 impl ReaderPostRecord {
@@ -71,17 +93,22 @@ impl ReaderPostRecord {
             author_avatar_url: None,
             author_url: None,
             featured_image: None,
+            display_image_url: None,
+            editorial_image_url: None,
             site_name: None,
             site_url: None,
             feed_url: None,
             like_count: None,
             i_like: None,
             is_following: None,
+            site_icon_url: None,
+            tags: None,
+            comment_count: None,
         })
     }
 
-    /// The fields the saved list sent, or `None` for a post that has no key.
-    pub fn from_saved_post(post: &ReaderSavedPost) -> Option<Self> {
+    /// The fields a Reader stream sent, or `None` for a post that has no key.
+    pub fn from_reader_post(post: &ReaderPost) -> Option<Self> {
         let author = post.author.as_ref();
         Some(Self {
             global_id: post.global_id.clone(),
@@ -94,12 +121,29 @@ impl ReaderPostRecord {
             author_avatar_url: author.and_then(|author| author.avatar_url.clone()),
             author_url: author.and_then(|author| author.url.clone()),
             featured_image: post.featured_image.clone(),
+            // Stored without the editor's pick, which has its own column, so a source that sends no
+            // pick still updates the image shown when there isn't one.
+            display_image_url: post
+                .display_image_url
+                .clone()
+                .filter(|url| Some(url) != post.editorial_image_url.as_ref())
+                .or_else(|| {
+                    reader_post_display_image_url(
+                        None,
+                        post.featured_image.as_deref(),
+                        post.featured_media.as_ref(),
+                    )
+                }),
+            editorial_image_url: post.editorial_image_url.clone(),
             site_name: post.site_name.clone(),
             site_url: post.site_url.clone(),
             feed_url: post.feed_url.clone(),
             like_count: post.like_count,
             i_like: post.i_like,
             is_following: post.is_following,
+            site_icon_url: post.site_icon_url.clone(),
+            tags: post.tags.clone(),
+            comment_count: post.comment_count,
             ..Self::from_identity(post.identity.clone())?
         })
     }
@@ -269,6 +313,81 @@ mod tests {
     #[case("other:1")]
     fn test_invalid_key_text_is_an_error(#[case] text: &str) {
         assert!(reader_saved_key_from_text(text).is_err());
+    }
+
+    fn reader_post(fields: serde_json::Value) -> ReaderPost {
+        let mut post = serde_json::json!({ "ID": 1, "site_ID": 2, "is_external": false });
+        post.as_object_mut()
+            .unwrap()
+            .extend(fields.as_object().unwrap().clone());
+        serde_json::from_value(post).unwrap()
+    }
+
+    #[test]
+    fn test_record_keeps_a_parsed_posts_display_image() {
+        let post = reader_post(serde_json::json!({
+            "featured_image": "",
+            "featured_media": { "uri": "https://example.com/media.jpg", "type": "image" },
+        }));
+        let record = ReaderPostRecord::from_reader_post(&post).unwrap();
+        assert_eq!(record.featured_image, None);
+        assert_eq!(
+            record.display_image_url.as_deref(),
+            Some("https://example.com/media.jpg")
+        );
+    }
+
+    #[test]
+    fn test_record_keeps_an_editorial_image_apart() {
+        let post = reader_post(serde_json::json!({
+            "editorial": { "image": "https://example.com/editorial.jpg" },
+            "featured_image": "https://example.com/featured.jpg",
+        }));
+        assert_eq!(
+            post.display_image_url.as_deref(),
+            Some("https://example.com/editorial.jpg")
+        );
+        let record = ReaderPostRecord::from_reader_post(&post).unwrap();
+        assert_eq!(
+            record.editorial_image_url.as_deref(),
+            Some("https://example.com/editorial.jpg")
+        );
+        assert_eq!(
+            record.display_image_url.as_deref(),
+            Some("https://example.com/featured.jpg"),
+            "Stored without the pick, which has its own column"
+        );
+    }
+
+    /// A post an app builds itself may set only `featured_image` or `featured_media`.
+    #[rstest]
+    #[case::own_display_image(
+        Some("https://app/display.jpg"),
+        Some("https://app/featured.jpg"),
+        Some("https://app/display.jpg")
+    )]
+    #[case::featured_image(
+        None,
+        Some("https://app/featured.jpg"),
+        Some("https://app/featured.jpg")
+    )]
+    #[case::featured_media(None, None, Some("https://app/media.jpg"))]
+    fn test_record_falls_back_for_a_post_built_by_an_app(
+        #[case] display_image_url: Option<&str>,
+        #[case] featured_image: Option<&str>,
+        #[case] expected: Option<&str>,
+    ) {
+        let mut post = reader_post(serde_json::json!({}));
+        post.display_image_url = display_image_url.map(str::to_string);
+        post.featured_image = featured_image.map(str::to_string);
+        post.featured_media = Some(wp_api::wp_com::reader_posts::ReaderFeaturedMedia {
+            uri: Some("https://app/media.jpg".to_string()),
+            media_type: Some("image".to_string()),
+            width: None,
+            height: None,
+        });
+        let record = ReaderPostRecord::from_reader_post(&post).unwrap();
+        assert_eq!(record.display_image_url.as_deref(), expected);
     }
 
     #[test]

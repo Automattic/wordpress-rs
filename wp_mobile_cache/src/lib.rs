@@ -505,7 +505,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 18] = [
+static MIGRATION_QUERIES: [&str; 15] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -520,10 +520,7 @@ static MIGRATION_QUERIES: [&str; 18] = [
     include_str!("../migrations/0012-invalidate-post-entity-states.sql"),
     include_str!("../migrations/0013-invalidate-post-entity-states-for-meta.sql"),
     include_str!("../migrations/0014-create-media-edit-context-table.sql"),
-    include_str!("../migrations/0015-create-wordpress-com-accounts-table.sql"),
-    include_str!("../migrations/0016-create-reader-posts-table.sql"),
-    include_str!("../migrations/0017-create-reader-streams-tables.sql"),
-    include_str!("../migrations/0018-create-reader-saved-tables.sql"),
+    include_str!("../migrations/0015-create-wordpress-com-account-and-reader-tables.sql"),
 ];
 
 pub struct MigrationManager<'a> {
