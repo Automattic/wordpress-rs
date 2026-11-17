@@ -1700,6 +1700,33 @@ async fn a_post_saved_with_its_details_shows_in_full_before_any_refresh() {
 }
 
 #[tokio::test]
+async fn blank_fields_in_an_import_are_filled_in_by_a_save_with_details() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let collection = service.clone().saved_posts();
+    executor.push(Step::Respond(200, write_response(true, post_json(4), 1)));
+    let mut save = local_save(identity(4), "");
+    save.featured_image = Some(" ".to_string());
+    save.site_name = Some(String::new());
+    service.import_saves(vec![save]).await.unwrap();
+
+    executor.push(Step::Respond(200, write_response(true, post_json(4), 1)));
+    service
+        .save_with_details(stream_post(4, "From the stream"))
+        .await
+        .unwrap();
+
+    let items = collection.load_items().await.unwrap();
+    assert_eq!(titles(&items), vec![Some("From the stream".to_string())]);
+    let post = items[0].post.clone().unwrap();
+    assert_eq!(
+        post.display_image_url.as_deref(),
+        Some("https://example.com/image.jpg")
+    );
+    assert_eq!(post.site_name.as_deref(), Some("A site"));
+}
+
+#[tokio::test]
 async fn details_passed_with_a_save_dont_replace_what_the_server_sent() {
     let device = Device::new();
     let (service, executor) = device.launch();

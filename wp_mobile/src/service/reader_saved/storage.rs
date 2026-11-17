@@ -144,12 +144,14 @@ impl ReaderSavedService {
                 else {
                     continue;
                 };
-                record.title = save.title.clone();
-                record.excerpt = save.excerpt.clone();
-                record.featured_image = save.featured_image.clone();
-                record.display_image_url = save.featured_image.clone();
-                record.site_name = save.site_name.clone();
-                record.site_url = save.site_url.clone();
+                // A blank field is one the app doesn't have. Stored as text, it would keep a later
+                // save's details from filling it in.
+                record.title = known(&save.title);
+                record.excerpt = known(&save.excerpt);
+                record.featured_image = known(&save.featured_image);
+                record.display_image_url = known(&save.featured_image);
+                record.site_name = known(&save.site_name);
+                record.site_url = known(&save.site_url);
                 // The import's copy may be older than what the saved list already stored.
                 let post = ReaderPostRepository::fill_missing(&transaction, self.account, &record)?;
                 added |= ReaderSavedRepository::import_save(
@@ -443,6 +445,11 @@ impl ReaderSavedPostsCollection {
 }
 
 /// A new in-memory cache with every migration run.
+/// The text, unless it's blank.
+fn known(text: &Option<String>) -> Option<String> {
+    text.clone().filter(|text| !text.trim().is_empty())
+}
+
 #[cfg(test)]
 pub(super) fn migrated_in_memory_cache() -> Arc<WpApiCache> {
     let cache = WpApiCache::new(None).expect("an in-memory cache opens");
