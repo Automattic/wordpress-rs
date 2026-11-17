@@ -26,6 +26,7 @@ import java.net.NoRouteToHostException
 import java.net.URI
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -311,18 +312,50 @@ class WpRequestExecutorTest {
         assertEquals("java.net.NoRouteToHostException", reason.reason)
     }
 
-    private suspend fun requestFailingWith(exception: IOException): RequestExecutionErrorReason {
-        val client = OkHttpClient.Builder()
-            .addInterceptor { throw exception }
-            .build()
+    @Test
+    fun `no route to host while the device is offline is mapped to DeviceIsOfflineError`() = runTest {
+        // The address can be known without a DNS lookup (cached, or an IP address), so the connect
+        // is the first thing to fail. With no network, that is the cause, not the site.
+        val reason = requestFailingWith(NoRouteToHostException("Host unreachable"), networkAvailable = false)
+
+        assertIs<RequestExecutionErrorReason.DeviceIsOfflineError>(reason)
+        assertTrue(reason.isDeviceOffline)
+        assertFalse(reason.isSiteUnreachable)
+    }
+
+    @Test
+    fun `refused connection while the device is offline is mapped to DeviceIsOfflineError`() = runTest {
+        // A real refused connection (nothing listening on the port), with the provider reporting
+        // no network. Android reports most failed connects this way, including no route to host
+        // when the client has a connect timeout.
+        val closedServer = MockWebServer()
+        closedServer.start()
+        val refusedUrl = closedServer.url("/wp-json")
+        closedServer.shutdown()
+
+        val reason = requestFailingWith(url = refusedUrl.toString(), networkAvailable = false)
+
+        assertIs<RequestExecutionErrorReason.DeviceIsOfflineError>(reason)
+        assertTrue(reason.isDeviceOffline)
+        assertFalse(reason.isSiteUnreachable)
+    }
+
+    private suspend fun requestFailingWith(
+        exception: IOException? = null,
+        url: String = mockWebServer.url("/wp-json").toString(),
+        networkAvailable: Boolean = true
+    ): RequestExecutionErrorReason {
+        val client = OkHttpClient.Builder().apply {
+            if (exception != null) addInterceptor { throw exception }
+        }.build()
 
         val executor = WpRequestExecutor(
             httpClient = WpHttpClient.CustomOkHttpClient(client),
-            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+            networkAvailabilityProvider = NetworkAvailabilityProvider { networkAvailable }
         )
 
         val apiClient = WpApiClient(
-            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            wpOrgSiteApiRootUrl = URI(url).toURL(),
             authProvider = WpAuthenticationProvider.none(),
             requestExecutor = executor
         )
