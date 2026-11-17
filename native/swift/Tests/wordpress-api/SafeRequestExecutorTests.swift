@@ -195,6 +195,77 @@ struct SafeRequestExecutorTests {
     }
     #endif // !os(watchOS)
     #endif
+
+    // Regression test for #1746: `buildURLRequest` force-unwrapped `URL(string:)`, which returns `nil` for
+    // characters the Rust `url` crate leaves unencoded, such as `{` in a host (on every OS version) or `|` and
+    // `^` in a path or query (before iOS 17 and macOS 14). The app crashed instead of the request failing.
+    @Test(
+        "buildURLRequest percent-encodes characters URL(string:) rejects",
+        arguments: [
+            ("https://{cdn}/wp-json/", "https://%7Bcdn%7D/wp-json/"),
+            ("https://example.com/wp-json/a|b?q[0]=^", "https://example.com/wp-json/a%7Cb?q%5B0%5D=%5E"),
+            ("https://example.com/wp-json/", "https://example.com/wp-json/")
+        ]
+    )
+    func testBuildURLRequestEncodesCharactersURLRejects(url: String, expected: String) throws {
+        let request = try StubRequest(url: url).buildURLRequest(additionalHeaders: [:])
+        #expect(request.url?.absoluteString == expected)
+    }
+
+    @Test("buildURLRequest throws .badURL when the address isn't a URL")
+    func testBuildURLRequestThrowsForInvalidURL() {
+        let error = #expect(throws: URLError.self) {
+            try StubRequest(url: "not a url").buildURLRequest(additionalHeaders: [:])
+        }
+        #expect(error?.code == .badURL)
+    }
+
+    // The executor reports a request it can't make a `URL` for as `.nonExistentSiteError`, its nearest fit
+    // for an invalid address (see `errorIsNonExistentSiteError`), rather than crashing.
+    @Test("A request with an address that isn't a URL fails with .nonExistentSiteError")
+    func testInvalidURLIsClassifiedAsNonExistentSiteError() async {
+        let executor = WpRequestExecutor(urlSession: .shared)
+
+        let result = await executor.perform(StubRequest(url: "not a url"))
+
+        guard case .failure(let error) = result,
+            case .RequestExecutionFailed(_, _, let reason, let requestUrl, _) = error
+        else {
+            Issue.record("Expected a RequestExecutionFailed failure, got \(result)")
+            return
+        }
+
+        guard case .nonExistentSiteError = reason else {
+            Issue.record("Expected .nonExistentSiteError, got \(reason)")
+            return
+        }
+        #expect(requestUrl == "not a url")
+    }
+}
+
+/// A `NetworkRequestContent` with a given URL, for testing how a `URLRequest` is built from it. Like
+/// `WpNetworkRequest`, `perform` builds its request with `buildURLRequest`, so an address it can't make a `URL`
+/// for fails before anything is sent.
+private struct StubRequest: NetworkRequestContent {
+    let stubURL: String
+
+    init(url: String) {
+        self.stubURL = url
+    }
+
+    func requestId() -> String { "1746-url-regression" }
+    func method() -> RequestMethod { .get }
+    func url() -> WpEndpointUrl { stubURL }
+    func headerMap() -> WpNetworkHeaderMap { .empty }
+    func encodeBody(into _: inout URLRequest) throws {}
+
+    func perform(
+        in session: URLSession,
+        withAdditionalHeaders headers: [String: String],
+        delegate _: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        try await session.data(for: buildURLRequest(additionalHeaders: headers))
+    }
 }
 
 #if !os(Linux)
