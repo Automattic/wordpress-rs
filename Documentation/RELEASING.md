@@ -4,11 +4,14 @@ A release is published automatically when a version bump PR is merged to `trunk`
 
 ## Steps
 
-1. **Open a version bump PR** that only edits `CHANGELOG.md`:
+1. **Open a version bump PR** that edits `CHANGELOG.md`:
    - Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`. Use today's
      UTC date. `X.Y.Z` is strict semver, optionally with an `-alpha.N` /
      `-beta.N` / `-rc.N` suffix for pre-releases.
    - Add a fresh empty `## [Unreleased]` section above the new version.
+   - Set `version = "X.Y.Z"` in every workspace crate's `Cargo.toml`, then
+     run `cargo update -w` to update `Cargo.lock`. `wp_api`'s version is
+     sent in the default User-Agent.
    - Apply the `Release` GitHub label.
    - PR title: `Release X.Y.Z`.
 2. **Review and merge** the PR. The `trunk` build detects the new version and
