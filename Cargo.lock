@@ -2069,7 +2069,7 @@ dependencies = [
 
 [[package]]
 name = "integration_test_credentials"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "serde_json",
 ]
@@ -5428,7 +5428,7 @@ dependencies = [
 
 [[package]]
 name = "wordpress-rs"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5446,7 +5446,7 @@ dependencies = [
 
 [[package]]
 name = "wp_api"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "android_logger",
  "async-trait",
@@ -5494,7 +5494,7 @@ dependencies = [
 
 [[package]]
 name = "wp_api_integration_tests"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5520,7 +5520,7 @@ dependencies = [
 
 [[package]]
 name = "wp_api_integration_tests_backend"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "rocket",
  "serde",
@@ -5530,7 +5530,7 @@ dependencies = [
 
 [[package]]
 name = "wp_cli"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -5540,7 +5540,7 @@ dependencies = [
 
 [[package]]
 name = "wp_com_e2e"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5557,7 +5557,7 @@ dependencies = [
 
 [[package]]
 name = "wp_contextual"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "convert_case",
  "proc-macro2",
@@ -5573,7 +5573,7 @@ dependencies = [
 
 [[package]]
 name = "wp_derive"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "convert_case",
  "proc-macro-crate",
@@ -5592,7 +5592,7 @@ dependencies = [
 
 [[package]]
 name = "wp_derive_request_builder"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "convert_case",
  "proc-macro-crate",
@@ -5612,7 +5612,7 @@ dependencies = [
 
 [[package]]
 name = "wp_localization"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "fluent-bundle",
  "fluent-langneg",
@@ -5629,7 +5629,7 @@ dependencies = [
 
 [[package]]
 name = "wp_localization_macro"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "convert_case",
  "fluent-syntax",
@@ -5646,7 +5646,7 @@ dependencies = [
 
 [[package]]
 name = "wp_localization_parser"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "fluent-syntax",
  "thiserror 2.0.21",
@@ -5654,7 +5654,7 @@ dependencies = [
 
 [[package]]
 name = "wp_localization_validation"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "clap",
  "fluent-syntax",
@@ -5665,7 +5665,7 @@ dependencies = [
 
 [[package]]
 name = "wp_mobile"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -5695,7 +5695,7 @@ dependencies = [
 
 [[package]]
 name = "wp_mobile_cache"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "chrono",
  "futures",
@@ -5713,7 +5713,7 @@ dependencies = [
 
 [[package]]
 name = "wp_mobile_integration_tests"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "integration_test_credentials",
  "reqwest",
@@ -5729,7 +5729,7 @@ dependencies = [
 
 [[package]]
 name = "wp_rs_web"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "linkify",
  "rocket",
@@ -5739,7 +5739,7 @@ dependencies = [
 
 [[package]]
 name = "wp_serde_helper"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "chrono",
  "rstest",
@@ -5749,7 +5749,7 @@ dependencies = [
 
 [[package]]
 name = "wp_uniffi_bindgen"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "uniffi",
 ]
@@ -5780,7 +5780,7 @@ dependencies = [
 
 [[package]]
 name = "xcframework"
-version = "0.1.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "clap",

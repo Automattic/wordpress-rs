@@ -55,6 +55,8 @@ steps:
       - label: ":memo: Validate Changelog"
         command: .buildkite/commands/validate-changelog.sh
         plugins: [$CI_TOOLKIT]
+      - label: ":memo: Validate Versions"
+        command: .buildkite/commands/validate-versions.sh
 
   #
   # Swift Group
