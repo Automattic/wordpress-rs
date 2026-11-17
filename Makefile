@@ -192,8 +192,8 @@ swift-example-app-mac:
 	xcodebuild -project native/swift/Example/Example.xcodeproj -scheme Example -destination 'platform=macOS,arch=arm64' -skipPackagePluginValidation build
 
 swift-example-app-ios:
-	xcrun simctl create "iPhone 17 Pro Test Device" "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
-	bundle exec fastlane run run_tests project:native/swift/Example/Example.xcodeproj scheme:Example build_for_testing:true ensure_devices_found:true device:"iPhone 17 Pro Test Device (26.5)" xcargs:"-skipPackagePluginValidation"
+	xcrun simctl create "iPhone 18 Pro Test Device" "com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro" "com.apple.CoreSimulator.SimRuntime.iOS-27-2"
+	bundle exec fastlane run run_tests project:native/swift/Example/Example.xcodeproj scheme:Example build_for_testing:true ensure_devices_found:true device:"iPhone 18 Pro Test Device (27.2)" xcargs:"-skipPackagePluginValidation"
 
 example-app-login:
 	@# Help: Sign an example app into WordPress.com (vars: PLATFORM=ios|android, DEVICE, RESET=1; token from ~/.wpcom-token).
@@ -214,16 +214,16 @@ test-swift-darwin: xcframework
 test-swift-macOS: test-swift-darwin
 
 test-swift-iOS: xcframework
-	scripts/xcodebuild-test.sh iOS-26-5
+	scripts/xcodebuild-test.sh iOS-27-2
 
 test-swift-Catalyst: xcframework
 	scripts/xcodebuild-test.sh Catalyst
 
 test-swift-tvOS: xcframework
-	scripts/xcodebuild-test.sh tvOS-26-5
+	scripts/xcodebuild-test.sh tvOS-27-2
 
 test-swift-watchOS: xcframework
-	scripts/xcodebuild-test.sh watchOS-26-5
+	scripts/xcodebuild-test.sh watchOS-27-2
 
 test-rust-lib:
 	$(rust_docker_run) cargo test --lib -- --nocapture
