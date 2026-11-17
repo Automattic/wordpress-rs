@@ -67,6 +67,22 @@ impl From<WpEndpointUrl> for String {
     }
 }
 
+/// `url` as a string that only uses characters RFC 3986 allows, or `None` if
+/// it isn't a URL.
+///
+/// Request URLs are built with the `url` crate, which follows the WHATWG URL
+/// standard and leaves characters such as `{`, `}`, `|` and `^` unencoded.
+/// Stricter parsers reject them: Foundation's `URL(string:)` returns `nil` for
+/// `{` in a host on every OS version, and for `|` or `^` in a path or query
+/// before iOS 17 and macOS 14. The result percent-encodes them, and names the
+/// same resource.
+#[uniffi::export]
+pub fn wp_endpoint_url_rfc3986(url: WpEndpointUrl) -> Option<String> {
+    Url::parse(&url.0)
+        .ok()
+        .map(|url| crate::parsed_url::rfc3986_serialization(&url))
+}
+
 #[derive(Debug)]
 pub struct ApiEndpointUrl {
     url: Url,
@@ -196,6 +212,28 @@ mod tests {
     use std::sync::Arc;
 
     const EXAMPLE_WP_JSON_URL: &str = "https://example.com/wp-json";
+
+    #[rstest]
+    #[case::unchanged("https://example.com/wp-json/", "https://example.com/wp-json/")]
+    #[case::host_placeholder("https://{cdn}/wp-json/", "https://%7Bcdn%7D/wp-json/")]
+    #[case::path_and_query(
+        "https://example.com/wp-json/a|b?q[0]=^",
+        "https://example.com/wp-json/a%7Cb?q%5B0%5D=%5E"
+    )]
+    fn wp_endpoint_url_rfc3986(#[case] input: &str, #[case] expected: &str) {
+        assert_eq!(
+            super::wp_endpoint_url_rfc3986(WpEndpointUrl(input.to_string())).as_deref(),
+            Some(expected)
+        );
+    }
+
+    #[test]
+    fn wp_endpoint_url_rfc3986_not_a_url() {
+        assert_eq!(
+            super::wp_endpoint_url_rfc3986(WpEndpointUrl("not a url".to_string())),
+            None
+        );
+    }
 
     #[fixture]
     pub fn fixture_wp_org_site_api_url_resolver() -> Arc<dyn ApiUrlResolver> {
