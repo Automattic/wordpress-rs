@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The default User-Agent now sends the release version, `wordpress-rs/0.11.0`, instead of `wordpress-rs/0.1.0`. Every crate now takes its version from `[workspace.package]` in the root `Cargo.toml`, and CI checks that it matches the newest release in this file.
 - **Internal:** Added integration test covering the `MediaService::create_media` cache upsert and collection update path.
 - **Internal:** Each PR build's xcframework is published at its own path, `pr-builds/<PR>/<build>`, rather than `pr-builds/<PR>`. A rebuild used to replace the file at the shared path while the CDN kept serving the old one, so apps pinned to the new `pr-build/<PR>` commit failed SwiftPM's checksum check. Package.swift on `pr-build/<PR>` points at the new path, so nothing changes for apps that pin it.
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.99.0` to `1.99.1`.
