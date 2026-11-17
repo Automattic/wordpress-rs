@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WpApiCache::remove_wordpress_com_account` deletes everything cached for a WordPress.com account, including its Reader posts and saved posts. Call it on sign-out. Swift gets it as `WordPressApiCache.removeWordpressComAccount(userId:)`.
 - `decode_html_entities` decodes the HTML character references in a field the API returns as HTML, such as a post title (`&#8211;` → `–`), the way a browser decodes text content. Swift gets it as `String.decodingHTMLEntities()`.
 - `site_icons` lists the icons a web page declares (`<link rel="icon">`, `apple-touch-icon`, `mask-icon`, `msapplication-TileImage`), with their sizes and types, resolved against the page's address and `<base href>` and percent-encoded so strict URL parsers accept them. `preferred_site_icon` picks the one to show at a given size, skipping SVG and mask icons and ranking an icon without `sizes` by a `-WxH` file name (as WordPress names them), and falls back to `/favicon.ico` at the origin's root (or returns nothing when the page isn't on `http` or `https`). Swift gets them as `SiteIcon.all(inHTML:pageURL:)`, `SiteIcon.preferred(inHTML:pageURL:size:)` and `SiteIcon.asURL`.
+- The Swift and Kotlin example apps have a Saved Posts screen, built on `ReaderSavedService` and its cache-backed `ReaderSavedPostsCollection`, with paging, saving a URL, unsaving and refreshing. The list is there after a relaunch, offline.
 
 ### Fixed
 
