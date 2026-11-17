@@ -9,9 +9,10 @@ A release is published automatically when a version bump PR is merged to `trunk`
      UTC date. `X.Y.Z` is strict semver, optionally with an `-alpha.N` /
      `-beta.N` / `-rc.N` suffix for pre-releases.
    - Add a fresh empty `## [Unreleased]` section above the new version.
-   - Set `version = "X.Y.Z"` in every workspace crate's `Cargo.toml`, then
-     run `cargo update -w` to update `Cargo.lock`. `wp_api`'s version is
-     sent in the default User-Agent.
+   - Set `version = "X.Y.Z"` under `[workspace.package]` in the root
+     `Cargo.toml` (every crate inherits it), then run `cargo update -w` to
+     update `Cargo.lock`. `wp_api`'s version is sent in the default
+     User-Agent.
    - Apply the `Release` GitHub label.
    - PR title: `Release X.Y.Z`.
 2. **Review and merge** the PR. The `trunk` build detects the new version and
@@ -24,6 +25,10 @@ The release is detected from the version bump commit, so:
 - PRs must be **squash-merged** to `trunk`.
 - The header must be exactly `## [X.Y.Z] - YYYY-MM-DD`, with `## [Unreleased]`
   kept above it.
+- The `Cargo.toml` and `Cargo.lock` versions must match the newest
+  `CHANGELOG.md` release. The `Validate Versions` CI step
+  (`.buildkite/commands/validate-versions.sh`) fails the build when they
+  don't.
 
 ## Manual release
 

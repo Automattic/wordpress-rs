@@ -1,6 +1,6 @@
 [package]
 name = "wp_localization"
-version = "0.11.0"
+version.workspace = true
 edition = "2024"
 
 [build-dependencies]

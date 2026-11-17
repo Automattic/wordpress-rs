@@ -1,6 +1,6 @@
 [package]
 name = "xcframework"
-version = "0.11.0"
+version.workspace = true
 edition = "2024"
 
 [dependencies]

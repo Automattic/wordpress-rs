@@ -24,6 +24,11 @@ members = [
 ]
 resolver = "3"
 
+# Every crate inherits this version. Bump it with the `## [X.Y.Z]` header in
+# CHANGELOG.md when releasing; CI checks that the two match.
+[workspace.package]
+version = "0.11.0"
+
 # Test binaries carry line tables instead of full debug info, which caps the
 # memory a `cargo test` link consumes on CI. Backtraces still resolve to file
 # and line; a debugger can no longer print locals or format values. For a

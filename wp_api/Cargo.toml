@@ -1,6 +1,6 @@
 [package]
 name = "wp_api"
-version = "0.11.0"
+version.workspace = true
 edition = "2024"
 
 [features]
