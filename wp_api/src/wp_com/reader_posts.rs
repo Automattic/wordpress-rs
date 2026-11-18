@@ -11,6 +11,7 @@
 use crate::{
     date::{WpGmtDateTime, deserialize_optional_wp_gmt_date_time},
     html_entities::decode_html_entities,
+    impl_as_query_value_from_to_string,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
@@ -18,6 +19,7 @@ use crate::{
         WpComSiteId,
         reader_saved::{ReaderPostSaveIdentity, deserialize_optional_text},
     },
+    wp_content_string_id,
 };
 use serde::{
     Deserialize, Deserializer, Serialize,
@@ -424,6 +426,95 @@ pub struct ReaderStreamParams {
     /// [`ReaderPost::site_locale`], and `likes` its likes.
     #[uniffi(default = None)]
     pub meta: Option<String>,
+}
+
+wp_content_string_id!(ReaderTagSlug);
+
+/// How a tag's posts are ordered.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ReaderTagPostsSort {
+    /// Newest first. The API's default.
+    Date,
+    /// Most popular first. A page then has no [`ReaderTagPostsResponse::date_range`].
+    Popularity,
+}
+
+impl_as_query_value_from_to_string!(ReaderTagPostsSort);
+
+/// Query parameters for a tag's posts. For the next page, pass the page's
+/// [`ReaderTagPostsResponse::next_page_handle`] as `page_handle`.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // The stream pages with `page_handle` rather than a page number.
+pub struct ReaderTagPostsParams {
+    /// The number of posts to return. The API returns 10 at most, whatever is asked for.
+    #[uniffi(default = None)]
+    pub number: Option<u32>,
+    /// The previous page's [`ReaderTagPostsResponse::next_page_handle`]. Send the same `sort` that
+    /// returned it.
+    #[uniffi(default = None)]
+    pub page_handle: Option<String>,
+    /// The order of the posts. The API's default is [`ReaderTagPostsSort::Date`].
+    #[uniffi(default = None)]
+    pub sort: Option<ReaderTagPostsSort>,
+    /// Only return posts published before this time.
+    #[uniffi(default = None)]
+    pub before: Option<WpGmtDateTime>,
+    /// Only return posts published after this time.
+    #[uniffi(default = None)]
+    pub after: Option<WpGmtDateTime>,
+}
+
+/// A page of a tag's posts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderTagPostsResponse")]
+pub struct ReaderTagPostsResponse {
+    /// The page's posts, without any in [`Self::unreadable_posts`]. Empty for a tag nobody has
+    /// used: the API has no "not found" for a tag.
+    pub posts: Vec<ReaderPost>,
+    /// The posts on the page that couldn't be read. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_posts: Vec<ReaderUnreadablePost>,
+    /// Pass it as `page_handle` for the next page. `None` on the last page.
+    #[uniffi(default = None)]
+    pub next_page_handle: Option<String>,
+    /// The dates the page covers. Missing when the posts are sorted by popularity.
+    #[uniffi(default = None)]
+    pub date_range: Option<ReaderDateRange>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderTagPostsResponse {
+    #[serde(default)]
+    posts: Option<LenientVec<ReaderPost>>,
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    next_page_handle: Option<String>,
+    #[serde(default)]
+    date_range: Option<ReaderDateRange>,
+}
+
+impl From<RawReaderTagPostsResponse> for ReaderTagPostsResponse {
+    fn from(raw: RawReaderTagPostsResponse) -> Self {
+        let (posts, unreadable_posts) = sort_posts(raw.posts);
+        Self {
+            posts,
+            unreadable_posts,
+            next_page_handle: raw.next_page_handle,
+            date_range: raw.date_range,
+        }
+    }
 }
 
 /// Every field a Reader post can arrive with, before the ones that vary in shape are tidied up.
@@ -860,6 +951,78 @@ mod tests {
         serde_json::from_value(value).expect("the post parses")
     }
 
+    /// A recording of a tag's posts on WordPress.com, trimmed, with the site, author and post
+    /// details replaced. It keeps the types the API sent, such as `like_count` as a string.
+    #[test]
+    fn test_deserialize_tag_posts() {
+        let json = include_str!("../../tests/wpcom/reader_posts/tag_posts.json");
+        let page: ReaderTagPostsResponse = serde_json::from_str(json).expect("the page parses");
+
+        assert_eq!(page.posts.len(), 2);
+        assert_eq!(
+            page.next_page_handle.as_deref(),
+            Some("ZnJvbT0yJmJlZm9yZT0yMDI2LTExLTE3VDE5JTNBMzklM0ExNC0wNSUzQTAw")
+        );
+        let range = page.date_range.expect("a page sorted by date has a range");
+        assert!(range.before.is_some());
+        assert!(range.after.is_some());
+
+        let post = &page.posts[0];
+        assert_eq!(post.identity.id, 1001);
+        assert_eq!(post.identity.site_id, Some(WpComSiteId(2001)));
+        assert!(!post.identity.is_external);
+        assert_eq!(post.title.as_deref(), Some("Example post 1"));
+        assert!(post.like_count.is_some());
+        assert_eq!(post.tags.as_ref().map(Vec::len), Some(1));
+    }
+
+    /// What the API sends for a tag nobody has used: no posts, and nulls where a page has values.
+    #[test]
+    fn test_deserialize_tag_posts_for_an_unused_tag() {
+        let page: ReaderTagPostsResponse = serde_json::from_value(json!({
+            "success": true,
+            "tags": ["no-such-tag"],
+            "sort": "date",
+            "lang": "en",
+            "page": 1,
+            "posts": [],
+            "next_page_handle": null,
+            "date_range": { "before": null, "after": null },
+        }))
+        .expect("the page parses");
+
+        assert!(page.posts.is_empty());
+        assert_eq!(page.next_page_handle, None);
+        assert_eq!(
+            page.date_range,
+            Some(ReaderDateRange {
+                before: None,
+                after: None,
+                unreadable_before: None,
+                unreadable_after: None,
+            })
+        );
+    }
+
+    /// Sorted by popularity, a page has no `date_range`.
+    #[test]
+    fn test_deserialize_tag_posts_sorted_by_popularity() {
+        let page: ReaderTagPostsResponse = serde_json::from_value(json!({
+            "success": true,
+            "tags": ["photography"],
+            "sort": "popularity",
+            "lang": "en",
+            "page": 1,
+            "posts": [{ "ID": 1, "site_ID": 2 }],
+            "next_page_handle": "ZnJvbT0z",
+        }))
+        .expect("the page parses");
+
+        assert_eq!(page.posts.len(), 1);
+        assert_eq!(page.next_page_handle.as_deref(), Some("ZnJvbT0z"));
+        assert_eq!(page.date_range, None);
+    }
+
     /// A recording of a site's posts on WordPress.com, with `meta=site,likes`, trimmed.
     #[test]
     fn test_deserialize_site_posts() {
@@ -1265,6 +1428,27 @@ mod tests {
             "{}",
             unreadable.error
         );
+    }
+
+    #[test]
+    fn test_a_page_of_a_tag_keeps_its_posts_when_one_cannot_be_read() {
+        let page: ReaderTagPostsResponse = serde_json::from_value(json!({
+            "posts": [
+                { "ID": 1, "site_ID": 10 },
+                { "ID": 2, "site_ID": 10, "modified": UNREADABLE_DATE },
+            ],
+            "next_page_handle": "ZnJvbT0z",
+        }))
+        .expect("the page parses");
+
+        assert_eq!(ids(&page.posts), [1]);
+        assert_eq!(page.next_page_handle.as_deref(), Some("ZnJvbT0z"));
+        let unreadable: Vec<_> = page
+            .unreadable_posts
+            .iter()
+            .map(|post| post.identity.as_ref().map(|identity| identity.id))
+            .collect();
+        assert_eq!(unreadable, [Some(2)]);
     }
 
     /// A post has to have an ID, so one without is unreadable, and there's no saying which it was.

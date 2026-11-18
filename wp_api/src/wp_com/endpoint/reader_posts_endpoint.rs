@@ -2,7 +2,10 @@ use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
     wp_com::{
         WpComNamespace, WpComSiteId,
-        reader_posts::{ReaderPostsResponse, ReaderStreamParams},
+        reader_posts::{
+            ReaderPostsResponse, ReaderStreamParams, ReaderTagPostsParams, ReaderTagPostsResponse,
+            ReaderTagSlug,
+        },
         reader_saved::ReaderFeedId,
     },
 };
@@ -19,11 +22,18 @@ enum ReaderPostsRequest {
     // An RSS feed's posts.
     #[get(url = "/read/feed/<reader_feed_id>/posts", params = &ReaderStreamParams, output = ReaderPostsResponse)]
     FeedPosts,
+    // A tag's posts.
+    #[get(url = "/read/tags/<reader_tag_slug>/posts", params = &ReaderTagPostsParams, output = ReaderTagPostsResponse)]
+    TagPosts,
 }
 
 impl DerivedRequest for ReaderPostsRequest {
     fn namespace(&self) -> impl AsNamespace {
-        WpComNamespace::RestV1_2
+        match self {
+            // The newest tag stream. `rest/v1.2` and `rest/v1.3` have older ones.
+            Self::TagPosts => WpComNamespace::V2,
+            _ => WpComNamespace::RestV1_2,
+        }
     }
 }
 
@@ -32,8 +42,12 @@ mod tests {
     use super::*;
     use crate::{
         request::endpoint::ApiUrlResolver,
-        wp_com::endpoint::tests::{
-            fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_2_endpoint,
+        wp_com::{
+            endpoint::tests::{
+                fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_2_endpoint,
+                validate_wp_com_v2_endpoint,
+            },
+            reader_posts::ReaderTagPostsSort,
         },
     };
     use rstest::*;
@@ -79,6 +93,42 @@ mod tests {
         validate_wp_com_rest_v1_2_endpoint(
             endpoint.feed_posts(&ReaderFeedId(8857199), &ReaderStreamParams::default()),
             "/read/feed/8857199/posts?",
+        );
+    }
+
+    #[rstest]
+    fn tag_posts(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_v2_endpoint(
+            endpoint.tag_posts(
+                &ReaderTagSlug("photography".to_string()),
+                &ReaderTagPostsParams::default(),
+            ),
+            "/read/tags/photography/posts?",
+        );
+        validate_wp_com_v2_endpoint(
+            endpoint.tag_posts(
+                &ReaderTagSlug("photography".to_string()),
+                &ReaderTagPostsParams {
+                    number: Some(10),
+                    page_handle: Some("abc==".to_string()),
+                    sort: Some(ReaderTagPostsSort::Popularity),
+                    before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
+                    after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
+                },
+            ),
+            "/read/tags/photography/posts?number=10&page_handle=abc%3D%3D&sort=popularity&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00",
+        );
+    }
+
+    /// A tag's slug can hold any character, such as Japanese, so it's escaped in the path.
+    #[rstest]
+    fn tag_posts_escapes_the_slug(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_v2_endpoint(
+            endpoint.tag_posts(
+                &ReaderTagSlug("写真".to_string()),
+                &ReaderTagPostsParams::default(),
+            ),
+            "/read/tags/%E5%86%99%E7%9C%9F/posts?",
         );
     }
 

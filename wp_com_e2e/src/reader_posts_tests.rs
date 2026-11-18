@@ -1,7 +1,7 @@
 use libtest_mimic::Trial;
 use std::sync::Arc;
 use wp_api::wp_com::WpComSiteId;
-use wp_api::wp_com::reader_posts::ReaderStreamParams;
+use wp_api::wp_com::reader_posts::{ReaderStreamParams, ReaderTagPostsParams, ReaderTagSlug};
 use wp_api::wp_com::reader_saved::ReaderFeedId;
 
 use crate::context::TestContext;
@@ -89,6 +89,52 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let post = page.posts.first().ok_or("The feed has no posts")?;
                     if !post.identity.is_external || post.identity.feed_item_id.is_none() {
                         return Err("A feed post should be external, with a feed item ID".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_posts::tag_posts", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // A tag busy enough to always have a second page.
+                    let tag = ReaderTagSlug("photography".to_string());
+                    let first = ctx
+                        .client
+                        .reader_posts()
+                        .tag_posts(&tag, &ReaderTagPostsParams::default())
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if first.posts.is_empty() {
+                        return Err("The tag has no posts".into());
+                    }
+                    let handle = first
+                        .next_page_handle
+                        .ok_or("The first page has no handle for the next")?;
+
+                    // Paging by handle: the next page is other posts.
+                    let params = ReaderTagPostsParams {
+                        page_handle: Some(handle),
+                        ..Default::default()
+                    };
+                    let second = ctx
+                        .client
+                        .reader_posts()
+                        .tag_posts(&tag, &params)
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    let seen = |page: &[wp_api::wp_com::reader_posts::ReaderPost]| {
+                        page.iter()
+                            .map(|post| (post.identity.site_id, post.identity.id))
+                            .collect::<std::collections::HashSet<_>>()
+                    };
+                    if second.posts.is_empty()
+                        || !seen(&first.posts).is_disjoint(&seen(&second.posts))
+                    {
+                        return Err("The second page should be other posts".into());
                     }
                     Ok(())
                 })
