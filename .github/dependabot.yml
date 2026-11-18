@@ -9,6 +9,9 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    ignore:
+      # Keep compatibility with Apple's system SQLite on iOS 18.
+      - dependency-name: "rusqlite"
 
   - package-ecosystem: "swift"
     directory: "/" # Location of package manifests
