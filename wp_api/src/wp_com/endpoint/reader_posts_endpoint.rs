@@ -59,10 +59,11 @@ mod tests {
             before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
             after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
             meta: Some("site,likes".to_string()),
+            fields: Some("ID,site_ID,date".to_string()),
         }
     }
 
-    const ALL_PARAMS_QUERY: &str = "number=7&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00&meta=site%2Clikes";
+    const ALL_PARAMS_QUERY: &str = "number=7&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00&meta=site%2Clikes&fields=ID%2Csite_ID%2Cdate";
 
     #[rstest]
     fn following(endpoint: ReaderPostsRequestEndpoint) {

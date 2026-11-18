@@ -426,6 +426,20 @@ pub struct ReaderStreamParams {
     /// [`ReaderPost::site_locale`], and `likes` its likes.
     #[uniffi(default = None)]
     pub meta: Option<String>,
+    /// The fields of each post to return, comma-separated, such as `ID,site_ID,date`. Without it
+    /// a post arrives with every field, about 60 of them.
+    ///
+    /// - `ID` has to be among them. A post without one can't be read, and is listed in
+    ///   [`ReaderPostsResponse::unreadable_posts`].
+    /// - `meta` has to be among them for what [`Self::meta`] asks for to arrive.
+    /// - Paging by date needs `date`.
+    /// - The API works some fields out from others, and only from the ones asked for. It fills
+    ///   `featured_media` from a post's `attachments` and `content`, so without those it's empty.
+    ///
+    /// A stream with no posts then answers with an empty list where the page would be, which reads
+    /// as a page with no posts.
+    #[uniffi(default = None)]
+    pub fields: Option<String>,
 }
 
 wp_content_string_id!(ReaderTagSlug);
@@ -1392,6 +1406,45 @@ mod tests {
     #[test]
     fn test_a_post_without_an_id_is_an_error() {
         assert!(serde_json::from_value::<ReaderPost>(json!({ "site_ID": 2 })).is_err());
+    }
+
+    /// With `fields`, a post arrives with only the fields asked for.
+    #[test]
+    fn test_a_page_of_posts_with_few_fields() {
+        let page: ReaderPostsResponse = serde_json::from_value(json!({
+            "found": 2,
+            "posts": [
+                { "ID": 1, "site_ID": 10, "date": "2026-11-17T09:00:00+00:00" },
+                { "ID": 2, "site_ID": 10, "date": "2026-11-16T09:00:00+00:00" },
+            ],
+        }))
+        .expect("the page parses");
+
+        assert_eq!(ids(&page.posts), [1, 2]);
+        assert!(page.unreadable_posts.is_empty());
+        assert!(page.posts.iter().all(|post| post.date.is_some()));
+        assert_eq!(page.posts[0].title, None);
+    }
+
+    /// Asked for `fields` that leave out `ID`, the API sends posts that can't be told apart.
+    #[test]
+    fn test_a_page_of_posts_without_their_ids() {
+        let page: ReaderPostsResponse = serde_json::from_value(json!({
+            "posts": [{ "title": "One" }, { "title": "Two" }],
+        }))
+        .expect("the page parses");
+
+        assert!(page.posts.is_empty());
+        assert_eq!(page.unreadable_posts.len(), 2);
+    }
+
+    /// With `fields`, a stream with no posts answers with an empty list where the page would be.
+    #[test]
+    fn test_a_page_sent_as_an_empty_list() {
+        let page: ReaderPostsResponse = serde_json::from_str("[]").expect("the page parses");
+        assert!(page.posts.is_empty());
+        assert!(page.unreadable_posts.is_empty());
+        assert_eq!(page.date_range, None);
     }
 
     /// A date WordPress.com sends for a post whose local and GMT dates don't agree.

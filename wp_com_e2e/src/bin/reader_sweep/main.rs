@@ -95,6 +95,12 @@ struct Args {
     #[arg(long)]
     meta: Option<String>,
 
+    /// The `fields` parameter to send with each request: the fields of each post to return, such
+    /// as `ID,site_ID,date`. It needs `ID`, or no post can be read, and `date`, or a stream stops
+    /// after its first page. A tag's stream doesn't take one.
+    #[arg(long)]
+    fields: Option<String>,
+
     /// How many streams to walk at once.
     #[arg(long, default_value_t = 4)]
     concurrency: usize,
@@ -481,6 +487,7 @@ async fn fetch_once(
         before,
         after: None,
         meta: args.meta.clone(),
+        fields: args.fields.clone(),
     };
     // Each endpoint has its own response type around the same page of posts.
     let page = match stream {

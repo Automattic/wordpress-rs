@@ -1,7 +1,9 @@
 use libtest_mimic::Trial;
 use std::sync::Arc;
 use wp_api::wp_com::WpComSiteId;
-use wp_api::wp_com::reader_posts::{ReaderStreamParams, ReaderTagPostsParams, ReaderTagSlug};
+use wp_api::wp_com::reader_posts::{
+    ReaderPost, ReaderStreamParams, ReaderTagPostsParams, ReaderTagSlug,
+};
 use wp_api::wp_com::reader_saved::ReaderFeedId;
 
 use crate::context::TestContext;
@@ -75,6 +77,48 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 })
             }
         }),
+        Trial::test("reader_posts::fields", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let page = |fields: Option<&str>| {
+                        let params = ReaderStreamParams {
+                            number: Some(10),
+                            meta: Some("site,likes".to_string()),
+                            fields: fields.map(str::to_string),
+                            ..Default::default()
+                        };
+                        let ctx = Arc::clone(&ctx);
+                        async move {
+                            ctx.client
+                                .reader_posts()
+                                .site_posts(&SITE, &params)
+                                .await
+                                .map(|response| response.data)
+                                .map_err(|e| e.to_string())
+                        }
+                    };
+
+                    // Without `fields`, a post has its title and content.
+                    let whole = page(None).await?;
+                    let post = whole.posts.first().ok_or("The site has no posts")?;
+                    if post.title.is_none() || post.content.is_none() {
+                        return Err("A whole post is missing its title or content".into());
+                    }
+
+                    // A few fields give only those.
+                    let few = page(Some("ID,site_ID,date")).await?;
+                    let post = few.posts.first().ok_or("The site has no posts")?;
+                    if post.identity.site_id != Some(SITE) || post.date.is_none() {
+                        return Err("A post is missing a field that was asked for".into());
+                    }
+                    if post.title.is_some() || post.content.is_some() {
+                        return Err("A post has a field that wasn't asked for".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
         Trial::test("reader_posts::feed_posts", {
             let ctx = Arc::clone(&ctx);
             move || {
@@ -126,7 +170,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         .await
                         .map_err(|e| e.to_string())?
                         .data;
-                    let seen = |page: &[wp_api::wp_com::reader_posts::ReaderPost]| {
+                    let seen = |page: &[ReaderPost]| {
                         page.iter()
                             .map(|post| (post.identity.site_id, post.identity.id))
                             .collect::<std::collections::HashSet<_>>()
