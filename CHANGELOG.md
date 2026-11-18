@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed an app launch crash on iOS 18 caused by the missing `sqlite3_set_clientdata` symbol, while continuing to use Apple's system SQLite.
+
 ## [0.11.0] - 2026-11-17
 
 ### Added
