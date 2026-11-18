@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
 
+### Fixed
+
+- A page of a Reader stream no longer fails to parse when one of its posts can't be read, such as a post whose date has a UTC offset of `+91:00`, which WordPress.com sends for some posts. `ReaderPostsResponse` keeps the posts that can be read in `posts`, and lists each of the others in the new `unreadable_posts` as a `ReaderUnreadablePost`, with the post's IDs and the reason. The same date in a page's `date_range` no longer fails the page either: the date is `None`, and `ReaderDateRange.unreadable_before` or `unreadable_after` has what the API sent.
+- A page of a Reader stream no longer fails to parse when one of its posts has a featured image with a negative `width` or `height`, which WordPress.com sends for some images. `ReaderFeaturedMedia.width` and `height` are now `None` for a value that isn't a size.
+- A page of a Reader stream no longer fails to parse when one of its posts has a negative comment count, which WordPress.com sends for some posts. `ReaderPost.comment_count` is now `None` for a value that isn't a count.
+
 ## [0.11.1] - 2026-11-18
 
 ### Fixed

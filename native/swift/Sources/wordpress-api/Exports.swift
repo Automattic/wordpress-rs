@@ -336,6 +336,7 @@ public typealias ReaderPostsRequestSitePostsResponse = WordPressAPIInternal.Read
 public typealias ReaderPostsRequestFeedPostsResponse = WordPressAPIInternal.ReaderPostsRequestFeedPostsResponse
 public typealias ReaderPostsResponse = WordPressAPIInternal.ReaderPostsResponse
 public typealias ReaderStreamParams = WordPressAPIInternal.ReaderStreamParams
+public typealias ReaderUnreadablePost = WordPressAPIInternal.ReaderUnreadablePost
 public typealias ReaderSavedBulkKey = WordPressAPIInternal.ReaderSavedBulkKey
 public typealias ReaderSavedBulkParams = WordPressAPIInternal.ReaderSavedBulkParams
 public typealias ReaderSavedBulkResponse = WordPressAPIInternal.ReaderSavedBulkResponse

@@ -4,6 +4,9 @@
 //! post shape, with fields that vary in type between posts: a site ID can be a number or a string,
 //! an empty `site_icon` or `tags` is an empty array rather than an object, and `i_like` can be `0` or
 //! `1`. [`ReaderPost`] reads all of them into one shape.
+//!
+//! A post that still can't be read doesn't fail its page. The page keeps the posts that can be
+//! read, and lists each of the others as a [`ReaderUnreadablePost`].
 
 use crate::{
     date::{WpGmtDateTime, deserialize_optional_wp_gmt_date_time},
@@ -23,8 +26,7 @@ use serde::{
 use std::fmt;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
-    deserialize_null_as_empty_vec, deserialize_optional_bool_or_int,
-    deserialize_u64_or_string_or_none,
+    LenientVec, deserialize_optional_bool_or_int, deserialize_u64_or_string_or_none,
 };
 
 /// A post in a Reader stream.
@@ -207,10 +209,12 @@ pub struct ReaderFeaturedMedia {
     )]
     #[uniffi(default = None)]
     pub media_type: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
+    /// `None` when the API sends something that isn't a size, such as a negative number.
+    #[serde(default, deserialize_with = "deserialize_optional_size")]
     #[uniffi(default = None)]
     pub width: Option<u64>,
-    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
+    /// `None` when the API sends something that isn't a size, such as a negative number.
+    #[serde(default, deserialize_with = "deserialize_optional_size")]
     #[uniffi(default = None)]
     pub height: Option<u64>,
 }
@@ -273,29 +277,133 @@ pub struct ReaderCrossPost {
 }
 
 /// The dates a page of a Reader stream covers, to page with `before`.
+///
+/// The API takes each date from a post on the page, so a date that can't be read turns up here as
+/// well as on its post. That doesn't fail the page: the date is left out, and what the API sent is
+/// kept beside it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderDateRange")]
 pub struct ReaderDateRange {
-    #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
+    /// `None` when the API left it out, and when what it sent is in [`Self::unreadable_before`].
     #[uniffi(default = None)]
     pub before: Option<WpGmtDateTime>,
-    #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
+    /// `None` when the API left it out, and when what it sent is in [`Self::unreadable_after`].
     #[uniffi(default = None)]
     pub after: Option<WpGmtDateTime>,
+    /// What the API sent for `before`, when that isn't a date that can be read.
+    #[uniffi(default = None)]
+    pub unreadable_before: Option<String>,
+    /// What the API sent for `after`, when that isn't a date that can be read.
+    #[uniffi(default = None)]
+    pub unreadable_after: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderDateRange {
+    #[serde(default)]
+    before: Option<serde_json::Value>,
+    #[serde(default)]
+    after: Option<serde_json::Value>,
+}
+
+impl From<RawReaderDateRange> for ReaderDateRange {
+    fn from(raw: RawReaderDateRange) -> Self {
+        let (before, unreadable_before) = date_range_bound(raw.before);
+        let (after, unreadable_after) = date_range_bound(raw.after);
+        Self {
+            before,
+            after,
+            unreadable_before,
+            unreadable_after,
+        }
+    }
+}
+
+/// One end of a date range: the date, or what the API sent when that isn't a date that can be read.
+fn date_range_bound(sent: Option<serde_json::Value>) -> (Option<WpGmtDateTime>, Option<String>) {
+    let Some(sent) = sent else {
+        return (None, None);
+    };
+    match deserialize_optional_wp_gmt_date_time(&sent) {
+        Ok(date) => (date, None),
+        Err(_) => {
+            let unreadable = match sent {
+                serde_json::Value::String(text) => text,
+                other => other.to_string(),
+            };
+            (None, Some(unreadable))
+        }
+    }
+}
+
+/// A post on a page of a Reader stream that couldn't be read.
+///
+/// One post the library can't read doesn't fail its page: the page keeps the posts it can read,
+/// and lists the others as these, so that a caller can report them and knows the page had more
+/// posts than it returned. WordPress.com sends a few such posts, for example one whose date has a
+/// UTC offset of `+91:00`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderUnreadablePost {
+    /// Which post it is. `None` when its IDs couldn't be read either.
+    #[uniffi(default = None)]
+    pub identity: Option<ReaderPostSaveIdentity>,
+    /// Why it couldn't be read. A line and column in it count from the start of the post.
+    pub error: String,
+}
+
+/// Sorts a page's posts into the ones that were read and the ones that weren't.
+fn sort_posts(
+    posts: Option<LenientVec<ReaderPost>>,
+) -> (Vec<ReaderPost>, Vec<ReaderUnreadablePost>) {
+    let posts = posts.unwrap_or_default();
+    let unreadable = posts
+        .invalid
+        .into_iter()
+        .map(|post| ReaderUnreadablePost {
+            identity: serde_json::from_str(post.json.get()).ok(),
+            error: post.error.to_string(),
+        })
+        .collect();
+    (posts.valid, unreadable)
 }
 
 /// A page of a Reader stream, newest first.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderPostsResponse")]
 pub struct ReaderPostsResponse {
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
+    /// The page's posts, without any in [`Self::unreadable_posts`].
     pub posts: Vec<ReaderPost>,
+    /// The posts on the page that couldn't be read. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_posts: Vec<ReaderUnreadablePost>,
     /// The dates the page covers. The Following stream and feed streams send it; site streams don't.
-    #[serde(default)]
     #[uniffi(default = None)]
     pub date_range: Option<ReaderDateRange>,
     /// How many posts there are. Site streams send it.
-    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
     #[uniffi(default = None)]
     pub found: Option<u64>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderPostsResponse {
+    #[serde(default)]
+    posts: Option<LenientVec<ReaderPost>>,
+    #[serde(default)]
+    date_range: Option<ReaderDateRange>,
+    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
+    found: Option<u64>,
+}
+
+impl From<RawReaderPostsResponse> for ReaderPostsResponse {
+    fn from(raw: RawReaderPostsResponse) -> Self {
+        let (posts, unreadable_posts) = sort_posts(raw.posts);
+        Self {
+            posts,
+            unreadable_posts,
+            date_range: raw.date_range,
+            found: raw.found,
+        }
+    }
 }
 
 /// Query parameters for the Reader streams that page by date: Following, a site's posts, and a
@@ -477,7 +585,7 @@ struct RawMetadata {
 
 #[derive(Deserialize)]
 struct RawDiscussion {
-    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
+    #[serde(default, deserialize_with = "deserialize_optional_count")]
     comment_count: Option<u64>,
     #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
     comments_open: Option<bool>,
@@ -614,6 +722,24 @@ where
     )
 }
 
+/// A count of something. The API sends a negative number for some posts' comments, which isn't a
+/// count, so anything that isn't one reads as `None` rather than failing the post.
+fn deserialize_optional_count<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_optional_id(deserializer)
+}
+
+/// A width or height. The API sends a negative number for some images, which isn't a size, so
+/// anything that isn't one reads as `None` rather than failing the post.
+fn deserialize_optional_size<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserialize_optional_id(deserializer)
+}
+
 /// A value the API sends as an object, or as an empty object or array, an empty string, `false` or
 /// `null` when there isn't one.
 fn deserialize_object_or_empty<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
@@ -725,7 +851,7 @@ mod tests {
     use super::*;
     use crate::posts::PostId;
     use crate::wp_com::reader_saved::{
-        ReaderFeedItemId, ReaderSavedKey, reader_saved_key_for_post,
+        ReaderFeedId, ReaderFeedItemId, ReaderSavedKey, reader_saved_key_for_post,
     };
     use rstest::rstest;
     use serde_json::json;
@@ -875,6 +1001,40 @@ mod tests {
         assert_eq!(post.featured_media, None);
         assert_eq!(post.comment_count, Some(4));
         assert_eq!(post.date, None);
+    }
+
+    /// Real posts have a negative comment count. It isn't a count, so it reads as `None`, and the
+    /// post is kept.
+    #[test]
+    fn test_comment_count_that_is_not_a_count() {
+        let post = parse(json!({
+            "ID": 9,
+            "site_ID": 123,
+            "discussion": { "comment_count": -8, "comments_open": true },
+        }));
+        assert_eq!(post.comment_count, None);
+        assert_eq!(post.comments_open, Some(true));
+    }
+
+    /// Real posts have a featured image with a negative width and height. Neither is a size, so
+    /// each reads as `None`, and the post and its image are kept.
+    #[test]
+    fn test_featured_media_with_sizes_that_are_not_sizes() {
+        let post = parse(json!({
+            "ID": 9,
+            "site_ID": 123,
+            "featured_media": {
+                "uri": "https://example.com/image.jpg",
+                "type": "image",
+                "width": -340,
+                "height": -334,
+            },
+        }));
+        let media = post.featured_media.expect("the image is kept");
+        assert_eq!(media.uri.as_deref(), Some("https://example.com/image.jpg"));
+        assert_eq!(media.media_type.as_deref(), Some("image"));
+        assert_eq!(media.width, None);
+        assert_eq!(media.height, None);
     }
 
     #[rstest::rstest]
@@ -1069,5 +1229,118 @@ mod tests {
     #[test]
     fn test_a_post_without_an_id_is_an_error() {
         assert!(serde_json::from_value::<ReaderPost>(json!({ "site_ID": 2 })).is_err());
+    }
+
+    /// A date WordPress.com sends for a post whose local and GMT dates don't agree.
+    const UNREADABLE_DATE: &str = "2026-11-16T16:45:34+91:00";
+
+    fn ids(posts: &[ReaderPost]) -> Vec<u64> {
+        posts.iter().map(|post| post.identity.id).collect()
+    }
+
+    #[test]
+    fn test_a_page_keeps_its_posts_when_one_cannot_be_read() {
+        let page: ReaderPostsResponse = serde_json::from_value(json!({
+            "found": 3,
+            "posts": [
+                { "ID": 1, "site_ID": 10, "date": "2026-11-17T09:00:00+00:00" },
+                { "ID": 2, "site_ID": 10, "feed_ID": 20, "date": UNREADABLE_DATE },
+                { "ID": 3, "site_ID": 10, "date": "2026-11-15T09:00:00+00:00" },
+            ],
+        }))
+        .expect("the page parses");
+
+        assert_eq!(ids(&page.posts), [1, 3]);
+        assert_eq!(page.found, Some(3));
+        assert_eq!(page.unreadable_posts.len(), 1);
+        let unreadable = &page.unreadable_posts[0];
+        let identity = unreadable.identity.as_ref().expect("its IDs were read");
+        assert_eq!(identity.id, 2);
+        assert_eq!(identity.site_id, Some(WpComSiteId(10)));
+        assert_eq!(identity.feed_id, Some(ReaderFeedId(20)));
+        assert!(
+            unreadable
+                .error
+                .starts_with(&format!("Invalid date format: {UNREADABLE_DATE}")),
+            "{}",
+            unreadable.error
+        );
+    }
+
+    /// A post has to have an ID, so one without is unreadable, and there's no saying which it was.
+    #[test]
+    fn test_an_unreadable_post_whose_ids_cannot_be_read() {
+        let page: ReaderPostsResponse = serde_json::from_value(json!({
+            "posts": [{ "site_ID": 10, "title": "No ID" }, "not a post", { "ID": 3 }],
+        }))
+        .expect("the page parses");
+
+        assert_eq!(ids(&page.posts), [3]);
+        let identities: Vec<_> = page
+            .unreadable_posts
+            .iter()
+            .map(|post| post.identity.clone())
+            .collect();
+        assert_eq!(identities, [None, None]);
+    }
+
+    #[rstest]
+    #[case(json!({ "posts": [] }))]
+    #[case(json!({ "posts": null }))]
+    #[case(json!({}))]
+    fn test_a_page_without_posts(#[case] page: serde_json::Value) {
+        let page: ReaderPostsResponse = serde_json::from_value(page).expect("the page parses");
+        assert!(page.posts.is_empty());
+        assert!(page.unreadable_posts.is_empty());
+    }
+
+    /// Only a post that can't be read is passed over. A page that isn't a page is still an error.
+    #[rstest]
+    #[case(json!({ "posts": "none" }))]
+    #[case(json!({ "posts": { "ID": 1 } }))]
+    #[case(json!({ "posts": [], "found": [] }))]
+    fn test_a_page_that_cannot_be_read_is_an_error(#[case] page: serde_json::Value) {
+        assert!(serde_json::from_value::<ReaderPostsResponse>(page.clone()).is_err());
+        assert!(serde_json::from_str::<ReaderPostsResponse>(&page.to_string()).is_err());
+    }
+
+    /// The oldest post's date is the page's `date_range.after`, so an unreadable one is in both.
+    #[test]
+    fn test_a_date_range_with_a_date_that_cannot_be_read() {
+        let page: ReaderPostsResponse = serde_json::from_value(json!({
+            "date_range": { "before": "2026-11-17T09:00:00+00:00", "after": UNREADABLE_DATE },
+            "posts": [
+                { "ID": 1, "date": "2026-11-17T09:00:00+00:00" },
+                { "ID": 2, "date": UNREADABLE_DATE },
+            ],
+        }))
+        .expect("the page parses");
+
+        assert_eq!(ids(&page.posts), [1]);
+        assert_eq!(page.unreadable_posts.len(), 1);
+        let range = page.date_range.expect("the page has a range");
+        assert_eq!(range.before, page.posts[0].date);
+        assert_eq!(range.unreadable_before, None);
+        assert_eq!(range.after, None);
+        assert_eq!(range.unreadable_after.as_deref(), Some(UNREADABLE_DATE));
+    }
+
+    #[rstest]
+    #[case(json!(null), None, None)]
+    #[case(json!(""), None, None)]
+    #[case(json!("0000-00-00 00:00:00"), None, None)]
+    #[case(json!("2026-11-17T09:00:00+00:00"), Some("2026-11-17T09:00:00+00:00"), None)]
+    #[case(json!("yesterday"), None, Some("yesterday"))]
+    #[case(json!({ "date": 1 }), None, Some(r#"{"date":1}"#))]
+    fn test_date_range_bound(
+        #[case] sent: serde_json::Value,
+        #[case] date: Option<&str>,
+        #[case] unreadable: Option<&str>,
+    ) {
+        let range: ReaderDateRange =
+            serde_json::from_value(json!({ "after": sent })).expect("the range parses");
+        assert_eq!(range.after, date.map(|date| date.parse().unwrap()));
+        assert_eq!(range.unreadable_after.as_deref(), unreadable);
+        assert_eq!((range.before, range.unreadable_before), (None, None));
     }
 }
