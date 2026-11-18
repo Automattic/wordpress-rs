@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 integration_test_credentials = { path = "../integration_test_credentials" }
 libtest-mimic = "0.8"
 serde = { workspace = true, features = ["derive"] }
@@ -18,3 +19,8 @@ wp_mobile_cache = { path = "../wp_mobile_cache" }
 
 [[bin]]
 name = "wp_com_e2e"
+
+# Runs the Reader endpoints against a large amount of real data. See its module docs.
+[[bin]]
+name = "reader_sweep"
+path = "src/bin/reader_sweep/main.rs"

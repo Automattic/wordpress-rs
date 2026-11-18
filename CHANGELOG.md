@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - WordPress.com Reader tag streams: `GET /wpcom/v2/read/tags/{tag}/posts` returns `ReaderTagPostsResponse`, a page of a tag's `ReaderPost`s with the `next_page_handle` for the next page, and `unreadable_posts` for any post on the page that couldn't be read. `ReaderTagPostsParams` takes `number`, `page_handle`, `sort` (`ReaderTagPostsSort::Date` or `Popularity`), `before` and `after`. The API returns 10 posts at most. Swift gets it through `WPComApiClient.readerPosts.tagPosts`.
+- `wp_com_e2e` has a `reader_sweep` binary, which runs the Reader endpoints against a large amount of real WordPress.com data and checks that every response, and every post in it, can be read. It's a test tool: nothing in the library changes.
 
 ### Changed
 

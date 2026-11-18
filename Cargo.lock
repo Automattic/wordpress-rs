@@ -5544,6 +5544,7 @@ version = "0.11.1"
 dependencies = [
  "anyhow",
  "async-trait",
+ "clap",
  "integration_test_credentials",
  "libtest-mimic",
  "serde",
