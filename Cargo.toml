@@ -88,7 +88,7 @@ rstest = "0.28"
 rstest_reuse = "0.7.0"
 # rusqlite 0.41 requires SQLite 3.45.3; iOS 18 ships system SQLite 3.43.2.
 # Its sqlite3_set_clientdata calls require iOS 26 when using system SQLite.
-rusqlite = "=0.40.2"
+rusqlite = "=0.43.0"
 rustls = "0.23.40"
 scraper = "0.27"
 semver = "1.0"
