@@ -3,20 +3,25 @@
 use libtest_mimic::{Failed, Trial};
 use std::collections::HashSet;
 use std::sync::Arc;
+use wp_api::comments::{CommentDeleteParams, CommentId};
 use wp_api::posts::PostId;
 use wp_api::prelude::*;
-use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::endpoint::WpComDotOrgApiUrlResolver;
 use wp_api::wp_com::me::WpComUserId;
+use wp_api::wp_com::reader_page_views::ReaderPageView;
 use wp_api::wp_com::reader_posts::{
     ReaderListOwner, ReaderListSlug, ReaderSearchSort, ReaderTagSlug,
 };
 use wp_api::wp_com::reader_saved::{ReaderSavedKey, ReaderSavedSource};
+use wp_api::wp_com::{WpComBaseUrl, WpComSiteId};
 use wp_mobile::service::reader::{
-    ReaderActionOutcome, ReaderError, ReaderFollowTarget, ReaderService, ReaderStream,
-    ReaderStreamCollection, ReaderStreamItem,
+    ReaderActionOutcome, ReaderError, ReaderFollowTarget, ReaderPageViewOutcome, ReaderService,
+    ReaderStream, ReaderStreamCollection, ReaderStreamItem,
 };
 use wp_mobile::service::reader_saved::ReaderOfflineState;
 use wp_mobile_cache::WpApiCache;
+use wp_mobile_cache::db_types::reader::ReaderPostRecord;
+use wp_mobile_cache::repository::reader_comments::ReaderCommentSendState;
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
 
 use crate::context::TestContext;
@@ -528,6 +533,85 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 })
             }
         }),
+        // Writes a public comment, so it only runs against a site the account owns, named in
+        // `WP_COM_E2E_OWN_SITE_ID`. It deletes what it writes.
+        Trial::test("reader_service::a_comment_is_written_shown_and_deleted", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                let Some(site_id) = own_site() else {
+                    return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
+                };
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let mut written = Vec::new();
+                    let result = write_comments(&service, site_id, &mut written).await;
+                    // Whatever happened, the comments it wrote are deleted, replies first.
+                    let site = WpApiClient::new(
+                        Arc::new(WpComDotOrgApiUrlResolver::new(
+                            site_id.0.to_string(),
+                            WpComBaseUrl::Production,
+                        )),
+                        ctx.delegate.clone(),
+                    );
+                    for comment in written.iter().rev() {
+                        site.comments()
+                            .delete(comment, &CommentDeleteParams::new(None))
+                            .await
+                            .map_err(|e| format!("Comment {} wasn't deleted: {e}", comment.0))?;
+                    }
+                    result
+                })
+            }
+        })
+        .with_ignored_flag(own_site().is_none()),
+        // Counts one view, on a post of a site the account owns.
+        Trial::test("reader_service::a_page_view_of_an_own_post", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                let Some(site_id) = own_site() else {
+                    return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
+                };
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let post = first_post_of(&service, site_id).await?;
+
+                    // The library doesn't count a member's view of a public site, and does count
+                    // a private site's.
+                    let outcome = service
+                        .post_opened(post.key.clone())
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let expected = if post.site_is_private == Some(true) {
+                        ReaderPageViewOutcome::Counted
+                    } else {
+                        ReaderPageViewOutcome::NotCountedForSiteMember
+                    };
+                    if outcome != expected {
+                        return Err(format!("Expected {expected:?}, got {outcome:?}").into());
+                    }
+
+                    // The request itself, which the rule above may not have sent.
+                    let view = ReaderPageView {
+                        site_id,
+                        post_id: PostId(post.identity.id as i64),
+                        site_url: post.site_url.clone().ok_or("The post has no site URL")?,
+                        site_is_private: post.site_is_private == Some(true),
+                    };
+                    let request = view.request().ok_or("The view has no request")?;
+                    let response = ctx
+                        .delegate
+                        .request_executor
+                        .execute(Arc::new(request))
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if response.status_code != 200 {
+                        return Err(format!("The pixel answered {}", response.status_code).into());
+                    }
+                    Ok(())
+                })
+            }
+        })
+        .with_ignored_flag(own_site().is_none()),
         Trial::test("reader_service::following_needs_an_account", {
             let ctx = Arc::clone(&ctx);
             move || {
@@ -572,6 +656,107 @@ async fn seen_in(
         .iter()
         .find(|item| &item.post.key == key)
         .and_then(|item| item.post.is_seen))
+}
+
+/// A site the account owns, for the trials that write something public. Only the environment
+/// names one, so no run writes a comment by accident.
+fn own_site() -> Option<WpComSiteId> {
+    std::env::var("WP_COM_E2E_OWN_SITE_ID")
+        .ok()?
+        .trim()
+        .parse()
+        .ok()
+        .map(WpComSiteId)
+}
+
+/// The newest post of a site, as the cache has it after a refresh of the site's stream.
+async fn first_post_of(
+    service: &ReaderService,
+    site_id: WpComSiteId,
+) -> Result<ReaderPostRecord, Failed> {
+    let stream = service.stream(ReaderStream::Site { site_id });
+    stream.refresh().await.map_err(|e| e.to_string())?;
+    let items = stream.load_items().await.map_err(|e| e.to_string())?;
+    Ok(items
+        .into_iter()
+        .next()
+        .ok_or("The site has no posts")?
+        .post)
+}
+
+/// Writes a comment and a reply to it through the service, and checks what the cache then
+/// shows. Every comment the server took is added to `written`, for the caller to delete.
+async fn write_comments(
+    service: &ReaderService,
+    site_id: WpComSiteId,
+    written: &mut Vec<CommentId>,
+) -> Result<(), Failed> {
+    let post = first_post_of(service, site_id).await?;
+    let comments = service.comments(site_id, PostId(post.identity.id as i64));
+    comments.refresh().await.map_err(|e| e.to_string())?;
+    let before = comments
+        .load_items()
+        .await
+        .map_err(|e| e.to_string())?
+        .len();
+
+    let text = "A test comment from wordpress-rs. It deletes itself.";
+    let comment = comments
+        .post_comment(text.to_string(), None)
+        .await
+        .map_err(|e| format!("The comment wasn't taken: {e}"))?;
+    let comment_id = comment.comment_id.ok_or("The comment has no ID")?;
+    written.push(comment_id);
+    if comment.send_state != ReaderCommentSendState::Sent || comment.local_id.is_some() {
+        return Err(format!("The comment isn't the server's: {comment:?}").into());
+    }
+    if !comment
+        .content
+        .as_deref()
+        .unwrap_or_default()
+        .contains("deletes itself")
+    {
+        return Err(format!("The comment's content is {:?}", comment.content).into());
+    }
+
+    let reply = comments
+        .post_comment(
+            "A test reply. It deletes itself too.".to_string(),
+            Some(comment_id),
+        )
+        .await
+        .map_err(|e| format!("The reply wasn't taken: {e}"))?;
+    let reply_id = reply.comment_id.ok_or("The reply has no ID")?;
+    written.push(reply_id);
+    if reply.parent_id != Some(comment_id) {
+        return Err(format!("The reply's parent is {:?}", reply.parent_id).into());
+    }
+
+    // The cache shows each once, and a refresh from the server keeps both.
+    for refreshed in [false, true] {
+        if refreshed {
+            comments.refresh().await.map_err(|e| e.to_string())?;
+        }
+        let items = comments.load_items().await.map_err(|e| e.to_string())?;
+        if items.len() != before + 2 {
+            return Err(format!(
+                "Expected {} comments, the cache has {} (refreshed: {refreshed})",
+                before + 2,
+                items.len()
+            )
+            .into());
+        }
+        for id in [comment_id, reply_id] {
+            let found = items
+                .iter()
+                .filter(|item| item.comment_id == Some(id))
+                .count();
+            if found != 1 {
+                return Err(format!("Comment {} is in the cache {found} times", id.0).into());
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Room for a few posts' images, so that running out of room is part of the trial.

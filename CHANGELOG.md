@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Saved Reader posts can keep their images on the device. `ReaderSavedService::set_offline_image_store` says where, and how much room they may take, and `download_for_offline(include_images: true)` stores them, newest save first. When room runs out, the oldest saves lose their images and keep their text. Unsaving a post deletes its images. `offline_post` returns a saved post with its content pointing at the stored copies.
 - `ReaderSavedService::saved_posts_ordered` gives the saved list by when each post was saved or published, newest or oldest first. Each order loads its own pages.
 - Swift: `ReaderPostRecord.galleryImageURLs` and `contentImageURLs` give the images of a Reader post's content.
+- `wp_com_e2e` has two trials that write to WordPress.com through the Reader service: one writes a comment and a reply and deletes both, and one counts a view of a post. They run only against a site the account owns, named in `WP_COM_E2E_OWN_SITE_ID`, and are skipped without it.
 
 ### Changed
 
