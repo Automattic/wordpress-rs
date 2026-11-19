@@ -1,6 +1,7 @@
 use super::{OAuth2Endpoints, WpApiDetails};
 use crate::{
     api_error::{RequestExecutionError, RequestExecutionErrorReason, WpErrorCode},
+    html_links::HtmlLinks,
     login::KnownAuthenticationBlockingPlugin,
     parsed_url::{ParseUrlError, ParsedUrl},
     request::{ResponseBodyType, WpRedirect},
@@ -14,6 +15,7 @@ use std::{
     num::{NonZero, NonZeroUsize},
     sync::Arc,
 };
+use url::Url;
 use wp_localization::{MessageBundle, WpMessages, WpSupportsLocalization};
 use wp_localization_macro::WpDeriveLocalizable;
 
@@ -774,15 +776,18 @@ impl XmlrpcDiscoveryError {
     }
 }
 
-pub(crate) fn extract_rsd_url(html: &str) -> Option<String> {
+/// The address of the RSD document `html` links to, resolved against `page_url` the way a
+/// browser would. The link may be relative, such as `/wp/xmlrpc.php?rsd`.
+pub(crate) fn extract_rsd_url(html: &str, page_url: &Url) -> Option<Url> {
     let selector =
         Selector::parse("link[rel='EditURI'][type='application/rsd+xml'][title='RSD']").ok()?;
-    Html::parse_document(html)
-        .select(&selector)
+    let links = HtmlLinks::parse(html, page_url);
+    let href = links
+        .active_elements(&selector)
         .next()?
         .value()
-        .attr("href")
-        .map(String::from)
+        .attr("href")?;
+    links.resolve(href)
 }
 
 pub(crate) fn parse_rsd_for_xmlrpc(rsd_xml: &str) -> Option<ParsedUrl> {
