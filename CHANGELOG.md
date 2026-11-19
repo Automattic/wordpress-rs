@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CreateSupportTicketParams` and `AddMessageToSupportConversationParams` accept `attachmentURLs: [URL]` alongside the existing `attachments: [String]`. Attachments cross the bindings as filesystem paths and the request executor opens each one directly, so a caller converting a file URL with `URL.path()` — which percent-encodes by default — produced a path that doesn't exist on disk and failed the request with `MediaFileNotFound`. A filename with a space is enough, and non-ASCII names are escaped too. The new initializers own the conversion.
 - `OAuth2ConfigurationStore.configuration_for(endpoints)`: like `find_configuration`, but fails with a localized `OAuth2ConfigurationStoreError` when the site's OAuth2 provider isn't registered, so apps can show a message instead of silently doing nothing.
 - **Internal:** `wp_rs_cli wpcom-login` signs in to WordPress.com in a browser with the OAuth2 authorization code flow and saves the account's bearer token to a file only you can read, without printing it. It reads the application's client ID and secret from a JSON file such as `wp_com_test_credentials.json`. It catches the sign-in itself when the application lists `http://localhost:8765/callback` as a redirect URL, and asks for the address the browser was sent to for any other redirect URL.
+### Fixed
+
+- `site_icons` and `preferred_site_icon` now treat whitespace in an icon address the way a browser does: only ASCII whitespace is stripped from the ends, so an address starting with a no-break space is no longer read as root-relative. Icons inside an SVG element named `template` are no longer skipped.
+- XML-RPC discovery now resolves a relative RSD link (such as `/wp/xmlrpc.php?rsd`) against the site's address, where it previously sent the link as-is, so the request failed and discovery fell back to `<site>/xmlrpc.php`. It follows the page's `<base href>`, as a browser does, and treats an empty link, or one that isn't an `http` or `https` address, as missing.
 
 ### Changed
 
