@@ -1,13 +1,16 @@
 package rs.wordpress.example.shared
 
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.webkit.WebSettings
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import org.koin.core.context.GlobalContext
 
 class AndroidPlatform : Platform {
     override val name: String = "Android ${Build.VERSION.SDK_INT}"
@@ -22,6 +25,12 @@ actual fun localTestSiteUrl() = object: TestSiteUrl {
 
 @OptIn(ExperimentalComposeUiApi::class)
 actual fun Modifier.testTagsForUiTests(): Modifier = semantics { testTagsAsResourceId = true }
+
+// The context is the one the app gave Koin when it started.
+actual fun readerPageViewUserAgent(): String {
+    val context = GlobalContext.get().get<Context>()
+    return "${WebSettings.getDefaultUserAgent(context)} $READER_PAGE_VIEW_APP_NAME"
+}
 
 /** The widest a stored image is read at. A photo is read smaller than it is, to fit in memory. */
 private const val STORED_IMAGE_MAX_WIDTH = 1080

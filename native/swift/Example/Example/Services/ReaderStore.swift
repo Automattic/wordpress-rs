@@ -3,6 +3,10 @@ import Foundation
 import WordPressAPI
 import WordPressApiCache
 
+#if canImport(WebKit)
+import WebKit
+#endif
+
 /// One reader's Reader: an account's, or the reader's who isn't signed in. Every Reader screen shares it.
 struct ReaderSession: Sendable {
     let service: ReaderService
@@ -16,6 +20,27 @@ struct ReaderSession: Sendable {
     var isSignedOut: Bool {
         owner == .signedOut
     }
+}
+
+/// The User-Agent the Reader's page views are sent with.
+@MainActor
+enum ReaderPageViewUserAgent {
+    /// What the app's web views send, followed by the app's name, which is how the WordPress apps send a view. A
+    /// site's stats read the reader's browser from it, and don't count a view sent with the library's own
+    /// User-Agent.
+    ///
+    /// Empty if the web view doesn't say what it sends. `postOpened` then answers that the view wasn't sent.
+    static let value: String = {
+        #if canImport(WebKit)
+        guard let webView = WKWebView().value(forKey: "userAgent") as? String, !webView.isEmpty else {
+            return ""
+        }
+        return "\(webView) wp-rs-example/1.0"
+        #else
+        // An Apple TV has no web view to ask, so the app names itself.
+        return "wp-rs-example/1.0 (Apple TV)"
+        #endif
+    }()
 }
 
 enum ReaderStoreError: LocalizedError {

@@ -126,13 +126,14 @@ final class ReaderPostViewModel {
             return
         }
         do {
-            let outcome = try await service.postOpened(key: key)
+            let outcome = try await service.postOpened(key: key, userAgent: ReaderPageViewUserAgent.value)
             pageView =
                 switch outcome {
                 case .counted: "Counted."
                 case .notCountedForRssPost: "Not counted: an RSS post has no site stats."
                 case .notCountedForSiteMember: "Not counted: the reader is a member of the post's site."
                 case .notCountedForMissingDetails: "Not counted: the cache lacks the post, or its site's ID or URL."
+                case .notCountedForUserAgent: "Not counted: the app has no User-Agent that stats count a view with."
                 }
         } catch {
             pageView = "Couldn't be counted. \(readerErrorMessage(error))"

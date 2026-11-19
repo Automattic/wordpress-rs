@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import rs.wordpress.example.shared.readerPageViewUserAgent
 import uniffi.wp_api.ReaderLikesParams
 import uniffi.wp_api.readerLikesNextPageParams
 import uniffi.wp_api.ReaderLikesResponse
@@ -31,6 +32,8 @@ private fun ReaderPageViewOutcome.text(): String = when (this) {
         "Page view not counted: you're a member of this site."
     ReaderPageViewOutcome.NOT_COUNTED_FOR_MISSING_DETAILS ->
         "Page view not counted: the cache doesn't have the post's site."
+    ReaderPageViewOutcome.NOT_COUNTED_FOR_USER_AGENT ->
+        "Page view not counted: the app has no User-Agent that stats count a view with."
 }
 
 /** A post's screen: the post from the cache, and what its buttons do. */
@@ -91,7 +94,7 @@ internal class ReaderPostState(
         }
         requests.launch {
             pageView = if (session.countPageViews) {
-                io { service.postOpened(key) }.text()
+                io { service.postOpened(key, readerPageViewUserAgent()) }.text()
             } else {
                 "Page view not sent: the switch on the Reader home is off."
             }

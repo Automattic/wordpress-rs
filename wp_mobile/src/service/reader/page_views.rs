@@ -14,13 +14,17 @@
 //!   allowed to see it, as the web Reader marks it.
 //!
 //! A view that can't be sent, such as offline, isn't kept to send later.
+//!
+//! A view is sent with the app's `User-Agent`, which the app passes each time: stats don't count
+//! one sent with the library's own. See
+//! [`reader_page_view_user_agent_counts`](wp_api::wp_com::reader_page_views::reader_page_view_user_agent_counts).
 
 use super::{ReaderContext, ReaderError, ReaderService};
 use std::time::Duration;
 use wp_api::posts::PostId;
 use wp_api::prelude::WpApiError;
 use wp_api::wp_com::WpComSiteId;
-use wp_api::wp_com::reader_page_views::ReaderPageView;
+use wp_api::wp_com::reader_page_views::{ReaderPageView, reader_page_view_user_agent_counts};
 use wp_api::wp_com::reader_saved::ReaderSavedKey;
 use wp_api::wp_com::sites::SitesListParams;
 use wp_mobile_cache::SqliteDbError;
@@ -48,6 +52,9 @@ pub enum ReaderPageViewOutcome {
     NotCountedForSiteMember,
     /// Not sent: the cache doesn't have the post, or what it has lacks the site's ID or URL.
     NotCountedForMissingDetails,
+    /// Not sent: the `User-Agent` passed is blank, or has `wordpress` in it as the library's own
+    /// has, and stats drop a view sent with one like that.
+    NotCountedForUserAgent,
 }
 
 #[uniffi::export]
@@ -55,11 +62,20 @@ impl ReaderService {
     /// Reports that a post was opened, and counts a view of it if it's one that counts. `key` is
     /// the post's key in the cache. Call it once each time the reader opens the post.
     ///
+    /// `user_agent` is the `User-Agent` the view is sent with: the one the app's web view sends,
+    /// which the WordPress apps follow with their own name, as in
+    /// `… Mobile/15E148 wp-iphone/26.4`. Not the library's own, which stats don't count a view
+    /// with: that's [`ReaderPageViewOutcome::NotCountedForUserAgent`], whatever the post.
+    ///
     /// Works signed out. A view that fails to send returns the error, and isn't sent again later.
     pub async fn post_opened(
         &self,
         key: ReaderSavedKey,
+        user_agent: String,
     ) -> Result<ReaderPageViewOutcome, ReaderError> {
+        if !reader_page_view_user_agent_counts(&user_agent) {
+            return Ok(ReaderPageViewOutcome::NotCountedForUserAgent);
+        }
         let context = &self.context;
         let post = context
             .cache
@@ -88,6 +104,7 @@ impl ReaderService {
             post_id: PostId(post.identity.id as i64),
             site_url,
             site_is_private,
+            user_agent,
         };
         let Some(request) = view.request() else {
             return Ok(ReaderPageViewOutcome::NotCountedForMissingDetails);

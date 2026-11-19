@@ -1312,6 +1312,9 @@ mod page_views {
         (service, executor)
     }
 
+    /// A `User-Agent` an app sends a view with.
+    const APP: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 wp-iphone/26.4";
+
     fn pixel() -> Step {
         // The pixel answers with an image, which nothing reads.
         Step::Respond(200, json!(null))
@@ -1337,7 +1340,7 @@ mod page_views {
         let (service, executor) = reading(ReaderOwner::SignedOut, vec![site_post(1, false)]).await;
         executor.push(pixel());
 
-        let outcome = service.post_opened(key(1)).await.unwrap();
+        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
 
         assert_eq!(outcome, ReaderPageViewOutcome::Counted);
         let sent = executor.sent();
@@ -1349,8 +1352,31 @@ mod page_views {
             "{url}"
         );
         assert!(!url.contains("priv=1"));
+        // The view goes out as the app, not as the library.
+        assert_eq!(sent.last().unwrap().user_agent.as_deref(), Some(APP));
         // Nothing else was asked for: a signed-out reader is no site's member.
         assert_eq!(sent.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_view_is_not_sent_with_a_user_agent_that_stats_dont_count() {
+        let (service, executor) = reading(ReaderOwner::SignedOut, vec![site_post(1, false)]).await;
+        let library = wp_api::request::user_agent::default_user_agent("URLSession");
+
+        for user_agent in ["", " ", library.as_str()] {
+            let outcome = service
+                .post_opened(key(1), user_agent.to_string())
+                .await
+                .unwrap();
+            assert_eq!(
+                outcome,
+                ReaderPageViewOutcome::NotCountedForUserAgent,
+                "{user_agent:?}"
+            );
+        }
+
+        // Only the stream was fetched: no view left the device.
+        assert_eq!(executor.sent().len(), 1);
     }
 
     #[tokio::test]
@@ -1360,7 +1386,7 @@ mod page_views {
         // The account's sites are fetched the first time a post is opened.
         executor.push(sites(&[123]));
 
-        let outcome = service.post_opened(key(1)).await.unwrap();
+        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
 
         assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForSiteMember);
         assert!(
@@ -1372,7 +1398,7 @@ mod page_views {
                 .starts_with("https://public-api.wordpress.com/rest/v1.2/me/sites")
         );
         // They're kept, so the next post asks for nothing.
-        let outcome = service.post_opened(key(2)).await.unwrap();
+        let outcome = service.post_opened(key(2), APP.to_string()).await.unwrap();
         assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForSiteMember);
         assert_eq!(executor.sent().len(), 2);
     }
@@ -1383,7 +1409,7 @@ mod page_views {
         service.set_member_sites(vec![WpComSiteId(999)]).unwrap();
         executor.push(pixel());
 
-        let outcome = service.post_opened(key(1)).await.unwrap();
+        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
 
         assert_eq!(outcome, ReaderPageViewOutcome::Counted);
         // The app said which sites the account belongs to, so they weren't fetched.
@@ -1396,7 +1422,7 @@ mod page_views {
         service.set_member_sites(vec![WpComSiteId(123)]).unwrap();
         executor.push(pixel());
 
-        let outcome = service.post_opened(key(1)).await.unwrap();
+        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
 
         assert_eq!(outcome, ReaderPageViewOutcome::Counted);
         assert!(executor.sent().last().unwrap().url.ends_with("&priv=1"));
@@ -1413,7 +1439,7 @@ mod page_views {
             feed_item_id: wp_api::wp_com::reader_saved::ReaderFeedItemId(9),
         };
 
-        let outcome = service.post_opened(key).await.unwrap();
+        let outcome = service.post_opened(key, APP.to_string()).await.unwrap();
 
         assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForRssPost);
         assert_eq!(executor.sent().len(), 1);
@@ -1425,7 +1451,10 @@ mod page_views {
         let (service, executor) = reading(ReaderOwner::SignedOut, vec![post_json(1, 10)]).await;
 
         for post in [1, 99] {
-            let outcome = service.post_opened(key(post)).await.unwrap();
+            let outcome = service
+                .post_opened(key(post), APP.to_string())
+                .await
+                .unwrap();
             assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForMissingDetails);
         }
         assert_eq!(executor.sent().len(), 1);
@@ -1436,7 +1465,7 @@ mod page_views {
         let (service, executor) = reading(ReaderOwner::SignedOut, vec![site_post(1, false)]).await;
         executor.push(Step::Offline);
 
-        let result = service.post_opened(key(1)).await;
+        let result = service.post_opened(key(1), APP.to_string()).await;
 
         assert!(matches!(result, Err(ReaderError::Api(_))));
         assert_eq!(service.pending_action_count().unwrap(), 0);
@@ -1468,13 +1497,13 @@ mod page_views {
         // Two days later the list is stale, and the device is offline.
         *now.lock().unwrap() += Duration::from_secs(2 * 24 * 60 * 60);
         executor.push(Step::Offline);
-        let outcome = service.post_opened(key(1)).await.unwrap();
+        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
         assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForSiteMember);
 
         // Back online, the list says the account has left the site.
         executor.push(sites(&[999]));
         executor.push(pixel());
-        let outcome = service.post_opened(key(1)).await.unwrap();
+        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
         assert_eq!(outcome, ReaderPageViewOutcome::Counted);
     }
 
@@ -1483,7 +1512,7 @@ mod page_views {
         let (service, executor) = reading(ACCOUNT, vec![site_post(1, false)]).await;
         executor.push(Step::Offline);
 
-        let result = service.post_opened(key(1)).await;
+        let result = service.post_opened(key(1), APP.to_string()).await;
 
         assert!(matches!(result, Err(ReaderError::Api(_))));
         assert!(matches!(

@@ -86,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A page of a Reader stream no longer fails to parse when one of its posts has a featured image with a negative `width` or `height`, which WordPress.com sends for some images. `ReaderFeaturedMedia.width` and `height` are now `None` for a value that isn't a size.
 - A page of a Reader stream no longer fails to parse when one of its posts has a negative comment count, which WordPress.com sends for some posts. `ReaderPost.comment_count` is now `None` for a value that isn't a count.
 - A Liked or Freshly Pressed post that a page couldn't read, and that then read when fetched on its own, left the unreadable list without joining the stream. It is now placed by its publish date until a page gives its place.
+- A Reader page view is sent with the app's `User-Agent`, and is now counted. `ReaderService::post_opened` and `ReaderPageView` take it: the one the app's web view sends, followed by the app's name. Until now a view went out with the library's own `User-Agent`, and a site's stats drop a view whose `User-Agent` has `wordpress` in it, while the pixel still answers 200. A blank `User-Agent`, or one with `wordpress` in it, is answered with the new `ReaderPageViewOutcome::NotCountedForUserAgent` and nothing is sent, and `reader_page_view_user_agent_counts` checks one ahead of time. The Swift, Kotlin and reqwest request executors now keep the `User-Agent` of a request that names its own, and add the library's to every other request as before.
 
 ## [0.11.1] - 2026-11-18
 

@@ -183,11 +183,16 @@ class WpRequestExecutor @JvmOverloads constructor(
                 requestBuilder.addHeader(key, value)
             }
         }
-        // Use header() instead of addHeader() to ensure User-Agent cannot be overridden
-        requestBuilder.header(
-            USER_AGENT_HEADER_NAME,
-            uniffi.wp_api.defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")
-        )
+        // A request that names its own User-Agent keeps it. A Reader page view is sent with the
+        // app's, and a site's stats don't count one sent with the library's.
+        val namesItsOwn = headerMap.toMap().keys.any { it.equals(USER_AGENT_HEADER_NAME, ignoreCase = true) }
+        if (!namesItsOwn) {
+            // header(), not addHeader(), so that there is only ever one User-Agent.
+            requestBuilder.header(
+                USER_AGENT_HEADER_NAME,
+                uniffi.wp_api.defaultUserAgent("kotlin-okhttp/${OkHttp.VERSION}")
+            )
+        }
     }
 
     // We intentionally catch all exceptions to prevent UniFFI callback crashes.

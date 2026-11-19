@@ -28,6 +28,9 @@ pub(crate) struct Sent {
     pub(crate) body: Option<Value>,
     /// The request's `Authorization` header.
     pub(crate) authorization: Option<String>,
+    /// The request's `User-Agent` header, which only a request that names its own has: an
+    /// executor adds the library's to the others.
+    pub(crate) user_agent: Option<String>,
 }
 
 /// Plays back a script of responses, and records every request.
@@ -61,18 +64,21 @@ impl RequestExecutor for ScriptedExecutor {
         &self,
         request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        let headers = request.header_map().to_header_map();
+        let header = |name: &str| {
+            headers
+                .get(name)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string)
+        };
         self.sent.lock().unwrap().push(Sent {
             method: request.method(),
             url: request.url().0,
             body: request
                 .body_as_string()
                 .map(|body| serde_json::from_str(&body).unwrap()),
-            authorization: request
-                .header_map()
-                .to_header_map()
-                .get("authorization")
-                .and_then(|value| value.to_str().ok())
-                .map(str::to_string),
+            authorization: header("authorization"),
+            user_agent: header("user-agent"),
         });
 
         let step = self.steps.lock().unwrap().pop_front();

@@ -64,10 +64,11 @@ impl ReqwestRequestExecutor {
         wp_request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, reqwest::Error> {
         let mut request_header_map = wp_request.header_map().to_header_map();
-        request_header_map.insert(
-            http::header::USER_AGENT,
-            user_agent::reqwest::user_agent_for_reqwest_request_executor(),
-        );
+        // A request that names its own `User-Agent` keeps it: a Reader page view is sent with the
+        // app's, and isn't counted with the library's.
+        request_header_map
+            .entry(http::header::USER_AGENT)
+            .or_insert_with(user_agent::reqwest::user_agent_for_reqwest_request_executor);
         let mut request = self
             .client
             .request(

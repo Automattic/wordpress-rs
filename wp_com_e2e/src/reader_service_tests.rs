@@ -3,6 +3,7 @@
 use libtest_mimic::{Failed, Trial};
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 use wp_api::comments::{CommentDeleteParams, CommentId};
 use wp_api::posts::PostId;
 use wp_api::prelude::*;
@@ -13,6 +14,7 @@ use wp_api::wp_com::reader_posts::{
     ReaderListOwner, ReaderListSlug, ReaderSearchSort, ReaderTagSlug,
 };
 use wp_api::wp_com::reader_saved::{ReaderSavedKey, ReaderSavedSource};
+use wp_api::wp_com::stats_post::StatsPostTarget;
 use wp_api::wp_com::{WpComBaseUrl, WpComSiteId};
 use wp_mobile::service::reader::{
     ReaderActionOutcome, ReaderError, ReaderFollowTarget, ReaderPageViewOutcome, ReaderService,
@@ -28,6 +30,9 @@ use crate::context::TestContext;
 
 /// The WordPress.com Blog, which is public and has years of posts.
 const SITE: WpComSiteId = WpComSiteId(3584907);
+
+/// The `User-Agent` a page view is sent with here. An app passes its web view's.
+const PAGE_VIEW_USER_AGENT: &str = "wp-rs-e2e/1.0 reqwest";
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     vec![
@@ -585,7 +590,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             }
         })
         .with_ignored_flag(own_site().is_none()),
-        // Counts one view, on a post of a site the account owns.
+        // Counts one view, on a post of a site the account owns, and checks that the site's stats
+        // show it.
         Trial::test("reader_service::a_page_view_of_an_own_post", {
             let ctx = Arc::clone(&ctx);
             move || {
@@ -595,11 +601,13 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 ctx.runtime.block_on(async {
                     let service = new_service(ctx.delegate.clone(), account())?;
                     let post = first_post_of(&service, site_id).await?;
+                    let post_id = PostId(post.identity.id as i64);
+                    let views_before = views_of(&ctx, site_id, post_id).await?;
 
                     // The library doesn't count a member's view of a public site, and does count
                     // a private site's.
                     let outcome = service
-                        .post_opened(post.key.clone())
+                        .post_opened(post.key.clone(), PAGE_VIEW_USER_AGENT.to_string())
                         .await
                         .map_err(|e| e.to_string())?;
                     let expected = if post.site_is_private == Some(true) {
@@ -611,12 +619,23 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         return Err(format!("Expected {expected:?}, got {outcome:?}").into());
                     }
 
+                    // Nor does it send a view as the library, which stats wouldn't count.
+                    let library = wp_api::request::user_agent::default_user_agent("reqwest");
+                    let outcome = service
+                        .post_opened(post.key.clone(), library)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if outcome != ReaderPageViewOutcome::NotCountedForUserAgent {
+                        return Err(format!("As the library, got {outcome:?}").into());
+                    }
+
                     // The request itself, which the rule above may not have sent.
                     let view = ReaderPageView {
                         site_id,
-                        post_id: PostId(post.identity.id as i64),
+                        post_id,
                         site_url: post.site_url.clone().ok_or("The post has no site URL")?,
                         site_is_private: post.site_is_private == Some(true),
+                        user_agent: PAGE_VIEW_USER_AGENT.to_string(),
                     };
                     let request = view.request().ok_or("The view has no request")?;
                     let response = ctx
@@ -628,7 +647,20 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     if response.status_code != 200 {
                         return Err(format!("The pixel answered {}", response.status_code).into());
                     }
-                    Ok(())
+
+                    // The pixel answers 200 whether or not the view counts, so the site's stats
+                    // are what says. They take a few seconds to show a view.
+                    for _ in 0..30 {
+                        tokio::time::sleep(Duration::from_secs(3)).await;
+                        if views_of(&ctx, site_id, post_id).await? > views_before {
+                            return Ok(());
+                        }
+                    }
+                    Err(format!(
+                        "The view was sent, and after 90 seconds the site's stats still show \
+                         {views_before} views of the post"
+                    )
+                    .into())
                 })
             }
         })
@@ -691,6 +723,18 @@ fn own_site() -> Option<WpComSiteId> {
 }
 
 /// The newest post of a site, as the cache has it after a refresh of the site's stream.
+/// How many views a site's stats have for a post.
+async fn views_of(ctx: &TestContext, site_id: WpComSiteId, post_id: PostId) -> Result<u64, Failed> {
+    Ok(ctx
+        .client
+        .stats_post()
+        .get_stats_post(&site_id, &StatsPostTarget::Post { id: post_id })
+        .await
+        .map_err(|e| e.to_string())?
+        .data
+        .views)
+}
+
 async fn first_post_of(
     service: &ReaderService,
     site_id: WpComSiteId,
