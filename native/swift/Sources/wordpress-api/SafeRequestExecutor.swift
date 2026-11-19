@@ -215,7 +215,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 redirects: executorDelegate.redirects(for: request.requestId()),
                 reason: RequestExecutionErrorReason.invalidSslError(
                     reason: .certificateNotValidForName(
-                        hostname: URL(string: request.url())?.host ?? "unknown host",
+                        hostname: request.displayHost() ?? "unknown host",
                         presentedHostnames: siteCertificate.presentedHostnames()
                     )
                 ),
@@ -620,6 +620,13 @@ extension NetworkRequestContent {
         }
         try self.encodeBody(into: &request)
         return request
+    }
+
+    /// The request's host with its percent escapes decoded, for an error message, or `nil` if the address isn't a
+    /// URL. Like `buildURLRequest`, it reads the RFC 3986 form, because `URL(string:)` rejects some addresses as
+    /// sent. See #1759.
+    func displayHost() -> String? {
+        wpEndpointUrlRfc3986(url: self.url()).flatMap { URL(string: $0) }?.host
     }
 }
 

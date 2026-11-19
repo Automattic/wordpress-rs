@@ -237,6 +237,26 @@ struct SafeRequestExecutorTests {
         }
         #expect(requestUrl == "not a url")
     }
+
+    // Regression test for #1759: the certificate-mismatch error read the host with `URL(string:)` on the
+    // unencoded address, so it named the host "unknown host" for an address `URL(string:)` rejects.
+    @Test(
+        "displayHost names the host of an address URL(string:) rejects",
+        arguments: [
+            ("https://{cdn}/wp-json/", "{cdn}"),
+            ("https://example.com/wp-json/a|b?q[0]=^", "example.com"),
+            ("https://example.com:8443/wp-json/", "example.com"),
+            ("https://[::1]/wp-json/", "::1")
+        ]
+    )
+    func testDisplayHostOfAddressURLRejects(url: String, expected: String) {
+        #expect(StubRequest(url: url).displayHost() == expected)
+    }
+
+    @Test("displayHost is nil when the address isn't a URL")
+    func testDisplayHostOfInvalidURL() {
+        #expect(StubRequest(url: "not a url").displayHost() == nil)
+    }
 }
 
 /// A `NetworkRequestContent` with a given URL, for testing how a `URLRequest` is built from it. Like
