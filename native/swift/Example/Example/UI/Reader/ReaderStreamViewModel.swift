@@ -77,15 +77,14 @@ final class ReaderStreamViewModel {
         hasStarted = true
 
         let collection = collection
-        let savedPosts = service.saved().savedPosts()
         // A site's, a feed's and a tag's header shows whether the reader follows it, which no collection says is
         // relevant, so those streams reload on any change.
         let reloadsOnAnyChange = stream.hasHeader
         watcher = ReaderCacheWatcher(
             session.cache.databaseUpdatesPublisher()
                 .filter { @Sendable hook in
+                    // The collection counts a save as its own change: each item says whether it's saved.
                     reloadsOnAnyChange || collection.isRelevantUpdate(hook: hook)
-                        || savedPosts.isRelevantUpdate(hook: hook)
                 }
         ) { [weak self] in
             await self?.reloadFromCache()
@@ -225,7 +224,7 @@ final class ReaderStreamViewModel {
         do {
             let items = try await collection.loadItems()
             let cards = try await collection.loadCards()
-            let entries = try await Self.entries(items: items, cards: cards, saved: service.saved())
+            let entries = Self.entries(items: items, cards: cards)
             // A later reload has newer rows, and may already have shown them.
             guard reload == reloads else { return }
 
@@ -246,9 +245,8 @@ final class ReaderStreamViewModel {
     /// each card after the post it follows.
     nonisolated private static func entries(
         items: [ReaderStreamItem],
-        cards: [ReaderStreamCard],
-        saved: ReaderSavedService
-    ) async throws -> [ReaderStreamEntry] {
+        cards: [ReaderStreamCard]
+    ) -> [ReaderStreamEntry] {
         let keys = Set(items.map(\.post.key.rowID))
         var leading: [ReaderStreamEntry] = []
         var following: [String: [ReaderStreamEntry]] = [:]
@@ -268,8 +266,7 @@ final class ReaderStreamViewModel {
             if item.gapBefore {
                 entries.append(.gap(below: item.post.key))
             }
-            let isSaved = try saved.status(post: item.post.identity) == .saved
-            entries.append(.post(item.post, isSaved: isSaved))
+            entries.append(.post(item.post, isSaved: item.isSaved))
             entries += following[item.post.key.rowID] ?? []
         }
         return entries + trailing

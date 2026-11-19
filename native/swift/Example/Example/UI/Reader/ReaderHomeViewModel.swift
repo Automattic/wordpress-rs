@@ -187,7 +187,8 @@ final class ReaderHomeViewModel {
                     isFollowed: followed.contains(interest.slug)
                 )
             }
-            pendingActions = try service.pendingActionCount()
+            // What the reader turned on or off, and their saves, which the saved posts service counts.
+            pendingActions = try service.pendingActionCount() + service.saved().pendingCount()
         } catch {
             loadError = readerErrorMessage(error)
         }
@@ -212,46 +213,10 @@ extension ReaderMenuEntry {
         id = "\(item.kind)-\(item.key)"
         title = item.title?.decodingHTMLEntities() ?? item.key
         stream =
-            switch item.kind {
-            case .stream: Self.ownStream(key: item.key, discoverTags: discoverTags)
-            case .organization: Self.organizationStream(slug: item.slug ?? item.key)
-            case .list: Self.listStream(address: item.url)
-            case .tag: item.slug.map { .tag(slug: $0) }
-            case .other: nil
+            switch item.stream {
+            case .discover: .discover(tags: discoverTags)
+            case let stream: stream
             }
-    }
-
-    /// One of the Reader's own streams, by its name in the menu.
-    private static func ownStream(key: String, discoverTags: [String]) -> ReaderStream? {
-        switch key {
-        case "following": .following
-        case "liked": .liked
-        case "discover": .discover(tags: discoverTags)
-        default: nil
-        }
-    }
-
-    /// The posts of an organization's sites.
-    private static func organizationStream(slug: String) -> ReaderStream? {
-        switch slug {
-        case "a8c": .automattic
-        case "p2": .p2
-        default: nil
-        }
-    }
-
-    /// A list's stream, from the API address of its posts, which ends in `/read/list/{owner}/{slug}/posts`. The
-    /// menu has a list's owner and slug nowhere else.
-    static func listStream(address: String?) -> ReaderStream? {
-        guard
-            let address,
-            let parts = URLComponents(string: address)?.path.split(separator: "/").map(String.init),
-            let list = parts.firstIndex(of: "list"),
-            parts.count > list + 2
-        else {
-            return nil
-        }
-        return .readerList(owner: parts[list + 1], slug: parts[list + 2])
     }
 }
 

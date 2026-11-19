@@ -6,7 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import uniffi.wp_api.ReaderSavedKey
 import uniffi.wp_api.ReaderTag
-import uniffi.wp_mobile.ReaderSavedStatus
 import uniffi.wp_mobile.ReaderStream
 import uniffi.wp_mobile.ReaderStreamCard
 import uniffi.wp_mobile.ReaderStreamCardKind
@@ -104,11 +103,7 @@ internal class ReaderStreamState(
     suspend fun reload() {
         val items = io { collection.loadItems() }
         val cards = io { collection.loadCards() }
-        val saved = io {
-            items.filter { service.saved().status(it.post.identity) == ReaderSavedStatus.SAVED }
-                .map { it.post.key }
-                .toSet()
-        }
+        val saved = items.filter { it.isSaved }.map { it.post.key }.toSet()
         val info = io { collection.info() }
         val site = io { cachedSite() }
         val followedTags = io { service.followedTags().map { it.slug ?: it.key }.toSet() }

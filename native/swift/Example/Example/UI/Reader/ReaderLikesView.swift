@@ -19,6 +19,9 @@ final class ReaderLikesViewModel {
     @ObservationIgnored private var hasStarted = false
 
     private(set) var likes: [ReaderLike] = []
+    /// What to ask the next page with, or `nil` when the last page is loaded.
+    @ObservationIgnored private var nextPage: ReaderLikesParams?
+    private(set) var hasMore = false
     private(set) var unreadable: [ReaderUnreadableLike] = []
     private(set) var found: UInt64?
     private(set) var iLike: Bool?
@@ -41,11 +44,21 @@ final class ReaderLikesViewModel {
         await load()
     }
 
+    /// Fetches the newest likes.
     func load() async {
+        await fetch(ReaderLikesParams(number: Self.pageSize), replaces: true)
+    }
+
+    /// Fetches the likes after the ones shown.
+    func loadMore() async {
+        guard let nextPage else { return }
+        await fetch(nextPage, replaces: false)
+    }
+
+    private func fetch(_ params: ReaderLikesParams, replaces: Bool) async {
         isWorking = true
         defer { isWorking = false }
         do {
-            let params = ReaderLikesParams(number: Self.pageSize)
             let page =
                 switch subject {
                 case .post(let siteID, let postID):
@@ -53,10 +66,12 @@ final class ReaderLikesViewModel {
                 case .comment(let siteID, let commentID):
                     try await session.service.commentLikes(siteId: siteID, commentId: commentID, params: params)
                 }
-            likes = page.likes
-            unreadable = page.unreadableLikes
+            likes = replaces ? page.likes : likes + page.likes
+            unreadable = replaces ? page.unreadableLikes : unreadable + page.unreadableLikes
             found = page.found
             iLike = page.iLike
+            nextPage = page.nextPageParams(number: Self.pageSize)
+            hasMore = nextPage != nil
             loadError = nil
         } catch {
             loadError = readerErrorMessage(error)
@@ -129,6 +144,13 @@ struct ReaderLikesView: View {
                             .foregroundStyle(.secondary)
                         }
                     }
+                }
+                if viewModel.hasMore {
+                    Button("Load more likes") {
+                        Task { await viewModel.loadMore() }
+                    }
+                    .disabled(viewModel.isWorking)
+                    .accessibilityIdentifier("likes-load-more")
                 }
             } header: {
                 Text("The newest \(viewModel.likes.count) likes")

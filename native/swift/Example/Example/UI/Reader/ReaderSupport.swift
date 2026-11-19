@@ -5,41 +5,22 @@ import WordPressApiCache
 
 // MARK: - Errors and outcomes in words
 
-/// What an error says, in words. The Reader's own errors have no description of their own in Swift.
+/// What an error says, in words. The Reader's errors carry the library's own sentence; an API error has a
+/// description of its own.
 func readerErrorMessage(_ error: any Error) -> String {
     switch error {
-    case let error as ReaderError: error.message
-    case let error as ReaderSavedError: error.message
-    default: error.localizedDescription
-    }
-}
-
-extension ReaderError {
-    fileprivate var message: String {
-        switch self {
-        case .Api(let error): error.localizedDescription
-        case .NeedsAccount: "Sign in to WordPress.com to use this."
-        case .PostNotInStream: "That post isn't in this stream."
-        case .MissingIds: "This is missing the IDs or the address it needs."
-        case .Refused(let reason): "The server didn't accept it: \(reason)"
-        case .Database(let error): "The cache failed: \(error)"
+    case let error as ReaderError:
+        if case .Api(let apiError) = error {
+            return apiError.localizedDescription
         }
-    }
-}
-
-extension ReaderSavedError {
-    fileprivate var message: String {
-        switch self {
-        case .Api(let error): error.localizedDescription
-        case .PostCannotBeSaved: "This post can't be saved."
-        case .TooManySaves: "You've reached the limit of saved posts."
-        case .UnexpectedImportResults(let sent, let received):
-            "The server returned \(received) results for \(sent) posts."
-        case .UnmatchedImportResults: "The server's results don't match the posts sent to it."
-        case .OfflineFiles(let reason): reason
-        case .OfflineUnreachable(let reason): reason
-        case .Database(let error): "The cache failed: \(error)"
+        return error.message
+    case let error as ReaderSavedError:
+        if case .Api(let apiError) = error {
+            return apiError.localizedDescription
         }
+        return error.message
+    default:
+        return error.localizedDescription
     }
 }
 

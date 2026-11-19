@@ -12,6 +12,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -172,7 +173,7 @@ private fun ReaderPostTags(post: ReaderPostRecord, open: (ReaderDestination) -> 
     }
 }
 
-/** The first page of the users who liked the post, once asked for. */
+/** The users who liked the post, once asked for, and a way to load more of them. */
 @Composable
 private fun ReaderPostLikes(state: ReaderPostState) {
     val likes = state.likes ?: return
@@ -184,6 +185,12 @@ private fun ReaderPostLikes(state: ReaderPostState) {
                 listOfNotNull(like.name ?: like.login ?: "User ${like.id}", like.dateLiked?.readerText())
                     .joinToString(" · ")
             )
+        }
+        if (state.hasMoreLikes) {
+            TextButton(
+                onClick = { state.loadMoreLikes() },
+                modifier = Modifier.testTag("reader_post_likes_more")
+            ) { Text("Load more likes") }
         }
     }
 }

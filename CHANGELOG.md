@@ -77,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - One saved post that can't be read no longer fails its page of the saved list. `ReaderSavedPostsResponse.posts` has the posts that could be read, and the new `unreadable_posts` lists the others with their IDs. Each is still saved.
 - A saved Reader post that can't be read stays in the saved list as a save, and says why its content couldn't be loaded, where it used to fail the list's page.
 - A signed-out reader's Reader posts have no seen status: `is_seen` is `None`, where the API's `false` was kept. Unfollowing a tag or unsaving a post while signed out now says it was removed from the device, where it said it was kept.
+- The example apps use what the Reader service now gives them: its own words for an error, whether each post of a stream is saved, the stream a menu entry opens, and the next page of the users who liked a post. Their home screens count saves among what's waiting to be sent.
 
 ### Fixed
 

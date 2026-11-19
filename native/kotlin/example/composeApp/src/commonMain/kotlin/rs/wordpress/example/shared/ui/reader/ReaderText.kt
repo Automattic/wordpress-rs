@@ -9,6 +9,8 @@ import uniffi.wp_mobile.ReaderException
 import uniffi.wp_mobile.ReaderSavedException
 import uniffi.wp_mobile.ReaderSavedOutcome
 import uniffi.wp_mobile.ReaderStream
+import uniffi.wp_mobile.readerErrorMessage
+import uniffi.wp_mobile.readerSavedErrorMessage
 import uniffi.wp_mobile_cache.ListState
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -20,13 +22,14 @@ private val blankLines = Regex("\\n\\s*\\n\\s*")
 private val wordStart = Regex("(?<=[a-z0-9])(?=[A-Z])")
 
 /**
- * An error, in words. An API error has a message of its own. The Reader's other errors reach
- * Kotlin as a name and their fields, without the sentence the library has for each, so this shows
- * the name as words, with the fields.
+ * An error, in words. An API error has a message of its own, and the Reader's other errors have
+ * the library's sentence for each.
  */
 internal fun readerErrorText(error: Throwable): String = when (error) {
     is ReaderException.Api -> error.v1.localizedDescription()
     is ReaderSavedException.Api -> error.v1.localizedDescription()
+    is ReaderException -> readerErrorMessage(error)
+    is ReaderSavedException -> readerSavedErrorMessage(error)
     is WpApiException -> error.localizedDescription()
     else -> {
         val name = error::class.simpleName.orEmpty().replace(wordStart, " ").lowercase()

@@ -17,8 +17,8 @@ import uniffi.wp_api.WpComSiteIdentifier
 import uniffi.wp_mobile.ReaderCachedMenu
 import uniffi.wp_mobile.ReaderSavedException
 import uniffi.wp_mobile.ReaderStream
+import uniffi.wp_mobile.readerStreamForMenuItem
 import uniffi.wp_mobile_cache.DbTable
-import java.net.URLDecoder
 
 /** The tables the Reader home shows something from. */
 private val homeTables = setOf(
@@ -28,7 +28,6 @@ private val homeTables = setOf(
     DbTable.READER_SAVED_POSTS
 )
 
-private val listAddress = Regex("/read/list/([^/]+)/([^/]+)")
 
 /** What the Reader home shows, read from the cache, and what its buttons do. */
 @Stable
@@ -57,7 +56,7 @@ internal class ReaderHomeState(val session: ReaderSession, val requests: ReaderR
     suspend fun reload() {
         val menu = io { service.menu() }
         val actions = io { service.pendingActionCount() }
-        val saves = io { service.saved().savedPosts().loadItems().count { it.isPending } }
+        val saves = io { service.saved().pendingCount().toInt() }
         this.menu = menu
         pendingActions = actions
         pendingSaves = saves
@@ -126,34 +125,13 @@ internal class ReaderHomeState(val session: ReaderSession, val requests: ReaderR
      * The stream a menu entry opens, or `null` for an entry of a kind this screen doesn't know.
      * Discover is given the followed tags when signed out, since no server knows them.
      */
-    fun streamOf(item: ReaderMenuItem): ReaderStream? = when (item.kind) {
-        is ReaderMenuItemKind.Stream -> ownStream(item.key, if (session.isSignedIn) emptyList() else followedSlugs)
-        is ReaderMenuItemKind.Organization -> organizationStream(item.slug)
-        is ReaderMenuItemKind.List -> listStream(item.url)
-        is ReaderMenuItemKind.Tag -> ReaderStream.Tag(item.slug ?: item.key)
-        is ReaderMenuItemKind.Other -> null
+    fun streamOf(item: ReaderMenuItem): ReaderStream? = when (val stream = readerStreamForMenuItem(item)) {
+        is ReaderStream.Discover ->
+            ReaderStream.Discover(if (session.isSignedIn) emptyList() else followedSlugs)
+        // A tag a new reader picks from comes with its slug as its key.
+        null -> if (item.kind is ReaderMenuItemKind.Tag) ReaderStream.Tag(item.key) else null
+        else -> stream
     }
-}
-
-/** One of the Reader's own streams, by its key in the menu. */
-private fun ownStream(key: String, discoverTags: List<String>): ReaderStream? = when (key) {
-    "following" -> ReaderStream.Following
-    "liked" -> ReaderStream.Liked
-    "discover" -> ReaderStream.Discover(discoverTags)
-    else -> null
-}
-
-/** The posts of an organization's sites, by the organization's slug in the menu. */
-private fun organizationStream(slug: String?): ReaderStream? = when (slug) {
-    "a8c" -> ReaderStream.Automattic
-    "p2" -> ReaderStream.P2
-    else -> null
-}
-
-/** A list's stream. The list's owner and slug are only in the address of its posts. */
-private fun listStream(url: String?): ReaderStream? = url?.let { listAddress.find(it) }?.let { match ->
-    val (owner, slug) = match.destructured
-    ReaderStream.ReaderList(URLDecoder.decode(owner, "UTF-8"), URLDecoder.decode(slug, "UTF-8"))
 }
 
 /**

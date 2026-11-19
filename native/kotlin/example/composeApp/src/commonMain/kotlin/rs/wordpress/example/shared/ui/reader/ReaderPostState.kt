@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import uniffi.wp_api.ReaderLikesParams
+import uniffi.wp_api.readerLikesNextPageParams
 import uniffi.wp_api.ReaderLikesResponse
 import uniffi.wp_api.ReaderPostSaveIdentity
 import uniffi.wp_api.ReaderSavedKey
@@ -33,6 +34,9 @@ private fun ReaderPageViewOutcome.text(): String = when (this) {
 }
 
 /** A post's screen: the post from the cache, and what its buttons do. */
+/** How many likes a page asks for. */
+private const val LIKES_PAGE_SIZE = 20u
+
 @Stable
 internal class ReaderPostState(
     val session: ReaderSession,
@@ -53,9 +57,14 @@ internal class ReaderPostState(
     var pageView by mutableStateOf<String?>(null)
         private set
 
-    /** The first page of the users who liked the post, once asked for. It isn't cached. */
+    /** The users who liked the post, as far as they've been loaded. They aren't cached. */
     var likes by mutableStateOf<ReaderLikesResponse?>(null)
         private set
+
+    /** What to ask the next page of likes with, or `null` when the last page is loaded. */
+    private var nextLikes by mutableStateOf<ReaderLikesParams?>(null)
+
+    val hasMoreLikes: Boolean get() = nextLikes != null
 
     /** The author's profile, once asked for. It isn't cached. */
     var author by mutableStateOf<ReaderUserProfile?>(null)
@@ -112,11 +121,20 @@ internal class ReaderPostState(
     }
 
     /** Loads the first page of the users who liked the post. */
-    fun loadLikes() {
+    fun loadLikes() = loadLikes(ReaderLikesParams(number = LIKES_PAGE_SIZE), shown = null)
+
+    /** Loads the page after the likes that are shown. */
+    fun loadMoreLikes() {
+        loadLikes(nextLikes ?: return, shown = likes)
+    }
+
+    private fun loadLikes(params: ReaderLikesParams, shown: ReaderLikesResponse?) {
         val siteId = siteId ?: return
-        requests.load({ service.postLikes(siteId, identity.id.toLong(), ReaderLikesParams()) }) {
-            likes = it
-            requests.say("Loaded ${it.likes.size} of the post's likes.")
+        requests.load({ service.postLikes(siteId, identity.id.toLong(), params) }) { page ->
+            val all = shown?.likes.orEmpty() + page.likes
+            likes = page.copy(likes = all)
+            nextLikes = readerLikesNextPageParams(page, LIKES_PAGE_SIZE)
+            requests.say("Loaded ${all.size} of the post's likes.")
         }
     }
 
