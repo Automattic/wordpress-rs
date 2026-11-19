@@ -367,6 +367,14 @@ public typealias ReaderUnsavePostParams = WordPressAPIInternal.ReaderUnsavePostP
 
 // MARK: Reader Service
 public typealias ReaderOwner = WordPressAPIInternal.ReaderOwner
+public typealias ReaderError = WordPressAPIInternal.ReaderError
+public typealias ReaderService = WordPressAPIInternal.ReaderService
+public typealias ReaderStream = WordPressAPIInternal.ReaderStream
+public typealias ReaderStreamCollection = WordPressAPIInternal.ReaderStreamCollection
+public typealias ReaderStreamInfo = WordPressAPIInternal.ReaderStreamInfo
+public typealias ReaderStreamItem = WordPressAPIInternal.ReaderStreamItem
+public typealias ReaderStreamOrder = WordPressAPIInternal.ReaderStreamOrder
+public typealias ReaderStreamPageResult = WordPressAPIInternal.ReaderStreamPageResult
 
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams

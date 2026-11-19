@@ -1,8 +1,8 @@
 //! What the service keeps in the cache: across a relaunch, through an import, and as the saved list.
 
 use super::super::tests::{
-    ScriptedExecutor, Step, bulk_response, cap_response, delegate, error_response, feed_json,
-    feed_key, identity, keys_response, post_json, post_key, rss_identity, synced,
+    ScriptedExecutor, SentInShort, Step, bulk_response, cap_response, delegate, error_response,
+    feed_json, feed_key, identity, keys_response, post_json, post_key, rss_identity, synced,
     unsaveable_identity, write_response,
 };
 use super::*;

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReaderStreamParams.fields` asks the Following, site and feed streams for only some fields of each post, such as `ID,site_ID,date`, which makes a page much smaller.
 - The cache can keep Reader data for a reader who isn't signed in to WordPress.com. `ReaderOwner` is who Reader data belongs to, an account or `SignedOut`, and `WpApiCache::remove_reader_data` deletes what's cached for one.
 - The cache can keep any Reader stream, not only the saved list. A stream ordered by date merges each page into what it has, removes posts the server no longer returns, and marks a gap where a refresh didn't reach the posts it already had. A stream kept in the server's order swaps its posts when its first page arrives. A new `reader_unreadable_posts` table keeps the IDs of posts a page couldn't read.
+- `ReaderService` is the entry point to a reader's Reader, for an account or for a reader who isn't signed in. `ReaderService::stream` gives a `ReaderStreamCollection` for a `ReaderStream` (Following, a site's, a feed's or a tag's posts), read from the cache: `load_items` returns the cached posts without touching the network, `refresh` merges the first page into them, `load_more` loads the next page, and `fill_gap` loads the posts a refresh skipped. A post a page couldn't read is counted in `ReaderStreamInfo.unreadable_post_count` and kept by its IDs.
 
 ### Changed
 

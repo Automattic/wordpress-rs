@@ -1,0 +1,196 @@
+//! The Reader: its streams of posts, read from the cache and kept up to date from WordPress.com.
+//!
+//! Everything here works for a reader who isn't signed in to WordPress.com, as far as the API
+//! allows: a tag's, a site's and a feed's posts need no account, and the Following stream does.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime};
+use wp_api::date::WpGmtDateTime;
+use wp_api::prelude::{WpApiClientDelegate, WpApiError};
+use wp_api::wp_com::client::WpComApiClient;
+use wp_mobile_cache::repository::reader::{ReaderPostRepository, ReaderStreamRepository};
+use wp_mobile_cache::repository::wordpress_com_accounts::{
+    ReaderOwner, WordPressComAccountRepository,
+};
+use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
+
+mod collection;
+mod stream;
+
+pub use collection::{
+    ReaderStreamCollection, ReaderStreamInfo, ReaderStreamItem, ReaderStreamPageResult,
+};
+pub use stream::{
+    ReaderStream, ReaderStreamOrder, reader_stream_needs_account, reader_stream_order,
+};
+
+use collection::StreamLanes;
+
+/// How long a stream nobody refreshes is kept.
+const STREAM_LIFETIME: Duration = Duration::from_secs(30 * 24 * 60 * 60);
+
+/// How long a post that's in no stream and isn't saved is kept after it was fetched, so one opened
+/// on its own, such as from a link, is still there the next few times it's opened.
+const UNUSED_POST_LIFETIME: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+
+/// The saved list's stream, which the saved posts service keeps, and which is kept whatever its age.
+const SAVED_STREAM: &str = "saved";
+
+#[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum ReaderError {
+    #[error("{0}")]
+    Api(WpApiError),
+
+    /// The reader isn't signed in, and this needs a WordPress.com account, such as the Following
+    /// stream. Nothing was sent.
+    #[error("Sign in to WordPress.com to use this.")]
+    NeedsAccount,
+
+    /// The post isn't in the stream, so there is no gap before it to fill.
+    #[error("That post isn't in this stream.")]
+    PostNotInStream,
+
+    #[error("{0}")]
+    Database(SqliteDbError),
+}
+
+impl From<WpApiError> for ReaderError {
+    fn from(err: WpApiError) -> Self {
+        Self::Api(err)
+    }
+}
+
+impl From<SqliteDbError> for ReaderError {
+    fn from(err: SqliteDbError) -> Self {
+        Self::Database(err)
+    }
+}
+
+pub(crate) type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
+
+/// What every part of a reader's Reader shares.
+pub(crate) struct ReaderContext {
+    pub(crate) client: WpComApiClient,
+    pub(crate) cache: Arc<WpApiCache>,
+    pub(crate) owner: ReaderOwner,
+    /// The owner's row in the cache.
+    pub(crate) owner_row: RowId,
+    clock: Clock,
+}
+
+impl ReaderContext {
+    pub(crate) fn now(&self) -> WpGmtDateTime {
+        WpGmtDateTime(chrono::DateTime::<chrono::Utc>::from((self.clock)()))
+    }
+
+    fn time_ago(&self, duration: Duration) -> WpGmtDateTime {
+        WpGmtDateTime(chrono::DateTime::<chrono::Utc>::from(
+            (self.clock)() - duration,
+        ))
+    }
+
+    /// Deletes what nothing shows any more: streams nobody has refreshed in a while, and posts
+    /// that are in no stream, aren't saved and weren't fetched lately.
+    pub(crate) fn clean_up(&self) -> Result<(), SqliteDbError> {
+        let stale = self.time_ago(STREAM_LIFETIME);
+        let unused = self.time_ago(UNUSED_POST_LIFETIME);
+        self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            ReaderStreamRepository::delete_stale(
+                &transaction,
+                self.owner_row,
+                &stale,
+                SAVED_STREAM,
+            )?;
+            ReaderPostRepository::delete_unused(&transaction, self.owner_row, &unused)?;
+            transaction.commit().map_err(SqliteDbError::from)
+        })
+    }
+}
+
+/// One reader's Reader: an account's, or the reader's who isn't signed in.
+///
+/// It's the entry point to the Reader, as `WpService` is to a site. Everything it hands out reads
+/// from the cache, so it shows what it has straight away and offline, and fetches when asked to.
+///
+/// Create one per reader and share it. For [`ReaderOwner::SignedOut`], pass a delegate that sends
+/// no authentication: a stream that needs an account then fails with
+/// [`ReaderError::NeedsAccount`] without sending anything.
+///
+/// [`WpApiCache::remove_reader_data`] deletes everything it keeps.
+#[derive(uniffi::Object)]
+pub struct ReaderService {
+    context: Arc<ReaderContext>,
+    /// What each stream's requests wait on, by the stream's cache key, so that two collections of
+    /// one stream take turns.
+    lanes: Mutex<HashMap<String, Arc<StreamLanes>>>,
+}
+
+#[uniffi::export]
+impl ReaderService {
+    /// Uses what the cache has for the reader. `cache` must have had its migrations run.
+    #[uniffi::constructor]
+    pub fn new(
+        delegate: WpApiClientDelegate,
+        cache: Arc<WpApiCache>,
+        owner: ReaderOwner,
+    ) -> Result<Self, ReaderError> {
+        Self::with_clock(delegate, cache, owner, Arc::new(SystemTime::now))
+    }
+
+    /// Who this Reader belongs to.
+    pub fn owner(&self) -> ReaderOwner {
+        self.context.owner
+    }
+
+    /// A stream's posts, as the cache has them. Getting it doesn't touch the network.
+    pub fn stream(&self, stream: ReaderStream) -> Arc<ReaderStreamCollection> {
+        let lanes = self
+            .lanes
+            .lock()
+            .expect("stream lanes lock poisoned")
+            .entry(stream.key())
+            .or_default()
+            .clone();
+        Arc::new(ReaderStreamCollection::new(
+            self.context.clone(),
+            stream,
+            lanes,
+        ))
+    }
+
+    /// Deletes what nothing shows any more: streams nobody has refreshed in 30 days, and posts
+    /// that are in no stream, aren't saved and weren't fetched in the last week. A stream's
+    /// refresh does this too, so it only needs calling for a reader who never refreshes.
+    pub fn clean_up(&self) -> Result<(), ReaderError> {
+        Ok(self.context.clean_up()?)
+    }
+}
+
+impl ReaderService {
+    pub(crate) fn with_clock(
+        delegate: WpApiClientDelegate,
+        cache: Arc<WpApiCache>,
+        owner: ReaderOwner,
+        clock: Clock,
+    ) -> Result<Self, ReaderError> {
+        let owner_row = cache.execute(|connection| {
+            WordPressComAccountRepository::get_or_create_owner(connection, owner)
+        })?;
+        Ok(Self {
+            context: Arc::new(ReaderContext {
+                client: WpComApiClient::new(delegate),
+                cache,
+                owner,
+                owner_row,
+                clock,
+            }),
+            lanes: Mutex::default(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests;
