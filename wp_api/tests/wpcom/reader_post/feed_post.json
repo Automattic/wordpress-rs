@@ -1,0 +1,62 @@
+{
+  "ID": 4001,
+  "author": {
+    "ID": 0,
+    "email": "",
+    "nice_name": "",
+    "name": "Example Name",
+    "URL": "https://example.com/",
+    "avatar_URL": "",
+    "has_avatar": false,
+    "profile_URL": ""
+  },
+  "date": "2026-11-18T00:00:00+00:00",
+  "modified": "2026-11-18T00:00:00+00:00",
+  "title": "Example post",
+  "URL": "https://example.com/example/",
+  "short_URL": "https://wp.me/pEXAMPLE-1",
+  "content": "<p>Example content.</p>\n",
+  "excerpt": "",
+  "slug": "",
+  "status": "",
+  "password": "",
+  "parent": false,
+  "type": "",
+  "discussion": {
+    "comments_open": false,
+    "comment_count": 0
+  },
+  "like_count": 0,
+  "i_like": 0,
+  "is_reblogged": 0,
+  "is_following": false,
+  "featured_image": "",
+  "format": "standard",
+  "geo": false,
+  "publicize_URLs": {},
+  "tags": {},
+  "categories": {},
+  "attachments": {},
+  "metadata": false,
+  "meta": {
+    "links": {
+      "feed": "https://public-api.wordpress.com/rest/v1.1/read/feed/3001/"
+    }
+  },
+  "word_count": 0,
+  "pseudo_ID": "00000000000000000000000000000001",
+  "global_ID": "00000000000000000000000000000001",
+  "site_ID": "3001",
+  "site_name": "Example Site",
+  "site_URL": "https://example.com",
+  "site_is_private": false,
+  "featured_media": {},
+  "is_external": true,
+  "is_jetpack": false,
+  "use_excerpt": false,
+  "feed_ID": 3001,
+  "feed_URL": "https://example.com/feed/",
+  "feed_item_ID": 4001,
+  "is_seen": false,
+  "views": null
+}

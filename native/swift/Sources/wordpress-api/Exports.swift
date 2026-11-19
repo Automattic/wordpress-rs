@@ -305,6 +305,19 @@ public typealias WpComSiteIdentifier = WordPressAPIInternal.WpComSiteIdentifier
 // MARK: Languages
 public typealias WPComLanguage = WordPressAPIInternal.WpComLanguage
 
+// MARK: Reader Single Posts
+public typealias ReaderPostRequestExecutor = WordPressAPIInternal.ReaderPostRequestExecutor
+public typealias ReaderPostRequestSitePostResponse = WordPressAPIInternal.ReaderPostRequestSitePostResponse
+public typealias ReaderPostRequestFeedPostResponse = WordPressAPIInternal.ReaderPostRequestFeedPostResponse
+public typealias ReaderPostRequestPostBySlugResponse = WordPressAPIInternal.ReaderPostRequestPostBySlugResponse
+public typealias ReaderPostRequestRelatedPostsResponse = WordPressAPIInternal.ReaderPostRequestRelatedPostsResponse
+public typealias ReaderPostParams = WordPressAPIInternal.ReaderPostParams
+public typealias ReaderPostSlug = WordPressAPIInternal.ReaderPostSlug
+public typealias ReaderPostBySlugParams = WordPressAPIInternal.ReaderPostBySlugParams
+public typealias ReaderPostBySlug = WordPressAPIInternal.ReaderPostBySlug
+public typealias ReaderRelatedPostsParams = WordPressAPIInternal.ReaderRelatedPostsParams
+public typealias ReaderRelatedPostsResponse = WordPressAPIInternal.ReaderRelatedPostsResponse
+
 // MARK: Reader Saved Posts
 public typealias ReaderFeedId = WordPressAPIInternal.ReaderFeedId
 public typealias ReaderFeedItemId = WordPressAPIInternal.ReaderFeedItemId

@@ -89,9 +89,15 @@ public final class WPComApiClient: Sendable {
         internalClient.subscribers()
     }
 
-    /// The Reader streams: Following, and a site's or a feed's posts.
+    /// The Reader's streams of posts.
     public var readerPosts: ReaderPostsRequestExecutor {
         internalClient.readerPosts()
+    }
+
+    /// One Reader post at a time: a site's post, a feed's post, a post found by its slug or its
+    /// address, and the posts related to a post.
+    public var readerPost: ReaderPostRequestExecutor {
+        internalClient.readerPost()
     }
 
     public var readerSaved: ReaderSavedRequestExecutor {

@@ -1,0 +1,346 @@
+use libtest_mimic::{Failed, Trial};
+use std::sync::Arc;
+use wp_api::api_error::{WpApiError, WpErrorCode};
+use wp_api::posts::PostId;
+use wp_api::prelude::*;
+use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::client::WpComApiClient;
+use wp_api::wp_com::reader_post::{
+    ReaderPostBySlugParams, ReaderPostParams, ReaderPostSlug, ReaderRelatedPostsParams,
+};
+use wp_api::wp_com::reader_posts::ReaderStreamParams;
+use wp_api::wp_com::reader_saved::ReaderFeedId;
+use wp_api::wp_com::sites::WpComSiteIdentifier;
+
+use crate::context::TestContext;
+
+/// The WordPress.com Blog, which is public.
+const SITE: WpComSiteId = WpComSiteId(3584907);
+const SITE_DOMAIN: &str = "en.blog.wordpress.com";
+/// One of its posts, from 2014.
+const POST: PostId = PostId(29614);
+const POST_SLUG: &str = "new-year-new-blog-make-it-a-great-one";
+/// The xkcd RSS feed, which is public.
+const FEED: ReaderFeedId = ReaderFeedId(8857199);
+
+/// A client that sends no token, to check what answers signed out.
+pub(crate) fn signed_out_client(ctx: &TestContext) -> WpComApiClient {
+    WpComApiClient::new(WpApiClientDelegate {
+        auth_provider: WpAuthenticationProvider::none().into(),
+        ..ctx.delegate.clone()
+    })
+}
+
+/// Checks that a request failed with a WordPress.com error code, such as `unknown_post`.
+pub(crate) fn expect_error_code<T>(
+    result: Result<T, WpApiError>,
+    expected_code: &str,
+) -> Result<(), Failed> {
+    match result {
+        Err(WpApiError::WpError { error_code, .. })
+            if error_code == WpErrorCode::CustomError(expected_code.to_string()) =>
+        {
+            Ok(())
+        }
+        Err(other) => Err(format!("Expected `{expected_code}`, got: {other:?}").into()),
+        Ok(_) => Err(format!("Expected `{expected_code}`, but the request succeeded").into()),
+    }
+}
+
+pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
+    vec![
+        Trial::test("reader_post::site_post", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let params = ReaderPostParams {
+                        meta: Some("site,likes".to_string()),
+                        ..Default::default()
+                    };
+                    let post = ctx
+                        .client
+                        .reader_post()
+                        .site_post(&SITE, &POST, &params)
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if post.identity.site_id != Some(SITE) || post.identity.id != POST.0 as u64 {
+                        return Err("It isn't the post that was asked for".into());
+                    }
+                    if post.identity.is_external || post.identity.feed_id.is_none() {
+                        return Err("A site's post isn't external, and has its feed ID".into());
+                    }
+                    if post.title.is_none() || post.content.is_none() || post.site_name.is_none() {
+                        return Err("The post is missing its title, content or site name".into());
+                    }
+                    if post.site_locale.is_none() {
+                        return Err("`meta=site` should send the site's locale".into());
+                    }
+
+                    // Signed out, the same post answers.
+                    let post = signed_out_client(&ctx)
+                        .reader_post()
+                        .site_post(&SITE, &POST, &ReaderPostParams::default())
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if post.identity.id != POST.0 as u64 || post.title.is_none() {
+                        return Err("Signed out, the post should be the same".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_post::site_post_fields", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let params = ReaderPostParams {
+                        fields: Some("ID,site_ID,date".to_string()),
+                        ..Default::default()
+                    };
+                    let post = ctx
+                        .client
+                        .reader_post()
+                        .site_post(&SITE, &POST, &params)
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if post.identity.site_id != Some(SITE) || post.date.is_none() {
+                        return Err("The post is missing a field that was asked for".into());
+                    }
+                    if post.title.is_some() || post.content.is_some() {
+                        return Err("The post has a field that wasn't asked for".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_post::site_post_that_is_not_there", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let missing_post = ctx
+                        .client
+                        .reader_post()
+                        .site_post(&SITE, &PostId(999999999), &ReaderPostParams::default())
+                        .await;
+                    expect_error_code(missing_post, "unknown_post")?;
+
+                    let missing_site = ctx
+                        .client
+                        .reader_post()
+                        .site_post(
+                            &WpComSiteId(99999999999),
+                            &PostId(1),
+                            &ReaderPostParams::default(),
+                        )
+                        .await;
+                    expect_error_code(missing_site, "unknown_blog")
+                })
+            }
+        }),
+        Trial::test("reader_post::feed_post", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // Feed items are pruned over time, so take one the feed has now.
+                    let params = ReaderStreamParams {
+                        number: Some(1),
+                        ..Default::default()
+                    };
+                    let page = ctx
+                        .client
+                        .reader_posts()
+                        .feed_posts(&FEED, &params)
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    let in_stream = page.posts.first().ok_or("The feed has no posts")?;
+                    let item = in_stream
+                        .identity
+                        .feed_item_id
+                        .ok_or("A feed's post should have a feed item ID")?;
+
+                    for client in [&ctx.client, &signed_out_client(&ctx)] {
+                        let post = client
+                            .reader_post()
+                            .feed_post(&FEED, &item, &ReaderPostParams::default())
+                            .await
+                            .map_err(|e| e.to_string())?
+                            .data;
+                        if post.identity != in_stream.identity {
+                            return Err("It should be the post the stream sent".into());
+                        }
+                        if !post.identity.is_external || post.title.is_none() {
+                            return Err("An RSS post is external, and has a title".into());
+                        }
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_post::feed_post_of_a_site", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // The site's newest post, which is recent enough to still be in its feed.
+                    let params = ReaderStreamParams {
+                        number: Some(1),
+                        ..Default::default()
+                    };
+                    let page = ctx
+                        .client
+                        .reader_posts()
+                        .site_posts(&SITE, &params)
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    let in_stream = page.posts.first().ok_or("The site has no posts")?;
+                    let (Some(feed), Some(item)) =
+                        (in_stream.identity.feed_id, in_stream.identity.feed_item_id)
+                    else {
+                        return Err("The site's newest post should have its feed IDs".into());
+                    };
+
+                    let post = ctx
+                        .client
+                        .reader_post()
+                        .feed_post(&feed, &item, &ReaderPostParams::default())
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if post.identity.is_external
+                        || post.identity.id != in_stream.identity.id
+                        || post.identity.site_id != Some(SITE)
+                        || post.identity.feed_item_id != Some(item)
+                    {
+                        return Err("It should be the site's post, with its feed item ID".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_post::feed_post_that_is_not_there", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let missing_item = ctx
+                        .client
+                        .reader_post()
+                        .feed_post(
+                            &FEED,
+                            &wp_api::wp_com::reader_saved::ReaderFeedItemId(1),
+                            &ReaderPostParams::default(),
+                        )
+                        .await;
+                    expect_error_code(missing_item, "no_such_item")
+                })
+            }
+        }),
+        Trial::test("reader_post::post_by_slug", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let slug = ReaderPostSlug(POST_SLUG.to_string());
+                    let by_domain = WpComSiteIdentifier::Slug {
+                        value: SITE_DOMAIN.to_string(),
+                    };
+                    let post = ctx
+                        .client
+                        .reader_post()
+                        .post_by_slug(&by_domain, &slug, &ReaderPostBySlugParams::default())
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if post.site_id != SITE || post.post_id != POST {
+                        return Err("The slug should find the post".into());
+                    }
+                    if post.title.is_none() || post.status.as_deref() != Some("publish") {
+                        return Err("The post is missing its title or status".into());
+                    }
+
+                    // Signed out, by site ID, and with only its IDs.
+                    let by_id = WpComSiteIdentifier::Id { value: SITE.0 };
+                    let params = ReaderPostBySlugParams {
+                        fields: Some("ID,site_ID".to_string()),
+                    };
+                    let post = signed_out_client(&ctx)
+                        .reader_post()
+                        .post_by_slug(&by_id, &slug, &params)
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if post.site_id != SITE || post.post_id != POST || post.title.is_some() {
+                        return Err("Asked for its IDs, the post should have only those".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_post::post_by_slug_that_is_not_there", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let site = WpComSiteIdentifier::Id { value: SITE.0 };
+                    let missing = ctx
+                        .client
+                        .reader_post()
+                        .post_by_slug(
+                            &site,
+                            &ReaderPostSlug("no-such-slug-xyzzy-12345".to_string()),
+                            &ReaderPostBySlugParams::default(),
+                        )
+                        .await;
+                    expect_error_code(missing, "unknown_post")
+                })
+            }
+        }),
+        Trial::test("reader_post::related_posts", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let params = ReaderRelatedPostsParams {
+                        size_local: Some(2),
+                        size_global: Some(2),
+                        ..Default::default()
+                    };
+                    for client in [&ctx.client, &signed_out_client(&ctx)] {
+                        let related = client
+                            .reader_post()
+                            .related_posts(&SITE, &POST, &params)
+                            .await
+                            .map_err(|e| e.to_string())?
+                            .data;
+                        if related.posts.is_empty() || related.posts.len() > 4 {
+                            return Err("There should be up to four related posts".into());
+                        }
+                        if related.posts.iter().any(|post| post.railcar.is_none()) {
+                            return Err("A related post should say how it was picked".into());
+                        }
+                        if !related
+                            .posts
+                            .iter()
+                            .any(|post| post.identity.site_id == Some(SITE))
+                        {
+                            return Err("Some related posts should be from the same site".into());
+                        }
+                    }
+
+                    // Without a size, the API returns none.
+                    let none = ctx
+                        .client
+                        .reader_post()
+                        .related_posts(&SITE, &POST, &ReaderRelatedPostsParams::default())
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if !none.posts.is_empty() {
+                        return Err("Without a size, there should be no related posts".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+    ]
+}
