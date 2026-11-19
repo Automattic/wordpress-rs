@@ -1,0 +1,22 @@
+{
+  "subscribed": false,
+  "tags": [
+    {
+      "ID": "9001",
+      "slug": "another-tag",
+      "title": "another tag",
+      "display_name": "another-tag",
+      "description": null,
+      "URL": "https://public-api.wordpress.com/rest/v1.1/read/tags/another-tag/posts"
+    },
+    {
+      "ID": "9002",
+      "slug": "example-tag",
+      "title": "Example Tag",
+      "display_name": "example-tag",
+      "description": null,
+      "URL": "https://public-api.wordpress.com/rest/v1.1/read/tags/example-tag/posts"
+    }
+  ],
+  "removed_tag": "9003"
+}

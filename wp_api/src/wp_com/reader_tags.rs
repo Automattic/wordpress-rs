@@ -1,7 +1,10 @@
-//! The Reader menu, tags, and the interests a new reader picks from.
+//! The Reader menu, tags, the interests a new reader picks from, and following and unfollowing a
+//! tag.
 //!
-//! All three answer without a token, so a signed-out reader has streams and tags to show. See
-//! [`ReaderMenu`] for what a signed-out menu holds.
+//! The menu, a tag and the interests answer without a token, so a signed-out reader has streams
+//! and tags to show. See [`ReaderMenu`] for what a signed-out menu holds. Following and unfollowing
+//! a tag act for the user, so they need a token: a signed-out reader's followed tags are kept by
+//! the app.
 //!
 //! The API sends a tag's slug percent-encoded when it isn't ASCII: `%e5%86%99%e7%9c%9f` for `写真`.
 //! Every slug here is decoded as it's read, so it can go straight into a [`ReaderTagSlug`]. A
@@ -16,7 +19,10 @@ use serde::{
     de::{MapAccess, SeqAccess, Visitor},
 };
 use std::fmt;
-use wp_serde_helper::{deserialize_u64_or_string_or_none, deserialize_u64_or_string_or_none_as_t};
+use wp_serde_helper::{
+    LenientVec, deserialize_bool_or_int, deserialize_u64_or_string_or_none,
+    deserialize_u64_or_string_or_none_as_t,
+};
 
 wp_content_u64_id!(ReaderTagId);
 
@@ -273,7 +279,8 @@ pub struct ReaderTagResponse {
 /// A tag.
 ///
 /// It doesn't say whether the user follows the tag: the API sends the same to every reader. The
-/// tags the user follows are in [`ReaderMenu::subscribed_items`].
+/// tags the user follows are in [`ReaderMenu::subscribed_items`], and in the answer to following
+/// or unfollowing one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ReaderTag {
     #[serde(
@@ -306,6 +313,171 @@ pub struct ReaderTag {
     )]
     #[uniffi(default = None)]
     pub url: Option<String>,
+}
+
+/// Request body to follow tags.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderFollowTagsParams {
+    /// The slugs of the tags to follow, sent as a list, as the iOS app sends them. The API also
+    /// takes one comma-separated string, which the Android app sends. One tag was tried: an empty
+    /// list wasn't, and neither was a slug that isn't ASCII.
+    pub tags: Vec<ReaderTagSlug>,
+}
+
+/// The answer to following tags.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderFollowTagsResponse")]
+pub struct ReaderFollowTagsResponse {
+    /// `true` in both answers seen: one that added a tag, and one that added none.
+    pub subscribed: bool,
+    /// Every tag the user follows now, not only the ones added, without any in
+    /// [`Self::unreadable_tags`]. They arrived in the order of their slugs.
+    ///
+    /// Each is a [`ReaderTag`], the shape a single tag is fetched in. The menu lists the same tags
+    /// as [`ReaderMenuItem`]s, which are entries of an object, with a `type` and no `description`.
+    pub tags: Vec<ReaderTag>,
+    /// The tags that couldn't be read. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_tags: Vec<ReaderUnreadableTag>,
+    /// The IDs of the tags this request added. Empty when the user already followed every tag
+    /// sent, which is still a 200.
+    #[uniffi(default = [])]
+    pub added_tags: Vec<ReaderTagId>,
+}
+
+/// The answer to unfollowing a tag.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderUnfollowTagResponse")]
+pub struct ReaderUnfollowTagResponse {
+    /// `false` in the answer seen. A tag the user doesn't follow has no answer of this shape: it's
+    /// a 400 `not_subscribed`.
+    pub subscribed: bool,
+    /// Every tag the user still follows, as [`ReaderFollowTagsResponse::tags`] has them.
+    pub tags: Vec<ReaderTag>,
+    /// The tags that couldn't be read. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_tags: Vec<ReaderUnreadableTag>,
+    /// The ID of the tag that was unfollowed.
+    #[uniffi(default = None)]
+    pub removed_tag: Option<ReaderTagId>,
+}
+
+/// A tag in the answer to following or unfollowing one that couldn't be read. It doesn't fail the
+/// answer: the other tags are kept, and this says one was left out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderUnreadableTag {
+    /// Which tag it is. `None` when its ID couldn't be read either.
+    #[uniffi(default = None)]
+    pub id: Option<ReaderTagId>,
+    /// Why it couldn't be read. A line and column in it count from the start of the tag.
+    pub error: String,
+}
+
+/// `added_tags` holds numbers, and `removed_tag` is a string. A followed tag's `ID` is a string
+/// too.
+#[derive(Deserialize)]
+struct RawReaderFollowTagsResponse {
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    subscribed: bool,
+    #[serde(default)]
+    tags: Option<LenientVec<ReaderTag>>,
+    #[serde(default, deserialize_with = "deserialize_tag_ids")]
+    added_tags: Vec<ReaderTagId>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderUnfollowTagResponse {
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    subscribed: bool,
+    #[serde(default)]
+    tags: Option<LenientVec<ReaderTag>>,
+    #[serde(default, deserialize_with = "deserialize_optional_tag_id")]
+    removed_tag: Option<ReaderTagId>,
+}
+
+impl From<RawReaderFollowTagsResponse> for ReaderFollowTagsResponse {
+    fn from(raw: RawReaderFollowTagsResponse) -> Self {
+        let (tags, unreadable_tags) = readable_and_unreadable_tags(raw.tags);
+        Self {
+            subscribed: raw.subscribed,
+            tags,
+            unreadable_tags,
+            added_tags: raw.added_tags,
+        }
+    }
+}
+
+impl From<RawReaderUnfollowTagResponse> for ReaderUnfollowTagResponse {
+    fn from(raw: RawReaderUnfollowTagResponse) -> Self {
+        let (tags, unreadable_tags) = readable_and_unreadable_tags(raw.tags);
+        Self {
+            subscribed: raw.subscribed,
+            tags,
+            unreadable_tags,
+            removed_tag: raw.removed_tag,
+        }
+    }
+}
+
+fn readable_and_unreadable_tags(
+    tags: Option<LenientVec<ReaderTag>>,
+) -> (Vec<ReaderTag>, Vec<ReaderUnreadableTag>) {
+    #[derive(Deserialize)]
+    struct TagIdOnly {
+        #[serde(
+            rename = "ID",
+            default,
+            deserialize_with = "deserialize_optional_tag_id"
+        )]
+        id: Option<ReaderTagId>,
+    }
+
+    let tags = tags.unwrap_or_default();
+    let unreadable = tags
+        .invalid
+        .into_iter()
+        .map(|tag| ReaderUnreadableTag {
+            id: serde_json::from_str::<TagIdOnly>(tag.json.get())
+                .ok()
+                .and_then(|tag| tag.id),
+            error: tag.error.to_string(),
+        })
+        .collect();
+    (tags.valid, unreadable)
+}
+
+/// A tag's ID, sent as a number or a string. Anything else reads as `None` rather than failing an
+/// answer to a change that has already been made.
+fn deserialize_optional_tag_id<'de, D>(deserializer: D) -> Result<Option<ReaderTagId>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Option::<serde_json::Value>::deserialize(deserializer)?
+        .as_ref()
+        .and_then(tag_id))
+}
+
+/// A list of tag IDs. One that isn't an ID is left out, and anything that isn't a list reads as
+/// an empty one.
+fn deserialize_tag_ids<'de, D>(deserializer: D) -> Result<Vec<ReaderTagId>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(
+        match Option::<serde_json::Value>::deserialize(deserializer)? {
+            Some(serde_json::Value::Array(ids)) => ids.iter().filter_map(tag_id).collect(),
+            _ => Vec::new(),
+        },
+    )
+}
+
+fn tag_id(value: &serde_json::Value) -> Option<ReaderTagId> {
+    match value {
+        serde_json::Value::Number(number) => number.as_u64(),
+        serde_json::Value::String(text) => text.parse().ok(),
+        _ => None,
+    }
+    .map(ReaderTagId)
 }
 
 /// Response from `GET /wpcom/v2/read/interests`: the tags a new reader picks from, in the order
@@ -605,6 +777,140 @@ mod tests {
                 (Some("Social Media"), "social-media"),
                 (Some("食べ物"), "食べ物")
             ]
+        );
+    }
+
+    fn slugs(tags: &[ReaderTag]) -> Vec<&str> {
+        tags.iter().map(|tag| tag.slug.0.as_str()).collect()
+    }
+
+    /// The answer to following a tag, recorded from WordPress.com, with the user's tags replaced.
+    /// It keeps the types the API sent: a tag's `ID` is a string, and `added_tags` holds numbers.
+    #[test]
+    fn test_deserialize_follow_tags() {
+        let json = include_str!("../../tests/wpcom/reader_tags/follow_tags.json");
+        let answer: ReaderFollowTagsResponse = serde_json::from_str(json).expect("it parses");
+
+        assert!(answer.subscribed);
+        assert_eq!(
+            slugs(&answer.tags),
+            ["another-tag", "example-tag", "new-tag"]
+        );
+        assert!(answer.unreadable_tags.is_empty());
+        assert_eq!(answer.added_tags, [ReaderTagId(9003)]);
+
+        let added = &answer.tags[2];
+        assert_eq!(added.id, Some(ReaderTagId(9003)));
+        assert_eq!(added.title.as_deref(), Some("new tag"));
+        assert_eq!(added.display_name.as_deref(), Some("new-tag"));
+        assert_eq!(added.description, None);
+        assert_eq!(
+            added.url.as_deref(),
+            Some("https://public-api.wordpress.com/rest/v1.2/read/tags/new-tag/posts")
+        );
+    }
+
+    /// What the API sends for tags the user already follows: a 200 that added none.
+    #[test]
+    fn test_deserialize_follow_tags_already_followed() {
+        let answer: ReaderFollowTagsResponse = serde_json::from_value(json!({
+            "subscribed": true,
+            "tags": [{ "ID": "9003", "slug": "new-tag", "title": "new tag" }],
+            "added_tags": [],
+        }))
+        .expect("it parses");
+
+        assert!(answer.subscribed);
+        assert_eq!(slugs(&answer.tags), ["new-tag"]);
+        assert!(answer.added_tags.is_empty());
+    }
+
+    /// The answer to unfollowing a tag, recorded from WordPress.com, with the user's tags
+    /// replaced. `removed_tag` is a string.
+    #[test]
+    fn test_deserialize_unfollow_tag() {
+        let json = include_str!("../../tests/wpcom/reader_tags/unfollow_tag.json");
+        let answer: ReaderUnfollowTagResponse = serde_json::from_str(json).expect("it parses");
+
+        assert!(!answer.subscribed);
+        assert_eq!(slugs(&answer.tags), ["another-tag", "example-tag"]);
+        assert!(answer.unreadable_tags.is_empty());
+        assert_eq!(answer.removed_tag, Some(ReaderTagId(9003)));
+    }
+
+    #[test]
+    fn test_a_followed_tag_that_cannot_be_read_does_not_fail_the_answer() {
+        let json = r#"{
+            "subscribed": true,
+            "tags": [
+                { "ID": "1", "slug": "one" },
+                { "ID": "2", "title": "No slug" },
+                "not a tag",
+                { "ID": "4", "slug": "four" }
+            ],
+            "added_tags": [4]
+        }"#;
+        let followed: ReaderFollowTagsResponse = serde_json::from_str(json).expect("it parses");
+        assert_eq!(slugs(&followed.tags), ["one", "four"]);
+        let unreadable: Vec<_> = followed.unreadable_tags.iter().map(|tag| tag.id).collect();
+        assert_eq!(unreadable, [Some(ReaderTagId(2)), None]);
+        assert!(!followed.unreadable_tags[0].error.is_empty());
+
+        let unfollowed: ReaderUnfollowTagResponse = serde_json::from_str(json).expect("it parses");
+        assert_eq!(slugs(&unfollowed.tags), ["one", "four"]);
+        assert_eq!(unfollowed.unreadable_tags.len(), 2);
+    }
+
+    /// Only `subscribed` has to be there. IDs arrive as numbers or strings, and one that is
+    /// neither is left out.
+    #[rstest]
+    #[case(json!({ "subscribed": true }), &[])]
+    #[case(json!({ "subscribed": 1, "tags": null, "added_tags": null }), &[])]
+    #[case(json!({ "subscribed": true, "tags": [], "added_tags": false }), &[])]
+    #[case(json!({ "subscribed": true, "added_tags": [7, "8", null, "nine", -1] }), &[7, 8])]
+    fn test_a_follow_tags_answer_with_little_in_it(
+        #[case] answer: serde_json::Value,
+        #[case] added: &[u64],
+    ) {
+        let answer: ReaderFollowTagsResponse = serde_json::from_value(answer).expect("it parses");
+        assert!(answer.subscribed);
+        assert!(answer.tags.is_empty());
+        let expected: Vec<_> = added.iter().copied().map(ReaderTagId).collect();
+        assert_eq!(answer.added_tags, expected);
+    }
+
+    #[rstest]
+    #[case(json!({ "subscribed": false, "removed_tag": "1336" }), Some(1336))]
+    #[case(json!({ "subscribed": false, "removed_tag": 1336 }), Some(1336))]
+    #[case(json!({ "subscribed": 0, "removed_tag": false }), None)]
+    #[case(json!({ "subscribed": false }), None)]
+    fn test_an_unfollow_tag_answer(
+        #[case] answer: serde_json::Value,
+        #[case] removed: Option<u64>,
+    ) {
+        let answer: ReaderUnfollowTagResponse = serde_json::from_value(answer).expect("it parses");
+        assert!(!answer.subscribed);
+        assert_eq!(answer.removed_tag, removed.map(ReaderTagId));
+    }
+
+    #[test]
+    fn test_a_tag_follow_answer_without_subscribed_is_an_error() {
+        let answer = json!({ "tags": [] });
+        assert!(serde_json::from_value::<ReaderFollowTagsResponse>(answer.clone()).is_err());
+        assert!(serde_json::from_value::<ReaderUnfollowTagResponse>(answer).is_err());
+    }
+
+    #[test]
+    fn test_the_body_to_follow_tags() {
+        let params = ReaderFollowTagsParams {
+            tags: vec![
+                ReaderTagSlug("photography".to_string()),
+                ReaderTagSlug("travel".to_string()),
+            ],
+        };
+        assert_eq!(
+            serde_json::to_value(&params).unwrap(),
+            json!({ "tags": ["photography", "travel"] })
         );
     }
 

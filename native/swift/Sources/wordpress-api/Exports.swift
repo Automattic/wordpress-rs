@@ -560,6 +560,8 @@ public typealias ReaderUnfollowUrlResponse = WordPressAPIInternal.ReaderUnfollow
 public typealias ReaderUnreadableSubscription = WordPressAPIInternal.ReaderUnreadableSubscription
 
 // MARK: Reader Menu and Tags
+public typealias ReaderFollowTagsParams = WordPressAPIInternal.ReaderFollowTagsParams
+public typealias ReaderFollowTagsResponse = WordPressAPIInternal.ReaderFollowTagsResponse
 public typealias ReaderInterest = WordPressAPIInternal.ReaderInterest
 public typealias ReaderInterestsResponse = WordPressAPIInternal.ReaderInterestsResponse
 public typealias ReaderMenu = WordPressAPIInternal.ReaderMenu
@@ -570,10 +572,14 @@ public typealias ReaderTag = WordPressAPIInternal.ReaderTag
 public typealias ReaderTagId = WordPressAPIInternal.ReaderTagId
 public typealias ReaderTagResponse = WordPressAPIInternal.ReaderTagResponse
 public typealias ReaderTagsRequestExecutor = WordPressAPIInternal.ReaderTagsRequestExecutor
+public typealias ReaderTagsRequestFollowTagsResponse = WordPressAPIInternal.ReaderTagsRequestFollowTagsResponse
 public typealias ReaderTagsRequestInterestsResponse = WordPressAPIInternal.ReaderTagsRequestInterestsResponse
 public typealias ReaderTagsRequestMenuResponse = WordPressAPIInternal.ReaderTagsRequestMenuResponse
 public typealias ReaderTagsRequestTagResponse = WordPressAPIInternal.ReaderTagsRequestTagResponse
+public typealias ReaderTagsRequestUnfollowTagResponse = WordPressAPIInternal.ReaderTagsRequestUnfollowTagResponse
+public typealias ReaderUnfollowTagResponse = WordPressAPIInternal.ReaderUnfollowTagResponse
 public typealias ReaderUnreadableMenuItem = WordPressAPIInternal.ReaderUnreadableMenuItem
+public typealias ReaderUnreadableTag = WordPressAPIInternal.ReaderUnreadableTag
 
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams

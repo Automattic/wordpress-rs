@@ -3,7 +3,10 @@ use crate::{
     wp_com::{
         WpComNamespace,
         reader_posts::ReaderTagSlug,
-        reader_tags::{ReaderInterestsResponse, ReaderMenu, ReaderTagResponse},
+        reader_tags::{
+            ReaderFollowTagsParams, ReaderFollowTagsResponse, ReaderInterestsResponse, ReaderMenu,
+            ReaderTagResponse, ReaderUnfollowTagResponse,
+        },
     },
 };
 use wp_derive_request_builder::WpDerivedRequest;
@@ -20,6 +23,14 @@ enum ReaderTagsRequest {
     // The tags a new reader picks from. Answers signed out.
     #[get(url = "/read/interests", output = ReaderInterestsResponse)]
     Interests,
+    // Follows one or more tags, and answers with every tag the user now follows. For a tag the
+    // user already follows it's still a 200, with nothing in `added_tags`.
+    #[post(url = "/read/tags/mine/new", params = &ReaderFollowTagsParams, output = ReaderFollowTagsResponse)]
+    FollowTags,
+    // Unfollows a tag, by its slug, and answers with every tag the user still follows. It takes
+    // no parameters. For a tag the user doesn't follow it's a 400 `not_subscribed`.
+    #[post(url = "/read/tags/<reader_tag_slug>/mine/delete", output = ReaderUnfollowTagResponse)]
+    UnfollowTag,
 }
 
 impl DerivedRequest for ReaderTagsRequest {
@@ -29,6 +40,11 @@ impl DerivedRequest for ReaderTagsRequest {
             Self::Menu => WpComNamespace::RestV1_3,
             // The newest tag info: `rest/v1.3` has none.
             Self::Tag => WpComNamespace::RestV1_2,
+            // The newest follow, which takes several tags. `rest/v1.1` follows one, named in the
+            // address.
+            Self::FollowTags => WpComNamespace::RestV1_2,
+            // The only version: `rest/v1.2` has none.
+            Self::UnfollowTag => WpComNamespace::RestV1_1,
             Self::Interests => WpComNamespace::V2,
         }
     }
@@ -40,8 +56,9 @@ mod tests {
     use crate::{
         request::endpoint::ApiUrlResolver,
         wp_com::endpoint::tests::{
-            fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_2_endpoint,
-            validate_wp_com_rest_v1_3_endpoint, validate_wp_com_v2_endpoint,
+            fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
+            validate_wp_com_rest_v1_2_endpoint, validate_wp_com_rest_v1_3_endpoint,
+            validate_wp_com_v2_endpoint,
         },
     };
     use rstest::*;
@@ -72,6 +89,23 @@ mod tests {
     #[rstest]
     fn interests(endpoint: ReaderTagsRequestEndpoint) {
         validate_wp_com_v2_endpoint(endpoint.interests(), "/read/interests");
+    }
+
+    #[rstest]
+    fn follow_tags(endpoint: ReaderTagsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(endpoint.follow_tags(), "/read/tags/mine/new");
+    }
+
+    #[rstest]
+    fn unfollow_tag(endpoint: ReaderTagsRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.unfollow_tag(&ReaderTagSlug("photography".to_string())),
+            "/read/tags/photography/mine/delete",
+        );
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.unfollow_tag(&ReaderTagSlug("写真".to_string())),
+            "/read/tags/%E5%86%99%E7%9C%9F/mine/delete",
+        );
     }
 
     #[fixture]

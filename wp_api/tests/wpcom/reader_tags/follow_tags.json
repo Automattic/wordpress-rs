@@ -1,0 +1,32 @@
+{
+  "subscribed": true,
+  "tags": [
+    {
+      "ID": "9001",
+      "slug": "another-tag",
+      "title": "another tag",
+      "display_name": "another-tag",
+      "description": null,
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/another-tag/posts"
+    },
+    {
+      "ID": "9002",
+      "slug": "example-tag",
+      "title": "Example Tag",
+      "display_name": "example-tag",
+      "description": null,
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/example-tag/posts"
+    },
+    {
+      "ID": "9003",
+      "slug": "new-tag",
+      "title": "new tag",
+      "display_name": "new-tag",
+      "description": null,
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/new-tag/posts"
+    }
+  ],
+  "added_tags": [
+    9003
+  ]
+}
