@@ -27,8 +27,9 @@ impl HtmlLinks {
     }
 
     /// The elements matching `selector` that a browser acts on, in document
-    /// order. Elements inside a `<template>`, an `<svg>` or a `<math>` are left
-    /// out.
+    /// order. SVG and MathML elements are left out, and so is anything inside
+    /// an HTML `<template>`. HTML elements inside an SVG `<foreignObject>` are
+    /// kept, as a browser keeps them.
     pub(crate) fn active_elements<'a>(
         &'a self,
         selector: &'a Selector,
@@ -49,9 +50,13 @@ impl HtmlLinks {
 ///
 /// Returns `None` when `address` is empty or only whitespace, doesn't parse,
 /// or resolves to anything but an `http` or `https` URL, such as a `data:` or
-/// `javascript:` URL. Surrounding whitespace is ignored, as browsers do.
+/// `javascript:` URL. Surrounding ASCII whitespace is ignored, as browsers do.
+/// Other whitespace, such as a no-break space, is part of the address.
+///
+/// Unlike a browser, an empty address doesn't resolve to `base_url` itself:
+/// no caller wants a link to the page it's reading.
 pub(crate) fn resolve_web_address(address: &str, base_url: &Url) -> Option<Url> {
-    let address = address.trim();
+    let address = address.trim_ascii();
     if address.is_empty() {
         return None;
     }
@@ -65,8 +70,8 @@ pub(crate) fn resolve_web_address(address: &str, base_url: &Url) -> Option<Url> 
 /// `<base href>`, resolved against `page_url`, or `page_url` itself.
 ///
 /// As in the HTML standard, a base that doesn't parse, or is a `data:` or
-/// `javascript:` URL, is ignored, and so is one a browser ignores because
-/// it's inside a `<template>` or an `<svg>`.
+/// `javascript:` URL, is ignored, and so is one a browser doesn't act on (see
+/// [`is_active_html_element`]).
 fn document_base_url(document: &Html, page_url: &Url) -> Url {
     let selector = Selector::parse("base[href]").expect("the base selector is valid");
     document
@@ -79,15 +84,19 @@ fn document_base_url(document: &Html, page_url: &Url) -> Url {
 }
 
 /// Whether a browser acts on `element`: it's an HTML element, not an SVG or
-/// MathML one, and it isn't inside a `<template>`, whose contents are inert.
+/// MathML one, and it isn't inside an HTML `<template>`, whose contents are
+/// inert. An SVG element named `template` has no such effect.
 fn is_active_html_element(element: ElementRef<'_>) -> bool {
-    let is_html = &*element.value().name.ns == "http://www.w3.org/1999/xhtml";
     let in_template = element.ancestors().any(|node| {
         node.value()
             .as_element()
-            .is_some_and(|ancestor| ancestor.name() == "template")
+            .is_some_and(|ancestor| is_html(ancestor) && ancestor.name() == "template")
     });
-    is_html && !in_template
+    is_html(element.value()) && !in_template
+}
+
+fn is_html(element: &scraper::node::Element) -> bool {
+    &*element.name.ns == "http://www.w3.org/1999/xhtml"
 }
 
 #[cfg(test)]
@@ -147,8 +156,22 @@ mod tests {
     }
 
     #[rstest]
+    #[case::leading_no_break_space("\u{00A0}/a.png", "https://example.com/blog/%C2%A0/a.png")]
+    #[case::trailing_ideographic_space("/a.png\u{3000}", "https://example.com/a.png%E3%80%80")]
+    #[case::tab_and_newline_inside("/a\t.p\nng", "https://example.com/a.png")]
+    fn keeps_whitespace_a_browser_keeps(#[case] address: &str, #[case] expected: &str) {
+        // Browsers strip only ASCII whitespace from the ends, and tabs and
+        // newlines from inside, so other whitespace is part of the address.
+        assert_eq!(
+            resolve_in("", "https://example.com/blog/", address).as_deref(),
+            Some(expected)
+        );
+    }
+
+    #[rstest]
     #[case::empty("")]
     #[case::blank("   ")]
+    #[case::blank_with_form_feed(" \u{000C}\t\r\n")]
     #[case::unparseable("https://[invalid/a.png")]
     #[case::data("data:image/png;base64,iVBORw0KGgo=")]
     #[case::javascript("javascript:alert(1)")]
@@ -184,6 +207,10 @@ mod tests {
         r#"<svg><base href="/assets/"></base></svg>"#,
         "https://example.com/blog/a.png"
     )]
+    #[case::in_foreign_object(
+        r#"<svg><foreignObject><base href="/assets/"></foreignObject></svg>"#,
+        "https://example.com/assets/a.png"
+    )]
     fn resolves_against_the_base_element_a_browser_uses(
         #[case] head: &str,
         #[case] expected: &str,
@@ -199,13 +226,18 @@ mod tests {
         let html = r#"<link rel="a" href="/a">
             <template><link rel="b" href="/b"></template>
             <svg><link rel="c" href="/c"></link></svg>
-            <link rel="d" href="/d">"#;
+            <link rel="d" href="/d">
+            <svg><foreignObject><link rel="e" href="/e"></foreignObject></svg>
+            <svg><template><foreignObject><link rel="f" href="/f"></foreignObject></template></svg>
+            <math><link rel="g" href="/g"></link></math>"#;
         let links = HtmlLinks::parse(html, &url("https://example.com/"));
         let selector = Selector::parse("link").unwrap();
         let rels: Vec<_> = links
             .active_elements(&selector)
             .filter_map(|element| element.value().attr("rel"))
             .collect();
-        assert_eq!(rels, ["a", "d"]);
+        // `e` and `f` are HTML elements in an SVG `<foreignObject>`. An SVG
+        // `template` isn't inert, so `f` counts too.
+        assert_eq!(rels, ["a", "d", "e", "f"]);
     }
 }
