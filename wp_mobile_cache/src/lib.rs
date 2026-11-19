@@ -8,7 +8,7 @@ use crate::repository::entity_state::EntityStateRepository;
 use crate::repository::list_metadata::ListMetadataRepository;
 use crate::repository::reader::ReaderStreamRepository;
 use crate::repository::sites::SiteRepository;
-use crate::repository::wordpress_com_accounts::WordPressComAccountRepository;
+use crate::repository::wordpress_com_accounts::{ReaderOwner, WordPressComAccountRepository};
 use wp_api::parsed_url::ParsedUrl;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
@@ -435,6 +435,16 @@ impl WpApiCache {
         user_id: WpComUserId,
     ) -> Result<bool, SqliteDbError> {
         self.execute(|connection| WordPressComAccountRepository::delete(connection, user_id))
+    }
+
+    /// Remove everything cached for a reader, such as their Reader posts, streams and followed
+    /// tags. For an account it's the same as [`Self::remove_wordpress_com_account`]. For
+    /// [`ReaderOwner::SignedOut`] it removes what was kept while nobody was signed in, such as
+    /// after it's been moved to an account.
+    ///
+    /// Returns `true` if anything was cached for the reader.
+    pub fn remove_reader_data(&self, owner: ReaderOwner) -> Result<bool, SqliteDbError> {
+        self.execute(|connection| WordPressComAccountRepository::delete_owner(connection, owner))
     }
 }
 

@@ -365,6 +365,9 @@ public typealias ReaderSavedSource = WordPressAPIInternal.ReaderSavedSource
 public typealias ReaderUnsavePostResponse = WordPressAPIInternal.ReaderUnsavePostResponse
 public typealias ReaderUnsavePostParams = WordPressAPIInternal.ReaderUnsavePostParams
 
+// MARK: Reader Service
+public typealias ReaderOwner = WordPressAPIInternal.ReaderOwner
+
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams
 public typealias SubscriberImportJobsListParams = WordPressAPIInternal.SubscriberImportJobsListParams
