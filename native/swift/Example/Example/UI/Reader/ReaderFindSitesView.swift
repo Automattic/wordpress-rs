@@ -7,6 +7,17 @@ struct ReaderFoundSite: Identifiable {
     let result: ReaderFeedSearchResult
     var isFollowing: Bool
 
+    init(id: Int, result: ReaderFeedSearchResult) {
+        self.id = id
+        self.result = result
+        self.isFollowing = Self.followedWhenFound(result)
+    }
+
+    /// Whether the search found the reader following the site or feed.
+    static func followedWhenFound(_ result: ReaderFeedSearchResult) -> Bool {
+        result.site?.isFollowing ?? result.feed?.isFollowing ?? false
+    }
+
     var title: String {
         (result.title ?? result.site?.name ?? result.feed?.name)?.decodingHTMLEntities() ?? address ?? "A site"
     }
@@ -16,22 +27,42 @@ struct ReaderFoundSite: Identifiable {
         result.url ?? result.site?.url ?? result.feed?.url ?? result.subscribeUrl
     }
 
+    /// A lookup by address can leave out the result's own site ID, which its site or feed has.
+    var siteId: UInt64? {
+        guard let siteId = result.siteId ?? result.site?.siteId ?? result.feed?.siteId, siteId != 0 else {
+            return nil
+        }
+        return siteId
+    }
+
+    var feedId: ReaderFeedId? {
+        result.feedId ?? result.site?.feedId
+    }
+
+    /// The subscriber count the search sent, which counted the reader as they were then, moved by a follow or an
+    /// unfollow made here since. The results aren't cached, so nothing else moves it.
     var subscribersCount: UInt64? {
-        result.subscribersCount ?? result.feed?.subscribersCount
+        guard let count = result.subscribersCount ?? result.feed?.subscribersCount else {
+            return nil
+        }
+        if isFollowing == Self.followedWhenFound(result) {
+            return count
+        }
+        return isFollowing ? count + 1 : (count > 0 ? count - 1 : 0)
     }
 
     /// The site's stream, or its feed's when it has no site ID.
     var stream: ReaderStream? {
-        if let siteId = result.siteId, siteId != 0 {
+        if let siteId {
             return .site(siteId: siteId)
         }
-        return result.feedId.map { .feed(feedId: $0) }
+        return feedId.map { .feed(feedId: $0) }
     }
 
     var followTarget: ReaderFollowTarget {
         ReaderFollowTarget(
-            siteId: result.siteId,
-            feedId: result.feedId,
+            siteId: siteId,
+            feedId: feedId,
             url: result.subscribeUrl ?? address,
             name: title
         )
@@ -102,11 +133,7 @@ final class ReaderFindSitesViewModel {
             guard searchedFor == query else { return }
             sites += page.feeds.enumerated()
                 .map { index, result in
-                    ReaderFoundSite(
-                        id: sites.count + index,
-                        result: result,
-                        isFollowing: result.site?.isFollowing ?? result.feed?.isFollowing ?? false
-                    )
+                    ReaderFoundSite(id: sites.count + index, result: result)
                 }
             total = page.total ?? total
             nextOffset = page.nextOffset
@@ -204,9 +231,14 @@ struct ReaderFindSitesView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(site.title)
             Text(
-                [site.address, site.subscribersCount.map { readerCount($0, "subscriber") }]
-                    .compactMap { $0 }
-                    .joined(separator: " · ")
+                [
+                    site.address,
+                    site.subscribersCount.map { readerCount($0, "subscriber") },
+                    site.siteId.map { "site \($0)" },
+                    site.feedId.map { "feed \($0)" }
+                ]
+                .compactMap { $0 }
+                .joined(separator: " · ")
             )
             .font(.caption)
             .foregroundStyle(.secondary)

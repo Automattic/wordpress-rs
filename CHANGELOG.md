@@ -103,6 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReaderService.set_post_emails` keeps the email frequency the server answers with when it starts a site's post emails. The server drops the frequency while the emails are off, so a subscriptions list fetched then had none, and the Kotlin example app showed "Emailed: not set" after the emails were turned back on, until a refresh.
 - The Kotlin example app's Find sites takes a result's site ID from its site or feed when the result leaves out its own, so the row shows it, opens the site's stream rather than its feed's, and follows by it; and a follow or unfollow made from the row moves its subscriber count. The owner's test site was listed with no site ID, and its count stayed at 0 after Follow.
 - The Kotlin example app's comments status counts the comments the server took against the server's total, and names the ones written on the device that it hasn't taken on their own. A comment that failed to send read as "2 of 1 comments".
+- The Swift example app's Find sites takes a result's site ID from its site or feed when the result leaves out its own, as the Kotlin app does, so the row shows it, opens the site's stream rather than its feed's, and follows by it; and a follow or unfollow made from the row moves its subscriber count. The owner's test site was listed with no site ID, and its count stayed at the search's after Follow.
 
 ## [0.11.1] - 2026-11-18
 
