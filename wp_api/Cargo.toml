@@ -26,7 +26,6 @@ indoc = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 url = { workspace = true }
-parse_link_header = { workspace = true }
 paste = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate", "rustls", "hickory-dns", "cookies" ], optional = true }
