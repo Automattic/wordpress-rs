@@ -75,13 +75,19 @@ fun ReaderCommentsScreen(
     }
 }
 
-/** Whether the comments are loading, how many there are, and the last error. */
+/**
+ * Whether the comments are loading, how many there are, and the last error. The server's count only
+ * has the comments it took, so the ones written here that it hasn't are counted on their own.
+ */
 @Composable
 private fun ReaderCommentsStatus(state: ReaderCommentsState) {
     val info = state.info ?: return
+    val taken = state.rows.count { it.comment.sendState == ReaderCommentSendState.SENT }
+    val notTaken = state.rows.size - taken
     ReaderNote(
         text = listOfNotNull(
-            "${state.rows.size} of ${info.found?.toString() ?: "an unknown number of"} comments",
+            "$taken of ${info.found?.toString() ?: "an unknown number of"} comments",
+            "$notTaken not sent yet".takeIf { notTaken > 0 },
             info.state.text(),
             info.lastRefreshedAt?.let { "refreshed ${it.readerText()}" } ?: "never refreshed"
         ).joinToString(" · "),
