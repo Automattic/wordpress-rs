@@ -1449,6 +1449,28 @@ mod tests {
         );
     }
 
+    // `WpNetworkHeaderMap` splits these at the commas inside the quoted values and the query,
+    // so this checks they survive the round trip.
+    #[test]
+    fn test_link_header_keeps_commas_in_quoted_params_and_queries() {
+        let response = response_with_link_header(
+            "https://sentry.io/api/0/projects/1/groups/",
+            r#"<?&cursor=1420837590:0:1>; rel="previous"; results="false", <https://example.com/?ids=1,2>; rel="next"; csv="one,two", </last>; rel="last""#,
+        );
+        assert_eq!(
+            response.get_link_header("previous"),
+            urls(&["https://sentry.io/api/0/projects/1/groups/?&cursor=1420837590:0:1"])
+        );
+        assert_eq!(
+            response.get_link_header("next"),
+            urls(&["https://example.com/?ids=1,2"])
+        );
+        assert_eq!(
+            response.get_link_header("last"),
+            urls(&["https://sentry.io/last"])
+        );
+    }
+
     #[test]
     fn test_link_header_without_a_usable_request_url() {
         // There's nothing to resolve a relative target against, and only `http(s)` targets
