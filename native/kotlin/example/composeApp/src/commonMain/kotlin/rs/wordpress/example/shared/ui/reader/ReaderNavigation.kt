@@ -105,6 +105,9 @@ fun ReaderScreen(
             is ReaderDestination.FindSites -> ReaderFindSitesScreen(session, open, onBackClicked)
             is ReaderDestination.SavedPosts ->
                 WpComReaderSavedPostsScreen(session.service.saved(), onBackClicked)
+            is ReaderDestination.Offline -> ReaderOfflineScreen(session, open, onBackClicked)
+            is ReaderDestination.OfflinePost ->
+                ReaderOfflinePostScreen(session, destination.key, onBackClicked)
         }
     }
 }

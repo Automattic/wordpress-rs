@@ -150,6 +150,7 @@ private fun ReaderTagRow(
 internal fun LazyListScope.readerLinkRows(state: ReaderHomeState, open: (ReaderDestination) -> Unit) {
     item { ReaderSectionTitle("More") }
     item { ReaderLinkRow("Saved posts") { open(ReaderDestination.SavedPosts) } }
+    item { ReaderLinkRow("Offline reading") { open(ReaderDestination.Offline) } }
     item { ReaderLinkRow("Subscriptions") { open(ReaderDestination.Subscriptions) } }
     item { ReaderLinkRow("Blocked sites") { open(ReaderDestination.BlockedSites) } }
     item { ReaderLinkRow("Find sites") { open(ReaderDestination.FindSites) } }

@@ -142,6 +142,12 @@ fun createWpComApiClient(
 /** Where the Reader keeps its cache and each account's user ID, across launches. */
 private val readerDirectory = File(System.getProperty("java.io.tmpdir"), "reader-saved-posts")
 
+/** Where the Reader keeps saved posts' images, for reading them with no connection. */
+val readerOfflineImageDirectory: File = File(readerDirectory, "offline-images")
+
+/** How much room saved posts' images may take: enough for a few dozen posts. */
+const val READER_OFFLINE_IMAGE_BYTES: ULong = 50_000_000uL
+
 /**
  * The Reader's cache: a file that lasts across launches, unlike the shared one in [cacheModule],
  * so the Reader shows its streams and saved posts after a relaunch, offline. Every reader's data

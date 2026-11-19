@@ -43,4 +43,10 @@ sealed interface ReaderDestination {
     data object FindSites : ReaderDestination
 
     data object SavedPosts : ReaderDestination
+
+    /** The saved posts, with what the device has of each for reading with no connection. */
+    data object Offline : ReaderDestination
+
+    /** A saved post as the device has it. */
+    data class OfflinePost(val key: ReaderSavedKey) : ReaderDestination
 }
