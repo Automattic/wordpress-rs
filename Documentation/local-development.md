@@ -113,3 +113,31 @@ adb shell am start -S -n rs.wordpress.example/.ui.welcome.WelcomeActivity --es w
 
 Either way, the token briefly appears in the process list while the launch command runs; that's
 inherent to passing it as a launch argument.
+
+## Checking the Swift example app's screens from a script
+
+The Swift example app's screens can be checked on an iOS Simulator without tapping by hand. A UI test
+(`native/swift/Example/ExampleUITests/ScriptedUITests.swift`) reads a script of steps, such as `tap Reader`,
+`type #tag-slug => knitting` and `shot 01-home`, and saves a screenshot and a text list of what's on screen for
+each `shot`. The steps it knows are listed at the top of that file.
+
+Build the Rust library for the simulator only, which is much smaller than `make xcframework-only-ios`, boot a
+simulator, and run a script:
+
+```bash
+make _build-apple-aarch64-apple-ios-sim
+cargo run --quiet --bin xcframework -- --profile dev --targets aarch64-apple-ios-sim
+
+scripts/example-app-ui-script.sh --build --device <udid> \
+    native/swift/Example/ExampleUITests/Scripts/reader-signed-out.txt ~/Desktop/reader-screens
+```
+
+`--build` builds the app and the UI test: leave it out to run another script against the same build. The script
+in the example goes through every Reader screen as a reader who isn't signed in, so it sends nothing that changes
+an account. To run a script as an account, sign the app in first with `make example-app-login`: the app stays
+signed in from one script to the next.
+
+Keep the output folder outside the checkout when the screens show real content.
+
+One launch argument helps a script: `launch -reader-offline` starts the app with every Reader request failing as it
+does with no connection, which shows the Reader's screens from the cache alone.
