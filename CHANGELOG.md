@@ -52,6 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The saved list can be sorted: `ReaderSavedPostsParams` has `order_by`, a `ReaderSavedOrderBy` (when each post was saved, or when it was published), and `order`. The API reads `order` only in capitals, which is how it is sent.
 - `reader_post_content_image_urls` lists the images in a Reader post's content, for storing them so the post can be read with no connection. It leaves out tracking pixels, which would count a view when fetched. `reader_post_content_with_stored_images` returns the content with each stored image pointing at its copy.
 - The cache keeps what the device has of each saved Reader post for reading with no connection: whether its content was fetched, why a fetch failed, and which of its images are stored as files. `ReaderSavedRepository::select_list_ordered` reads the saved list by when each post was saved or published, newest or oldest first.
+- `ReaderSavedService::download_for_offline` gets every saved Reader post ready to read with no connection. It fetches the content of each save that has none, from the saved list and then one post at a time, and reports what the device has. Each `ReaderSavedListItem` has an `offline` state: not downloaded, downloading, ready, or failed with the reason. `retry_offline` tries a failed one again.
+- Saved Reader posts can keep their images on the device. `ReaderSavedService::set_offline_image_store` says where, and how much room they may take, and `download_for_offline(include_images: true)` stores them, newest save first. When room runs out, the oldest saves lose their images and keep their text. Unsaving a post deletes its images. `offline_post` returns a saved post with its content pointing at the stored copies.
+- `ReaderSavedService::saved_posts_ordered` gives the saved list by when each post was saved or published, newest or oldest first. Each order loads its own pages.
+- Swift: `ReaderPostRecord.galleryImageURLs` and `contentImageURLs` give the images of a Reader post's content.
 
 ### Changed
 
@@ -60,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReaderService::new` takes the app as `saved_source`, which is recorded with each save.
 - `ReaderStreamOrder`, which says whether a stream's posts are ordered by date or kept in the server's order, is now `ReaderStreamOrdering`. The name is free for the `order` parameter of the streams added next.
 - One saved post that can't be read no longer fails its page of the saved list. `ReaderSavedPostsResponse.posts` has the posts that could be read, and the new `unreadable_posts` lists the others with their IDs. Each is still saved.
+- A saved Reader post that can't be read stays in the saved list as a save, and says why its content couldn't be loaded, where it used to fail the list's page.
 
 ### Fixed
 

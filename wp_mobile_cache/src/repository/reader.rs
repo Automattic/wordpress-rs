@@ -1058,7 +1058,8 @@ impl ReaderStreamRepository {
     }
 
     /// Deletes the account's streams last refreshed before `before`, with their posts' places in
-    /// them. `except` is a stream to keep whatever its age, such as the saved list.
+    /// them. `except` is a stream to keep whatever its age, such as the saved list, along with
+    /// the streams whose key is `except`, a colon, and more: the saved list in another order.
     pub fn delete_stale(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -1067,7 +1068,7 @@ impl ReaderStreamRepository {
     ) -> Result<u64, SqliteDbError> {
         let removed = executor.execute(
             "DELETE FROM reader_streams
-            WHERE account_id = ?1 AND key != ?3
+            WHERE account_id = ?1 AND key != ?3 AND key NOT LIKE ?3 || ':%'
                 AND state NOT IN (?4, ?5)
                 AND (last_refreshed_at IS NULL OR last_refreshed_at < ?2)",
             params![
@@ -2016,6 +2017,21 @@ impl ReaderSavedRepository {
             params![row_id, post, date_saved.map(reader_date_text)],
         )?;
         Self::add_aliases(executor, row_id, main, keys)
+    }
+
+    /// Gives a save its post, fetched for it on its own, and shows it in the saved list: the
+    /// device now has what the list would have sent.
+    pub fn link_post(
+        executor: &impl QueryExecutor,
+        saved: RowId,
+        post: RowId,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "UPDATE reader_saved_posts SET post_id = ?2, listed = 1
+            WHERE rowid = ?1 AND (post_id IS NOT ?2 OR listed != 1)",
+            params![saved, post],
+        )?;
+        Ok(())
     }
 
     /// Adds an imported save, as a save would: a post already saved is left as it is, and one

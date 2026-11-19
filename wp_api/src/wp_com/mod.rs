@@ -18,6 +18,7 @@ pub mod purchases;
 pub mod reader_blocks;
 pub mod reader_comments;
 pub mod reader_likes;
+pub mod reader_offline_images;
 pub mod reader_page_views;
 pub mod reader_post;
 pub mod reader_post_display;

@@ -17,6 +17,8 @@ pub(crate) enum Step {
     Offline,
     /// The request timed out, so the server may have applied it.
     TimedOut,
+    /// The host couldn't be reached, though the device is online: it's gone, or it refused.
+    Unreachable,
 }
 
 #[derive(Debug, Clone)]
@@ -24,6 +26,8 @@ pub(crate) struct Sent {
     pub(crate) method: RequestMethod,
     pub(crate) url: String,
     pub(crate) body: Option<Value>,
+    /// The request's `Authorization` header.
+    pub(crate) authorization: Option<String>,
 }
 
 /// Plays back a script of responses, and records every request.
@@ -63,6 +67,12 @@ impl RequestExecutor for ScriptedExecutor {
             body: request
                 .body_as_string()
                 .map(|body| serde_json::from_str(&body).unwrap()),
+            authorization: request
+                .header_map()
+                .to_header_map()
+                .get("authorization")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_string),
         });
 
         let step = self.steps.lock().unwrap().pop_front();
@@ -88,6 +98,17 @@ impl RequestExecutor for ScriptedExecutor {
                     status_code: None,
                     redirects: None,
                     reason: RequestExecutionErrorReason::HttpTimeoutError,
+                    request_url: request.url().0,
+                    request_method: request.method(),
+                });
+            }
+            Step::Unreachable => {
+                return Err(RequestExecutionError::RequestExecutionFailed {
+                    status_code: None,
+                    redirects: None,
+                    reason: RequestExecutionErrorReason::ConnectionError {
+                        reason: "Could not connect to the server.".to_string(),
+                    },
                     request_url: request.url().0,
                     request_method: request.method(),
                 });

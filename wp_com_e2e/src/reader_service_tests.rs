@@ -15,6 +15,7 @@ use wp_mobile::service::reader::{
     ReaderActionOutcome, ReaderError, ReaderFollowTarget, ReaderService, ReaderStream,
     ReaderStreamCollection, ReaderStreamItem,
 };
+use wp_mobile::service::reader_saved::ReaderOfflineState;
 use wp_mobile_cache::WpApiCache;
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
 
@@ -511,6 +512,22 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 })
             }
         }),
+        Trial::test("reader_service::saved_posts_are_downloaded_for_offline", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let directory = std::env::temp_dir()
+                        .join(format!("reader-offline-{}", uuid::Uuid::new_v4()));
+                    let result = download_saved_posts(&service, &directory).await;
+                    // The trial's files go whether it passed or not.
+                    let removed = std::fs::remove_dir_all(&directory);
+                    result?;
+                    removed.map_err(|e| format!("Couldn't remove {}: {e}", directory.display()))?;
+                    Ok(())
+                })
+            }
+        }),
         Trial::test("reader_service::following_needs_an_account", {
             let ctx = Arc::clone(&ctx);
             move || {
@@ -555,6 +572,108 @@ async fn seen_in(
         .iter()
         .find(|item| &item.post.key == key)
         .and_then(|item| item.post.is_seen))
+}
+
+/// Room for a few posts' images, so that running out of room is part of the trial.
+const OFFLINE_IMAGE_BYTES: u64 = 3_000_000;
+
+/// Downloads the account's saved posts for reading with no connection, into a new cache, and
+/// checks what the device then has. It only reads from the server.
+async fn download_saved_posts(
+    service: &ReaderService,
+    directory: &std::path::Path,
+) -> Result<(), Failed> {
+    let saved = service.saved();
+    saved
+        .set_offline_image_store(directory.display().to_string(), OFFLINE_IMAGE_BYTES)
+        .map_err(|e| e.to_string())?;
+
+    let report = saved
+        .download_for_offline(true)
+        .await
+        .map_err(|e| e.to_string())?;
+    eprintln!("Saved posts for offline: {report:?}");
+    if let Some(reason) = &report.stopped_because {
+        return Err(format!("The download stopped: {reason}").into());
+    }
+    let count = saved.saved_count().map_err(|e| e.to_string())?;
+    if count.is_none_or(|count| count == 0) {
+        // An account with nothing saved has nothing to check.
+        return Ok(());
+    }
+    if report.ready == 0 {
+        return Err(format!("No saved post has its content: {report:?}").into());
+    }
+    if report.not_downloaded > 0 {
+        return Err(format!("Saves were left without being tried: {report:?}").into());
+    }
+    if report.image_bytes > OFFLINE_IMAGE_BYTES {
+        return Err(format!("The images take more room than allowed: {report:?}").into());
+    }
+
+    // The files in the directory are the stored images, and nothing else.
+    let mut on_disk = 0;
+    for entry in std::fs::read_dir(directory).map_err(|e| e.to_string())? {
+        on_disk += entry
+            .and_then(|entry| entry.metadata())
+            .map_err(|e| e.to_string())?
+            .len();
+    }
+    if on_disk != report.image_bytes {
+        return Err(format!(
+            "The directory holds {on_disk} bytes, and the report says {}",
+            report.image_bytes
+        )
+        .into());
+    }
+
+    // A post with its images reads from the stored copies.
+    let items = saved
+        .clone()
+        .saved_posts()
+        .load_items()
+        .await
+        .map_err(|e| e.to_string())?;
+    let with_images = items
+        .iter()
+        .filter(|item| item.offline == ReaderOfflineState::Ready { has_images: true })
+        .count() as u64;
+    if with_images > report.with_images {
+        return Err("The list has more posts with images than the report".into());
+    }
+    for item in items
+        .iter()
+        .filter(|item| item.offline == ReaderOfflineState::Ready { has_images: true })
+    {
+        let post = saved
+            .offline_post(item.key.clone(), "reader-file://".to_string())
+            .map_err(|e| e.to_string())?
+            .ok_or("A saved post has no offline copy")?;
+        let content = post.post.content.unwrap_or_default();
+        for image in &post.images {
+            if !directory.join(&image.file_name).is_file() {
+                return Err(format!("{} isn't in the directory", image.file_name).into());
+            }
+            let pointed_at = content.contains(&format!("reader-file://{}", image.file_name))
+                || post.post.featured_image.as_deref()
+                    == Some(format!("reader-file://{}", image.file_name).as_str())
+                || post.post.display_image_url.as_deref()
+                    == Some(format!("reader-file://{}", image.file_name).as_str());
+            if !pointed_at {
+                return Err(format!("Nothing points at the stored copy of {}", image.url).into());
+            }
+        }
+    }
+
+    // A second download has nothing left to fetch but the list's first page.
+    let again = saved
+        .download_for_offline(false)
+        .await
+        .map_err(|e| e.to_string())?;
+    if again.ready < report.ready {
+        return Err(format!("A second download lost content: {again:?}").into());
+    }
+    Ok(())
 }
 
 /// A service with a new, empty cache.

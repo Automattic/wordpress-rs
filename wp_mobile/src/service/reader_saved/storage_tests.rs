@@ -2123,3 +2123,72 @@ async fn a_signed_out_reader_has_nothing_to_take_over() {
     assert_eq!(shown(&signed_out).await.len(), 1);
     assert!(executor.sent().is_empty());
 }
+
+// The list in another order
+
+fn listed_and_published(post_id: u64, date_saved: &str, published: &str) -> Value {
+    let mut post = listed(post_id, date_saved);
+    post["date"] = json!(published);
+    post
+}
+
+#[tokio::test]
+async fn the_list_in_another_order_loads_its_own_pages_and_reads_the_same_saves() {
+    let device = Device::new();
+    let (service, executor) = device.launch();
+    let newest_save_first = service.clone().saved_posts();
+    let oldest_published_first = service.clone().saved_posts_ordered(
+        wp_api::wp_com::reader_saved::ReaderSavedOrderBy::DatePublished,
+        wp_api::wp_com::reader_posts::ReaderStreamOrder::Asc,
+    );
+    // Post 1 was saved first and published last.
+    let first = listed_and_published(1, "2026-11-01T00:00:00+00:00", "2026-10-03T00:00:00+00:00");
+    let second = listed_and_published(2, "2026-11-02T00:00:00+00:00", "2026-10-02T00:00:00+00:00");
+    let keys = keys_response(&[post_json(1), post_json(2)]);
+
+    executor.push(Step::Respond(200, keys.clone()));
+    executor.push(Step::Respond(
+        200,
+        page(std::slice::from_ref(&second), Some("by-save")),
+    ));
+    newest_save_first.refresh().await.unwrap();
+    executor.push(Step::Respond(200, keys));
+    executor.push(Step::Respond(200, page(&[second], Some("by-published"))));
+    oldest_published_first.refresh().await.unwrap();
+
+    // Each continues from its own page.
+    executor.push(Step::Respond(200, page(std::slice::from_ref(&first), None)));
+    oldest_published_first.load_next_page().await.unwrap();
+    executor.push(Step::Respond(200, page(&[first], None)));
+    newest_save_first.load_next_page().await.unwrap();
+
+    let lists: Vec<_> = executor
+        .sent()
+        .into_iter()
+        .filter(|sent| sent.url.contains("/read/saved?"))
+        .map(|sent| sent.url.split_once('?').unwrap().1.to_string())
+        .collect();
+    assert_eq!(
+        lists,
+        [
+            "meta=site%2Cfeed",
+            "meta=site%2Cfeed&orderBy=date_published&order=ASC",
+            "page_handle=by-published&meta=site%2Cfeed&orderBy=date_published&order=ASC",
+            "page_handle=by-save&meta=site%2Cfeed",
+        ]
+    );
+    assert_eq!(
+        keys_of(&newest_save_first.load_items().await.unwrap()),
+        [post_key(2), post_key(1)]
+    );
+    assert_eq!(
+        keys_of(&oldest_published_first.load_items().await.unwrap()),
+        [post_key(2), post_key(1)],
+        "post 2 was published first"
+    );
+    assert_eq!(
+        oldest_published_first.list_info().unwrap().has_more,
+        Some(false)
+    );
+    assert_eq!(newest_save_first.list_info().unwrap().has_more, Some(false));
+}

@@ -508,3 +508,32 @@ fn test_the_list_can_be_ordered_by_either_date_both_ways() {
         "a save without the date comes last"
     );
 }
+
+/// The saved list in another order keeps where it's up to, as the saved list does.
+#[test]
+fn test_stale_streams_are_deleted_except_the_saved_list_in_any_order() {
+    use crate::repository::reader::ReaderStreamRepository;
+    let conn = conn();
+    let account = account(&conn, 1);
+    for key in [
+        "saved",
+        "saved:date_published:ASC",
+        "savedness",
+        "following",
+    ] {
+        ReaderStreamRepository::get_or_create(&conn, account, key).unwrap();
+    }
+
+    ReaderStreamRepository::delete_stale(&conn, account, &date("2026-11-05T10:00:00Z"), "saved")
+        .unwrap();
+
+    let mut statement = conn
+        .prepare("SELECT key FROM reader_streams ORDER BY key")
+        .unwrap();
+    let keys: Vec<String> = statement
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    assert_eq!(keys, ["saved", "saved:date_published:ASC"]);
+}

@@ -38,8 +38,10 @@ use futures::lock::Mutex as AsyncMutex;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
+use wp_api::auth::WpAuthenticationProvider;
 use wp_api::date::WpGmtDateTime;
 use wp_api::prelude::{RequestExecutionErrorReason, WpApiClientDelegate, WpApiError, WpErrorCode};
+use wp_api::request::RequestExecutor;
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_posts::ReaderPost;
@@ -58,8 +60,10 @@ use wp_mobile_cache::repository::wordpress_com_accounts::{
 };
 use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 
+mod offline;
 mod storage;
 
+pub use offline::{ReaderOfflineImage, ReaderOfflinePost, ReaderOfflineReport, ReaderOfflineState};
 pub use storage::{
     ReaderLocalSave, ReaderSavedImportReport, ReaderSavedListInfo, ReaderSavedListItem,
     ReaderSavedPageResult, ReaderSavedPostsCollection,
@@ -99,6 +103,15 @@ pub enum ReaderSavedError {
     /// two for the same key. The server may have saved any of them, so they wait for a refresh.
     #[error("The server's results don't match the posts sent to it.")]
     UnmatchedImportResults,
+
+    /// A saved post's image couldn't be written to, or deleted from, the directory given to
+    /// [`ReaderSavedService::set_offline_image_store`].
+    #[error("{reason}")]
+    OfflineFiles { reason: String },
+
+    /// The server couldn't be reached to fetch a saved post's content.
+    #[error("{reason}")]
+    OfflineUnreachable { reason: String },
 
     #[error("{0}")]
     Database(SqliteDbError),
@@ -173,6 +186,12 @@ pub struct ReaderSavedService {
     refusals: Mutex<Vec<(Vec<RowId>, Refusal)>>,
     /// The rows taps are waiting on, and how many taps wait on each.
     waiting: Mutex<HashMap<RowId, usize>>,
+    /// Fetches saved posts' images, which aren't API requests.
+    request_executor: Arc<dyn RequestExecutor>,
+    /// The account's authorization, for a private site's images.
+    auth_provider: Arc<WpAuthenticationProvider>,
+    /// Where saved posts' images are kept, once the app has said.
+    image_store: Mutex<Option<offline::ImageStore>>,
     clock: Clock,
 }
 
@@ -369,6 +388,9 @@ impl ReaderSavedService {
             Ok::<_, SqliteDbError>(account)
         })?;
         Ok(Self {
+            request_executor: delegate.request_executor.clone(),
+            auth_provider: delegate.auth_provider.clone(),
+            image_store: Mutex::default(),
             client: WpComApiClient::new(delegate),
             source,
             cache,
@@ -524,6 +546,7 @@ impl ReaderSavedService {
         })?;
         if self.signed_out {
             self.notify();
+            self.remove_files_of_unsaved_posts()?;
             return Ok(signed_out_outcome());
         }
         self.forget_refusals(&waiting);
@@ -536,21 +559,22 @@ impl ReaderSavedService {
             return Err(error);
         }
         let rows = self.rows_for(&keys)?;
-        Ok(
-            match rows
-                .iter()
-                .find(|row| row.is_pending() || row.tapped || row.saved)
-            {
-                Some(row) if !row.saved => sent.pending_reason(row),
-                // A save tapped since decides.
-                Some(row) => ReaderSavedOutcome::Synced {
-                    key: row.key.clone(),
-                },
-                None => ReaderSavedOutcome::Synced {
-                    key: rows.first().map_or(keys[0].clone(), |row| row.key.clone()),
-                },
+        let outcome = match rows
+            .iter()
+            .find(|row| row.is_pending() || row.tapped || row.saved)
+        {
+            Some(row) if !row.saved => sent.pending_reason(row),
+            // A save tapped since decides.
+            Some(row) => ReaderSavedOutcome::Synced {
+                key: row.key.clone(),
             },
-        )
+            None => ReaderSavedOutcome::Synced {
+                key: rows.first().map_or(keys[0].clone(), |row| row.key.clone()),
+            },
+        };
+        // An unsaved post's images go with it. A refused unsave returned above, with them kept.
+        self.remove_files_of_unsaved_posts()?;
+        Ok(outcome)
     }
 
     fn rows_for(&self, keys: &[ReaderSavedKey]) -> Result<Vec<DbReaderSavedRow>, ReaderSavedError> {
