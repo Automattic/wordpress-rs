@@ -2961,6 +2961,62 @@ mod more_actions {
     }
 
     #[tokio::test]
+    async fn emails_started_again_take_the_frequency_the_server_answers_with() {
+        let (service, executor, _) = reading().await;
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "subscription": subscription_json() }),
+        ));
+        service.set_followed(target(), true).await.unwrap();
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "subscribed": true }),
+        ));
+        service
+            .set_post_email_frequency(SITE, ReaderSubscriptionEmailFrequency::Weekly)
+            .await
+            .unwrap();
+        let frequency =
+            |service: &ReaderService| service.subscriptions().unwrap()[0].email_frequency.clone();
+
+        executor.push(Step::Respond(
+            200,
+            json!({
+                "success": true,
+                "subscribed": true,
+                "subscription": { "blog_ID": "123", "delivery_frequency": "daily", "status": "active" }
+            }),
+        ));
+        service.set_post_emails(SITE, true).await.unwrap();
+        assert_eq!(
+            frequency(&service),
+            Some(ReaderSubscriptionEmailFrequency::Daily)
+        );
+
+        // An answer without the emails' settings leaves the frequency as it was.
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "subscribed": true }),
+        ));
+        service.set_post_emails(SITE, true).await.unwrap();
+        assert_eq!(
+            frequency(&service),
+            Some(ReaderSubscriptionEmailFrequency::Daily)
+        );
+
+        // Stopping the emails doesn't take a frequency from the answer.
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "subscribed": false, "subscription": null }),
+        ));
+        service.set_post_emails(SITE, false).await.unwrap();
+        assert_eq!(
+            frequency(&service),
+            Some(ReaderSubscriptionEmailFrequency::Daily)
+        );
+    }
+
+    #[tokio::test]
     async fn the_frequency_of_emails_is_not_kept_to_send_later() {
         let (service, executor, _) = reading().await;
         executor.push(Step::Offline);

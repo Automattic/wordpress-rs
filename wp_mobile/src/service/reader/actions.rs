@@ -36,7 +36,8 @@ use wp_api::wp_com::reader_seen::{
     ReaderSeenFeedItemsParams, ReaderSeenSitePostsParams, ReaderSeenSource,
 };
 use wp_api::wp_com::reader_subscriptions::{
-    ReaderFollowUrlParams, ReaderPostEmailSubscriptionParams, ReaderUnfollowUrlParams,
+    ReaderFollowUrlParams, ReaderPostEmailSubscriptionParams, ReaderSubscriptionEmailFrequency,
+    ReaderUnfollowUrlParams,
 };
 use wp_api::wp_com::reader_tags::ReaderFollowTagsParams;
 use wp_mobile_cache::db_types::reader::reader_saved_key_text;
@@ -135,6 +136,9 @@ struct Confirmation {
     like_count: Option<u64>,
     /// The subscription a follow made.
     subscription: Option<ReaderSubscriptionRecord>,
+    /// How often a site's new posts are emailed, once the emails are started. The server picks
+    /// it when the request doesn't, and drops it when the emails stop.
+    email_frequency: Option<ReaderSubscriptionEmailFrequency>,
 }
 
 /// The app, as the Reader's requests name it.
@@ -462,6 +466,18 @@ impl Action {
                     ReaderSubscriptionRepository::add_first(executor, owner, subscription)?;
                 }
             }
+            // Emails started again come at the frequency the server answers with, which a
+            // subscriptions list fetched while they were off doesn't have.
+            Self::Delivery {
+                site_id,
+                setting: DeliverySetting::PostEmails,
+            } => {
+                if let (true, Some(frequency)) = (on, &confirmation.email_frequency) {
+                    ReaderSubscriptionRepository::set_email_frequency(
+                        executor, owner, *site_id, frequency,
+                    )?;
+                }
+            }
             // While a site is blocked the server says it isn't followed, but it keeps the
             // subscription, and the unblock brings the follow back. A fetch made during the block
             // stored the server's "not followed", so a site the subscriptions list is followed
@@ -641,9 +657,12 @@ impl Action {
                 match (setting, on) {
                     (DeliverySetting::PostEmails, true) => {
                         let params = ReaderPostEmailSubscriptionParams::default();
-                        subscriptions
+                        confirmation.email_frequency = subscriptions
                             .subscribe_to_post_emails(site_id, &params)
-                            .await?;
+                            .await?
+                            .data
+                            .subscription
+                            .and_then(|subscription| subscription.delivery_frequency);
                     }
                     (DeliverySetting::PostEmails, false) => {
                         let params = ReaderPostEmailSubscriptionParams::default();
