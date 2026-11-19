@@ -114,6 +114,11 @@ public final class WPComApiClient: Sendable {
         internalClient.readerBlocks()
     }
 
+    /// The sites and feeds the user is subscribed to in the Reader.
+    public var readerSubscriptions: ReaderSubscriptionsRequestExecutor {
+        internalClient.readerSubscriptions()
+    }
+
     /// The Reader menu, a tag's info, and the interests a new reader picks from.
     public var readerTags: ReaderTagsRequestExecutor {
         internalClient.readerTags()

@@ -1,0 +1,635 @@
+//! The sites and feeds the user is subscribed to in the Reader.
+//!
+//! Both requests need a token: signed out, each is a 403 `authorization_required`.
+
+use crate::{
+    date::{WpGmtDateTime, deserialize_optional_wp_gmt_date_time},
+    url_query::{
+        AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
+    },
+    wp_com::{
+        WpComSiteId,
+        reader_saved::{ReaderFeedId, deserialize_optional_text},
+    },
+    wp_content_u64_id,
+};
+use serde::{Deserialize, Deserializer, Serialize};
+use wp_derive::WpDeriveParamsField;
+use wp_serde_helper::{
+    LenientVec, deserialize_optional_bool_or_int, deserialize_u64_or_string_or_none,
+};
+
+wp_content_u64_id!(ReaderSubscriptionId);
+
+/// The most subscriptions a page covers. The web Reader asks for this many, and says the API
+/// returns no more. It wasn't seen in trials: the account they ran on has fewer subscriptions.
+const MAX_PAGE_SIZE: u32 = 100;
+
+/// Query parameters for the user's subscriptions. For the next page, add 1 to `page`, and see
+/// [`ReaderSubscriptionsResponse::has_next_page`] for when to stop.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // The response has no `Link` header to read the next page from.
+pub struct ReaderSubscriptionsParams {
+    /// The page to return, counting from 1. `0` returns the first page.
+    #[uniffi(default = None)]
+    pub page: Option<u32>,
+    /// The number of subscriptions a page covers. Ask for 100 at most, which is what the apps and
+    /// the web Reader ask for. Without it, or with `0`, the API returned every subscription of an
+    /// account that has 37.
+    #[uniffi(default = None)]
+    pub number: Option<u32>,
+    /// Text to search the subscriptions for. In trials every search came back empty, even for the
+    /// whole name or address of a subscription, so don't rely on it. An empty `q` is ignored.
+    #[uniffi(default = None)]
+    pub q: Option<String>,
+    /// Only return some subscriptions. `a8c` returns the ones to Automattic's sites: it drops the
+    /// others from each page after the page is cut, so a page of 4 can come back with 2. No other
+    /// value tried changed the list.
+    #[uniffi(default = None)]
+    pub filter: Option<String>,
+    /// Extra data to include, comma-separated. `site,feed`, which the apps send, makes the API add
+    /// each subscription's whole site and feed, which [`ReaderSubscription`] doesn't keep.
+    #[uniffi(default = None)]
+    pub meta: Option<String>,
+}
+
+/// A page of the user's subscriptions, newest subscription first.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderSubscriptionsResponse")]
+pub struct ReaderSubscriptionsResponse {
+    /// The page's subscriptions, without any in [`Self::unreadable_subscriptions`].
+    pub subscriptions: Vec<ReaderSubscription>,
+    /// The subscriptions on the page that couldn't be read. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_subscriptions: Vec<ReaderUnreadableSubscription>,
+    /// The page this is, counting from 1.
+    #[uniffi(default = None)]
+    pub page: Option<u32>,
+    /// How many subscriptions the page has, which can be fewer than were asked for.
+    #[uniffi(default = None)]
+    pub number: Option<u32>,
+    /// How many subscriptions the pages are cut from. It counts some that no page lists: an
+    /// account with 39 gets 37 of them, whatever the page size. A first page that holds the whole
+    /// list says 37 instead.
+    #[uniffi(default = None)]
+    pub total_subscriptions: Option<u64>,
+}
+
+impl ReaderSubscriptionsResponse {
+    /// Whether the list has a page after this one. `number` is how many subscriptions a page
+    /// were asked for.
+    ///
+    /// A short page isn't the end, and neither is an empty one. The API cuts each page from every
+    /// subscription the user has, and then leaves out the ones it doesn't list. So the list ends
+    /// once the pages asked for cover [`Self::total_subscriptions`], however many they returned.
+    ///
+    /// When the response doesn't say which page it is or how many there are, a page with nothing
+    /// on it is taken as the end.
+    pub fn has_next_page(&self, number: u32) -> bool {
+        match (self.page, self.total_subscriptions) {
+            (Some(page), Some(total)) if number > 0 => {
+                u64::from(page) * u64::from(number.min(MAX_PAGE_SIZE)) < total
+            }
+            _ => !(self.subscriptions.is_empty() && self.unreadable_subscriptions.is_empty()),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct RawReaderSubscriptionsResponse {
+    #[serde(default)]
+    subscriptions: Option<LenientVec<ReaderSubscription>>,
+    #[serde(default, deserialize_with = "deserialize_optional_u32")]
+    page: Option<u32>,
+    #[serde(default, deserialize_with = "deserialize_optional_u32")]
+    number: Option<u32>,
+    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
+    total_subscriptions: Option<u64>,
+}
+
+impl From<RawReaderSubscriptionsResponse> for ReaderSubscriptionsResponse {
+    fn from(raw: RawReaderSubscriptionsResponse) -> Self {
+        let subscriptions = raw.subscriptions.unwrap_or_default();
+        let unreadable_subscriptions = subscriptions
+            .invalid
+            .into_iter()
+            .map(|subscription| ReaderUnreadableSubscription {
+                id: serde_json::from_str::<SubscriptionIdOnly>(subscription.json.get())
+                    .ok()
+                    .and_then(|subscription| subscription.id),
+                error: subscription.error.to_string(),
+            })
+            .collect();
+        Self {
+            subscriptions: subscriptions.valid,
+            unreadable_subscriptions,
+            page: raw.page,
+            number: raw.number,
+            total_subscriptions: raw.total_subscriptions,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct SubscriptionIdOnly {
+    #[serde(rename = "ID", default, deserialize_with = "deserialize_optional_id")]
+    id: Option<ReaderSubscriptionId>,
+}
+
+/// A subscription on a page that couldn't be read. It doesn't fail the page: the page keeps the
+/// subscriptions it can read, and lists the others as these.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderUnreadableSubscription {
+    /// Which subscription it is. `None` when its ID couldn't be read either.
+    #[uniffi(default = None)]
+    pub id: Option<ReaderSubscriptionId>,
+    /// Why it couldn't be read. A line and column in it count from the start of the subscription.
+    pub error: String,
+}
+
+/// A subscription to a site or a feed.
+///
+/// What it's a subscription to is its [`Self::feed_id`], which every subscription has, and its
+/// [`Self::blog_id`], which only a WordPress.com or Jetpack site has. [`Self::url`] is the address
+/// that was followed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderSubscription {
+    /// The subscription's own ID. It isn't the site's or the feed's: unfollowing by subscription
+    /// takes it, and so does asking for one subscription's details.
+    #[serde(rename = "ID", default, deserialize_with = "deserialize_optional_id")]
+    #[uniffi(default = None)]
+    pub id: Option<ReaderSubscriptionId>,
+    /// The site, for a WordPress.com or Jetpack site. `None` for anything else, which the API
+    /// sends as `0` for a site and `false` for an RSS feed.
+    #[serde(
+        rename = "blog_ID",
+        default,
+        deserialize_with = "deserialize_optional_id"
+    )]
+    #[uniffi(default = None)]
+    pub blog_id: Option<WpComSiteId>,
+    /// The feed. Every subscription seen has one, a WordPress.com site's too.
+    #[serde(
+        rename = "feed_ID",
+        default,
+        deserialize_with = "deserialize_optional_id"
+    )]
+    #[uniffi(default = None)]
+    pub feed_id: Option<ReaderFeedId>,
+    /// The address that was followed: a site's, or a feed's.
+    #[serde(
+        rename = "URL",
+        default,
+        deserialize_with = "deserialize_optional_text"
+    )]
+    #[uniffi(default = None)]
+    pub url: Option<String>,
+    /// The feed's address. Often not the same as [`Self::url`].
+    #[serde(
+        rename = "feed_URL",
+        default,
+        deserialize_with = "deserialize_optional_text"
+    )]
+    #[uniffi(default = None)]
+    pub feed_url: Option<String>,
+    /// The site's or feed's name.
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    #[uniffi(default = None)]
+    pub name: Option<String>,
+    /// The address of the site's icon. `None` for a site or feed without one.
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    #[uniffi(default = None)]
+    pub site_icon: Option<String>,
+    /// When the user subscribed.
+    #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
+    #[uniffi(default = None)]
+    pub date_subscribed: Option<WpGmtDateTime>,
+    /// When the site or feed last had something new.
+    #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
+    #[uniffi(default = None)]
+    pub last_updated: Option<WpGmtDateTime>,
+    /// How many of its posts the user hasn't seen.
+    #[serde(default, deserialize_with = "deserialize_optional_count")]
+    #[uniffi(default = None)]
+    pub unseen_count: Option<u64>,
+    /// `1` for an Automattic site, including its P2s, and `0` for a site in no organization.
+    #[serde(default, deserialize_with = "deserialize_optional_count")]
+    #[uniffi(default = None)]
+    pub organization_id: Option<u64>,
+    /// What the API calls the user owning the site. It's set for an Automattician's P2s too, so
+    /// it isn't only the site's owner.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub is_owner: Option<bool>,
+    /// Whether it's an RSS feed rather than a site.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub is_rss: Option<bool>,
+    /// Whether the site is a P2.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub is_wpforteams_site: Option<bool>,
+    /// Whether the user pays for the subscription. `false` for every subscription seen.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub is_paid_subscription: Option<bool>,
+    /// Whether it's a complimentary subscription: a paid one the site gave the user for free.
+    /// `false` for every subscription seen.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub is_comp: Option<bool>,
+    /// How the user hears about the subscription's new posts and comments.
+    #[serde(default, deserialize_with = "deserialize_delivery_methods")]
+    pub delivery_methods: ReaderSubscriptionDeliveryMethods,
+}
+
+/// How a subscription's new posts and comments reach the user.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderSubscriptionDeliveryMethods {
+    /// By email. `None` when the subscription sends none: the API then leaves `email` out.
+    #[serde(default, deserialize_with = "deserialize_object_or_none")]
+    #[uniffi(default = None)]
+    pub email: Option<ReaderSubscriptionEmailDelivery>,
+    /// By notification.
+    #[serde(default, deserialize_with = "deserialize_object_or_none")]
+    #[uniffi(default = None)]
+    pub notification: Option<ReaderSubscriptionNotificationDelivery>,
+}
+
+/// What a subscription emails the user.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderSubscriptionEmailDelivery {
+    /// Whether new posts are emailed.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub send_posts: Option<bool>,
+    /// Whether new comments are emailed.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub send_comments: Option<bool>,
+    /// How often new posts are emailed.
+    #[serde(default, deserialize_with = "deserialize_optional_frequency")]
+    #[uniffi(default = None)]
+    pub post_delivery_frequency: Option<ReaderSubscriptionEmailFrequency>,
+    /// When the user subscribed by email, which can be later than
+    /// [`ReaderSubscription::date_subscribed`].
+    #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
+    #[uniffi(default = None)]
+    pub date_subscribed: Option<WpGmtDateTime>,
+}
+
+/// How often a subscription emails new posts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum ReaderSubscriptionEmailFrequency {
+    /// As each post is published.
+    Instantly,
+    /// Once a day.
+    Daily,
+    /// Once a week.
+    Weekly,
+    /// A frequency this version doesn't know, as the API sent it.
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// What a subscription notifies the user of.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderSubscriptionNotificationDelivery {
+    /// Whether new posts send a notification.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub send_posts: Option<bool>,
+}
+
+/// Whether the user follows a site, from `GET /rest/v1.1/sites/{site}/follows/mine`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderSiteFollowStatus {
+    pub is_following: bool,
+}
+
+/// An ID the API sends as a number or a string, and as `0`, `false`, `""` or `null` when there
+/// isn't one.
+fn deserialize_optional_id<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: From<u64>,
+{
+    Ok(deserialize_optional_count(deserializer)?
+        .filter(|id| *id != 0)
+        .map(T::from))
+}
+
+/// A count the API sends as a number or a string. Anything that isn't one reads as `None` rather
+/// than failing the subscription.
+fn deserialize_optional_count<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(
+        match Option::<serde_json::Value>::deserialize(deserializer)? {
+            Some(serde_json::Value::Number(number)) => number.as_u64(),
+            Some(serde_json::Value::String(text)) => text.parse().ok(),
+            _ => None,
+        },
+    )
+}
+
+fn deserialize_optional_u32<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(deserialize_optional_count(deserializer)?.and_then(|count| u32::try_from(count).ok()))
+}
+
+/// `delivery_methods`, an object. PHP sends an empty one as `[]`.
+fn deserialize_delivery_methods<'de, D>(
+    deserializer: D,
+) -> Result<ReaderSubscriptionDeliveryMethods, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(deserialize_object_or_none(deserializer)?.unwrap_or_default())
+}
+
+/// An object, or `None` for `null`, `false`, or an empty list, which PHP sends for an empty object.
+fn deserialize_object_or_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: serde::de::DeserializeOwned,
+{
+    match Option::<serde_json::Value>::deserialize(deserializer)? {
+        Some(value @ serde_json::Value::Object(_)) => serde_json::from_value(value)
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+        _ => Ok(None),
+    }
+}
+
+fn deserialize_optional_frequency<'de, D>(
+    deserializer: D,
+) -> Result<Option<ReaderSubscriptionEmailFrequency>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(
+        deserialize_optional_text(deserializer)?.map(|frequency| match frequency.as_str() {
+            "instantly" => ReaderSubscriptionEmailFrequency::Instantly,
+            "daily" => ReaderSubscriptionEmailFrequency::Daily,
+            "weekly" => ReaderSubscriptionEmailFrequency::Weekly,
+            _ => ReaderSubscriptionEmailFrequency::Other(frequency),
+        }),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+    use serde_json::json;
+
+    fn page(json: &str) -> ReaderSubscriptionsResponse {
+        serde_json::from_str(json).expect("the page parses")
+    }
+
+    /// A page recorded from WordPress.com, with one subscription of each kind seen, and the
+    /// names, addresses and IDs replaced. It keeps the types the API sent: IDs are strings,
+    /// and a missing `blog_ID` is `0` or `false`.
+    #[test]
+    fn test_deserialize_subscriptions() {
+        let page = page(include_str!(
+            "../../tests/wpcom/reader_subscriptions/subscriptions.json"
+        ));
+
+        assert_eq!(page.page, Some(1));
+        assert_eq!(page.number, Some(4));
+        assert_eq!(page.total_subscriptions, Some(39));
+        assert!(page.unreadable_subscriptions.is_empty());
+        let [emailed, team, feed, rss] = &page.subscriptions[..] else {
+            panic!("Expected four subscriptions");
+        };
+
+        // A WordPress.com site, whose posts are emailed.
+        assert_eq!(emailed.id, Some(ReaderSubscriptionId(900000004)));
+        assert_eq!(emailed.blog_id, Some(WpComSiteId(100000001)));
+        assert_eq!(emailed.feed_id, Some(ReaderFeedId(200000001)));
+        assert_eq!(emailed.url.as_deref(), Some("https://example.blog"));
+        assert_eq!(emailed.feed_url.as_deref(), Some("https://example.blog"));
+        assert_eq!(emailed.name.as_deref(), Some("Example Blog"));
+        assert_eq!(
+            emailed.date_subscribed,
+            Some("2026-11-03T23:17:59+00:00".parse().unwrap())
+        );
+        assert_eq!(emailed.unseen_count, Some(30));
+        assert_eq!(emailed.organization_id, Some(0));
+        assert_eq!(emailed.is_rss, Some(false));
+        let email = emailed.delivery_methods.email.as_ref().expect("an email");
+        assert_eq!(email.send_posts, Some(true));
+        assert_eq!(email.send_comments, Some(false));
+        assert_eq!(
+            email.post_delivery_frequency,
+            Some(ReaderSubscriptionEmailFrequency::Instantly)
+        );
+        // Sent without an offset, and read as UTC.
+        assert_eq!(
+            email.date_subscribed,
+            Some("2026-11-04T08:00:00+00:00".parse().unwrap())
+        );
+        assert_eq!(
+            emailed.delivery_methods.notification,
+            Some(ReaderSubscriptionNotificationDelivery {
+                send_posts: Some(true)
+            })
+        );
+
+        // A P2 the user belongs to, with no email.
+        assert_eq!(team.organization_id, Some(1));
+        assert_eq!(team.is_wpforteams_site, Some(true));
+        assert_eq!(team.is_owner, Some(true));
+        assert_eq!(team.delivery_methods.email, None);
+
+        // A site that isn't on WordPress.com: `blog_ID` is `0`, and it isn't RSS.
+        assert_eq!(feed.blog_id, None);
+        assert_eq!(feed.feed_id, Some(ReaderFeedId(200000003)));
+        assert_eq!(feed.is_rss, Some(false));
+        assert_eq!(feed.site_icon, None);
+        assert_ne!(feed.url, feed.feed_url);
+
+        // An RSS feed: `blog_ID` is `false`.
+        assert_eq!(rss.blog_id, None);
+        assert_eq!(rss.feed_id, Some(ReaderFeedId(200000004)));
+        assert_eq!(rss.is_rss, Some(true));
+    }
+
+    /// What the API sends past the last page, and for a search that finds nothing.
+    #[test]
+    fn test_deserialize_an_empty_page() {
+        let page =
+            page(r#"{ "subscriptions": [], "page": 9, "number": 0, "total_subscriptions": 39 }"#);
+        assert!(page.subscriptions.is_empty());
+        assert_eq!(page.page, Some(9));
+        assert_eq!(page.number, Some(0));
+        assert!(!page.has_next_page(5));
+    }
+
+    #[rstest]
+    // Pages of 5 over 39 subscriptions, of which the API lists 37. The seventh page is short,
+    // with one more after it.
+    #[case::first_page(json!({ "page": 1, "number": 5, "total": 39 }), 5, true)]
+    #[case::short_page_with_more_to_come(json!({ "page": 7, "number": 4, "total": 39 }), 5, true)]
+    #[case::last_page(json!({ "page": 8, "number": 3, "total": 39 }), 5, false)]
+    #[case::past_the_end(json!({ "page": 9, "number": 0, "total": 39 }), 5, false)]
+    // One page that holds the whole list, which then counts only what it lists.
+    #[case::whole_list(json!({ "page": 1, "number": 37, "total": 37 }), 100, false)]
+    // A page covers 100 at most, however many were asked for.
+    #[case::asked_for_too_many(json!({ "page": 1, "number": 100, "total": 250 }), 500, true)]
+    #[case::asked_for_too_many_second_page(json!({ "page": 2, "number": 100, "total": 250 }), 500, true)]
+    #[case::asked_for_too_many_last_page(json!({ "page": 3, "number": 50, "total": 250 }), 500, false)]
+    fn test_has_next_page(
+        #[case] sent: serde_json::Value,
+        #[case] number_asked_for: u32,
+        #[case] expected: bool,
+    ) {
+        let subscriptions: Vec<_> = (0..sent["number"].as_u64().unwrap())
+            .map(|id| json!({ "ID": id + 1 }))
+            .collect();
+        let page: ReaderSubscriptionsResponse = serde_json::from_value(json!({
+            "subscriptions": subscriptions,
+            "page": sent["page"],
+            "number": sent["number"],
+            "total_subscriptions": sent["total"],
+        }))
+        .expect("the page parses");
+        assert_eq!(page.has_next_page(number_asked_for), expected);
+    }
+
+    /// Without a page or a total to go by, only an empty page ends the list.
+    #[test]
+    fn test_has_next_page_without_a_total() {
+        let some: ReaderSubscriptionsResponse =
+            serde_json::from_value(json!({ "subscriptions": [{ "ID": 1 }] })).unwrap();
+        assert!(some.has_next_page(100));
+        let none: ReaderSubscriptionsResponse =
+            serde_json::from_value(json!({ "subscriptions": [] })).unwrap();
+        assert!(!none.has_next_page(100));
+    }
+
+    #[rstest]
+    #[case::string(json!("123"), Some(123))]
+    #[case::number(json!(123), Some(123))]
+    #[case::zero(json!(0), None)]
+    #[case::zero_string(json!("0"), None)]
+    #[case::false_(json!(false), None)]
+    #[case::null(json!(null), None)]
+    #[case::empty(json!(""), None)]
+    #[case::negative(json!(-1), None)]
+    fn test_ids_that_vary_in_shape(#[case] sent: serde_json::Value, #[case] expected: Option<u64>) {
+        let subscription: ReaderSubscription =
+            serde_json::from_value(json!({ "ID": sent, "blog_ID": sent, "feed_ID": sent }))
+                .expect("the subscription parses");
+        assert_eq!(subscription.id, expected.map(ReaderSubscriptionId));
+        assert_eq!(subscription.blog_id, expected.map(WpComSiteId));
+        assert_eq!(subscription.feed_id, expected.map(ReaderFeedId));
+    }
+
+    #[rstest]
+    #[case::left_out(json!({ "ID": 1 }))]
+    #[case::empty_list(json!({ "ID": 1, "delivery_methods": [] }))]
+    #[case::empty_object(json!({ "ID": 1, "delivery_methods": {} }))]
+    #[case::null(json!({ "ID": 1, "delivery_methods": null }))]
+    fn test_a_subscription_without_delivery_methods(#[case] subscription: serde_json::Value) {
+        let subscription: ReaderSubscription =
+            serde_json::from_value(subscription).expect("the subscription parses");
+        assert_eq!(
+            subscription.delivery_methods,
+            ReaderSubscriptionDeliveryMethods::default()
+        );
+    }
+
+    /// A site the user doesn't follow has `null` and `[]` where a subscription has settings.
+    #[rstest]
+    #[case(json!({ "email": null, "notification": [] }))]
+    #[case(json!({ "email": false, "notification": null }))]
+    #[case(json!({ "email": [], "notification": {} }))]
+    fn test_delivery_methods_that_are_not_set(#[case] delivery_methods: serde_json::Value) {
+        let subscription: ReaderSubscription =
+            serde_json::from_value(json!({ "ID": 1, "delivery_methods": delivery_methods }))
+                .expect("the subscription parses");
+        assert_eq!(subscription.delivery_methods.email, None);
+        let notification = subscription.delivery_methods.notification;
+        assert!(notification.is_none_or(|notification| notification.send_posts.is_none()));
+    }
+
+    #[rstest]
+    #[case("instantly", ReaderSubscriptionEmailFrequency::Instantly)]
+    #[case("daily", ReaderSubscriptionEmailFrequency::Daily)]
+    #[case("weekly", ReaderSubscriptionEmailFrequency::Weekly)]
+    #[case("monthly", ReaderSubscriptionEmailFrequency::Other("monthly".to_string()))]
+    fn test_email_frequency(
+        #[case] sent: &str,
+        #[case] expected: ReaderSubscriptionEmailFrequency,
+    ) {
+        let email: ReaderSubscriptionEmailDelivery =
+            serde_json::from_value(json!({ "post_delivery_frequency": sent })).unwrap();
+        assert_eq!(email.post_delivery_frequency, Some(expected.clone()));
+        // It's sent the way it's read, for the requests that change it.
+        assert_eq!(serde_json::to_value(&expected).unwrap(), json!(sent));
+    }
+
+    #[test]
+    fn test_a_page_keeps_its_subscriptions_when_one_cannot_be_read() {
+        let page = page(
+            r#"{
+                "subscriptions": [
+                    { "ID": "1", "blog_ID": "10", "feed_ID": "20" },
+                    { "ID": "2", "date_subscribed": "2026-11-16T16:45:34+91:00" },
+                    "not a subscription",
+                    { "ID": "4", "blog_ID": false, "feed_ID": "40" }
+                ],
+                "page": 1,
+                "number": 4,
+                "total_subscriptions": 4
+            }"#,
+        );
+
+        let ids: Vec<_> = page.subscriptions.iter().map(|s| s.id).collect();
+        assert_eq!(
+            ids,
+            [Some(ReaderSubscriptionId(1)), Some(ReaderSubscriptionId(4))]
+        );
+        let unreadable: Vec<_> = page.unreadable_subscriptions.iter().map(|s| s.id).collect();
+        assert_eq!(unreadable, [Some(ReaderSubscriptionId(2)), None]);
+        assert!(
+            page.unreadable_subscriptions[0]
+                .error
+                .starts_with("Invalid date format"),
+            "{}",
+            page.unreadable_subscriptions[0].error
+        );
+    }
+
+    #[rstest]
+    #[case(json!({ "subscriptions": null }))]
+    #[case(json!({}))]
+    fn test_a_page_without_subscriptions(#[case] page: serde_json::Value) {
+        let page: ReaderSubscriptionsResponse =
+            serde_json::from_value(page).expect("the page parses");
+        assert!(page.subscriptions.is_empty());
+        assert!(page.unreadable_subscriptions.is_empty());
+    }
+
+    #[test]
+    fn test_a_page_that_is_not_one_is_an_error() {
+        let result =
+            serde_json::from_value::<ReaderSubscriptionsResponse>(json!({ "subscriptions": 7 }));
+        assert!(result.is_err());
+    }
+
+    #[rstest]
+    #[case(r#"{"is_following":true,"meta":{"links":{"site":"https://public-api.wordpress.com/rest/v1.1/sites/3584907"}}}"#, true)]
+    #[case(r#"{"is_following":false,"meta":{"links":{"site":"https://public-api.wordpress.com/rest/v1.1/sites/3584907"}}}"#, false)]
+    fn test_deserialize_site_follow_status(#[case] json: &str, #[case] expected: bool) {
+        let status: ReaderSiteFollowStatus = serde_json::from_str(json).expect("it parses");
+        assert_eq!(status.is_following, expected);
+    }
+}

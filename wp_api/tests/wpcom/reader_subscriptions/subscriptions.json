@@ -1,0 +1,127 @@
+{
+  "subscriptions": [
+    {
+      "ID": "900000004",
+      "blog_ID": "100000001",
+      "feed_ID": "200000001",
+      "URL": "https://example.blog",
+      "feed_URL": "https://example.blog",
+      "date_subscribed": "2026-11-03T23:17:59+00:00",
+      "delivery_methods": {
+        "email": {
+          "send_posts": true,
+          "send_comments": false,
+          "post_delivery_frequency": "instantly",
+          "date_subscribed": "2026-11-04 08:00:00"
+        },
+        "notification": {
+          "send_posts": true
+        }
+      },
+      "name": "Example Blog",
+      "organization_id": 0,
+      "unseen_count": 30,
+      "last_updated": "2026-11-16T10:55:06+00:00",
+      "site_icon": "https://example.blog/wp-content/uploads/icon.png",
+      "is_owner": false,
+      "meta": {
+        "links": {
+          "site": "https://public-api.wordpress.com/rest/v1.2/read/sites/100000001",
+          "feed": "https://public-api.wordpress.com/rest/v1.2/read/feed/200000001"
+        }
+      },
+      "is_wpforteams_site": false,
+      "is_paid_subscription": false,
+      "is_rss": false,
+      "is_comp": false
+    },
+    {
+      "ID": "900000003",
+      "blog_ID": "100000002",
+      "feed_ID": "200000002",
+      "URL": "http://exampleteam.wordpress.com",
+      "feed_URL": "http://exampleteam.wordpress.com",
+      "date_subscribed": "2026-08-07T17:21:58+00:00",
+      "delivery_methods": {
+        "notification": {
+          "send_posts": false
+        }
+      },
+      "name": "Example Team",
+      "organization_id": 1,
+      "unseen_count": 229,
+      "last_updated": "2026-11-17T17:23:23+00:00",
+      "site_icon": "https://exampleteam.wordpress.com/wp-content/uploads/icon.png",
+      "is_owner": true,
+      "meta": {
+        "links": {
+          "site": "https://public-api.wordpress.com/rest/v1.2/read/sites/100000002",
+          "feed": "https://public-api.wordpress.com/rest/v1.2/read/feed/200000002"
+        }
+      },
+      "is_wpforteams_site": true,
+      "is_paid_subscription": false,
+      "is_rss": false,
+      "is_comp": false
+    },
+    {
+      "ID": "900000002",
+      "blog_ID": 0,
+      "feed_ID": "200000003",
+      "URL": "https://example.com/",
+      "feed_URL": "https://example.com/feed/",
+      "date_subscribed": "2026-10-05T18:09:18+00:00",
+      "delivery_methods": {
+        "notification": {
+          "send_posts": false
+        }
+      },
+      "name": "Example Site",
+      "organization_id": 0,
+      "unseen_count": 0,
+      "last_updated": "2026-10-05T18:09:18+00:00",
+      "site_icon": null,
+      "is_owner": false,
+      "meta": {
+        "links": {
+          "feed": "https://public-api.wordpress.com/rest/v1.2/read/feed/200000003"
+        }
+      },
+      "is_wpforteams_site": false,
+      "is_paid_subscription": false,
+      "is_rss": false,
+      "is_comp": false
+    },
+    {
+      "ID": "900000001",
+      "blog_ID": false,
+      "feed_ID": "200000004",
+      "URL": "http://feeds.example.org/",
+      "feed_URL": "http://feeds.example.org/rss.xml",
+      "date_subscribed": "2024-11-06T20:37:44+00:00",
+      "delivery_methods": {
+        "notification": {
+          "send_posts": false
+        }
+      },
+      "name": "Example Feed",
+      "organization_id": 0,
+      "unseen_count": 204,
+      "last_updated": "2026-11-19T02:15:00+00:00",
+      "site_icon": "https://feeds.example.org/favicon.ico",
+      "is_owner": false,
+      "meta": {
+        "links": {
+          "feed": "https://public-api.wordpress.com/rest/v1.2/read/feed/200000004"
+        }
+      },
+      "is_wpforteams_site": false,
+      "is_paid_subscription": false,
+      "is_rss": true,
+      "is_comp": false
+    }
+  ],
+  "page": 1,
+  "number": 4,
+  "total_subscriptions": 39
+}
