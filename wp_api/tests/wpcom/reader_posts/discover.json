@@ -1,0 +1,139 @@
+{
+  "cards": [
+    {
+      "type": "post",
+      "data": {
+        "ID": 1001,
+        "site_ID": 2001,
+        "feed_ID": 3001,
+        "is_external": false,
+        "date": "2026-11-17T12:00:00-06:00",
+        "modified": "2026-11-17T12:05:00-06:00",
+        "title": "Example post 1",
+        "URL": "https://example1.wordpress.com/2026/11/17/example-post/",
+        "short_URL": "https://wp.me/pEXAMPLE-1",
+        "excerpt": "<p>An example excerpt.</p>\n",
+        "content": "<p>Example content.</p>\n",
+        "author": {
+          "ID": 5001,
+          "login": "example1",
+          "email": false,
+          "name": "Example Author",
+          "first_name": "Example",
+          "last_name": "Author",
+          "nice_name": "example1",
+          "URL": "https://example1.wordpress.com",
+          "avatar_URL": "https://example.com/avatar.png",
+          "profile_URL": "https://example.com/example1",
+          "site_ID": 2001,
+          "has_avatar": true,
+          "wpcom_id": 5001,
+          "wpcom_login": "example1"
+        },
+        "site_name": "Example Site 1",
+        "site_URL": "https://example1.wordpress.com",
+        "featured_image": "https://example.com/image.jpg",
+        "like_count": "1",
+        "i_like": false,
+        "is_following": false,
+        "discussion": {
+          "comments_open": true,
+          "comment_status": "open",
+          "pings_open": false,
+          "ping_status": "closed",
+          "comment_count": 1,
+          "comments_require_registration": false,
+          "comments_allow_blocks": true
+        },
+        "tags": {
+          "example": {
+            "ID": 1,
+            "name": "example",
+            "slug": "example",
+            "description": "",
+            "post_count": 3
+          }
+        },
+        "global_ID": "00000000000000000000000000000001",
+        "use_excerpt": false,
+        "railcar": {
+          "railcar": "EXAMPLE00001",
+          "fetch_algo": "read:recommendations:posts/discover-stream",
+          "fetch_position": 0,
+          "rec_blog_id": 2001,
+          "rec_post_id": 1001
+        }
+      }
+    },
+    {
+      "type": "recommended_blogs",
+      "data": [
+        {
+          "description": "An example site.",
+          "feed_ID": 7001,
+          "feed_URL": "https://examplesite1.wordpress.com/feed",
+          "icon": {
+            "img": "https://example.com/icon.png",
+            "ico": "https://example.com/icon.png"
+          },
+          "ID": 6001,
+          "is_private": false,
+          "jetpack": true,
+          "name": "Example Site 1",
+          "prefer_feed": false,
+          "subscribers_count": 10,
+          "subscription": {
+            "delivery_methods": {
+              "email": null,
+              "notification": {
+                "send_posts": false
+              }
+            }
+          },
+          "URL": "https://examplesite1.wordpress.com"
+        },
+        {
+          "description": "An example site.",
+          "feed_ID": 7002,
+          "feed_URL": "https://examplesite2.wordpress.com/feed",
+          "icon": null,
+          "ID": 6002,
+          "is_private": false,
+          "jetpack": false,
+          "name": "Example Site 2",
+          "prefer_feed": false,
+          "subscribers_count": 20,
+          "subscription": {
+            "delivery_methods": {
+              "email": null,
+              "notification": {
+                "send_posts": false
+              }
+            }
+          },
+          "URL": "https://examplesite2.wordpress.com"
+        }
+      ]
+    },
+    {
+      "type": "interests_you_may_like",
+      "data": [
+        {
+          "slug": "photography",
+          "title": "Photography",
+          "score": 1258
+        },
+        {
+          "slug": "travel",
+          "title": "Travel",
+          "score": 1003
+        }
+      ]
+    }
+  ],
+  "next_page_handle": "RVhBTVBMRS1IQU5ETEU",
+  "user_interests": [
+    "photography",
+    "travel"
+  ]
+}

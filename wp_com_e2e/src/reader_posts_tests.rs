@@ -4,10 +4,12 @@ use wp_api::date::WpGmtDateTime;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::reader_posts::{
-    ReaderFreshlyPressedParams, ReaderLikedPostsParams, ReaderListOwner, ReaderListPostsParams,
-    ReaderListPostsResponse, ReaderListSlug, ReaderOrganizationPostsParams, ReaderPost,
-    ReaderPostsResponse, ReaderSearchPostsParams, ReaderSearchPostsResponse, ReaderSearchSort,
-    ReaderStreamParams, ReaderTagPostsParams, ReaderTagSlug,
+    ReaderCard, ReaderDiscoverParams, ReaderFirstPostsParams, ReaderFreshlyPressedParams,
+    ReaderLikedPostsParams, ReaderListOwner, ReaderListPostsParams, ReaderListPostsResponse,
+    ReaderListSlug, ReaderOrganizationPostsParams, ReaderPost, ReaderPostsResponse,
+    ReaderSearchPostsParams, ReaderSearchPostsResponse, ReaderSearchSort, ReaderStreamParams,
+    ReaderTagPostsParams, ReaderTagPostsResponse, ReaderTagPostsSort, ReaderTagSlug,
+    ReaderTagsPostsParams,
 };
 use wp_api::wp_com::reader_saved::ReaderFeedId;
 
@@ -391,6 +393,175 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 })
             }
         }),
+        Trial::test("reader_posts::discover", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let page = |params: ReaderDiscoverParams| {
+                        let ctx = Arc::clone(&ctx);
+                        async move {
+                            let page = ctx
+                                .client
+                                .reader_posts()
+                                .discover(&params)
+                                .await
+                                .map_err(|e| e.to_string())?
+                                .data;
+                            match page.unreadable_cards.first() {
+                                Some(card) => Err(format!("A card couldn't be read: {card:?}")),
+                                None => Ok(page),
+                            }
+                        }
+                    };
+
+                    // A page is posts, with a card of recommended sites among them.
+                    let first = page(ReaderDiscoverParams::default()).await?;
+                    if card_posts(&first.cards).is_empty() {
+                        return Err("Discover has no posts".into());
+                    }
+                    if !first
+                        .cards
+                        .iter()
+                        .any(|card| matches!(card, ReaderCard::RecommendedSites { .. }))
+                    {
+                        return Err("A page should have a card of recommended sites".into());
+                    }
+                    let handle = first
+                        .next_page_handle
+                        .clone()
+                        .ok_or("The first page has no handle for the next")?;
+
+                    // Paging by handle: the next page is other posts.
+                    let second = page(ReaderDiscoverParams {
+                        page_handle: Some(handle),
+                        ..Default::default()
+                    })
+                    .await?;
+                    let second_posts = card_posts(&second.cards);
+                    if second_posts.is_empty()
+                        || !card_posts(&first.cards).is_disjoint(&second_posts)
+                    {
+                        return Err("The second page should be other posts".into());
+                    }
+
+                    // Asked for with tags, a page ends with a card of tags the user may like.
+                    let tagged = page(ReaderDiscoverParams {
+                        tags: vec![ReaderTagSlug("photography".to_string())],
+                        ..Default::default()
+                    })
+                    .await?;
+                    if !matches!(tagged.cards.last(), Some(ReaderCard::SuggestedTags { .. })) {
+                        return Err("A page asked for with tags should end with tags".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_posts::first_posts", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let page = |page_handle| {
+                        let params = ReaderFirstPostsParams {
+                            page_handle,
+                            ..Default::default()
+                        };
+                        let ctx = Arc::clone(&ctx);
+                        async move {
+                            let page = ctx
+                                .client
+                                .reader_posts()
+                                .first_posts(&params)
+                                .await
+                                .map_err(|e| e.to_string())?
+                                .data;
+                            match page.unreadable_cards.first() {
+                                Some(card) => Err(format!("A card couldn't be read: {card:?}")),
+                                None => Ok(page),
+                            }
+                        }
+                    };
+
+                    // A page is posts, then a card of new sites.
+                    let first = page(None).await?;
+                    if card_posts(&first.cards).is_empty() {
+                        return Err("The stream has no posts".into());
+                    }
+                    if !matches!(first.cards.last(), Some(ReaderCard::NewSites { .. })) {
+                        return Err("A page should end with a card of new sites".into());
+                    }
+                    let handle = first
+                        .next_page_handle
+                        .clone()
+                        .ok_or("The first page has no handle for the next")?;
+
+                    // Paging by handle: the next page is other posts.
+                    let second = page(Some(handle)).await?;
+                    let second_posts = card_posts(&second.cards);
+                    if second_posts.is_empty()
+                        || !card_posts(&first.cards).is_disjoint(&second_posts)
+                    {
+                        return Err("The second page should be other posts".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_posts::tags_posts", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let seen = |page: &ReaderTagPostsResponse| {
+                        page.posts
+                            .iter()
+                            .map(|post| (post.identity.site_id, post.identity.id))
+                            .collect::<std::collections::HashSet<_>>()
+                    };
+
+                    // By date, the next page is the one the handle names.
+                    let first = tags_posts(&ctx.client, ReaderTagsPostsParams::default()).await?;
+                    if first.posts.is_empty() {
+                        return Err("The tags have no posts".into());
+                    }
+                    let handle = first
+                        .next_page_handle
+                        .clone()
+                        .ok_or("The first page has no handle for the next")?;
+                    let second = tags_posts(
+                        &ctx.client,
+                        ReaderTagsPostsParams {
+                            page_handle: Some(handle),
+                            ..Default::default()
+                        },
+                    )
+                    .await?;
+                    if second.posts.is_empty() || !seen(&first).is_disjoint(&seen(&second)) {
+                        return Err("The second page by date should be other posts".into());
+                    }
+
+                    // By popularity, the next page is the next page number.
+                    let popular = |page| {
+                        tags_posts(
+                            &ctx.client,
+                            ReaderTagsPostsParams {
+                                sort: Some(ReaderTagPostsSort::Popularity),
+                                page,
+                                ..Default::default()
+                            },
+                        )
+                    };
+                    let first = popular(None).await?;
+                    let second = popular(Some(2)).await?;
+                    if first.posts.is_empty()
+                        || second.posts.is_empty()
+                        || !seen(&first).is_disjoint(&seen(&second))
+                    {
+                        return Err("The second page by popularity should be other posts".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
         Trial::test("reader_posts::signed_out", {
             let ctx = Arc::clone(&ctx);
             move || {
@@ -442,6 +613,31 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     {
                         return Err("A public list should have posts signed out".into());
                     }
+
+                    // So do Discover, the first posts stream and the posts of several tags.
+                    let discover = reader_posts
+                        .discover(&ReaderDiscoverParams::default())
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if card_posts(&discover.cards).is_empty() {
+                        return Err("Discover should have posts signed out".into());
+                    }
+                    let first_posts = reader_posts
+                        .first_posts(&ReaderFirstPostsParams::default())
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if card_posts(&first_posts.cards).is_empty() {
+                        return Err("The first posts stream should have posts signed out".into());
+                    }
+                    if tags_posts(&ctx.signed_out_client, ReaderTagsPostsParams::default())
+                        .await?
+                        .posts
+                        .is_empty()
+                    {
+                        return Err("The posts of tags should arrive signed out".into());
+                    }
                     Ok(())
                 })
             }
@@ -487,6 +683,38 @@ async fn list_posts(
             &ReaderListSlug("a12s".to_string()),
             &params,
         )
+        .await
+        .map(|response| response.data)
+        .map_err(|e| e.to_string())
+}
+
+/// The posts on a page of cards.
+fn card_posts(cards: &[ReaderCard]) -> std::collections::HashSet<(Option<WpComSiteId>, u64)> {
+    cards
+        .iter()
+        .filter_map(|card| match card {
+            ReaderCard::Post { post } => Some((post.identity.site_id, post.identity.id)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A page of the posts of two tags busy enough to always have a second page. `params` is the rest
+/// of the request.
+async fn tags_posts(
+    client: &WpComApiClient,
+    params: ReaderTagsPostsParams,
+) -> Result<ReaderTagPostsResponse, String> {
+    let params = ReaderTagsPostsParams {
+        tags: vec![
+            ReaderTagSlug("photography".to_string()),
+            ReaderTagSlug("travel".to_string()),
+        ],
+        ..params
+    };
+    client
+        .reader_posts()
+        .tags_posts(&params)
         .await
         .map(|response| response.data)
         .map_err(|e| e.to_string())

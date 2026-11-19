@@ -17,7 +17,7 @@ use crate::{
     },
     wp_com::{
         WpComSiteId,
-        reader_saved::{ReaderPostSaveIdentity, deserialize_optional_text},
+        reader_saved::{ReaderFeedId, ReaderPostSaveIdentity, deserialize_optional_text},
     },
     wp_content_string_id,
 };
@@ -30,6 +30,7 @@ use std::fmt;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
     LenientVec, deserialize_optional_bool_or_int, deserialize_u64_or_string_or_none,
+    deserialize_u64_or_string_or_none_as_t,
 };
 
 /// A post in a Reader stream.
@@ -912,18 +913,25 @@ pub enum ReaderTagPostsSort {
 
 impl_as_query_value_from_to_string!(ReaderTagPostsSort);
 
-/// Query parameters for a tag's posts. For the next page, pass the page's
-/// [`ReaderTagPostsResponse::next_page_handle`] as `page_handle`.
+/// Query parameters for a tag's posts.
+///
+/// Sorted by date, pass the page's [`ReaderTagPostsResponse::next_page_handle`] as `page_handle`
+/// for the next page. Sorted by popularity, pass the next `page` instead: the API answers a
+/// handle from that order with the first page again.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
-#[supports_pagination(false)] // The stream pages with `page_handle` rather than a page number.
+#[supports_pagination(false)] // `page` is a parameter of its own: the stream has no page count.
 pub struct ReaderTagPostsParams {
     /// The number of posts to return. The API returns 10 at most, whatever is asked for.
     #[uniffi(default = None)]
     pub number: Option<u32>,
-    /// The previous page's [`ReaderTagPostsResponse::next_page_handle`]. Send the same `sort` that
-    /// returned it.
+    /// The previous page's [`ReaderTagPostsResponse::next_page_handle`], from a page sorted by
+    /// date. A handle from a page sorted by popularity returns the first page again.
     #[uniffi(default = None)]
     pub page_handle: Option<String>,
+    /// The page to return, counting from 1. It works in either order, and it's the only way to
+    /// page posts sorted by popularity.
+    #[uniffi(default = None)]
+    pub page: Option<u32>,
     /// The order of the posts. The API's default is [`ReaderTagPostsSort::Date`].
     #[uniffi(default = None)]
     pub sort: Option<ReaderTagPostsSort>,
@@ -935,7 +943,7 @@ pub struct ReaderTagPostsParams {
     pub after: Option<WpGmtDateTime>,
 }
 
-/// A page of a tag's posts.
+/// A page of the posts of a tag, or of several tags.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 #[serde(from = "RawReaderTagPostsResponse")]
 pub struct ReaderTagPostsResponse {
@@ -945,7 +953,8 @@ pub struct ReaderTagPostsResponse {
     /// The posts on the page that couldn't be read. Almost always empty.
     #[uniffi(default = [])]
     pub unreadable_posts: Vec<ReaderUnreadablePost>,
-    /// Pass it as `page_handle` for the next page. `None` on the last page.
+    /// Pass it as `page_handle` for the next page of posts sorted by date. `None` on the last
+    /// page. Posts sorted by popularity page by `page`: their handle returns the first page again.
     #[uniffi(default = None)]
     pub next_page_handle: Option<String>,
     /// The dates the page covers. Missing when the posts are sorted by popularity.
@@ -971,6 +980,440 @@ impl From<RawReaderTagPostsResponse> for ReaderTagPostsResponse {
             unreadable_posts,
             next_page_handle: raw.next_page_handle,
             date_range: raw.date_range,
+        }
+    }
+}
+
+/// Query parameters for the posts of several tags. With one tag, it's that tag's posts.
+///
+/// It pages as a tag's posts do. Sorted by date, pass the page's
+/// [`ReaderTagPostsResponse::next_page_handle`] as `page_handle` for the next page. Sorted by
+/// popularity, pass the next `page` instead: the API answers a handle from that order with the
+/// first page again.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // `page` is a parameter of its own: the stream has no page count.
+pub struct ReaderTagsPostsParams {
+    /// The tags to return posts for. Without any, the API answers 400.
+    pub tags: Vec<ReaderTagSlug>,
+    /// The number of posts to return. The API returns 10 at most, whatever is asked for.
+    #[uniffi(default = None)]
+    pub number: Option<u32>,
+    /// The previous page's [`ReaderTagPostsResponse::next_page_handle`], from a page sorted by
+    /// date. A handle from a page sorted by popularity returns the first page again.
+    #[uniffi(default = None)]
+    pub page_handle: Option<String>,
+    /// The page to return, counting from 1. It works in either order, and it's the only way to
+    /// page posts sorted by popularity.
+    #[uniffi(default = None)]
+    pub page: Option<u32>,
+    /// The order of the posts. The API's default is [`ReaderTagPostsSort::Date`].
+    #[uniffi(default = None)]
+    pub sort: Option<ReaderTagPostsSort>,
+    /// Only return posts published before this time.
+    #[uniffi(default = None)]
+    pub before: Option<WpGmtDateTime>,
+    /// Only return posts published after this time.
+    #[uniffi(default = None)]
+    pub after: Option<WpGmtDateTime>,
+}
+
+/// A card in a stream of cards, such as Discover.
+///
+/// A stream of cards mixes posts with other things to show between them. Each kind the API is
+/// known to send has a case. A card of any other kind is [`ReaderCard::Unknown`], so that a new
+/// kind doesn't fail the page.
+#[derive(Debug, Clone, PartialEq, Serialize, uniffi::Enum)]
+// A stream is nearly all posts, so boxing the post would cost an allocation on most cards.
+#[allow(clippy::large_enum_variant)]
+pub enum ReaderCard {
+    /// A post. The API calls the card `post`.
+    Post { post: ReaderPost },
+    /// Sites to recommend. The API calls the card `recommended_blogs`. Discover sends one on each
+    /// page, at any position, with up to as many sites as the cards that were asked for.
+    RecommendedSites { sites: Vec<ReaderCardSite> },
+    /// Sites that have just started. The API calls the card `new_sites`. The first posts stream
+    /// sends one at the end of each page, and it can be empty.
+    NewSites { sites: Vec<ReaderCardSite> },
+    /// Tags the user may like. The API calls the card `interests_you_may_like`. Discover sends one
+    /// at the end of a page that was asked for with `tags`.
+    SuggestedTags { tags: Vec<ReaderCardTag> },
+    /// A card of a kind this library doesn't know, with the name the API gave it.
+    Unknown { card_type: String },
+}
+
+/// A site on a card of recommended or new sites.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderCardSite")]
+pub struct ReaderCardSite {
+    #[uniffi(default = None)]
+    pub site_id: Option<WpComSiteId>,
+    /// `None` for a site the Reader has no feed for.
+    #[uniffi(default = None)]
+    pub feed_id: Option<ReaderFeedId>,
+    #[uniffi(default = None)]
+    pub name: Option<String>,
+    #[uniffi(default = None)]
+    pub description: Option<String>,
+    #[uniffi(default = None)]
+    pub url: Option<String>,
+    #[uniffi(default = None)]
+    pub feed_url: Option<String>,
+    /// The site's icon: `icon.img`, else `icon.ico`. Many sites have none.
+    #[uniffi(default = None)]
+    pub icon_url: Option<String>,
+    #[uniffi(default = None)]
+    pub is_private: Option<bool>,
+    #[uniffi(default = None)]
+    pub is_jetpack: Option<bool>,
+    /// Whether to show the site as its feed rather than as a WordPress.com site.
+    #[uniffi(default = None)]
+    pub prefer_feed: Option<bool>,
+    #[uniffi(default = None)]
+    pub subscribers_count: Option<u64>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderCardSite {
+    #[serde(
+        rename = "ID",
+        default,
+        deserialize_with = "deserialize_u64_or_string_or_none_as_t"
+    )]
+    site_id: Option<WpComSiteId>,
+    #[serde(
+        rename = "feed_ID",
+        default,
+        deserialize_with = "deserialize_u64_or_string_or_none_as_t"
+    )]
+    feed_id: Option<ReaderFeedId>,
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    description: Option<String>,
+    #[serde(
+        rename = "URL",
+        default,
+        deserialize_with = "deserialize_optional_text"
+    )]
+    url: Option<String>,
+    #[serde(
+        rename = "feed_URL",
+        default,
+        deserialize_with = "deserialize_optional_text"
+    )]
+    feed_url: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_object_or_empty")]
+    icon: Option<RawSiteIcon>,
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    is_private: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    jetpack: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    prefer_feed: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_optional_count")]
+    subscribers_count: Option<u64>,
+}
+
+impl From<RawReaderCardSite> for ReaderCardSite {
+    fn from(raw: RawReaderCardSite) -> Self {
+        Self {
+            site_id: raw.site_id,
+            feed_id: raw.feed_id,
+            name: raw.name,
+            description: raw.description,
+            url: raw.url,
+            feed_url: raw.feed_url,
+            icon_url: raw.icon.and_then(|icon| icon.img.or(icon.ico)),
+            is_private: raw.is_private,
+            is_jetpack: raw.jetpack,
+            prefer_feed: raw.prefer_feed,
+            subscribers_count: raw.subscribers_count,
+        }
+    }
+}
+
+/// A tag on a card of tags the user may like.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderCardTag {
+    pub slug: ReaderTagSlug,
+    /// The tag's name, to show.
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    #[uniffi(default = None)]
+    pub title: Option<String>,
+    /// How strongly the tag is suggested. A card's tags arrive strongest first.
+    #[serde(default, deserialize_with = "deserialize_optional_score")]
+    #[uniffi(default = None)]
+    pub score: Option<f64>,
+}
+
+/// A card on a page that couldn't be read, or part of one.
+///
+/// One card the library can't read doesn't fail its page. The page keeps the cards it can read,
+/// and lists the others as these. A site or a tag that can't be read is listed too, and its card
+/// keeps the rest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderUnreadableCard {
+    /// The card's kind, as the API names it. `None` when that couldn't be read either.
+    #[uniffi(default = None)]
+    pub card_type: Option<String>,
+    /// Which post it is, for a post card whose IDs could be read.
+    #[uniffi(default = None)]
+    pub post: Option<ReaderPostSaveIdentity>,
+    /// Why it couldn't be read. A line and column in it count from the start of the card, or of
+    /// the post, site or tag in it.
+    pub error: String,
+}
+
+/// Reads a page's cards, and lists the ones that can't be read.
+fn sort_cards(cards: Option<LenientVec<RawCard>>) -> (Vec<ReaderCard>, Vec<ReaderUnreadableCard>) {
+    let cards = cards.unwrap_or_default();
+    let mut unreadable: Vec<_> = cards
+        .invalid
+        .into_iter()
+        .map(|card| ReaderUnreadableCard {
+            card_type: None,
+            post: None,
+            error: card.error.to_string(),
+        })
+        .collect();
+    let mut read = Vec::new();
+    for card in cards.valid {
+        let Some(kind) = card.kind.clone() else {
+            unreadable.push(ReaderUnreadableCard {
+                card_type: None,
+                post: None,
+                error: "the card has no `type`".to_string(),
+            });
+            continue;
+        };
+        match card.read(&kind, &mut unreadable) {
+            Ok(card) => read.push(card),
+            Err(error) => unreadable.push(error),
+        }
+    }
+    (read, unreadable)
+}
+
+impl RawCard {
+    /// The card, once its kind says how to read its data. A site or a tag in it that can't be
+    /// read goes to `unreadable`, and the card keeps the rest.
+    fn read(
+        &self,
+        kind: &str,
+        unreadable: &mut Vec<ReaderUnreadableCard>,
+    ) -> Result<ReaderCard, ReaderUnreadableCard> {
+        match kind {
+            "post" => {
+                let data = self
+                    .data()
+                    .ok_or_else(|| unreadable_card(kind, None, "the card has no post"))?;
+                serde_json::from_str(data.get())
+                    .map(|post| ReaderCard::Post { post })
+                    .map_err(|error| {
+                        unreadable_card(kind, serde_json::from_str(data.get()).ok(), error)
+                    })
+            }
+            "recommended_blogs" => Ok(ReaderCard::RecommendedSites {
+                sites: read_card_items(kind, self.list(kind)?, unreadable),
+            }),
+            "new_sites" => Ok(ReaderCard::NewSites {
+                sites: read_card_items(kind, self.list(kind)?, unreadable),
+            }),
+            "interests_you_may_like" => Ok(ReaderCard::SuggestedTags {
+                tags: read_card_items(kind, self.list(kind)?, unreadable),
+            }),
+            _ => Ok(ReaderCard::Unknown {
+                card_type: kind.to_string(),
+            }),
+        }
+    }
+
+    /// The card's data as a list, each element still as JSON. A card without data has none.
+    fn list(&self, kind: &str) -> Result<Vec<Box<RawValue>>, ReaderUnreadableCard> {
+        match self.data() {
+            None => Ok(Vec::new()),
+            Some(data) => {
+                serde_json::from_str(data.get()).map_err(|error| unreadable_card(kind, None, error))
+            }
+        }
+    }
+}
+
+fn unreadable_card(
+    kind: &str,
+    post: Option<ReaderPostSaveIdentity>,
+    error: impl fmt::Display,
+) -> ReaderUnreadableCard {
+    ReaderUnreadableCard {
+        card_type: Some(kind.to_string()),
+        post,
+        error: error.to_string(),
+    }
+}
+
+/// The sites or tags of a card that can be read. Each of the others is listed in `unreadable`.
+fn read_card_items<T: DeserializeOwned>(
+    kind: &str,
+    items: Vec<Box<RawValue>>,
+    unreadable: &mut Vec<ReaderUnreadableCard>,
+) -> Vec<T> {
+    items
+        .into_iter()
+        .filter_map(|item| match serde_json::from_str(item.get()) {
+            Ok(item) => Some(item),
+            Err(error) => {
+                unreadable.push(unreadable_card(kind, None, error));
+                None
+            }
+        })
+        .collect()
+}
+
+/// How Discover picks its posts.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ReaderDiscoverSort {
+    /// Popular posts first. The API's default. The first pages are recent posts, and later ones
+    /// reach back years.
+    Popular,
+    /// Newest first. The API sorts this way for any value but `popular`.
+    Latest,
+}
+
+impl_as_query_value_from_to_string!(ReaderDiscoverSort);
+
+/// Query parameters for Discover's stream of cards. For the next page, pass the page's
+/// [`ReaderDiscoverResponse::next_page_handle`] as `page_handle`. The stream has ended when a
+/// page has no handle.
+///
+/// `meta` and `fields` aren't here: `meta` adds nothing to a post, and `fields` trims a post only
+/// part of the way.
+#[derive(Debug, Default, PartialEq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // The stream pages with `page_handle` rather than a page number.
+pub struct ReaderDiscoverParams {
+    /// The number of cards to return: 8 by default. The card of recommended sites is one of them.
+    /// The API returned as many as 120 when asked, and 86 when asked for 150 or more. It answers
+    /// 500 to `0`.
+    #[uniffi(default = None)]
+    pub count: Option<u32>,
+    /// The previous page's [`ReaderDiscoverResponse::next_page_handle`]. The API answers 500 to a
+    /// handle it didn't send.
+    #[uniffi(default = None)]
+    pub page_handle: Option<String>,
+    /// Tags to lean the stream toward. With any, the page also ends with a card of tags the user
+    /// may like, which isn't counted in `count`.
+    #[uniffi(default = [])]
+    pub tags: Vec<ReaderTagSlug>,
+    /// How the posts are picked. The API's default is [`ReaderDiscoverSort::Popular`].
+    #[uniffi(default = None)]
+    pub sort: Option<ReaderDiscoverSort>,
+    /// How much to hold a post's age against it, between 0 and 1. It changed nothing in the
+    /// responses that were looked at.
+    #[uniffi(default = None)]
+    pub age_based_decay: Option<f64>,
+}
+
+/// A page of Discover's stream of cards.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderDiscoverResponse")]
+pub struct ReaderDiscoverResponse {
+    /// The page's cards, in the order to show them, without any in [`Self::unreadable_cards`].
+    pub cards: Vec<ReaderCard>,
+    /// The cards on the page that couldn't be read. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_cards: Vec<ReaderUnreadableCard>,
+    /// Pass it as `page_handle` for the next page. `None` on the last page, which has a card of
+    /// recommended sites and no posts.
+    #[uniffi(default = None)]
+    pub next_page_handle: Option<String>,
+    /// The tags the user follows, or the API's own choice for a signed-out request. The last page
+    /// doesn't send them.
+    #[uniffi(default = [])]
+    pub user_interests: Vec<ReaderTagSlug>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderDiscoverResponse {
+    #[serde(default)]
+    cards: Option<LenientVec<RawCard>>,
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    next_page_handle: Option<String>,
+    #[serde(default)]
+    user_interests: Option<LenientVec<ReaderTagSlug>>,
+}
+
+impl From<RawReaderDiscoverResponse> for ReaderDiscoverResponse {
+    fn from(raw: RawReaderDiscoverResponse) -> Self {
+        let (cards, unreadable_cards) = sort_cards(raw.cards);
+        Self {
+            cards,
+            unreadable_cards,
+            next_page_handle: raw.next_page_handle,
+            user_interests: raw.user_interests.unwrap_or_default().valid,
+        }
+    }
+}
+
+/// Query parameters for the stream of new sites' first posts. For the next page, pass the page's
+/// [`ReaderFirstPostsResponse::next_page_handle`] as `page_handle`.
+///
+/// `meta` and `fields` aren't here: `meta` adds nothing to a post, and `fields` trims a post only
+/// part of the way.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // The stream pages with `page_handle` rather than a page number.
+pub struct ReaderFirstPostsParams {
+    /// The number of cards to ask for: 8 by default. A page has fewer posts than that, often half
+    /// as many. Asked for 16 or more, the API returns no posts and no handle, and it answers 500
+    /// to `0`.
+    #[uniffi(default = None)]
+    pub count: Option<u32>,
+    /// The previous page's [`ReaderFirstPostsResponse::next_page_handle`]. The API answers a
+    /// handle it didn't send with the first page.
+    #[uniffi(default = None)]
+    pub page_handle: Option<String>,
+}
+
+/// A page of the stream of new sites' first posts: post cards, then a card of new sites.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderFirstPostsResponse")]
+pub struct ReaderFirstPostsResponse {
+    /// The page's cards, in the order to show them, without any in [`Self::unreadable_cards`].
+    pub cards: Vec<ReaderCard>,
+    /// The cards on the page that couldn't be read. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_cards: Vec<ReaderUnreadableCard>,
+    /// Pass it as `page_handle` for the next page. `None` when there isn't one.
+    #[uniffi(default = None)]
+    pub next_page_handle: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderFirstPostsResponse {
+    #[serde(default)]
+    cards: Option<LenientVec<RawCard>>,
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    next_page_handle: Option<String>,
+}
+
+impl From<RawReaderFirstPostsResponse> for ReaderFirstPostsResponse {
+    fn from(raw: RawReaderFirstPostsResponse) -> Self {
+        let (cards, unreadable_cards) = sort_cards(raw.cards);
+        Self {
+            cards,
+            unreadable_cards,
+            next_page_handle: raw.next_page_handle,
         }
     }
 }
@@ -1823,6 +2266,294 @@ mod tests {
             .collect();
         assert_eq!(errors.len(), 2);
         assert!(errors.contains(&"expected a `post` card, not a `recommended_blogs` card"));
+    }
+
+    fn card_kinds(cards: &[ReaderCard]) -> Vec<&str> {
+        cards
+            .iter()
+            .map(|card| match card {
+                ReaderCard::Post { .. } => "post",
+                ReaderCard::RecommendedSites { .. } => "recommended sites",
+                ReaderCard::NewSites { .. } => "new sites",
+                ReaderCard::SuggestedTags { .. } => "suggested tags",
+                ReaderCard::Unknown { card_type } => card_type,
+            })
+            .collect()
+    }
+
+    /// A recording of Discover on WordPress.com, asked for with `tags`, trimmed, with the sites,
+    /// authors and post details replaced.
+    #[test]
+    fn test_deserialize_discover() {
+        let json = include_str!("../../tests/wpcom/reader_posts/discover.json");
+        let page: ReaderDiscoverResponse = serde_json::from_str(json).expect("the page parses");
+
+        assert_eq!(
+            card_kinds(&page.cards),
+            ["post", "recommended sites", "suggested tags"]
+        );
+        assert!(page.unreadable_cards.is_empty());
+        assert_eq!(
+            page.next_page_handle.as_deref(),
+            Some("RVhBTVBMRS1IQU5ETEU")
+        );
+        assert_eq!(
+            page.user_interests,
+            [
+                ReaderTagSlug("photography".to_string()),
+                ReaderTagSlug("travel".to_string())
+            ]
+        );
+
+        let ReaderCard::Post { post } = &page.cards[0] else {
+            panic!("the first card is a post");
+        };
+        assert_eq!(post.identity.id, 1001);
+        assert_eq!(post.title.as_deref(), Some("Example post 1"));
+        assert!(post.railcar.is_some());
+
+        let ReaderCard::RecommendedSites { sites } = &page.cards[1] else {
+            panic!("the second card is recommended sites");
+        };
+        assert_eq!(sites.len(), 2);
+        assert_eq!(sites[0].site_id, Some(WpComSiteId(6001)));
+        assert_eq!(sites[0].feed_id, Some(ReaderFeedId(7001)));
+        assert_eq!(sites[0].name.as_deref(), Some("Example Site 1"));
+        assert_eq!(
+            sites[0].url.as_deref(),
+            Some("https://examplesite1.wordpress.com")
+        );
+        assert_eq!(
+            sites[0].icon_url.as_deref(),
+            Some("https://example.com/icon.png")
+        );
+        assert_eq!(sites[0].is_jetpack, Some(true));
+        assert_eq!(sites[0].subscribers_count, Some(10));
+        assert_eq!(sites[1].icon_url, None, "The API sent `null` for its icon");
+
+        let ReaderCard::SuggestedTags { tags } = &page.cards[2] else {
+            panic!("the third card is suggested tags");
+        };
+        assert_eq!(tags.len(), 2);
+        assert_eq!(tags[0].slug, ReaderTagSlug("photography".to_string()));
+        assert_eq!(tags[0].title.as_deref(), Some("Photography"));
+        assert_eq!(tags[0].score, Some(1258.0));
+    }
+
+    /// A recording of the first posts stream on WordPress.com, trimmed, with the sites, authors
+    /// and post details replaced. The post's site is too new to have a feed.
+    #[test]
+    fn test_deserialize_first_posts() {
+        let json = include_str!("../../tests/wpcom/reader_posts/first_posts.json");
+        let page: ReaderFirstPostsResponse = serde_json::from_str(json).expect("the page parses");
+
+        assert_eq!(card_kinds(&page.cards), ["post", "new sites"]);
+        assert!(page.unreadable_cards.is_empty());
+        assert_eq!(
+            page.next_page_handle.as_deref(),
+            Some("RVhBTVBMRS1IQU5ETEU")
+        );
+
+        let ReaderCard::Post { post } = &page.cards[0] else {
+            panic!("the first card is a post");
+        };
+        assert_eq!(post.identity.site_id, Some(WpComSiteId(2001)));
+        assert_eq!(post.identity.feed_id, None);
+
+        let ReaderCard::NewSites { sites } = &page.cards[1] else {
+            panic!("the second card is new sites");
+        };
+        assert_eq!(sites.len(), 1);
+        assert_eq!(sites[0].site_id, Some(WpComSiteId(6001)));
+        assert_eq!(sites[0].subscribers_count, Some(10));
+    }
+
+    /// Discover's last page: a card of recommended sites, no posts, no handle and no interests.
+    #[test]
+    fn test_deserialize_the_last_page_of_discover() {
+        let page: ReaderDiscoverResponse = serde_json::from_str(
+            r#"{ "cards": [{ "type": "recommended_blogs", "data": [{ "ID": 1, "name": "A" }] }] }"#,
+        )
+        .expect("the page parses");
+
+        assert_eq!(card_kinds(&page.cards), ["recommended sites"]);
+        assert_eq!(page.next_page_handle, None);
+        assert!(page.user_interests.is_empty());
+    }
+
+    /// What the first posts stream sends when asked for 16 cards or more: an empty card of new
+    /// sites, and an empty string for the handle.
+    #[test]
+    fn test_deserialize_first_posts_asked_for_too_many() {
+        let page: ReaderFirstPostsResponse = serde_json::from_str(
+            r#"{"cards":[{"type":"new_sites","data":[]}],"next_page_handle":"","success":true,"lang":"en"}"#,
+        )
+        .expect("the page parses");
+
+        assert_eq!(page.cards, [ReaderCard::NewSites { sites: vec![] }]);
+        assert_eq!(page.next_page_handle, None);
+    }
+
+    #[test]
+    fn test_a_card_of_an_unknown_kind_keeps_its_name() {
+        let page: ReaderDiscoverResponse = serde_json::from_str(
+            r#"{
+                "cards": [
+                    { "type": "post", "data": { "ID": 1, "site_ID": 10 } },
+                    { "type": "poll_of_the_day", "data": { "question": "?" } },
+                    { "type": "divider" },
+                    { "type": "post", "data": { "ID": 2, "site_ID": 11 } }
+                ],
+                "next_page_handle": "abc"
+            }"#,
+        )
+        .expect("the page parses");
+
+        assert_eq!(
+            card_kinds(&page.cards),
+            ["post", "poll_of_the_day", "divider", "post"]
+        );
+        assert!(page.unreadable_cards.is_empty());
+        assert_eq!(page.next_page_handle.as_deref(), Some("abc"));
+    }
+
+    #[test]
+    fn test_a_page_of_cards_keeps_its_cards_when_one_cannot_be_read() {
+        let page: ReaderDiscoverResponse = serde_json::from_str(
+            &json!({
+                "cards": [
+                    { "type": "post", "data": { "ID": 1, "site_ID": 10 } },
+                    { "type": "post", "data": { "ID": 2, "site_ID": 10, "date": UNREADABLE_DATE } },
+                    { "type": "post", "data": false },
+                    { "data": { "ID": 3 } },
+                    "not a card",
+                    { "type": "recommended_blogs", "data": { "ID": 4 } },
+                    { "type": "post", "data": { "ID": 5, "site_ID": 11 } },
+                ],
+                "next_page_handle": "abc",
+            })
+            .to_string(),
+        )
+        .expect("the page parses");
+
+        assert_eq!(card_kinds(&page.cards), ["post", "post"]);
+        assert_eq!(page.next_page_handle.as_deref(), Some("abc"));
+        assert_eq!(page.unreadable_cards.len(), 5);
+
+        let of_kind = |kind: Option<&str>| -> Vec<&ReaderUnreadableCard> {
+            page.unreadable_cards
+                .iter()
+                .filter(|card| card.card_type.as_deref() == kind)
+                .collect()
+        };
+        let posts = of_kind(Some("post"));
+        assert_eq!(posts.len(), 2);
+        let dated = posts
+            .iter()
+            .find(|card| card.post.is_some())
+            .expect("the post whose date can't be read");
+        assert_eq!(dated.post.as_ref().map(|post| post.id), Some(2));
+        assert!(
+            dated.error.starts_with("Invalid date format"),
+            "{}",
+            dated.error
+        );
+        assert!(
+            posts
+                .iter()
+                .any(|card| card.error == "the card has no post")
+        );
+        assert_eq!(of_kind(Some("recommended_blogs")).len(), 1);
+        let nameless = of_kind(None);
+        assert_eq!(nameless.len(), 2);
+        assert!(
+            nameless
+                .iter()
+                .any(|card| card.error == "the card has no `type`")
+        );
+    }
+
+    /// A site or a tag that can't be read is left out of its card, and listed.
+    #[test]
+    fn test_a_card_keeps_its_sites_and_tags_when_one_cannot_be_read() {
+        let page: ReaderFirstPostsResponse = serde_json::from_str(
+            &json!({
+                "cards": [
+                    { "type": "new_sites", "data": [{ "ID": 1, "name": "One" }, "not a site", { "ID": 2 }] },
+                    { "type": "interests_you_may_like", "data": [{ "title": "No slug" }, { "slug": "art" }] },
+                ],
+            })
+            .to_string(),
+        )
+        .expect("the page parses");
+
+        let ReaderCard::NewSites { sites } = &page.cards[0] else {
+            panic!("the first card is new sites");
+        };
+        let ids: Vec<_> = sites.iter().map(|site| site.site_id).collect();
+        assert_eq!(ids, [Some(WpComSiteId(1)), Some(WpComSiteId(2))]);
+        let ReaderCard::SuggestedTags { tags } = &page.cards[1] else {
+            panic!("the second card is suggested tags");
+        };
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].slug, ReaderTagSlug("art".to_string()));
+
+        let kinds: Vec<_> = page
+            .unreadable_cards
+            .iter()
+            .map(|card| card.card_type.as_deref())
+            .collect();
+        assert_eq!(kinds, [Some("new_sites"), Some("interests_you_may_like")]);
+    }
+
+    #[test]
+    fn test_card_site_fields_that_vary_in_shape() {
+        let site: ReaderCardSite = serde_json::from_value(json!({
+            "ID": "12",
+            "feed_ID": null,
+            "feed_URL": null,
+            "name": "",
+            "icon": [],
+            "jetpack": 1,
+            "subscribers_count": "7",
+            "blog_id": null,
+        }))
+        .unwrap();
+        assert_eq!(site.site_id, Some(WpComSiteId(12)));
+        assert_eq!(site.feed_id, None);
+        assert_eq!(site.feed_url, None);
+        assert_eq!(site.name, None);
+        assert_eq!(site.icon_url, None);
+        assert_eq!(site.is_jetpack, Some(true));
+        assert_eq!(site.subscribers_count, Some(7));
+
+        let favicon: ReaderCardSite =
+            serde_json::from_value(json!({ "ID": 1, "icon": { "ico": "https://a/favicon.ico" } }))
+                .unwrap();
+        assert_eq!(favicon.icon_url.as_deref(), Some("https://a/favicon.ico"));
+    }
+
+    /// A page of the posts of two tags is the shape of a page of one tag's posts.
+    #[test]
+    fn test_deserialize_the_posts_of_several_tags() {
+        let page: ReaderTagPostsResponse = serde_json::from_value(json!({
+            "success": true,
+            "tags": ["photography", "travel"],
+            "sort": "date",
+            "lang": "en",
+            "page": 1,
+            "posts": [{ "ID": 1, "site_ID": 10 }, { "ID": 2, "site_ID": 11 }],
+            "next_page_handle": "ZnJvbT0xMA==",
+            "date_range": {
+                "before": "2026-11-19T16:25:14+11:00",
+                "after": "2026-11-19T00:01:00-05:00",
+            },
+        }))
+        .expect("the page parses");
+
+        assert_eq!(ids(&page.posts), [1, 2]);
+        assert_eq!(page.next_page_handle.as_deref(), Some("ZnJvbT0xMA=="));
+        assert!(page.date_range.is_some());
     }
 
     /// The API reads `order` in capitals only.

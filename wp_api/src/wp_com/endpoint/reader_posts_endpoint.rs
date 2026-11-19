@@ -3,11 +3,12 @@ use crate::{
     wp_com::{
         WpComNamespace, WpComSiteId,
         reader_posts::{
-            ReaderFreshlyPressedParams, ReaderLikedPostsParams, ReaderListOwner,
-            ReaderListPostsParams, ReaderListPostsResponse, ReaderListSlug,
+            ReaderDiscoverParams, ReaderDiscoverResponse, ReaderFirstPostsParams,
+            ReaderFirstPostsResponse, ReaderFreshlyPressedParams, ReaderLikedPostsParams,
+            ReaderListOwner, ReaderListPostsParams, ReaderListPostsResponse, ReaderListSlug,
             ReaderOrganizationPostsParams, ReaderPostsResponse, ReaderSearchPostsParams,
             ReaderSearchPostsResponse, ReaderStreamParams, ReaderTagPostsParams,
-            ReaderTagPostsResponse, ReaderTagSlug,
+            ReaderTagPostsResponse, ReaderTagSlug, ReaderTagsPostsParams,
         },
         reader_saved::ReaderFeedId,
     },
@@ -48,13 +49,25 @@ enum ReaderPostsRequest {
     // doesn't exist.
     #[get(url = "/read/list/<reader_list_owner>/<reader_list_slug>/posts", params = &ReaderListPostsParams, output = ReaderListPostsResponse)]
     ListPosts,
+    // Discover's stream of recommended posts, as cards. Answers signed out.
+    #[get(url = "/read/streams/discover", params = &ReaderDiscoverParams, output = ReaderDiscoverResponse)]
+    Discover,
+    // The first posts of new sites, as cards. Answers signed out.
+    #[get(url = "/read/streams/first-posts", params = &ReaderFirstPostsParams, output = ReaderFirstPostsResponse)]
+    FirstPosts,
+    // The posts of several tags, which is Discover's "latest" tab. Answers signed out.
+    #[get(url = "/read/tags/posts", params = &ReaderTagsPostsParams, output = ReaderTagPostsResponse)]
+    TagsPosts,
 }
 
 impl DerivedRequest for ReaderPostsRequest {
     fn namespace(&self) -> impl AsNamespace {
         match self {
-            // The newest tag stream. `rest/v1.2` and `rest/v1.3` have older ones.
-            Self::TagPosts => WpComNamespace::V2,
+            // The newest tag stream. `rest/v1.2` and `rest/v1.3` have older ones. The card streams
+            // are only in `wpcom/v2`.
+            Self::TagPosts | Self::TagsPosts | Self::Discover | Self::FirstPosts => {
+                WpComNamespace::V2
+            }
             // The newest list stream. It pages with a handle and returns cards, where `rest/v1.2`
             // pages by date and returns posts.
             Self::ListPosts => WpComNamespace::RestV1_3,
@@ -75,7 +88,9 @@ mod tests {
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_2_endpoint,
                 validate_wp_com_rest_v1_3_endpoint, validate_wp_com_v2_endpoint,
             },
-            reader_posts::{ReaderSearchSort, ReaderStreamOrder, ReaderTagPostsSort},
+            reader_posts::{
+                ReaderDiscoverSort, ReaderSearchSort, ReaderStreamOrder, ReaderTagPostsSort,
+            },
         },
     };
     use rstest::*;
@@ -140,12 +155,13 @@ mod tests {
                 &ReaderTagPostsParams {
                     number: Some(10),
                     page_handle: Some("abc==".to_string()),
+                    page: Some(2),
                     sort: Some(ReaderTagPostsSort::Popularity),
                     before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
                     after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
                 },
             ),
-            "/read/tags/photography/posts?number=10&page_handle=abc%3D%3D&sort=popularity&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00",
+            "/read/tags/photography/posts?number=10&page_handle=abc%3D%3D&page=2&sort=popularity&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00",
         );
     }
 
@@ -291,6 +307,69 @@ mod tests {
                 },
             ),
             "/read/list/automattic/a12s/posts?number=40&page_handle=abc%3D%3D&page=2&order=ASC&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00",
+        );
+    }
+
+    fn tags() -> Vec<ReaderTagSlug> {
+        vec![
+            ReaderTagSlug("photography".to_string()),
+            ReaderTagSlug("travel".to_string()),
+        ]
+    }
+
+    #[rstest]
+    fn discover(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_v2_endpoint(
+            endpoint.discover(&ReaderDiscoverParams::default()),
+            "/read/streams/discover?",
+        );
+        validate_wp_com_v2_endpoint(
+            endpoint.discover(&ReaderDiscoverParams {
+                count: Some(8),
+                page_handle: Some("abc==".to_string()),
+                tags: tags(),
+                sort: Some(ReaderDiscoverSort::Latest),
+                age_based_decay: Some(0.5),
+            }),
+            "/read/streams/discover?count=8&page_handle=abc%3D%3D&tags=photography%2Ctravel&sort=latest&age_based_decay=0.5",
+        );
+    }
+
+    #[rstest]
+    fn first_posts(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_v2_endpoint(
+            endpoint.first_posts(&ReaderFirstPostsParams::default()),
+            "/read/streams/first-posts?",
+        );
+        validate_wp_com_v2_endpoint(
+            endpoint.first_posts(&ReaderFirstPostsParams {
+                count: Some(8),
+                page_handle: Some("abc==".to_string()),
+            }),
+            "/read/streams/first-posts?count=8&page_handle=abc%3D%3D",
+        );
+    }
+
+    #[rstest]
+    fn tags_posts(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_v2_endpoint(
+            endpoint.tags_posts(&ReaderTagsPostsParams {
+                tags: tags(),
+                ..Default::default()
+            }),
+            "/read/tags/posts?tags=photography%2Ctravel",
+        );
+        validate_wp_com_v2_endpoint(
+            endpoint.tags_posts(&ReaderTagsPostsParams {
+                tags: tags(),
+                number: Some(10),
+                page_handle: Some("abc==".to_string()),
+                page: Some(2),
+                sort: Some(ReaderTagPostsSort::Popularity),
+                before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
+                after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
+            }),
+            "/read/tags/posts?tags=photography%2Ctravel&number=10&page_handle=abc%3D%3D&page=2&sort=popularity&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00",
         );
     }
 
