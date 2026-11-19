@@ -6,7 +6,7 @@ use super::{
         AutoDiscoveryAttemptSuccess, AutoDiscoveryResult, DiscoveredAuthenticationMechanism,
         FetchAndParseApiRootFailure, FindApiRootFailure, ParseApiRootFailureReason,
         ParseHomepageResult, XmlrpcDisabledReason, XmlrpcDiscoveryError, extract_rsd_url,
-        is_xmlrpc_response, parse_rsd_for_xmlrpc,
+        is_xmlrpc_response, parse_rsd_for_xmlrpc, site_directory_url,
     },
 };
 use crate::{
@@ -578,8 +578,11 @@ impl WpLoginClient {
 
         // A link that is empty, or isn't an `http(s)` address once resolved, is no better
         // than a missing one.
-        let rsd_url = extract_rsd_url(&response.body_as_string(), &parsed_site_url.inner)
-            .ok_or(XmlrpcDiscoveryError::EndpointNotFound)?;
+        let rsd_url = extract_rsd_url(
+            &response.body_as_string(),
+            &site_directory_url(&parsed_site_url.inner),
+        )
+        .ok_or(XmlrpcDiscoveryError::EndpointNotFound)?;
 
         let rsd_response = self
             .perform(
@@ -587,7 +590,7 @@ impl WpLoginClient {
                     uuid: Uuid::new_v4().into(),
                     retry_count: 0,
                     method: RequestMethod::GET,
-                    url: WpEndpointUrl(rsd_url.into()),
+                    url: WpEndpointUrl(rsd_url.to_string()),
                     header_map: WpNetworkHeaderMap::default().into(),
                     body: None,
                 }
@@ -599,7 +602,7 @@ impl WpLoginClient {
                 reason: XmlrpcDisabledReason::ByHost,
             })?;
 
-        parse_rsd_for_xmlrpc(&rsd_response.body_as_string())
+        parse_rsd_for_xmlrpc(&rsd_response.body_as_string(), &rsd_url)
             .ok_or(XmlrpcDiscoveryError::EndpointNotFound)
     }
 }
@@ -916,9 +919,9 @@ mod tests {
         )
     }
 
-    fn rsd_body() -> String {
+    fn rsd_body(api_link: &str) -> String {
         format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd"><service><apis><api name="WordPress" blogID="1" preferred="true" apiLink="{XMLRPC_URL}" /></apis></service></rsd>"#
+            r#"<?xml version="1.0" encoding="UTF-8"?><rsd version="1.0" xmlns="http://archipelago.phrasewise.com/rsd"><service><apis><api name="WordPress" blogID="1" preferred="true" apiLink="{api_link}" /></apis></service></rsd>"#
         )
     }
 
@@ -933,8 +936,16 @@ mod tests {
         site_url: &'static str,
         homepage: String,
     ) -> (Result<ParsedUrl, XmlrpcDiscoveryError>, Vec<String>) {
+        xmlrpc_from_rsd_with(site_url, homepage, XMLRPC_URL).await
+    }
+
+    async fn xmlrpc_from_rsd_with(
+        site_url: &'static str,
+        homepage: String,
+        api_link: &str,
+    ) -> (Result<ParsedUrl, XmlrpcDiscoveryError>, Vec<String>) {
         let executor = Arc::new(RoutingExecutor {
-            routes: vec![(site_url, homepage), (RSD_URL, rsd_body())],
+            routes: vec![(site_url, homepage), (RSD_URL, rsd_body(api_link))],
             requested_urls: Mutex::new(vec![]),
         });
         let client = WpLoginClient::new_with_default_middleware_pipeline(executor.clone());
@@ -951,6 +962,15 @@ mod tests {
     #[case::protocol_relative("https://example.com/", "//example.com/wp/xmlrpc.php?rsd")]
     #[case::path_relative("https://example.com/", "wp/xmlrpc.php?rsd")]
     #[case::path_relative_from_subdirectory("https://example.com/wp/", "xmlrpc.php?rsd")]
+    // A site address is a directory, with or without its trailing slash.
+    #[case::path_relative_from_subdirectory_without_slash(
+        "https://example.com/wp",
+        "xmlrpc.php?rsd"
+    )]
+    #[case::dot_relative_from_subdirectory_without_slash(
+        "https://example.com/wp",
+        "./xmlrpc.php?rsd"
+    )]
     #[case::surrounding_whitespace("https://example.com/", " /wp/xmlrpc.php?rsd ")]
     #[tokio::test]
     async fn test_xmlrpc_from_rsd_resolves_link_against_homepage(
@@ -984,6 +1004,56 @@ mod tests {
         let homepage = r#"<html><head><base href="/wp/"><link rel="EditURI" type="application/rsd+xml" title="RSD" href="xmlrpc.php?rsd" /></head></html>"#;
         let (result, requested_urls) =
             xmlrpc_from_rsd_on_homepage("https://example.com/", homepage.to_string()).await;
+        assert_eq!(requested_urls, ["https://example.com/", RSD_URL]);
+        assert_eq!(result.unwrap().url(), XMLRPC_URL);
+    }
+
+    // WordPress builds the RSD link and its `apiLink` the same way, so a site that makes one
+    // relative makes both relative.
+    #[rstest]
+    #[case::root_relative("/wp/xmlrpc.php")]
+    #[case::path_relative("xmlrpc.php")]
+    #[case::protocol_relative("//example.com/wp/xmlrpc.php")]
+    #[tokio::test]
+    async fn test_xmlrpc_from_rsd_resolves_api_link_against_rsd_url(#[case] api_link: &str) {
+        let (result, requested_urls) = xmlrpc_from_rsd_with(
+            "https://example.com/wp",
+            homepage_with_rsd_link("/wp/xmlrpc.php?rsd"),
+            api_link,
+        )
+        .await;
+        assert_eq!(requested_urls, ["https://example.com/wp", RSD_URL]);
+        assert_eq!(result.unwrap().url(), XMLRPC_URL);
+    }
+
+    #[rstest]
+    #[case::empty("")]
+    #[case::javascript("javascript:void(0)")]
+    #[tokio::test]
+    async fn test_xmlrpc_from_rsd_unusable_api_link_is_not_found(#[case] api_link: &str) {
+        let (result, _) = xmlrpc_from_rsd_with(
+            "https://example.com/",
+            homepage_with_rsd_link(RSD_URL),
+            api_link,
+        )
+        .await;
+        assert!(
+            matches!(result, Err(XmlrpcDiscoveryError::EndpointNotFound)),
+            "{result:#?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_xmlrpc_from_rsd_skips_a_link_without_a_usable_href() {
+        let homepage = format!(
+            r#"<html><head>
+            <link rel="EditURI" type="application/rsd+xml" title="RSD" />
+            <link rel="EditURI" type="application/rsd+xml" title="RSD" href="" />
+            <link rel="EditURI" type="application/rsd+xml" title="RSD" href="{RSD_URL}" />
+            </head></html>"#
+        );
+        let (result, requested_urls) =
+            xmlrpc_from_rsd_on_homepage("https://example.com/", homepage).await;
         assert_eq!(requested_urls, ["https://example.com/", RSD_URL]);
         assert_eq!(result.unwrap().url(), XMLRPC_URL);
     }
