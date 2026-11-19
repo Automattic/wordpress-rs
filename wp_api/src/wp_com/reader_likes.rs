@@ -1,6 +1,6 @@
-//! The users who liked a post.
+//! The users who liked a post or a comment.
 //!
-//! The list answers without a token for a public site. For a private site it's then a 403
+//! Both lists answer without a token for a public site. For a private site they're then a 403
 //! `unauthorized`.
 
 use crate::{
@@ -402,6 +402,24 @@ mod tests {
         assert_eq!(no_site.site_visible, None);
         assert_eq!(no_site.preferred_blog, None);
         assert_eq!(no_site.default_avatar, Some(true));
+    }
+
+    /// A comment's likes, recorded from WordPress.com, with the user replaced. They arrive in the
+    /// same shape as a post's.
+    #[test]
+    fn test_deserialize_comment_likes() {
+        let page = page(include_str!(
+            "../../tests/wpcom/reader_likes/comment_likes.json"
+        ));
+
+        assert_eq!(page.found, Some(6));
+        assert_eq!(page.i_like, Some(false));
+        assert_eq!(page.likes.len(), 1);
+        assert_eq!(page.likes[0].id, WpComUserId(1001));
+        assert_eq!(
+            page.likes[0].date_liked,
+            Some("2026-04-30T16:24:55+00:00".parse().unwrap())
+        );
     }
 
     /// What the API sends for something nobody has liked, and past the last page.

@@ -453,10 +453,28 @@ public typealias ReaderStreamInfo = WordPressAPIInternal.ReaderStreamInfo
 public typealias ReaderStreamItem = WordPressAPIInternal.ReaderStreamItem
 public typealias ReaderStreamOrdering = WordPressAPIInternal.ReaderStreamOrdering
 public typealias ReaderStreamPageResult = WordPressAPIInternal.ReaderStreamPageResult
+// MARK: Reader Comments
+public typealias ReaderComment = WordPressAPIInternal.ReaderComment
+public typealias ReaderCommentAuthor = WordPressAPIInternal.ReaderCommentAuthor
+public typealias ReaderCommentStatus = WordPressAPIInternal.ReaderCommentStatus
+public typealias ReaderCommentType = WordPressAPIInternal.ReaderCommentType
+public typealias ReaderCommentsOrder = WordPressAPIInternal.ReaderCommentsOrder
+public typealias ReaderCommentsParams = WordPressAPIInternal.ReaderCommentsParams
+public typealias ReaderCommentsRequestExecutor = WordPressAPIInternal.ReaderCommentsRequestExecutor
+public typealias ReaderCommentsRequestListResponse = WordPressAPIInternal.ReaderCommentsRequestListResponse
+public typealias ReaderCommentsRequestSubscriptionResponse =
+    WordPressAPIInternal.ReaderCommentsRequestSubscriptionResponse
+public typealias ReaderCommentsResponse = WordPressAPIInternal.ReaderCommentsResponse
+public typealias ReaderCommentsStatusFilter = WordPressAPIInternal.ReaderCommentsStatusFilter
+public typealias ReaderCommentsTypeFilter = WordPressAPIInternal.ReaderCommentsTypeFilter
+public typealias ReaderPostCommentsSubscription = WordPressAPIInternal.ReaderPostCommentsSubscription
+public typealias ReaderUnreadableComment = WordPressAPIInternal.ReaderUnreadableComment
+
 // MARK: Reader Likes
 public typealias ReaderLike = WordPressAPIInternal.ReaderLike
 public typealias ReaderLikePreferredBlog = WordPressAPIInternal.ReaderLikePreferredBlog
 public typealias ReaderLikesParams = WordPressAPIInternal.ReaderLikesParams
+public typealias ReaderLikesRequestCommentLikesResponse = WordPressAPIInternal.ReaderLikesRequestCommentLikesResponse
 public typealias ReaderLikesRequestExecutor = WordPressAPIInternal.ReaderLikesRequestExecutor
 public typealias ReaderLikesRequestPostLikesResponse = WordPressAPIInternal.ReaderLikesRequestPostLikesResponse
 public typealias ReaderLikesResponse = WordPressAPIInternal.ReaderLikesResponse

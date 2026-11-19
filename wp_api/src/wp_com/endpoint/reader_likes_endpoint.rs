@@ -1,4 +1,5 @@
 use crate::{
+    comments::CommentId,
     posts::PostId,
     request::endpoint::{AsNamespace, DerivedRequest},
     wp_com::{
@@ -15,12 +16,17 @@ enum ReaderLikesRequest {
     // doesn't exist is a 404 `unknown_post`.
     #[get(url = "/sites/<wp_com_site_id>/posts/<post_id>/likes", params = &ReaderLikesParams, output = ReaderLikesResponse)]
     PostLikes,
+    // The users who liked a comment, with the same parameters and paging as a post's likes.
+    // Answers signed out for a public site. A comment that doesn't exist is a 404
+    // `unknown_comment`.
+    #[get(url = "/sites/<wp_com_site_id>/comments/<comment_id>/likes", params = &ReaderLikesParams, output = ReaderLikesResponse)]
+    CommentLikes,
 }
 
 impl DerivedRequest for ReaderLikesRequest {
     fn namespace(&self) -> impl AsNamespace {
-        // The newest list of likes, and the one with each like's date, which paging needs.
-        // `rest/v1.1` returns 90 likes with no dates and no way to the rest.
+        // The newest lists of likes, and the ones with each like's date, which paging needs.
+        // `rest/v1.1` returns likes with no dates, and no way past the first 90 of a post's.
         WpComNamespace::RestV1_2
     }
 }
@@ -65,6 +71,22 @@ mod tests {
         validate_wp_com_rest_v1_2_endpoint(
             endpoint.post_likes(&WpComSiteId(3584907), &PostId(6014), &all_params()),
             &format!("/sites/3584907/posts/6014/likes?{ALL_PARAMS_QUERY}"),
+        );
+    }
+
+    #[rstest]
+    fn comment_likes(endpoint: ReaderLikesRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.comment_likes(
+                &WpComSiteId(3584907),
+                &CommentId(451572),
+                &ReaderLikesParams::default(),
+            ),
+            "/sites/3584907/comments/451572/likes?",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.comment_likes(&WpComSiteId(3584907), &CommentId(451572), &all_params()),
+            &format!("/sites/3584907/comments/451572/likes?{ALL_PARAMS_QUERY}"),
         );
     }
 

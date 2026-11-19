@@ -12,6 +12,7 @@ mod products_tests;
 mod purchases_tests;
 mod reader_actions_tests;
 mod reader_post_tests;
+mod reader_comments_tests;
 mod reader_likes_tests;
 mod reader_posts_tests;
 mod reader_saved_tests;
@@ -69,6 +70,7 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(me_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_actions_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_post_tests::tests(Arc::clone(&ctx)));
+    tests.extend(reader_comments_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_likes_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_posts_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_saved_tests::tests(Arc::clone(&ctx)));

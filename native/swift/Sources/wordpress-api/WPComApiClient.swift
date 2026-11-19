@@ -129,6 +129,11 @@ public final class WPComApiClient: Sendable {
         internalClient.readerLikes()
     }
 
+    /// A post's comments, and the user's subscription to them.
+    public var readerComments: ReaderCommentsRequestExecutor {
+        internalClient.readerComments()
+    }
+
     /// Creates the account's saved Reader posts service. Prefer it over `readerSaved` for anything a
     /// user sees: a save or unsave shows straight away and survives a relaunch, and one the server
     /// hasn't got yet is sent by a later call.
