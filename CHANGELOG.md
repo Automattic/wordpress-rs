@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
+- **BREAKING:** `ParseUrlError` has a new `UnsupportedScheme` case, for a valid URL that isn't `http` or `https`. Login site discovery returns it, in `AutoDiscoveryAttemptFailure::ParseSiteUrl`, for a typed site address such as `data:,`. Exhaustive `switch`/`when` statements over `ParseUrlError` need a case for it.
+
+### Fixed
+
+- The Swift `WpRequestExecutor` no longer crashes when it's asked to request an address that isn't `http` or `https`. A site could cause this by advertising a `data:` URL as its REST API root. `URLSession` answers `data:`, `about:` and `file:` addresses with a plain `URLResponse`, and the executor trapped on it. The request now fails with `GenericError` before it's sent, as it does with reqwest. A plain `URLResponse` from a `URLProtocol` the app registers fails the same way.
+- Login site discovery no longer requests a typed site address that isn't `http` or `https`, such as `data:,`, and XML-RPC discovery ignores an RSD document's XML-RPC address unless it's `http` or `https`.
 
 ## [0.11.1] - 2026-11-18
 

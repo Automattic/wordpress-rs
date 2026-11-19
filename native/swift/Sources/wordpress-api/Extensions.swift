@@ -13,8 +13,13 @@ public extension MiddlewarePipeline {
 
 extension WpNetworkResponse {
     init(data: Data, request: NetworkRequestContent, response: URLResponse) throws {
+        // `buildURLRequest` only sends `http` and `https` requests, but a `URLProtocol` the app
+        // registers can still answer one with a plain `URLResponse`. See #1756.
         guard let response = response as? HTTPURLResponse else {
-            preconditionFailure("We should never wind up here")
+            throw URLError(
+                .badServerResponse,
+                userInfo: [NSLocalizedDescriptionKey: "Expected an HTTP response, but got \(type(of: response))."]
+            )
         }
 
         self = WpNetworkResponse(

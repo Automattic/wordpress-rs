@@ -20,6 +20,21 @@ impl ParsedUrl {
         self.inner.as_str()
     }
 
+    /// Parses `input` like [`Self::parse`], but accepts only an `http` or `https` URL.
+    ///
+    /// Use it for an address that came from a user or a server and is about to be requested.
+    /// Request executors can only send `http` and `https` requests. `URLSession` answers some
+    /// other schemes, such as `data:` or `file:`, with something that isn't an HTTP response.
+    pub fn parse_http_or_https(input: &str) -> Result<Self, ParseUrlError> {
+        let url = Self::parse(input)?;
+        // `url` lowercases the scheme, so `HTTPS://example.com` matches too.
+        if matches!(url.inner.scheme(), "http" | "https") {
+            Ok(url)
+        } else {
+            Err(ParseUrlError::UnsupportedScheme)
+        }
+    }
+
     pub fn by_extending_and_splitting_by_forward_slash<I>(&self, segments: I) -> Url
     where
         I: IntoIterator,
@@ -209,7 +224,9 @@ fn is_rfc3986_path_query_or_fragment_char(byte: u8) -> bool {
     WpDeriveLocalizable,
 )]
 pub enum ParseUrlError {
-    Generic { reason: String },
+    Generic {
+        reason: String,
+    },
     EmptyHost,
     IdnaError,
     InvalidPort,
@@ -220,6 +237,9 @@ pub enum ParseUrlError {
     RelativeUrlWithCannotBeABaseBase,
     SetHostOnCannotBeABaseUrl,
     Overflow,
+    /// The URL is valid, but isn't `http` or `https`, so it can't be requested. It doesn't name
+    /// the scheme: in `example.com:8080` the scheme is the host.
+    UnsupportedScheme,
 }
 
 impl WpSupportsLocalization for ParseUrlError {
@@ -294,6 +314,43 @@ mod tests {
     #[case("https://xn--u-ccb.com", ParseUrlError::IdnaError)]
     fn parse_url_error(#[case] input: &str, #[case] expected_err: ParseUrlError) {
         assert_eq!(ParsedUrl::try_from(input).unwrap_err(), expected_err);
+    }
+
+    #[rstest]
+    #[case("http://example.com", "http://example.com/")]
+    #[case("https://example.com/wp-json/", "https://example.com/wp-json/")]
+    #[case("HTTPS://EXAMPLE.com", "https://example.com/")]
+    fn parse_http_or_https_success(#[case] input: &str, #[case] expected: &str) {
+        assert_eq!(
+            ParsedUrl::parse_http_or_https(input).unwrap().url(),
+            expected
+        );
+    }
+
+    #[rstest]
+    #[case("data:,")]
+    #[case("data:application/json,{}")]
+    #[case("about:blank")]
+    #[case("file:///etc/passwd")]
+    #[case("ftp://example.com/wp-json/")]
+    #[case("javascript:alert(1)")]
+    // A host and port typed without a scheme parse with the host as the scheme.
+    #[case("example.com:8080")]
+    fn parse_http_or_https_rejects_other_schemes(#[case] input: &str) {
+        // Each is a valid URL, so the scheme is the only reason it's rejected.
+        assert!(ParsedUrl::parse(input).is_ok());
+        assert_eq!(
+            ParsedUrl::parse_http_or_https(input).unwrap_err(),
+            ParseUrlError::UnsupportedScheme
+        );
+    }
+
+    #[test]
+    fn parse_http_or_https_reports_parse_errors_first() {
+        assert_eq!(
+            ParsedUrl::parse_http_or_https("https://example.com:foo").unwrap_err(),
+            ParseUrlError::InvalidPort
+        );
     }
 
     #[rstest]

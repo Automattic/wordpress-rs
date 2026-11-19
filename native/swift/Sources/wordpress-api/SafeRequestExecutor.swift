@@ -607,6 +607,18 @@ protocol NetworkRequestContent {
 extension NetworkRequestContent {
     func buildURLRequest(additionalHeaders: [String: String]) throws -> URLRequest {
         let url = URL(string: self.url())!
+        // `URLSession` answers some other schemes, such as `data:`, `about:` and `file:`, with a
+        // plain `URLResponse`, not an HTTP one. Refuse them here, as `URLSession` itself refuses a
+        // scheme it doesn't know. See #1756.
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
+            throw URLError(
+                .unsupportedURL,
+                userInfo: [
+                    NSURLErrorFailingURLErrorKey: url,
+                    NSLocalizedDescriptionKey: "Only http and https URLs can be requested."
+                ]
+            )
+        }
         var request = URLRequest(url: url)
         request.httpMethod = self.method().rawValue
         request.allHTTPHeaderFields = self.headerMap().toFlatMap()
