@@ -92,7 +92,7 @@ class WpRequestExecutor @JvmOverloads constructor(
 
     override suspend fun execute(request: WpNetworkRequest): WpNetworkResponse =
         withContext(dispatcher) {
-            val requestBuilder = Request.Builder().url(request.url())
+            val requestBuilder = Request.Builder().urlOrFail(request.url(), request.method())
             val wpNetworkRequestBody = request.body()?.contents()?.toRequestBody()
             requestBuilder.method(
                 method = request.method().toString(),
@@ -114,7 +114,7 @@ class WpRequestExecutor @JvmOverloads constructor(
         withContext(dispatcher) {
             val multipartBody = buildMultipartBody(request)
             val bodyWithProgress = wrapWithProgressTracking(multipartBody)
-            val requestBuilder = Request.Builder().url(request.url())
+            val requestBuilder = Request.Builder().urlOrFail(request.url(), request.method())
             requestBuilder.method(request.method().toString(), bodyWithProgress)
 
             addRequestHeaders(requestBuilder, request.headerMap())
@@ -399,6 +399,27 @@ private fun RequestExecutionErrorReason.Companion.invalidSSLError(
         )
     }
 }
+
+/**
+ * Sets the request's address, failing with `GenericError` (as reqwest and the Swift executor do) when
+ * OkHttp can't request it, such as an address that isn't `http` or `https`.
+ *
+ * OkHttp throws `IllegalArgumentException` for such an address. Thrown out of the executor, that isn't
+ * the `RequestExecutionException` UniFFI's callback declares, so `WpApiClient.request` would throw an
+ * `InternalException` instead of returning a result.
+ */
+// The cause can't be attached: `RequestExecutionException` is generated. Its message is kept.
+@Suppress("SwallowedException")
+private fun Request.Builder.urlOrFail(requestUrl: String, requestMethod: RequestMethod): Request.Builder =
+    try {
+        url(requestUrl)
+    } catch (e: IllegalArgumentException) {
+        throw requestExecutionFailedWith(
+            RequestExecutionErrorReason.GenericError(errorMessage = e.localizedMessage ?: e.toString()),
+            requestUrl,
+            requestMethod,
+        )
+    }
 
 private fun requestExecutionFailedWith(
     reason: RequestExecutionErrorReason,

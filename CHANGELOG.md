@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
 
+### Fixed
+
+- The Kotlin `WpRequestExecutor` no longer makes `WpApiClient.request` throw an `InternalException` when it's asked to request an address that isn't `http` or `https`, such as a `file:` API root. OkHttp refuses those addresses, and its `IllegalArgumentException` escaped the executor. The request now fails with `GenericError`, as it does with reqwest.
+
 ## [0.11.1] - 2026-11-18
 
 ### Fixed
