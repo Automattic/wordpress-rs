@@ -262,6 +262,67 @@ mod tests {
         assert!(links[0].has_rel("next"));
     }
 
+    // Headers from other APIs, taken from the test suites of `parse_link_header` and
+    // `nom-rfc8288`.
+    #[test]
+    fn reads_github_pagination() {
+        assert_eq!(
+            parse(
+                r#"<https://api.github.com/repositories/41986369/contributors?page=2>; rel="next", <https://api.github.com/repositories/41986369/contributors?page=14>; rel="last""#
+            ),
+            [
+                link(
+                    "https://api.github.com/repositories/41986369/contributors?page=2",
+                    &["next"]
+                ),
+                link(
+                    "https://api.github.com/repositories/41986369/contributors?page=14",
+                    &["last"]
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn reads_sentry_pagination() {
+        // Parameters after `rel`, and a query with `&` first and `:` in a value.
+        assert_eq!(
+            parse(
+                r#"<https://sentry.io/api/0/projects/1/groups/?&cursor=1420837590:0:1>; rel="previous"; results="false", <https://sentry.io/api/0/projects/1/groups/?&cursor=1420837533:0:0>; rel="next"; results="true""#
+            ),
+            [
+                link(
+                    "https://sentry.io/api/0/projects/1/groups/?&cursor=1420837590:0:1",
+                    &["previous"]
+                ),
+                link(
+                    "https://sentry.io/api/0/projects/1/groups/?&cursor=1420837533:0:0",
+                    &["next"]
+                ),
+            ]
+        );
+    }
+
+    #[rstest]
+    #[case::escaped_quote(r#"</terms>; rel="copy\"right"; anchor=#foo"#, &["copy\"right"])]
+    #[case::slash_in_quoted_value(r#"</terms>; rel="foo/bar""#, &["foo/bar"])]
+    #[case::empty_quoted(r#"</terms>; rel="""#, &[])]
+    #[case::quoted_comma_in_other_param(r#"</terms>; rel="origin"; csv="one,two""#, &["origin"])]
+    fn reads_quoted_rel_values(#[case] header: &str, #[case] rels: &[&str]) {
+        let links = parse(header);
+        assert_eq!(links.len(), 1, "{links:?}");
+        assert_eq!(links[0].target, "/terms");
+        assert_eq!(links[0].rels, rels);
+    }
+
+    #[rstest]
+    #[case::leading_commas(", , </a>; rel=next")]
+    #[case::trailing_commas("</a>; rel=next , ,")]
+    #[case::trailing_semicolon("</a>; rel=next;")]
+    fn ignores_empty_list_entries(#[case] header: &str) {
+        assert_eq!(parse(header), [link("/a", &["next"])]);
+    }
+
     #[test]
     fn has_rel_ignores_case() {
         assert!(link("a", &["Next"]).has_rel("next"));
