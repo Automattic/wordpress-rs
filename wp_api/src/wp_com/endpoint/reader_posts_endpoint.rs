@@ -3,6 +3,7 @@ use crate::{
     wp_com::{
         WpComNamespace, WpComSiteId,
         reader_posts::{
+            ReaderFreshlyPressedParams, ReaderLikedPostsParams, ReaderOrganizationPostsParams,
             ReaderPostsResponse, ReaderStreamParams, ReaderTagPostsParams, ReaderTagPostsResponse,
             ReaderTagSlug,
         },
@@ -25,6 +26,19 @@ enum ReaderPostsRequest {
     // A tag's posts.
     #[get(url = "/read/tags/<reader_tag_slug>/posts", params = &ReaderTagPostsParams, output = ReaderTagPostsResponse)]
     TagPosts,
+    // The posts the user liked, newest like first. Signed out, the API answers 403.
+    #[get(url = "/read/liked", params = &ReaderLikedPostsParams, output = ReaderPostsResponse)]
+    Liked,
+    // Posts from Automattic's sites, for Automatticians. Signed out, the API answers with a page
+    // with no posts.
+    #[get(url = "/read/a8c", params = &ReaderOrganizationPostsParams, output = ReaderPostsResponse)]
+    Automattic,
+    // Posts from the P2s the user follows. Signed out, the API answers 403.
+    #[get(url = "/read/following/p2", params = &ReaderOrganizationPostsParams, output = ReaderPostsResponse)]
+    FollowingP2,
+    // Freshly Pressed: the posts WordPress.com's editors picked. Answers signed out.
+    #[get(url = "/freshly-pressed", params = &ReaderFreshlyPressedParams, output = ReaderPostsResponse)]
+    FreshlyPressed,
 }
 
 impl DerivedRequest for ReaderPostsRequest {
@@ -32,6 +46,8 @@ impl DerivedRequest for ReaderPostsRequest {
         match self {
             // The newest tag stream. `rest/v1.2` and `rest/v1.3` have older ones.
             Self::TagPosts => WpComNamespace::V2,
+            // `rest/v1.2` is the newest Automattic stream with whole posts: `rest/v1.3` returns
+            // only each post's IDs and date.
             _ => WpComNamespace::RestV1_2,
         }
     }
@@ -47,7 +63,7 @@ mod tests {
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_2_endpoint,
                 validate_wp_com_v2_endpoint,
             },
-            reader_posts::ReaderTagPostsSort,
+            reader_posts::{ReaderStreamOrder, ReaderTagPostsSort},
         },
     };
     use rstest::*;
@@ -130,6 +146,85 @@ mod tests {
                 &ReaderTagPostsParams::default(),
             ),
             "/read/tags/%E5%86%99%E7%9C%9F/posts?",
+        );
+    }
+
+    #[rstest]
+    fn liked(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.liked(&ReaderLikedPostsParams::default()),
+            "/read/liked?",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.liked(&ReaderLikedPostsParams {
+                number: Some(40),
+                before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
+                after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
+                order: Some(ReaderStreamOrder::Asc),
+                page: Some(2),
+                meta: Some("site,likes".to_string()),
+                fields: Some("ID,site_ID,date_liked".to_string()),
+            }),
+            "/read/liked?number=40&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00&order=ASC&page=2&meta=site%2Clikes&fields=ID%2Csite_ID%2Cdate_liked",
+        );
+    }
+
+    fn all_organization_params() -> ReaderOrganizationPostsParams {
+        ReaderOrganizationPostsParams {
+            number: Some(40),
+            before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
+            after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
+            order: Some(ReaderStreamOrder::Desc),
+            page: Some(2),
+            meta: Some("site,likes".to_string()),
+            fields: Some("ID,site_ID,date".to_string()),
+        }
+    }
+
+    const ALL_ORGANIZATION_PARAMS_QUERY: &str = "number=40&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00&order=DESC&page=2&meta=site%2Clikes&fields=ID%2Csite_ID%2Cdate";
+
+    #[rstest]
+    fn automattic(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.automattic(&ReaderOrganizationPostsParams::default()),
+            "/read/a8c?",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.automattic(&all_organization_params()),
+            &format!("/read/a8c?{ALL_ORGANIZATION_PARAMS_QUERY}"),
+        );
+    }
+
+    #[rstest]
+    fn following_p_2(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.following_p_2(&ReaderOrganizationPostsParams::default()),
+            "/read/following/p2?",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.following_p_2(&all_organization_params()),
+            &format!("/read/following/p2?{ALL_ORGANIZATION_PARAMS_QUERY}"),
+        );
+    }
+
+    #[rstest]
+    fn freshly_pressed(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.freshly_pressed(&ReaderFreshlyPressedParams::default()),
+            "/freshly-pressed?",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.freshly_pressed(&ReaderFreshlyPressedParams {
+                number: Some(40),
+                before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
+                after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
+                content_width: Some(675),
+                thumb_width: Some(252),
+                thumb_height: Some(160),
+                meta: Some("site,likes".to_string()),
+                fields: Some("ID,site_ID,date,editorial".to_string()),
+            }),
+            "/freshly-pressed?number=40&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00&content_width=675&thumb_width=252&thumb_height=160&meta=site%2Clikes&fields=ID%2Csite_ID%2Cdate%2Ceditorial",
         );
     }
 

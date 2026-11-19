@@ -13,6 +13,8 @@ use wp_mobile_cache::WpApiCache;
 
 pub struct TestContext {
     pub client: WpComApiClient,
+    /// A client with no account, for the endpoints that answer signed out.
+    pub signed_out_client: WpComApiClient,
     pub delegate: WpApiClientDelegate,
     pub service: WpService,
     pub site_id: WpComSiteId,
@@ -46,6 +48,10 @@ impl TestContext {
         };
 
         let client = WpComApiClient::new(delegate.clone());
+        let signed_out_client = WpComApiClient::new(WpApiClientDelegate {
+            auth_provider: WpAuthenticationProvider::none().into(),
+            ..delegate.clone()
+        });
 
         let site_id = WpComTestCredentials::instance().site_id;
         // Use a test site on the test account used in CI.
@@ -67,6 +73,7 @@ impl TestContext {
 
         Self {
             client,
+            signed_out_client,
             delegate,
             service,
             site_id: WpComSiteId(site_id),

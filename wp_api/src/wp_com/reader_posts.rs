@@ -111,6 +111,11 @@ pub struct ReaderPost {
     /// a source without `editorial` doesn't swap the post's image back to its featured image.
     #[uniffi(default = None)]
     pub editorial_image_url: Option<String>,
+    /// When Freshly Pressed shows the post, from `editorial.displayed_on`. Freshly Pressed is
+    /// ordered by it, newest first, and pages by it. The newest one can be a few hours in the
+    /// future. Only Freshly Pressed sends it.
+    #[uniffi(default = None)]
+    pub editorial_displayed_on: Option<WpGmtDateTime>,
     /// In the order the API sends them. `None` when the response left out `tags`, and empty when
     /// the post has none.
     #[uniffi(default = None)]
@@ -369,7 +374,10 @@ fn sort_posts(
     (posts.valid, unreadable)
 }
 
-/// A page of a Reader stream, newest first.
+/// A page of a Reader stream that pages by date, newest first.
+///
+/// For the next page, pass [`ReaderDateRange::after`] as `before`. A site stream sends no
+/// `date_range`, so pass its oldest post's date. A stream has ended when a page has no posts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 #[serde(from = "RawReaderPostsResponse")]
 pub struct ReaderPostsResponse {
@@ -378,7 +386,11 @@ pub struct ReaderPostsResponse {
     /// The posts on the page that couldn't be read. Almost always empty.
     #[uniffi(default = [])]
     pub unreadable_posts: Vec<ReaderUnreadablePost>,
-    /// The dates the page covers. The Following stream and feed streams send it; site streams don't.
+    /// The dates the page covers, in the date the stream is ordered by: `before` is the newest
+    /// post's and `after` the oldest post's. That date is when a post was published, except on
+    /// the Liked stream, where it's [`ReaderPost::date_liked`], and on Freshly Pressed, where it's
+    /// [`ReaderPost::editorial_displayed_on`]. Site streams don't send it, and a page with no posts
+    /// has no dates in it.
     #[uniffi(default = None)]
     pub date_range: Option<ReaderDateRange>,
     /// How many posts there are. Site streams send it.
@@ -410,6 +422,9 @@ impl From<RawReaderPostsResponse> for ReaderPostsResponse {
 
 /// Query parameters for the Reader streams that page by date: Following, a site's posts, and a
 /// feed's posts. For the next page, pass the oldest post's date as `before`.
+///
+/// The other streams that page by date have parameters of their own: [`ReaderLikedPostsParams`],
+/// [`ReaderOrganizationPostsParams`] and [`ReaderFreshlyPressedParams`].
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(false)] // The streams page by date rather than page number.
 pub struct ReaderStreamParams {
@@ -438,6 +453,152 @@ pub struct ReaderStreamParams {
     ///
     /// A stream with no posts then answers with an empty list where the page would be, which reads
     /// as a page with no posts.
+    #[uniffi(default = None)]
+    pub fields: Option<String>,
+}
+
+/// The order of a Reader stream's posts.
+///
+/// The API reads the value in capitals only, and takes anything else as its default.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "UPPERCASE")]
+#[strum(serialize_all = "UPPERCASE")]
+pub enum ReaderStreamOrder {
+    /// Newest first. The API's default.
+    Desc,
+    /// Oldest first. What that does depends on the stream: see the stream's parameters.
+    Asc,
+}
+
+impl_as_query_value_from_to_string!(ReaderStreamOrder);
+
+/// Query parameters for the posts the user liked.
+///
+/// The stream is ordered by when the user liked each post, newest like first, and `before` and
+/// `after` compare with that time rather than with when a post was published. For the next page,
+/// pass the page's [`ReaderDateRange::after`] as `before`: it's the last post's
+/// [`ReaderPost::date_liked`]. The stream has ended when a page has no posts.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // The stream pages by the date of the like rather than a page number.
+pub struct ReaderLikedPostsParams {
+    /// The number of posts to return: 10 by default, and at most 40.
+    #[uniffi(default = None)]
+    pub number: Option<u32>,
+    /// Only return posts liked before this time. A post liked at that very second is left out.
+    #[uniffi(default = None)]
+    pub before: Option<WpGmtDateTime>,
+    /// Only return posts liked after this time. A post liked at that very second is left out.
+    #[uniffi(default = None)]
+    pub after: Option<WpGmtDateTime>,
+    /// The order of the posts. [`ReaderStreamOrder::Asc`] starts from the oldest like, and a page's
+    /// `date_range` then has the last post's date in `before`. To page that way, pass that date
+    /// as `after`.
+    #[uniffi(default = None)]
+    pub order: Option<ReaderStreamOrder>,
+    /// The page to return, counting from 1. Don't page with it: each page starts 5 posts later
+    /// than it should, so those posts are never returned. Page with `before`.
+    #[uniffi(default = None)]
+    pub page: Option<u32>,
+    /// Extra data to include, comma-separated, as in [`ReaderStreamParams::meta`].
+    #[uniffi(default = None)]
+    pub meta: Option<String>,
+    /// The fields of each post to return, comma-separated, as in [`ReaderStreamParams::fields`].
+    /// The page's `date_range` arrives whichever fields are asked for, and a stream with no posts
+    /// still answers with a page, not an empty list.
+    #[uniffi(default = None)]
+    pub fields: Option<String>,
+}
+
+/// Query parameters for the streams of an organization's posts: Automattic's, and the P2s the user
+/// follows.
+///
+/// Both are ordered by when each post was published, newest first. For the next page, pass the
+/// page's [`ReaderDateRange::after`], the last post's date, as `before`. The stream has ended when
+/// a page has no posts.
+///
+/// The API declares the same parameters for both. What each one does was checked on the Automattic
+/// stream only: the account used had no P2 posts.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // The streams page by date. `page` is a parameter of its own.
+pub struct ReaderOrganizationPostsParams {
+    /// The number of posts to return: 10 by default, and at most 40.
+    #[uniffi(default = None)]
+    pub number: Option<u32>,
+    /// Only return posts published before this time. A post published at that very second is left
+    /// out.
+    #[uniffi(default = None)]
+    pub before: Option<WpGmtDateTime>,
+    /// Only return posts published after this time. A post published at that very second is left
+    /// out.
+    #[uniffi(default = None)]
+    pub after: Option<WpGmtDateTime>,
+    /// The order of the posts on the page. [`ReaderStreamOrder::Asc`] returns the same posts as
+    /// [`ReaderStreamOrder::Desc`], the newest ones, with the oldest of them first. It doesn't
+    /// start the stream from its oldest post.
+    #[uniffi(default = None)]
+    pub order: Option<ReaderStreamOrder>,
+    /// The page to return, counting from 1, from the newest post at the time of the request. A
+    /// new post moves every other post along by one, so page with `before` instead.
+    #[uniffi(default = None)]
+    pub page: Option<u32>,
+    /// Extra data to include, comma-separated, as in [`ReaderStreamParams::meta`].
+    #[uniffi(default = None)]
+    pub meta: Option<String>,
+    /// The fields of each post to return, comma-separated, as in [`ReaderStreamParams::fields`].
+    /// The page's `date_range` arrives whichever fields are asked for, and a stream with no posts
+    /// still answers with a page, not an empty list.
+    #[uniffi(default = None)]
+    pub fields: Option<String>,
+}
+
+/// Query parameters for Freshly Pressed, the posts WordPress.com's editors picked.
+///
+/// The stream is ordered by when each post is shown, [`ReaderPost::editorial_displayed_on`], newest
+/// first. That's about one post a day, and the newest can be a few hours in the future. `before`
+/// and `after` compare with that time rather than with when a post was published. For the next
+/// page, pass the page's [`ReaderDateRange::after`] as `before`. The stream has ended when a page
+/// has no posts.
+///
+/// The API also takes `format=rss`, which redirects to an RSS feed, so it isn't here.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // The stream pages by date rather than page number.
+pub struct ReaderFreshlyPressedParams {
+    /// The number of posts to return: 10 by default, and at most 40.
+    #[uniffi(default = None)]
+    pub number: Option<u32>,
+    /// Only return posts shown before this time. A post shown at that very second is left out.
+    #[uniffi(default = None)]
+    pub before: Option<WpGmtDateTime>,
+    /// Only return posts shown at or after this time.
+    #[uniffi(default = None)]
+    pub after: Option<WpGmtDateTime>,
+    /// The width, in pixels, to size the images in each post's content for. 480 by default.
+    #[uniffi(default = None)]
+    pub content_width: Option<u32>,
+    /// The width, in pixels, of the screenshot in `editorial.image`. 252 by default.
+    #[uniffi(default = None)]
+    pub thumb_width: Option<u32>,
+    /// The height, in pixels, of thumbnail images. 160 by default. It changed nothing in the
+    /// responses that were looked at.
+    #[uniffi(default = None)]
+    pub thumb_height: Option<u32>,
+    /// Extra data to include, comma-separated, as in [`ReaderStreamParams::meta`].
+    #[uniffi(default = None)]
+    pub meta: Option<String>,
+    /// The fields of each post to return, comma-separated, as in [`ReaderStreamParams::fields`].
+    /// `editorial` has the time a post is shown. The page's `date_range` arrives whichever fields
+    /// are asked for, and a stream with no posts still answers with a page, not an empty list.
     #[uniffi(default = None)]
     pub fields: Option<String>,
 }
@@ -634,11 +795,14 @@ struct RawReaderPost {
     railcar: Option<serde_json::Value>,
 }
 
-/// `editorial`, which Discover sends for a post an editor picked. Only its image is kept.
+/// `editorial`, which Freshly Pressed sends for a post an editor picked. Only its image and the
+/// time it's shown are kept.
 #[derive(Deserialize)]
 struct RawEditorial {
     #[serde(default, deserialize_with = "deserialize_optional_text")]
     image: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
+    displayed_on: Option<WpGmtDateTime>,
 }
 
 #[derive(Deserialize)]
@@ -730,6 +894,10 @@ impl TryFrom<RawReaderPost> for ReaderPost {
         );
         let editorial_image_url =
             reader_post_editorial_image_url(editorial_image).map(str::to_string);
+        let editorial_displayed_on = raw
+            .editorial
+            .as_ref()
+            .and_then(|editorial| editorial.displayed_on);
         Ok(Self {
             identity: raw.identity,
             global_id: raw.global_id,
@@ -755,6 +923,7 @@ impl TryFrom<RawReaderPost> for ReaderPost {
             featured_media: raw.featured_media,
             display_image_url,
             editorial_image_url,
+            editorial_displayed_on,
             tags: raw.tags,
             cross_post: cross_post(&metadata),
             like_count: raw.like_count,
@@ -1080,6 +1249,109 @@ mod tests {
         assert_eq!(post.site_icon_url, None);
         assert_eq!(post.tags, Some(vec![]));
         assert_eq!(post.site_locale, None, "Not asked for with meta=site");
+    }
+
+    /// A recording of the Liked stream on WordPress.com, trimmed, with the site, author and post
+    /// details replaced. Its `date_range` is in the times the posts were liked.
+    #[test]
+    fn test_deserialize_liked_posts() {
+        let json = include_str!("../../tests/wpcom/reader_posts/liked.json");
+        let page: ReaderPostsResponse = serde_json::from_str(json).expect("the page parses");
+
+        assert_eq!(page.posts.len(), 2);
+        assert!(page.unreadable_posts.is_empty());
+        let liked: Vec<_> = page.posts.iter().map(|post| post.date_liked).collect();
+        assert!(liked.iter().all(Option::is_some));
+        let range = page.date_range.expect("the page has a range");
+        assert_eq!(range.before, liked[0]);
+        assert_eq!(range.after, liked[1], "The `before` of the next page");
+        assert_ne!(
+            range.after, page.posts[1].date,
+            "Liked after it was published"
+        );
+        assert_eq!(page.posts[0].i_like, Some(true));
+    }
+
+    /// A recording of Freshly Pressed on WordPress.com, trimmed, with the site, author and post
+    /// details replaced. Its `date_range` is in the times the posts are shown.
+    #[test]
+    fn test_deserialize_freshly_pressed() {
+        let json = include_str!("../../tests/wpcom/reader_posts/freshly_pressed.json");
+        let page: ReaderPostsResponse = serde_json::from_str(json).expect("the page parses");
+
+        assert_eq!(page.posts.len(), 2);
+        assert!(page.unreadable_posts.is_empty());
+        let shown: Vec<_> = page
+            .posts
+            .iter()
+            .map(|post| post.editorial_displayed_on)
+            .collect();
+        assert!(shown.iter().all(Option::is_some));
+        let range = page.date_range.expect("the page has a range");
+        assert_eq!(range.before, shown[0]);
+        assert_eq!(range.after, shown[1], "The `before` of the next page");
+        assert_ne!(
+            range.after, page.posts[1].date,
+            "Shown after it was published"
+        );
+
+        let post = &page.posts[0];
+        assert_eq!(post.identity.id, 1001);
+        assert_eq!(
+            post.editorial_image_url, None,
+            "The pick is a screenshot of the page"
+        );
+        let railcar: serde_json::Value =
+            serde_json::from_str(post.railcar.as_deref().expect("a railcar")).unwrap();
+        assert_eq!(
+            railcar["fetch_algo"],
+            "read:recommendations:posts/freshly-pressed"
+        );
+    }
+
+    /// What a stream that pages by date sends past its last post. Freshly Pressed sends an empty
+    /// list for the range, and the others a range of empty strings.
+    #[rstest]
+    #[case::empty_dates(json!({ "date_range": { "before": "", "after": "" }, "number": 0, "posts": [] }))]
+    #[case::empty_list(json!({ "date_range": [], "number": 0, "posts": [] }))]
+    fn test_a_page_past_the_end_of_a_stream(#[case] page: serde_json::Value) {
+        let page: ReaderPostsResponse =
+            serde_json::from_str(&page.to_string()).expect("the page parses");
+        assert!(page.posts.is_empty());
+        assert!(page.unreadable_posts.is_empty());
+        assert_eq!(
+            page.date_range,
+            Some(ReaderDateRange {
+                before: None,
+                after: None,
+                unreadable_before: None,
+                unreadable_after: None,
+            })
+        );
+    }
+
+    #[rstest]
+    #[case::shown(json!({ "displayed_on": "2026-11-19T12:00:00+00:00" }), Some("2026-11-19T12:00:00+00:00"))]
+    #[case::empty(json!({ "displayed_on": "" }), None)]
+    #[case::left_out(json!({ "image": "https://editorial/img.jpg" }), None)]
+    #[case::no_editorial(json!(null), None)]
+    fn test_editorial_displayed_on(
+        #[case] editorial: serde_json::Value,
+        #[case] expected: Option<&str>,
+    ) {
+        let post = parse(json!({ "ID": 1, "site_ID": 2, "editorial": editorial }));
+        assert_eq!(
+            post.editorial_displayed_on,
+            expected.map(|date| date.parse().unwrap())
+        );
+    }
+
+    /// The API reads `order` in capitals only.
+    #[test]
+    fn test_stream_order_is_sent_in_capitals() {
+        assert_eq!(ReaderStreamOrder::Asc.to_string(), "ASC");
+        assert_eq!(ReaderStreamOrder::Desc.to_string(), "DESC");
+        assert_eq!("ASC".parse(), Ok(ReaderStreamOrder::Asc));
     }
 
     #[test]
