@@ -105,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Kotlin example app's comments status counts the comments the server took against the server's total, and names the ones written on the device that it hasn't taken on their own. A comment that failed to send read as "2 of 1 comments".
 - The Swift example app's Find sites takes a result's site ID from its site or feed when the result leaves out its own, as the Kotlin app does, so the row shows it, opens the site's stream rather than its feed's, and follows by it; and a follow or unfollow made from the row moves its subscriber count. The owner's test site was listed with no site ID, and its count stayed at the search's after Follow.
 - The Swift example app's pull to refresh on a site's, a feed's or a tag's stream fetches what the header shows as well as the posts, as the Kotlin app does. It fetched only the posts, so a header changed on the server since the stream was opened kept the old follow and subscriber count: after a block, the test site's header still offered Unfollow with 1 subscriber while the server had it as not followed with 0.
+- The Swift example app's Subscriptions shows "Not set" for a site's email frequency when the cache has none, as the Kotlin app's "Emailed: not set" does. It showed Instantly, so a frequency the server had dropped while post emails were off read as set.
 
 ## [0.11.1] - 2026-11-18
 

@@ -231,13 +231,21 @@ private struct ReaderSubscriptionRowView: View {
         )
         Picker(
             "Email frequency",
-            selection: Binding(
-                get: { subscription.emailFrequency ?? .instantly },
-                set: { frequency in Task { await viewModel.setEmailFrequency(siteID: siteID, frequency) } }
+            selection: Binding<ReaderSubscriptionEmailFrequency?>(
+                get: { subscription.emailFrequency },
+                set: { frequency in
+                    // "Not set" is only shown, never sent: there's no frequency to set it to.
+                    guard let frequency else { return }
+                    Task { await viewModel.setEmailFrequency(siteID: siteID, frequency) }
+                }
             )
         ) {
+            // The server keeps no frequency while the site's post emails are off.
+            if subscription.emailFrequency == nil {
+                Text("Not set").tag(ReaderSubscriptionEmailFrequency?.none)
+            }
             ForEach(frequencies, id: \.self) { frequency in
-                Text(frequency.label).tag(frequency)
+                Text(frequency.label).tag(ReaderSubscriptionEmailFrequency?.some(frequency))
             }
         }
         .disabled(subscription.emailPosts != true)
