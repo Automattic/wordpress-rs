@@ -1,0 +1,268 @@
+import SwiftUI
+import WordPressAPI
+import WordPressApiCache
+
+/// An entry of the Reader menu, as the home screen lists it.
+struct ReaderMenuEntry: Identifiable {
+    let id: String
+    let title: String
+    /// The stream the entry opens, or `nil` for one this app doesn't know how to open.
+    let stream: ReaderStream?
+}
+
+/// A tag the home screen lists, with whether the reader follows it.
+struct ReaderTagEntry: Identifiable {
+    let slug: String
+    let title: String
+    let isFollowed: Bool
+
+    var id: String { slug }
+}
+
+/// The Reader home: the menu, the tags and the waiting actions, all read from the cache and reloaded whenever
+/// the cache changes.
+@MainActor
+@Observable
+final class ReaderHomeViewModel {
+    let session: ReaderSession
+
+    @ObservationIgnored private var watcher: ReaderCacheWatcher?
+    @ObservationIgnored private var hasStarted = false
+
+    private(set) var streams: [ReaderMenuEntry] = []
+    private(set) var lists: [ReaderMenuEntry] = []
+    private(set) var followedTags: [ReaderTagEntry] = []
+    private(set) var recommendedTags: [ReaderTagEntry] = []
+    private(set) var interests: [ReaderTagEntry] = []
+    private(set) var menuHasLoaded = false
+    private(set) var pendingActions: UInt64 = 0
+    private(set) var isWorking = false
+    private(set) var notice: String?
+    /// What went wrong fetching the menu, shown with the reader.
+    var loadError: String?
+    /// What went wrong with something the reader did, shown as an alert: the reader may be far down the list.
+    var actionError: String?
+
+    var tagToFollow = ""
+    var searchQuery = ""
+    var searchSort = ReaderSearchSort.relevance
+    var siteID = ""
+    var feedID = ""
+    var postURL = ""
+    var postSite = ""
+    var postSlug = ""
+
+    @ObservationIgnored private var loadedInterests: [ReaderInterest] = []
+
+    init(session: ReaderSession) {
+        self.session = session
+    }
+
+    private var service: ReaderService { session.service }
+
+    /// The stream of the newest posts of every tag the reader follows, when they follow any.
+    var followedTagsStream: ReaderStream? {
+        followedTags.isEmpty ? nil : .tags(slugs: followedTags.map(\.slug))
+    }
+
+    /// Shows what the cache has straight away, then fetches the menu.
+    func start() async {
+        guard !hasStarted else { return }
+        hasStarted = true
+        // The home screen shows the menu, the tags and the waiting actions, which have no collection to ask
+        // whether a change is theirs. Everything in this cache is the Reader's, so any change reloads.
+        watcher = ReaderCacheWatcher(session.cache.databaseUpdatesPublisher()) { [weak self] in
+            self?.reloadFromCache()
+        }
+        reloadFromCache()
+        await refreshMenu()
+    }
+
+    func refreshMenu() async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            try await service.refreshMenu()
+            loadError = nil
+        } catch {
+            loadError = readerErrorMessage(error)
+        }
+    }
+
+    /// Sends what's waiting: what the reader turned on or off, and their saves.
+    func sync() async {
+        isWorking = true
+        defer { isWorking = false }
+
+        var problems: [String] = []
+        var waiting: UInt64?
+        do {
+            waiting = try await service.syncActions()
+        } catch {
+            problems.append(readerErrorMessage(error))
+        }
+        do {
+            try await service.saved().sync()
+        } catch {
+            problems.append(readerErrorMessage(error))
+        }
+        notice = waiting.map { $0 == 0 ? "Everything is sent." : "\($0) still waiting to be sent." }
+        actionError = problems.isEmpty ? nil : problems.joined(separator: "\n")
+        reloadFromCache()
+    }
+
+    func setTagFollowed(slug: String, title: String?, followed: Bool) async {
+        let slug = slug.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !slug.isEmpty else { return }
+        await run {
+            let outcome = try await self.service.setTagFollowed(slug: slug, title: title, followed: followed)
+            self.notice = "\(followed ? "Followed" : "Unfollowed") \(slug). \(outcome.message)"
+            if self.tagToFollow.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == slug {
+                self.tagToFollow = ""
+            }
+        }
+    }
+
+    func loadInterests() async {
+        await run {
+            self.loadedInterests = try await self.service.interests()
+            self.reloadFromCache()
+        }
+    }
+
+    /// Takes over, for this account, the tags followed and the posts saved while nobody was signed in.
+    func adoptSignedOut() async {
+        await run {
+            let saves = try await self.service.saved().adoptSignedOutSaves()
+            let tags = try await self.service.adoptSignedOutTags()
+            self.notice =
+                "Took over \(readerCount(tags, "tag")). Saved posts: \(saves.imported) on the server, "
+                + "\(saves.pending) waiting to be sent, \(saves.rejected.count) refused, "
+                + "\(saves.waitingForRoom) waiting for room, \(saves.unsaveable) that can't be saved."
+        }
+    }
+
+    /// Fetches the post at `postURL`, and returns the screen that shows it.
+    func openPostAtURL() async -> ReaderRoute? {
+        let url = postURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !url.isEmpty else { return nil }
+        var route: ReaderRoute?
+        await run {
+            route = .post(try await self.service.fetchPostAtUrl(url: url))
+        }
+        return route
+    }
+
+    /// Fetches the post with the slug `postSlug` on the site `postSite`, and returns the screen that shows it.
+    func openPostBySlug() async -> ReaderRoute? {
+        let site = postSite.trimmingCharacters(in: .whitespacesAndNewlines)
+        let slug = postSlug.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !site.isEmpty, !slug.isEmpty else { return nil }
+        let identifier: WpComSiteIdentifier = UInt64(site).map { .id(value: $0) } ?? .slug(value: site)
+        var route: ReaderRoute?
+        await run {
+            route = .post(try await self.service.fetchPostBySlug(site: identifier, slug: slug))
+        }
+        return route
+    }
+
+    private func reloadFromCache() {
+        do {
+            let menu = try service.menu()
+            let followed = Set(menu.followedTags.compactMap(\.slug))
+            let discoverTags = session.isSignedOut ? menu.followedTags.compactMap(\.slug) : []
+
+            menuHasLoaded = !menu.items.isEmpty
+            let entries = menu.items.map { item in
+                (item.kind, ReaderMenuEntry(item: item, discoverTags: discoverTags))
+            }
+            streams = entries.filter { $0.0 != .list }.map(\.1)
+            lists = entries.filter { $0.0 == .list }.map(\.1)
+            followedTags = menu.followedTags.compactMap { ReaderTagEntry(item: $0, followed: followed) }
+            recommendedTags = menu.recommendedTags.compactMap { ReaderTagEntry(item: $0, followed: followed) }
+            interests = loadedInterests.map { interest in
+                ReaderTagEntry(
+                    slug: interest.slug,
+                    title: interest.title?.decodingHTMLEntities() ?? interest.slug,
+                    isFollowed: followed.contains(interest.slug)
+                )
+            }
+            pendingActions = try service.pendingActionCount()
+        } catch {
+            loadError = readerErrorMessage(error)
+        }
+    }
+
+    private func run(_ work: () async throws -> Void) async {
+        isWorking = true
+        defer { isWorking = false }
+
+        do {
+            try await work()
+        } catch {
+            actionError = readerErrorMessage(error)
+        }
+    }
+}
+
+extension ReaderMenuEntry {
+    /// `discoverTags` are the reader's interests, which Discover is asked for when the server doesn't know them:
+    /// for a reader who isn't signed in.
+    init(item: ReaderMenuItem, discoverTags: [String]) {
+        id = "\(item.kind)-\(item.key)"
+        title = item.title?.decodingHTMLEntities() ?? item.key
+        stream =
+            switch item.kind {
+            case .stream: Self.ownStream(key: item.key, discoverTags: discoverTags)
+            case .organization: Self.organizationStream(slug: item.slug ?? item.key)
+            case .list: Self.listStream(address: item.url)
+            case .tag: item.slug.map { .tag(slug: $0) }
+            case .other: nil
+            }
+    }
+
+    /// One of the Reader's own streams, by its name in the menu.
+    private static func ownStream(key: String, discoverTags: [String]) -> ReaderStream? {
+        switch key {
+        case "following": .following
+        case "liked": .liked
+        case "discover": .discover(tags: discoverTags)
+        default: nil
+        }
+    }
+
+    /// The posts of an organization's sites.
+    private static func organizationStream(slug: String) -> ReaderStream? {
+        switch slug {
+        case "a8c": .automattic
+        case "p2": .p2
+        default: nil
+        }
+    }
+
+    /// A list's stream, from the API address of its posts, which ends in `/read/list/{owner}/{slug}/posts`. The
+    /// menu has a list's owner and slug nowhere else.
+    static func listStream(address: String?) -> ReaderStream? {
+        guard
+            let address,
+            let parts = URLComponents(string: address)?.path.split(separator: "/").map(String.init),
+            let list = parts.firstIndex(of: "list"),
+            parts.count > list + 2
+        else {
+            return nil
+        }
+        return .readerList(owner: parts[list + 1], slug: parts[list + 2])
+    }
+}
+
+extension ReaderTagEntry {
+    /// `nil` for a menu entry without a slug, which can't be opened or followed.
+    init?(item: ReaderMenuItem, followed: Set<String>) {
+        guard let slug = item.slug else { return nil }
+        self.init(
+            slug: slug,
+            title: item.title?.decodingHTMLEntities() ?? slug,
+            isFollowed: followed.contains(slug)
+        )
+    }
+}

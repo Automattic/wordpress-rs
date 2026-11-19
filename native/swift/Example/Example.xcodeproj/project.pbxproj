@@ -41,6 +41,9 @@
 		4AE0A7636D7BFDE1595D8621 /* ReaderSubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE0E716551AB8472D8400DB /* ReaderSubscriptionsView.swift */; };
 		4AE090D76CDD02CB2744EC5F /* ReaderFindSitesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE04287364D30E937999969 /* ReaderFindSitesView.swift */; };
 		4AE07053BD110B7C0635ED9D /* ReaderBlockedSitesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE0AB4A359BE3EC724F2D1C /* ReaderBlockedSitesView.swift */; };
+		4AE0227604700B2A9A494632 /* ReaderRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE02102A68369855FA63F6B /* ReaderRootView.swift */; };
+		4AE0EF5AD91E54756ED6500A /* ReaderHomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE0BBE2FB9BA69FAAD7F2AF /* ReaderHomeViewModel.swift */; };
+		4AE0AE5B5037C73DA955D792 /* ReaderHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE03EBD2A5BDFDE5F605546 /* ReaderHomeView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -77,6 +80,9 @@
 		4AE0E716551AB8472D8400DB /* ReaderSubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSubscriptionsView.swift; sourceTree = "<group>"; };
 		4AE04287364D30E937999969 /* ReaderFindSitesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderFindSitesView.swift; sourceTree = "<group>"; };
 		4AE0AB4A359BE3EC724F2D1C /* ReaderBlockedSitesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderBlockedSitesView.swift; sourceTree = "<group>"; };
+		4AE02102A68369855FA63F6B /* ReaderRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderRootView.swift; sourceTree = "<group>"; };
+		4AE0BBE2FB9BA69FAAD7F2AF /* ReaderHomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderHomeViewModel.swift; sourceTree = "<group>"; };
+		4AE03EBD2A5BDFDE5F605546 /* ReaderHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderHomeView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,6 +119,9 @@
 		4AE04FDB80C1CC01A9E6724A /* Reader */ = {
 			isa = PBXGroup;
 			children = (
+				4AE03EBD2A5BDFDE5F605546 /* ReaderHomeView.swift */,
+				4AE0BBE2FB9BA69FAAD7F2AF /* ReaderHomeViewModel.swift */,
+				4AE02102A68369855FA63F6B /* ReaderRootView.swift */,
 				4AE0AB4A359BE3EC724F2D1C /* ReaderBlockedSitesView.swift */,
 				4AE04287364D30E937999969 /* ReaderFindSitesView.swift */,
 				4AE0E716551AB8472D8400DB /* ReaderSubscriptionsView.swift */,
@@ -313,6 +322,9 @@
 				24367DA82F15993D0011BDB8 /* WPComRootView.swift in Sources */,
 				242D64942C3608C6007CA96C /* ListView.swift in Sources */,
 				24367DAA2F159B910011BDB8 /* SelfHostedRootView.swift in Sources */,
+				4AE0AE5B5037C73DA955D792 /* ReaderHomeView.swift in Sources */,
+				4AE0EF5AD91E54756ED6500A /* ReaderHomeViewModel.swift in Sources */,
+				4AE0227604700B2A9A494632 /* ReaderRootView.swift in Sources */,
 				4AE07053BD110B7C0635ED9D /* ReaderBlockedSitesView.swift in Sources */,
 				4AE090D76CDD02CB2744EC5F /* ReaderFindSitesView.swift in Sources */,
 				4AE0A7636D7BFDE1595D8621 /* ReaderSubscriptionsView.swift in Sources */,

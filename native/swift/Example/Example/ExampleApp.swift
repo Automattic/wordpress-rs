@@ -58,6 +58,11 @@ struct ExampleApp: App {
                 Tab("WordPress.com", systemImage: "network") {
                     WPComRootView()
                 }
+
+                // Works without an account, so it isn't under the WordPress.com tab.
+                Tab("Reader", systemImage: "book") {
+                    ReaderRootView()
+                }
             }
         }
         .environmentObject(self.loginManager)
