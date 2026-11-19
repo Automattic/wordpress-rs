@@ -408,11 +408,60 @@ pub struct DbReaderSavedKey {
     pub url: Option<String>,
 }
 
+/// Whether a saved post's images are stored on this device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DbReaderOfflineImages {
+    /// Not stored, or not all of them yet.
+    #[default]
+    NotStored,
+    /// Each image is stored, or the server said it can't be had.
+    Stored,
+    /// Not stored because there's no room: left out, or removed to make room for newer saves.
+    NoRoom,
+}
+
+impl DbReaderOfflineImages {
+    pub(crate) fn number(self) -> i64 {
+        match self {
+            Self::NotStored => 0,
+            Self::Stored => 1,
+            Self::NoRoom => 2,
+        }
+    }
+
+    pub(crate) fn from_number(number: i64) -> Self {
+        match number {
+            1 => Self::Stored,
+            2 => Self::NoRoom,
+            _ => Self::NotStored,
+        }
+    }
+}
+
+/// What this device has of a saved post for reading with no connection, besides the post itself.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DbReaderSavedOffline {
+    /// The post was stored in full, from the saved list or fetched on its own. The device then
+    /// has all the content there is, even if that's none.
+    pub fetched: bool,
+    /// Its content or images are being fetched.
+    pub downloading: bool,
+    /// Why the last try to get its content failed.
+    pub error: Option<String>,
+    /// How many tries the server answered with a failure.
+    pub attempts: u32,
+    /// When the last of those was.
+    pub attempted_at: Option<WpGmtDateTime>,
+    pub images: DbReaderOfflineImages,
+}
+
 /// A row of the saved list, with its post when the cache has it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DbReaderSavedListItem {
     pub row: DbReaderSavedRow,
     pub post: Option<ReaderPostRecord>,
+    /// What the device has of it for reading with no connection, besides the post.
+    pub offline: DbReaderSavedOffline,
 }
 
 /// A key as stored text: `post:{blog_id}:{post_id}`, `feed-item:{feed_item_id}` or `url:{url}`,

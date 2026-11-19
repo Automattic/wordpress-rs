@@ -12,13 +12,14 @@ use crate::{
     },
     list_metadata::ListState,
     repository::QueryExecutor,
+    repository::reader_offline::{OFFLINE_COLUMNS, offline_from_row},
 };
 use rusqlite::{OptionalExtension, Row, params, types::Value};
 use wp_api::date::WpGmtDateTime;
 use wp_api::wp_com::WpComSiteId;
-use wp_api::wp_com::reader_posts::ReaderCrossPost;
+use wp_api::wp_com::reader_posts::{ReaderCrossPost, ReaderStreamOrder};
 use wp_api::wp_com::reader_saved::{
-    ReaderFeedId, ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey,
+    ReaderFeedId, ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey, ReaderSavedOrderBy,
 };
 
 /// The `reader_posts` columns a [`ReaderPostRecord`] is read from.
@@ -418,6 +419,23 @@ impl ReaderPostRepository {
             })
             .optional()?
             .transpose()
+    }
+
+    /// The post in a row, with its content.
+    pub fn select_by_row_id(
+        executor: &impl QueryExecutor,
+        post: RowId,
+    ) -> Result<Option<ReaderPostRecord>, SqliteDbError> {
+        let sql = format!(
+            "SELECT {} FROM reader_posts p WHERE p.rowid = ?1",
+            post_columns(PostContent::Included)
+        );
+        let mut statement = executor.prepare(&sql)?;
+        Ok(statement
+            .query_row([post], |row| Ok(post_from_row(row)))
+            .optional()?
+            .transpose()?
+            .map(|(_, post)| post))
     }
 }
 
@@ -1363,6 +1381,9 @@ const ROW_COLUMNS: &str = "s.rowid, s.key, \
     s.feed_item_key, s.saved, s.server, s.in_doubt, s.seq, s.date_saved, s.post_id, s.listed, \
     s.imported, s.waiting_for_room, s.tapped, s.date_known";
 
+/// How many columns [`ROW_COLUMNS`] is.
+const ROW_COLUMN_COUNT: usize = 15;
+
 fn saved_row_from_row(row: &Row) -> Result<DbReaderSavedRow, SqliteDbError> {
     let key = |index: usize| -> Result<Option<ReaderSavedKey>, SqliteDbError> {
         row.get::<_, Option<String>>(index)?
@@ -2073,16 +2094,45 @@ impl ReaderSavedRepository {
         Ok(Some((total as i64 + delta).max(0) as u64))
     }
 
-    /// The saved list: rows saved and listed, newest first, with their posts.
+    /// The saved list: rows saved and listed, newest save first, with their posts.
     pub fn select_list(
         executor: &impl QueryExecutor,
         account: RowId,
     ) -> Result<Vec<DbReaderSavedListItem>, SqliteDbError> {
+        Self::select_list_ordered(
+            executor,
+            account,
+            ReaderSavedOrderBy::Date,
+            ReaderStreamOrder::Desc,
+        )
+    }
+
+    /// The saved list in another order: by when each post was saved or published, newest or
+    /// oldest first. A save without that date comes last either way.
+    pub fn select_list_ordered(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        order_by: ReaderSavedOrderBy,
+        order: ReaderStreamOrder,
+    ) -> Result<Vec<DbReaderSavedListItem>, SqliteDbError> {
+        let direction = match order {
+            ReaderStreamOrder::Desc => "DESC",
+            ReaderStreamOrder::Asc => "ASC",
+        };
+        let order = match order_by {
+            ReaderSavedOrderBy::Date => format!(
+                "s.date_saved IS NULL, s.date_saved {direction}, s.seq {direction}, s.rowid {direction}"
+            ),
+            ReaderSavedOrderBy::DatePublished => {
+                format!("p.date IS NULL, p.date {direction}, s.rowid {direction}")
+            }
+        };
         let sql = format!(
-            "SELECT {ROW_COLUMNS}, {} FROM reader_saved_posts s
+            "SELECT {ROW_COLUMNS}, {OFFLINE_COLUMNS}, {} FROM reader_saved_posts s
             LEFT JOIN reader_posts p ON p.rowid = s.post_id
+            LEFT JOIN reader_saved_offline o ON o.saved_post_id = s.rowid
             WHERE s.account_id = ?1 AND s.saved = 1 AND s.listed = 1
-            ORDER BY s.date_saved IS NULL, s.date_saved DESC, s.seq DESC, s.rowid DESC",
+            ORDER BY {order}",
             post_columns(PostContent::Included)
         );
         let mut statement = executor.prepare(&sql)?;
@@ -2093,10 +2143,27 @@ impl ReaderSavedRepository {
                     Some(_) => Some(post_from_row(row)?.1),
                     None => None,
                 };
-                Ok(DbReaderSavedListItem { row: saved, post })
+                Ok(DbReaderSavedListItem {
+                    row: saved,
+                    post,
+                    offline: offline_from_row(row, ROW_COLUMN_COUNT)?,
+                })
             })())
         })?;
         collect_rows(rows.map(|row| row.map_err(SqliteDbError::from).and_then(|row| row)))
+    }
+
+    /// The account's row for a key, whatever the user wants for it, with its post's row.
+    pub fn select_row_id_for_key(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        key: &ReaderSavedKey,
+    ) -> Result<Option<(RowId, Option<RowId>)>, SqliteDbError> {
+        Ok(
+            Self::select_rows_for_keys(executor, account, std::slice::from_ref(key))?
+                .first()
+                .map(|row| (row.row_id, row.post_row_id)),
+        )
     }
 }
 

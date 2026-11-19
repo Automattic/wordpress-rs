@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Swift: `WPComApiClient.makeReaderService(cache:owner:savedSource:)` creates the `ReaderService` for an account, or for a reader who isn't signed in.
 - The saved list can be sorted: `ReaderSavedPostsParams` has `order_by`, a `ReaderSavedOrderBy` (when each post was saved, or when it was published), and `order`. The API reads `order` only in capitals, which is how it is sent.
 - `reader_post_content_image_urls` lists the images in a Reader post's content, for storing them so the post can be read with no connection. It leaves out tracking pixels, which would count a view when fetched. `reader_post_content_with_stored_images` returns the content with each stored image pointing at its copy.
+- The cache keeps what the device has of each saved Reader post for reading with no connection: whether its content was fetched, why a fetch failed, and which of its images are stored as files. `ReaderSavedRepository::select_list_ordered` reads the saved list by when each post was saved or published, newest or oldest first.
 
 ### Changed
 

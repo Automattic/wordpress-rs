@@ -8,6 +8,7 @@ use crate::repository::entity_state::EntityStateRepository;
 use crate::repository::list_metadata::ListMetadataRepository;
 use crate::repository::reader::ReaderStreamRepository;
 use crate::repository::reader_comments::{ReaderCommentRepository, ReaderCommentThreadRepository};
+use crate::repository::reader_offline::ReaderOfflineRepository;
 use crate::repository::sites::SiteRepository;
 use crate::repository::wordpress_com_accounts::{ReaderOwner, WordPressComAccountRepository};
 use wp_api::parsed_url::ParsedUrl;
@@ -152,6 +153,10 @@ pub enum DbTable {
     ReaderComments,
     /// Where each post's comments are up to
     ReaderCommentThreads,
+    /// What the device has of each saved post for reading with no connection
+    ReaderSavedOffline,
+    /// The stored images of saved posts
+    ReaderOfflineFiles,
 }
 
 impl DbTable {
@@ -193,6 +198,8 @@ impl DbTable {
             DbTable::ReaderSites => "reader_sites",
             DbTable::ReaderComments => "reader_comments",
             DbTable::ReaderCommentThreads => "reader_comment_threads",
+            DbTable::ReaderSavedOffline => "reader_saved_offline",
+            DbTable::ReaderOfflineFiles => "reader_offline_files",
         }
     }
 }
@@ -247,6 +254,8 @@ impl TryFrom<&str> for DbTable {
             "reader_sites" => Ok(DbTable::ReaderSites),
             "reader_comments" => Ok(DbTable::ReaderComments),
             "reader_comment_threads" => Ok(DbTable::ReaderCommentThreads),
+            "reader_saved_offline" => Ok(DbTable::ReaderSavedOffline),
+            "reader_offline_files" => Ok(DbTable::ReaderOfflineFiles),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -406,6 +415,9 @@ impl WpApiCache {
             }
             if let Err(e) = ReaderCommentRepository::fail_comments_left_sending(connection) {
                 log::warn!("Failed to mark Reader comments left sending: {}", e);
+            }
+            if let Err(e) = ReaderOfflineRepository::reset_downloading(connection) {
+                log::warn!("Failed to reset Reader downloads left running: {}", e);
             }
 
             // Clear abandoned fetch operations after migrations complete.
@@ -570,7 +582,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 22] = [
+static MIGRATION_QUERIES: [&str; 23] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -593,6 +605,7 @@ static MIGRATION_QUERIES: [&str; 22] = [
     include_str!("../migrations/0020-add-computed-fields-to-reader-posts.sql"),
     include_str!("../migrations/0021-create-reader-menu-subscriptions-and-sites-tables.sql"),
     include_str!("../migrations/0022-create-reader-comments-tables.sql"),
+    include_str!("../migrations/0023-create-reader-offline-tables.sql"),
 ];
 
 pub struct MigrationManager<'a> {
