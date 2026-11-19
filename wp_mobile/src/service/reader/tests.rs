@@ -2467,6 +2467,106 @@ mod more_actions {
         );
     }
 
+    /// Site 123 as the server describes it: followed or not, by so many subscribers.
+    fn site_json(following: bool, subscribers: u64) -> Value {
+        let mut site: Value = serde_json::from_str(include_str!(
+            "../../../../wp_api/tests/wpcom/reader_sites/site_followed.json"
+        ))
+        .unwrap();
+        site["ID"] = json!(123);
+        site["URL"] = json!("https://site.example");
+        site["is_following"] = json!(following);
+        site["subscribers_count"] = json!(subscribers);
+        site
+    }
+
+    /// Whether the cached site says it's followed, and by how many.
+    fn site_shown(service: &ReaderService) -> (Option<bool>, Option<u64>) {
+        let site = service.cached_site(Some(SITE), None).unwrap().unwrap();
+        (site.is_following, site.subscribers_count)
+    }
+
+    #[tokio::test]
+    async fn a_follow_and_an_unfollow_move_the_sites_subscriber_count() {
+        let (service, executor) = service();
+        executor.push(Step::Respond(200, site_json(false, 4)));
+        service.fetch_site(SITE).await.unwrap();
+        assert_eq!(site_shown(&service), (Some(false), Some(4)));
+
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "subscription": subscription_json() }),
+        ));
+        service.set_followed(target(), true).await.unwrap();
+        assert_eq!(site_shown(&service), (Some(true), Some(5)));
+
+        // Following what's followed already doesn't count the reader twice.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "subscription": subscription_json() }),
+        ));
+        service.set_followed(target(), true).await.unwrap();
+        assert_eq!(site_shown(&service), (Some(true), Some(5)));
+
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "is_following": false }),
+        ));
+        service.set_followed(target(), false).await.unwrap();
+        assert_eq!(site_shown(&service), (Some(false), Some(4)));
+
+        // Nor does unfollowing what isn't followed.
+        executor.push(refused("are_not_subscribed"));
+        service.set_followed(target(), false).await.unwrap();
+        assert_eq!(site_shown(&service), (Some(false), Some(4)));
+    }
+
+    #[tokio::test]
+    async fn a_refused_follow_puts_the_sites_subscriber_count_back() {
+        let (service, executor) = service();
+        executor.push(Step::Respond(200, site_json(false, 4)));
+        service.fetch_site(SITE).await.unwrap();
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            400,
+            json!({ "error": "unauthorized", "message": "" }),
+        ));
+
+        let (result, ()) = futures::join!(service.set_followed(target(), true), async {
+            assert_eq!(site_shown(&service), (Some(true), Some(5)));
+            release.send(()).unwrap();
+        });
+
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        assert_eq!(site_shown(&service), (Some(false), Some(4)));
+    }
+
+    #[tokio::test]
+    async fn a_fetch_of_the_site_keeps_a_follow_that_is_waiting_counted_once() {
+        let (service, executor) = service();
+        executor.push(Step::Respond(200, site_json(false, 4)));
+        service.fetch_site(SITE).await.unwrap();
+        executor.push(Step::Offline);
+        service.set_followed(target(), true).await.unwrap();
+        assert_eq!(site_shown(&service), (Some(true), Some(5)));
+
+        // The server doesn't have the follow yet: its count is without the reader.
+        executor.push(Step::Respond(200, site_json(false, 4)));
+        service.fetch_site(SITE).await.unwrap();
+        assert_eq!(site_shown(&service), (Some(true), Some(5)));
+
+        // Once it has it, its count is the one shown.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "subscription": subscription_json() }),
+        ));
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+        executor.push(Step::Respond(200, site_json(true, 5)));
+        service.fetch_site(SITE).await.unwrap();
+        assert_eq!(site_shown(&service), (Some(true), Some(5)));
+    }
+
     #[tokio::test]
     async fn an_address_that_cannot_be_followed_is_refused_and_put_back() {
         let (service, executor, stream) = reading().await;

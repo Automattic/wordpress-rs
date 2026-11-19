@@ -1132,6 +1132,9 @@ impl ReaderService {
     /// Follows or unfollows a site or a feed. Every cached post of it, what's cached of the site,
     /// and the list of subscriptions show it straight away. Needs an account.
     ///
+    /// When it changes whether the cached site is followed, the site's subscriber count counts
+    /// the reader in or out with it, and goes back with it if the server refuses.
+    ///
     /// A follow is sent by the site's or feed's address, and an unfollow by the site's ID when
     /// there is one.
     pub async fn set_followed(

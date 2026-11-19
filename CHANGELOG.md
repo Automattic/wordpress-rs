@@ -94,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Swift example app builds for tvOS again. The media upload screen needs a photo or file picker, which tvOS doesn't have, so it's left out of the Apple TV app.
 - Unfollowing a tag with `ReaderService::set_tag_followed` now takes it off the followed tags in the cache once the menu has been refreshed. The server's menu keys a followed tag by its ID, and the cache looked the tag up by its slug as the key, so the unfollow was sent but the tag stayed listed until the next refresh, and a refused unfollow wasn't put back as it was. Tags are now found by their slug. A tag the cache lists already is no longer listed twice when it's followed again.
 - A comment the server takes through `ReaderCommentsCollection::post_comment` or `retry_comment` now adds one to the comment count of the cached post, as a like adds one to its like count. The post's screen and its stream rows showed the old count until the post was fetched again. A comment held for a moderator isn't counted, as the server doesn't count it.
+- Following or unfollowing a site with `ReaderService::set_followed` now counts the reader in or out of the cached site's subscriber count, as a like moves a post's like count, and a refused follow puts it back. The header of a site's stream showed the old count until the site was fetched again. The count moves only when the cached follow changes, never goes below 0, and a site or feed with no count is left without one.
 
 ## [0.11.1] - 2026-11-18
 

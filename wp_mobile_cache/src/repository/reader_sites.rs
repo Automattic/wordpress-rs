@@ -611,6 +611,11 @@ impl ReaderSiteRepository {
     }
 
     /// Records whether the account follows a site or a feed, on every stored record of either.
+    ///
+    /// A record whose stored follow this changes counts the account in or out of its subscriber
+    /// count, never below zero. A record that was already as asked, or that doesn't say whether
+    /// it's followed, keeps its count, and a missing count stays missing. The record's next fetch
+    /// replaces it with the server's count.
     pub fn set_following(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -618,8 +623,15 @@ impl ReaderSiteRepository {
         feed_id: Option<ReaderFeedId>,
         following: bool,
     ) -> Result<(), SqliteDbError> {
+        // `SET` reads the row as it was, so `is_following` here is the follow before this one.
         executor.execute(
-            "UPDATE reader_sites SET is_following = ?4
+            "UPDATE reader_sites SET
+                subscribers_count = CASE
+                    WHEN is_following IS NULL OR is_following = ?4 THEN subscribers_count
+                    WHEN ?4 THEN subscribers_count + 1
+                    ELSE MAX(subscribers_count - 1, 0)
+                END,
+                is_following = ?4
             WHERE account_id = ?1 AND (
                 (?2 IS NOT NULL AND site_id = ?2) OR (?3 IS NOT NULL AND feed_id = ?3))",
             params![
@@ -940,5 +952,62 @@ mod tests {
             .unwrap();
         assert_eq!(select(None, Some(200)).unwrap().is_following, Some(true));
         assert_eq!(select(Some(10), None).unwrap().is_following, Some(false));
+        // The feed's follow changed, so it counts one more subscriber; the site's didn't.
+        assert_eq!(select(None, Some(200)).unwrap().subscribers_count, Some(13));
+        assert_eq!(select(Some(10), None).unwrap().subscribers_count, Some(13));
+    }
+
+    #[test]
+    fn a_follow_moves_the_subscriber_count_only_when_it_changes() {
+        let (conn, account) = conn();
+        let now: WpGmtDateTime = "2026-11-18T10:00:00Z".parse().unwrap();
+        let site = ReaderSiteRecord {
+            site_id: Some(WpComSiteId(10)),
+            feed_id: None,
+            name: None,
+            description: None,
+            url: None,
+            feed_url: None,
+            icon_url: None,
+            subscribers_count: Some(0),
+            post_count: None,
+            is_private: None,
+            is_jetpack: None,
+            organization_id: None,
+            is_following: Some(true),
+        };
+        ReaderSiteRepository::upsert(&conn, account, &site, &now).unwrap();
+        let set = |following| {
+            ReaderSiteRepository::set_following(
+                &conn,
+                account,
+                Some(WpComSiteId(10)),
+                None,
+                following,
+            )
+            .unwrap();
+            let stored = ReaderSiteRepository::select(&conn, account, Some(WpComSiteId(10)), None)
+                .unwrap()
+                .unwrap();
+            (stored.is_following, stored.subscribers_count)
+        };
+        // A count that's already 0 doesn't go below it.
+        assert_eq!(set(false), (Some(false), Some(0)));
+        assert_eq!(set(true), (Some(true), Some(1)));
+        assert_eq!(set(true), (Some(true), Some(1)));
+        assert_eq!(set(false), (Some(false), Some(0)));
+
+        // A missing count stays missing.
+        conn.execute("UPDATE reader_sites SET subscribers_count = NULL", [])
+            .unwrap();
+        assert_eq!(set(true), (Some(true), None));
+
+        // A record that doesn't say whether it's followed keeps its count.
+        conn.execute(
+            "UPDATE reader_sites SET subscribers_count = 5, is_following = NULL",
+            [],
+        )
+        .unwrap();
+        assert_eq!(set(true), (Some(true), Some(5)));
     }
 }
