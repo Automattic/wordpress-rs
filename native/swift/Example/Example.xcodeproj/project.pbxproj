@@ -36,6 +36,8 @@
 		4AE07D8B8D46BAB15E336E04 /* ReaderPostViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE07BAC3947F028EF62EC75 /* ReaderPostViewModel.swift */; };
 		4AE0EA16D2831F2CF2B8748F /* ReaderPostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE08C3E51719502FB3C8338 /* ReaderPostView.swift */; };
 		4AE0F8C1D33F50B2FB4CA669 /* ReaderHTMLView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE071CF765D27669A87D090 /* ReaderHTMLView.swift */; };
+		4AE06157225A98F5AB378DBC /* ReaderLikesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE02F241DF4E5A76EEBB2B0 /* ReaderLikesView.swift */; };
+		4AE001A0A0852497092E04AA /* ReaderCommentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE0BA67341CCB9D555129BD /* ReaderCommentsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -67,6 +69,8 @@
 		4AE07BAC3947F028EF62EC75 /* ReaderPostViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPostViewModel.swift; sourceTree = "<group>"; };
 		4AE08C3E51719502FB3C8338 /* ReaderPostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPostView.swift; sourceTree = "<group>"; };
 		4AE071CF765D27669A87D090 /* ReaderHTMLView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderHTMLView.swift; sourceTree = "<group>"; };
+		4AE02F241DF4E5A76EEBB2B0 /* ReaderLikesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderLikesView.swift; sourceTree = "<group>"; };
+		4AE0BA67341CCB9D555129BD /* ReaderCommentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderCommentsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -103,6 +107,8 @@
 		4AE04FDB80C1CC01A9E6724A /* Reader */ = {
 			isa = PBXGroup;
 			children = (
+				4AE0BA67341CCB9D555129BD /* ReaderCommentsView.swift */,
+				4AE02F241DF4E5A76EEBB2B0 /* ReaderLikesView.swift */,
 				4AE071CF765D27669A87D090 /* ReaderHTMLView.swift */,
 				4AE08C3E51719502FB3C8338 /* ReaderPostView.swift */,
 				4AE07BAC3947F028EF62EC75 /* ReaderPostViewModel.swift */,
@@ -298,6 +304,8 @@
 				24367DA82F15993D0011BDB8 /* WPComRootView.swift in Sources */,
 				242D64942C3608C6007CA96C /* ListView.swift in Sources */,
 				24367DAA2F159B910011BDB8 /* SelfHostedRootView.swift in Sources */,
+				4AE001A0A0852497092E04AA /* ReaderCommentsView.swift in Sources */,
+				4AE06157225A98F5AB378DBC /* ReaderLikesView.swift in Sources */,
 				4AE0F8C1D33F50B2FB4CA669 /* ReaderHTMLView.swift in Sources */,
 				4AE0EA16D2831F2CF2B8748F /* ReaderPostView.swift in Sources */,
 				4AE07D8B8D46BAB15E336E04 /* ReaderPostViewModel.swift in Sources */,
