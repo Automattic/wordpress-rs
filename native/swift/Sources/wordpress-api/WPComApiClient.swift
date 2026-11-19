@@ -162,6 +162,27 @@ public final class WPComApiClient: Sendable {
         try ReaderSavedService(delegate: delegate, source: source, cache: cache.cache, userId: userID)
     }
 
+    /// Creates the Reader service for one reader: an account, or the device when no one is signed
+    /// in. It keeps streams, posts, comments, follows and saves in `cache`, shows a change at once,
+    /// and sends it when it can.
+    ///
+    /// For a signed-out reader, use `.signedOut` with a client that sends no authentication. What
+    /// that reader follows and saves stays on the device.
+    ///
+    /// The cache's migrations must have run. `savedSource` is the app, which is recorded with each
+    /// save. Call `syncActions()` at launch, when the app comes to the foreground, and when the
+    /// device comes back online.
+    ///
+    /// Create one per reader and share it: it sends one change at a time, and a second instance
+    /// would send alongside it.
+    public func makeReaderService(
+        cache: WordPressApiCache,
+        owner: ReaderOwner,
+        savedSource: ReaderSavedSource
+    ) throws -> ReaderService {
+        try ReaderService(delegate: delegate, cache: cache.cache, owner: owner, savedSource: savedSource)
+    }
+
     public var supportBots: SupportBotsRequestExecutor {
         internalClient.supportBots()
     }

@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReaderService` likes posts and comments, follows sites, feeds and tags, and changes a followed site's delivery settings: `set_post_liked`, `set_comment_liked`, `set_followed`, `set_tag_followed`, `set_post_emails`, `set_comment_emails`, `set_post_notifications`, `set_comments_subscribed` and `set_comment_notifications`. Each shows straight away, is sent, and is put back if the server refuses. A signed-out reader follows tags on the device, and `adopt_signed_out_tags` moves them to an account.
 - `ReaderService` keeps the Reader menu (`refresh_menu`, `menu`, `followed_tags`), the account's subscriptions (`refresh_subscriptions`, `subscriptions`) and what it shows of a site or feed (`fetch_site`, `fetch_feed`, `cached_site`) in the cache, and passes on `search_sites`, `interests`, `tag_info`, `user_profile`, `post_likes` and `comment_likes`.
 - `ReaderService::comments` gives a post's comments from the cache as a `ReaderCommentsCollection`. `post_comment` writes a comment or a reply: it shows at once, is sent once, and stays as not taken if that fails, until `retry_comment` or `discard_comment`.
+- Swift: `WPComApiClient.makeReaderService(cache:owner:savedSource:)` creates the `ReaderService` for an account, or for a reader who isn't signed in.
 
 ### Changed
 
