@@ -117,6 +117,10 @@ struct ReaderRootView: View {
                 viewModel: ReaderSavedPostsViewModel { (session.service.saved(), session.cache) },
                 opensPosts: true
             )
+        case .offline:
+            ReaderOfflineView(viewModel: ReaderOfflineViewModel(session: session))
+        case .offlinePost(let key):
+            ReaderOfflinePostView(session: session, key: key)
         case .subscriptions:
             ReaderSubscriptionsView(viewModel: ReaderSubscriptionsViewModel(session: session))
         case .blockedSites:

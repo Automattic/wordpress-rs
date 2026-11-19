@@ -278,6 +278,8 @@ struct ReaderHomeView: View {
     private var moreSection: some View {
         Section("More") {
             NavigationLink("Saved posts", value: ReaderRoute.saved)
+            NavigationLink("Offline reading", value: ReaderRoute.offline)
+                .accessibilityIdentifier("reader-offline")
             NavigationLink("Subscriptions", value: ReaderRoute.subscriptions)
             NavigationLink("Blocked sites", value: ReaderRoute.blockedSites)
             NavigationLink("Find sites", value: ReaderRoute.findSites)

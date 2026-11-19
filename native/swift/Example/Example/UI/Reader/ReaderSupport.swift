@@ -36,6 +36,8 @@ extension ReaderSavedError {
         case .UnexpectedImportResults(let sent, let received):
             "The server returned \(received) results for \(sent) posts."
         case .UnmatchedImportResults: "The server's results don't match the posts sent to it."
+        case .OfflineFiles(let reason): reason
+        case .OfflineUnreachable(let reason): reason
         case .Database(let error): "The cache failed: \(error)"
         }
     }

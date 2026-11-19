@@ -12,6 +12,10 @@ enum ReaderRoute: Hashable, Sendable {
     case postLikes(siteID: UInt64, postID: Int64)
     case commentLikes(siteID: UInt64, commentID: Int64)
     case saved
+    /// The saved posts, with what the device has of each for reading with no connection.
+    case offline
+    /// A saved post as the device has it.
+    case offlinePost(key: ReaderSavedKey)
     case subscriptions
     case blockedSites
     case findSites
