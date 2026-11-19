@@ -1,4 +1,4 @@
-//! The users who liked a post or a comment, and liking and unliking a post.
+//! The users who liked a post or a comment, and liking and unliking one.
 //!
 //! Both lists answer without a token for a public site. For a private site they're then a 403
 //! `unauthorized`. Liking and unliking act for the user, so they need a token.
@@ -347,6 +347,27 @@ pub struct ReaderPostLikeResponse {
     #[serde(default, deserialize_with = "deserialize_liker")]
     #[uniffi(default = None)]
     pub liker: Option<ReaderLike>,
+}
+
+/// The answer to liking or unliking a comment. Unlike a post's, it has no IDs and no user.
+///
+/// It's built the way [`ReaderPostLikeResponse`] is, from the answer to an unlike that changed
+/// nothing. In trials the API refused the like with a 400 `comment_like_failed`, so the comment
+/// was never liked.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderCommentLikeResponse {
+    /// Whether the like changed. `false`, in a 200, for an unlike of a comment the user doesn't
+    /// like. The apps and the web Reader take `false` as a failure for a like too.
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    pub success: bool,
+    /// Whether the user likes the comment now.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub i_like: Option<bool>,
+    /// How many likes the comment has now.
+    #[serde(default, deserialize_with = "deserialize_optional_count")]
+    #[uniffi(default = None)]
+    pub like_count: Option<u64>,
 }
 
 /// A site's ID, sent as a number or a string. Anything that isn't one, such as `0`, `-1`, `false`
@@ -719,6 +740,50 @@ mod tests {
     #[test]
     fn test_a_post_like_answer_without_success_is_an_error() {
         let result = serde_json::from_value::<ReaderPostLikeResponse>(json!({ "i_like": true }));
+        assert!(result.is_err());
+    }
+
+    /// The answer to unliking a comment the user doesn't like, recorded from WordPress.com, with
+    /// the site replaced. It's a 200 that says nothing changed.
+    #[test]
+    fn test_deserialize_unlike_comment() {
+        let answer: ReaderCommentLikeResponse = serde_json::from_str(include_str!(
+            "../../tests/wpcom/reader_likes/unlike_comment.json"
+        ))
+        .expect("the answer parses");
+
+        assert_eq!(
+            answer,
+            ReaderCommentLikeResponse {
+                success: false,
+                i_like: Some(false),
+                like_count: Some(0),
+            }
+        );
+    }
+
+    /// The shape a comment like that works is taken to have, which wasn't seen, and an answer
+    /// with only `success` in it.
+    #[rstest]
+    #[case(json!({ "success": true, "i_like": true, "like_count": 2 }), Some(true), Some(2))]
+    #[case(json!({ "success": 1, "i_like": 1, "like_count": "2" }), Some(true), Some(2))]
+    #[case(json!({ "success": true }), None, None)]
+    #[case(json!({ "success": true, "i_like": null, "like_count": false }), None, None)]
+    fn test_a_comment_like_answer(
+        #[case] answer: serde_json::Value,
+        #[case] i_like: Option<bool>,
+        #[case] like_count: Option<u64>,
+    ) {
+        let answer: ReaderCommentLikeResponse =
+            serde_json::from_value(answer).expect("the answer parses");
+        assert!(answer.success);
+        assert_eq!(answer.i_like, i_like);
+        assert_eq!(answer.like_count, like_count);
+    }
+
+    #[test]
+    fn test_a_comment_like_answer_without_success_is_an_error() {
+        let result = serde_json::from_value::<ReaderCommentLikeResponse>(json!({ "i_like": true }));
         assert!(result.is_err());
     }
 }

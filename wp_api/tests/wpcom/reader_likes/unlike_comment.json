@@ -1,0 +1,13 @@
+{
+  "success": false,
+  "i_like": false,
+  "like_count": 0,
+  "meta": {
+    "links": {
+      "help": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/comments/1/likes/mine/delete/help",
+      "post": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/posts/3",
+      "comment": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/comments/1",
+      "site": "https://public-api.wordpress.com/rest/v1.1/sites/100000001"
+    }
+  }
+}

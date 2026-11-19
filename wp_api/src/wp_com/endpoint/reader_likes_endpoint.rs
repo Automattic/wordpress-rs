@@ -4,7 +4,10 @@ use crate::{
     request::endpoint::{AsNamespace, DerivedRequest},
     wp_com::{
         WpComNamespace, WpComSiteId,
-        reader_likes::{ReaderLikesParams, ReaderLikesResponse, ReaderPostLikeResponse},
+        reader_likes::{
+            ReaderCommentLikeResponse, ReaderLikesParams, ReaderLikesResponse,
+            ReaderPostLikeResponse,
+        },
     },
 };
 use wp_derive_request_builder::WpDerivedRequest;
@@ -30,6 +33,15 @@ enum ReaderLikesRequest {
     // like it's still a 200, with `success: false`.
     #[post(url = "/sites/<wp_com_site_id>/posts/<post_id>/likes/mine/delete", output = ReaderPostLikeResponse)]
     UnlikePost,
+    // Likes a comment, for the user. It takes no parameters. In trials the API refused the like
+    // with a 400 `comment_like_failed` and an empty message, for a reason that isn't known, so
+    // the answer to a like that works wasn't seen.
+    #[post(url = "/sites/<wp_com_site_id>/comments/<comment_id>/likes/new", output = ReaderCommentLikeResponse)]
+    LikeComment,
+    // Removes the user's like from a comment. It takes no parameters. For a comment the user
+    // doesn't like it's still a 200, with `success: false`.
+    #[post(url = "/sites/<wp_com_site_id>/comments/<comment_id>/likes/mine/delete", output = ReaderCommentLikeResponse)]
+    UnlikeComment,
 }
 
 impl DerivedRequest for ReaderLikesRequest {
@@ -38,8 +50,10 @@ impl DerivedRequest for ReaderLikesRequest {
             // The newest lists of likes, and the ones with each like's date, which paging needs.
             // `rest/v1.1` returns likes with no dates, and no way past the first 90 of a post's.
             Self::PostLikes | Self::CommentLikes => WpComNamespace::RestV1_2,
-            // The only version of both: `rest/v1.2` has neither.
-            Self::LikePost | Self::UnlikePost => WpComNamespace::RestV1_1,
+            // The only version of each: `rest/v1.2` has none of them.
+            Self::LikePost | Self::UnlikePost | Self::LikeComment | Self::UnlikeComment => {
+                WpComNamespace::RestV1_1
+            }
         }
     }
 }
@@ -113,6 +127,18 @@ mod tests {
         validate_wp_com_rest_v1_1_endpoint(
             endpoint.unlike_post(&WpComSiteId(3584907), &PostId(6014)),
             "/sites/3584907/posts/6014/likes/mine/delete",
+        );
+    }
+
+    #[rstest]
+    fn like_and_unlike_comment(endpoint: ReaderLikesRequestEndpoint) {
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.like_comment(&WpComSiteId(3584907), &CommentId(451572)),
+            "/sites/3584907/comments/451572/likes/new",
+        );
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.unlike_comment(&WpComSiteId(3584907), &CommentId(451572)),
+            "/sites/3584907/comments/451572/likes/mine/delete",
         );
     }
 
