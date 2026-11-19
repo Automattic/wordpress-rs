@@ -79,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A saved Reader post that can't be read stays in the saved list as a save, and says why its content couldn't be loaded, where it used to fail the list's page.
 - A signed-out reader's Reader posts have no seen status: `is_seen` is `None`, where the API's `false` was kept. Unfollowing a tag or unsaving a post while signed out now says it was removed from the device, where it said it was kept.
 - The example apps use what the Reader service now gives them: its own words for an error, whether each post of a stream is saved, the stream a menu entry opens, and the next page of the users who liked a post. Their home screens count saves among what's waiting to be sent.
+- `WPCOM_REST_API_CHECKLIST.md` ticks the WordPress.com Reader endpoints the library now has, and adds the ones it has that the list lacked. A line says so where the library uses a newer version than the one listed.
 
 ### Fixed
 
