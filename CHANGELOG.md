@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `site_icons` and `preferred_site_icon` now treat whitespace in an icon address the way a browser does: only ASCII whitespace is stripped from the ends, so an address starting with a no-break space is no longer read as root-relative. Icons inside an SVG element named `template` are no longer skipped.
+
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
+- **Internal:** Moved the browser-style link resolution that `site_icons` uses (relative addresses, `<base href>`, `http`/`https` only) into a shared `html_links` module, so other code that reads links from a page can use it.
 
 ## [0.11.1] - 2026-11-18
 
