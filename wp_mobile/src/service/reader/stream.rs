@@ -77,6 +77,9 @@ pub enum ReaderStream {
     /// Posts from the sites and feeds the user follows. Needs an account.
     Following,
     /// The posts the user liked, newest like first. Needs an account.
+    ///
+    /// The stream is the server's list as last fetched: a post unliked since stays in it, shown
+    /// as not liked, until the stream is refreshed.
     Liked,
     /// Posts from Automattic's sites, for Automatticians. Needs an account.
     Automattic,
