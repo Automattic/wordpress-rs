@@ -1016,8 +1016,10 @@ async fn subscribe_to_comments_and_check(
     let sent = service
         .set_comments_subscribed(identity.clone(), true)
         .await;
+    expect_synced("Subscribing", sent)?;
+    // Whether a new subscription notifies is the server's to choose, so only the subscription is
+    // checked here.
     let subscribed = comment_subscription(ctx, post).await?;
-    sent.map_err(|e| format!("Subscribing was refused: {e}"))?;
     if !subscribed.0 {
         return Err("The server doesn't have the subscription".into());
     }
