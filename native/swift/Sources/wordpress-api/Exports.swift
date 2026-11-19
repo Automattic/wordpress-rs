@@ -453,6 +453,21 @@ public typealias ReaderStreamInfo = WordPressAPIInternal.ReaderStreamInfo
 public typealias ReaderStreamItem = WordPressAPIInternal.ReaderStreamItem
 public typealias ReaderStreamOrdering = WordPressAPIInternal.ReaderStreamOrdering
 public typealias ReaderStreamPageResult = WordPressAPIInternal.ReaderStreamPageResult
+// MARK: Reader Menu and Tags
+public typealias ReaderInterest = WordPressAPIInternal.ReaderInterest
+public typealias ReaderInterestsResponse = WordPressAPIInternal.ReaderInterestsResponse
+public typealias ReaderMenu = WordPressAPIInternal.ReaderMenu
+public typealias ReaderMenuItem = WordPressAPIInternal.ReaderMenuItem
+public typealias ReaderMenuItemKind = WordPressAPIInternal.ReaderMenuItemKind
+public typealias ReaderMenuSection = WordPressAPIInternal.ReaderMenuSection
+public typealias ReaderTag = WordPressAPIInternal.ReaderTag
+public typealias ReaderTagId = WordPressAPIInternal.ReaderTagId
+public typealias ReaderTagResponse = WordPressAPIInternal.ReaderTagResponse
+public typealias ReaderTagsRequestExecutor = WordPressAPIInternal.ReaderTagsRequestExecutor
+public typealias ReaderTagsRequestInterestsResponse = WordPressAPIInternal.ReaderTagsRequestInterestsResponse
+public typealias ReaderTagsRequestMenuResponse = WordPressAPIInternal.ReaderTagsRequestMenuResponse
+public typealias ReaderTagsRequestTagResponse = WordPressAPIInternal.ReaderTagsRequestTagResponse
+public typealias ReaderUnreadableMenuItem = WordPressAPIInternal.ReaderUnreadableMenuItem
 
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams

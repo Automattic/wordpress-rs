@@ -114,6 +114,11 @@ public final class WPComApiClient: Sendable {
         internalClient.readerBlocks()
     }
 
+    /// The Reader menu, a tag's info, and the interests a new reader picks from.
+    public var readerTags: ReaderTagsRequestExecutor {
+        internalClient.readerTags()
+    }
+
     /// Creates the account's saved Reader posts service. Prefer it over `readerSaved` for anything a
     /// user sees: a save or unsave shows straight away and survives a relaunch, and one the server
     /// hasn't got yet is sent by a later call.

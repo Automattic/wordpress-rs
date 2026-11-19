@@ -21,6 +21,7 @@ pub mod reader_post;
 pub mod reader_posts;
 pub mod reader_saved;
 pub mod reader_seen;
+pub mod reader_tags;
 pub mod segments;
 pub mod shopping_cart;
 pub mod site_plans;
