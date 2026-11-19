@@ -321,6 +321,26 @@ public typealias ReaderPostRequestResolveUrlResponse = WordPressAPIInternal.Read
 public typealias ReaderResolveUrlParams = WordPressAPIInternal.ReaderResolveUrlParams
 public typealias ReaderResolvedUrl = WordPressAPIInternal.ReaderResolvedUrl
 
+// MARK: Reader Sites and Feeds
+public typealias ReaderSitesRequestExecutor = WordPressAPIInternal.ReaderSitesRequestExecutor
+public typealias ReaderSitesRequestSiteResponse = WordPressAPIInternal.ReaderSitesRequestSiteResponse
+public typealias ReaderSitesRequestFeedResponse = WordPressAPIInternal.ReaderSitesRequestFeedResponse
+public typealias ReaderSitesRequestSearchFeedsResponse = WordPressAPIInternal.ReaderSitesRequestSearchFeedsResponse
+public typealias ReaderSite = WordPressAPIInternal.ReaderSite
+public typealias ReaderSiteParams = WordPressAPIInternal.ReaderSiteParams
+public typealias ReaderSiteOwner = WordPressAPIInternal.ReaderSiteOwner
+public typealias ReaderSubscriptionDeliveryMethods = WordPressAPIInternal.ReaderSubscriptionDeliveryMethods
+public typealias ReaderSubscriptionEmailDelivery = WordPressAPIInternal.ReaderSubscriptionEmailDelivery
+public typealias ReaderSubscriptionEmailFrequency = WordPressAPIInternal.ReaderSubscriptionEmailFrequency
+public typealias ReaderSubscriptionNotificationDelivery = WordPressAPIInternal.ReaderSubscriptionNotificationDelivery
+public typealias ReaderFeed = WordPressAPIInternal.ReaderFeed
+public typealias ReaderFeedOwner = WordPressAPIInternal.ReaderFeedOwner
+public typealias ReaderSubscriptionId = WordPressAPIInternal.ReaderSubscriptionId
+public typealias ReaderFeedSearchParams = WordPressAPIInternal.ReaderFeedSearchParams
+public typealias ReaderFeedSearchSort = WordPressAPIInternal.ReaderFeedSearchSort
+public typealias ReaderFeedSearchResponse = WordPressAPIInternal.ReaderFeedSearchResponse
+public typealias ReaderFeedSearchResult = WordPressAPIInternal.ReaderFeedSearchResult
+
 // MARK: Reader Saved Posts
 public typealias ReaderFeedId = WordPressAPIInternal.ReaderFeedId
 public typealias ReaderFeedItemId = WordPressAPIInternal.ReaderFeedItemId
@@ -483,11 +503,6 @@ public typealias ReaderUnreadableLike = WordPressAPIInternal.ReaderUnreadableLik
 // MARK: Reader Subscriptions
 public typealias ReaderSiteFollowStatus = WordPressAPIInternal.ReaderSiteFollowStatus
 public typealias ReaderSubscription = WordPressAPIInternal.ReaderSubscription
-public typealias ReaderSubscriptionDeliveryMethods = WordPressAPIInternal.ReaderSubscriptionDeliveryMethods
-public typealias ReaderSubscriptionEmailDelivery = WordPressAPIInternal.ReaderSubscriptionEmailDelivery
-public typealias ReaderSubscriptionEmailFrequency = WordPressAPIInternal.ReaderSubscriptionEmailFrequency
-public typealias ReaderSubscriptionId = WordPressAPIInternal.ReaderSubscriptionId
-public typealias ReaderSubscriptionNotificationDelivery = WordPressAPIInternal.ReaderSubscriptionNotificationDelivery
 public typealias ReaderSubscriptionsParams = WordPressAPIInternal.ReaderSubscriptionsParams
 public typealias ReaderSubscriptionsRequestExecutor = WordPressAPIInternal.ReaderSubscriptionsRequestExecutor
 public typealias ReaderSubscriptionsRequestIsFollowingSiteResponse =

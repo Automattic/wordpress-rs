@@ -11,12 +11,13 @@ use super::endpoint::{
     publicize_endpoint::{PublicizeRequestBuilder, PublicizeRequestExecutor},
     purchases_endpoint::{PurchasesRequestBuilder, PurchasesRequestExecutor},
     reader_blocks_endpoint::{ReaderBlocksRequestBuilder, ReaderBlocksRequestExecutor},
-    reader_post_endpoint::{ReaderPostRequestBuilder, ReaderPostRequestExecutor},
     reader_comments_endpoint::{ReaderCommentsRequestBuilder, ReaderCommentsRequestExecutor},
     reader_likes_endpoint::{ReaderLikesRequestBuilder, ReaderLikesRequestExecutor},
+    reader_post_endpoint::{ReaderPostRequestBuilder, ReaderPostRequestExecutor},
     reader_posts_endpoint::{ReaderPostsRequestBuilder, ReaderPostsRequestExecutor},
     reader_saved_endpoint::{ReaderSavedRequestBuilder, ReaderSavedRequestExecutor},
     reader_seen_endpoint::{ReaderSeenRequestBuilder, ReaderSeenRequestExecutor},
+    reader_sites_endpoint::{ReaderSitesRequestBuilder, ReaderSitesRequestExecutor},
     reader_subscriptions_endpoint::{
         ReaderSubscriptionsRequestBuilder, ReaderSubscriptionsRequestExecutor,
     },
@@ -107,6 +108,7 @@ pub struct WpComApiRequestBuilder {
     reader_seen: Arc<ReaderSeenRequestBuilder>,
     reader_subscriptions: Arc<ReaderSubscriptionsRequestBuilder>,
     reader_tags: Arc<ReaderTagsRequestBuilder>,
+    reader_sites: Arc<ReaderSitesRequestBuilder>,
     shopping_cart: Arc<ShoppingCartRequestBuilder>,
     site_plans: Arc<SitePlansRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
@@ -170,6 +172,7 @@ impl WpComApiRequestBuilder {
             reader_seen,
             reader_subscriptions,
             reader_tags,
+            reader_sites,
             shopping_cart,
             site_plans,
             sites,
@@ -240,6 +243,7 @@ pub struct WpComApiClient {
     reader_seen: Arc<ReaderSeenRequestExecutor>,
     reader_subscriptions: Arc<ReaderSubscriptionsRequestExecutor>,
     reader_tags: Arc<ReaderTagsRequestExecutor>,
+    reader_sites: Arc<ReaderSitesRequestExecutor>,
     shopping_cart: Arc<ShoppingCartRequestExecutor>,
     site_plans: Arc<SitePlansRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
@@ -300,6 +304,7 @@ impl WpComApiClient {
             reader_seen,
             reader_subscriptions,
             reader_tags,
+            reader_sites,
             shopping_cart,
             site_plans,
             sites,
@@ -353,6 +358,7 @@ api_client_generate_endpoint_impl!(WpComApi, reader_blocks);
 api_client_generate_endpoint_impl!(WpComApi, reader_seen);
 api_client_generate_endpoint_impl!(WpComApi, reader_subscriptions);
 api_client_generate_endpoint_impl!(WpComApi, reader_tags);
+api_client_generate_endpoint_impl!(WpComApi, reader_sites);
 api_client_generate_endpoint_impl!(WpComApi, shopping_cart);
 api_client_generate_endpoint_impl!(WpComApi, site_plans);
 api_client_generate_endpoint_impl!(WpComApi, sites);
