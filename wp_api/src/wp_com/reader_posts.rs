@@ -25,6 +25,7 @@ use serde::{
     Deserialize, Deserializer, Serialize,
     de::{DeserializeOwned, IgnoredAny, MapAccess, SeqAccess, Visitor},
 };
+use serde_json::value::RawValue;
 use std::fmt;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
@@ -359,19 +360,22 @@ pub struct ReaderUnreadablePost {
 }
 
 /// Sorts a page's posts into the ones that were read and the ones that weren't.
-fn sort_posts(
-    posts: Option<LenientVec<ReaderPost>>,
-) -> (Vec<ReaderPost>, Vec<ReaderUnreadablePost>) {
+fn sort_posts<T>(posts: Option<LenientVec<T>>) -> (Vec<T>, Vec<ReaderUnreadablePost>) {
     let posts = posts.unwrap_or_default();
     let unreadable = posts
         .invalid
         .into_iter()
-        .map(|post| ReaderUnreadablePost {
-            identity: serde_json::from_str(post.json.get()).ok(),
-            error: post.error.to_string(),
-        })
+        .map(|post| unreadable_post(&post.json, post.error.to_string()))
         .collect();
     (posts.valid, unreadable)
+}
+
+/// A post that couldn't be read, with its IDs when those can be.
+fn unreadable_post(json: &RawValue, error: String) -> ReaderUnreadablePost {
+    ReaderUnreadablePost {
+        identity: serde_json::from_str(json.get()).ok(),
+        error,
+    }
 }
 
 /// A page of a Reader stream that pages by date, newest first.
@@ -601,6 +605,285 @@ pub struct ReaderFreshlyPressedParams {
     /// are asked for, and a stream with no posts still answers with a page, not an empty list.
     #[uniffi(default = None)]
     pub fields: Option<String>,
+}
+
+/// How the results of a search of Reader posts are ordered.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ReaderSearchSort {
+    /// Best match first. The API's default. A search pages through its best 200 results and no
+    /// further.
+    Relevance,
+    /// Newest first. A search pages on past 200 results.
+    Date,
+}
+
+impl_as_query_value_from_to_string!(ReaderSearchSort);
+
+/// Query parameters for a search of Reader posts.
+///
+/// For the next page, pass the page's [`ReaderSearchPostsResponse::next_page_handle`] as
+/// `page_handle`, with the same `q` and `sort`. The search has ended when a page has no handle.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct ReaderSearchPostsParams {
+    /// What to search for. Without it the API answers 400.
+    pub q: String,
+    /// The number of posts to return: 20 by default, and 20 at most. The API answers 400 to more.
+    #[uniffi(default = None)]
+    pub number: Option<u32>,
+    /// The previous page's [`ReaderSearchPostsResponse::next_page_handle`]. Send the `sort` that
+    /// returned it: without it, the API ignores a handle from a search by date.
+    #[uniffi(default = None)]
+    pub page_handle: Option<String>,
+    /// How many results to skip: 199 at most, and the API answers 400 to more. A search by
+    /// relevance pages this way, and its page handle holds the next offset.
+    #[uniffi(default = None)]
+    pub offset: Option<u32>,
+    /// The order of the results. The API's default is [`ReaderSearchSort::Relevance`].
+    #[uniffi(default = None)]
+    pub sort: Option<ReaderSearchSort>,
+    /// Only return posts published before this time.
+    #[uniffi(default = None)]
+    pub before: Option<WpGmtDateTime>,
+    /// Only return posts published after this time.
+    #[uniffi(default = None)]
+    pub after: Option<WpGmtDateTime>,
+    /// The language to search in, such as `fr`.
+    #[uniffi(default = None)]
+    pub lang: Option<String>,
+    /// The name of the algorithm to search with. The API sends back the name it's given, in
+    /// [`ReaderSearchPostsResponse::algorithm`] and in the page handle. Another name changed
+    /// nothing in the results that were looked at.
+    #[uniffi(default = None)]
+    pub algorithm: Option<String>,
+    /// Extra data to include, comma-separated, as in [`ReaderStreamParams::meta`].
+    #[uniffi(default = None)]
+    pub meta: Option<String>,
+    /// The fields of each post to return, comma-separated, as in [`ReaderStreamParams::fields`].
+    /// A search with no results still answers with a page, not an empty list.
+    #[uniffi(default = None)]
+    pub fields: Option<String>,
+}
+
+// Written out rather than derived: `q` is always sent, and the derive reads every field back
+// from a query as an `Option`.
+impl AppendUrlQueryPairs for ReaderSearchPostsParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut
+            .append_query_value_pair("q", &self.q)
+            .append_option_query_value_pair("number", self.number.as_ref())
+            .append_option_query_value_pair("page_handle", self.page_handle.as_ref())
+            .append_option_query_value_pair("offset", self.offset.as_ref())
+            .append_option_query_value_pair("sort", self.sort.as_ref())
+            .append_option_query_value_pair("before", self.before.as_ref())
+            .append_option_query_value_pair("after", self.after.as_ref())
+            .append_option_query_value_pair("lang", self.lang.as_ref())
+            .append_option_query_value_pair("algorithm", self.algorithm.as_ref())
+            .append_option_query_value_pair("meta", self.meta.as_ref())
+            .append_option_query_value_pair("fields", self.fields.as_ref());
+    }
+}
+
+/// A post in the results of a search, with what only a search says about it.
+///
+/// A search sets [`ReaderPost::tagged_on`] to the time of the request, which says nothing about
+/// the post.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderSearchPost {
+    #[serde(flatten)]
+    pub post: ReaderPost,
+    /// How well the post matches. A search by relevance is ordered by it, highest first, and a
+    /// search by date doesn't send it.
+    #[serde(default, deserialize_with = "deserialize_optional_score")]
+    #[uniffi(default = None)]
+    pub score: Option<f64>,
+    /// How many followers the post's site has.
+    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
+    #[uniffi(default = None)]
+    pub site_follower_count: Option<u64>,
+    /// When the search picked the post up, a few seconds after it was published. A search by date
+    /// is ordered by it, newest first.
+    #[serde(default, deserialize_with = "deserialize_optional_wp_gmt_date_time")]
+    #[uniffi(default = None)]
+    pub date_added: Option<WpGmtDateTime>,
+}
+
+/// A page of the results of a search of Reader posts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderSearchPostsResponse")]
+pub struct ReaderSearchPostsResponse {
+    /// The page's posts, without any in [`Self::unreadable_posts`]. A page of a search by date can
+    /// have fewer than were asked for and not be the last.
+    pub posts: Vec<ReaderSearchPost>,
+    /// The posts on the page that couldn't be read. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_posts: Vec<ReaderUnreadablePost>,
+    /// Pass it as `page_handle` for the next page. `None` on the last page. The API sends it as
+    /// `next_page`.
+    ///
+    /// A search by relevance pages by offset, so a result that moves between two requests can
+    /// arrive twice, or not at all.
+    #[uniffi(default = None)]
+    pub next_page_handle: Option<String>,
+    /// The name of the algorithm that picked the results.
+    #[uniffi(default = None)]
+    pub algorithm: Option<String>,
+    /// The [`ReaderSearchPost::date_added`] of two of the page's posts. Don't page with it: page
+    /// with [`Self::next_page_handle`]. In a search by date, many posts share a second.
+    #[uniffi(default = None)]
+    pub date_range: Option<ReaderDateRange>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderSearchPostsResponse {
+    #[serde(default)]
+    posts: Option<LenientVec<ReaderSearchPost>>,
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    next_page: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    algorithm: Option<String>,
+    #[serde(default)]
+    date_range: Option<ReaderDateRange>,
+}
+
+impl From<RawReaderSearchPostsResponse> for ReaderSearchPostsResponse {
+    fn from(raw: RawReaderSearchPostsResponse) -> Self {
+        let (posts, unreadable_posts) = sort_posts(raw.posts);
+        Self {
+            posts,
+            unreadable_posts,
+            next_page_handle: raw.next_page,
+            algorithm: raw.algorithm,
+            date_range: raw.date_range,
+        }
+    }
+}
+
+wp_content_string_id!(ReaderListOwner);
+wp_content_string_id!(ReaderListSlug);
+
+/// Query parameters for a Reader list's posts. For the next page, pass the page's
+/// [`ReaderListPostsResponse::next_page_handle`] as `page_handle`.
+///
+/// The API declares `page`, `order`, `before` and `after` too. None of them changed anything in
+/// the responses that were looked at, and neither did `meta`. `fields` empties the response.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // The stream pages with `page_handle` rather than a page number.
+pub struct ReaderListPostsParams {
+    /// The most posts to return: 10 by default. A page had 197 at most, whatever was asked for,
+    /// and can have far fewer than were asked for without being the last.
+    #[uniffi(default = None)]
+    pub number: Option<u32>,
+    /// The previous page's [`ReaderListPostsResponse::next_page_handle`].
+    #[uniffi(default = None)]
+    pub page_handle: Option<String>,
+    /// The page to return, counting from 1. It changed nothing in the responses that were looked
+    /// at.
+    #[uniffi(default = None)]
+    pub page: Option<u32>,
+    /// The order of the posts. It changed nothing in the responses that were looked at.
+    #[uniffi(default = None)]
+    pub order: Option<ReaderStreamOrder>,
+    /// Only return posts published before this time. It changed nothing in the responses that
+    /// were looked at.
+    #[uniffi(default = None)]
+    pub before: Option<WpGmtDateTime>,
+    /// Only return posts published after this time. It changed nothing in the responses that were
+    /// looked at.
+    #[uniffi(default = None)]
+    pub after: Option<WpGmtDateTime>,
+}
+
+/// A page of a Reader list's posts, newest first.
+///
+/// The API sends the page as cards, each holding a post. This is their posts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderListPostsResponse")]
+pub struct ReaderListPostsResponse {
+    /// The page's posts, without any in [`Self::unreadable_posts`]. Empty for a list with nothing
+    /// in it.
+    pub posts: Vec<ReaderPost>,
+    /// The cards on the page that couldn't be read as a post. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_posts: Vec<ReaderUnreadablePost>,
+    /// How many of the page's cards came without a post. The API sends `false` where a post would
+    /// be, and often: for 11 of the 40 cards on one page that was looked at.
+    #[uniffi(default = 0)]
+    pub missing_posts: u32,
+    /// Pass it as `page_handle` for the next page. `None` when there isn't one.
+    #[uniffi(default = None)]
+    pub next_page_handle: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderListPostsResponse {
+    #[serde(default)]
+    cards: Option<LenientVec<RawCard>>,
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    next_page_handle: Option<String>,
+}
+
+/// A card as it arrives: its kind, and its data still as JSON, to read once the kind is known.
+#[derive(Deserialize)]
+struct RawCard {
+    #[serde(rename = "type", default)]
+    kind: Option<String>,
+    #[serde(default)]
+    data: Option<Box<RawValue>>,
+}
+
+impl RawCard {
+    /// The card's data, unless the API sent `false` or `null` where the data would be.
+    fn data(&self) -> Option<&RawValue> {
+        self.data
+            .as_deref()
+            .filter(|data| !matches!(data.get(), "false" | "null"))
+    }
+}
+
+impl From<RawReaderListPostsResponse> for ReaderListPostsResponse {
+    fn from(raw: RawReaderListPostsResponse) -> Self {
+        let (cards, mut unreadable_posts) = sort_posts(raw.cards);
+        let mut posts = Vec::new();
+        let mut missing_posts = 0;
+        for card in cards {
+            let kind = card.kind.as_deref().unwrap_or_default();
+            if kind != "post" {
+                let error = format!("expected a `post` card, not a `{kind}` card");
+                unreadable_posts.push(ReaderUnreadablePost {
+                    identity: None,
+                    error,
+                });
+                continue;
+            }
+            let Some(data) = card.data() else {
+                missing_posts += 1;
+                continue;
+            };
+            match serde_json::from_str::<ReaderPost>(data.get()) {
+                Ok(post) => posts.push(post),
+                Err(error) => unreadable_posts.push(unreadable_post(data, error.to_string())),
+            }
+        }
+        Self {
+            posts,
+            unreadable_posts,
+            missing_posts,
+            next_page_handle: raw.next_page_handle,
+        }
+    }
 }
 
 wp_content_string_id!(ReaderTagSlug);
@@ -1014,6 +1297,21 @@ where
     deserialize_optional_id(deserializer)
 }
 
+/// A search score, which the API sends as a number. A number in a string is read too, and
+/// anything else reads as `None` rather than failing the post.
+fn deserialize_optional_score<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(
+        match Option::<serde_json::Value>::deserialize(deserializer)? {
+            Some(serde_json::Value::Number(number)) => number.as_f64(),
+            Some(serde_json::Value::String(text)) => text.parse().ok(),
+            _ => None,
+        },
+    )
+}
+
 /// A value the API sends as an object, or as an empty object or array, an empty string, `false` or
 /// `null` when there isn't one.
 fn deserialize_object_or_empty<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
@@ -1344,6 +1642,187 @@ mod tests {
             post.editorial_displayed_on,
             expected.map(|date| date.parse().unwrap())
         );
+    }
+
+    /// A recording of a search on WordPress.com, trimmed, with the site, author and post details
+    /// replaced.
+    #[test]
+    fn test_deserialize_search() {
+        let json = include_str!("../../tests/wpcom/reader_posts/search.json");
+        let page: ReaderSearchPostsResponse = serde_json::from_str(json).expect("the page parses");
+
+        assert_eq!(page.posts.len(), 2);
+        assert!(page.unreadable_posts.is_empty());
+        assert_eq!(
+            page.next_page_handle.as_deref(),
+            Some("offset=2&algorithm=read:search:posts/11")
+        );
+        assert_eq!(page.algorithm.as_deref(), Some("read:search:posts/11"));
+
+        let first = &page.posts[0];
+        assert_eq!(first.post.identity.id, 1001);
+        assert_eq!(first.post.title.as_deref(), Some("Example post 1"));
+        assert_eq!(first.score, Some(42.5));
+        assert_eq!(first.site_follower_count, Some(1));
+        assert_eq!(first.post.comment_count, Some(1));
+        // The API sends the time without an offset. It's GMT.
+        assert_eq!(
+            first.date_added,
+            Some("2026-11-17T12:00:00+00:00".parse().unwrap())
+        );
+
+        // The range is in the same time, taken from the first and last posts.
+        let range = page.date_range.expect("the page has a range");
+        assert_eq!(range.after, first.date_added);
+        assert_eq!(range.before, page.posts[1].date_added);
+    }
+
+    /// A page of a search by date: its handle isn't an offset, and its posts have no score.
+    #[test]
+    fn test_deserialize_search_by_date() {
+        let page: ReaderSearchPostsResponse = serde_json::from_value(json!({
+            "date_range": { "before": "2026-11-19 05:41:42", "after": "2026-11-19 05:35:52" },
+            "posts": [
+                { "ID": 1, "site_ID": 10, "date_added": "2026-11-19 05:41:42" },
+                { "ID": 2, "site_ID": 11, "date_added": "2026-11-19 05:35:52" },
+            ],
+            "algorithm": "read:search:posts/11",
+            "next_page": "algorithm=read:search:posts/11&ts=1795066552&blog=11&post=2",
+        }))
+        .expect("the page parses");
+
+        assert_eq!(
+            page.next_page_handle.as_deref(),
+            Some("algorithm=read:search:posts/11&ts=1795066552&blog=11&post=2")
+        );
+        assert!(page.posts.iter().all(|post| post.score.is_none()));
+        assert!(page.posts.iter().all(|post| post.date_added.is_some()));
+    }
+
+    /// What a search with no results sends: no posts, no handle, and a range of empty strings.
+    #[test]
+    fn test_deserialize_search_with_no_results() {
+        let page: ReaderSearchPostsResponse = serde_json::from_value(json!({
+            "date_range": { "before": "", "after": "" },
+            "posts": [],
+            "algorithm": "read:search:posts/11",
+        }))
+        .expect("the page parses");
+
+        assert!(page.posts.is_empty());
+        assert_eq!(page.next_page_handle, None);
+        assert_eq!(page.date_range.and_then(|range| range.before), None);
+    }
+
+    #[rstest]
+    #[case::number(json!(4443.716), Some(4443.716))]
+    #[case::whole_number(json!(12), Some(12.0))]
+    #[case::string(json!("3383.948"), Some(3383.948))]
+    #[case::not_a_number(json!("high"), None)]
+    #[case::null(json!(null), None)]
+    #[case::false_(json!(false), None)]
+    fn test_search_score(#[case] score: serde_json::Value, #[case] expected: Option<f64>) {
+        let post: ReaderSearchPost =
+            serde_json::from_value(json!({ "ID": 1, "site_ID": 2, "score": score })).unwrap();
+        assert_eq!(post.score, expected);
+    }
+
+    #[test]
+    fn test_a_page_of_a_search_keeps_its_posts_when_one_cannot_be_read() {
+        let page: ReaderSearchPostsResponse = serde_json::from_value(json!({
+            "posts": [
+                { "ID": 1, "site_ID": 10, "score": 2.5 },
+                { "ID": 2, "site_ID": 10, "date": UNREADABLE_DATE },
+            ],
+            "next_page": "offset=2",
+        }))
+        .expect("the page parses");
+
+        assert_eq!(page.posts.len(), 1);
+        assert_eq!(page.posts[0].post.identity.id, 1);
+        assert_eq!(page.next_page_handle.as_deref(), Some("offset=2"));
+        let unreadable: Vec<_> = page
+            .unreadable_posts
+            .iter()
+            .map(|post| post.identity.as_ref().map(|identity| identity.id))
+            .collect();
+        assert_eq!(unreadable, [Some(2)]);
+    }
+
+    /// A recording of a list's posts on WordPress.com, trimmed, with the site, author and post
+    /// details replaced. The second of its three cards came without a post.
+    #[test]
+    fn test_deserialize_list_posts() {
+        let json = include_str!("../../tests/wpcom/reader_posts/list_posts.json");
+        let page: ReaderListPostsResponse = serde_json::from_str(json).expect("the page parses");
+
+        assert_eq!(ids(&page.posts), [1001, 1002]);
+        assert!(page.unreadable_posts.is_empty());
+        assert_eq!(page.missing_posts, 1);
+        assert_eq!(
+            page.next_page_handle.as_deref(),
+            Some("RVhBTVBMRS1IQU5ETEU")
+        );
+        assert!(!page.posts[0].identity.is_external);
+        assert!(page.posts[1].identity.is_external);
+        assert_eq!(page.posts[0].title.as_deref(), Some("Example post 1"));
+    }
+
+    /// A list with nothing in it answers with an empty list where the page would be. So does a
+    /// request with `fields`.
+    #[test]
+    fn test_a_page_of_a_list_sent_as_an_empty_list() {
+        let page: ReaderListPostsResponse = serde_json::from_str("[]").expect("the page parses");
+        assert!(page.posts.is_empty());
+        assert!(page.unreadable_posts.is_empty());
+        assert_eq!(page.missing_posts, 0);
+        assert_eq!(page.next_page_handle, None);
+    }
+
+    #[test]
+    fn test_a_page_of_a_list_keeps_its_posts_when_a_card_cannot_be_read() {
+        let page: ReaderListPostsResponse = serde_json::from_str(
+            &json!({
+                "cards": [
+                    { "type": "post", "date": 1795057248, "data": { "ID": 1, "site_ID": 10 } },
+                    { "type": "post", "date": 1795057247, "data": false },
+                    { "type": "post", "date": 1795057246, "data": null },
+                    { "type": "post", "date": 1795057245 },
+                    { "type": "post", "data": { "ID": 2, "site_ID": 10, "date": UNREADABLE_DATE } },
+                    { "type": "recommended_blogs", "data": [{ "ID": 3 }] },
+                    "not a card",
+                    { "type": "post", "date": 1795057244, "data": { "ID": 4, "site_ID": 11 } },
+                ],
+                "next_page_handle": "abc",
+            })
+            .to_string(),
+        )
+        .expect("the page parses");
+
+        assert_eq!(ids(&page.posts), [1, 4]);
+        assert_eq!(page.missing_posts, 3);
+        assert_eq!(page.next_page_handle.as_deref(), Some("abc"));
+
+        assert_eq!(page.unreadable_posts.len(), 3);
+        let by_id = |id| {
+            page.unreadable_posts
+                .iter()
+                .find(|post| post.identity.as_ref().map(|identity| identity.id) == id)
+        };
+        let post = by_id(Some(2)).expect("the post whose date can't be read");
+        assert!(
+            post.error.starts_with("Invalid date format"),
+            "{}",
+            post.error
+        );
+        let errors: Vec<_> = page
+            .unreadable_posts
+            .iter()
+            .filter(|post| post.identity.is_none())
+            .map(|post| post.error.as_str())
+            .collect();
+        assert_eq!(errors.len(), 2);
+        assert!(errors.contains(&"expected a `post` card, not a `recommended_blogs` card"));
     }
 
     /// The API reads `order` in capitals only.

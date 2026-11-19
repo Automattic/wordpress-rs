@@ -1,0 +1,99 @@
+{
+  "cards": [
+    {
+      "type": "post",
+      "date": 1794916800,
+      "data": {
+        "ID": 1001,
+        "site_ID": 2001,
+        "feed_ID": 3001,
+        "feed_item_ID": 4001,
+        "is_external": false,
+        "date": "2026-11-17T12:00:00+00:00",
+        "modified": "2026-11-17T12:05:00+00:00",
+        "title": "Example post 1",
+        "URL": "https://example1.wordpress.com/2026/11/17/example-post/",
+        "short_URL": "https://wp.me/pEXAMPLE-1",
+        "excerpt": "<p>An example excerpt.</p>\n",
+        "content": "<p>Example content.</p>\n",
+        "author": null,
+        "site_name": "Example Site 1",
+        "site_URL": "https://example1.wordpress.com",
+        "featured_image": "https://example.com/image.jpg",
+        "like_count": 1,
+        "i_like": false,
+        "is_following": false,
+        "discussion": {
+          "comments_open": false,
+          "comment_status": "closed",
+          "pings_open": false,
+          "ping_status": "closed",
+          "comment_count": 1,
+          "comments_require_registration": false,
+          "comments_allow_blocks": true
+        },
+        "tags": {
+          "example": {
+            "ID": 1,
+            "name": "example",
+            "slug": "example",
+            "description": "",
+            "post_count": 3,
+            "display_name": "example"
+          }
+        },
+        "global_ID": "00000000000000000000000000000001",
+        "use_excerpt": false,
+        "is_seen": false
+      }
+    },
+    {
+      "type": "post",
+      "date": 1794913620,
+      "data": false
+    },
+    {
+      "type": "post",
+      "date": 1794913200,
+      "data": {
+        "ID": 1002,
+        "site_ID": 2002,
+        "feed_ID": 3002,
+        "feed_item_ID": 4002,
+        "is_external": true,
+        "date": "2026-11-17T11:00:00+00:00",
+        "modified": "2026-11-17T11:05:00+00:00",
+        "title": "Example post 2",
+        "URL": "https://example2.wordpress.com/2026/11/17/example-post/",
+        "short_URL": "https://wp.me/pEXAMPLE-2",
+        "excerpt": "<p>An example excerpt.</p>\n",
+        "content": "<p>Example content.</p>\n",
+        "author": {
+          "ID": 5002,
+          "email": "author@example.com",
+          "nice_name": "example2",
+          "name": "Example Author",
+          "URL": "https://example2.wordpress.com",
+          "avatar_URL": "https://example.com/avatar.png",
+          "has_avatar": false,
+          "profile_URL": "https://example.com/example2"
+        },
+        "site_name": "Example Site 2",
+        "site_URL": "https://example2.wordpress.com",
+        "featured_image": "",
+        "like_count": 2,
+        "i_like": 0,
+        "is_following": false,
+        "discussion": {
+          "comments_open": false,
+          "comment_count": 2
+        },
+        "tags": {},
+        "global_ID": "00000000000000000000000000000002",
+        "use_excerpt": false,
+        "is_seen": false
+      }
+    }
+  ],
+  "next_page_handle": "RVhBTVBMRS1IQU5ETEU"
+}

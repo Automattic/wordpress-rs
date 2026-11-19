@@ -3,9 +3,11 @@ use crate::{
     wp_com::{
         WpComNamespace, WpComSiteId,
         reader_posts::{
-            ReaderFreshlyPressedParams, ReaderLikedPostsParams, ReaderOrganizationPostsParams,
-            ReaderPostsResponse, ReaderStreamParams, ReaderTagPostsParams, ReaderTagPostsResponse,
-            ReaderTagSlug,
+            ReaderFreshlyPressedParams, ReaderLikedPostsParams, ReaderListOwner,
+            ReaderListPostsParams, ReaderListPostsResponse, ReaderListSlug,
+            ReaderOrganizationPostsParams, ReaderPostsResponse, ReaderSearchPostsParams,
+            ReaderSearchPostsResponse, ReaderStreamParams, ReaderTagPostsParams,
+            ReaderTagPostsResponse, ReaderTagSlug,
         },
         reader_saved::ReaderFeedId,
     },
@@ -39,6 +41,13 @@ enum ReaderPostsRequest {
     // Freshly Pressed: the posts WordPress.com's editors picked. Answers signed out.
     #[get(url = "/freshly-pressed", params = &ReaderFreshlyPressedParams, output = ReaderPostsResponse)]
     FreshlyPressed,
+    // A search of Reader posts. Answers signed out.
+    #[get(url = "/read/search", params = &ReaderSearchPostsParams, output = ReaderSearchPostsResponse)]
+    Search,
+    // A Reader list's posts. Answers signed out for a public list, and 404 for a list that
+    // doesn't exist.
+    #[get(url = "/read/list/<reader_list_owner>/<reader_list_slug>/posts", params = &ReaderListPostsParams, output = ReaderListPostsResponse)]
+    ListPosts,
 }
 
 impl DerivedRequest for ReaderPostsRequest {
@@ -46,6 +55,9 @@ impl DerivedRequest for ReaderPostsRequest {
         match self {
             // The newest tag stream. `rest/v1.2` and `rest/v1.3` have older ones.
             Self::TagPosts => WpComNamespace::V2,
+            // The newest list stream. It pages with a handle and returns cards, where `rest/v1.2`
+            // pages by date and returns posts.
+            Self::ListPosts => WpComNamespace::RestV1_3,
             // `rest/v1.2` is the newest Automattic stream with whole posts: `rest/v1.3` returns
             // only each post's IDs and date.
             _ => WpComNamespace::RestV1_2,
@@ -61,9 +73,9 @@ mod tests {
         wp_com::{
             endpoint::tests::{
                 fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_2_endpoint,
-                validate_wp_com_v2_endpoint,
+                validate_wp_com_rest_v1_3_endpoint, validate_wp_com_v2_endpoint,
             },
-            reader_posts::{ReaderStreamOrder, ReaderTagPostsSort},
+            reader_posts::{ReaderSearchSort, ReaderStreamOrder, ReaderTagPostsSort},
         },
     };
     use rstest::*;
@@ -225,6 +237,60 @@ mod tests {
                 fields: Some("ID,site_ID,date,editorial".to_string()),
             }),
             "/freshly-pressed?number=40&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00&content_width=675&thumb_width=252&thumb_height=160&meta=site%2Clikes&fields=ID%2Csite_ID%2Cdate%2Ceditorial",
+        );
+    }
+
+    #[rstest]
+    fn search(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.search(&ReaderSearchPostsParams {
+                q: "street photography".to_string(),
+                ..Default::default()
+            }),
+            "/read/search?q=street+photography",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.search(&ReaderSearchPostsParams {
+                q: "café & bar".to_string(),
+                number: Some(20),
+                page_handle: Some("offset=20&algorithm=read:search:posts/11".to_string()),
+                offset: Some(20),
+                sort: Some(ReaderSearchSort::Date),
+                before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
+                after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
+                lang: Some("fr".to_string()),
+                algorithm: Some("read:search:posts/11".to_string()),
+                meta: Some("site,likes".to_string()),
+                fields: Some("ID,site_ID,date".to_string()),
+            }),
+            "/read/search?q=caf%C3%A9+%26+bar&number=20&page_handle=offset%3D20%26algorithm%3Dread%3Asearch%3Aposts%2F11&offset=20&sort=date&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00&lang=fr&algorithm=read%3Asearch%3Aposts%2F11&meta=site%2Clikes&fields=ID%2Csite_ID%2Cdate",
+        );
+    }
+
+    #[rstest]
+    fn list_posts(endpoint: ReaderPostsRequestEndpoint) {
+        validate_wp_com_rest_v1_3_endpoint(
+            endpoint.list_posts(
+                &ReaderListOwner("automattic".to_string()),
+                &ReaderListSlug("a12s".to_string()),
+                &ReaderListPostsParams::default(),
+            ),
+            "/read/list/automattic/a12s/posts?",
+        );
+        validate_wp_com_rest_v1_3_endpoint(
+            endpoint.list_posts(
+                &ReaderListOwner("automattic".to_string()),
+                &ReaderListSlug("a12s".to_string()),
+                &ReaderListPostsParams {
+                    number: Some(40),
+                    page_handle: Some("abc==".to_string()),
+                    page: Some(2),
+                    order: Some(ReaderStreamOrder::Asc),
+                    before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
+                    after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
+                },
+            ),
+            "/read/list/automattic/a12s/posts?number=40&page_handle=abc%3D%3D&page=2&order=ASC&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00",
         );
     }
 

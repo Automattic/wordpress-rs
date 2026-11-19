@@ -4,8 +4,10 @@ use wp_api::date::WpGmtDateTime;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::reader_posts::{
-    ReaderFreshlyPressedParams, ReaderLikedPostsParams, ReaderOrganizationPostsParams, ReaderPost,
-    ReaderPostsResponse, ReaderStreamParams, ReaderTagPostsParams, ReaderTagSlug,
+    ReaderFreshlyPressedParams, ReaderLikedPostsParams, ReaderListOwner, ReaderListPostsParams,
+    ReaderListPostsResponse, ReaderListSlug, ReaderOrganizationPostsParams, ReaderPost,
+    ReaderPostsResponse, ReaderSearchPostsParams, ReaderSearchPostsResponse, ReaderSearchSort,
+    ReaderStreamParams, ReaderTagPostsParams, ReaderTagSlug,
 };
 use wp_api::wp_com::reader_saved::ReaderFeedId;
 
@@ -314,6 +316,81 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 })
             }
         }),
+        Trial::test("reader_posts::search", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // By relevance: every post has a score, and the handle is the next offset.
+                    let first = search(&ctx.client, None, None).await?;
+                    if first.posts.is_empty() {
+                        return Err("The search has no results".into());
+                    }
+                    if first.posts.iter().any(|post| post.score.is_none()) {
+                        return Err("A result by relevance should have a score".into());
+                    }
+                    let handle = first
+                        .next_page_handle
+                        .clone()
+                        .ok_or("The first page has no handle for the next")?;
+                    let second = search(&ctx.client, None, Some(handle)).await?;
+                    if second.posts.is_empty() {
+                        return Err("The second page by relevance has no results".into());
+                    }
+
+                    // By date: every post says when the search picked it up, and the next page
+                    // is other posts.
+                    let sort = Some(ReaderSearchSort::Date);
+                    let first = search(&ctx.client, sort, None).await?;
+                    if first.posts.is_empty() || first.posts.iter().any(|p| p.date_added.is_none())
+                    {
+                        return Err("A result by date should say when it was picked up".into());
+                    }
+                    let handle = first
+                        .next_page_handle
+                        .clone()
+                        .ok_or("The first page by date has no handle for the next")?;
+                    let second = search(&ctx.client, sort, Some(handle)).await?;
+                    let seen = |page: &ReaderSearchPostsResponse| {
+                        page.posts
+                            .iter()
+                            .map(|result| (result.post.identity.site_id, result.post.identity.id))
+                            .collect::<std::collections::HashSet<_>>()
+                    };
+                    if second.posts.is_empty() || !seen(&first).is_disjoint(&seen(&second)) {
+                        return Err("The second page by date should be other posts".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_posts::list_posts", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let first = list_posts(&ctx.client, None).await?;
+                    if first.posts.is_empty() {
+                        return Err("The list has no posts".into());
+                    }
+                    let handle = first
+                        .next_page_handle
+                        .clone()
+                        .ok_or("The first page has no handle for the next")?;
+
+                    // Paging by handle: the next page is other posts.
+                    let second = list_posts(&ctx.client, Some(handle)).await?;
+                    let seen = |page: &ReaderListPostsResponse| {
+                        page.posts
+                            .iter()
+                            .map(|post| (post.identity.site_id, post.identity.id))
+                            .collect::<std::collections::HashSet<_>>()
+                    };
+                    if second.posts.is_empty() || !seen(&first).is_disjoint(&seen(&second)) {
+                        return Err("The second page should be other posts".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
         Trial::test("reader_posts::signed_out", {
             let ctx = Arc::clone(&ctx);
             move || {
@@ -349,11 +426,70 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     {
                         return Err("The P2 stream should need an account".into());
                     }
+
+                    // A search and a public list's posts answer without an account.
+                    if search(&ctx.signed_out_client, None, None)
+                        .await?
+                        .posts
+                        .is_empty()
+                    {
+                        return Err("A search should have results signed out".into());
+                    }
+                    if list_posts(&ctx.signed_out_client, None)
+                        .await?
+                        .posts
+                        .is_empty()
+                    {
+                        return Err("A public list should have posts signed out".into());
+                    }
                     Ok(())
                 })
             }
         }),
     ]
+}
+
+/// A page of a search for a word that always has results.
+async fn search(
+    client: &WpComApiClient,
+    sort: Option<ReaderSearchSort>,
+    page_handle: Option<String>,
+) -> Result<ReaderSearchPostsResponse, String> {
+    let params = ReaderSearchPostsParams {
+        q: "photography".to_string(),
+        number: Some(5),
+        sort,
+        page_handle,
+        ..Default::default()
+    };
+    client
+        .reader_posts()
+        .search(&params)
+        .await
+        .map(|response| response.data)
+        .map_err(|e| e.to_string())
+}
+
+/// A page of "Automattician Blogs", a public list that Automattic has kept for years.
+async fn list_posts(
+    client: &WpComApiClient,
+    page_handle: Option<String>,
+) -> Result<ReaderListPostsResponse, String> {
+    let params = ReaderListPostsParams {
+        number: Some(10),
+        page_handle,
+        ..Default::default()
+    };
+    client
+        .reader_posts()
+        .list_posts(
+            &ReaderListOwner("automattic".to_string()),
+            &ReaderListSlug("a12s".to_string()),
+            &params,
+        )
+        .await
+        .map(|response| response.data)
+        .map_err(|e| e.to_string())
 }
 
 /// Whether `date` is earlier than `cursor`, the `before` a page was asked for.
