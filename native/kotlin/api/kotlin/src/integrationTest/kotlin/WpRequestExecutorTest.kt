@@ -335,7 +335,7 @@ class WpRequestExecutorTest {
     /**
      * OkHttp only requests `http` and `https` addresses. Anything else must fail the request with
      * `GenericError` (as reqwest and the Swift executor do), not escape the UniFFI callback as
-     * OkHttp's `IllegalArgumentException` — UniFFI would panic and `WpApiClient.request` would throw.
+     * OkHttp's `IllegalArgumentException`, which makes `WpApiClient.request` throw an `InternalException`.
      */
     @Test
     fun `a non-web address is mapped to GenericError`() = runTest {
