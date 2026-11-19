@@ -4,6 +4,7 @@ use crate::{
     auth::{WpAuthentication, WpAuthenticationProvider},
     url_query::{FromUrlQueryPairs, UrlQueryPairsMap},
 };
+use crate::{html_links::resolve_web_address, link_header};
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use endpoint::{
@@ -607,23 +608,36 @@ impl WpSupportsLocalization for WpNetworkHeaderMapError {
 }
 
 impl WpNetworkResponse {
+    /// The targets of the `Link` header entries with the relation type `name`, in order.
+    ///
+    /// A target may be relative, such as `</wp-json/>; rel="https://api.w.org/"`. As RFC 8288
+    /// says, it's resolved against the URL of the request this response answers. Targets that
+    /// aren't `http` or `https` once resolved are left out, and so are entries that aren't well
+    /// formed, without affecting the others.
     pub fn get_link_header(&self, name: &str) -> Vec<Url> {
-        [
-            self.response_header_map.inner.get_all(http::header::LINK),
-            self.response_header_map
-                .inner
-                .get_all(http::header::LINK.to_string().to_lowercase()),
-        ]
-        .into_iter()
-        .flatten()
-        .flat_map(|link_header| link_header.to_str().ok())
-        .flat_map(|link_header_str| parse_link_header::parse_with_rel(link_header_str).ok())
-        .flat_map(|link_map| {
-            link_map
-                .get(name)
-                .and_then(|link| Url::parse(link.raw_uri.as_str()).ok())
-        })
-        .collect()
+        let base_url = Url::parse(&self.request_url.0).ok();
+        // Header names are case-insensitive, so this finds `Link`, `link` and `LINK`.
+        //
+        // `WpNetworkHeaderMap` splits header values at every comma, including the commas
+        // inside a target like `<…?ids=1,2>`, and trims the pieces. Several values of one header
+        // mean the same as one value joined with commas (RFC 9110), so join them back before
+        // parsing. A URL has no whitespace, so joining with a bare `,` restores it exactly.
+        let header = self
+            .response_header_map
+            .inner
+            .get_all(http::header::LINK)
+            .into_iter()
+            .filter_map(|value| value.to_str().ok())
+            .collect::<Vec<_>>()
+            .join(",");
+        link_header::parse(&header)
+            .into_iter()
+            .filter(|link| link.has_rel(name))
+            .filter_map(|link| match &base_url {
+                Some(base_url) => resolve_web_address(&link.target, base_url),
+                None => Url::parse(&link.target).ok(),
+            })
+            .collect()
     }
 
     pub fn get_pagination_header<P: FromUrlQueryPairs>(
@@ -1295,6 +1309,93 @@ mod tests {
             "response headers: {:?}",
             response.response_header_map.inner
         );
+    }
+
+    fn response_with_link_header(request_url: &str, link: &str) -> WpNetworkResponse {
+        WpNetworkResponse {
+            body: Vec::with_capacity(0),
+            status_code: 200,
+            response_header_map: Arc::new(
+                WpNetworkHeaderMap::from_map([("Link".to_string(), link.to_string())].into())
+                    .unwrap(),
+            ),
+            request_url: WpEndpointUrl(request_url.to_string()),
+            request_method: RequestMethod::GET,
+            request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+        }
+    }
+
+    #[rstest]
+    #[case::absolute(
+        "https://example.com/",
+        "https://example.com/wp-json/",
+        "https://example.com/wp-json/"
+    )]
+    #[case::root_relative(
+        "https://example.com/",
+        "/wp/wp-json/",
+        "https://example.com/wp/wp-json/"
+    )]
+    #[case::protocol_relative(
+        "https://example.com/",
+        "//example.com/wp-json/",
+        "https://example.com/wp-json/"
+    )]
+    #[case::path_relative(
+        "https://example.com/blog/",
+        "wp-json/",
+        "https://example.com/blog/wp-json/"
+    )]
+    #[case::query_only(
+        "https://example.com/",
+        "?rest_route=/",
+        "https://example.com/?rest_route=/"
+    )]
+    #[case::relative_to_request_path(
+        "https://example.com/wp-json/wp/v2/posts?page=1",
+        "posts?page=2",
+        "https://example.com/wp-json/wp/v2/posts?page=2"
+    )]
+    fn test_link_header_resolves_against_request_url(
+        #[case] request_url: &str,
+        #[case] target: &str,
+        #[case] expected: &str,
+    ) {
+        let response =
+            response_with_link_header(request_url, &format!(r#"<{target}>; rel="next""#));
+        assert_eq!(
+            response.get_link_header("next"),
+            [Url::parse(expected).unwrap()]
+        );
+    }
+
+    #[test]
+    fn test_link_header_reads_the_rest_of_a_header_with_a_bad_entry() {
+        // The old parser dropped the whole header when one entry didn't parse, or when a
+        // target had a comma in it.
+        let response = response_with_link_header(
+            "https://example.com/",
+            r#"junk, <https://example.com/?ids=1,2&page=2>; rel="next", </wp-json/>; rel="https://api.w.org/""#,
+        );
+        assert_eq!(
+            response.get_link_header("next"),
+            [Url::parse("https://example.com/?ids=1,2&page=2").unwrap()]
+        );
+        assert_eq!(
+            response.get_link_header("https://api.w.org/"),
+            [Url::parse("https://example.com/wp-json/").unwrap()]
+        );
+    }
+
+    #[rstest]
+    #[case::mailto("mailto:someone@example.com")]
+    #[case::ftp("ftp://example.com/wp-json/")]
+    fn test_link_header_ignores_targets_that_arent_http(#[case] target: &str) {
+        let response = response_with_link_header(
+            "https://example.com/",
+            &format!(r#"<{target}>; rel="next""#),
+        );
+        assert_eq!(response.get_link_header("next"), Vec::<Url>::new());
     }
 
     fn pagination_test_response(
