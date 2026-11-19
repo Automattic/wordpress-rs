@@ -57,22 +57,26 @@ pub(crate) fn show_tag_followed(
     followed: bool,
 ) -> Result<(), SqliteDbError> {
     let subscribed = ReaderMenuSection::Subscribed;
-    if followed {
-        // The tag's name comes from the recommended tags when the caller didn't have it.
-        let title = match title {
-            Some(title) => Some(title),
-            None => ReaderMenuRepository::select_item(
-                executor,
-                owner,
-                ReaderMenuSection::Recommended,
-                &slug.0,
-            )?
-            .and_then(|item| item.title),
-        };
-        ReaderMenuRepository::upsert_item(executor, owner, subscribed, &tag_menu_item(slug, title))
-    } else {
-        ReaderMenuRepository::delete_item(executor, owner, subscribed, &slug.0).map(|_| ())
+    // A tag is found by its slug: the server's menu keys a tag by its ID.
+    if !followed {
+        return ReaderMenuRepository::delete_tag(executor, owner, subscribed, &slug.0).map(|_| ());
     }
+    if ReaderMenuRepository::select_tag(executor, owner, subscribed, &slug.0)?.is_some() {
+        // Listed already, by the server or by an earlier follow.
+        return Ok(());
+    }
+    // The tag's name comes from the recommended tags when the caller didn't have it.
+    let title = match title {
+        Some(title) => Some(title),
+        None => ReaderMenuRepository::select_tag(
+            executor,
+            owner,
+            ReaderMenuSection::Recommended,
+            &slug.0,
+        )?
+        .and_then(|item| item.title),
+    };
+    ReaderMenuRepository::upsert_item(executor, owner, subscribed, &tag_menu_item(slug, title))
 }
 
 /// Whether the cache shows a tag as followed.
@@ -82,7 +86,7 @@ pub(crate) fn is_tag_followed(
     slug: &ReaderTagSlug,
 ) -> Result<bool, SqliteDbError> {
     Ok(
-        ReaderMenuRepository::select_item(executor, owner, ReaderMenuSection::Subscribed, &slug.0)?
+        ReaderMenuRepository::select_tag(executor, owner, ReaderMenuSection::Subscribed, &slug.0)?
             .is_some(),
     )
 }

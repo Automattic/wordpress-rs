@@ -120,33 +120,40 @@ impl ReaderMenuRepository {
         Ok(())
     }
 
-    pub fn delete_item(
+    /// Removes a section's entries for a tag, found by its slug as [`Self::select_tag`] finds
+    /// them. Returns whether there was one.
+    pub fn delete_tag(
         executor: &impl QueryExecutor,
         account: RowId,
         section: ReaderMenuSection,
-        key: &str,
+        slug: &str,
     ) -> Result<bool, SqliteDbError> {
         let removed = executor.execute(
-            "DELETE FROM reader_menu_items WHERE account_id = ?1 AND section = ?2 AND key = ?3",
-            params![account, section_number(section), key],
+            "DELETE FROM reader_menu_items
+            WHERE account_id = ?1 AND section = ?2 AND (slug = ?3 OR (slug IS NULL AND key = ?3))",
+            params![account, section_number(section), slug],
         )?;
         Ok(removed > 0)
     }
 
-    pub fn select_item(
+    /// A section's entry for a tag, found by its slug. The server keys a tag in the menu by the
+    /// tag's ID, and a tag followed on this device is keyed by its slug, so the slug is what both
+    /// have. An entry without a slug is matched by its key.
+    pub fn select_tag(
         executor: &impl QueryExecutor,
         account: RowId,
         section: ReaderMenuSection,
-        key: &str,
+        slug: &str,
     ) -> Result<Option<ReaderMenuItem>, SqliteDbError> {
         let sql = format!(
             "SELECT {MENU_COLUMNS} FROM reader_menu_items
-            WHERE account_id = ?1 AND section = ?2 AND key = ?3"
+            WHERE account_id = ?1 AND section = ?2 AND (slug = ?3 OR (slug IS NULL AND key = ?3))
+            ORDER BY position, rowid LIMIT 1"
         );
         let mut statement = executor.prepare(&sql)?;
         Ok(statement
             .query_row(
-                params![account, section_number(section), key],
+                params![account, section_number(section), slug],
                 menu_item_from_row,
             )
             .optional()?)
@@ -685,14 +692,46 @@ mod tests {
         ReaderMenuRepository::upsert_item(&conn, account, subscribed, &tag("b")).unwrap();
         assert_eq!(keys(&conn, account, subscribed), ["b", "a", "c"]);
 
-        assert!(ReaderMenuRepository::delete_item(&conn, account, subscribed, "a").unwrap());
-        assert!(!ReaderMenuRepository::delete_item(&conn, account, subscribed, "a").unwrap());
+        assert!(ReaderMenuRepository::delete_tag(&conn, account, subscribed, "a").unwrap());
+        assert!(!ReaderMenuRepository::delete_tag(&conn, account, subscribed, "a").unwrap());
         assert_eq!(keys(&conn, account, subscribed), ["b", "c"]);
         assert_eq!(keys(&conn, account, ReaderMenuSection::Recommended), ["a"]);
-        let item = ReaderMenuRepository::select_item(&conn, account, subscribed, "c")
+        let item = ReaderMenuRepository::select_tag(&conn, account, subscribed, "c")
             .unwrap()
             .unwrap();
         assert_eq!(item, tag("c"));
+    }
+
+    #[test]
+    fn test_a_tag_is_found_and_removed_by_its_slug_whatever_its_key() {
+        let (conn, account) = conn();
+        let subscribed = ReaderMenuSection::Subscribed;
+        // As the server lists it: keyed by the tag's ID.
+        let listed = ReaderMenuItem {
+            key: "9002".to_string(),
+            ..tag("knitting")
+        };
+        // An entry without a slug is known by its key.
+        let without_slug = ReaderMenuItem {
+            slug: None,
+            ..tag("travel")
+        };
+        ReaderMenuRepository::replace_section(
+            &conn,
+            account,
+            subscribed,
+            &[listed.clone(), without_slug.clone()],
+        )
+        .unwrap();
+
+        let found = |slug: &str| ReaderMenuRepository::select_tag(&conn, account, subscribed, slug);
+        assert_eq!(found("knitting").unwrap(), Some(listed));
+        assert_eq!(found("9002").unwrap(), None);
+        assert_eq!(found("travel").unwrap(), Some(without_slug));
+
+        assert!(ReaderMenuRepository::delete_tag(&conn, account, subscribed, "knitting").unwrap());
+        assert!(ReaderMenuRepository::delete_tag(&conn, account, subscribed, "travel").unwrap());
+        assert!(keys(&conn, account, subscribed).is_empty());
     }
 
     #[test]

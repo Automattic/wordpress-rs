@@ -2622,6 +2622,69 @@ mod more_actions {
     }
 
     #[tokio::test]
+    async fn a_tag_the_servers_menu_lists_is_unfollowed_by_its_slug() {
+        let (service, executor) = service();
+        // The server's menu keys a followed tag by the tag's ID, not its slug.
+        executor.push(Step::Respond(
+            200,
+            json!({
+                "default": {},
+                "subscribed": {
+                    "9002": {
+                        "ID": "9002",
+                        "title": "Knitting",
+                        "slug": "knitting",
+                        "display_name": "knitting",
+                        "type": "tag"
+                    }
+                },
+                "recommended": {}
+            }),
+        ));
+        service.refresh_menu().await.unwrap();
+        let slug = ReaderTagSlug("knitting".to_string());
+        let followed = |service: &ReaderService| {
+            service
+                .followed_tags()
+                .unwrap()
+                .into_iter()
+                .map(|tag| (tag.key, tag.slug))
+                .collect::<Vec<_>>()
+        };
+        let listed = vec![("9002".to_string(), Some("knitting".to_string()))];
+        assert_eq!(followed(&service), listed);
+
+        // A refused unfollow puts it back as it was.
+        executor.push(refused("unauthorized"));
+        let result = service.set_tag_followed(slug.clone(), None, false).await;
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        assert_eq!(
+            followed(&service),
+            [("knitting".to_string(), Some("knitting".to_string()))]
+        );
+
+        // Following a tag that's listed already doesn't list it twice.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [], "added_tags": [] }),
+        ));
+        service
+            .set_tag_followed(slug.clone(), None, true)
+            .await
+            .unwrap();
+        assert_eq!(followed(&service).len(), 1);
+
+        // An unfollow the server takes removes it.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": false, "tags": [], "removed_tag": 9002 }),
+        ));
+        let outcome = service.set_tag_followed(slug, None, false).await.unwrap();
+        assert_eq!(outcome, ReaderActionOutcome::Synced);
+        assert!(followed(&service).is_empty());
+    }
+
+    #[tokio::test]
     async fn signed_out_tags_are_followed_on_the_device_and_an_account_takes_them_over() {
         let cache = cache();
         let executor = Arc::new(ScriptedExecutor::default());
