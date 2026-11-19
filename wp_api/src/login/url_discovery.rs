@@ -793,7 +793,7 @@ pub(crate) fn parse_rsd_for_xmlrpc(rsd_xml: &str) -> Option<ParsedUrl> {
         .descendants()
         .find(|n| n.has_tag_name("api") && n.attribute("name") == Some("WordPress"))?
         .attribute("apiLink")
-        .and_then(|s| ParsedUrl::parse(s).ok())
+        .and_then(|s| ParsedUrl::parse_http_or_https(s).ok())
 }
 
 pub(crate) fn is_xmlrpc_response(body: &str) -> bool {
@@ -978,6 +978,25 @@ mod tests {
         assert_eq!(
             parsed_url,
             Some(ParsedUrl::parse("https://example.com/xmlrpc.php").unwrap())
+        );
+    }
+
+    // #1756: the XML-RPC address an RSD document advertises is requested next, so only an `http`
+    // or `https` one is used.
+    #[rstest]
+    #[case::web_url(
+        "https://example.com/xmlrpc.php",
+        Some("https://example.com/xmlrpc.php")
+    )]
+    #[case::data_url("data:text/xml,methodResponse", None)]
+    #[case::file_url("file:///etc/passwd", None)]
+    fn test_parse_rsd_xmlrpc_address(#[case] api_link: &str, #[case] expected: Option<&str>) {
+        let content = format!(
+            r#"<rsd version="1.0"><service><apis><api name="WordPress" blogID="1" preferred="true" apiLink="{api_link}" /></apis></service></rsd>"#
+        );
+        assert_eq!(
+            parse_rsd_for_xmlrpc(&content),
+            expected.map(|url| ParsedUrl::parse(url).unwrap())
         );
     }
 

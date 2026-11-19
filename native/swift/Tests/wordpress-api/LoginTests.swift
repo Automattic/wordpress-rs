@@ -494,6 +494,51 @@ class LoginTests {
         )
     }
 
+    // Regression tests for #1756: a site could crash the app by advertising a non-web address, such as
+    // a `data:` URL, as its API root. `URLSession` answers one with a plain `URLResponse`.
+    //
+    // Excluded on watchOS: the session's `protocolClasses` stub isn't dependably consulted there (see
+    // `SafeRequestExecutorTests`).
+    #if !os(watchOS)
+    @Test("A site advertising a non-web API root fails discovery instead of crashing")
+    func testNonWebApiRootFromLinkTag() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [NonWebApiRootSiteURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+        let client = WordPressLoginClient(requestExecutor: WpRequestExecutor(urlSession: session))
+
+        // A crash ends the test process, so any discovery failure passes. Which one is reported depends on
+        // whether discovery ignores the `data:` link or the executor refuses to request it.
+        await #expect(throws: AutoDiscoveryAttemptFailure.self) {
+            _ = try await client.details(ofSite: "https://example.com")
+        }
+    }
+    #endif
+
+    @Test("A typed non-web address fails discovery instead of crashing", arguments: ["data:,", "about:blank"])
+    func testNonWebSiteAddress(_ address: String) async {
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.finishTasksAndInvalidate() }
+        let client = WordPressLoginClient(requestExecutor: WpRequestExecutor(urlSession: session))
+
+        await #expect(
+            performing: {
+                _ = try await client.details(ofSite: address)
+            },
+            throws: { error in
+                // Both attempts fail to parse: the address as typed has an unsupported scheme, and the
+                // `https://` form (`https://data:,`) has an invalid port. Either may be reported.
+                guard case .ParseSiteUrl = error as? AutoDiscoveryAttemptFailure else {
+                    Issue.record("Expected .ParseSiteUrl, got \(error)")
+                    return false
+                }
+
+                return true
+            }
+        )
+    }
+
     private func findLoginUrl(forSite url: String) async throws -> ParsedUrl {
         let result = try await client.details(ofSite: url)
         return result.authentication.applicationPasswordsUrl!
@@ -561,3 +606,35 @@ class LoginTests {
 }
 
 // swiftlint:enable line_length
+
+#if !os(watchOS)
+/// Serves a homepage that advertises a `data:` address as its API root, and a 404 for every other page.
+///
+/// It only handles `http` and `https`, so a `data:` request reaches `URLSession`'s own handler, as it
+/// does in an app.
+private final class NonWebApiRootSiteURLProtocol: URLProtocol {
+    override static func canInit(with request: URLRequest) -> Bool {
+        ["http", "https"].contains(request.url?.scheme)
+    }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let url = request.url!
+        let isHomepage = url.path.isEmpty || url.path == "/"
+        let body =
+            isHomepage
+            ? #"<html><head><link rel="https://api.w.org/" href="data:application/json,{}"></head></html>"#
+            : "Not Found"
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: isHomepage ? 200 : 404,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "text/html"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+#endif

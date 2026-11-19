@@ -123,13 +123,14 @@ impl WpLoginClient {
         attempt: AutoDiscoveryAttempt,
         context: Option<Arc<RequestContext>>,
     ) -> AutoDiscoveryAttemptResult {
-        let parsed_site_url: Arc<ParsedUrl> = match ParsedUrl::parse(&attempt.attempt_site_url) {
-            Ok(u) => u,
-            Err(e) => {
-                return AutoDiscoveryAttemptResult::from_parse_site_url_error(attempt, e);
+        let parsed_site_url: Arc<ParsedUrl> =
+            match ParsedUrl::parse_http_or_https(&attempt.attempt_site_url) {
+                Ok(u) => u,
+                Err(e) => {
+                    return AutoDiscoveryAttemptResult::from_parse_site_url_error(attempt, e);
+                }
             }
-        }
-        .into();
+            .into();
 
         match self
             .find_api_root_url(Arc::clone(&parsed_site_url), context.clone())
@@ -655,7 +656,10 @@ impl PerformsRequests for WpLoginClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{request::WpMultipartFormRequest, unit_test_common::wp_network_response_from_json};
+    use crate::{
+        login::url_discovery::AutoDiscoveryAttemptType, parsed_url::ParseUrlError,
+        request::WpMultipartFormRequest, unit_test_common::wp_network_response_from_json,
+    };
     use async_trait::async_trait;
     use rstest::*;
     use std::sync::Mutex;
@@ -862,6 +866,41 @@ mod tests {
                 Err(VerifyIssuedApplicationPasswordError::Other { .. })
             ),
             "{result:#?}"
+        );
+    }
+
+    // #1756: a typed address that isn't `http` or `https`, such as `data:,`, was requested.
+    // `URLSession` answers one without an HTTP response, which crashed the Swift app.
+    #[rstest]
+    #[case::data_url("data:,")]
+    #[case::about_url("about:blank")]
+    #[case::file_url("file:///etc/passwd")]
+    #[tokio::test]
+    async fn test_api_discovery_rejects_a_typed_non_web_address(#[case] site_url: &str) {
+        let executor = Arc::new(StubExecutor {
+            response: wp_network_response_from_json("{}", 200),
+            requests: Mutex::new(vec![]),
+        });
+        let client = WpLoginClient::new_with_default_middleware_pipeline(executor.clone());
+        let result = client.api_discovery(site_url.to_string(), None).await;
+        let attempt = &result.attempts[&AutoDiscoveryAttemptType::UserInput];
+        assert!(
+            matches!(
+                attempt.api_discovery_result,
+                Err(AutoDiscoveryAttemptFailure::ParseSiteUrl {
+                    error: ParseUrlError::UnsupportedScheme
+                })
+            ),
+            "{attempt:#?}"
+        );
+        // The `https://` attempt for `file:///etc/passwd` is `https://file///etc/passwd`, which
+        // is still requested.
+        let requested = executor.requests.lock().unwrap();
+        assert!(
+            requested
+                .iter()
+                .all(|request| request.url.0.starts_with("https://")),
+            "{requested:#?}"
         );
     }
 

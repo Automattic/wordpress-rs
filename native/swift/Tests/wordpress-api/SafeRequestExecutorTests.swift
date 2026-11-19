@@ -27,6 +27,88 @@ struct SafeRequestExecutorTests {
         #expect(elapsed < .seconds(2))
     }
 
+    // Regression tests for #1756. `URLSession` answers a `data:`, `about:` or `file:` address with a
+    // plain `URLResponse`, not an `HTTPURLResponse`, and `WpNetworkResponse.init` trapped on it. A site
+    // that advertised such an address as its API root crashed the app.
+    @Test(
+        "A non-web address fails the request instead of being sent",
+        arguments: ["data:application/json,{}", "about:blank", "file:///etc/hosts", "ftp://example.com/wp-json/"]
+    )
+    func testNonWebAddressIsRejected(address: String) async {
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.finishTasksAndInvalidate() }
+        let executor = WpRequestExecutor(urlSession: session)
+
+        let result = await executor.perform(BuiltRequest(address: address))
+
+        guard case .failure(.RequestExecutionFailed(_, _, let reason, _, _)) = result else {
+            Issue.record("Expected a RequestExecutionFailed failure for \(address), got \(result)")
+            return
+        }
+
+        guard case .genericError = reason else {
+            Issue.record("Expected .genericError for \(address), got \(reason)")
+            return
+        }
+    }
+
+    // A `URLProtocol` an app registers can still answer with a plain `URLResponse`. That is a failed
+    // request, not a reason to crash.
+    @Test("A non-HTTP response fails the request instead of crashing")
+    func testNonHttpResponseIsAFailure() async {
+        let executor = WpRequestExecutor(urlSession: .shared)
+
+        let result = await executor.perform(NonHttpResponseRequest())
+
+        guard case .failure(.RequestExecutionFailed(_, _, let reason, _, _)) = result else {
+            Issue.record("Expected a RequestExecutionFailed failure, got \(result)")
+            return
+        }
+
+        guard case .genericError = reason else {
+            Issue.record("Expected .genericError, got \(reason)")
+            return
+        }
+    }
+
+    // End-to-end companion: an app-supplied `file:` API root, sent through the production
+    // `WpNetworkRequest.perform` and back through the Rust client. The file exists, so without the
+    // check `URLSession` reads it and answers with a plain `URLResponse`.
+    @Test("A non-web API root surfaces end-to-end as an error instead of crashing")
+    func testNonWebApiRootSurfacesEndToEnd() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let apiRoot = directory.appendingPathComponent("wp-json")
+        try Data("{}".utf8).write(to: apiRoot)
+
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.finishTasksAndInvalidate() }
+
+        let api = try WordPressAPI(
+            siteInfo: .selfHosted(
+                siteUrl: ParsedUrl.parse(input: directory.absoluteString),
+                apiRoot: ParsedUrl.parse(input: apiRoot.absoluteString)
+            ),
+            authenticationProvider: .none(),
+            executor: WpRequestExecutor(urlSession: session),
+            middlewarePipeline: .default,
+            appNotifier: nil
+        )
+
+        do {
+            _ = try await api.apiRoot.get()
+            Issue.record("Expected the request to fail, but it succeeded")
+        } catch {
+            let reason = (error as? CarriesRequestExecutionErrorReason)?.executionErrorReason
+            guard case .some(.genericError) = reason else {
+                Issue.record("Expected .genericError, got \(String(describing: reason)) (error: \(error))")
+                return
+            }
+        }
+    }
+
     // Regression test for #1491: a URLSession timeout (`URLError.timedOut`) had no branch in
     // `perform(_:)`, so it fell through to `.genericError` and `HttpTimeoutError` was unreachable on
     // Apple platforms — even though reqwest (`is_timeout()`) and Kotlin (`SocketTimeoutException`)
@@ -195,6 +277,51 @@ struct SafeRequestExecutorTests {
     }
     #endif // !os(watchOS)
     #endif
+}
+
+/// A `NetworkRequestContent` that builds its request with the production `buildURLRequest`, then sends
+/// it through the executor's session.
+private struct BuiltRequest: NetworkRequestContent {
+    let address: String
+
+    func requestId() -> String { "1756-non-web-address" }
+    func method() -> RequestMethod { .get }
+    func url() -> WpEndpointUrl { address }
+    func headerMap() -> WpNetworkHeaderMap { .empty }
+    func encodeBody(into _: inout URLRequest) throws {}
+
+    func perform(
+        in session: URLSession,
+        withAdditionalHeaders headers: [String: String],
+        delegate _: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        try await session.data(for: buildURLRequest(additionalHeaders: headers))
+    }
+}
+
+/// A `NetworkRequestContent` answered with a plain `URLResponse`, as a `URLProtocol` an app registers
+/// may answer.
+private struct NonHttpResponseRequest: NetworkRequestContent {
+    func requestId() -> String { "1756-non-http-response" }
+    func method() -> RequestMethod { .get }
+    func url() -> WpEndpointUrl { "https://example.com/wp-json/" }
+    func headerMap() -> WpNetworkHeaderMap { .empty }
+    func encodeBody(into _: inout URLRequest) throws {}
+
+    func perform(
+        in _: URLSession,
+        withAdditionalHeaders _: [String: String],
+        delegate _: URLSessionTaskDelegate?
+    ) async throws -> (Data, URLResponse) {
+        let body = Data("{}".utf8)
+        let response = URLResponse(
+            url: URL(string: url())!,
+            mimeType: "application/json",
+            expectedContentLength: body.count,
+            textEncodingName: nil
+        )
+        return (body, response)
+    }
 }
 
 #if !os(Linux)
