@@ -262,6 +262,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
     let static_language_provider = &config.static_types.language_provider;
     let static_wp_network_request_type = &config.static_types.wp_network_request;
     let static_wp_multipart_form_request_type = &config.static_types.wp_multipart_form_request;
+    let static_parse_url_error_type = &config.static_types.parse_url_error;
     let generated_endpoint_ident = &config.generated_idents.endpoint;
     let generated_request_builder_ident = &config.generated_idents.request_builder;
 
@@ -303,9 +304,9 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
                 static_wp_network_request_type
             };
             quote! {
-                pub #fn_signature -> #return_type {
+                pub #fn_signature -> Result<#return_type, #static_parse_url_error_type> {
                     #url_from_endpoint
-                    #fn_body_build_request_from_url
+                    Ok(#fn_body_build_request_from_url)
                 }
             }
         })
@@ -339,6 +340,7 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
     let static_api_url_resolver = &config.static_types.api_url_resolver;
     let static_api_endpoint_url_type = &config.static_types.api_endpoint_url;
     let static_language_provider = &config.static_types.language_provider;
+    let static_parse_url_error_type = &config.static_types.parse_url_error;
     let generated_endpoint_ident = &config.generated_idents.endpoint;
 
     let functions = parsed_enum.variants.iter().map(|variant| {
@@ -377,7 +379,7 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
             let fields_query_pairs =
                 fn_body_fields_query_pairs(&config.crate_ident, &context_and_filter_handler);
             quote! {
-                pub #fn_signature -> #static_api_endpoint_url_type {
+                pub #fn_signature -> Result<#static_api_endpoint_url_type, #static_parse_url_error_type> {
                     #url_from_api_url_resolver
                     // Appended before the request's own params so that an endpoint
                     // declaring its own locale parameter overrides this one.
@@ -386,7 +388,7 @@ fn generate_endpoint_type(config: &Config, parsed_enum: &ParsedEnum) -> TokenStr
                     #query_pairs
                     #additional_query_pairs
                     #fields_query_pairs
-                    url.into()
+                    Ok(url.into())
                 }
             }
         })
@@ -544,6 +546,7 @@ pub struct ConfigStaticTypes {
     pub language_provider: TokenStream,
     pub wp_network_request: TokenStream,
     pub wp_multipart_form_request: TokenStream,
+    pub parse_url_error: TokenStream,
 }
 
 impl ConfigStaticTypes {
@@ -556,6 +559,7 @@ impl ConfigStaticTypes {
             language_provider: quote! { Option<std::sync::Arc<dyn #crate_ident::wp_com::language::WpComLanguageProvider>> },
             wp_network_request: quote! { #crate_ident::request::WpNetworkRequest },
             wp_multipart_form_request: quote! { #crate_ident::request::WpMultipartFormRequest },
+            parse_url_error: quote! { #crate_ident::parsed_url::ParseUrlError },
         }
     }
 }

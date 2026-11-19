@@ -1,5 +1,5 @@
 use crate::{
-    parsed_url::ParsedUrl,
+    parsed_url::{ParseUrlError, ParsedUrl},
     request::endpoint::{ApiUrlResolver, AsNamespace, WpNamespace},
     wp_com::WpComBaseUrl,
 };
@@ -70,7 +70,11 @@ impl WpComDotOrgApiUrlResolver {
 
 #[uniffi::export]
 impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
-    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
+    fn resolve(
+        &self,
+        namespace: String,
+        endpoint_segments: Vec<String>,
+    ) -> Result<Arc<ParsedUrl>, ParseUrlError> {
         {
             if !WpNamespace::iter().any(|n| n.namespace_value() == namespace) {
                 panic!(
@@ -89,18 +93,16 @@ impl ApiUrlResolver for WpComDotOrgApiUrlResolver {
             );
             let parsed_url =
                 ParsedUrl::parse(&url_string).expect("WordPress.com API root URL is valid");
-            return Arc::new(parsed_url);
+            return Ok(Arc::new(parsed_url));
         }
 
-        Arc::new(
-            self.base_url
-                .by_extending_and_splitting_by_forward_slash(
-                    vec![namespace, "sites".to_string(), self.site_id.to_string()]
-                        .into_iter()
-                        .chain(endpoint_segments),
-                )
-                .into(),
-        )
+        self.base_url
+            .by_extending_and_splitting_by_forward_slash(
+                vec![namespace, "sites".to_string(), self.site_id.to_string()]
+                    .into_iter()
+                    .chain(endpoint_segments),
+            )
+            .map(|url| Arc::new(url.into()))
     }
 
     fn route_path(&self, namespace: String, endpoint_path: String) -> String {
@@ -133,7 +135,11 @@ impl Default for WpComApiClientInternalUrlResolver {
 }
 
 impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
-    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
+    fn resolve(
+        &self,
+        namespace: String,
+        endpoint_segments: Vec<String>,
+    ) -> Result<Arc<ParsedUrl>, ParseUrlError> {
         {
             if WpNamespace::iter().any(|n| n.namespace_value() == namespace) {
                 panic!(
@@ -141,13 +147,11 @@ impl ApiUrlResolver for WpComApiClientInternalUrlResolver {
                 );
             }
         }
-        Arc::new(
-            self.base_url
-                .by_extending_and_splitting_by_forward_slash(
-                    vec![namespace].into_iter().chain(endpoint_segments),
-                )
-                .into(),
-        )
+        self.base_url
+            .by_extending_and_splitting_by_forward_slash(
+                vec![namespace].into_iter().chain(endpoint_segments),
+            )
+            .map(|url| Arc::new(url.into()))
     }
 
     fn route_path(&self, namespace: String, endpoint_path: String) -> String {
@@ -196,25 +200,43 @@ pub(crate) mod tests {
         Some(Arc::new(StubLanguageProvider(language)))
     }
 
-    pub fn validate_wp_com_rest_v1_1_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+    pub fn validate_wp_com_rest_v1_1_endpoint(
+        endpoint_url: Result<ApiEndpointUrl, ParseUrlError>,
+        path: &str,
+    ) {
         validate_endpoint(WpComNamespace::RestV1_1, endpoint_url, path);
     }
 
-    pub fn validate_wp_com_rest_v1_2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+    pub fn validate_wp_com_rest_v1_2_endpoint(
+        endpoint_url: Result<ApiEndpointUrl, ParseUrlError>,
+        path: &str,
+    ) {
         validate_endpoint(WpComNamespace::RestV1_2, endpoint_url, path);
     }
 
-    pub fn validate_wp_com_rest_v1_3_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+    pub fn validate_wp_com_rest_v1_3_endpoint(
+        endpoint_url: Result<ApiEndpointUrl, ParseUrlError>,
+        path: &str,
+    ) {
         validate_endpoint(WpComNamespace::RestV1_3, endpoint_url, path);
     }
 
-    pub fn validate_wp_com_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+    pub fn validate_wp_com_v2_endpoint(
+        endpoint_url: Result<ApiEndpointUrl, ParseUrlError>,
+        path: &str,
+    ) {
         validate_endpoint(WpComNamespace::V2, endpoint_url, path);
     }
 
-    fn validate_endpoint(namespace: WpComNamespace, endpoint_url: ApiEndpointUrl, path: &str) {
+    fn validate_endpoint(
+        namespace: WpComNamespace,
+        endpoint_url: Result<ApiEndpointUrl, ParseUrlError>,
+        path: &str,
+    ) {
         assert_eq!(
-            endpoint_url.as_str(),
+            endpoint_url
+                .expect("The WordPress.com base URL can have a path")
+                .as_str(),
             format!("{}{}{}", WP_COM_BASE_URL, namespace.namespace_value(), path)
         );
     }
@@ -233,8 +255,23 @@ pub(crate) mod tests {
         assert_eq!(
             resolver
                 .resolve(namespace.to_string(), endpoint_segments)
+                .expect("The WordPress.com base URL can have a path")
                 .url(),
             expected_url
+        );
+    }
+
+    #[test]
+    fn wp_com_dot_org_api_url_resolver_rejects_a_base_url_that_cannot_have_a_path() {
+        let resolver = WpComDotOrgApiUrlResolver::new(
+            "example.wordpress.com".to_string(),
+            WpComBaseUrl::Custom(ParsedUrl::parse("data:,").expect("valid url").into()),
+        );
+        assert_eq!(
+            resolver
+                .resolve("/wp/v2".to_string(), vec!["posts".to_string()])
+                .unwrap_err(),
+            ParseUrlError::RelativeUrlWithCannotBeABaseBase
         );
     }
 }

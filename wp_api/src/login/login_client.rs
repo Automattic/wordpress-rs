@@ -450,7 +450,8 @@ impl WpLoginClient {
             )),
             None,
         )
-        .retrieve_current_with_edit_context();
+        .retrieve_current_with_edit_context()
+        .map_err(WpApiError::from)?;
         let response = self
             .perform(request.into(), context)
             .await
@@ -486,13 +487,14 @@ impl WpLoginClient {
         {
             candidates.push(url);
         }
-        // Fallback to the default XML-RPC URL.
-        candidates.push(
-            details
-                .parsed_site_url
-                .by_extending_and_splitting_by_forward_slash(["xmlrpc.php"])
-                .into(),
-        );
+        // Fallback to the default XML-RPC URL. A site address that can't have a
+        // path, such as `data:,`, has none.
+        if let Ok(url) = details
+            .parsed_site_url
+            .by_extending_and_splitting_by_forward_slash(["xmlrpc.php"])
+        {
+            candidates.push(url.into());
+        }
         candidates.dedup();
 
         let mut failures: Vec<XmlrpcDiscoveryError> = vec![];
@@ -512,7 +514,7 @@ impl WpLoginClient {
             .into_iter()
             .sorted_by(|a, b| b.importance().cmp(&a.importance()))
             .next()
-            .expect("There is at least one failure"))
+            .unwrap_or(XmlrpcDiscoveryError::EndpointNotFound))
     }
 
     async fn validate_xmlrpc_url(
@@ -882,6 +884,73 @@ mod tests {
                     ..
                 })
             ),
+            "{result:#?}"
+        );
+    }
+
+    // An API root that can't have a path, such as `data:,`, used to panic
+    // here (#1781).
+    #[tokio::test]
+    async fn test_verify_issued_application_password_with_an_api_root_that_cannot_have_a_path() {
+        let executor = Arc::new(StubExecutor {
+            response: wp_network_response_from_json("{}", 200),
+            requests: Mutex::new(vec![]),
+        });
+        let client = WpLoginClient::new_with_default_middleware_pipeline(executor.clone());
+        let result = client
+            .verify_issued_application_password(
+                ParsedUrl::parse("data:,").unwrap().into(),
+                WpApiApplicationPasswordDetails {
+                    site_url: "https://example.com".to_string(),
+                    user_login: "demo".to_string(),
+                    password: "abcd efgh".to_string(),
+                },
+                None,
+            )
+            .await;
+
+        assert!(
+            matches!(
+                &result,
+                Err(VerifyIssuedApplicationPasswordError::Other {
+                    error: WpApiError::SiteUrlParsingError { reason }
+                }) if reason == "RelativeUrlWithCannotBeABaseBase"
+            ),
+            "{result:#?}"
+        );
+        assert!(executor.requests.lock().unwrap().is_empty());
+    }
+
+    // A site address that can't have a path, such as `data:,`, has no default
+    // XML-RPC address. Looking for one used to panic (#1781).
+    #[tokio::test]
+    async fn test_xmlrpc_discovery_for_a_site_address_that_cannot_have_a_path() {
+        let executor = Arc::new(StubExecutor {
+            response: wp_network_response_from_json("<html></html>", 200),
+            requests: Mutex::new(vec![]),
+        });
+        let client = WpLoginClient::new_with_default_middleware_pipeline(executor.clone());
+        let site_url: Arc<ParsedUrl> = ParsedUrl::parse("data:,").unwrap().into();
+        let api_details: WpApiDetails = serde_json::from_str(
+            r#"{"name":"","description":"","url":"","home":"","namespaces":[],"authentication":[],"routes":{}}"#,
+        )
+        .unwrap();
+        let result = client
+            .xmlrpc_discovery(
+                AutoDiscoveryAttemptSuccess {
+                    parsed_site_url: site_url.clone(),
+                    api_root_url: site_url.clone(),
+                    api_details: api_details.into(),
+                    authentication: DiscoveredAuthenticationMechanism::ApplicationPasswords {
+                        authentication_url: site_url,
+                    },
+                },
+                None,
+            )
+            .await;
+
+        assert!(
+            matches!(result, Err(XmlrpcDiscoveryError::EndpointNotFound)),
             "{result:#?}"
         );
     }

@@ -1,4 +1,5 @@
 use crate::cloudflare::{CloudflareErrorKind, CloudflareErrorResponse};
+use crate::parsed_url::ParseUrlError;
 use crate::request::WpRedirect;
 use crate::request::{
     HttpAuthMethod, HttpAuthMethodParsingError, RequestMethod, WpNetworkResponse,
@@ -989,6 +990,19 @@ impl From<RequestExecutionError> for WpApiError {
             RequestExecutionError::MediaFileUnreadable { file_path } => {
                 Self::MediaFileUnreadable { file_path }
             }
+        }
+    }
+}
+
+/// A request whose address couldn't be built, for example from an API root
+/// that can't have a path, such as `data:,`.
+///
+/// `reason` names the `ParseUrlError` case, never the address, so a log line
+/// can include it unredacted.
+impl From<ParseUrlError> for WpApiError {
+    fn from(value: ParseUrlError) -> Self {
+        Self::SiteUrlParsingError {
+            reason: format!("{value:?}"),
         }
     }
 }

@@ -20,7 +20,14 @@ impl ParsedUrl {
         self.inner.as_str()
     }
 
-    pub fn by_extending_and_splitting_by_forward_slash<I>(&self, segments: I) -> Url
+    /// Append path segments to this URL, splitting each one on `/`.
+    ///
+    /// Fails with [`ParseUrlError::RelativeUrlWithCannotBeABaseBase`] for a URL
+    /// that can't have a path, such as `data:,`, `about:blank` or `mailto:x`.
+    pub fn by_extending_and_splitting_by_forward_slash<I>(
+        &self,
+        segments: I,
+    ) -> Result<Url, ParseUrlError>
     where
         I: IntoIterator,
         I::Item: AsRef<str>,
@@ -36,7 +43,6 @@ impl ParsedUrl {
                     })
                     .collect::<Vec<String>>()
             }))
-            .expect("ParsedUrl is already parsed, so this can't result in an error")
     }
 
     /// Extend an API-root URL with REST API path segments, preserving the form
@@ -44,7 +50,10 @@ impl ParsedUrl {
     /// query-parameter form (`…/index.php?rest_route=/`); for those we append
     /// into the `rest_route` value rather than the path. Otherwise we extend
     /// the path as before.
-    pub fn by_extending_rest_api_path<I>(&self, segments: I) -> Url
+    ///
+    /// Fails like [`Self::by_extending_and_splitting_by_forward_slash`] when
+    /// the path form is needed and the URL can't have a path.
+    pub fn by_extending_rest_api_path<I>(&self, segments: I) -> Result<Url, ParseUrlError>
     where
         I: IntoIterator,
         I::Item: AsRef<str>,
@@ -87,7 +96,7 @@ impl ParsedUrl {
             for (k, v) in pairs {
                 url.query_pairs_mut().append_pair(&k, &v);
             }
-            return url;
+            return Ok(url);
         }
 
         self.by_extending_and_splitting_by_forward_slash([appended_path])
@@ -101,26 +110,32 @@ impl Display for ParsedUrl {
 }
 
 trait UrlExtension {
-    fn extend<I>(self, segments: I) -> Result<Url, ()>
+    fn extend<I>(self, segments: I) -> Result<Url, ParseUrlError>
     where
         I: IntoIterator,
         I::Item: AsRef<str>;
 }
 
 impl UrlExtension for Url {
-    fn extend<I>(mut self, segments: I) -> Result<Url, ()>
+    fn extend<I>(mut self, segments: I) -> Result<Url, ParseUrlError>
     where
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
+        // `path_segments_mut` fails only for a URL that can't have a path, such
+        // as `data:,`. `Url::join` gives this error for one, too.
+        let cannot_be_a_base = |()| ParseUrlError::RelativeUrlWithCannotBeABaseBase;
+
         // Drop the trailing slash, so that `foo/` and `bar` turn into `foo/bar` instead of `foo//bar`.
         if let Some(mut segments) = self.path_segments()
             && segments.next_back() == Some("")
         {
-            self.path_segments_mut()?.pop();
+            self.path_segments_mut().map_err(cannot_be_a_base)?.pop();
         }
 
-        self.path_segments_mut()?.extend(segments);
+        self.path_segments_mut()
+            .map_err(cannot_be_a_base)?
+            .extend(segments);
         Ok(self)
     }
 }
@@ -396,8 +411,27 @@ mod tests {
     ) {
         let parsed = ParsedUrl::parse(api_root).unwrap();
         assert_eq!(
-            parsed.by_extending_rest_api_path(segments).as_str(),
+            parsed
+                .by_extending_rest_api_path(segments)
+                .expect("The URL can have a path")
+                .as_str(),
             expected
+        );
+    }
+
+    #[rstest]
+    #[case::data("data:,")]
+    #[case::about_blank("about:blank")]
+    #[case::mailto("mailto:someone@example.com")]
+    fn extending_a_url_that_cannot_have_a_path_fails(#[case] input: &str) {
+        let parsed = ParsedUrl::parse(input).unwrap();
+        assert_eq!(
+            parsed.by_extending_and_splitting_by_forward_slash(["xmlrpc.php"]),
+            Err(ParseUrlError::RelativeUrlWithCannotBeABaseBase)
+        );
+        assert_eq!(
+            parsed.by_extending_rest_api_path(["/wp/v2", "users"]),
+            Err(ParseUrlError::RelativeUrlWithCannotBeABaseBase)
         );
     }
 }

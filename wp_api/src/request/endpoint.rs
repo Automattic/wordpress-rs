@@ -1,4 +1,4 @@
-use crate::parsed_url::ParsedUrl;
+use crate::parsed_url::{ParseUrlError, ParsedUrl};
 use std::sync::Arc;
 use strum_macros::EnumIter;
 use url::Url;
@@ -144,7 +144,13 @@ impl AsNamespace for WpNamespace {
 
 #[uniffi::export(with_foreign)]
 pub trait ApiUrlResolver: Send + Sync {
-    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl>;
+    /// Returns the address of an endpoint, or an error if none can be built,
+    /// for example from an API root that can't have a path, such as `data:,`.
+    fn resolve(
+        &self,
+        namespace: String,
+        endpoint_segments: Vec<String>,
+    ) -> Result<Arc<ParsedUrl>, ParseUrlError>;
 
     /// Returns the route key for an endpoint, matching the keys used in
     /// `WpApiDetails.routes`. Implementations must produce the same path
@@ -171,12 +177,14 @@ impl WpOrgSiteApiUrlResolver {
 
 #[uniffi::export]
 impl ApiUrlResolver for WpOrgSiteApiUrlResolver {
-    fn resolve(&self, namespace: String, endpoint_segments: Vec<String>) -> Arc<ParsedUrl> {
-        Arc::new(
-            self.api_root_url
-                .by_extending_rest_api_path([namespace].into_iter().chain(endpoint_segments))
-                .into(),
-        )
+    fn resolve(
+        &self,
+        namespace: String,
+        endpoint_segments: Vec<String>,
+    ) -> Result<Arc<ParsedUrl>, ParseUrlError> {
+        self.api_root_url
+            .by_extending_rest_api_path([namespace].into_iter().chain(endpoint_segments))
+            .map(|url| Arc::new(url.into()))
     }
 
     fn route_path(&self, namespace: String, endpoint_path: String) -> String {
@@ -206,17 +214,29 @@ mod tests {
         ))
     }
 
-    pub fn validate_wp_v2_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+    pub fn validate_wp_v2_endpoint(
+        endpoint_url: Result<ApiEndpointUrl, ParseUrlError>,
+        path: &str,
+    ) {
         validate_endpoint(WpNamespace::WpV2, endpoint_url, path);
     }
 
-    pub fn validate_wp_site_health_endpoint(endpoint_url: ApiEndpointUrl, path: &str) {
+    pub fn validate_wp_site_health_endpoint(
+        endpoint_url: Result<ApiEndpointUrl, ParseUrlError>,
+        path: &str,
+    ) {
         validate_endpoint(WpNamespace::WpSiteHealthV1, endpoint_url, path);
     }
 
-    fn validate_endpoint(namespace: WpNamespace, endpoint_url: ApiEndpointUrl, path: &str) {
+    fn validate_endpoint(
+        namespace: WpNamespace,
+        endpoint_url: Result<ApiEndpointUrl, ParseUrlError>,
+        path: &str,
+    ) {
         assert_eq!(
-            endpoint_url.as_str(),
+            endpoint_url
+                .expect("The example API root can have a path")
+                .as_str(),
             format!(
                 "{}{}{}",
                 EXAMPLE_WP_JSON_URL,
@@ -250,8 +270,26 @@ mod tests {
         assert_eq!(
             resolver
                 .resolve(namespace.to_string(), endpoint_segments)
+                .expect("The API root can have a path")
                 .url(),
             expected
+        );
+    }
+
+    // An API root that can't have a path, such as `data:,`, used to panic
+    // here (#1781).
+    #[rstest]
+    #[case::data("data:,")]
+    #[case::about_blank("about:blank")]
+    #[case::mailto("mailto:someone@example.com")]
+    fn wp_org_resolver_rejects_an_api_root_that_cannot_have_a_path(#[case] api_root: &str) {
+        let resolver =
+            WpOrgSiteApiUrlResolver::new(ParsedUrl::parse(api_root).expect("valid url").into());
+        assert_eq!(
+            resolver
+                .resolve("/wp/v2".to_string(), vec!["users".to_string()])
+                .unwrap_err(),
+            ParseUrlError::RelativeUrlWithCannotBeABaseBase
         );
     }
 }

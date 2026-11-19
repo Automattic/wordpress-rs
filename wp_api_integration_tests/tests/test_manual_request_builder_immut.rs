@@ -23,7 +23,10 @@ async fn list_users_with_edit_context(#[case] params: UserListParams) {
             TestCredentials::instance().admin_password.to_string(),
         )),
     );
-    let wp_request = request_builder.users().list_with_edit_context(&params);
+    let wp_request = request_builder
+        .users()
+        .list_with_edit_context(&params)
+        .expect("The test site's API root can have a path");
     let response = request_executor.async_request(wp_request.into()).await;
     let result: Result<UsersRequestListWithEditContextResponse, WpApiError> =
         response.unwrap().parse();
