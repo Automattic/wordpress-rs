@@ -13,14 +13,21 @@ use wp_derive_request_builder::WpDerivedRequest;
 
 #[derive(WpDerivedRequest)]
 enum ReaderSavedRequest {
+    // The posts the user saved, newest save first, a page at a time. Needs a token.
     #[get(url = "/read/saved", params = &ReaderSavedPostsParams, output = ReaderSavedPostsResponse)]
     ListPosts,
+    // The key of every post the user saved, newest first, up to 1,000. Needs a token.
     #[get(url = "/read/saved/keys", output = ReaderSavedKeysResponse)]
     ListKeys,
+    // Saves a post, an RSS post, or a page by its address. Needs a token. A user has at most 1,000
+    // saves: one more is refused with `saved_limit_reached`.
     #[post(url = "/read/saved/new", params = &ReaderSavePostParams, output = ReaderSavePostResponse)]
     Save,
+    // Unsaves what a key names. Needs a token.
     #[post(url = "/read/saved/delete", params = &ReaderUnsavePostParams, output = ReaderUnsavePostResponse)]
     Unsave,
+    // Saves up to 100 posts or RSS posts in one request, and answers with one result a key. Needs
+    // a token.
     #[post(url = "/read/saved/bulk", params = &ReaderSavedBulkParams, output = ReaderSavedBulkResponse)]
     BulkSave,
 }

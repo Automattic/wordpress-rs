@@ -9,11 +9,13 @@ use wp_api::posts::PostId;
 use wp_api::prelude::*;
 use wp_api::wp_com::endpoint::WpComDotOrgApiUrlResolver;
 use wp_api::wp_com::me::WpComUserId;
+use wp_api::wp_com::reader_likes::ReaderLikesParams;
 use wp_api::wp_com::reader_page_views::ReaderPageView;
 use wp_api::wp_com::reader_posts::{
     ReaderListOwner, ReaderListSlug, ReaderSearchSort, ReaderTagSlug,
 };
 use wp_api::wp_com::reader_saved::{ReaderSavedKey, ReaderSavedSource};
+use wp_api::wp_com::reader_subscriptions::ReaderSubscriptionEmailFrequency;
 use wp_api::wp_com::stats_post::StatsPostTarget;
 use wp_api::wp_com::{WpComBaseUrl, WpComSiteId};
 use wp_mobile::service::reader::{
@@ -551,13 +553,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let mut written = Vec::new();
                     let result = write_comments(&service, site_id, &mut written).await;
                     // Whatever happened, the comments it wrote are deleted, replies first.
-                    let site = WpApiClient::new(
-                        Arc::new(WpComDotOrgApiUrlResolver::new(
-                            site_id.0.to_string(),
-                            WpComBaseUrl::Production,
-                        )),
-                        ctx.delegate.clone(),
-                    );
+                    let site = own_site_client(&ctx, site_id);
                     for comment in written.iter().rev() {
                         site.comments()
                             .delete(comment, &CommentDeleteParams::new(None))
@@ -579,13 +575,121 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 ctx.runtime.block_on(async {
                     let service = new_service(ctx.delegate.clone(), account())?;
                     let post = first_post_of(&service, site_id).await?;
-                    let was = post.i_like == Some(true);
+                    let was = server_says_post_liked(&ctx, &post).await?;
 
-                    let result = like_and_check(&service, &post, !was).await;
+                    let result = like_and_check(&ctx, &service, &post, !was).await;
                     // Whatever happened, the post is left as it was found.
-                    let restored = like_and_check(&service, &post, was).await;
+                    let restored = like_and_check(&ctx, &service, &post, was).await;
                     result?;
                     restored
+                })
+            }
+        })
+        .with_ignored_flag(own_site().is_none()),
+        // Likes a comment the trial writes, so it only runs against a site the account owns.
+        Trial::test("reader_service::a_comment_like_is_sent_and_put_back", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                let Some(site_id) = own_site() else {
+                    return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
+                };
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let post = first_post_of(&service, site_id).await?;
+                    let comments = service.comments(site_id, PostId(post.identity.id as i64));
+                    let comment = comments
+                        .post_comment(
+                            "A test comment from wordpress-rs, to like. It deletes itself."
+                                .to_string(),
+                            None,
+                        )
+                        .await
+                        .map_err(|e| format!("The comment wasn't taken: {e}"))?;
+                    let comment_id = comment.comment_id.ok_or("The comment has no ID")?;
+
+                    let result = like_comment_and_check(&ctx, &service, site_id, comment_id).await;
+                    // Whatever happened, the comment is deleted, and its like with it.
+                    own_site_client(&ctx, site_id)
+                        .comments()
+                        .delete(&comment_id, &CommentDeleteParams::new(None))
+                        .await
+                        .map_err(|e| format!("Comment {} wasn't deleted: {e}", comment_id.0))?;
+                    result
+                })
+            }
+        })
+        .with_ignored_flag(own_site().is_none()),
+        // Subscribing to comments emails the account, so it only runs against a site it owns.
+        Trial::test(
+            "reader_service::a_comment_subscription_is_sent_and_put_back",
+            {
+                let ctx = Arc::clone(&ctx);
+                move || {
+                    let Some(site_id) = own_site() else {
+                        return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
+                    };
+                    ctx.runtime.block_on(async {
+                        let service = new_service(ctx.delegate.clone(), account())?;
+                        let post = first_post_of(&service, site_id).await?;
+                        let was = comment_subscription(&ctx, &post).await?;
+
+                        let result = subscribe_to_comments_and_check(&ctx, &service, &post).await;
+                        // Whatever happened, the subscription is left as it was found.
+                        let restored =
+                            restore_comment_subscription(&ctx, &service, &post, was).await;
+                        result?;
+                        restored
+                    })
+                }
+            },
+        )
+        .with_ignored_flag(own_site().is_none()),
+        // A site's emails and notifications are the account's own settings for a site it
+        // follows, so this only runs against a site it owns and follows.
+        Trial::test("reader_service::delivery_settings_are_sent_and_put_back", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                let Some(site_id) = own_site() else {
+                    return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
+                };
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    service
+                        .refresh_subscriptions()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let was = delivery_on_the_server(&ctx, site_id).await?;
+
+                    let result = change_delivery_and_check(&ctx, &service, site_id, &was).await;
+                    // Whatever happened, the settings are left as they were found.
+                    let restored = restore_delivery(&ctx, &service, site_id, &was).await;
+                    result?;
+                    restored
+                })
+            }
+        })
+        .with_ignored_flag(own_site().is_none()),
+        // The requests that follow and unfollow a site by its ID, which the service doesn't use
+        // to follow: it follows by address. Only against a site the account owns.
+        Trial::test("reader_service::a_site_is_followed_and_unfollowed_by_id", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                let Some(site_id) = own_site() else {
+                    return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
+                };
+                ctx.runtime.block_on(async {
+                    let was = follows_by_id(&ctx, site_id).await?;
+
+                    let result = async {
+                        set_followed_by_id(&ctx, site_id, !was).await?;
+                        set_followed_by_id(&ctx, site_id, was).await
+                    }
+                    .await;
+                    // Whatever happened, the site is left as it was found.
+                    if follows_by_id(&ctx, site_id).await? != was {
+                        set_followed_by_id(&ctx, site_id, was).await?;
+                    }
+                    result
                 })
             }
         })
@@ -749,9 +853,45 @@ async fn first_post_of(
         .post)
 }
 
-/// Likes or unlikes a post through the service, and checks the server took it and the cache
+/// A client for the WordPress REST API of a site the account owns, which is what deletes a
+/// comment.
+fn own_site_client(ctx: &TestContext, site_id: WpComSiteId) -> WpApiClient {
+    WpApiClient::new(
+        Arc::new(WpComDotOrgApiUrlResolver::new(
+            site_id.0.to_string(),
+            WpComBaseUrl::Production,
+        )),
+        ctx.delegate.clone(),
+    )
+}
+
+/// Whether the server has the account's like on a post, asked of the post's likes directly:
+/// nothing of the service or its cache is in the answer.
+async fn server_says_post_liked(
+    ctx: &TestContext,
+    post: &ReaderPostRecord,
+) -> Result<bool, Failed> {
+    let site_id = post.identity.site_id.ok_or("The post has no site")?;
+    let likes = ctx
+        .client
+        .reader_likes()
+        .post_likes(
+            &site_id,
+            &PostId(post.identity.id as i64),
+            &ReaderLikesParams::default(),
+        )
+        .await
+        .map_err(|e| e.to_string())?
+        .data;
+    likes
+        .i_like
+        .ok_or_else(|| "The post's likes don't say whether the account likes it".into())
+}
+
+/// Likes or unlikes a post through the service, and checks that the server has it and the cache
 /// shows it.
 async fn like_and_check(
+    ctx: &TestContext,
     service: &ReaderService,
     post: &ReaderPostRecord,
     liked: bool,
@@ -769,6 +909,343 @@ async fn like_and_check(
         .ok_or("The post left the cache")?;
     if cached.i_like != Some(liked) {
         return Err(format!("The cache says i_like is {:?}", cached.i_like).into());
+    }
+    if server_says_post_liked(ctx, post).await? != liked {
+        return Err(format!("The server doesn't have the like set to {liked}").into());
+    }
+    Ok(())
+}
+
+/// Whether the server has the account's like on a comment.
+async fn server_says_comment_liked(
+    ctx: &TestContext,
+    site_id: WpComSiteId,
+    comment_id: CommentId,
+) -> Result<bool, Failed> {
+    let likes = ctx
+        .client
+        .reader_likes()
+        .comment_likes(&site_id, &comment_id, &ReaderLikesParams::default())
+        .await
+        .map_err(|e| e.to_string())?
+        .data;
+    likes
+        .i_like
+        .ok_or_else(|| "The comment's likes don't say whether the account likes it".into())
+}
+
+/// Likes then unlikes a comment through the service, and checks the server after each.
+async fn like_comment_and_check(
+    ctx: &TestContext,
+    service: &ReaderService,
+    site_id: WpComSiteId,
+    comment_id: CommentId,
+) -> Result<(), Failed> {
+    for liked in [true, false] {
+        let outcome = service
+            .set_comment_liked(site_id, comment_id, liked)
+            .await
+            .map_err(|e| format!("Setting the comment's like to {liked} was refused: {e}"))?;
+        if outcome != ReaderActionOutcome::Synced {
+            return Err(format!("The comment's like wasn't sent: {outcome:?}").into());
+        }
+        if server_says_comment_liked(ctx, site_id, comment_id).await? != liked {
+            return Err(
+                format!("The server doesn't have the comment's like set to {liked}").into(),
+            );
+        }
+    }
+    Ok(())
+}
+
+/// The account's subscription to a post's comments, as the server has it: whether it's
+/// subscribed, and whether new comments notify it.
+async fn comment_subscription(
+    ctx: &TestContext,
+    post: &ReaderPostRecord,
+) -> Result<(bool, bool), Failed> {
+    let site_id = post.identity.site_id.ok_or("The post has no site")?;
+    let subscription = ctx
+        .client
+        .reader_comments()
+        .subscription(&site_id, &PostId(post.identity.id as i64))
+        .await
+        .map_err(|e| e.to_string())?
+        .data;
+    Ok((
+        subscription.i_subscribe,
+        subscription.receives_notifications == Some(true),
+    ))
+}
+
+/// Sends one change to a post's comment subscription, and checks what the server then has.
+async fn expect_comment_subscription(
+    ctx: &TestContext,
+    post: &ReaderPostRecord,
+    sent: Result<ReaderActionOutcome, ReaderError>,
+    expected: (bool, bool),
+) -> Result<(), Failed> {
+    let outcome = sent.map_err(|e| format!("The change was refused: {e}"))?;
+    if outcome != ReaderActionOutcome::Synced {
+        return Err(format!("The change wasn't sent: {outcome:?}").into());
+    }
+    let has = comment_subscription(ctx, post).await?;
+    if has != expected {
+        return Err(format!(
+            "The server has (subscribed, notified) as {has:?}, expected {expected:?}"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+/// Subscribes to a post's comments, turns their notifications on and off, and unsubscribes,
+/// checking the server after each.
+async fn subscribe_to_comments_and_check(
+    ctx: &TestContext,
+    service: &ReaderService,
+    post: &ReaderPostRecord,
+) -> Result<(), Failed> {
+    let identity = post.identity.clone();
+    if comment_subscription(ctx, post).await?.0 {
+        let sent = service
+            .set_comments_subscribed(identity.clone(), false)
+            .await;
+        expect_comment_subscription(ctx, post, sent, (false, false)).await?;
+    }
+    let sent = service
+        .set_comments_subscribed(identity.clone(), true)
+        .await;
+    let subscribed = comment_subscription(ctx, post).await?;
+    sent.map_err(|e| format!("Subscribing was refused: {e}"))?;
+    if !subscribed.0 {
+        return Err("The server doesn't have the subscription".into());
+    }
+    let sent = service
+        .set_comment_notifications(identity.clone(), true)
+        .await;
+    expect_comment_subscription(ctx, post, sent, (true, true)).await?;
+    let sent = service
+        .set_comment_notifications(identity.clone(), false)
+        .await;
+    expect_comment_subscription(ctx, post, sent, (true, false)).await?;
+    let sent = service.set_comments_subscribed(identity, false).await;
+    expect_comment_subscription(ctx, post, sent, (false, false)).await
+}
+
+/// Puts a post's comment subscription back to what it was.
+async fn restore_comment_subscription(
+    ctx: &TestContext,
+    service: &ReaderService,
+    post: &ReaderPostRecord,
+    was: (bool, bool),
+) -> Result<(), Failed> {
+    let identity = post.identity.clone();
+    let now = comment_subscription(ctx, post).await?;
+    if now.0 != was.0 {
+        service
+            .set_comments_subscribed(identity.clone(), was.0)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    if was.0 && comment_subscription(ctx, post).await?.1 != was.1 {
+        service
+            .set_comment_notifications(identity, was.1)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    let now = comment_subscription(ctx, post).await?;
+    if now != was {
+        return Err(format!("The subscription is {now:?}, and was {was:?}").into());
+    }
+    Ok(())
+}
+
+/// How a followed site reaches the account, as the server has it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Delivery {
+    email_posts: bool,
+    email_comments: bool,
+    notify_posts: bool,
+    frequency: Option<ReaderSubscriptionEmailFrequency>,
+}
+
+/// A followed site's delivery settings, read by a service with a cache of its own, so they're
+/// the server's.
+async fn delivery_on_the_server(
+    ctx: &TestContext,
+    site_id: WpComSiteId,
+) -> Result<Delivery, Failed> {
+    let other = new_service(ctx.delegate.clone(), account())?;
+    other
+        .refresh_subscriptions()
+        .await
+        .map_err(|e| e.to_string())?;
+    let subscription = other
+        .subscriptions()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .find(|one| one.site_id == Some(site_id))
+        .ok_or("The account doesn't follow the site, so it has no delivery settings")?;
+    Ok(Delivery {
+        email_posts: subscription.email_posts == Some(true),
+        email_comments: subscription.email_comments == Some(true),
+        notify_posts: subscription.notify_posts == Some(true),
+        frequency: subscription.email_frequency,
+    })
+}
+
+fn expect_synced(what: &str, sent: Result<ReaderActionOutcome, ReaderError>) -> Result<(), Failed> {
+    match sent {
+        Ok(ReaderActionOutcome::Synced) => Ok(()),
+        Ok(outcome) => Err(format!("{what} wasn't sent: {outcome:?}").into()),
+        Err(error) => Err(format!("{what} was refused: {error}").into()),
+    }
+}
+
+/// Flips each of a site's delivery settings and flips it back, checking the server after each
+/// change.
+async fn change_delivery_and_check(
+    ctx: &TestContext,
+    service: &ReaderService,
+    site_id: WpComSiteId,
+    was: &Delivery,
+) -> Result<(), Failed> {
+    for on in [!was.email_comments, was.email_comments] {
+        expect_synced(
+            "Comment emails",
+            service.set_comment_emails(site_id, on).await,
+        )?;
+        if delivery_on_the_server(ctx, site_id).await?.email_comments != on {
+            return Err(format!("The server doesn't have comment emails set to {on}").into());
+        }
+    }
+    for on in [!was.notify_posts, was.notify_posts] {
+        expect_synced(
+            "Notifications",
+            service.set_post_notifications(site_id, on).await,
+        )?;
+        if delivery_on_the_server(ctx, site_id).await?.notify_posts != on {
+            return Err(format!("The server doesn't have notifications set to {on}").into());
+        }
+    }
+    // The frequency is only kept while posts are emailed.
+    if was.email_posts {
+        let other = if was.frequency == Some(ReaderSubscriptionEmailFrequency::Daily) {
+            ReaderSubscriptionEmailFrequency::Weekly
+        } else {
+            ReaderSubscriptionEmailFrequency::Daily
+        };
+        let original = was
+            .frequency
+            .clone()
+            .unwrap_or(ReaderSubscriptionEmailFrequency::Instantly);
+        for frequency in [other, original] {
+            service
+                .set_post_email_frequency(site_id, frequency.clone())
+                .await
+                .map_err(|e| format!("The frequency was refused: {e}"))?;
+            let has = delivery_on_the_server(ctx, site_id).await?.frequency;
+            if has != Some(frequency.clone()) {
+                return Err(
+                    format!("The server has the frequency as {has:?}, not {frequency:?}").into(),
+                );
+            }
+        }
+    }
+    for on in [!was.email_posts, was.email_posts] {
+        expect_synced("Post emails", service.set_post_emails(site_id, on).await)?;
+        if delivery_on_the_server(ctx, site_id).await?.email_posts != on {
+            return Err(format!("The server doesn't have post emails set to {on}").into());
+        }
+    }
+    Ok(())
+}
+
+/// Puts a site's delivery settings back to what they were.
+async fn restore_delivery(
+    ctx: &TestContext,
+    service: &ReaderService,
+    site_id: WpComSiteId,
+    was: &Delivery,
+) -> Result<(), Failed> {
+    let now = delivery_on_the_server(ctx, site_id).await?;
+    if now.email_posts != was.email_posts {
+        expect_synced(
+            "Post emails",
+            service.set_post_emails(site_id, was.email_posts).await,
+        )?;
+    }
+    if now.email_comments != was.email_comments {
+        expect_synced(
+            "Comment emails",
+            service
+                .set_comment_emails(site_id, was.email_comments)
+                .await,
+        )?;
+    }
+    if now.notify_posts != was.notify_posts {
+        expect_synced(
+            "Notifications",
+            service
+                .set_post_notifications(site_id, was.notify_posts)
+                .await,
+        )?;
+    }
+    if was.email_posts
+        && let Some(frequency) = &was.frequency
+        && delivery_on_the_server(ctx, site_id).await?.frequency != was.frequency
+    {
+        service
+            .set_post_email_frequency(site_id, frequency.clone())
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    let now = delivery_on_the_server(ctx, site_id).await?;
+    if &now != was {
+        return Err(format!("The settings are {now:?}, and were {was:?}").into());
+    }
+    Ok(())
+}
+
+/// Whether the account follows a site, as the server answers for the site's ID.
+async fn follows_by_id(ctx: &TestContext, site_id: WpComSiteId) -> Result<bool, Failed> {
+    Ok(ctx
+        .client
+        .reader_subscriptions()
+        .is_following_site(&site_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .data
+        .is_following)
+}
+
+/// Follows or unfollows a site by its ID, and checks the answer and what the server then says.
+async fn set_followed_by_id(
+    ctx: &TestContext,
+    site_id: WpComSiteId,
+    followed: bool,
+) -> Result<(), Failed> {
+    let subscriptions = ctx.client.reader_subscriptions();
+    let refused = |e: WpApiError| format!("Setting the follow to {followed} was refused: {e}");
+    let answer = if followed {
+        subscriptions
+            .follow_site(&site_id)
+            .await
+            .map_err(refused)?
+            .data
+    } else {
+        subscriptions
+            .unfollow_site(&site_id)
+            .await
+            .map_err(refused)?
+            .data
+    };
+    if answer.is_following != followed || answer.success != Some(true) {
+        return Err(format!("The answer to setting the follow to {followed} is {answer:?}").into());
+    }
+    if follows_by_id(ctx, site_id).await? != followed {
+        return Err(format!("The server doesn't have the follow set to {followed}").into());
     }
     Ok(())
 }

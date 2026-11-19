@@ -27,18 +27,22 @@ pub enum ReaderSeenSource {
 /// Request body to mark posts of a WordPress.com or Jetpack site as seen, or as unseen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
 pub struct ReaderSeenSitePostsParams {
+    /// The site the posts are on.
     pub blog_id: WpComSiteId,
     /// At least one. The API refuses an empty list with `rest_invalid_param`.
     pub post_ids: Vec<PostId>,
+    /// The app marking the posts, which is recorded with the mark.
     pub source: ReaderSeenSource,
 }
 
 /// Request body to mark posts of an RSS feed as seen, or as unseen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
 pub struct ReaderSeenFeedItemsParams {
+    /// The feed the posts are in.
     pub feed_id: ReaderFeedId,
     /// At least one.
     pub feed_item_ids: Vec<ReaderFeedItemId>,
+    /// The app marking the posts, which is recorded with the mark.
     pub source: ReaderSeenSource,
 }
 

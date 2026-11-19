@@ -319,11 +319,7 @@ pub struct ReaderSiteFollowStatus {
     pub is_following: bool,
 }
 
-/// The answer to following or unfollowing a site by its ID.
-///
-/// It's built from the answer to an unfollow, the only one seen. In trials the API refused the
-/// follow with a 400 `follow_failed`. A follow is taken to answer in the same shape: the Android
-/// app reads `is_following` from both.
+/// The answer to following or unfollowing a site by its ID. Both answer in this shape.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ReaderFollowSiteResponse {
     /// Whether the user follows the site now.
@@ -872,8 +868,23 @@ mod tests {
         );
     }
 
-    /// The shape a follow by ID that works is taken to have, which wasn't seen, and an answer
-    /// with only `is_following` in it.
+    /// The answer to a follow by ID, recorded from WordPress.com, with the site's ID replaced.
+    #[test]
+    fn test_deserialize_follow_site() {
+        let answer: ReaderFollowSiteResponse = serde_json::from_str(include_str!(
+            "../../tests/wpcom/reader_subscriptions/follow_site.json"
+        ))
+        .expect("the answer parses");
+        assert_eq!(
+            answer,
+            ReaderFollowSiteResponse {
+                is_following: true,
+                success: Some(true),
+            }
+        );
+    }
+
+    /// The same answer with numbers for its flags, and an answer with only `is_following` in it.
     #[rstest]
     #[case(json!({ "success": true, "is_following": true }), Some(true))]
     #[case(json!({ "success": 1, "is_following": 1 }), Some(true))]

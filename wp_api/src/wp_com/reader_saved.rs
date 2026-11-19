@@ -167,6 +167,7 @@ pub enum ReaderSavedSource {
 pub struct ReaderSavePostParams {
     #[serde(flatten)]
     pub key: ReaderSavedKey,
+    /// The app making the save, which is recorded with it.
     pub source: ReaderSavedSource,
     /// What to show for a page saved by URL, which the server doesn't fetch. Kept only when the URL
     /// isn't a WordPress.com post.
@@ -206,6 +207,7 @@ pub struct ReaderSavedPageDetails {
 pub struct ReaderUnsavePostParams {
     #[serde(flatten)]
     pub key: ReaderSavedKey,
+    /// The app removing the save.
     pub source: ReaderSavedSource,
 }
 
@@ -252,6 +254,7 @@ pub struct ReaderSavedBulkParams {
     /// The keys to save, newest first: between 1 and 100, or the whole request is rejected. If they
     /// would take the user past the 1,000 save cap, the newest are the ones saved.
     pub keys: Vec<ReaderSavedBulkKey>,
+    /// The app making the saves, which is recorded with each.
     pub source: ReaderSavedSource,
 }
 

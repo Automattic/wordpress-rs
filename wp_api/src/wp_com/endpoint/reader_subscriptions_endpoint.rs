@@ -22,9 +22,11 @@ enum ReaderSubscriptionsRequest {
     // ID is read as some other site's.
     #[get(url = "/sites/<wp_com_site_id>/follows/mine", output = ReaderSiteFollowStatus)]
     IsFollowingSite,
-    // Follows a WordPress.com or Jetpack site, by its ID. In trials the API refused the follow
-    // with a 400 `follow_failed` and an empty message, for a reason that isn't known, so the
-    // answer to a follow that works wasn't seen.
+    // Follows a WordPress.com or Jetpack site, by its ID, and answers as an unfollow does. For a
+    // site the user follows already it's a 400 `already_subscribed`.
+    //
+    // When this was first tried, the API refused every follow with a 400 `follow_failed` and an
+    // empty message. A day later it took them, with nothing changed on this side.
     //
     // The API declares a `source` for it, which says where the follow came from, and reads it
     // from the address only: the apps add `?source=android` or `?source=ios`. A POST here sends
