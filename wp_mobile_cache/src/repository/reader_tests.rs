@@ -60,7 +60,7 @@ fn test_reader_posts_columns() {
             "{column} is read but isn't in reader_posts"
         );
     }
-    assert_eq!(columns.len(), 59, "{columns:?}");
+    assert_eq!(columns.len(), 62, "{columns:?}");
 }
 
 #[test]
@@ -89,6 +89,9 @@ fn test_a_post_keeps_what_a_stream_sends() {
         receives_comment_notifications: Some(false),
         is_seen: Some(true),
         word_count: Some(321),
+        summary: Some("A summary".to_string()),
+        reading_time_minutes: Some(2),
+        card_type: Some(wp_api::wp_com::reader_post_display::ReaderPostCardType::Gallery),
         ..post(456)
     };
     ReaderPostRepository::upsert(&conn, account, &stored).unwrap();

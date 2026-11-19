@@ -427,6 +427,32 @@ async fn items_come_without_content_and_the_cache_keeps_it() {
 }
 
 #[tokio::test]
+async fn a_stored_post_has_its_summary_reading_time_and_card_type() {
+    let (service, executor) = service();
+    let stream = service.stream(ReaderStream::Following);
+    let mut written = post_json(1, 10);
+    written["excerpt"] = json!("<p>An excerpt &amp; more [&hellip;]</p>");
+    written["word_count"] = json!(450);
+    // A source that sends neither excerpt nor content has nothing to work them out from.
+    let mut bare = post_json(2, 9);
+    bare.as_object_mut().unwrap().remove("content");
+    executor.push(Step::Respond(200, json!({ "posts": [written, bare] })));
+
+    stream.refresh().await.unwrap();
+
+    let items = stream.load_items().await.unwrap();
+    assert_eq!(items[0].post.summary.as_deref(), Some("An excerpt & more…"));
+    assert_eq!(items[0].post.reading_time_minutes, Some(3));
+    assert_eq!(
+        items[0].post.card_type,
+        Some(wp_api::wp_com::reader_post_display::ReaderPostCardType::Default)
+    );
+    assert_eq!(items[1].post.summary, None);
+    assert_eq!(items[1].post.reading_time_minutes, None);
+    assert_eq!(items[1].post.card_type, None);
+}
+
+#[tokio::test]
 async fn a_refresh_that_reaches_the_cached_posts_adds_the_new_ones_on_top() {
     let (service, executor) = service();
     let stream = service.stream(ReaderStream::Following);

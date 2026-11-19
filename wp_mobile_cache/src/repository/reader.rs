@@ -7,7 +7,8 @@ use crate::{
         DbReaderPageEntry, DbReaderPageItem, DbReaderPageOutcome, DbReaderSavedKey,
         DbReaderSavedListItem, DbReaderSavedRow, DbReaderSavedState, DbReaderStream,
         DbReaderStreamCard, DbReaderStreamItem, DbReaderUnreadablePost, ReaderPostRecord,
-        reader_date_from_text, reader_date_text, reader_saved_key_from_text, reader_saved_key_text,
+        reader_card_type_from_number, reader_card_type_number, reader_date_from_text,
+        reader_date_text, reader_saved_key_from_text, reader_saved_key_text,
     },
     list_metadata::ListState,
     repository::QueryExecutor,
@@ -70,6 +71,9 @@ const POST_FIELDS: &[&str] = &[
     "receives_comment_notifications",
     "is_seen",
     "word_count",
+    "summary",
+    "reading_time_minutes",
+    "card_type",
 ];
 
 /// What to read of each post.
@@ -174,6 +178,11 @@ fn post_from_row(row: &Row) -> Result<(RowId, ReaderPostRecord), SqliteDbError> 
         receives_comment_notifications: row.get("p_receives_comment_notifications")?,
         is_seen: row.get("p_is_seen")?,
         word_count: row.get("p_word_count")?,
+        summary: row.get("p_summary")?,
+        reading_time_minutes: row.get("p_reading_time_minutes")?,
+        card_type: row
+            .get::<_, Option<i64>>("p_card_type")?
+            .map(reader_card_type_from_number),
     };
     Ok((row.get("p_rowid")?, record))
 }
@@ -320,6 +329,15 @@ impl ReaderPostRepository {
             ),
             ("is_seen", flag(post.is_seen)),
             ("word_count", number(post.word_count)),
+            ("summary", text(&post.summary)),
+            (
+                "reading_time_minutes",
+                number(post.reading_time_minutes.map(u64::from)),
+            ),
+            (
+                "card_type",
+                Value::from(post.card_type.map(reader_card_type_number)),
+            ),
         ];
 
         let mut updates: Vec<String> = Vec::new();

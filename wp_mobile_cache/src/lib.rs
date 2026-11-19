@@ -543,7 +543,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 19] = [
+static MIGRATION_QUERIES: [&str; 20] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -563,6 +563,7 @@ static MIGRATION_QUERIES: [&str; 19] = [
     include_str!("../migrations/0017-create-reader-actions-tables.sql"),
     include_str!("../migrations/0018-create-reader-member-sites-table.sql"),
     include_str!("../migrations/0019-create-reader-stream-cards-table.sql"),
+    include_str!("../migrations/0020-add-computed-fields-to-reader-posts.sql"),
 ];
 
 pub struct MigrationManager<'a> {

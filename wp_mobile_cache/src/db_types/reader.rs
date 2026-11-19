@@ -5,6 +5,10 @@ use std::str::FromStr;
 use wp_api::date::WpGmtDateTime;
 use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::reader_post_display::{
+    ReaderPostCardType, reader_post_card_type, reader_post_reading_time_minutes,
+    reader_post_summary,
+};
 use wp_api::wp_com::reader_posts::{
     ReaderCrossPost, ReaderPost, ReaderPostTag, reader_post_display_image_url,
 };
@@ -115,6 +119,43 @@ pub struct ReaderPostRecord {
     pub is_seen: Option<bool>,
     #[uniffi(default = None)]
     pub word_count: Option<u64>,
+    /// The text to show on the post's card, worked out when the post was stored. See
+    /// [`reader_post_summary`]. `None` for a post with no text, and for one stored from a source
+    /// that sent neither its excerpt nor its content.
+    #[uniffi(default = None)]
+    pub summary: Option<String>,
+    /// How long the post takes to read, in minutes, worked out when the post was stored. See
+    /// [`reader_post_reading_time_minutes`]. `None` when the source sent no words to count.
+    #[uniffi(default = None)]
+    pub reading_time_minutes: Option<u32>,
+    /// Which layout the post gets in a stream, worked out when the post was stored. See
+    /// [`reader_post_card_type`]. `None` when the source didn't send the post's content, which
+    /// the layout depends on.
+    #[uniffi(default = None)]
+    pub card_type: Option<ReaderPostCardType>,
+}
+
+/// A card type as the cache stores it. The numbers never change, since rows outlive a launch.
+pub fn reader_card_type_number(card_type: ReaderPostCardType) -> i64 {
+    match card_type {
+        ReaderPostCardType::Default => 0,
+        ReaderPostCardType::Photo => 1,
+        ReaderPostCardType::Gallery => 2,
+        ReaderPostCardType::Video => 3,
+        ReaderPostCardType::CrossPost => 4,
+    }
+}
+
+/// Reads a card type stored by [`reader_card_type_number`]. A number this version doesn't know,
+/// which a newer version stored, reads as the default layout.
+pub fn reader_card_type_from_number(number: i64) -> ReaderPostCardType {
+    match number {
+        1 => ReaderPostCardType::Photo,
+        2 => ReaderPostCardType::Gallery,
+        3 => ReaderPostCardType::Video,
+        4 => ReaderPostCardType::CrossPost,
+        _ => ReaderPostCardType::Default,
+    }
 }
 
 impl ReaderPostRecord {
@@ -161,6 +202,9 @@ impl ReaderPostRecord {
             receives_comment_notifications: None,
             is_seen: None,
             word_count: None,
+            summary: None,
+            reading_time_minutes: None,
+            card_type: None,
         })
     }
 
@@ -217,6 +261,10 @@ impl ReaderPostRecord {
             receives_comment_notifications: post.subscribed_comments_notifications,
             is_seen: post.is_seen,
             word_count: post.word_count,
+            summary: reader_post_summary(post),
+            reading_time_minutes: reader_post_reading_time_minutes(post),
+            // The layout is read from the content, so a source that sent none can't say.
+            card_type: post.content.as_ref().map(|_| reader_post_card_type(post)),
             ..Self::from_identity(post.identity.clone())?
         })
     }
