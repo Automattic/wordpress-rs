@@ -135,6 +135,10 @@ pub enum DbTable {
     ReaderBlockedSites,
     /// The users the reader blocked, on this device
     ReaderBlockedUsers,
+    /// The sites the account is a member of
+    ReaderMemberSites,
+    /// When each of a reader's lists was last fetched whole
+    ReaderSyncTimes,
 }
 
 impl DbTable {
@@ -168,6 +172,8 @@ impl DbTable {
             DbTable::ReaderActions => "reader_actions",
             DbTable::ReaderBlockedSites => "reader_blocked_sites",
             DbTable::ReaderBlockedUsers => "reader_blocked_users",
+            DbTable::ReaderMemberSites => "reader_member_sites",
+            DbTable::ReaderSyncTimes => "reader_sync_times",
         }
     }
 }
@@ -214,6 +220,8 @@ impl TryFrom<&str> for DbTable {
             "reader_actions" => Ok(DbTable::ReaderActions),
             "reader_blocked_sites" => Ok(DbTable::ReaderBlockedSites),
             "reader_blocked_users" => Ok(DbTable::ReaderBlockedUsers),
+            "reader_member_sites" => Ok(DbTable::ReaderMemberSites),
+            "reader_sync_times" => Ok(DbTable::ReaderSyncTimes),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -531,7 +539,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 17] = [
+static MIGRATION_QUERIES: [&str; 18] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -549,6 +557,7 @@ static MIGRATION_QUERIES: [&str; 17] = [
     include_str!("../migrations/0015-create-wordpress-com-account-and-reader-tables.sql"),
     include_str!("../migrations/0016-create-reader-unreadable-posts-table.sql"),
     include_str!("../migrations/0017-create-reader-actions-tables.sql"),
+    include_str!("../migrations/0018-create-reader-member-sites-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {

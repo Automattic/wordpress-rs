@@ -185,13 +185,12 @@ async fn items_come_without_content_and_the_cache_keeps_it() {
     assert_eq!(items[0].post.content, None);
     assert_eq!(items[0].sort_date, Some(date(10).parse().unwrap()));
 
-    let stored = service.context.cache.execute(|connection| {
-        ReaderPostRepository::select_by_key(&*connection, service.context.owner_row, &key(1))
-    });
+    let stored = service.cached_post(key(1)).unwrap().unwrap();
     assert_eq!(
-        stored.unwrap().unwrap().1.content.as_deref(),
+        stored.content.as_deref(),
         Some("<p>The content of post 1.</p>")
     );
+    assert_eq!(service.cached_post(key(99)).unwrap(), None);
 }
 
 #[tokio::test]
@@ -1026,5 +1025,211 @@ mod actions {
         let (signed_out, _) = service_for(ReaderOwner::SignedOut);
         signed_out.set_user_blocked(WpComUserId(7), true).unwrap();
         assert_eq!(signed_out.blocked_users().unwrap(), [WpComUserId(7)]);
+    }
+}
+
+mod page_views {
+    use super::*;
+
+    /// A post of a site, as a stream sends it.
+    fn site_post(id: u64, private: bool) -> Value {
+        let mut post = post_json(id, 10);
+        post["site_URL"] = json!("https://example.wordpress.com");
+        post["site_is_private"] = json!(private);
+        post
+    }
+
+    /// A service whose tag stream holds `posts`.
+    async fn reading(
+        owner: ReaderOwner,
+        posts: Vec<Value>,
+    ) -> (ReaderService, Arc<ScriptedExecutor>) {
+        let (service, executor) = service_for(owner);
+        executor.push(Step::Respond(200, json!({ "posts": posts })));
+        service.stream(tag()).refresh().await.unwrap();
+        (service, executor)
+    }
+
+    fn pixel() -> Step {
+        // The pixel answers with an image, which nothing reads.
+        Step::Respond(200, json!(null))
+    }
+
+    fn sites(ids: &[u64]) -> Step {
+        let sites: Vec<Value> = ids.iter().map(|id| site_json(*id)).collect();
+        Step::Respond(200, json!({ "sites": sites }))
+    }
+
+    /// A site as the account's site list sends one, with its ID changed.
+    fn site_json(id: u64) -> Value {
+        let mut site: Value = serde_json::from_str(include_str!(
+            "../../../../wp_api/tests/wpcom/sites/v1.2-sites-01.json"
+        ))
+        .expect("the site fixture is JSON");
+        site["ID"] = json!(id);
+        site
+    }
+
+    #[tokio::test]
+    async fn a_signed_out_readers_view_is_counted() {
+        let (service, executor) = reading(ReaderOwner::SignedOut, vec![site_post(1, false)]).await;
+        executor.push(pixel());
+
+        let outcome = service.post_opened(key(1)).await.unwrap();
+
+        assert_eq!(outcome, ReaderPageViewOutcome::Counted);
+        let sent = executor.sent();
+        let url = &sent.last().unwrap().url;
+        assert!(
+            url.starts_with(
+                "https://pixel.wp.com/g.gif?v=wpcom&reader=1&blog=123&post=1&host=example.wordpress.com&ref=https%3A%2F%2Fwordpress.com%2F&t="
+            ),
+            "{url}"
+        );
+        assert!(!url.contains("priv=1"));
+        // Nothing else was asked for: a signed-out reader is no site's member.
+        assert_eq!(sent.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_view_by_a_member_of_a_public_site_is_not_counted() {
+        let (service, executor) =
+            reading(ACCOUNT, vec![site_post(1, false), site_post(2, false)]).await;
+        // The account's sites are fetched the first time a post is opened.
+        executor.push(sites(&[123]));
+
+        let outcome = service.post_opened(key(1)).await.unwrap();
+
+        assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForSiteMember);
+        assert!(
+            executor
+                .sent()
+                .last()
+                .unwrap()
+                .url
+                .starts_with("https://public-api.wordpress.com/rest/v1.2/me/sites")
+        );
+        // They're kept, so the next post asks for nothing.
+        let outcome = service.post_opened(key(2)).await.unwrap();
+        assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForSiteMember);
+        assert_eq!(executor.sent().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_view_by_someone_who_is_not_a_member_is_counted() {
+        let (service, executor) = reading(ACCOUNT, vec![site_post(1, false)]).await;
+        service.set_member_sites(vec![WpComSiteId(999)]).unwrap();
+        executor.push(pixel());
+
+        let outcome = service.post_opened(key(1)).await.unwrap();
+
+        assert_eq!(outcome, ReaderPageViewOutcome::Counted);
+        // The app said which sites the account belongs to, so they weren't fetched.
+        assert_eq!(executor.sent().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_view_of_a_private_site_is_counted_even_by_a_member() {
+        let (service, executor) = reading(ACCOUNT, vec![site_post(1, true)]).await;
+        service.set_member_sites(vec![WpComSiteId(123)]).unwrap();
+        executor.push(pixel());
+
+        let outcome = service.post_opened(key(1)).await.unwrap();
+
+        assert_eq!(outcome, ReaderPageViewOutcome::Counted);
+        assert!(executor.sent().last().unwrap().url.ends_with("&priv=1"));
+    }
+
+    #[tokio::test]
+    async fn a_view_of_an_rss_post_is_not_counted() {
+        let rss = json!({
+            "ID": 9, "feed_ID": 456, "feed_item_ID": 9, "is_external": true,
+            "site_URL": "https://example.com", "date": date(10),
+        });
+        let (service, executor) = reading(ReaderOwner::SignedOut, vec![rss]).await;
+        let key = ReaderSavedKey::FeedItem {
+            feed_item_id: wp_api::wp_com::reader_saved::ReaderFeedItemId(9),
+        };
+
+        let outcome = service.post_opened(key).await.unwrap();
+
+        assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForRssPost);
+        assert_eq!(executor.sent().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_post_the_cache_lacks_or_knows_too_little_of_is_not_counted() {
+        // Post 1 has no site URL.
+        let (service, executor) = reading(ReaderOwner::SignedOut, vec![post_json(1, 10)]).await;
+
+        for post in [1, 99] {
+            let outcome = service.post_opened(key(post)).await.unwrap();
+            assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForMissingDetails);
+        }
+        assert_eq!(executor.sent().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_view_that_cannot_be_sent_is_an_error_and_is_not_kept() {
+        let (service, executor) = reading(ReaderOwner::SignedOut, vec![site_post(1, false)]).await;
+        executor.push(Step::Offline);
+
+        let result = service.post_opened(key(1)).await;
+
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn the_sites_are_fetched_again_after_a_day_and_an_older_list_answers_if_that_fails() {
+        let executor = Arc::new(ScriptedExecutor::default());
+        let now = Arc::new(Mutex::new(SystemTime::now()));
+        let clock = {
+            let now = now.clone();
+            Arc::new(move || *now.lock().unwrap())
+        };
+        let service = ReaderService::with_clock(
+            delegate(executor.clone()),
+            cache(),
+            ACCOUNT,
+            ReaderSavedSource::Ios,
+            clock,
+        )
+        .unwrap();
+        executor.push(Step::Respond(
+            200,
+            json!({ "posts": [site_post(1, false)] }),
+        ));
+        service.stream(tag()).refresh().await.unwrap();
+        service.set_member_sites(vec![WpComSiteId(123)]).unwrap();
+
+        // Two days later the list is stale, and the device is offline.
+        *now.lock().unwrap() += Duration::from_secs(2 * 24 * 60 * 60);
+        executor.push(Step::Offline);
+        let outcome = service.post_opened(key(1)).await.unwrap();
+        assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForSiteMember);
+
+        // Back online, the list says the account has left the site.
+        executor.push(sites(&[999]));
+        executor.push(pixel());
+        let outcome = service.post_opened(key(1)).await.unwrap();
+        assert_eq!(outcome, ReaderPageViewOutcome::Counted);
+    }
+
+    #[tokio::test]
+    async fn with_no_list_of_sites_a_failed_fetch_is_the_error() {
+        let (service, executor) = reading(ACCOUNT, vec![site_post(1, false)]).await;
+        executor.push(Step::Offline);
+
+        let result = service.post_opened(key(1)).await;
+
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        assert!(matches!(
+            service_for(ReaderOwner::SignedOut)
+                .0
+                .refresh_member_sites()
+                .await,
+            Err(ReaderError::NeedsAccount)
+        ));
     }
 }

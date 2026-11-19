@@ -390,6 +390,8 @@ public typealias ReaderBlocksRequestUnblockSiteResponse = WordPressAPIInternal.R
 
 // MARK: Reader Service
 public typealias ReaderOwner = WordPressAPIInternal.ReaderOwner
+public typealias ReaderPageView = WordPressAPIInternal.ReaderPageView
+public typealias ReaderPageViewOutcome = WordPressAPIInternal.ReaderPageViewOutcome
 public typealias ReaderActionOutcome = WordPressAPIInternal.ReaderActionOutcome
 public typealias ReaderError = WordPressAPIInternal.ReaderError
 public typealias ReaderService = WordPressAPIInternal.ReaderService

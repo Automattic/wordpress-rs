@@ -8,8 +8,10 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 use wp_api::date::WpGmtDateTime;
 use wp_api::prelude::{WpApiClientDelegate, WpApiError};
+use wp_api::request::RequestExecutor;
 use wp_api::wp_com::client::WpComApiClient;
-use wp_api::wp_com::reader_saved::ReaderSavedSource;
+use wp_api::wp_com::reader_saved::{ReaderSavedKey, ReaderSavedSource};
+use wp_mobile_cache::db_types::reader::ReaderPostRecord;
 use wp_mobile_cache::repository::reader::{ReaderPostRepository, ReaderStreamRepository};
 use wp_mobile_cache::repository::wordpress_com_accounts::{
     ReaderOwner, WordPressComAccountRepository,
@@ -18,12 +20,14 @@ use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 
 mod actions;
 mod collection;
+mod page_views;
 mod stream;
 
 pub use actions::ReaderActionOutcome;
 pub use collection::{
     ReaderStreamCollection, ReaderStreamInfo, ReaderStreamItem, ReaderStreamPageResult,
 };
+pub use page_views::ReaderPageViewOutcome;
 pub use stream::{
     ReaderStream, ReaderStreamOrder, reader_stream_needs_account, reader_stream_order,
 };
@@ -90,6 +94,8 @@ pub(crate) struct ReaderContext {
     pub(crate) source: ReaderSavedSource,
     /// What the reader turned on or off that's waiting to be sent.
     pub(crate) actions: ActionQueue,
+    /// Sends requests that aren't to the API, such as the one that counts a view.
+    pub(crate) request_executor: Arc<dyn RequestExecutor>,
     clock: Clock,
 }
 
@@ -183,6 +189,18 @@ impl ReaderService {
         ))
     }
 
+    /// A post as the cache has it, with its content, or `None` if the cache doesn't have it.
+    /// `key` is the post's [`ReaderPostRecord::key`]. Doesn't touch the network.
+    pub fn cached_post(
+        &self,
+        key: ReaderSavedKey,
+    ) -> Result<Option<ReaderPostRecord>, ReaderError> {
+        let post = self.context.cache.execute(|connection| {
+            ReaderPostRepository::select_by_key(connection, self.context.owner_row, &key)
+        })?;
+        Ok(post.map(|(_, post)| post))
+    }
+
     /// The reader's saved posts. A signed-out reader's are kept on this device only: see
     /// [`ReaderSavedService::for_reader`].
     pub fn saved(&self) -> Arc<ReaderSavedService> {
@@ -208,6 +226,7 @@ impl ReaderService {
         let owner_row = cache.execute(|connection| {
             WordPressComAccountRepository::get_or_create_owner(connection, owner)
         })?;
+        let request_executor = delegate.request_executor.clone();
         let saved = ReaderSavedService::for_reader_with_clock(
             delegate.clone(),
             saved_source,
@@ -224,6 +243,7 @@ impl ReaderService {
                 owner_row,
                 source: saved_source,
                 actions: ActionQueue::default(),
+                request_executor,
                 clock,
             }),
             lanes: Mutex::default(),

@@ -297,6 +297,77 @@ impl ReaderBlockRepository {
     }
 }
 
+/// The sites an account is a member of, and when lists like it were last fetched.
+pub struct ReaderMemberSiteRepository;
+
+impl ReaderMemberSiteRepository {
+    /// Makes the account's member sites be exactly `sites`. Call it inside a transaction.
+    pub fn replace(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        sites: &[WpComSiteId],
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "DELETE FROM reader_member_sites WHERE account_id = ?1",
+            [account],
+        )?;
+        for site in sites {
+            executor.execute(
+                "INSERT INTO reader_member_sites (account_id, site_id) VALUES (?1, ?2)
+                ON CONFLICT(account_id, site_id) DO NOTHING",
+                params![account, site.0],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn is_member(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        site_id: WpComSiteId,
+    ) -> Result<bool, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT EXISTS(
+                SELECT 1 FROM reader_member_sites WHERE account_id = ?1 AND site_id = ?2)",
+        )?;
+        Ok(statement.query_row(params![account, site_id.0], |row| row.get(0))?)
+    }
+}
+
+/// When each of a reader's lists was last fetched whole. See the `reader_sync_times` table.
+pub struct ReaderSyncTimeRepository;
+
+impl ReaderSyncTimeRepository {
+    /// Records that the list `name` was fetched at `at`, as text that sorts in date order.
+    pub fn set(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        name: &str,
+        at: &str,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "INSERT INTO reader_sync_times (account_id, name, synced_at) VALUES (?1, ?2, ?3)
+            ON CONFLICT(account_id, name) DO UPDATE SET synced_at = excluded.synced_at",
+            params![account, name, at],
+        )?;
+        Ok(())
+    }
+
+    /// When the list `name` was last fetched, or `None` if it never was.
+    pub fn select(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        name: &str,
+    ) -> Result<Option<String>, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT synced_at FROM reader_sync_times WHERE account_id = ?1 AND name = ?2",
+        )?;
+        Ok(statement
+            .query_row(params![account, name], |row| row.get(0))
+            .optional()?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -447,6 +518,32 @@ mod tests {
             .map(|site| site.site_id.0)
             .collect();
         assert_eq!(ids, [3, 2]);
+    }
+
+    #[test]
+    fn test_member_sites_and_when_they_were_fetched() {
+        let (conn, account) = conn();
+        assert_eq!(
+            ReaderSyncTimeRepository::select(&conn, account, "member_sites").unwrap(),
+            None
+        );
+        ReaderMemberSiteRepository::replace(&conn, account, &[WpComSiteId(1), WpComSiteId(2)])
+            .unwrap();
+        ReaderSyncTimeRepository::set(&conn, account, "member_sites", "2026-11-18T10:00:00.000Z")
+            .unwrap();
+        assert!(ReaderMemberSiteRepository::is_member(&conn, account, WpComSiteId(2)).unwrap());
+
+        ReaderMemberSiteRepository::replace(&conn, account, &[WpComSiteId(3)]).unwrap();
+        ReaderSyncTimeRepository::set(&conn, account, "member_sites", "2026-11-19T10:00:00.000Z")
+            .unwrap();
+        assert!(!ReaderMemberSiteRepository::is_member(&conn, account, WpComSiteId(2)).unwrap());
+        assert!(ReaderMemberSiteRepository::is_member(&conn, account, WpComSiteId(3)).unwrap());
+        assert_eq!(
+            ReaderSyncTimeRepository::select(&conn, account, "member_sites")
+                .unwrap()
+                .as_deref(),
+            Some("2026-11-19T10:00:00.000Z")
+        );
     }
 
     #[test]
