@@ -1,18 +1,19 @@
-//! The users who liked a post or a comment.
+//! The users who liked a post or a comment, and liking and unliking a post.
 //!
 //! Both lists answer without a token for a public site. For a private site they're then a 403
-//! `unauthorized`.
+//! `unauthorized`. Liking and unliking act for the user, so they need a token.
 
 use crate::{
     date::{WpGmtDateTime, deserialize_optional_wp_gmt_date_time},
+    posts::PostId,
     url_query::{AppendUrlQueryPairs, QueryPairs, QueryPairsExtension},
     wp_com::{WpComSiteId, me::WpComUserId, reader_saved::deserialize_optional_text},
 };
 use chrono::Duration;
 use serde::{Deserialize, Deserializer, Serialize};
 use wp_serde_helper::{
-    LenientVec, deserialize_optional_bool_or_int, deserialize_u64_or_string_as_t,
-    deserialize_u64_or_string_or_none,
+    LenientVec, deserialize_bool_or_int, deserialize_optional_bool_or_int,
+    deserialize_u64_or_string_as_t, deserialize_u64_or_string_or_none,
 };
 
 /// Query parameters for the users who liked something. For the next page, use
@@ -307,6 +308,47 @@ impl From<RawReaderLike> for ReaderLike {
     }
 }
 
+/// The answer to liking or unliking a post.
+///
+/// It's built from the answer to an unlike that changed nothing, the only one seen. In trials the
+/// API refused every like with a 400 `like_failed`, so no post was ever liked, and every unlike
+/// found nothing to remove. A like is taken to answer in the same shape: the web Reader reads both
+/// the same way.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderPostLikeResponse {
+    /// Whether the like changed. `false`, in a 200, for an unlike of a post the user doesn't
+    /// like. The web Reader takes `false` as a failure for a like too.
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    pub success: bool,
+    /// Whether the user likes the post now.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub i_like: Option<bool>,
+    /// How many likes the post has now.
+    #[serde(default, deserialize_with = "deserialize_optional_count")]
+    #[uniffi(default = None)]
+    pub like_count: Option<u64>,
+    #[serde(
+        rename = "site_ID",
+        default,
+        deserialize_with = "deserialize_optional_site_id"
+    )]
+    #[uniffi(default = None)]
+    pub site_id: Option<WpComSiteId>,
+    #[serde(
+        rename = "post_ID",
+        default,
+        deserialize_with = "deserialize_optional_post_id"
+    )]
+    #[uniffi(default = None)]
+    pub post_id: Option<PostId>,
+    /// The user, as a like of theirs lists them, without a `date_liked`. `None` when it can't be
+    /// read, which doesn't fail the answer.
+    #[serde(default, deserialize_with = "deserialize_liker")]
+    #[uniffi(default = None)]
+    pub liker: Option<ReaderLike>,
+}
+
 /// A site's ID, sent as a number or a string. Anything that isn't one, such as `0`, `-1`, `false`
 /// or `null`, reads as `None` rather than failing the like.
 fn deserialize_optional_site_id<'de, D>(deserializer: D) -> Result<Option<WpComSiteId>, D::Error>
@@ -319,6 +361,43 @@ where
         _ => None,
     };
     Ok(id.filter(|id| *id != 0).map(WpComSiteId))
+}
+
+/// A post's ID, sent as a number or a string. Anything else reads as `None`.
+fn deserialize_optional_post_id<'de, D>(deserializer: D) -> Result<Option<PostId>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let id = match Option::<serde_json::Value>::deserialize(deserializer)? {
+        Some(serde_json::Value::Number(number)) => number.as_i64(),
+        Some(serde_json::Value::String(text)) => text.parse().ok(),
+        _ => None,
+    };
+    Ok(id.filter(|id| *id > 0).map(PostId))
+}
+
+/// A count, sent as a number or a string. Anything else reads as `None` rather than failing the
+/// answer to a like, which has already taken effect by the time it's read.
+fn deserialize_optional_count<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(
+        match Option::<serde_json::Value>::deserialize(deserializer)? {
+            Some(serde_json::Value::Number(number)) => number.as_u64(),
+            Some(serde_json::Value::String(text)) => text.parse().ok(),
+            _ => None,
+        },
+    )
+}
+
+/// The user in the answer to a like. `None` for anything that isn't a user.
+fn deserialize_liker<'de, D>(deserializer: D) -> Result<Option<ReaderLike>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let liker = Option::<serde_json::Value>::deserialize(deserializer)?;
+    Ok(liker.and_then(|liker| serde_json::from_value(liker).ok()))
 }
 
 /// An object, or `None` for `null`, `false`, or an empty list, which PHP sends for an empty object.
@@ -578,5 +657,68 @@ mod tests {
     #[test]
     fn test_a_page_that_is_not_one_is_an_error() {
         assert!(serde_json::from_value::<ReaderLikesResponse>(json!({ "likes": "none" })).is_err());
+    }
+
+    /// The answer to unliking a post the user doesn't like, recorded from WordPress.com, with the
+    /// user and the site replaced. It's a 200 that says nothing changed.
+    #[test]
+    fn test_deserialize_unlike_post() {
+        let answer: ReaderPostLikeResponse = serde_json::from_str(include_str!(
+            "../../tests/wpcom/reader_likes/unlike_post.json"
+        ))
+        .expect("the answer parses");
+
+        assert!(!answer.success);
+        assert_eq!(answer.i_like, Some(false));
+        assert_eq!(answer.like_count, Some(0));
+        assert_eq!(answer.site_id, Some(WpComSiteId(100000001)));
+        assert_eq!(answer.post_id, Some(PostId(3)));
+        let liker = answer.liker.expect("the user");
+        assert_eq!(liker.id, WpComUserId(1001));
+        assert_eq!(liker.login.as_deref(), Some("exampleuser1"));
+        assert_eq!(liker.site_id, Some(WpComSiteId(2001)));
+        assert_eq!(liker.date_liked, None);
+    }
+
+    /// The shape a like that works is taken to have. It wasn't seen: see
+    /// [`ReaderPostLikeResponse`].
+    #[test]
+    fn test_deserialize_a_like_that_changed_something() {
+        let answer: ReaderPostLikeResponse = serde_json::from_value(json!({
+            "success": true,
+            "i_like": true,
+            "like_count": "4",
+            "site_ID": "100000001",
+            "post_ID": "3",
+        }))
+        .expect("the answer parses");
+
+        assert!(answer.success);
+        assert_eq!(answer.i_like, Some(true));
+        assert_eq!(answer.like_count, Some(4));
+        assert_eq!(answer.site_id, Some(WpComSiteId(100000001)));
+        assert_eq!(answer.post_id, Some(PostId(3)));
+        assert_eq!(answer.liker, None);
+    }
+
+    /// Only `success` has to be there. A field that isn't what's expected reads as `None`.
+    #[rstest]
+    #[case(json!({ "success": true }))]
+    #[case(json!({ "success": 1, "like_count": -1, "site_ID": false, "post_ID": 0, "liker": false }))]
+    #[case(json!({ "success": true, "like_count": null, "liker": { "login": "no-id" } }))]
+    fn test_a_post_like_answer_with_little_in_it(#[case] answer: serde_json::Value) {
+        let answer: ReaderPostLikeResponse =
+            serde_json::from_value(answer).expect("the answer parses");
+        assert!(answer.success);
+        assert_eq!(answer.like_count, None);
+        assert_eq!(answer.site_id, None);
+        assert_eq!(answer.post_id, None);
+        assert_eq!(answer.liker, None);
+    }
+
+    #[test]
+    fn test_a_post_like_answer_without_success_is_an_error() {
+        let result = serde_json::from_value::<ReaderPostLikeResponse>(json!({ "i_like": true }));
+        assert!(result.is_err());
     }
 }
