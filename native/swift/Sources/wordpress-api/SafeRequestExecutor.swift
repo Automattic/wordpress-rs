@@ -215,7 +215,8 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 redirects: executorDelegate.redirects(for: request.requestId()),
                 reason: RequestExecutionErrorReason.invalidSslError(
                     reason: .certificateNotValidForName(
-                        hostname: request.displayHost() ?? "unknown host",
+                        // The request was sent, so its address is a URL. `.host` decodes percent escapes.
+                        hostname: (try? request.url() as URL)?.host ?? "unknown host",
                         presentedHostnames: siteCertificate.presentedHostnames()
                     )
                 ),
@@ -605,13 +606,20 @@ protocol NetworkRequestContent {
 }
 
 extension NetworkRequestContent {
-    func buildURLRequest(additionalHeaders: [String: String]) throws -> URLRequest {
-        // The request's URL can contain characters, such as `{` in a host or `|` in a path, that `URL(string:)`
-        // rejects. Its RFC 3986 form percent-encodes them. See #1746.
-        guard let rfc3986 = wpEndpointUrlRfc3986(url: self.url()), let url = URL(string: rfc3986) else {
-            throw URLError(.badURL, userInfo: [NSURLErrorFailingURLStringErrorKey: self.url()])
+    /// The request's address as a `URL`, or `URLError(.badURL)` if it isn't a URL.
+    ///
+    /// The address can contain characters, such as `{` in a host or `|` in a path, that `URL(string:)` rejects. Its
+    /// RFC 3986 form percent-encodes them. See #1746 and #1759.
+    func url() throws -> URL {
+        let address: WpEndpointUrl = self.url()
+        guard let rfc3986 = wpEndpointUrlRfc3986(url: address), let url = URL(string: rfc3986) else {
+            throw URLError(.badURL, userInfo: [NSURLErrorFailingURLStringErrorKey: address])
         }
-        var request = URLRequest(url: url)
+        return url
+    }
+
+    func buildURLRequest(additionalHeaders: [String: String]) throws -> URLRequest {
+        var request = URLRequest(url: try self.url())
         request.httpMethod = self.method().rawValue
         request.allHTTPHeaderFields = self.headerMap().toFlatMap()
         request.allHTTPHeaderFields?[requestIdHeaderName] = self.requestId()
@@ -620,13 +628,6 @@ extension NetworkRequestContent {
         }
         try self.encodeBody(into: &request)
         return request
-    }
-
-    /// The request's host with its percent escapes decoded, for an error message, or `nil` if the address isn't a
-    /// URL. Like `buildURLRequest`, it reads the RFC 3986 form, because `URL(string:)` rejects some addresses as
-    /// sent. See #1759.
-    func displayHost() -> String? {
-        wpEndpointUrlRfc3986(url: self.url()).flatMap { URL(string: $0) }?.host
     }
 }
 

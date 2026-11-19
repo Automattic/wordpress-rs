@@ -241,7 +241,7 @@ struct SafeRequestExecutorTests {
     // Regression test for #1759: the certificate-mismatch error read the host with `URL(string:)` on the
     // unencoded address, so it named the host "unknown host" for an address `URL(string:)` rejects.
     @Test(
-        "displayHost names the host of an address URL(string:) rejects",
+        "url() as URL names the host of an address URL(string:) rejects",
         arguments: [
             ("https://{cdn}/wp-json/", "{cdn}"),
             ("https://example.com/wp-json/a|b?q[0]=^", "example.com"),
@@ -249,13 +249,18 @@ struct SafeRequestExecutorTests {
             ("https://[::1]/wp-json/", "::1")
         ]
     )
-    func testDisplayHostOfAddressURLRejects(url: String, expected: String) {
-        #expect(StubRequest(url: url).displayHost() == expected)
+    func testURLHostOfAddressURLRejects(url: String, expected: String) throws {
+        let url: URL = try StubRequest(url: url).url()
+        #expect(url.host == expected)
     }
 
-    @Test("displayHost is nil when the address isn't a URL")
-    func testDisplayHostOfInvalidURL() {
-        #expect(StubRequest(url: "not a url").displayHost() == nil)
+    @Test("url() as URL throws .badURL when the address isn't a URL")
+    func testURLOfInvalidAddressThrows() {
+        let error = #expect(throws: URLError.self) {
+            let _: URL = try StubRequest(url: "not a url").url()
+        }
+        #expect(error?.code == .badURL)
+        #expect(error?.failureURLString == "not a url")
     }
 }
 
