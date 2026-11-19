@@ -3,6 +3,7 @@
 use libtest_mimic::{Failed, Trial};
 use std::collections::HashSet;
 use std::sync::Arc;
+use wp_api::posts::PostId;
 use wp_api::prelude::*;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
@@ -142,6 +143,47 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     for stream in streams {
                         walk_two_pages(&service, stream).await?;
                     }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::a_post_and_its_related_posts_signed_out", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
+                    let stream = service.stream(ReaderStream::Site { site_id: SITE });
+                    stream.refresh().await.map_err(|e| e.to_string())?;
+                    let items = stream.load_items().await.map_err(|e| e.to_string())?;
+                    let listed = items.first().ok_or("The site has no posts")?.post.clone();
+
+                    // Fetched on its own, the post is the one the stream listed, with its content.
+                    let post = service
+                        .fetch_post(listed.identity.clone())
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if post.key != listed.key || post.title != listed.title {
+                        return Err("The fetched post isn't the one the stream listed".into());
+                    }
+                    if post.content.as_deref().unwrap_or_default().is_empty() {
+                        return Err("A fetched post should have its content".into());
+                    }
+                    let cached = service
+                        .cached_post(post.key.clone())
+                        .map_err(|e| e.to_string())?;
+                    if cached.as_ref() != Some(&post) {
+                        return Err("The fetched post should be what the cache has".into());
+                    }
+
+                    let related = service.stream(ReaderStream::Related {
+                        site_id: SITE,
+                        post_id: PostId(post.identity.id as i64),
+                    });
+                    let page = related.refresh().await.map_err(|e| e.to_string())?;
+                    if page.post_count == 0 || page.has_more {
+                        return Err("A post should have related posts, in one page".into());
+                    }
+                    check_stream(&related).await?;
                     Ok(())
                 })
             }

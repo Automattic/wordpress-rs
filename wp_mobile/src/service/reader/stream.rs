@@ -2,9 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 use wp_api::date::WpGmtDateTime;
+use wp_api::posts::PostId;
 use wp_api::prelude::WpApiError;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::client::WpComApiClient;
+use wp_api::wp_com::reader_post::ReaderRelatedPostsParams;
 use wp_api::wp_com::reader_posts::{
     ReaderCard, ReaderCardSite, ReaderCardTag, ReaderDiscoverParams, ReaderFirstPostsParams,
     ReaderFreshlyPressedParams, ReaderLikedPostsParams, ReaderListOwner, ReaderListPostsParams,
@@ -20,6 +22,10 @@ const DATED_PAGE_SIZE: u32 = 20;
 
 /// How many posts a page of search results asks for, which is the most the API gives.
 const SEARCH_PAGE_SIZE: u32 = 20;
+
+/// How many related posts are asked for from the post's own site, and how many from other sites.
+/// The API returns none of a kind that isn't asked for.
+const RELATED_POSTS_OF_EACH_KIND: u32 = 3;
 
 /// What a stream asks for with each post: the post's site, and an RSS post's feed. They carry the
 /// site's or feed's icon and the site's language, which a post doesn't have without them.
@@ -61,6 +67,12 @@ pub enum ReaderStream {
     Discover { tags: Vec<ReaderTagSlug> },
     /// The first posts of new sites.
     FirstPosts,
+    /// The posts related to a site's post: some from the same site, and some from others. It has
+    /// one page.
+    Related {
+        site_id: WpComSiteId,
+        post_id: PostId,
+    },
 }
 
 /// What orders a stream's posts, which decides how the cache keeps them.
@@ -99,6 +111,7 @@ impl ReaderStream {
             Self::ReaderList { owner, slug } => format!("list:{}/{}", owner.0, slug.0),
             Self::Discover { tags } => format!("discover:{}", tags_key(tags)),
             Self::FirstPosts => "first-posts".to_string(),
+            Self::Related { site_id, post_id } => format!("related:{}:{}", site_id.0, post_id.0),
         }
     }
 
@@ -113,7 +126,8 @@ impl ReaderStream {
             | Self::Search { .. }
             | Self::ReaderList { .. }
             | Self::Discover { .. }
-            | Self::FirstPosts => false,
+            | Self::FirstPosts
+            | Self::Related { .. } => false,
         }
     }
 
@@ -131,12 +145,13 @@ impl ReaderStream {
             | Self::Search { .. }
             | Self::ReaderList { .. }
             | Self::Discover { .. }
-            | Self::FirstPosts => ReaderStreamOrdering::Server,
+            | Self::FirstPosts
+            | Self::Related { .. } => ReaderStreamOrdering::Server,
         }
     }
 
     /// The date a stream ordered by date orders a post by, and pages by.
-    fn sort_date(&self, post: &ReaderPost) -> Option<WpGmtDateTime> {
+    pub(crate) fn sort_date(&self, post: &ReaderPost) -> Option<WpGmtDateTime> {
         match self {
             Self::Liked => post.date_liked,
             Self::FreshlyPressed => post.editorial_displayed_on,
@@ -298,6 +313,24 @@ impl ReaderStream {
                 };
                 let page = posts.first_posts(&params).await?.data;
                 card_page(page.cards, page.unreadable_cards, page.next_page_handle)
+            }
+            Self::Related { site_id, post_id } => {
+                let params = ReaderRelatedPostsParams {
+                    size_local: Some(RELATED_POSTS_OF_EACH_KIND),
+                    size_global: Some(RELATED_POSTS_OF_EACH_KIND),
+                    meta,
+                    ..Default::default()
+                };
+                let page = client
+                    .reader_post()
+                    .related_posts(site_id, post_id, &params)
+                    .await?
+                    .data;
+                StreamPage {
+                    entries: page.posts.into_iter().map(undated).collect(),
+                    unreadable: unreadable_posts(page.unreadable_posts),
+                    next_page_handle: None,
+                }
             }
         })
     }
@@ -512,6 +545,7 @@ mod tests {
         false,
         ReaderStreamOrdering::Server
     )]
+    #[case(ReaderStream::Related { site_id: WpComSiteId(1), post_id: PostId(2) }, "related:1:2", false, ReaderStreamOrdering::Server)]
     fn test_what_each_stream_is(
         #[case] stream: ReaderStream,
         #[case] key: &str,

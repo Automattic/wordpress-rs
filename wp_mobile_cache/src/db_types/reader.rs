@@ -293,6 +293,8 @@ pub struct DbReaderUnreadablePost {
     pub error: String,
     /// How many times it's been asked for on its own since.
     pub attempts: u32,
+    /// When a page first had it.
+    pub first_seen_at: WpGmtDateTime,
     pub last_attempt_at: Option<WpGmtDateTime>,
 }
 

@@ -21,6 +21,7 @@ use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 mod actions;
 mod collection;
 mod page_views;
+mod posts;
 mod stream;
 
 pub use actions::ReaderActionOutcome;

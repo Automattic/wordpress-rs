@@ -1466,3 +1466,301 @@ mod page_views {
         ));
     }
 }
+
+mod posts {
+    use super::*;
+    use wp_api::wp_com::reader_saved::{ReaderFeedItemId, ReaderPostSaveIdentity};
+    use wp_api::wp_com::sites::WpComSiteIdentifier;
+
+    fn identity(id: u64) -> ReaderPostSaveIdentity {
+        ReaderPostSaveIdentity {
+            id,
+            site_id: Some(WpComSiteId(123)),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        }
+    }
+
+    fn paths(executor: &ScriptedExecutor) -> Vec<String> {
+        executor
+            .sent()
+            .iter()
+            .map(|sent| {
+                sent.url
+                    .trim_start_matches("https://public-api.wordpress.com")
+                    .to_string()
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_post_is_fetched_by_its_ids_and_kept() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(Step::Respond(200, post_json(7, 10)));
+
+        let post = service.fetch_post(identity(7)).await.unwrap();
+
+        assert_eq!(post.title.as_deref(), Some("Post 7"));
+        assert_eq!(
+            post.content.as_deref(),
+            Some("<p>The content of post 7.</p>")
+        );
+        assert_eq!(
+            paths(&executor),
+            ["/rest/v1.2/read/sites/123/posts/7?meta=site%2Cfeed"]
+        );
+        // It's in the cache, in no stream.
+        assert_eq!(service.cached_post(key(7)).unwrap(), Some(post));
+    }
+
+    #[tokio::test]
+    async fn an_rss_post_is_fetched_from_its_feed() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(Step::Respond(
+            200,
+            json!({ "ID": 9, "feed_ID": 456, "feed_item_ID": 9, "is_external": true, "title": "From a feed" }),
+        ));
+        let rss = ReaderPostSaveIdentity {
+            id: 9,
+            site_id: None,
+            feed_id: Some(ReaderFeedId(456)),
+            feed_item_id: Some(ReaderFeedItemId(9)),
+            is_external: true,
+            url: None,
+        };
+
+        let post = service.fetch_post(rss).await.unwrap();
+
+        assert_eq!(post.title.as_deref(), Some("From a feed"));
+        assert_eq!(
+            paths(&executor),
+            ["/rest/v1.3/read/feed/456/posts/9?meta=site%2Cfeed"]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_post_without_the_ids_to_fetch_it_by_is_an_error() {
+        let (service, executor) = service();
+        let post = ReaderPostSaveIdentity {
+            id: 9,
+            site_id: None,
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        };
+
+        assert!(matches!(
+            service.fetch_post(post).await,
+            Err(ReaderError::MissingIds)
+        ));
+        assert!(executor.sent().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_fetched_post_keeps_what_the_reader_turned_on_since() {
+        let (service, executor) = service();
+        let mut post = post_json(7, 10);
+        post["is_seen"] = json!(false);
+        executor.push(Step::Respond(200, post.clone()));
+        service.fetch_post(identity(7)).await.unwrap();
+        // Marked as seen while offline.
+        executor.push(Step::Offline);
+        service.set_post_seen(identity(7), true).await.unwrap();
+
+        // The server still says it isn't seen.
+        executor.push(Step::Respond(200, post));
+        let fetched = service.fetch_post(identity(7)).await.unwrap();
+
+        assert_eq!(fetched.is_seen, Some(true));
+    }
+
+    #[tokio::test]
+    async fn a_slug_finds_a_post_which_is_then_fetched_whole() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(Step::Respond(
+            200,
+            json!({ "ID": 7, "site_ID": 123, "slug": "hello-world", "title": "Post 7" }),
+        ));
+        executor.push(Step::Respond(200, post_json(7, 10)));
+
+        let post = service
+            .fetch_post_by_slug(
+                WpComSiteIdentifier::Slug {
+                    value: "example.wordpress.com".to_string(),
+                },
+                "hello-world".to_string(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(post.identity.id, 7);
+        assert_eq!(
+            paths(&executor),
+            [
+                "/rest/v1.1/sites/example.wordpress.com/posts/slug:hello-world?",
+                "/rest/v1.2/read/sites/123/posts/7?meta=site%2Cfeed",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn an_address_is_resolved_to_a_post_for_an_account_only() {
+        let (signed_out, executor) = service_for(ReaderOwner::SignedOut);
+        let url = "https://example.wordpress.com/2026/11/18/hello-world/".to_string();
+        assert!(matches!(
+            signed_out.fetch_post_at_url(url.clone()).await,
+            Err(ReaderError::NeedsAccount)
+        ));
+        assert!(executor.sent().is_empty());
+
+        let (service, executor) = service();
+        executor.push(Step::Respond(200, json!({ "site_id": 123, "post_id": 7 })));
+        executor.push(Step::Respond(200, post_json(7, 10)));
+
+        let post = service.fetch_post_at_url(url).await.unwrap();
+
+        assert_eq!(post.identity.id, 7);
+        assert!(paths(&executor)[0].starts_with("/wpcom/v2/mobile/resolve-reader-url?url=https"));
+    }
+
+    #[tokio::test]
+    async fn related_posts_are_a_stream_of_one_page() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        let stream = service.stream(ReaderStream::Related {
+            site_id: WpComSiteId(123),
+            post_id: PostId(7),
+        });
+        executor.push(Step::Respond(200, page(&[(8, 10), (9, 11)])));
+
+        let result = stream.refresh().await.unwrap();
+
+        assert!(!result.has_more);
+        assert_eq!(shown(&stream).await, ["8", "9"]);
+        assert_eq!(
+            paths(&executor),
+            ["/rest/v1.2/read/site/123/post/7/related?size_global=3&size_local=3&meta=site%2Cfeed"]
+        );
+    }
+
+    /// A service with a clock the test moves, whose Following stream had post 2 unreadable.
+    async fn with_an_unreadable_post() -> (
+        ReaderService,
+        Arc<ScriptedExecutor>,
+        Arc<ReaderStreamCollection>,
+        Arc<Mutex<SystemTime>>,
+    ) {
+        let executor = Arc::new(ScriptedExecutor::default());
+        let now = Arc::new(Mutex::new(SystemTime::now()));
+        let clock = {
+            let now = now.clone();
+            Arc::new(move || *now.lock().unwrap())
+        };
+        let service = ReaderService::with_clock(
+            delegate(executor.clone()),
+            cache(),
+            ACCOUNT,
+            ReaderSavedSource::Ios,
+            clock,
+        )
+        .unwrap();
+        let stream = service.stream(ReaderStream::Following);
+        let mut unreadable = post_json(2, 11);
+        unreadable["date"] = json!("2026-11-18T11:00:00+91:00");
+        executor.push(Step::Respond(
+            200,
+            json!({ "posts": [post_json(3, 12), unreadable, post_json(1, 10)] }),
+        ));
+        stream.refresh().await.unwrap();
+        (service, executor, stream, now)
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_post_is_asked_for_again_after_an_hour_and_takes_its_place() {
+        let (_service, executor, stream, now) = with_an_unreadable_post().await;
+        // Straight away, nothing is asked for: the server would send the same post.
+        assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 0);
+        assert_eq!(executor.sent().len(), 1);
+
+        *now.lock().unwrap() += Duration::from_secs(61 * 60);
+        executor.push(Step::Respond(200, post_json(2, 11)));
+        assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 1);
+
+        assert_eq!(shown(&stream).await, ["3", "2", "1"]);
+        assert_eq!(stream.info().unwrap().unreadable_post_count, 0);
+        assert_eq!(
+            paths(&executor)[1],
+            "/rest/v1.2/read/sites/123/posts/2?meta=site%2Cfeed"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_post_that_still_cannot_be_read_is_tried_five_times() {
+        let (_service, executor, stream, now) = with_an_unreadable_post().await;
+        let mut still_unreadable = post_json(2, 11);
+        still_unreadable["date"] = json!("2026-11-18T11:00:00+91:00");
+
+        for attempt in 1..=6 {
+            *now.lock().unwrap() += Duration::from_secs(61 * 60);
+            if attempt <= 5 {
+                executor.push(Step::Respond(200, still_unreadable.clone()));
+            }
+            assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 0);
+        }
+
+        // Five requests for the post, and none the sixth time.
+        assert_eq!(executor.sent().len(), 6);
+        assert_eq!(stream.info().unwrap().unreadable_post_count, 1);
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_post_the_server_no_longer_has_is_forgotten() {
+        let (_service, executor, stream, now) = with_an_unreadable_post().await;
+        *now.lock().unwrap() += Duration::from_secs(61 * 60);
+        executor.push(Step::Respond(
+            404,
+            json!({ "error": "unknown_post", "message": "Unknown post" }),
+        ));
+
+        assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 0);
+
+        assert_eq!(stream.info().unwrap().unreadable_post_count, 0);
+        assert_eq!(shown(&stream).await, ["3", "1"]);
+    }
+
+    #[tokio::test]
+    async fn offline_an_unreadable_post_is_not_counted_as_tried() {
+        let (_service, executor, stream, now) = with_an_unreadable_post().await;
+        for _ in 0..6 {
+            *now.lock().unwrap() += Duration::from_secs(61 * 60);
+            executor.push(Step::Offline);
+            assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 0);
+        }
+
+        // Back online, it's still asked for.
+        *now.lock().unwrap() += Duration::from_secs(61 * 60);
+        executor.push(Step::Respond(200, post_json(2, 11)));
+        assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_refresh_asks_again_for_unreadable_posts_that_are_due() {
+        let (_service, executor, stream, now) = with_an_unreadable_post().await;
+        *now.lock().unwrap() += Duration::from_secs(61 * 60);
+        // The page still can't read post 2, and then the post on its own can be.
+        let mut unreadable = post_json(2, 11);
+        unreadable["date"] = json!("2026-11-18T11:00:00+91:00");
+        executor.push(Step::Respond(
+            200,
+            json!({ "posts": [post_json(3, 12), unreadable, post_json(1, 10)] }),
+        ));
+        executor.push(Step::Respond(200, post_json(2, 11)));
+
+        stream.refresh().await.unwrap();
+
+        assert_eq!(shown(&stream).await, ["3", "2", "1"]);
+        assert_eq!(stream.info().unwrap().unreadable_post_count, 0);
+    }
+}

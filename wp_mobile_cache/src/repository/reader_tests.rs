@@ -1763,6 +1763,7 @@ mod stream_pages {
                 &post_key(9),
                 &identity(9),
                 error,
+                &"2026-11-18T09:00:00Z".parse().unwrap(),
             )
             .unwrap()
         };

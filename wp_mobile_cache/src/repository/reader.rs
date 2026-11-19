@@ -1160,7 +1160,8 @@ impl ReaderPostRepository {
 pub struct ReaderUnreadablePostRepository;
 
 impl ReaderUnreadablePostRepository {
-    /// Records that a page of the stream had a post it couldn't read, or that it still can't.
+    /// Records that a page of the stream had a post it couldn't read, or that it still can't. `now`
+    /// is when, which is kept for a post that wasn't recorded yet.
     pub fn record(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -1168,12 +1169,13 @@ impl ReaderUnreadablePostRepository {
         key: &ReaderSavedKey,
         identity: &ReaderPostSaveIdentity,
         error: &str,
+        now: &WpGmtDateTime,
     ) -> Result<(), SqliteDbError> {
         executor.execute(
             "INSERT INTO reader_unreadable_posts (
                 account_id, stream_id, identity_key, post_id, site_id, feed_id, feed_item_id,
-                is_external, url, error
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                is_external, url, error, first_seen_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
             ON CONFLICT(stream_id, identity_key) DO UPDATE SET error = excluded.error",
             params![
                 account,
@@ -1186,6 +1188,7 @@ impl ReaderUnreadablePostRepository {
                 identity.is_external,
                 identity.url,
                 error,
+                reader_date_text(now),
             ],
         )?;
         Ok(())
@@ -1218,7 +1221,7 @@ impl ReaderUnreadablePostRepository {
     ) -> Result<Vec<DbReaderUnreadablePost>, SqliteDbError> {
         let mut statement = executor.prepare(
             "SELECT rowid, stream_id, post_id, site_id, feed_id, feed_item_id, is_external, url,
-                error, attempts, last_attempt_at
+                error, attempts, last_attempt_at, first_seen_at
             FROM reader_unreadable_posts WHERE stream_id = ?1 ORDER BY rowid",
         )?;
         let rows = statement.query_map([stream], |row| {
@@ -1236,6 +1239,7 @@ impl ReaderUnreadablePostRepository {
                     },
                     error: row.get(8)?,
                     attempts: row.get(9)?,
+                    first_seen_at: reader_date_from_text(&row.get::<_, String>(11)?)?,
                     last_attempt_at: row
                         .get::<_, Option<String>>(10)?
                         .map(|text| reader_date_from_text(&text))

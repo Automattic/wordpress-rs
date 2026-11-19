@@ -8,7 +8,9 @@ use super::{ReaderContext, ReaderError, ReaderStream, ReaderStreamOrdering};
 use futures::lock::Mutex as AsyncMutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use wp_api::date::WpGmtDateTime;
+use wp_api::prelude::WpApiError;
 use wp_api::wp_com::reader_saved::{ReaderSavedKey, reader_saved_key_for_post};
 use wp_mobile_cache::db_types::reader::{
     DbReaderPageEntry, DbReaderPageItem, DbReaderPageOutcome, DbReaderStream, ReaderPostRecord,
@@ -25,6 +27,16 @@ use wp_mobile_cache::{DbTable, RowId, SqliteDbError, UpdateHook};
 /// The most posts a stream ordered by date keeps. A refresh removes the oldest past it, and they
 /// can be loaded again.
 const MAX_DATED_POSTS: u64 = 500;
+
+/// How many of a stream's unreadable posts are asked for again at a time.
+const UNREADABLE_RETRIES_AT_A_TIME: usize = 5;
+
+/// How many times an unreadable post is asked for on its own before it's left alone.
+const MAX_UNREADABLE_ATTEMPTS: u32 = 5;
+
+/// How long an unreadable post waits before it's asked for again. The server keeps a post it built
+/// for an hour, so asking sooner gets the same answer.
+const UNREADABLE_RETRY_INTERVAL: Duration = Duration::from_secs(60 * 60);
 
 /// The tables a stream is read from.
 const STREAM_TABLES: [DbTable; 7] = [
@@ -248,13 +260,91 @@ impl ReaderStreamCollection {
             .lock()
             .expect("last refresh lock poisoned") = result.as_ref().ok().cloned();
         self.lanes.refreshes.fetch_add(1, Ordering::SeqCst);
-        if result.is_ok()
-            && let Err(error) = self.context.clean_up()
-        {
-            // The refresh worked, so a failure to tidy up afterwards is only logged.
-            log::error!("Couldn't clean up the Reader cache: {error}");
+        if result.is_ok() {
+            // The refresh worked, so a failure in what follows it is only logged.
+            if let Err(error) = self.context.clean_up() {
+                log::error!("Couldn't clean up the Reader cache: {error}");
+            }
+            if let Err(error) = self.retry_unreadable_posts().await {
+                log::warn!("Couldn't ask again for a Reader stream's unreadable posts: {error}");
+            }
         }
         result
+    }
+
+    /// Asks again, one by one, for posts the stream's pages had that couldn't be read. A post
+    /// that reads now is stored, and takes its place in a stream ordered by date. Returns how
+    /// many read. A refresh does this too.
+    ///
+    /// A post is asked for at most once an hour, since the server keeps a post it built for that
+    /// long, and five times in all. One the server no longer has is forgotten.
+    pub async fn retry_unreadable_posts(&self) -> Result<u64, ReaderError> {
+        let now = self.context.now();
+        let interval = chrono::Duration::from_std(UNREADABLE_RETRY_INTERVAL).unwrap_or_default();
+        let due = self.context.cache.execute(|connection| {
+            let Some(stream) = self.select_stream(&*connection)? else {
+                return Ok::<_, SqliteDbError>(Vec::new());
+            };
+            let posts = ReaderUnreadablePostRepository::select(&*connection, stream.row_id)?;
+            Ok(posts
+                .into_iter()
+                .filter(|post| {
+                    let last = post.last_attempt_at.unwrap_or(post.first_seen_at);
+                    post.attempts < MAX_UNREADABLE_ATTEMPTS && now.0 - last.0 >= interval
+                })
+                .take(UNREADABLE_RETRIES_AT_A_TIME)
+                .collect())
+        })?;
+
+        let mut readable = 0;
+        for post in due {
+            let fetched = match self.context.fetch_reader_post(&post.identity).await {
+                Ok(fetched) => fetched,
+                Err(error) => {
+                    let message = error.to_string();
+                    self.context.cache.execute(|connection| {
+                        if is_gone(&error) {
+                            ReaderUnreadablePostRepository::delete(&*connection, post.row_id)
+                        } else if was_answered(&error) {
+                            ReaderUnreadablePostRepository::record_attempt(
+                                &*connection,
+                                post.row_id,
+                                &now,
+                                &message,
+                            )
+                        } else {
+                            // The request didn't get an answer, which says nothing about the post.
+                            Ok(())
+                        }
+                    })?;
+                    continue;
+                }
+            };
+            let stored = self.context.store_reader_post(&fetched)?;
+            let sort_date = self.stream.sort_date(&fetched);
+            self.context.cache.execute(|connection| {
+                let transaction = connection.transaction()?;
+                if let (ReaderStreamOrdering::Date, Some(date)) =
+                    (self.stream.ordering(), sort_date)
+                    && let Some(row) = ReaderPostRepository::select_row_id_by_key(
+                        &transaction,
+                        self.context.owner_row,
+                        &stored.key,
+                    )?
+                {
+                    ReaderStreamRepository::upsert_item(
+                        &transaction,
+                        post.stream_row_id,
+                        row,
+                        &reader_date_text(&date),
+                    )?;
+                }
+                ReaderUnreadablePostRepository::delete(&transaction, post.row_id)?;
+                transaction.commit().map_err(SqliteDbError::from)
+            })?;
+            readable += 1;
+        }
+        Ok(readable)
     }
 
     /// Fetches the page after the stream's last post, or refreshes if the stream hasn't loaded
@@ -546,6 +636,7 @@ impl ReaderStreamCollection {
                     &key,
                     identity,
                     error,
+                    &self.context.now(),
                 )?;
                 if let Some(row) =
                     ReaderPostRepository::select_row_id_by_key(&transaction, owner, &key)?
@@ -654,5 +745,22 @@ impl ReaderStreamCollection {
                 has_more,
             })
         })
+    }
+}
+
+/// Whether an error says the server no longer has the post.
+fn is_gone(error: &ReaderError) -> bool {
+    matches!(error, ReaderError::Api(error) if matches!(error.status_code(), Some(404 | 410)))
+}
+
+/// Whether an error is the server's answer about the post, as opposed to a request that failed on
+/// the way: an answer that couldn't be read, or one in the 400s.
+fn was_answered(error: &ReaderError) -> bool {
+    match error {
+        ReaderError::Api(WpApiError::ResponseParsingError { .. }) => true,
+        ReaderError::Api(error) => {
+            matches!(error.status_code(), Some(status) if (400..500).contains(&status))
+        }
+        _ => false,
     }
 }
