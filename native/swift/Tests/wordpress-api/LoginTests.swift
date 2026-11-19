@@ -497,9 +497,9 @@ class LoginTests {
     // Regression tests for #1756: a site could crash the app by advertising a non-web address, such as
     // a `data:` URL, as its API root. `URLSession` answers one with a plain `URLResponse`.
     //
-    // Excluded on watchOS: the session's `protocolClasses` stub isn't dependably consulted there (see
-    // `SafeRequestExecutorTests`).
-    #if !os(watchOS)
+    // Excluded on watchOS, where the session's `protocolClasses` stub isn't dependably consulted (see
+    // `SafeRequestExecutorTests`), and on Linux, where this suite doesn't run.
+    #if !os(watchOS) && !os(Linux)
     @Test("A site advertising a non-web API root fails discovery instead of crashing")
     func testNonWebApiRootFromLinkTag() async throws {
         let configuration = URLSessionConfiguration.ephemeral
@@ -607,7 +607,7 @@ class LoginTests {
 
 // swiftlint:enable line_length
 
-#if !os(watchOS)
+#if !os(watchOS) && !os(Linux)
 /// Serves a homepage that advertises a `data:` address as its API root, and a 404 for every other page.
 ///
 /// It only handles `http` and `https`, so a `data:` request reaches `URLSession`'s own handler, as it

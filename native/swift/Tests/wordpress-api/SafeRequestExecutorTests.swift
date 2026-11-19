@@ -3,6 +3,10 @@ import Testing
 @testable import WordPressAPI
 @testable import WordPressAPIInternal
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 @Suite("SafeRequestExecutor")
 struct SafeRequestExecutorTests {
 
@@ -32,7 +36,7 @@ struct SafeRequestExecutorTests {
     // that advertised such an address as its API root crashed the app.
     @Test(
         "A non-web address fails the request instead of being sent",
-        arguments: ["data:application/json,{}", "about:blank", "file:///etc/hosts", "ftp://example.com/wp-json/"]
+        arguments: ["data:application/json,%7B%7D", "about:blank", "file:///etc/hosts", "ftp://example.com/wp-json/"]
     )
     func testNonWebAddressIsRejected(address: String) async {
         let session = URLSession(configuration: .ephemeral)
