@@ -139,15 +139,8 @@ impl WpLoginClient {
                 attempt_type: attempt.attempt_type,
                 attempt_site_url: attempt.attempt_site_url,
                 api_discovery_result: self
-                    .fetch_and_parse_api_root(Arc::clone(&parsed_site_url), &api_root_url, context)
-                    .await
-                    .map_err(|fetch_and_parse_api_root_failure| {
-                        AutoDiscoveryAttemptFailure::from_fetch_and_parse_api_root_failure(
-                            parsed_site_url,
-                            api_root_url.0,
-                            fetch_and_parse_api_root_failure,
-                        )
-                    }),
+                    .fetch_and_parse_advertised_api_root(parsed_site_url, api_root_url, context)
+                    .await,
             },
             Err(find_api_root_failure) => {
                 let root_wp_json_url: Arc<ParsedUrl> =
@@ -220,6 +213,71 @@ impl WpLoginClient {
                     },
                 }
             }
+        }
+    }
+
+    /// Fetches and parses the API root a site advertised, falling back to `<site>/wp-json`
+    /// when the advertised address can't be fetched or isn't an API root.
+    ///
+    /// The advertised address can be wrong even on a working site: a relative link is
+    /// resolved against the address that was requested, because a response doesn't say where
+    /// a redirect ended up, and a site can advertise a stale address. When the fallback fails
+    /// to fetch or parse too, the advertised address's failure is reported. When the fallback
+    /// gets further, its failure is reported instead.
+    async fn fetch_and_parse_advertised_api_root(
+        &self,
+        parsed_site_url: Arc<ParsedUrl>,
+        api_root_url: ApiRootUrl,
+        context: Option<Arc<RequestContext>>,
+    ) -> Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure> {
+        let failure = match self
+            .fetch_and_parse_api_root(Arc::clone(&parsed_site_url), &api_root_url, context.clone())
+            .await
+        {
+            Ok(success) => return Ok(success),
+            Err(failure) => failure,
+        };
+        let advertised_failure = |failure| {
+            AutoDiscoveryAttemptFailure::from_fetch_and_parse_api_root_failure(
+                Arc::clone(&parsed_site_url),
+                Arc::clone(&api_root_url.0),
+                failure,
+            )
+        };
+        if !matches!(
+            failure,
+            FetchAndParseApiRootFailure::FetchApiRoot { .. }
+                | FetchAndParseApiRootFailure::ParseApiRoot { .. }
+        ) {
+            // The advertised address is an API root; the failure is about the site.
+            return Err(advertised_failure(failure));
+        }
+        let Some(root_wp_json_url) = Self::root_wp_json_url((*parsed_site_url).clone())
+            .filter(|url| *url != *api_root_url.0)
+            .map(Arc::new)
+        else {
+            return Err(advertised_failure(failure));
+        };
+        match self
+            .fetch_and_parse_api_root(
+                Arc::clone(&parsed_site_url),
+                &ApiRootUrl(Arc::clone(&root_wp_json_url)),
+                context,
+            )
+            .await
+        {
+            Ok(success) => Ok(success),
+            Err(
+                FetchAndParseApiRootFailure::FetchApiRoot { .. }
+                | FetchAndParseApiRootFailure::ParseApiRoot { .. },
+            ) => Err(advertised_failure(failure)),
+            Err(fallback_failure) => Err(
+                AutoDiscoveryAttemptFailure::from_fetch_and_parse_api_root_failure(
+                    parsed_site_url,
+                    root_wp_json_url,
+                    fallback_failure,
+                ),
+            ),
         }
     }
 
@@ -321,8 +379,10 @@ impl WpLoginClient {
         }
         // If we can't find the api root in the link header, we parse the HTML page to look for it
         // in the link tags
-        let parse_html_result =
-            ParseHomepageResult::parse_response(&response.body_as_string(), &parsed_site_url.inner);
+        let parse_html_result = ParseHomepageResult::parse_response(
+            &response.body_as_string(),
+            &site_directory_url(&parsed_site_url.inner),
+        );
         if let Some(api_root_url) = parse_html_result.api_root_url_from_link_tag {
             return Ok(ApiRootUrl(api_root_url));
         }
@@ -370,6 +430,9 @@ impl WpLoginClient {
         root_wp_json_url
             .path_segments_mut()
             .ok()?
+            // `example.com/blog/` ends in an empty segment; drop it, or the result is
+            // `example.com/blog//wp-json`.
+            .pop_if_empty()
             .extend(WP_JSON_PATH_SEGMENTS);
         Some(root_wp_json_url.into())
     }
@@ -1057,6 +1120,169 @@ mod tests {
             xmlrpc_from_rsd_on_homepage("https://example.com/", homepage).await;
         assert_eq!(requested_urls, ["https://example.com/", RSD_URL]);
         assert_eq!(result.unwrap().url(), XMLRPC_URL);
+    }
+
+    /// An API root for the site at `home`, with application passwords enabled.
+    fn api_root_body(home: &str) -> String {
+        format!(
+            r#"{{"name":"Site","description":"","url":"{home}","home":"{home}","gmt_offset":0,"timezone_string":"","namespaces":["wp/v2"],"authentication":{{"application-passwords":{{"endpoints":{{"authorization":"{home}/wp-admin/authorize-application.php"}}}}}},"routes":{{}}}}"#
+        )
+    }
+
+    fn homepage_with_api_root_link(href: &str) -> String {
+        format!(
+            r#"<html><head><link rel="https://api.w.org/" href="{href}" /></head><body></body></html>"#
+        )
+    }
+
+    /// Runs one discovery attempt for `site_url` against `routes`, and returns the API root it
+    /// settled on (or the failure) and every URL it requested.
+    async fn discover(
+        site_url: &str,
+        routes: Vec<(&'static str, String)>,
+    ) -> (
+        Result<AutoDiscoveryAttemptSuccess, AutoDiscoveryAttemptFailure>,
+        Vec<String>,
+    ) {
+        let executor = Arc::new(RoutingExecutor {
+            routes,
+            requested_urls: Mutex::new(vec![]),
+        });
+        let client = WpLoginClient::new_with_default_middleware_pipeline(executor.clone());
+        let result = client
+            .attempt_api_discovery(
+                AutoDiscoveryAttempt {
+                    attempt_site_url: site_url.to_string(),
+                    attempt_type: url_discovery::AutoDiscoveryAttemptType::UserInput,
+                },
+                None,
+            )
+            .await;
+        let requested_urls = executor.requested_urls.lock().unwrap().clone();
+        (result.api_discovery_result, requested_urls)
+    }
+
+    // A site address is a directory, so a path-relative link on `example.com/blog` stays under
+    // `/blog/`, with or without the trailing slash.
+    #[rstest]
+    #[case::without_slash("https://example.com/blog", "wp-json/")]
+    #[case::with_slash("https://example.com/blog/", "wp-json/")]
+    #[case::dot_relative("https://example.com/blog", "./wp-json/")]
+    #[case::root_relative("https://example.com/blog", "/blog/wp-json/")]
+    #[tokio::test]
+    async fn test_api_discovery_resolves_link_tag_against_site_directory(
+        #[case] site_url: &'static str,
+        #[case] href: &str,
+    ) {
+        let (result, requested_urls) = discover(
+            site_url,
+            vec![
+                (site_url, homepage_with_api_root_link(href)),
+                (
+                    "https://example.com/blog/wp-json/",
+                    api_root_body("https://example.com/blog"),
+                ),
+            ],
+        )
+        .await;
+        assert_eq!(
+            requested_urls,
+            [site_url, "https://example.com/blog/wp-json/"]
+        );
+        assert_eq!(
+            result.unwrap().api_root_url.url(),
+            "https://example.com/blog/wp-json/"
+        );
+    }
+
+    #[rstest]
+    // An advertised root that answers with something other than an API root.
+    #[case::not_found("/wrong/")]
+    // A relative link resolved against the address that was requested, when a redirect took
+    // the homepage somewhere else.
+    #[case::other_directory("../elsewhere/wp-json/")]
+    #[tokio::test]
+    async fn test_api_discovery_falls_back_to_wp_json_when_advertised_root_fails(
+        #[case] href: &str,
+    ) {
+        let (result, requested_urls) = discover(
+            "https://example.com/blog",
+            vec![
+                (
+                    "https://example.com/blog",
+                    homepage_with_api_root_link(href),
+                ),
+                (
+                    "https://example.com/blog/wp-json",
+                    api_root_body("https://example.com/blog"),
+                ),
+            ],
+        )
+        .await;
+        assert_eq!(requested_urls.len(), 3, "{requested_urls:?}");
+        assert_eq!(requested_urls[2], "https://example.com/blog/wp-json");
+        assert_eq!(
+            result.unwrap().api_root_url.url(),
+            "https://example.com/blog/wp-json"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_api_discovery_reports_advertised_root_when_fallback_fails_too() {
+        let (result, requested_urls) = discover(
+            "https://example.com/blog",
+            vec![(
+                "https://example.com/blog",
+                homepage_with_api_root_link("/wrong/"),
+            )],
+        )
+        .await;
+        assert_eq!(
+            requested_urls,
+            [
+                "https://example.com/blog",
+                "https://example.com/wrong/",
+                "https://example.com/blog/wp-json",
+            ]
+        );
+        match result {
+            Err(AutoDiscoveryAttemptFailure::FetchAndParseApiRoot {
+                api_root_url,
+                fetch_and_parse_api_root_failure: FetchAndParseApiRootFailure::ParseApiRoot { .. },
+                ..
+            }) => assert_eq!(api_root_url.url(), "https://example.com/wrong/"),
+            other => panic!("unexpected result: {other:#?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_api_discovery_doesnt_retry_when_advertised_root_is_wp_json() {
+        let (result, requested_urls) = discover(
+            "https://example.com/blog",
+            vec![(
+                "https://example.com/blog",
+                homepage_with_api_root_link("/blog/wp-json"),
+            )],
+        )
+        .await;
+        // The fallback would request the same address again.
+        assert_eq!(
+            requested_urls,
+            [
+                "https://example.com/blog",
+                "https://example.com/blog/wp-json"
+            ]
+        );
+        assert!(result.is_err());
+    }
+
+    #[rstest]
+    #[case::without_slash("https://example.com/blog", "https://example.com/blog/wp-json")]
+    #[case::with_slash("https://example.com/blog/", "https://example.com/blog/wp-json")]
+    #[case::root("https://example.com", "https://example.com/wp-json")]
+    fn test_root_wp_json_url(#[case] site_url: &str, #[case] expected: &str) {
+        let url = WpLoginClient::root_wp_json_url(ParsedUrl::parse(site_url).unwrap()).unwrap();
+        assert_eq!(url.url(), expected);
     }
 
     #[test]
