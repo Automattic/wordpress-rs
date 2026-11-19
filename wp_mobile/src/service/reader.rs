@@ -9,6 +9,7 @@ use std::time::{Duration, SystemTime};
 use wp_api::date::WpGmtDateTime;
 use wp_api::prelude::{WpApiClientDelegate, WpApiError};
 use wp_api::wp_com::client::WpComApiClient;
+use wp_api::wp_com::reader_saved::ReaderSavedSource;
 use wp_mobile_cache::repository::reader::{ReaderPostRepository, ReaderStreamRepository};
 use wp_mobile_cache::repository::wordpress_com_accounts::{
     ReaderOwner, WordPressComAccountRepository,
@@ -25,6 +26,7 @@ pub use stream::{
     ReaderStream, ReaderStreamOrder, reader_stream_needs_account, reader_stream_order,
 };
 
+use super::reader_saved::ReaderSavedService;
 use collection::StreamLanes;
 
 /// How long a stream nobody refreshes is kept.
@@ -123,6 +125,7 @@ impl ReaderContext {
 #[derive(uniffi::Object)]
 pub struct ReaderService {
     context: Arc<ReaderContext>,
+    saved: Arc<ReaderSavedService>,
     /// What each stream's requests wait on, by the stream's cache key, so that two collections of
     /// one stream take turns.
     lanes: Mutex<HashMap<String, Arc<StreamLanes>>>,
@@ -131,13 +134,21 @@ pub struct ReaderService {
 #[uniffi::export]
 impl ReaderService {
     /// Uses what the cache has for the reader. `cache` must have had its migrations run.
+    /// `saved_source` is the app, which is recorded with each save.
     #[uniffi::constructor]
     pub fn new(
         delegate: WpApiClientDelegate,
         cache: Arc<WpApiCache>,
         owner: ReaderOwner,
+        saved_source: ReaderSavedSource,
     ) -> Result<Self, ReaderError> {
-        Self::with_clock(delegate, cache, owner, Arc::new(SystemTime::now))
+        Self::with_clock(
+            delegate,
+            cache,
+            owner,
+            saved_source,
+            Arc::new(SystemTime::now),
+        )
     }
 
     /// Who this Reader belongs to.
@@ -161,6 +172,12 @@ impl ReaderService {
         ))
     }
 
+    /// The reader's saved posts. A signed-out reader's are kept on this device only: see
+    /// [`ReaderSavedService::for_reader`].
+    pub fn saved(&self) -> Arc<ReaderSavedService> {
+        self.saved.clone()
+    }
+
     /// Deletes what nothing shows any more: streams nobody has refreshed in 30 days, and posts
     /// that are in no stream, aren't saved and weren't fetched in the last week. A stream's
     /// refresh does this too, so it only needs calling for a reader who never refreshes.
@@ -174,12 +191,21 @@ impl ReaderService {
         delegate: WpApiClientDelegate,
         cache: Arc<WpApiCache>,
         owner: ReaderOwner,
+        saved_source: ReaderSavedSource,
         clock: Clock,
     ) -> Result<Self, ReaderError> {
         let owner_row = cache.execute(|connection| {
             WordPressComAccountRepository::get_or_create_owner(connection, owner)
         })?;
+        let saved = ReaderSavedService::for_reader_with_clock(
+            delegate.clone(),
+            saved_source,
+            cache.clone(),
+            owner,
+            clock.clone(),
+        )?;
         Ok(Self {
+            saved: Arc::new(saved),
             context: Arc::new(ReaderContext {
                 client: WpComApiClient::new(delegate),
                 cache,

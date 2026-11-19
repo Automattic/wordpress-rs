@@ -1813,6 +1813,30 @@ impl ReaderSavedRepository {
         Ok(true)
     }
 
+    /// Deletes the account's rows that want the post unsaved. For a reader whose saves are only on
+    /// this device: no server has them, so an unsaved row has nothing left to say. Returns how
+    /// many it deleted.
+    pub fn delete_unsaved(
+        executor: &impl QueryExecutor,
+        account: RowId,
+    ) -> Result<u64, SqliteDbError> {
+        let deleted = executor.execute(
+            "DELETE FROM reader_saved_posts WHERE account_id = ?1 AND saved = 0",
+            [account],
+        )?;
+        Ok(deleted as u64)
+    }
+
+    /// Deletes every saved post row of the account, such as a signed-out reader's once an
+    /// account has taken them over. The posts stay. Returns how many it deleted.
+    pub fn delete_all(executor: &impl QueryExecutor, account: RowId) -> Result<u64, SqliteDbError> {
+        let deleted = executor.execute(
+            "DELETE FROM reader_saved_posts WHERE account_id = ?1",
+            [account],
+        )?;
+        Ok(deleted as u64)
+    }
+
     /// The newest total the server gave, moved by what's pending: `None` before any.
     pub fn saved_count(
         executor: &impl QueryExecutor,

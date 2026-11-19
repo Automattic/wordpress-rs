@@ -7,6 +7,7 @@ use wp_api::prelude::*;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_posts::ReaderTagSlug;
+use wp_api::wp_com::reader_saved::ReaderSavedSource;
 use wp_mobile::service::reader::{
     ReaderError, ReaderService, ReaderStream, ReaderStreamCollection, ReaderStreamItem,
 };
@@ -129,7 +130,10 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 fn service(delegate: WpApiClientDelegate, owner: ReaderOwner) -> Result<ReaderService, Failed> {
     let cache = WpApiCache::new(None).map_err(|e| e.to_string())?;
     cache.perform_migrations().map_err(|e| e.to_string())?;
-    Ok(ReaderService::new(delegate, Arc::new(cache), owner).map_err(|e| e.to_string())?)
+    Ok(
+        ReaderService::new(delegate, Arc::new(cache), owner, ReaderSavedSource::Ios)
+            .map_err(|e| e.to_string())?,
+    )
 }
 
 /// The same delegate, sending no authentication.

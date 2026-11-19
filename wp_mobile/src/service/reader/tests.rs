@@ -7,7 +7,7 @@ use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_posts::ReaderTagSlug;
-use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderSavedKey};
+use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderSavedKey, ReaderSavedSource};
 use wp_mobile_cache::list_metadata::ListState;
 use wp_mobile_cache::repository::reader::ReaderUnreadablePostRepository;
 
@@ -23,7 +23,13 @@ fn cache() -> Arc<WpApiCache> {
 
 fn service_for(owner: ReaderOwner) -> (ReaderService, Arc<ScriptedExecutor>) {
     let executor = Arc::new(ScriptedExecutor::default());
-    let service = ReaderService::new(delegate(executor.clone()), cache(), owner).unwrap();
+    let service = ReaderService::new(
+        delegate(executor.clone()),
+        cache(),
+        owner,
+        ReaderSavedSource::Ios,
+    )
+    .unwrap();
     (service, executor)
 }
 
@@ -539,13 +545,17 @@ async fn two_refreshes_at_once_send_one_request() {
 async fn each_reader_has_its_own_streams() {
     let cache = cache();
     let executor = Arc::new(ScriptedExecutor::default());
-    let account = ReaderService::new(delegate(executor.clone()), cache.clone(), ACCOUNT).unwrap();
-    let signed_out = ReaderService::new(
-        delegate(executor.clone()),
-        cache.clone(),
-        ReaderOwner::SignedOut,
-    )
-    .unwrap();
+    let new = |owner| {
+        ReaderService::new(
+            delegate(executor.clone()),
+            cache.clone(),
+            owner,
+            ReaderSavedSource::Ios,
+        )
+        .unwrap()
+    };
+    let account = new(ACCOUNT);
+    let signed_out = new(ReaderOwner::SignedOut);
     executor.push(Step::Respond(200, tag_page(&[1, 2], None)));
     account.stream(tag()).refresh().await.unwrap();
 
@@ -554,7 +564,7 @@ async fn each_reader_has_its_own_streams() {
 
     // Removing the account's data leaves nothing for a new service to show.
     assert!(cache.remove_reader_data(ACCOUNT).unwrap());
-    let account = ReaderService::new(delegate(executor), cache, ACCOUNT).unwrap();
+    let account = new(ACCOUNT);
     assert!(shown(&account.stream(tag())).await.is_empty());
 }
 
@@ -566,8 +576,14 @@ async fn a_refresh_cleans_up_streams_nobody_has_refreshed_in_a_month() {
         let now = now.clone();
         Arc::new(move || *now.lock().unwrap())
     };
-    let service =
-        ReaderService::with_clock(delegate(executor.clone()), cache(), ACCOUNT, clock).unwrap();
+    let service = ReaderService::with_clock(
+        delegate(executor.clone()),
+        cache(),
+        ACCOUNT,
+        ReaderSavedSource::Ios,
+        clock,
+    )
+    .unwrap();
     let old = service.stream(tag());
     executor.push(Step::Respond(200, tag_page(&[1, 2], None)));
     old.refresh().await.unwrap();
@@ -604,4 +620,22 @@ async fn a_change_to_a_stream_table_is_relevant() {
     assert!(stream.is_relevant_update(&hook(wp_mobile_cache::DbTable::ReaderStreamItems)));
     assert!(stream.is_relevant_update(&hook(wp_mobile_cache::DbTable::ReaderPosts)));
     assert!(!stream.is_relevant_update(&hook(wp_mobile_cache::DbTable::ReaderSavedPosts)));
+}
+
+#[tokio::test]
+async fn the_saved_posts_are_the_readers() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let post: wp_api::wp_com::reader_posts::ReaderPost =
+        serde_json::from_value(post_json(1, 10)).unwrap();
+
+    // A signed-out reader's save stays on the device, with the post it was made from.
+    service.saved().save_with_details(post).await.unwrap();
+
+    assert!(executor.sent().is_empty());
+    let saved = service.saved().saved_posts().load_items().await.unwrap();
+    assert_eq!(saved.len(), 1);
+    assert_eq!(
+        saved[0].post.as_ref().unwrap().title.as_deref(),
+        Some("Post 1")
+    );
 }

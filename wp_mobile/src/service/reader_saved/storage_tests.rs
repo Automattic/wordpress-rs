@@ -2009,3 +2009,117 @@ async fn details_saved_with_a_jetpack_posts_feed_item_copy_fill_in_its_stored_po
         "What the list left out is filled in"
     );
 }
+
+/// A service for the reader who isn't signed in, and one for an account, on one cache.
+fn signed_out_and_account() -> (
+    Arc<ReaderSavedService>,
+    Arc<ReaderSavedService>,
+    Arc<ScriptedExecutor>,
+) {
+    let executor = Arc::new(ScriptedExecutor::default());
+    let cache = migrated_in_memory_cache();
+    let new = |owner| {
+        Arc::new(
+            ReaderSavedService::for_reader(
+                delegate(executor.clone()),
+                ReaderSavedSource::Android,
+                cache.clone(),
+                owner,
+            )
+            .unwrap(),
+        )
+    };
+    let signed_out = new(ReaderOwner::SignedOut);
+    let account = new(ReaderOwner::Account {
+        user_id: WpComUserId(1),
+    });
+    (signed_out, account, executor)
+}
+
+#[tokio::test]
+async fn a_signed_out_readers_saves_stay_on_the_device() {
+    let (service, _, executor) = signed_out_and_account();
+    // Nothing has been saved, and no keys will ever load to say so.
+    assert_eq!(status(&service, identity(4)), NotSaved);
+    assert_eq!(service.saved_count().unwrap(), Some(0));
+
+    let outcome = service
+        .save_with_details(stream_post(4, "From the stream"))
+        .await
+        .unwrap();
+
+    assert!(matches!(outcome, ReaderSavedOutcome::Pending { .. }));
+    assert_eq!(status(&service, identity(4)), Saved);
+    assert_eq!(service.saved_count().unwrap(), Some(1));
+    let items = service.clone().saved_posts().load_items().await.unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(
+        items[0].post.as_ref().unwrap().title.as_deref(),
+        Some("From the stream")
+    );
+
+    // Nothing syncs, and the list has no pages to fetch.
+    service.sync().await.unwrap();
+    let collection = service.clone().saved_posts();
+    assert!(!collection.refresh().await.unwrap().has_more);
+    assert!(!collection.load_next_page().await.unwrap().has_more);
+    assert!(executor.sent().is_empty());
+
+    let outcome = service.unsave(identity(4)).await.unwrap();
+    assert!(matches!(outcome, ReaderSavedOutcome::Pending { .. }));
+    assert_eq!(status(&service, identity(4)), NotSaved);
+    assert_eq!(service.saved_count().unwrap(), Some(0));
+    assert!(shown(&service).await.is_empty());
+    assert!(executor.sent().is_empty());
+}
+
+#[tokio::test]
+async fn an_account_takes_over_the_saves_made_signed_out() {
+    let (signed_out, account, executor) = signed_out_and_account();
+    signed_out
+        .save_with_details(stream_post(4, "Saved first"))
+        .await
+        .unwrap();
+    signed_out
+        .save_with_details(stream_post(5, "Saved second"))
+        .await
+        .unwrap();
+    // The device is offline, so the account keeps them to send later.
+    executor.push(Step::Offline);
+
+    let report = account.adopt_signed_out_saves().await.unwrap();
+
+    assert_eq!(report.pending, 2);
+    assert!(report.rejected.is_empty());
+    let items = account.clone().saved_posts().load_items().await.unwrap();
+    let titles: Vec<_> = items
+        .iter()
+        .map(|item| item.post.as_ref().unwrap().title.clone().unwrap())
+        .collect();
+    assert_eq!(titles, ["Saved second", "Saved first"]);
+    assert_eq!(status(&account, identity(4)), Saved);
+    // They're the account's now.
+    assert!(shown(&signed_out).await.is_empty());
+    assert_eq!(status(&signed_out, identity(4)), NotSaved);
+
+    // Taking them over again changes nothing, and sends only what's still waiting.
+    executor.push(Step::Offline);
+    let report = account.adopt_signed_out_saves().await.unwrap();
+    assert_eq!(report.pending, 0);
+    assert_eq!(shown(&account).await.len(), 2);
+}
+
+#[tokio::test]
+async fn a_signed_out_reader_has_nothing_to_take_over() {
+    let (signed_out, _, executor) = signed_out_and_account();
+    signed_out
+        .save_with_details(stream_post(4, "From the stream"))
+        .await
+        .unwrap();
+
+    let report = signed_out.adopt_signed_out_saves().await.unwrap();
+
+    assert_eq!(report.imported + report.pending, 0);
+    assert_eq!(shown(&signed_out).await.len(), 1);
+    assert!(executor.sent().is_empty());
+}

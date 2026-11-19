@@ -15,6 +15,9 @@ use wp_mobile_cache::list_metadata::ListState;
 use wp_mobile_cache::repository::reader::{
     ReaderPostRepository, ReaderSavedRepository, ReaderStreamRepository,
 };
+use wp_mobile_cache::repository::wordpress_com_accounts::{
+    ReaderOwner, WordPressComAccountRepository,
+};
 use wp_mobile_cache::{DbTable, SqliteDbError, UpdateHook};
 
 /// The saved list's key in `reader_streams`, which keeps where the list is up to.
@@ -172,6 +175,70 @@ impl ReaderSavedService {
             self.notify();
         }
 
+        self.send_imported(keys, unsaveable).await
+    }
+
+    /// Takes over the saves made on this device while nobody was signed in, as an import: each is
+    /// saved to this account, with what the device kept of its post, and the signed-out reader's
+    /// saved list is emptied. Call it after sign-in, on the account's service. A post the account
+    /// already saved stays as it is.
+    pub async fn adopt_signed_out_saves(
+        &self,
+    ) -> Result<ReaderSavedImportReport, ReaderSavedError> {
+        let mut keys = Vec::new();
+        if !self.signed_out {
+            self.cache.execute(|connection| {
+                let transaction = connection.transaction()?;
+                let Some(signed_out) = WordPressComAccountRepository::select_owner(
+                    &transaction,
+                    ReaderOwner::SignedOut,
+                )?
+                else {
+                    return Ok(());
+                };
+                // Oldest first, so the newest are sent last and stay newest.
+                for item in ReaderSavedRepository::select_list(&transaction, signed_out)?
+                    .into_iter()
+                    .rev()
+                {
+                    let post = match &item.post {
+                        Some(post) => Some(ReaderPostRepository::fill_missing(
+                            &transaction,
+                            self.account,
+                            post,
+                        )?),
+                        None => None,
+                    };
+                    ReaderSavedRepository::import_save(
+                        &transaction,
+                        self.account,
+                        &item.row.key,
+                        post,
+                        item.row.date_saved.as_ref(),
+                    )?;
+                    if !keys.contains(&item.row.key) {
+                        keys.push(item.row.key);
+                    }
+                }
+                // They're the account's now.
+                ReaderSavedRepository::delete_all(&transaction, signed_out)?;
+                transaction.commit().map_err(SqliteDbError::from)
+            })?;
+        }
+        if !keys.is_empty() {
+            self.notify();
+        }
+        self.send_imported(keys, 0).await
+    }
+}
+
+impl ReaderSavedService {
+    /// Sends imported saves, and reports what became of them.
+    async fn send_imported(
+        &self,
+        keys: Vec<ReaderSavedKey>,
+        unsaveable: u64,
+    ) -> Result<ReaderSavedImportReport, ReaderSavedError> {
         let sent = {
             let _lane = self.lane.lock().await;
             self.send_pending().await?
@@ -286,6 +353,13 @@ impl ReaderSavedService {
 
     /// Syncs, then loads the first page of the list. Call it holding the lane.
     async fn refresh_list_in_lane(&self) -> Result<ReaderSavedPageResult, ReaderSavedError> {
+        if self.signed_out {
+            // The list is what this device saved, and all of it is in the cache.
+            return Ok(ReaderSavedPageResult {
+                post_count: 0,
+                has_more: false,
+            });
+        }
         self.set_list_state(ListState::FetchingFirstPage, None)?;
         let result = async {
             self.sync_in_lane().await?;
@@ -303,6 +377,12 @@ impl ReaderSavedService {
     }
 
     async fn load_next_page_in_lane(&self) -> Result<ReaderSavedPageResult, ReaderSavedError> {
+        if self.signed_out {
+            return Ok(ReaderSavedPageResult {
+                post_count: 0,
+                has_more: false,
+            });
+        }
         let stream = self.cache.execute(|connection| {
             ReaderStreamRepository::get_or_create(&*connection, self.account, SAVED_STREAM)
         })?;
