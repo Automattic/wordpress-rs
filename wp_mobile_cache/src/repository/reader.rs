@@ -590,7 +590,7 @@ impl ReaderStreamRepository {
         Ok(removed > 0)
     }
 
-    /// The stream's posts, newest first.
+    /// The stream's posts, newest first, without posts from a site or by a user the reader blocked.
     pub fn select_items(
         executor: &impl QueryExecutor,
         stream: RowId,
@@ -617,6 +617,12 @@ impl ReaderStreamRepository {
             FROM reader_stream_items i
             JOIN reader_posts p ON p.rowid = i.post_id
             WHERE i.stream_id = ?1
+                AND NOT EXISTS (
+                    SELECT 1 FROM reader_blocked_sites b
+                    WHERE b.account_id = p.account_id AND b.site_id = p.site_id)
+                AND NOT EXISTS (
+                    SELECT 1 FROM reader_blocked_users u
+                    WHERE u.account_id = p.account_id AND u.user_id = p.author_id)
             ORDER BY i.sort_key DESC, i.rowid ASC",
             post_columns(content)
         );
@@ -1012,6 +1018,81 @@ impl ReaderPostRepository {
             params![account, reader_date_text(fetched_before)],
         )?;
         Ok(removed as u64)
+    }
+}
+
+/// Something about a post that the user turns on or off.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReaderPostFlag {
+    IsSeen,
+    ILike,
+    IsFollowing,
+    IsSubscribedComments,
+    ReceivesCommentNotifications,
+}
+
+impl ReaderPostFlag {
+    fn column(&self) -> &'static str {
+        match self {
+            Self::IsSeen => "is_seen",
+            Self::ILike => "i_like",
+            Self::IsFollowing => "is_following",
+            Self::IsSubscribedComments => "is_subscribed_comments",
+            Self::ReceivesCommentNotifications => "receives_comment_notifications",
+        }
+    }
+}
+
+impl ReaderPostRepository {
+    /// A flag of a stored post, or `None` if the post has no value for it.
+    pub fn select_flag(
+        executor: &impl QueryExecutor,
+        post: RowId,
+        flag: ReaderPostFlag,
+    ) -> Result<Option<bool>, SqliteDbError> {
+        let sql = format!(
+            "SELECT {} FROM reader_posts WHERE rowid = ?1",
+            flag.column()
+        );
+        let mut statement = executor.prepare(&sql)?;
+        Ok(statement
+            .query_row([post], |row| row.get::<_, Option<bool>>(0))
+            .optional()?
+            .flatten())
+    }
+
+    /// Sets a flag of a stored post.
+    pub fn set_flag(
+        executor: &impl QueryExecutor,
+        post: RowId,
+        flag: ReaderPostFlag,
+        value: bool,
+    ) -> Result<(), SqliteDbError> {
+        let sql = format!(
+            "UPDATE reader_posts SET {} = ?2 WHERE rowid = ?1",
+            flag.column()
+        );
+        executor.execute(&sql, params![post, value])?;
+        Ok(())
+    }
+
+    /// The name and URL of a site, from a post of it the cache has.
+    pub fn select_site_name_and_url(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        site_id: WpComSiteId,
+    ) -> Result<(Option<String>, Option<String>), SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT site_name, site_url FROM reader_posts
+            WHERE account_id = ?1 AND site_id = ?2 AND (site_name IS NOT NULL OR site_url IS NOT NULL)
+            ORDER BY rowid DESC LIMIT 1",
+        )?;
+        Ok(statement
+            .query_row(params![account, site_id.0], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .optional()?
+            .unwrap_or((None, None)))
     }
 }
 

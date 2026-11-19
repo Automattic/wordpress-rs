@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Saved posts work for a reader who isn't signed in. `ReaderSavedService::for_reader` with `ReaderOwner::SignedOut` keeps saves on the device and sends nothing, and `ReaderService::saved` gives the reader's saved posts either way. After sign-in, `ReaderSavedService::adopt_signed_out_saves` moves those saves to the account.
 - WordPress.com Reader seen status: `POST /wpcom/v2/seen-posts/seen/blog/new` and `/delete` mark a site's posts as seen or unseen, and `POST /wpcom/v2/seen-posts/seen/new` and `/delete` do the same for an RSS feed's posts. Swift gets them through `WPComApiClient.readerSeen`.
 - WordPress.com Reader blocked sites: `GET /wpcom/v2/me/blocks/sites` lists the sites the user blocked, and `POST /rest/v1.1/me/block/sites/{site}/new` and `/delete` block and unblock one. Swift gets them through `WPComApiClient.readerBlocks`.
+- The Reader keeps what the user turns on or off, such as a post marked as seen or a blocked site, on the device first. `ReaderService::set_post_seen` and `set_site_blocked` show the change straight away, send it, and put it back if the server refuses. Offline, the change waits, and `sync_actions` sends it later. A blocked site's posts are left out of every stream. `set_user_blocked` blocks a user on this device, since WordPress.com keeps no such list.
 
 ### Changed
 

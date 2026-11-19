@@ -7,9 +7,10 @@ use wp_api::prelude::*;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_posts::ReaderTagSlug;
-use wp_api::wp_com::reader_saved::ReaderSavedSource;
+use wp_api::wp_com::reader_saved::{ReaderSavedKey, ReaderSavedSource};
 use wp_mobile::service::reader::{
-    ReaderError, ReaderService, ReaderStream, ReaderStreamCollection, ReaderStreamItem,
+    ReaderActionOutcome, ReaderError, ReaderService, ReaderStream, ReaderStreamCollection,
+    ReaderStreamItem,
 };
 use wp_mobile_cache::WpApiCache;
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
@@ -25,11 +26,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             let ctx = Arc::clone(&ctx);
             move || {
                 ctx.runtime.block_on(async {
-                    // The cache is new for each test, so any user ID keeps them apart.
-                    let owner = ReaderOwner::Account {
-                        user_id: WpComUserId(1),
-                    };
-                    let service = service(ctx.delegate.clone(), owner)?;
+                    let service = new_service(ctx.delegate.clone(), account())?;
                     let stream = service.stream(ReaderStream::Following);
                     let page = stream.refresh().await.map_err(|e| e.to_string())?;
                     let items = stream.load_items().await.map_err(|e| e.to_string())?;
@@ -45,7 +42,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             let ctx = Arc::clone(&ctx);
             move || {
                 ctx.runtime.block_on(async {
-                    let service = service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
+                    let service = new_service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
                     let stream = service.stream(ReaderStream::Site { site_id: SITE });
 
                     let first = stream.refresh().await.map_err(|e| e.to_string())?;
@@ -83,7 +80,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             let ctx = Arc::clone(&ctx);
             move || {
                 ctx.runtime.block_on(async {
-                    let service = service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
+                    let service = new_service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
                     let stream = service.stream(ReaderStream::Tag {
                         slug: ReaderTagSlug("photography".to_string()),
                     });
@@ -111,11 +108,112 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 })
             }
         }),
+        Trial::test("reader_service::seen_is_shown_sent_and_put_back", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let stream = service.stream(ReaderStream::Following);
+                    stream.refresh().await.map_err(|e| e.to_string())?;
+                    // The newest followed post that has a seen state. An account that follows
+                    // nothing has none, and then there's nothing to try.
+                    let items = stream.load_items().await.map_err(|e| e.to_string())?;
+                    let Some(post) = items.iter().find(|item| item.post.is_seen.is_some()) else {
+                        return Ok(());
+                    };
+                    let identity = post.post.identity.clone();
+                    let key = post.post.key.clone();
+                    let was = post.post.is_seen == Some(true);
+
+                    let marked = service.set_post_seen(identity.clone(), !was).await;
+                    let shown = seen_in(&stream, &key).await;
+                    // What the server has, read by a service with a cache of its own.
+                    let other = new_service(ctx.delegate.clone(), account())?;
+                    let other_stream = other.stream(ReaderStream::Following);
+                    let fetched = match other_stream.refresh().await {
+                        Ok(_) => seen_in(&other_stream, &key).await,
+                        Err(error) => Err(error.to_string().into()),
+                    };
+                    // Whatever happened, the post ends as it was.
+                    let restored = service
+                        .set_post_seen(identity, was)
+                        .await
+                        .map_err(|e| e.to_string())?;
+
+                    if marked.map_err(|e| e.to_string())? != ReaderActionOutcome::Synced
+                        || restored != ReaderActionOutcome::Synced
+                    {
+                        return Err("Marking the post should reach the server".into());
+                    }
+                    if shown? != Some(!was) || fetched? != Some(!was) {
+                        return Err(
+                            "The cache and the server should both show the new state".into()
+                        );
+                    }
+                    if seen_in(&stream, &key).await? != Some(was) {
+                        return Err("The post should be back as it was".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::a_block_is_sent_and_put_back", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let site = ctx.site_id;
+                    let is_blocked = |service: &ReaderService| {
+                        service
+                            .blocked_sites()
+                            .map(|sites| sites.iter().any(|blocked| blocked.id == site))
+                            .map_err(|e| Failed::from(e.to_string()))
+                    };
+                    service
+                        .refresh_blocked_sites()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if is_blocked(&service)? {
+                        return Err("The test site is blocked already, which isn't the trial's \
+                                    doing, so it's left alone"
+                            .into());
+                    }
+
+                    let blocked = service.set_site_blocked(site, true).await;
+                    // What the server has, read by a service with a cache of its own.
+                    let other = service_for_blocks(&ctx).await;
+                    // Whatever happened, the site ends unblocked.
+                    let unblocked = service
+                        .set_site_blocked(site, false)
+                        .await
+                        .map_err(|e| e.to_string())?;
+
+                    if blocked.map_err(|e| e.to_string())? != ReaderActionOutcome::Synced
+                        || unblocked != ReaderActionOutcome::Synced
+                    {
+                        return Err("The block should reach the server".into());
+                    }
+                    if !is_blocked(&other?)? {
+                        return Err(
+                            "The server's list should have the site while it's blocked".into()
+                        );
+                    }
+                    service
+                        .refresh_blocked_sites()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if is_blocked(&service)? {
+                        return Err("The site should be unblocked again".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
         Trial::test("reader_service::following_needs_an_account", {
             let ctx = Arc::clone(&ctx);
             move || {
                 ctx.runtime.block_on(async {
-                    let service = service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
+                    let service = new_service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
                     let stream = service.stream(ReaderStream::Following);
                     match stream.refresh().await {
                         Err(ReaderError::NeedsAccount) => Ok(()),
@@ -127,7 +225,38 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     ]
 }
 
-fn service(delegate: WpApiClientDelegate, owner: ReaderOwner) -> Result<ReaderService, Failed> {
+/// The account whose token the trials use. Each trial's cache is new, so any user ID keeps them
+/// apart.
+fn account() -> ReaderOwner {
+    ReaderOwner::Account {
+        user_id: WpComUserId(1),
+    }
+}
+
+/// A service with a cache of its own, holding the server's blocked sites.
+async fn service_for_blocks(ctx: &TestContext) -> Result<ReaderService, Failed> {
+    let service = new_service(ctx.delegate.clone(), account())?;
+    service
+        .refresh_blocked_sites()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(service)
+}
+
+/// The seen state of a post in a stream's cached items.
+async fn seen_in(
+    stream: &ReaderStreamCollection,
+    key: &ReaderSavedKey,
+) -> Result<Option<bool>, Failed> {
+    let items = stream.load_items().await.map_err(|e| e.to_string())?;
+    Ok(items
+        .iter()
+        .find(|item| &item.post.key == key)
+        .and_then(|item| item.post.is_seen))
+}
+
+/// A service with a new, empty cache.
+fn new_service(delegate: WpApiClientDelegate, owner: ReaderOwner) -> Result<ReaderService, Failed> {
     let cache = WpApiCache::new(None).map_err(|e| e.to_string())?;
     cache.perform_migrations().map_err(|e| e.to_string())?;
     Ok(

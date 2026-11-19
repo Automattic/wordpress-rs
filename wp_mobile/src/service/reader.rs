@@ -16,9 +16,11 @@ use wp_mobile_cache::repository::wordpress_com_accounts::{
 };
 use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 
+mod actions;
 mod collection;
 mod stream;
 
+pub use actions::ReaderActionOutcome;
 pub use collection::{
     ReaderStreamCollection, ReaderStreamInfo, ReaderStreamItem, ReaderStreamPageResult,
 };
@@ -27,6 +29,7 @@ pub use stream::{
 };
 
 use super::reader_saved::ReaderSavedService;
+use actions::ActionQueue;
 use collection::StreamLanes;
 
 /// How long a stream nobody refreshes is kept.
@@ -54,6 +57,10 @@ pub enum ReaderError {
     #[error("That post isn't in this stream.")]
     PostNotInStream,
 
+    /// The post doesn't have the IDs the API needs for this.
+    #[error("This post is missing the IDs this needs.")]
+    MissingIds,
+
     #[error("{0}")]
     Database(SqliteDbError),
 }
@@ -79,6 +86,10 @@ pub(crate) struct ReaderContext {
     pub(crate) owner: ReaderOwner,
     /// The owner's row in the cache.
     pub(crate) owner_row: RowId,
+    /// The app, which is recorded with what the reader does.
+    pub(crate) source: ReaderSavedSource,
+    /// What the reader turned on or off that's waiting to be sent.
+    pub(crate) actions: ActionQueue,
     clock: Clock,
 }
 
@@ -211,6 +222,8 @@ impl ReaderService {
                 cache,
                 owner,
                 owner_row,
+                source: saved_source,
+                actions: ActionQueue::default(),
                 clock,
             }),
             lanes: Mutex::default(),

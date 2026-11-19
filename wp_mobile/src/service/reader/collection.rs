@@ -29,11 +29,13 @@ use wp_mobile_cache::{DbTable, RowId, SqliteDbError, UpdateHook};
 const MAX_DATED_POSTS: u64 = 500;
 
 /// The tables a stream is read from.
-const STREAM_TABLES: [DbTable; 4] = [
+const STREAM_TABLES: [DbTable; 6] = [
     DbTable::ReaderPosts,
     DbTable::ReaderStreams,
     DbTable::ReaderStreamItems,
     DbTable::ReaderUnreadablePosts,
+    DbTable::ReaderBlockedSites,
+    DbTable::ReaderBlockedUsers,
 ];
 
 /// A post in a stream.
@@ -133,7 +135,8 @@ impl ReaderStreamCollection {
         self.stream.clone()
     }
 
-    /// The stream's posts from the cache, in the stream's order.
+    /// The stream's posts from the cache, in the stream's order, without posts from a site or by a
+    /// user the reader blocked.
     pub async fn load_items(&self) -> Result<Vec<ReaderStreamItem>, ReaderError> {
         let dated = self.stream.order() == ReaderStreamOrder::Date;
         let items = self.context.cache.execute(|connection| {
@@ -480,6 +483,9 @@ impl ReaderStreamCollection {
                     railcar: post.post.railcar.clone(),
                 });
             }
+
+            // The page may be older than something the reader turned on or off since.
+            super::actions::show_pending(&transaction, owner)?;
 
             // An unreadable post is kept by its IDs, to ask for again. If the stream has it from
             // an earlier page, it stays: the server still has it.

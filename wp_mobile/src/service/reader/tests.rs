@@ -639,3 +639,392 @@ async fn the_saved_posts_are_the_readers() {
         Some("Post 1")
     );
 }
+
+mod actions {
+    use super::*;
+    use wp_api::wp_com::reader_saved::{ReaderFeedItemId, ReaderPostSaveIdentity};
+
+    fn identity(id: u64) -> ReaderPostSaveIdentity {
+        ReaderPostSaveIdentity {
+            id,
+            site_id: Some(WpComSiteId(123)),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        }
+    }
+
+    /// A followed post that hasn't been seen, written by user 7.
+    fn followed_post(id: u64, hour: u32) -> Value {
+        let mut post = post_json(id, hour);
+        post["is_seen"] = json!(false);
+        post["site_name"] = json!("A site");
+        post["author"] = json!({ "ID": 7, "name": "An author" });
+        post
+    }
+
+    /// A service whose Following stream has posts 2 and 1.
+    async fn following() -> (
+        ReaderService,
+        Arc<ScriptedExecutor>,
+        Arc<ReaderStreamCollection>,
+    ) {
+        let (service, executor) = service();
+        let stream = service.stream(ReaderStream::Following);
+        executor.push(Step::Respond(
+            200,
+            json!({ "posts": [followed_post(2, 11), followed_post(1, 10)] }),
+        ));
+        stream.refresh().await.unwrap();
+        (service, executor, stream)
+    }
+
+    async fn is_seen(stream: &ReaderStreamCollection, id: u64) -> Option<bool> {
+        stream
+            .load_items()
+            .await
+            .unwrap()
+            .iter()
+            .find(|item| item.post.identity.id == id)
+            .and_then(|item| item.post.is_seen)
+    }
+
+    fn refused() -> Step {
+        Step::Respond(
+            404,
+            json!({ "code": "post_not_found", "message": "Post not found.", "data": { "status": 404 } }),
+        )
+    }
+
+    fn marked() -> Step {
+        Step::Respond(200, json!({ "status": true }))
+    }
+
+    /// The path and body of each request sent after the first `skip`.
+    fn sent_after(executor: &ScriptedExecutor, skip: usize) -> Vec<(String, Value)> {
+        executor
+            .sent()
+            .iter()
+            .skip(skip)
+            .map(|sent| {
+                (
+                    sent.url
+                        .trim_start_matches("https://public-api.wordpress.com")
+                        .to_string(),
+                    sent.body.clone().unwrap_or(Value::Null),
+                )
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn marking_a_post_as_seen_shows_at_once_and_is_sent() {
+        let (service, executor, stream) = following().await;
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(held, 200, json!({ "status": true })));
+
+        let (outcome, ()) = futures::join!(service.set_post_seen(identity(2), true), async {
+            // It shows while the request is on its way.
+            assert_eq!(is_seen(&stream, 2).await, Some(true));
+            assert_eq!(service.pending_action_count().unwrap(), 1);
+            release.send(()).unwrap();
+        });
+
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(is_seen(&stream, 2).await, Some(true));
+        assert_eq!(is_seen(&stream, 1).await, Some(false));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+        assert_eq!(
+            sent_after(&executor, 1),
+            [(
+                "/wpcom/v2/seen-posts/seen/blog/new".to_string(),
+                json!({ "blog_id": 123, "post_ids": [2], "source": "reader-ios" })
+            )]
+        );
+    }
+
+    #[tokio::test]
+    async fn an_rss_post_is_marked_by_its_feed() {
+        let (service, executor) = service();
+        executor.push(marked());
+        let post = ReaderPostSaveIdentity {
+            id: 9,
+            site_id: None,
+            feed_id: Some(ReaderFeedId(456)),
+            feed_item_id: Some(ReaderFeedItemId(9)),
+            is_external: true,
+            url: None,
+        };
+
+        service.set_post_seen(post, false).await.unwrap();
+
+        assert_eq!(
+            sent_after(&executor, 0),
+            [(
+                "/wpcom/v2/seen-posts/seen/delete".to_string(),
+                json!({ "feed_id": 456, "feed_item_ids": [9], "source": "reader-ios" })
+            )]
+        );
+    }
+
+    #[tokio::test]
+    async fn offline_it_waits_and_a_sync_sends_it() {
+        let (service, executor, stream) = following().await;
+        executor.push(Step::Offline);
+
+        let outcome = service.set_post_seen(identity(2), true).await.unwrap();
+
+        assert!(matches!(outcome, ReaderActionOutcome::Pending { .. }));
+        assert_eq!(is_seen(&stream, 2).await, Some(true));
+        assert_eq!(service.pending_action_count().unwrap(), 1);
+
+        // A refresh brings the server's older state, which doesn't undo it.
+        executor.push(Step::Respond(
+            200,
+            json!({ "posts": [followed_post(2, 11), followed_post(1, 10)] }),
+        ));
+        stream.refresh().await.unwrap();
+        assert_eq!(is_seen(&stream, 2).await, Some(true));
+
+        executor.push(marked());
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+        assert_eq!(is_seen(&stream, 2).await, Some(true));
+        assert_eq!(
+            sent_after(&executor, 3)[0].0,
+            "/wpcom/v2/seen-posts/seen/blog/new"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_refusal_puts_it_back_and_is_returned() {
+        let (service, executor, stream) = following().await;
+        executor.push(refused());
+
+        let result = service.set_post_seen(identity(2), true).await;
+
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        assert_eq!(is_seen(&stream, 2).await, Some(false));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn turning_it_on_and_off_offline_sends_only_the_last() {
+        let (service, executor, stream) = following().await;
+        executor.push(Step::Offline);
+        service.set_post_seen(identity(2), true).await.unwrap();
+        executor.push(Step::Offline);
+        service.set_post_seen(identity(2), false).await.unwrap();
+        assert_eq!(is_seen(&stream, 2).await, Some(false));
+        assert_eq!(service.pending_action_count().unwrap(), 1);
+
+        executor.push(marked());
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+
+        assert_eq!(
+            sent_after(&executor, 3),
+            [(
+                "/wpcom/v2/seen-posts/seen/blog/delete".to_string(),
+                json!({ "blog_id": 123, "post_ids": [2], "source": "reader-ios" })
+            )]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_tap_while_its_request_is_on_its_way_is_sent_after_it() {
+        let (service, executor, stream) = following().await;
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(held, 200, json!({ "status": true })));
+        executor.push(marked());
+
+        let (first, second) = futures::join!(service.set_post_seen(identity(2), true), async {
+            let second = service.set_post_seen(identity(2), false);
+            release.send(()).unwrap();
+            second.await
+        });
+
+        assert_eq!(first.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(second.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(is_seen(&stream, 2).await, Some(false));
+        let paths: Vec<_> = sent_after(&executor, 1)
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect();
+        assert_eq!(
+            paths,
+            [
+                "/wpcom/v2/seen-posts/seen/blog/new",
+                "/wpcom/v2/seen-posts/seen/blog/delete"
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_refusal_of_an_older_tap_leaves_the_newer_one() {
+        let (service, executor, stream) = following().await;
+        let (release, held) = oneshot::channel();
+        // The server refuses the first tap, and takes the second.
+        executor.push(Step::Hold(
+            held,
+            404,
+            json!({ "code": "post_not_found", "message": "Post not found.", "data": { "status": 404 } }),
+        ));
+        executor.push(marked());
+
+        let (first, second) = futures::join!(service.set_post_seen(identity(2), true), async {
+            let second = service.set_post_seen(identity(2), false);
+            release.send(()).unwrap();
+            second.await
+        });
+
+        // The newer tap is what the reader wants, so the older one's refusal isn't reported.
+        assert_eq!(first.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(second.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(is_seen(&stream, 2).await, Some(false));
+    }
+
+    #[tokio::test]
+    async fn actions_need_an_account() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+
+        assert!(matches!(
+            service.set_post_seen(identity(2), true).await,
+            Err(ReaderError::NeedsAccount)
+        ));
+        assert!(matches!(
+            service.set_site_blocked(WpComSiteId(123), true).await,
+            Err(ReaderError::NeedsAccount)
+        ));
+        assert!(matches!(
+            service.refresh_blocked_sites().await,
+            Err(ReaderError::NeedsAccount)
+        ));
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+        assert!(executor.sent().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_post_without_ids_cannot_be_marked() {
+        let (service, executor) = service();
+        let post = ReaderPostSaveIdentity {
+            id: 0,
+            site_id: None,
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        };
+
+        let result = service.set_post_seen(post, true).await;
+
+        assert!(matches!(result, Err(ReaderError::MissingIds)));
+        assert!(executor.sent().is_empty());
+    }
+
+    #[tokio::test]
+    async fn blocking_a_site_hides_its_posts_at_once() {
+        let (service, executor, stream) = following().await;
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "modified_sub": true }),
+        ));
+
+        let outcome = service
+            .set_site_blocked(WpComSiteId(123), true)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, ReaderActionOutcome::Synced);
+        assert!(shown(&stream).await.is_empty());
+        // The site's name comes from a post of it the cache has.
+        let blocked = service.blocked_sites().unwrap();
+        assert_eq!(blocked.len(), 1);
+        assert_eq!(blocked[0].id, WpComSiteId(123));
+        assert_eq!(blocked[0].name.as_deref(), Some("A site"));
+        assert_eq!(
+            sent_after(&executor, 1)[0].0,
+            "/rest/v1.1/me/block/sites/123/new"
+        );
+
+        // Unblocking brings them back, since the cache kept them.
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "modified_sub": true }),
+        ));
+        service
+            .set_site_blocked(WpComSiteId(123), false)
+            .await
+            .unwrap();
+        assert_eq!(shown(&stream).await, ["2", "1"]);
+        assert!(service.blocked_sites().unwrap().is_empty());
+        assert_eq!(
+            sent_after(&executor, 2)[0].0,
+            "/rest/v1.1/me/block/sites/123/delete"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_refused_block_shows_the_posts_again() {
+        let (service, executor, stream) = following().await;
+        executor.push(refused());
+
+        let result = service.set_site_blocked(WpComSiteId(123), true).await;
+
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        assert_eq!(shown(&stream).await, ["2", "1"]);
+        assert!(service.blocked_sites().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_servers_blocked_sites_replace_the_cached_ones_except_what_is_waiting() {
+        let (service, executor, _) = following().await;
+        // Site 123's block is waiting to be sent.
+        executor.push(Step::Offline);
+        service
+            .set_site_blocked(WpComSiteId(123), true)
+            .await
+            .unwrap();
+        executor.push(Step::Respond(
+            200,
+            json!({
+                "sites": [{ "ID": 7, "name": "Seven", "URL": "https://seven.example" }],
+                "page": 1,
+                "count": 1,
+            }),
+        ));
+
+        service.refresh_blocked_sites().await.unwrap();
+
+        let ids: Vec<_> = service
+            .blocked_sites()
+            .unwrap()
+            .iter()
+            .map(|site| site.id.0)
+            .collect();
+        assert_eq!(ids, [123, 7]);
+        assert_eq!(
+            executor.sent().last().unwrap().url,
+            "https://public-api.wordpress.com/wpcom/v2/me/blocks/sites?page=1&per_page=100"
+        );
+    }
+
+    #[tokio::test]
+    async fn blocking_a_user_hides_their_posts_on_this_device() {
+        let (service, executor, stream) = following().await;
+
+        service.set_user_blocked(WpComUserId(7), true).unwrap();
+
+        assert!(shown(&stream).await.is_empty());
+        assert_eq!(service.blocked_users().unwrap(), [WpComUserId(7)]);
+        // Nothing is sent: the server keeps no list of blocked users.
+        assert_eq!(executor.sent().len(), 1);
+
+        service.set_user_blocked(WpComUserId(7), false).unwrap();
+        assert_eq!(shown(&stream).await, ["2", "1"]);
+
+        // It works signed out too.
+        let (signed_out, _) = service_for(ReaderOwner::SignedOut);
+        signed_out.set_user_blocked(WpComUserId(7), true).unwrap();
+        assert_eq!(signed_out.blocked_users().unwrap(), [WpComUserId(7)]);
+    }
+}

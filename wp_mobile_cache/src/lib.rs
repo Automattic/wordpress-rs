@@ -129,6 +129,12 @@ pub enum DbTable {
     ReaderSavedPostUrls,
     /// Posts a Reader stream's page had that couldn't be read
     ReaderUnreadablePosts,
+    /// What the user turned on or off in the Reader that the server doesn't have yet
+    ReaderActions,
+    /// The sites the user blocked in the Reader
+    ReaderBlockedSites,
+    /// The users the reader blocked, on this device
+    ReaderBlockedUsers,
 }
 
 impl DbTable {
@@ -159,6 +165,9 @@ impl DbTable {
             DbTable::ReaderSavedPosts => "reader_saved_posts",
             DbTable::ReaderSavedPostUrls => "reader_saved_post_urls",
             DbTable::ReaderUnreadablePosts => "reader_unreadable_posts",
+            DbTable::ReaderActions => "reader_actions",
+            DbTable::ReaderBlockedSites => "reader_blocked_sites",
+            DbTable::ReaderBlockedUsers => "reader_blocked_users",
         }
     }
 }
@@ -202,6 +211,9 @@ impl TryFrom<&str> for DbTable {
             "reader_saved_posts" => Ok(DbTable::ReaderSavedPosts),
             "reader_saved_post_urls" => Ok(DbTable::ReaderSavedPostUrls),
             "reader_unreadable_posts" => Ok(DbTable::ReaderUnreadablePosts),
+            "reader_actions" => Ok(DbTable::ReaderActions),
+            "reader_blocked_sites" => Ok(DbTable::ReaderBlockedSites),
+            "reader_blocked_users" => Ok(DbTable::ReaderBlockedUsers),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -519,7 +531,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 16] = [
+static MIGRATION_QUERIES: [&str; 17] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -536,6 +548,7 @@ static MIGRATION_QUERIES: [&str; 16] = [
     include_str!("../migrations/0014-create-media-edit-context-table.sql"),
     include_str!("../migrations/0015-create-wordpress-com-account-and-reader-tables.sql"),
     include_str!("../migrations/0016-create-reader-unreadable-posts-table.sql"),
+    include_str!("../migrations/0017-create-reader-actions-tables.sql"),
 ];
 
 pub struct MigrationManager<'a> {
