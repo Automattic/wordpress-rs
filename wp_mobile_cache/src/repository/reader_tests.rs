@@ -1348,7 +1348,7 @@ fn test_deleting_an_account_deletes_its_reader_data() {
 
 mod stream_pages {
     use super::*;
-    use crate::db_types::reader::{DbReaderPageItem, DbReaderPageOutcome};
+    use crate::db_types::reader::{DbReaderPageEntry, DbReaderPageItem, DbReaderPageOutcome};
 
     /// A stream with `(post ID, hour)` posts added as pages. Each post is dated at that hour of one
     /// day, so a larger hour is a newer post.
@@ -1563,24 +1563,46 @@ mod stream_pages {
         assert_eq!(above(1), Some(hour(11)));
     }
 
+    fn entries(fixture: &Fixture, page: &[&str]) -> Vec<DbReaderPageEntry> {
+        page.iter()
+            .map(|entry| match entry.parse::<u64>() {
+                Ok(post_id) => DbReaderPageEntry::Post(DbReaderPageItem {
+                    post: fixture.row(post_id),
+                    sort_key: String::new(),
+                    railcar: None,
+                }),
+                Err(_) => DbReaderPageEntry::Card(entry.to_string()),
+            })
+            .collect()
+    }
+
+    /// The stream's cards, each with the post it comes after.
+    fn cards(fixture: &Fixture) -> Vec<(String, Option<ReaderSavedKey>)> {
+        ReaderStreamRepository::select_cards(&fixture.conn, fixture.stream)
+            .unwrap()
+            .into_iter()
+            .map(|card| (card.card, card.after_post))
+            .collect()
+    }
+
     #[test]
     fn test_a_first_page_replaces_a_stream_kept_in_the_servers_order() {
         let fixture = Fixture::new();
-        let first = fixture.items(&[(1, 0), (2, 0), (3, 0)]);
-        ReaderStreamRepository::replace_items(&fixture.conn, fixture.stream, &first).unwrap();
+        let first = entries(&fixture, &["1", "2", "3"]);
+        ReaderStreamRepository::replace_entries(&fixture.conn, fixture.stream, &first).unwrap();
         assert_eq!(fixture.shown(), ["1", "2", "3"]);
 
-        let more = fixture.items(&[(4, 0), (2, 0), (5, 0)]);
+        let more = entries(&fixture, &["4", "2", "5"]);
         let outcome =
-            ReaderStreamRepository::append_items(&fixture.conn, fixture.stream, &more).unwrap();
+            ReaderStreamRepository::append_entries(&fixture.conn, fixture.stream, &more).unwrap();
         assert_eq!(outcome.added, 2);
         assert!(outcome.overlapped);
         assert_eq!(fixture.shown(), ["1", "2", "3", "4", "5"]);
 
         // A refresh: the server's first page is now different.
-        let refreshed = fixture.items(&[(6, 0), (2, 0), (6, 0), (1, 0)]);
+        let refreshed = entries(&fixture, &["6", "2", "6", "1"]);
         let outcome =
-            ReaderStreamRepository::replace_items(&fixture.conn, fixture.stream, &refreshed)
+            ReaderStreamRepository::replace_entries(&fixture.conn, fixture.stream, &refreshed)
                 .unwrap();
         assert_eq!(
             outcome,
@@ -1593,9 +1615,42 @@ mod stream_pages {
         assert_eq!(fixture.shown(), ["6", "2", "1"]);
 
         // The next page goes after it, though earlier pages took later places.
-        let more = fixture.items(&[(7, 0)]);
-        ReaderStreamRepository::append_items(&fixture.conn, fixture.stream, &more).unwrap();
+        let more = entries(&fixture, &["7"]);
+        ReaderStreamRepository::append_entries(&fixture.conn, fixture.stream, &more).unwrap();
         assert_eq!(fixture.shown(), ["6", "2", "1", "7"]);
+    }
+
+    #[test]
+    fn test_cards_keep_their_place_among_the_posts() {
+        let fixture = Fixture::new();
+        let first = entries(&fixture, &["sites", "1", "2", "tags", "3"]);
+        ReaderStreamRepository::replace_entries(&fixture.conn, fixture.stream, &first).unwrap();
+        assert_eq!(fixture.shown(), ["1", "2", "3"]);
+        assert_eq!(
+            cards(&fixture),
+            [
+                ("sites".to_string(), None),
+                ("tags".to_string(), Some(post_key(2)))
+            ]
+        );
+
+        // A later page's card goes after everything, and a post the stream has doesn't move.
+        let more = entries(&fixture, &["2", "4", "more sites"]);
+        ReaderStreamRepository::append_entries(&fixture.conn, fixture.stream, &more).unwrap();
+        assert_eq!(fixture.shown(), ["1", "2", "3", "4"]);
+        assert_eq!(
+            cards(&fixture)[2],
+            ("more sites".to_string(), Some(post_key(4)))
+        );
+
+        // A refresh starts the cards again.
+        let refreshed = entries(&fixture, &["5", "new tags"]);
+        ReaderStreamRepository::replace_entries(&fixture.conn, fixture.stream, &refreshed).unwrap();
+        assert_eq!(fixture.shown(), ["5"]);
+        assert_eq!(
+            cards(&fixture),
+            [("new tags".to_string(), Some(post_key(5)))]
+        );
     }
 
     #[test]

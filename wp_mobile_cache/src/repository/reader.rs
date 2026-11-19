@@ -4,10 +4,10 @@
 use crate::{
     RowId, SqliteDbError,
     db_types::reader::{
-        DbReaderPageItem, DbReaderPageOutcome, DbReaderSavedKey, DbReaderSavedListItem,
-        DbReaderSavedRow, DbReaderSavedState, DbReaderStream, DbReaderStreamItem,
-        DbReaderUnreadablePost, ReaderPostRecord, reader_date_from_text, reader_date_text,
-        reader_saved_key_from_text, reader_saved_key_text,
+        DbReaderPageEntry, DbReaderPageItem, DbReaderPageOutcome, DbReaderSavedKey,
+        DbReaderSavedListItem, DbReaderSavedRow, DbReaderSavedState, DbReaderStream,
+        DbReaderStreamCard, DbReaderStreamItem, DbReaderUnreadablePost, ReaderPostRecord,
+        reader_date_from_text, reader_date_text, reader_saved_key_from_text, reader_saved_key_text,
     },
     list_metadata::ListState,
     repository::QueryExecutor,
@@ -765,66 +765,50 @@ impl ReaderStreamRepository {
         format!("{:010}", 9_999_999_999u64.saturating_sub(position))
     }
 
-    /// Makes a stream kept in the order the server sent hold exactly `items`, in that order. For
+    /// Makes a stream kept in the order the server sent hold exactly `entries`, in that order. For
     /// the first page of such a stream: its later pages follow from it, so what the stream had
     /// past it can't be kept. Call it inside a transaction.
-    pub fn replace_items(
+    pub fn replace_entries(
         executor: &impl QueryExecutor,
         stream: RowId,
-        items: &[DbReaderPageItem],
+        entries: &[DbReaderPageEntry],
     ) -> Result<DbReaderPageOutcome, SqliteDbError> {
-        let mut outcome = DbReaderPageOutcome::default();
-        let page = Self::rows_json(items.iter().map(|item| &item.post));
-        outcome.removed = executor.execute(
-            "DELETE FROM reader_stream_items
-            WHERE stream_id = ?1 AND post_id NOT IN (SELECT value FROM json_each(?2))",
-            params![stream, page],
-        )? as u64;
-        let mut position = 0;
-        let mut placed: Vec<RowId> = Vec::new();
-        for item in items {
-            // A post the server sent twice keeps its first place.
-            if placed.contains(&item.post) {
-                continue;
-            }
-            placed.push(item.post);
-            if Self::has_item(executor, stream, item.post)? {
-                outcome.overlapped = true;
-            } else {
-                outcome.added += 1;
-            }
-            executor.execute(
-                "INSERT INTO reader_stream_items (stream_id, post_id, sort_key, railcar, gap_before)
-                VALUES (?1, ?2, ?3, ?4, 0)
-                ON CONFLICT(stream_id, post_id) DO UPDATE SET
-                    sort_key = excluded.sort_key,
-                    railcar = COALESCE(excluded.railcar, railcar),
-                    gap_before = 0",
-                params![
-                    stream,
-                    item.post,
-                    Self::position_sort_key(position),
-                    item.railcar
-                ],
-            )?;
-            position += 1;
-        }
+        let posts = entries.iter().filter_map(|entry| match entry {
+            DbReaderPageEntry::Post(item) => Some(&item.post),
+            DbReaderPageEntry::Card(_) => None,
+        });
+        let mut outcome = DbReaderPageOutcome {
+            removed: executor.execute(
+                "DELETE FROM reader_stream_items
+                WHERE stream_id = ?1 AND post_id NOT IN (SELECT value FROM json_each(?2))",
+                params![stream, Self::rows_json(posts)],
+            )? as u64,
+            ..Default::default()
+        };
+        executor.execute(
+            "DELETE FROM reader_stream_cards WHERE stream_id = ?1",
+            [stream],
+        )?;
+        Self::place_entries(executor, stream, entries, 0, &mut outcome)?;
         Ok(outcome)
     }
 
     /// Adds a later page to a stream kept in the order the server sent, after what it has. A post
     /// the stream already has stays where it is. Call it inside a transaction.
-    pub fn append_items(
+    pub fn append_entries(
         executor: &impl QueryExecutor,
         stream: RowId,
-        items: &[DbReaderPageItem],
+        entries: &[DbReaderPageEntry],
     ) -> Result<DbReaderPageOutcome, SqliteDbError> {
-        let mut outcome = DbReaderPageOutcome::default();
-        // One past the lowest place taken. Places aren't reused, so this is past every post.
-        let mut statement = executor
-            .prepare("SELECT MIN(sort_key) FROM reader_stream_items WHERE stream_id = ?1")?;
+        // One past the lowest place taken, by a post or a card. Places aren't reused, so this is
+        // past everything.
+        let mut statement = executor.prepare(
+            "SELECT MIN(sort_key) FROM (
+                SELECT sort_key FROM reader_stream_items WHERE stream_id = ?1
+                UNION ALL SELECT sort_key FROM reader_stream_cards WHERE stream_id = ?1)",
+        )?;
         let lowest: Option<String> = statement.query_row([stream], |row| row.get(0))?;
-        let mut position = match lowest {
+        let position = match lowest {
             Some(key) => {
                 let taken: u64 = key.parse().map_err(|_| {
                     SqliteDbError::SqliteError(format!("Invalid Reader stream position: {key}"))
@@ -833,25 +817,101 @@ impl ReaderStreamRepository {
             }
             None => 0,
         };
-        for item in items {
-            if Self::has_item(executor, stream, item.post)? {
-                outcome.overlapped = true;
-                continue;
+        let mut outcome = DbReaderPageOutcome::default();
+        Self::place_entries(executor, stream, entries, position, &mut outcome)?;
+        Ok(outcome)
+    }
+
+    /// Gives each entry the next place from `position`. A post the stream has keeps its place on a
+    /// later page, and takes its new one on a first page, where the places start again.
+    fn place_entries(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        entries: &[DbReaderPageEntry],
+        mut position: u64,
+        outcome: &mut DbReaderPageOutcome,
+    ) -> Result<(), SqliteDbError> {
+        let first_page = position == 0;
+        let mut placed: Vec<RowId> = Vec::new();
+        for entry in entries {
+            match entry {
+                DbReaderPageEntry::Post(item) => {
+                    // A post the server sent twice keeps its first place.
+                    if placed.contains(&item.post) {
+                        continue;
+                    }
+                    placed.push(item.post);
+                    if Self::has_item(executor, stream, item.post)? {
+                        outcome.overlapped = true;
+                        if !first_page {
+                            continue;
+                        }
+                    } else {
+                        outcome.added += 1;
+                    }
+                    executor.execute(
+                        "INSERT INTO reader_stream_items
+                            (stream_id, post_id, sort_key, railcar, gap_before)
+                        VALUES (?1, ?2, ?3, ?4, 0)
+                        ON CONFLICT(stream_id, post_id) DO UPDATE SET
+                            sort_key = excluded.sort_key,
+                            railcar = COALESCE(excluded.railcar, railcar),
+                            gap_before = 0",
+                        params![
+                            stream,
+                            item.post,
+                            Self::position_sort_key(position),
+                            item.railcar
+                        ],
+                    )?;
+                }
+                DbReaderPageEntry::Card(card) => {
+                    executor.execute(
+                        "INSERT INTO reader_stream_cards (stream_id, sort_key, card)
+                        VALUES (?1, ?2, ?3)",
+                        params![stream, Self::position_sort_key(position), card],
+                    )?;
+                }
             }
-            executor.execute(
-                "INSERT INTO reader_stream_items (stream_id, post_id, sort_key, railcar)
-                VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    stream,
-                    item.post,
-                    Self::position_sort_key(position),
-                    item.railcar
-                ],
-            )?;
-            outcome.added += 1;
             position += 1;
         }
-        Ok(outcome)
+        Ok(())
+    }
+
+    /// The stream's cards that aren't posts, in the stream's order, each with the post it comes
+    /// after among the posts [`Self::select_items`] returns.
+    pub fn select_cards(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+    ) -> Result<Vec<DbReaderStreamCard>, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT c.card, (
+                SELECT p.identity_key FROM reader_stream_items i
+                JOIN reader_posts p ON p.rowid = i.post_id
+                WHERE i.stream_id = c.stream_id AND i.sort_key > c.sort_key
+                    AND NOT EXISTS (
+                        SELECT 1 FROM reader_blocked_sites b
+                        WHERE b.account_id = p.account_id AND b.site_id = p.site_id)
+                    AND NOT EXISTS (
+                        SELECT 1 FROM reader_blocked_users u
+                        WHERE u.account_id = p.account_id AND u.user_id = p.author_id)
+                ORDER BY i.sort_key ASC, i.rowid DESC LIMIT 1)
+            FROM reader_stream_cards c
+            WHERE c.stream_id = ?1
+            ORDER BY c.sort_key DESC, c.rowid ASC",
+        )?;
+        let rows = statement.query_map([stream], |row| {
+            Ok((|| -> Result<DbReaderStreamCard, SqliteDbError> {
+                Ok(DbReaderStreamCard {
+                    card: row.get(0)?,
+                    after_post: row
+                        .get::<_, Option<String>>(1)?
+                        .map(|key| reader_saved_key_from_text(&key))
+                        .transpose()?,
+                })
+            })())
+        })?;
+        collect_rows(rows.map(|row| row.map_err(SqliteDbError::from).and_then(|row| row)))
     }
 
     /// The sort key of the stream's last post: the oldest, in a stream ordered by date.

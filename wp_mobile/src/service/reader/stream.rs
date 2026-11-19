@@ -1,33 +1,66 @@
 //! The Reader's streams: which endpoint each one reads, how it pages, and what orders its posts.
 
+use serde::{Deserialize, Serialize};
 use wp_api::date::WpGmtDateTime;
 use wp_api::prelude::WpApiError;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::reader_posts::{
-    ReaderPost, ReaderStreamParams, ReaderTagPostsParams, ReaderTagPostsSort, ReaderTagSlug,
-    ReaderUnreadablePost,
+    ReaderCard, ReaderCardSite, ReaderCardTag, ReaderDiscoverParams, ReaderFirstPostsParams,
+    ReaderFreshlyPressedParams, ReaderLikedPostsParams, ReaderListOwner, ReaderListPostsParams,
+    ReaderListSlug, ReaderOrganizationPostsParams, ReaderPost, ReaderPostsResponse,
+    ReaderSearchPostsParams, ReaderSearchSort, ReaderStreamParams, ReaderTagPostsParams,
+    ReaderTagPostsResponse, ReaderTagPostsSort, ReaderTagSlug, ReaderTagsPostsParams,
+    ReaderUnreadableCard, ReaderUnreadablePost,
 };
-use wp_api::wp_com::reader_saved::ReaderFeedId;
+use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderPostSaveIdentity};
 
 /// How many posts a page of a stream ordered by date asks for.
 const DATED_PAGE_SIZE: u32 = 20;
+
+/// How many posts a page of search results asks for, which is the most the API gives.
+const SEARCH_PAGE_SIZE: u32 = 20;
 
 /// What a stream asks for with each post: the post's site, and an RSS post's feed. They carry the
 /// site's or feed's icon and the site's language, which a post doesn't have without them.
 const POST_META: &str = "site,feed";
 
 /// A stream of posts the Reader shows.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum ReaderStream {
     /// Posts from the sites and feeds the user follows. Needs an account.
     Following,
+    /// The posts the user liked, newest like first. Needs an account.
+    Liked,
+    /// Posts from Automattic's sites, for Automatticians. Needs an account.
+    Automattic,
+    /// Posts from the P2s the user follows. Needs an account.
+    P2,
+    /// Freshly Pressed: the posts WordPress.com's editors picked, newest pick first.
+    FreshlyPressed,
     /// A WordPress.com or Jetpack site's posts.
     Site { site_id: WpComSiteId },
     /// An RSS feed's posts.
     Feed { feed_id: ReaderFeedId },
     /// A tag's posts, newest first.
     Tag { slug: ReaderTagSlug },
+    /// The newest posts of several tags, which is Discover's "latest" tab.
+    Tags { slugs: Vec<ReaderTagSlug> },
+    /// A search of posts.
+    Search {
+        query: String,
+        sort: ReaderSearchSort,
+    },
+    /// A Reader list's posts.
+    ReaderList {
+        owner: ReaderListOwner,
+        slug: ReaderListSlug,
+    },
+    /// Discover's recommended posts, with cards of sites and tags among them. `tags` are the
+    /// reader's interests, for a reader the server doesn't know them for: a signed-out one.
+    Discover { tags: Vec<ReaderTagSlug> },
+    /// The first posts of new sites.
+    FirstPosts,
 }
 
 /// What orders a stream's posts, which decides how the cache keeps them.
@@ -41,29 +74,90 @@ pub enum ReaderStreamOrdering {
     Server,
 }
 
+fn tags_key(slugs: &[ReaderTagSlug]) -> String {
+    let mut slugs: Vec<&str> = slugs.iter().map(|slug| slug.0.as_str()).collect();
+    slugs.sort_unstable();
+    slugs.dedup();
+    slugs.join(",")
+}
+
 impl ReaderStream {
     /// The stream's key in the cache. It never changes for a stream, since the cache finds the
-    /// stream's posts by it.
+    /// stream's posts by it. The same tags in another order are the same stream.
     pub(crate) fn key(&self) -> String {
         match self {
             Self::Following => "following".to_string(),
+            Self::Liked => "liked".to_string(),
+            Self::Automattic => "a8c".to_string(),
+            Self::P2 => "p2".to_string(),
+            Self::FreshlyPressed => "freshly-pressed".to_string(),
             Self::Site { site_id } => format!("site:{}", site_id.0),
             Self::Feed { feed_id } => format!("feed:{}", feed_id.0),
             Self::Tag { slug } => format!("tag:{}", slug.0),
+            Self::Tags { slugs } => format!("tags:{}", tags_key(slugs)),
+            Self::Search { query, sort } => format!("search:{sort}:{query}"),
+            Self::ReaderList { owner, slug } => format!("list:{}/{}", owner.0, slug.0),
+            Self::Discover { tags } => format!("discover:{}", tags_key(tags)),
+            Self::FirstPosts => "first-posts".to_string(),
         }
     }
 
     pub(crate) fn needs_account(&self) -> bool {
         match self {
-            Self::Following => true,
-            Self::Site { .. } | Self::Feed { .. } | Self::Tag { .. } => false,
+            Self::Following | Self::Liked | Self::Automattic | Self::P2 => true,
+            Self::FreshlyPressed
+            | Self::Site { .. }
+            | Self::Feed { .. }
+            | Self::Tag { .. }
+            | Self::Tags { .. }
+            | Self::Search { .. }
+            | Self::ReaderList { .. }
+            | Self::Discover { .. }
+            | Self::FirstPosts => false,
         }
     }
 
-    pub(crate) fn order(&self) -> ReaderStreamOrdering {
+    pub(crate) fn ordering(&self) -> ReaderStreamOrdering {
         match self {
-            Self::Following | Self::Site { .. } | Self::Feed { .. } => ReaderStreamOrdering::Date,
-            Self::Tag { .. } => ReaderStreamOrdering::Server,
+            Self::Following
+            | Self::Liked
+            | Self::Automattic
+            | Self::P2
+            | Self::FreshlyPressed
+            | Self::Site { .. }
+            | Self::Feed { .. } => ReaderStreamOrdering::Date,
+            Self::Tag { .. }
+            | Self::Tags { .. }
+            | Self::Search { .. }
+            | Self::ReaderList { .. }
+            | Self::Discover { .. }
+            | Self::FirstPosts => ReaderStreamOrdering::Server,
+        }
+    }
+
+    /// The date a stream ordered by date orders a post by, and pages by.
+    fn sort_date(&self, post: &ReaderPost) -> Option<WpGmtDateTime> {
+        match self {
+            Self::Liked => post.date_liked,
+            Self::FreshlyPressed => post.editorial_displayed_on,
+            _ => post.date,
+        }
+    }
+
+    fn dated(&self, page: ReaderPostsResponse) -> StreamPage {
+        StreamPage {
+            entries: page
+                .posts
+                .into_iter()
+                .map(|post| {
+                    StreamEntry::Post(StreamPost {
+                        sort_date: self.sort_date(&post),
+                        post,
+                    })
+                })
+                .collect(),
+            unreadable: unreadable_posts(page.unreadable_posts),
+            next_page_handle: None,
         }
     }
 
@@ -74,46 +168,138 @@ impl ReaderStream {
         cursor: Option<&StreamCursor>,
     ) -> Result<StreamPage, WpApiError> {
         let posts = client.reader_posts();
-        match self {
+        let before = match cursor {
+            Some(StreamCursor::Before(date)) => Some(*date),
+            _ => None,
+        };
+        let page_handle = match cursor {
+            Some(StreamCursor::Handle(handle)) => Some(handle.clone()),
+            _ => None,
+        };
+        let number = Some(DATED_PAGE_SIZE);
+        let meta = Some(POST_META.to_string());
+        Ok(match self {
             Self::Following | Self::Site { .. } | Self::Feed { .. } => {
                 let params = ReaderStreamParams {
-                    number: Some(DATED_PAGE_SIZE),
-                    before: match cursor {
-                        Some(StreamCursor::Before(date)) => Some(*date),
-                        _ => None,
-                    },
-                    meta: Some(POST_META.to_string()),
+                    number,
+                    before,
+                    meta,
                     ..Default::default()
                 };
-                let page = match self {
+                self.dated(match self {
                     Self::Following => posts.following(&params).await?.data,
                     Self::Site { site_id } => posts.site_posts(site_id, &params).await?.data,
                     Self::Feed { feed_id } => posts.feed_posts(feed_id, &params).await?.data,
-                    Self::Tag { .. } => unreachable!("a tag's stream is fetched below"),
-                };
-                Ok(StreamPage {
-                    posts: page.posts.into_iter().map(dated_by_its_date).collect(),
-                    unreadable: page.unreadable_posts,
-                    next_page_handle: None,
+                    _ => unreachable!("the other streams are fetched below"),
                 })
+            }
+            Self::Liked => {
+                let params = ReaderLikedPostsParams {
+                    number,
+                    before,
+                    meta,
+                    ..Default::default()
+                };
+                self.dated(posts.liked(&params).await?.data)
+            }
+            Self::Automattic | Self::P2 => {
+                let params = ReaderOrganizationPostsParams {
+                    number,
+                    before,
+                    meta,
+                    ..Default::default()
+                };
+                self.dated(match self {
+                    Self::Automattic => posts.automattic(&params).await?.data,
+                    _ => posts.following_p_2(&params).await?.data,
+                })
+            }
+            Self::FreshlyPressed => {
+                let params = ReaderFreshlyPressedParams {
+                    number,
+                    before,
+                    meta,
+                    ..Default::default()
+                };
+                self.dated(posts.freshly_pressed(&params).await?.data)
             }
             Self::Tag { slug } => {
                 let params = ReaderTagPostsParams {
-                    page_handle: match cursor {
-                        Some(StreamCursor::Handle(handle)) => Some(handle.clone()),
-                        _ => None,
-                    },
+                    page_handle,
                     sort: Some(ReaderTagPostsSort::Date),
                     ..Default::default()
                 };
-                let page = posts.tag_posts(slug, &params).await?.data;
-                Ok(StreamPage {
-                    posts: page.posts.into_iter().map(dated_by_its_date).collect(),
-                    unreadable: page.unreadable_posts,
-                    next_page_handle: page.next_page_handle,
-                })
+                tag_page(posts.tag_posts(slug, &params).await?.data)
             }
-        }
+            Self::Tags { slugs } => {
+                let params = ReaderTagsPostsParams {
+                    tags: slugs.clone(),
+                    number: None,
+                    page_handle,
+                    page: None,
+                    sort: Some(ReaderTagPostsSort::Date),
+                    before: None,
+                    after: None,
+                };
+                tag_page(posts.tags_posts(&params).await?.data)
+            }
+            Self::Search { query, sort } => {
+                let params = ReaderSearchPostsParams {
+                    q: query.clone(),
+                    number: Some(SEARCH_PAGE_SIZE),
+                    page_handle,
+                    offset: None,
+                    sort: Some(*sort),
+                    before: None,
+                    after: None,
+                    lang: None,
+                    algorithm: None,
+                    meta,
+                    fields: None,
+                };
+                let page = posts.search(&params).await?.data;
+                StreamPage {
+                    entries: page
+                        .posts
+                        .into_iter()
+                        .map(|result| undated(result.post))
+                        .collect(),
+                    unreadable: unreadable_posts(page.unreadable_posts),
+                    next_page_handle: page.next_page_handle,
+                }
+            }
+            Self::ReaderList { owner, slug } => {
+                let params = ReaderListPostsParams {
+                    page_handle,
+                    ..Default::default()
+                };
+                let page = posts.list_posts(owner, slug, &params).await?.data;
+                StreamPage {
+                    entries: page.posts.into_iter().map(undated).collect(),
+                    unreadable: unreadable_posts(page.unreadable_posts),
+                    next_page_handle: page.next_page_handle,
+                }
+            }
+            Self::Discover { tags } => {
+                let params = ReaderDiscoverParams {
+                    count: None,
+                    page_handle,
+                    tags: tags.clone(),
+                    sort: None,
+                    age_based_decay: None,
+                };
+                let page = posts.discover(&params).await?.data;
+                card_page(page.cards, page.unreadable_cards, page.next_page_handle)
+            }
+            Self::FirstPosts => {
+                let params = ReaderFirstPostsParams {
+                    count: None,
+                    page_handle,
+                };
+                let page = posts.first_posts(&params).await?.data;
+                card_page(page.cards, page.unreadable_cards, page.next_page_handle)
+            }
+        })
     }
 }
 
@@ -127,7 +313,7 @@ pub fn reader_stream_needs_account(stream: ReaderStream) -> bool {
 /// What orders a stream's posts.
 #[uniffi::export]
 pub fn reader_stream_ordering(stream: ReaderStream) -> ReaderStreamOrdering {
-    stream.order()
+    stream.ordering()
 }
 
 /// Where a page starts.
@@ -140,13 +326,22 @@ pub(crate) enum StreamCursor {
 }
 
 /// A page of a stream.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct StreamPage {
     /// In the order the server sent.
-    pub(crate) posts: Vec<StreamPost>,
-    pub(crate) unreadable: Vec<ReaderUnreadablePost>,
+    pub(crate) entries: Vec<StreamEntry>,
+    /// What the page had that couldn't be read: the post's IDs where they could be, and why.
+    pub(crate) unreadable: Vec<(Option<ReaderPostSaveIdentity>, String)>,
     /// The handle of the next page of a stream that pages with one, or `None` on its last page.
     pub(crate) next_page_handle: Option<String>,
+}
+
+/// Something on a page of a stream: a post, or a card that isn't one.
+#[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)] // A page is nearly all posts.
+pub(crate) enum StreamEntry {
+    Post(StreamPost),
+    Card(ReaderStreamCardKind),
 }
 
 /// A post on a page, with the date its stream orders it by.
@@ -157,10 +352,129 @@ pub(crate) struct StreamPost {
     pub(crate) sort_date: Option<WpGmtDateTime>,
 }
 
-fn dated_by_its_date(post: ReaderPost) -> StreamPost {
-    StreamPost {
-        sort_date: post.date,
+/// A card in a stream that isn't a post.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Enum)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ReaderStreamCardKind {
+    /// Sites the reader may want to follow.
+    RecommendedSites { sites: Vec<ReaderStreamCardSite> },
+    /// New sites.
+    NewSites { sites: Vec<ReaderStreamCardSite> },
+    /// Tags the reader may want to follow.
+    SuggestedTags { tags: Vec<ReaderStreamCardTag> },
+}
+
+/// A site on a card of sites. See [`ReaderCardSite`], which it's stored from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderStreamCardSite {
+    #[uniffi(default = None)]
+    pub site_id: Option<WpComSiteId>,
+    /// `None` for a site the Reader has no feed for.
+    #[uniffi(default = None)]
+    pub feed_id: Option<ReaderFeedId>,
+    #[uniffi(default = None)]
+    pub name: Option<String>,
+    #[uniffi(default = None)]
+    pub description: Option<String>,
+    #[uniffi(default = None)]
+    pub url: Option<String>,
+    #[uniffi(default = None)]
+    pub feed_url: Option<String>,
+    #[uniffi(default = None)]
+    pub icon_url: Option<String>,
+    #[uniffi(default = None)]
+    pub subscribers_count: Option<u64>,
+}
+
+/// A tag on a card of tags. See [`ReaderCardTag`], which it's stored from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderStreamCardTag {
+    pub slug: ReaderTagSlug,
+    /// The tag's name, to show.
+    #[uniffi(default = None)]
+    pub title: Option<String>,
+}
+
+fn card_site(site: ReaderCardSite) -> ReaderStreamCardSite {
+    ReaderStreamCardSite {
+        site_id: site.site_id,
+        feed_id: site.feed_id,
+        name: site.name,
+        description: site.description,
+        url: site.url,
+        feed_url: site.feed_url,
+        icon_url: site.icon_url,
+        subscribers_count: site.subscribers_count,
+    }
+}
+
+fn card_tag(tag: ReaderCardTag) -> ReaderStreamCardTag {
+    ReaderStreamCardTag {
+        slug: tag.slug,
+        title: tag.title,
+    }
+}
+
+fn undated(post: ReaderPost) -> StreamEntry {
+    StreamEntry::Post(StreamPost {
         post,
+        sort_date: None,
+    })
+}
+
+fn unreadable_posts(
+    posts: Vec<ReaderUnreadablePost>,
+) -> Vec<(Option<ReaderPostSaveIdentity>, String)> {
+    posts
+        .into_iter()
+        .map(|post| (post.identity, post.error))
+        .collect()
+}
+
+fn tag_page(page: ReaderTagPostsResponse) -> StreamPage {
+    StreamPage {
+        entries: page.posts.into_iter().map(undated).collect(),
+        unreadable: unreadable_posts(page.unreadable_posts),
+        next_page_handle: page.next_page_handle,
+    }
+}
+
+/// A page of a stream of cards. A card of a kind this library doesn't know is left out: nothing
+/// could show it.
+fn card_page(
+    cards: Vec<ReaderCard>,
+    unreadable: Vec<ReaderUnreadableCard>,
+    next_page_handle: Option<String>,
+) -> StreamPage {
+    StreamPage {
+        entries: cards
+            .into_iter()
+            .filter_map(|card| match card {
+                ReaderCard::Post { post } => Some(undated(post)),
+                ReaderCard::RecommendedSites { sites } => {
+                    Some(StreamEntry::Card(ReaderStreamCardKind::RecommendedSites {
+                        sites: sites.into_iter().map(card_site).collect(),
+                    }))
+                }
+                ReaderCard::NewSites { sites } => {
+                    Some(StreamEntry::Card(ReaderStreamCardKind::NewSites {
+                        sites: sites.into_iter().map(card_site).collect(),
+                    }))
+                }
+                ReaderCard::SuggestedTags { tags } => {
+                    Some(StreamEntry::Card(ReaderStreamCardKind::SuggestedTags {
+                        tags: tags.into_iter().map(card_tag).collect(),
+                    }))
+                }
+                ReaderCard::Unknown { .. } => None,
+            })
+            .collect(),
+        unreadable: unreadable
+            .into_iter()
+            .map(|card| (card.post, card.error))
+            .collect(),
+        // The API sends an empty handle on some last pages.
+        next_page_handle: next_page_handle.filter(|handle| !handle.is_empty()),
     }
 }
 
@@ -169,19 +483,64 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
+    fn slug(slug: &str) -> ReaderTagSlug {
+        ReaderTagSlug(slug.to_string())
+    }
+
     #[rstest]
     #[case(ReaderStream::Following, "following", true, ReaderStreamOrdering::Date)]
+    #[case(ReaderStream::Liked, "liked", true, ReaderStreamOrdering::Date)]
+    #[case(ReaderStream::Automattic, "a8c", true, ReaderStreamOrdering::Date)]
+    #[case(ReaderStream::P2, "p2", true, ReaderStreamOrdering::Date)]
+    #[case(
+        ReaderStream::FreshlyPressed,
+        "freshly-pressed",
+        false,
+        ReaderStreamOrdering::Date
+    )]
     #[case(ReaderStream::Site { site_id: WpComSiteId(3584907) }, "site:3584907", false, ReaderStreamOrdering::Date)]
     #[case(ReaderStream::Feed { feed_id: ReaderFeedId(8857199) }, "feed:8857199", false, ReaderStreamOrdering::Date)]
-    #[case(ReaderStream::Tag { slug: ReaderTagSlug("photography".to_string()) }, "tag:photography", false, ReaderStreamOrdering::Server)]
+    #[case(ReaderStream::Tag { slug: slug("photography") }, "tag:photography", false, ReaderStreamOrdering::Server)]
+    #[case(ReaderStream::Tags { slugs: vec![slug("travel"), slug("art"), slug("travel")] }, "tags:art,travel", false, ReaderStreamOrdering::Server)]
+    #[case(ReaderStream::Search { query: "cats and dogs".to_string(), sort: ReaderSearchSort::Date }, "search:date:cats and dogs", false, ReaderStreamOrdering::Server)]
+    #[case(ReaderStream::ReaderList { owner: ReaderListOwner("automattic".to_string()), slug: ReaderListSlug("design".to_string()) }, "list:automattic/design", false, ReaderStreamOrdering::Server)]
+    #[case(ReaderStream::Discover { tags: vec![] }, "discover:", false, ReaderStreamOrdering::Server)]
+    #[case(ReaderStream::Discover { tags: vec![slug("b"), slug("a")] }, "discover:a,b", false, ReaderStreamOrdering::Server)]
+    #[case(
+        ReaderStream::FirstPosts,
+        "first-posts",
+        false,
+        ReaderStreamOrdering::Server
+    )]
     fn test_what_each_stream_is(
         #[case] stream: ReaderStream,
         #[case] key: &str,
         #[case] needs_account: bool,
-        #[case] order: ReaderStreamOrdering,
+        #[case] ordering: ReaderStreamOrdering,
     ) {
         assert_eq!(stream.key(), key);
         assert_eq!(stream.needs_account(), needs_account);
-        assert_eq!(stream.order(), order);
+        assert_eq!(stream.ordering(), ordering);
+    }
+
+    #[test]
+    fn test_a_card_is_stored_and_read_back() {
+        let card = ReaderStreamCardKind::RecommendedSites {
+            sites: vec![ReaderStreamCardSite {
+                site_id: Some(WpComSiteId(1)),
+                feed_id: None,
+                name: Some("A site".to_string()),
+                description: None,
+                url: Some("https://example.com".to_string()),
+                feed_url: None,
+                icon_url: None,
+                subscribers_count: Some(12),
+            }],
+        };
+        let stored = serde_json::to_string(&card).unwrap();
+        assert_eq!(
+            serde_json::from_str::<ReaderStreamCardKind>(&stored).unwrap(),
+            card
+        );
     }
 }

@@ -6,7 +6,9 @@ use std::time::Duration;
 use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
-use wp_api::wp_com::reader_posts::ReaderTagSlug;
+use wp_api::wp_com::reader_posts::{
+    ReaderListOwner, ReaderListSlug, ReaderSearchSort, ReaderTagSlug,
+};
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderSavedKey, ReaderSavedSource};
 use wp_mobile_cache::list_metadata::ListState;
 use wp_mobile_cache::repository::reader::ReaderUnreadablePostRepository;
@@ -142,35 +144,266 @@ async fn a_refresh_stores_the_first_page() {
 #[tokio::test]
 async fn each_stream_reads_its_own_endpoint() {
     let (service, executor) = service();
-    for stream in [
-        ReaderStream::Site {
-            site_id: WpComSiteId(123),
-        },
-        ReaderStream::Feed {
-            feed_id: ReaderFeedId(456),
-        },
-        tag(),
-    ] {
-        executor.push(Step::Respond(200, page(&[(1, 10)])));
-        service.stream(stream).refresh().await.unwrap();
-    }
-    let paths: Vec<String> = executor
-        .sent()
-        .iter()
-        .map(|sent| {
-            sent.url
-                .trim_start_matches("https://public-api.wordpress.com")
-                .to_string()
-        })
-        .collect();
-    assert_eq!(
-        paths,
-        [
+    let slug = |slug: &str| ReaderTagSlug(slug.to_string());
+    let streams = [
+        (
+            ReaderStream::Following,
+            "/rest/v1.2/read/following?number=20&meta=site%2Cfeed",
+        ),
+        (
+            ReaderStream::Liked,
+            "/rest/v1.2/read/liked?number=20&meta=site%2Cfeed",
+        ),
+        (
+            ReaderStream::Automattic,
+            "/rest/v1.2/read/a8c?number=20&meta=site%2Cfeed",
+        ),
+        (
+            ReaderStream::P2,
+            "/rest/v1.2/read/following/p2?number=20&meta=site%2Cfeed",
+        ),
+        (
+            ReaderStream::FreshlyPressed,
+            "/rest/v1.2/freshly-pressed?number=20&meta=site%2Cfeed",
+        ),
+        (
+            ReaderStream::Site {
+                site_id: WpComSiteId(123),
+            },
             "/rest/v1.2/read/sites/123/posts?number=20&meta=site%2Cfeed",
+        ),
+        (
+            ReaderStream::Feed {
+                feed_id: ReaderFeedId(456),
+            },
             "/rest/v1.2/read/feed/456/posts?number=20&meta=site%2Cfeed",
-            "/wpcom/v2/read/tags/photography/posts?sort=date",
-        ]
+        ),
+        (tag(), "/wpcom/v2/read/tags/photography/posts?sort=date"),
+        (
+            ReaderStream::Tags {
+                slugs: vec![slug("art"), slug("travel")],
+            },
+            "/wpcom/v2/read/tags/posts?tags=art%2Ctravel&sort=date",
+        ),
+        (
+            ReaderStream::Search {
+                query: "cats and dogs".to_string(),
+                sort: ReaderSearchSort::Date,
+            },
+            "/rest/v1.2/read/search?q=cats+and+dogs&number=20&sort=date&meta=site%2Cfeed",
+        ),
+        (
+            ReaderStream::ReaderList {
+                owner: ReaderListOwner("automattic".to_string()),
+                slug: ReaderListSlug("design".to_string()),
+            },
+            "/rest/v1.3/read/list/automattic/design/posts?",
+        ),
+        (
+            ReaderStream::Discover {
+                tags: vec![slug("art")],
+            },
+            "/wpcom/v2/read/streams/discover?tags=art",
+        ),
+        (
+            ReaderStream::FirstPosts,
+            "/wpcom/v2/read/streams/first-posts?",
+        ),
+    ];
+    for (stream, _) in &streams {
+        executor.push(Step::Respond(200, page(&[(1, 10)])));
+        service.stream(stream.clone()).refresh().await.unwrap();
+    }
+    let sent = executor.sent();
+    for (index, (stream, path)) in streams.iter().enumerate() {
+        assert_eq!(
+            sent[index]
+                .url
+                .trim_start_matches("https://public-api.wordpress.com"),
+            *path,
+            "{stream:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn liked_posts_are_ordered_and_paged_by_when_they_were_liked() {
+    let (service, executor) = service();
+    let stream = service.stream(ReaderStream::Liked);
+    // Post 1 was written last and liked first.
+    let liked = |id: u64, written: u32, liked: u32| {
+        let mut post = post_json(id, written);
+        post["date_liked"] = json!(date(liked));
+        post
+    };
+    executor.push(Step::Respond(
+        200,
+        json!({ "posts": [liked(2, 5, 12), liked(1, 20, 11)] }),
+    ));
+    stream.refresh().await.unwrap();
+
+    assert_eq!(shown(&stream).await, ["2", "1"]);
+    let items = stream.load_items().await.unwrap();
+    assert_eq!(items[1].sort_date, Some(date(11).parse().unwrap()));
+
+    executor.push(Step::Respond(200, page(&[])));
+    stream.load_more().await.unwrap();
+    assert_eq!(
+        queries(&executor)[1],
+        "number=20&before=2026-11-18T11%3A00%3A00%2B00%3A00&meta=site%2Cfeed"
     );
+}
+
+#[tokio::test]
+async fn freshly_pressed_posts_are_ordered_by_when_they_were_shown() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let stream = service.stream(ReaderStream::FreshlyPressed);
+    let shown_at = |id: u64, written: u32, displayed: u32| {
+        let mut post = post_json(id, written);
+        post["editorial"] = json!({ "displayed_on": date(displayed) });
+        post
+    };
+    executor.push(Step::Respond(
+        200,
+        json!({ "posts": [shown_at(2, 5, 12), shown_at(1, 20, 11)] }),
+    ));
+
+    stream.refresh().await.unwrap();
+
+    assert_eq!(shown(&stream).await, ["2", "1"]);
+}
+
+#[tokio::test]
+async fn streams_of_an_account_need_one() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    for stream in [
+        ReaderStream::Following,
+        ReaderStream::Liked,
+        ReaderStream::Automattic,
+        ReaderStream::P2,
+    ] {
+        assert!(
+            matches!(
+                service.stream(stream.clone()).refresh().await,
+                Err(ReaderError::NeedsAccount)
+            ),
+            "{stream:?}"
+        );
+    }
+    assert!(executor.sent().is_empty());
+}
+
+#[tokio::test]
+async fn a_search_follows_its_page_handles() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let stream = service.stream(ReaderStream::Search {
+        query: "cats".to_string(),
+        sort: ReaderSearchSort::Relevance,
+    });
+    executor.push(Step::Respond(
+        200,
+        json!({ "posts": [post_json(2, 10), post_json(1, 12)], "next_page": "20" }),
+    ));
+    let result = stream.refresh().await.unwrap();
+    assert!(result.has_more);
+    // Results keep the server's order, which isn't by date.
+    assert_eq!(shown(&stream).await, ["2", "1"]);
+
+    executor.push(Step::Respond(200, json!({ "posts": [post_json(3, 11)] })));
+    let result = stream.load_more().await.unwrap();
+    assert!(!result.has_more);
+    assert_eq!(shown(&stream).await, ["2", "1", "3"]);
+    assert_eq!(
+        queries(&executor)[1],
+        "q=cats&number=20&page_handle=20&sort=relevance&meta=site%2Cfeed"
+    );
+}
+
+#[tokio::test]
+async fn discover_keeps_its_cards_among_its_posts() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let stream = service.stream(ReaderStream::Discover { tags: vec![] });
+    let post_card = |id: u64| json!({ "type": "post", "data": post_json(id, 10) });
+    executor.push(Step::Respond(
+        200,
+        json!({
+            "cards": [
+                post_card(1),
+                { "type": "recommended_blogs", "data": [
+                    { "ID": 7, "name": "A site", "URL": "https://seven.example", "feed_ID": 70 },
+                ] },
+                post_card(2),
+                { "type": "interests_you_may_like", "data": [
+                    { "slug": "art", "title": "Art", "score": 1.5 },
+                ] },
+                { "type": "something_new", "data": {} },
+            ],
+            "next_page_handle": "second",
+        }),
+    ));
+
+    let result = stream.refresh().await.unwrap();
+
+    assert_eq!(result.post_count, 2);
+    assert!(result.has_more);
+    assert_eq!(shown(&stream).await, ["1", "2"]);
+    let cards = stream.load_cards().await.unwrap();
+    assert_eq!(cards.len(), 2);
+    assert_eq!(cards[0].after_post, Some(key(1)));
+    let ReaderStreamCardKind::RecommendedSites { sites } = &cards[0].card else {
+        panic!("The first card should be the recommended sites");
+    };
+    assert_eq!(sites[0].site_id, Some(WpComSiteId(7)));
+    assert_eq!(sites[0].name.as_deref(), Some("A site"));
+    assert_eq!(cards[1].after_post, Some(key(2)));
+    assert!(matches!(
+        &cards[1].card,
+        ReaderStreamCardKind::SuggestedTags { tags } if tags[0].slug.0 == "art"
+    ));
+
+    // The next page's cards go after everything the stream has.
+    executor.push(Step::Respond(
+        200,
+        json!({
+            "cards": [post_card(3), { "type": "new_sites", "data": [{ "ID": 8 }] }],
+            "next_page_handle": "",
+        }),
+    ));
+    let result = stream.load_more().await.unwrap();
+    assert!(!result.has_more);
+    let cards = stream.load_cards().await.unwrap();
+    assert_eq!(cards.len(), 3);
+    assert_eq!(cards[2].after_post, Some(key(3)));
+
+    // A refresh starts the cards again.
+    executor.push(Step::Respond(200, json!({ "cards": [post_card(4)] })));
+    stream.refresh().await.unwrap();
+    assert_eq!(shown(&stream).await, ["4"]);
+    assert!(stream.load_cards().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_lists_posts_leave_out_the_ones_the_server_no_longer_has() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let stream = service.stream(ReaderStream::ReaderList {
+        owner: ReaderListOwner("automattic".to_string()),
+        slug: ReaderListSlug("design".to_string()),
+    });
+    executor.push(Step::Respond(
+        200,
+        json!({
+            "cards": [
+                { "type": "post", "data": post_json(1, 10) },
+                { "type": "post", "data": false },
+                { "type": "post", "data": post_json(2, 9) },
+            ],
+        }),
+    ));
+
+    let result = stream.refresh().await.unwrap();
+
+    assert_eq!(result.post_count, 2);
+    assert_eq!(shown(&stream).await, ["1", "2"]);
 }
 
 #[tokio::test]

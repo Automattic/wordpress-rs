@@ -139,6 +139,8 @@ pub enum DbTable {
     ReaderMemberSites,
     /// When each of a reader's lists was last fetched whole
     ReaderSyncTimes,
+    /// Cards in a Reader stream that aren't posts
+    ReaderStreamCards,
 }
 
 impl DbTable {
@@ -174,6 +176,7 @@ impl DbTable {
             DbTable::ReaderBlockedUsers => "reader_blocked_users",
             DbTable::ReaderMemberSites => "reader_member_sites",
             DbTable::ReaderSyncTimes => "reader_sync_times",
+            DbTable::ReaderStreamCards => "reader_stream_cards",
         }
     }
 }
@@ -222,6 +225,7 @@ impl TryFrom<&str> for DbTable {
             "reader_blocked_users" => Ok(DbTable::ReaderBlockedUsers),
             "reader_member_sites" => Ok(DbTable::ReaderMemberSites),
             "reader_sync_times" => Ok(DbTable::ReaderSyncTimes),
+            "reader_stream_cards" => Ok(DbTable::ReaderStreamCards),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -539,7 +543,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 18] = [
+static MIGRATION_QUERIES: [&str; 19] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -558,6 +562,7 @@ static MIGRATION_QUERIES: [&str; 18] = [
     include_str!("../migrations/0016-create-reader-unreadable-posts-table.sql"),
     include_str!("../migrations/0017-create-reader-actions-tables.sql"),
     include_str!("../migrations/0018-create-reader-member-sites-table.sql"),
+    include_str!("../migrations/0019-create-reader-stream-cards-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {

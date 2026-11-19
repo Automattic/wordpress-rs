@@ -256,6 +256,23 @@ pub struct DbReaderPageItem {
     pub railcar: Option<String>,
 }
 
+/// Something on a page of a stream kept in the server's order: a post, or a card that isn't one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DbReaderPageEntry {
+    Post(DbReaderPageItem),
+    /// A card that isn't a post, as JSON.
+    Card(String),
+}
+
+/// A card in a stream that isn't a post.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DbReaderStreamCard {
+    /// The card, as JSON.
+    pub card: String,
+    /// The key of the post the card comes after, or `None` if it comes before every post.
+    pub after_post: Option<ReaderSavedKey>,
+}
+
 /// What adding a page to a stream did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DbReaderPageOutcome {

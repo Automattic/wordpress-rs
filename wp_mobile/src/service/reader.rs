@@ -25,11 +25,13 @@ mod stream;
 
 pub use actions::ReaderActionOutcome;
 pub use collection::{
-    ReaderStreamCollection, ReaderStreamInfo, ReaderStreamItem, ReaderStreamPageResult,
+    ReaderStreamCard, ReaderStreamCollection, ReaderStreamInfo, ReaderStreamItem,
+    ReaderStreamPageResult,
 };
 pub use page_views::ReaderPageViewOutcome;
 pub use stream::{
-    ReaderStream, ReaderStreamOrdering, reader_stream_needs_account, reader_stream_ordering,
+    ReaderStream, ReaderStreamCardKind, ReaderStreamCardSite, ReaderStreamCardTag,
+    ReaderStreamOrdering, reader_stream_needs_account, reader_stream_ordering,
 };
 
 use super::reader_saved::ReaderSavedService;

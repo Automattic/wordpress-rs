@@ -6,7 +6,9 @@ use std::sync::Arc;
 use wp_api::prelude::*;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
-use wp_api::wp_com::reader_posts::ReaderTagSlug;
+use wp_api::wp_com::reader_posts::{
+    ReaderListOwner, ReaderListSlug, ReaderSearchSort, ReaderTagSlug,
+};
 use wp_api::wp_com::reader_saved::{ReaderSavedKey, ReaderSavedSource};
 use wp_mobile::service::reader::{
     ReaderActionOutcome, ReaderError, ReaderService, ReaderStream, ReaderStreamCollection,
@@ -103,6 +105,75 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let items = check_stream(&stream).await?;
                     if items.len() as u64 != refreshed.post_count {
                         return Err("A refreshed tag stream should have only its first page".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::every_public_stream_signed_out", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
+                    let tag = |slug: &str| ReaderTagSlug(slug.to_string());
+                    let streams = [
+                        ReaderStream::FreshlyPressed,
+                        ReaderStream::Tags {
+                            slugs: vec![tag("photography"), tag("travel")],
+                        },
+                        ReaderStream::Search {
+                            query: "wordpress".to_string(),
+                            sort: ReaderSearchSort::Relevance,
+                        },
+                        ReaderStream::Search {
+                            query: "wordpress".to_string(),
+                            sort: ReaderSearchSort::Date,
+                        },
+                        ReaderStream::ReaderList {
+                            owner: ReaderListOwner("automattic".to_string()),
+                            slug: ReaderListSlug("a12s".to_string()),
+                        },
+                        ReaderStream::Discover { tags: vec![] },
+                        ReaderStream::Discover {
+                            tags: vec![tag("photography")],
+                        },
+                        ReaderStream::FirstPosts,
+                    ];
+                    for stream in streams {
+                        walk_two_pages(&service, stream).await?;
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::the_accounts_streams", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    // Any of these can be empty for an account, so only what loads is checked.
+                    for stream in [
+                        ReaderStream::Liked,
+                        ReaderStream::Automattic,
+                        ReaderStream::P2,
+                    ] {
+                        let collection = service.stream(stream.clone());
+                        let first = collection
+                            .refresh()
+                            .await
+                            .map_err(|e| format!("{stream:?}: {e}"))?;
+                        if first.has_more {
+                            collection
+                                .load_more()
+                                .await
+                                .map_err(|e| format!("{stream:?}: {e}"))?;
+                        }
+                        let items = check_stream(&collection).await.map_err(|e| {
+                            format!("{stream:?}: {}", e.message().unwrap_or_default())
+                        })?;
+                        check_newest_first(&items).map_err(|e| {
+                            format!("{stream:?}: {}", e.message().unwrap_or_default())
+                        })?;
                     }
                     Ok(())
                 })
@@ -271,6 +342,46 @@ fn signed_out(delegate: &WpApiClientDelegate) -> WpApiClientDelegate {
         auth_provider: Arc::new(WpAuthenticationProvider::none()),
         ..delegate.clone()
     }
+}
+
+/// Refreshes a stream, loads its next page if it has one, and checks what the cache then holds.
+async fn walk_two_pages(service: &ReaderService, stream: ReaderStream) -> Result<(), Failed> {
+    let collection = service.stream(stream.clone());
+    let first = collection
+        .refresh()
+        .await
+        .map_err(|e| format!("{stream:?}: {e}"))?;
+    if first.post_count == 0 {
+        return Err(format!("{stream:?} has no posts on its first page").into());
+    }
+    let mut expected = first.post_count;
+    if first.has_more {
+        let more = collection
+            .load_more()
+            .await
+            .map_err(|e| format!("{stream:?}: {e}"))?;
+        expected += more.new_post_count;
+    }
+    let items = check_stream(&collection)
+        .await
+        .map_err(|e| format!("{stream:?}: {}", e.message().unwrap_or_default()))?;
+    if items.len() as u64 != expected {
+        return Err(format!(
+            "{stream:?} has {} posts in the cache, and its pages had {expected}",
+            items.len()
+        )
+        .into());
+    }
+    // Every card says which post it follows, and that post is in the stream.
+    let cards = collection.load_cards().await.map_err(|e| e.to_string())?;
+    for card in &cards {
+        if let Some(after) = &card.after_post
+            && !items.iter().any(|item| &item.post.key == after)
+        {
+            return Err(format!("{stream:?} has a card after a post that isn't in it").into());
+        }
+    }
+    Ok(())
 }
 
 /// The stream's items, checked for a post in it twice and for gaps a page shouldn't have left.

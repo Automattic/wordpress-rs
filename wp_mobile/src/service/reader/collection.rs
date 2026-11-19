@@ -3,18 +3,16 @@
 //! A page is stored in one transaction, so a reader of the cache never sees half of one. How a
 //! page is merged depends on what orders the stream: see [`ReaderStreamOrdering`].
 
-use super::stream::{StreamCursor, StreamPage};
+use super::stream::{ReaderStreamCardKind, StreamCursor, StreamEntry, StreamPage};
 use super::{ReaderContext, ReaderError, ReaderStream, ReaderStreamOrdering};
 use futures::lock::Mutex as AsyncMutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use wp_api::date::WpGmtDateTime;
-use wp_api::wp_com::reader_saved::{
-    ReaderPostSaveIdentity, ReaderSavedKey, reader_saved_key_for_post,
-};
+use wp_api::wp_com::reader_saved::{ReaderSavedKey, reader_saved_key_for_post};
 use wp_mobile_cache::db_types::reader::{
-    DbReaderPageItem, DbReaderPageOutcome, DbReaderStream, ReaderPostRecord, reader_date_from_text,
-    reader_date_text,
+    DbReaderPageEntry, DbReaderPageItem, DbReaderPageOutcome, DbReaderStream, ReaderPostRecord,
+    reader_date_from_text, reader_date_text,
 };
 use wp_mobile_cache::list_metadata::ListState;
 use wp_mobile_cache::repository::QueryExecutor;
@@ -29,10 +27,11 @@ use wp_mobile_cache::{DbTable, RowId, SqliteDbError, UpdateHook};
 const MAX_DATED_POSTS: u64 = 500;
 
 /// The tables a stream is read from.
-const STREAM_TABLES: [DbTable; 6] = [
+const STREAM_TABLES: [DbTable; 7] = [
     DbTable::ReaderPosts,
     DbTable::ReaderStreams,
     DbTable::ReaderStreamItems,
+    DbTable::ReaderStreamCards,
     DbTable::ReaderUnreadablePosts,
     DbTable::ReaderBlockedSites,
     DbTable::ReaderBlockedUsers,
@@ -50,6 +49,16 @@ pub struct ReaderStreamItem {
     /// Posts may be missing between this one and the one above it: a refresh didn't reach the
     /// posts the stream already had. [`ReaderStreamCollection::fill_gap`] loads them.
     pub gap_before: bool,
+}
+
+/// A card in a stream that isn't a post, such as Discover's recommended sites.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct ReaderStreamCard {
+    pub card: ReaderStreamCardKind,
+    /// The key of the post the card comes after, among the posts
+    /// [`ReaderStreamCollection::load_items`] returns, or `None` if it comes before them all.
+    #[uniffi(default = None)]
+    pub after_post: Option<ReaderSavedKey>,
 }
 
 /// What loading a page of a stream did.
@@ -138,7 +147,7 @@ impl ReaderStreamCollection {
     /// The stream's posts from the cache, in the stream's order, without posts from a site or by a
     /// user the reader blocked.
     pub async fn load_items(&self) -> Result<Vec<ReaderStreamItem>, ReaderError> {
-        let dated = self.stream.order() == ReaderStreamOrdering::Date;
+        let dated = self.stream.ordering() == ReaderStreamOrdering::Date;
         let items = self.context.cache.execute(|connection| {
             let Some(stream) = self.select_stream(&*connection)? else {
                 return Ok(Vec::new());
@@ -157,6 +166,27 @@ impl ReaderStreamCollection {
                 })
             })
             .collect()
+    }
+
+    /// The stream's cards that aren't posts, from the cache, in the stream's order. Only a stream
+    /// of cards has any: [`ReaderStream::Discover`] and [`ReaderStream::FirstPosts`].
+    pub async fn load_cards(&self) -> Result<Vec<ReaderStreamCard>, ReaderError> {
+        let cards = self.context.cache.execute(|connection| {
+            let Some(stream) = self.select_stream(&*connection)? else {
+                return Ok(Vec::new());
+            };
+            ReaderStreamRepository::select_cards(&*connection, stream.row_id)
+        })?;
+        Ok(cards
+            .into_iter()
+            // A card a newer version stored that this one can't read is left out.
+            .filter_map(|card| {
+                Some(ReaderStreamCard {
+                    card: serde_json::from_str(&card.card).ok()?,
+                    after_post: card.after_post,
+                })
+            })
+            .collect())
     }
 
     /// Whether the stream is loading, and where it's up to.
@@ -242,7 +272,11 @@ impl ReaderStreamCollection {
         } else if stream.has_more == Some(false) {
             return Ok(self.nothing_loaded(&stream));
         } else {
-            match (self.stream.order(), last_sort_key, &stream.next_page_handle) {
+            match (
+                self.stream.ordering(),
+                last_sort_key,
+                &stream.next_page_handle,
+            ) {
                 (ReaderStreamOrdering::Date, Some(oldest), _) => Some(PageKind::Older {
                     before: reader_date_from_text(&oldest)?,
                 }),
@@ -437,7 +471,7 @@ impl ReaderStreamCollection {
         page: StreamPage,
     ) -> Result<ReaderStreamPageResult, SqliteDbError> {
         let owner = self.context.owner_row;
-        let order = self.stream.order();
+        let order = self.stream.ordering();
         self.context.cache.execute(|connection| {
             let transaction = connection.transaction()?;
             let stream = self.get_or_create_stream(&transaction)?;
@@ -452,13 +486,20 @@ impl ReaderStreamCollection {
 
             // What couldn't be read, by its IDs where they could be: the server's, then any post
             // this stream can't place.
-            let mut unreadable: Vec<(Option<ReaderPostSaveIdentity>, String)> = page
-                .unreadable
-                .into_iter()
-                .map(|post| (post.identity, post.error))
-                .collect();
+            let mut unreadable = page.unreadable;
+            // The page's posts, and its posts and cards in the order the server sent.
             let mut items = Vec::new();
-            for post in &page.posts {
+            let mut entries = Vec::new();
+            for entry in &page.entries {
+                let post = match entry {
+                    StreamEntry::Post(post) => post,
+                    StreamEntry::Card(card) => {
+                        let card = serde_json::to_string(card)
+                            .map_err(|error| SqliteDbError::SqliteError(error.to_string()))?;
+                        entries.push(DbReaderPageEntry::Card(card));
+                        continue;
+                    }
+                };
                 let Some(record) = ReaderPostRecord::from_reader_post(&post.post) else {
                     unreadable.push((None, "The post has no IDs to keep it by.".to_string()));
                     continue;
@@ -477,11 +518,13 @@ impl ReaderStreamCollection {
                 };
                 let row = ReaderPostRepository::upsert(&transaction, owner, &record)?;
                 ReaderUnreadablePostRepository::resolve(&transaction, stream.row_id, &record.key)?;
-                items.push(DbReaderPageItem {
+                let item = DbReaderPageItem {
                     post: row,
                     sort_key,
                     railcar: post.post.railcar.clone(),
-                });
+                };
+                entries.push(DbReaderPageEntry::Post(item.clone()));
+                items.push(item);
             }
 
             // The page may be older than something the reader turned on or off since.
@@ -574,12 +617,12 @@ impl ReaderStreamCollection {
                     (outcome, has_more, None)
                 }
                 (ReaderStreamOrdering::Server, PageKind::First) => (
-                    ReaderStreamRepository::replace_items(&transaction, stream.row_id, &items)?,
+                    ReaderStreamRepository::replace_entries(&transaction, stream.row_id, &entries)?,
                     Some(page.next_page_handle.is_some()),
                     page.next_page_handle,
                 ),
                 (ReaderStreamOrdering::Server, _) => (
-                    ReaderStreamRepository::append_items(&transaction, stream.row_id, &items)?,
+                    ReaderStreamRepository::append_entries(&transaction, stream.row_id, &entries)?,
                     Some(page.next_page_handle.is_some()),
                     page.next_page_handle,
                 ),
