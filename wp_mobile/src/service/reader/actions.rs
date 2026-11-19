@@ -18,22 +18,37 @@ use futures::lock::Mutex as AsyncMutex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
+use wp_api::comments::CommentId;
 use wp_api::posts::PostId;
-use wp_api::prelude::WpApiError;
+use wp_api::prelude::{WpApiError, WpErrorCode};
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_blocks::{ReaderBlockedSite, ReaderBlockedSitesParams};
+use wp_api::wp_com::reader_comments::{
+    ReaderCommentsNotificationsParams, ReaderSubscribeToCommentsParams,
+};
+use wp_api::wp_com::reader_posts::ReaderTagSlug;
 use wp_api::wp_com::reader_saved::{
-    ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedSource, reader_saved_key_for_post,
+    ReaderFeedId, ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedSource,
+    reader_saved_key_for_post,
 };
 use wp_api::wp_com::reader_seen::{
     ReaderSeenFeedItemsParams, ReaderSeenSitePostsParams, ReaderSeenSource,
 };
+use wp_api::wp_com::reader_subscriptions::{
+    ReaderFollowUrlParams, ReaderPostEmailSubscriptionParams, ReaderUnfollowUrlParams,
+};
+use wp_api::wp_com::reader_tags::ReaderFollowTagsParams;
 use wp_mobile_cache::db_types::reader::reader_saved_key_text;
 use wp_mobile_cache::repository::QueryExecutor;
 use wp_mobile_cache::repository::reader::{ReaderPostFlag, ReaderPostRepository};
 use wp_mobile_cache::repository::reader_actions::{
     DbReaderAction, DbReaderBlockedSite, ReaderActionRepository, ReaderBlockRepository,
+};
+use wp_mobile_cache::repository::reader_comments::ReaderCommentRepository;
+use wp_mobile_cache::repository::reader_sites::{
+    ReaderDeliverySetting, ReaderSiteRepository, ReaderSubscriptionRecord,
+    ReaderSubscriptionRepository,
 };
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
 use wp_mobile_cache::{RowId, SqliteDbError};
@@ -60,6 +75,84 @@ pub(crate) enum Action {
     Seen { post: ReaderPostSaveIdentity },
     /// A site is blocked, or not.
     BlockSite { site_id: WpComSiteId },
+    /// The user likes a post, or not.
+    LikePost { post: ReaderPostSaveIdentity },
+    /// The user follows a site or a feed, or not.
+    Follow {
+        site_id: Option<WpComSiteId>,
+        feed_id: Option<ReaderFeedId>,
+        /// The address to follow: the site's, or the feed's.
+        url: Option<String>,
+        name: Option<String>,
+    },
+    /// The user follows a tag, or not.
+    FollowTag {
+        slug: ReaderTagSlug,
+        title: Option<String>,
+    },
+    /// The user likes a comment, or not.
+    LikeComment {
+        site_id: WpComSiteId,
+        comment_id: CommentId,
+    },
+    /// A followed site's new posts, new comments or notifications are sent to the user, or not.
+    Delivery {
+        site_id: WpComSiteId,
+        setting: DeliverySetting,
+    },
+    /// The user is subscribed to a post's comments, or not.
+    SubscribeComments { post: ReaderPostSaveIdentity },
+    /// The user gets notifications for the comments of a post they're subscribed to, or not.
+    CommentNotifications { post: ReaderPostSaveIdentity },
+}
+
+/// A way a followed site's news reaches the user.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum DeliverySetting {
+    /// New posts are emailed.
+    PostEmails,
+    /// New comments are emailed.
+    CommentEmails,
+    /// New posts send a notification.
+    Notifications,
+}
+
+impl DeliverySetting {
+    fn column(self) -> ReaderDeliverySetting {
+        match self {
+            Self::PostEmails => ReaderDeliverySetting::EmailPosts,
+            Self::CommentEmails => ReaderDeliverySetting::EmailComments,
+            Self::Notifications => ReaderDeliverySetting::NotifyPosts,
+        }
+    }
+}
+
+/// What the server said when it took an action, where there's something to keep.
+#[derive(Debug, Default)]
+struct Confirmation {
+    /// How many likes the post or comment now has.
+    like_count: Option<u64>,
+    /// The subscription a follow made.
+    subscription: Option<ReaderSubscriptionRecord>,
+}
+
+/// The app, as the Reader's requests name it.
+fn source_name(source: ReaderSavedSource) -> &'static str {
+    match source {
+        ReaderSavedSource::Android => "reader-android",
+        ReaderSavedSource::Ios => "reader-ios",
+    }
+}
+
+/// Whether an error is the server saying the thing was already as asked, by one of `codes`. Such
+/// an answer to turning something off means it's off.
+fn says_already(error: &WpApiError, codes: &[&str]) -> bool {
+    matches!(
+        error,
+        WpApiError::WpError { error_code: WpErrorCode::CustomError(code), .. }
+            if codes.contains(&code.as_str())
+    )
 }
 
 impl Action {
@@ -69,6 +162,17 @@ impl Action {
         match self {
             Self::Seen { .. } => 1,
             Self::BlockSite { .. } => 2,
+            Self::LikePost { .. } => 3,
+            Self::Follow { .. } => 4,
+            Self::FollowTag { .. } => 5,
+            Self::LikeComment { .. } => 6,
+            Self::Delivery { setting, .. } => match setting {
+                DeliverySetting::PostEmails => 7,
+                DeliverySetting::CommentEmails => 8,
+                DeliverySetting::Notifications => 9,
+            },
+            Self::SubscribeComments { .. } => 10,
+            Self::CommentNotifications { .. } => 11,
         }
     }
 
@@ -76,9 +180,30 @@ impl Action {
     /// that say.
     fn target(&self) -> Option<String> {
         match self {
-            Self::Seen { post } => reader_saved_key_for_post(post.clone())
+            Self::Seen { post }
+            | Self::LikePost { post }
+            | Self::SubscribeComments { post }
+            | Self::CommentNotifications { post } => reader_saved_key_for_post(post.clone())
                 .map(|key| reader_saved_key_text(&key.normalized())),
-            Self::BlockSite { site_id } => Some(format!("site:{}", site_id.0)),
+            Self::BlockSite { site_id } | Self::Delivery { site_id, .. } => {
+                Some(format!("site:{}", site_id.0))
+            }
+            Self::Follow {
+                site_id,
+                feed_id,
+                url,
+                ..
+            } => match (site_id, feed_id, url) {
+                (Some(site), _, _) => Some(format!("site:{}", site.0)),
+                (None, Some(feed), _) => Some(format!("feed:{}", feed.0)),
+                (None, None, Some(url)) if !url.is_empty() => Some(format!("url:{url}")),
+                _ => None,
+            },
+            Self::FollowTag { slug, .. } => Some(format!("tag:{}", slug.0)),
+            Self::LikeComment {
+                site_id,
+                comment_id,
+            } => Some(format!("comment:{}:{}", site_id.0, comment_id.0)),
         }
     }
 
@@ -100,16 +225,53 @@ impl Action {
         executor: &impl QueryExecutor,
         owner: RowId,
     ) -> Result<Option<bool>, SqliteDbError> {
-        match self {
-            Self::Seen { post } => match Self::post_row(post, executor, owner)? {
-                Some(row) => {
-                    ReaderPostRepository::select_flag(executor, row, ReaderPostFlag::IsSeen)
-                }
+        let post_flag =
+            |post: &ReaderPostSaveIdentity, flag| match Self::post_row(post, executor, owner)? {
+                Some(row) => ReaderPostRepository::select_flag(executor, row, flag),
                 None => Ok(None),
-            },
+            };
+        match self {
+            Self::Seen { post } => post_flag(post, ReaderPostFlag::IsSeen),
+            Self::LikePost { post } => post_flag(post, ReaderPostFlag::ILike),
+            Self::SubscribeComments { post } => {
+                post_flag(post, ReaderPostFlag::IsSubscribedComments)
+            }
+            Self::CommentNotifications { post } => {
+                post_flag(post, ReaderPostFlag::ReceivesCommentNotifications)
+            }
             Self::BlockSite { site_id } => Ok(Some(ReaderBlockRepository::is_site_blocked(
                 executor, owner, *site_id,
             )?)),
+            Self::Follow {
+                site_id, feed_id, ..
+            } => {
+                // Followed if the subscriptions list it, or what's cached of the site says so.
+                let listed = ReaderSubscriptionRepository::is_following(
+                    executor, owner, *site_id, *feed_id,
+                )?;
+                let site_says = ReaderSiteRepository::select(executor, owner, *site_id, *feed_id)?
+                    .and_then(|site| site.is_following);
+                Ok(Some(listed || site_says == Some(true)))
+            }
+            Self::FollowTag { slug, .. } => {
+                Ok(Some(super::tags::is_tag_followed(executor, owner, slug)?))
+            }
+            Self::LikeComment {
+                site_id,
+                comment_id,
+            } => Ok(
+                ReaderCommentRepository::select_like(executor, owner, *site_id, *comment_id)?
+                    .and_then(|like| like.i_like),
+            ),
+            Self::Delivery { site_id, setting } => Ok(
+                ReaderSubscriptionRepository::select_for_site(executor, owner, *site_id)?.and_then(
+                    |subscription| match setting {
+                        DeliverySetting::PostEmails => subscription.email_posts,
+                        DeliverySetting::CommentEmails => subscription.email_comments,
+                        DeliverySetting::Notifications => subscription.notify_posts,
+                    },
+                ),
+            ),
         }
     }
 
@@ -124,6 +286,40 @@ impl Action {
             Self::Seen { post } => {
                 if let Some(row) = Self::post_row(post, executor, owner)? {
                     ReaderPostRepository::set_flag(executor, row, ReaderPostFlag::IsSeen, on)?;
+                }
+            }
+            Self::LikePost { post } => {
+                if let Some(row) = Self::post_row(post, executor, owner)? {
+                    ReaderPostRepository::set_liked(executor, row, on)?;
+                }
+            }
+            Self::SubscribeComments { post } => {
+                if let Some(row) = Self::post_row(post, executor, owner)? {
+                    ReaderPostRepository::set_flag(
+                        executor,
+                        row,
+                        ReaderPostFlag::IsSubscribedComments,
+                        on,
+                    )?;
+                    if !on {
+                        // Unsubscribing ends the notifications too.
+                        ReaderPostRepository::set_flag(
+                            executor,
+                            row,
+                            ReaderPostFlag::ReceivesCommentNotifications,
+                            false,
+                        )?;
+                    }
+                }
+            }
+            Self::CommentNotifications { post } => {
+                if let Some(row) = Self::post_row(post, executor, owner)? {
+                    ReaderPostRepository::set_flag(
+                        executor,
+                        row,
+                        ReaderPostFlag::ReceivesCommentNotifications,
+                        on,
+                    )?;
                 }
             }
             Self::BlockSite { site_id } => {
@@ -143,12 +339,137 @@ impl Action {
                     ReaderBlockRepository::unblock_site(executor, owner, *site_id)?;
                 }
             }
+            Self::Follow {
+                site_id,
+                feed_id,
+                url,
+                name,
+            } => {
+                ReaderPostRepository::set_following(executor, owner, *site_id, *feed_id, on)?;
+                ReaderSiteRepository::set_following(executor, owner, *site_id, *feed_id, on)?;
+                let following = ReaderSubscriptionRepository::is_following(
+                    executor, owner, *site_id, *feed_id,
+                )?;
+                if on && !following {
+                    // A stand-in until the server answers with the subscription it made.
+                    let site = ReaderSiteRepository::select(executor, owner, *site_id, *feed_id)?;
+                    let site = site.as_ref();
+                    ReaderSubscriptionRepository::add_first(
+                        executor,
+                        owner,
+                        &ReaderSubscriptionRecord {
+                            subscription_id: None,
+                            site_id: *site_id,
+                            feed_id: *feed_id,
+                            url: url.clone().or(site.and_then(|site| site.url.clone())),
+                            feed_url: site.and_then(|site| site.feed_url.clone()),
+                            name: name.clone().or(site.and_then(|site| site.name.clone())),
+                            icon_url: site.and_then(|site| site.icon_url.clone()),
+                            date_subscribed: None,
+                            unseen_count: None,
+                            organization_id: site.and_then(|site| site.organization_id),
+                            is_owner: None,
+                            is_rss: Some(site_id.is_none()),
+                            email_posts: None,
+                            email_comments: None,
+                            email_frequency: None,
+                            notify_posts: None,
+                        },
+                    )?;
+                } else if !on {
+                    ReaderSubscriptionRepository::remove(
+                        executor,
+                        owner,
+                        *site_id,
+                        *feed_id,
+                        url.as_deref(),
+                    )?;
+                }
+            }
+            Self::FollowTag { slug, title } => {
+                super::tags::show_tag_followed(executor, owner, slug, title.clone(), on)?;
+            }
+            Self::LikeComment {
+                site_id,
+                comment_id,
+            } => {
+                if let Some(like) =
+                    ReaderCommentRepository::select_like(executor, owner, *site_id, *comment_id)?
+                {
+                    // The count moves by one only when the like is a change.
+                    let like_count = match (like.i_like == Some(on), on) {
+                        (true, _) => like.like_count,
+                        (false, true) => Some(like.like_count.unwrap_or(0) + 1),
+                        (false, false) => Some(like.like_count.unwrap_or(0).saturating_sub(1)),
+                    };
+                    ReaderCommentRepository::set_like(
+                        executor,
+                        owner,
+                        *site_id,
+                        *comment_id,
+                        on,
+                        like_count,
+                    )?;
+                }
+            }
+            Self::Delivery { site_id, setting } => {
+                ReaderSubscriptionRepository::set_delivery(
+                    executor,
+                    owner,
+                    *site_id,
+                    setting.column(),
+                    on,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Keeps what the server said when it took the action.
+    fn confirm(
+        &self,
+        executor: &impl QueryExecutor,
+        owner: RowId,
+        on: bool,
+        confirmation: &Confirmation,
+    ) -> Result<(), SqliteDbError> {
+        match self {
+            Self::LikePost { post } => {
+                if let (Some(row), Some(like_count)) = (
+                    Self::post_row(post, executor, owner)?,
+                    confirmation.like_count,
+                ) {
+                    ReaderPostRepository::set_like_count(executor, row, like_count)?;
+                }
+            }
+            Self::LikeComment {
+                site_id,
+                comment_id,
+            } => {
+                if confirmation.like_count.is_some() {
+                    ReaderCommentRepository::set_like(
+                        executor,
+                        owner,
+                        *site_id,
+                        *comment_id,
+                        on,
+                        confirmation.like_count,
+                    )?;
+                }
+            }
+            Self::Follow { .. } => {
+                if let (true, Some(subscription)) = (on, &confirmation.subscription) {
+                    ReaderSubscriptionRepository::add_first(executor, owner, subscription)?;
+                }
+            }
+            _ => {}
         }
         Ok(())
     }
 
     /// Asks the server to turn it on or off.
-    async fn send(&self, context: &ReaderContext, on: bool) -> Result<(), WpApiError> {
+    async fn send(&self, context: &ReaderContext, on: bool) -> Result<Confirmation, ReaderError> {
+        let mut confirmation = Confirmation::default();
         match self {
             Self::Seen { post } => {
                 let source = match context.source {
@@ -170,7 +491,7 @@ impl Action {
                     }
                 } else {
                     let params = ReaderSeenSitePostsParams {
-                        blog_id: post.site_id.unwrap_or(WpComSiteId(0)),
+                        blog_id: post.site_id.ok_or(ReaderError::MissingIds)?,
                         post_ids: vec![PostId(post.id as i64)],
                         source,
                     };
@@ -190,8 +511,181 @@ impl Action {
                     blocks.unblock_site(site_id).await?;
                 }
             }
+            Self::LikePost { post } => {
+                // Only a post of a WordPress.com or Jetpack site can be liked.
+                let site_id = post
+                    .site_id
+                    .filter(|site| site.0 != 0 && !post.is_external)
+                    .ok_or(ReaderError::MissingIds)?;
+                let post_id = PostId(post.id as i64);
+                let likes = context.client.reader_likes();
+                confirmation.like_count = if on {
+                    likes.like_post(&site_id, &post_id).await?.data.like_count
+                } else {
+                    likes.unlike_post(&site_id, &post_id).await?.data.like_count
+                };
+            }
+            Self::Follow {
+                site_id,
+                feed_id,
+                url,
+                ..
+            } => {
+                let subscriptions = context.client.reader_subscriptions();
+                // The address comes with the action, or from what the cache has of the site.
+                let url = match url.clone().filter(|url| !url.is_empty()) {
+                    Some(url) => Some(url),
+                    None => context.cache.execute(|connection| {
+                        Ok::<_, SqliteDbError>(
+                            ReaderSiteRepository::select(
+                                &*connection,
+                                context.owner_row,
+                                *site_id,
+                                *feed_id,
+                            )?
+                            .and_then(|site| site.url.or(site.feed_url)),
+                        )
+                    })?,
+                };
+                if on {
+                    let params = ReaderFollowUrlParams {
+                        url: url.ok_or(ReaderError::MissingIds)?,
+                        source: Some(source_name(context.source).to_string()),
+                    };
+                    let answer = subscriptions.follow_url(&params).await?.data;
+                    if !answer.subscribed {
+                        // The API answers 200 for an address it can't follow.
+                        return Err(ReaderError::Refused {
+                            reason: answer
+                                .info
+                                .unwrap_or_else(|| "The address can't be followed.".to_string()),
+                        });
+                    }
+                    confirmation.subscription = answer
+                        .subscription
+                        .as_ref()
+                        .map(super::sites::subscription_record);
+                } else {
+                    // Unfollowing something that isn't followed is refused, and leaves it unfollowed.
+                    let result = match site_id {
+                        Some(site_id) => subscriptions.unfollow_site(site_id).await.map(|_| ()),
+                        None => {
+                            let params = ReaderUnfollowUrlParams {
+                                sub_id: None,
+                                url: Some(url.ok_or(ReaderError::MissingIds)?),
+                                blog_id: None,
+                                email_id: None,
+                            };
+                            subscriptions.unfollow_url(&params).await.map(|_| ())
+                        }
+                    };
+                    match result {
+                        Err(error) if !says_already(&error, &["are_not_subscribed"]) => {
+                            return Err(error.into());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Self::FollowTag { slug, .. } => {
+                let tags = context.client.reader_tags();
+                if on {
+                    tags.follow_tags(&ReaderFollowTagsParams {
+                        tags: vec![slug.clone()],
+                    })
+                    .await?;
+                } else {
+                    // Unfollowing a tag that isn't followed is refused, and leaves it unfollowed.
+                    match tags.unfollow_tag(slug).await {
+                        Err(error) if !says_already(&error, &["not_subscribed"]) => {
+                            return Err(error.into());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Self::LikeComment {
+                site_id,
+                comment_id,
+            } => {
+                let likes = context.client.reader_likes();
+                confirmation.like_count = if on {
+                    likes
+                        .like_comment(site_id, comment_id)
+                        .await?
+                        .data
+                        .like_count
+                } else {
+                    likes
+                        .unlike_comment(site_id, comment_id)
+                        .await?
+                        .data
+                        .like_count
+                };
+            }
+            Self::Delivery { site_id, setting } => {
+                let subscriptions = context.client.reader_subscriptions();
+                match (setting, on) {
+                    (DeliverySetting::PostEmails, true) => {
+                        let params = ReaderPostEmailSubscriptionParams::default();
+                        subscriptions
+                            .subscribe_to_post_emails(site_id, &params)
+                            .await?;
+                    }
+                    (DeliverySetting::PostEmails, false) => {
+                        let params = ReaderPostEmailSubscriptionParams::default();
+                        subscriptions
+                            .unsubscribe_from_post_emails(site_id, &params)
+                            .await?;
+                    }
+                    (DeliverySetting::CommentEmails, true) => {
+                        subscriptions.subscribe_to_comment_emails(site_id).await?;
+                    }
+                    (DeliverySetting::CommentEmails, false) => {
+                        subscriptions
+                            .unsubscribe_from_comment_emails(site_id)
+                            .await?;
+                    }
+                    (DeliverySetting::Notifications, true) => {
+                        subscriptions.subscribe_to_notifications(site_id).await?;
+                    }
+                    (DeliverySetting::Notifications, false) => {
+                        subscriptions
+                            .unsubscribe_from_notifications(site_id)
+                            .await?;
+                    }
+                }
+            }
+            Self::SubscribeComments { post } | Self::CommentNotifications { post } => {
+                // Only a post of a WordPress.com or Jetpack site has comments to subscribe to.
+                let site_id = post
+                    .site_id
+                    .filter(|site| site.0 != 0 && !post.is_external)
+                    .ok_or(ReaderError::MissingIds)?;
+                let post_id = PostId(post.id as i64);
+                let comments = context.client.reader_comments();
+                match (self, on) {
+                    (Self::SubscribeComments { .. }, true) => {
+                        let params = ReaderSubscribeToCommentsParams {
+                            receive_notifications: None,
+                        };
+                        comments.subscribe(&site_id, &post_id, &params).await?;
+                    }
+                    (Self::SubscribeComments { .. }, false) => {
+                        comments.unsubscribe(&site_id, &post_id).await?;
+                    }
+                    _ => {
+                        let params = ReaderCommentsNotificationsParams {
+                            receive_notifications: on,
+                        };
+                        comments
+                            .update_subscription(&site_id, &post_id, &params)
+                            .await?;
+                    }
+                }
+            }
         }
-        Ok(())
+        Ok(confirmation)
     }
 }
 
@@ -221,7 +715,7 @@ pub(crate) struct ActionQueue {
     waiting: Mutex<HashMap<Target, usize>>,
     /// Why the server refused a target a tap is waiting on, until the tap takes it. The call that
     /// sends a row isn't always its tap's: whichever call holds the lane sends every row.
-    refusals: Mutex<HashMap<Target, WpApiError>>,
+    refusals: Mutex<HashMap<Target, ReaderError>>,
 }
 
 /// Marks a target a tap waits on, while it waits, so a refusal is kept for it. Dropping it,
@@ -310,7 +804,7 @@ impl ReaderContext {
             .expect("refusals lock poisoned")
             .remove(&target)
         {
-            return Err(ReaderError::Api(error));
+            return Err(error);
         }
         let row = self.cache.execute(|connection| {
             ReaderActionRepository::select(connection, self.owner_row, target.0, &target.1)
@@ -356,9 +850,9 @@ impl ReaderContext {
             };
 
             match action.send(self, row.wanted).await {
-                Ok(()) => self.action_answered(&row, &action, None)?,
+                Ok(confirmation) => self.action_answered(&row, &action, Ok(confirmation))?,
                 Err(error) if is_refused(&error) => {
-                    self.action_answered(&row, &action, Some(error))?
+                    self.action_answered(&row, &action, Err(error))?
                 }
                 Err(error) => {
                     let message = error.to_string();
@@ -371,37 +865,41 @@ impl ReaderContext {
         }
     }
 
-    /// Records the server's answer to a row: it agreed, or refused with `refusal`.
+    /// Records the server's answer to a row: it took it, or refused it.
     fn action_answered(
         &self,
         row: &DbReaderAction,
         action: &Action,
-        refusal: Option<WpApiError>,
+        answer: Result<Confirmation, ReaderError>,
     ) -> Result<(), SqliteDbError> {
         let target = (row.kind, row.target.clone());
         let finished = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
             let finished = ReaderActionRepository::finish(&transaction, row.row_id, row.seq)?;
-            match (&refusal, finished) {
+            match (&answer, finished) {
+                // Taken, with no tap since: the row is done, and what the server said is kept.
+                (Ok(confirmation), true) => {
+                    action.confirm(&transaction, self.owner_row, row.wanted, confirmation)?;
+                }
+                // Taken, and the user tapped again since: the server now has what was sent,
+                // which is what the newer tap goes back to if it's refused.
+                (Ok(_), false) => {
+                    ReaderActionRepository::set_was(&transaction, row.row_id, row.wanted)?;
+                }
                 // Refused, with no tap since: the cache goes back to what it showed before.
-                (Some(_), true) => {
+                (Err(_), true) => {
                     if let Some(was) = row.was {
                         action.show(&transaction, self.owner_row, was)?;
                     }
                 }
-                // Agreed, and the user tapped again since: the server now has what was sent,
-                // which is what the newer tap goes back to if it's refused.
-                (None, false) => {
-                    ReaderActionRepository::set_was(&transaction, row.row_id, row.wanted)?;
-                }
-                // Agreed with no tap since, so the row is done. Or refused with a tap since,
-                // which is newer than what was refused, and is sent next.
-                (None, true) | (Some(_), false) => {}
+                // Refused, with a tap since, which is newer than what was refused and is sent
+                // next.
+                (Err(_), false) => {}
             }
             transaction.commit()?;
             Ok::<_, SqliteDbError>(finished)
         })?;
-        if let (Some(error), true) = (refusal, finished) {
+        if let (Err(error), true) = (answer, finished) {
             let is_waited_on = self
                 .actions
                 .waiting
@@ -424,16 +922,18 @@ impl ReaderContext {
 
 /// Whether the server refused a request for good, rather than it failing on the way or for now.
 /// A request timeout and a rate limit pass, so their rows are sent again later. Any other answer
-/// in the 400s won't change by asking again.
-fn is_refused(error: &WpApiError) -> bool {
+/// in the 400s won't change by asking again, and nor will an action that's missing what it needs
+/// to be sent.
+fn is_refused(error: &ReaderError) -> bool {
     /// Request timeout, too many requests.
     const TEMPORARY: [u32; 2] = [408, 429];
     match error {
-        WpApiError::WpError { status_code, .. }
-        | WpApiError::InvalidHttpStatusCode { status_code, .. }
-        | WpApiError::UnknownError { status_code, .. } => {
-            (400..500).contains(status_code) && !TEMPORARY.contains(status_code)
-        }
+        ReaderError::Api(
+            WpApiError::WpError { status_code, .. }
+            | WpApiError::InvalidHttpStatusCode { status_code, .. }
+            | WpApiError::UnknownError { status_code, .. },
+        ) => (400..500).contains(status_code) && !TEMPORARY.contains(status_code),
+        ReaderError::Refused { .. } | ReaderError::MissingIds => true,
         _ => false,
     }
 }
@@ -577,5 +1077,258 @@ impl ReaderService {
         Ok(self.context.cache.execute(|connection| {
             ReaderActionRepository::count(connection, self.context.owner_row)
         })?)
+    }
+}
+
+/// A site or feed to follow or unfollow. Give every ID the caller has: a site's ID, its feed's ID,
+/// or both.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct ReaderFollowTarget {
+    /// The site's ID, for a WordPress.com or Jetpack site.
+    #[uniffi(default = None)]
+    pub site_id: Option<WpComSiteId>,
+    /// The feed's ID.
+    #[uniffi(default = None)]
+    pub feed_id: Option<ReaderFeedId>,
+    /// The address to follow: the site's, or the feed's. Without it, the address the cache has
+    /// for the site or feed is used, and a follow of one the cache doesn't know is refused.
+    #[uniffi(default = None)]
+    pub url: Option<String>,
+    /// The site's or feed's name, to show in the list of subscriptions until the server answers.
+    #[uniffi(default = None)]
+    pub name: Option<String>,
+}
+
+/// What becomes of something a signed-out reader turned on or off: it stays on this device.
+fn kept_on_this_device() -> ReaderActionOutcome {
+    ReaderActionOutcome::Pending {
+        reason: "It's kept on this device until you sign in to WordPress.com.".to_string(),
+    }
+}
+
+#[uniffi::export]
+impl ReaderService {
+    /// Likes or unlikes a post. The post's like count moves with it, straight away, and is set to
+    /// the server's once it answers. Needs an account. Only a post of a WordPress.com or Jetpack
+    /// site can be liked.
+    pub async fn set_post_liked(
+        &self,
+        post: ReaderPostSaveIdentity,
+        liked: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        self.context
+            .set_action(Action::LikePost { post }, liked)
+            .await
+    }
+
+    /// Follows or unfollows a site or a feed. Every cached post of it, what's cached of the site,
+    /// and the list of subscriptions show it straight away. Needs an account.
+    ///
+    /// A follow is sent by the site's or feed's address, and an unfollow by the site's ID when
+    /// there is one.
+    pub async fn set_followed(
+        &self,
+        target: ReaderFollowTarget,
+        followed: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        let action = Action::Follow {
+            site_id: target.site_id.filter(|site| site.0 != 0),
+            feed_id: target.feed_id.filter(|feed| feed.0 != 0),
+            url: target.url,
+            name: target.name,
+        };
+        self.context.set_action(action, followed).await
+    }
+
+    /// Follows or unfollows a tag. `title` is the tag's name, to show with it. It shows in
+    /// [`Self::followed_tags`] straight away.
+    ///
+    /// Signed out, the tag is followed on this device only, and nothing is sent:
+    /// [`Self::adopt_signed_out_tags`] takes such tags over after sign-in.
+    pub async fn set_tag_followed(
+        &self,
+        slug: ReaderTagSlug,
+        title: Option<String>,
+        followed: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        let context = &self.context;
+        if context.owner == ReaderOwner::SignedOut {
+            context.cache.execute(|connection| {
+                super::tags::show_tag_followed(
+                    &*connection,
+                    context.owner_row,
+                    &slug,
+                    title,
+                    followed,
+                )
+            })?;
+            return Ok(kept_on_this_device());
+        }
+        context
+            .set_action(Action::FollowTag { slug, title }, followed)
+            .await
+    }
+
+    /// Follows, for this account, the tags that were followed on this device while nobody was
+    /// signed in, and empties the signed-out reader's list. Call it after sign-in, on the
+    /// account's service. Returns how many tags it took over. A tag the account already follows
+    /// stays followed.
+    pub async fn adopt_signed_out_tags(&self) -> Result<u64, ReaderError> {
+        use wp_api::wp_com::reader_tags::ReaderMenuSection;
+        use wp_mobile_cache::repository::reader_sites::ReaderMenuRepository;
+        use wp_mobile_cache::repository::wordpress_com_accounts::WordPressComAccountRepository;
+
+        let context = &self.context;
+        if context.owner == ReaderOwner::SignedOut {
+            return Ok(0);
+        }
+        let tags = context.cache.execute(|connection| {
+            let Some(signed_out) =
+                WordPressComAccountRepository::select_owner(&*connection, ReaderOwner::SignedOut)?
+            else {
+                return Ok::<_, SqliteDbError>(Vec::new());
+            };
+            let tags = ReaderMenuRepository::select_section(
+                &*connection,
+                signed_out,
+                ReaderMenuSection::Subscribed,
+            )?;
+            // They're the account's now.
+            ReaderMenuRepository::replace_section(
+                &*connection,
+                signed_out,
+                ReaderMenuSection::Subscribed,
+                &[],
+            )?;
+            Ok(tags)
+        })?;
+        let mut adopted = 0;
+        for tag in tags {
+            let slug = ReaderTagSlug(tag.slug.unwrap_or(tag.key));
+            // A follow that can't be sent now waits, as any other does.
+            self.set_tag_followed(slug, tag.title, true).await?;
+            adopted += 1;
+        }
+        Ok(adopted)
+    }
+
+    /// Likes or unlikes a comment. Needs an account.
+    pub async fn set_comment_liked(
+        &self,
+        site_id: WpComSiteId,
+        comment_id: CommentId,
+        liked: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        self.context
+            .set_action(
+                Action::LikeComment {
+                    site_id,
+                    comment_id,
+                },
+                liked,
+            )
+            .await
+    }
+
+    /// Subscribes the user to a post's comments, or unsubscribes them. Unsubscribing ends the
+    /// post's comment notifications too. Needs an account, and a post of a WordPress.com or
+    /// Jetpack site.
+    pub async fn set_comments_subscribed(
+        &self,
+        post: ReaderPostSaveIdentity,
+        subscribed: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        self.context
+            .set_action(Action::SubscribeComments { post }, subscribed)
+            .await
+    }
+
+    /// Turns notifications for the comments of a post the user is subscribed to on or off. Needs
+    /// an account.
+    pub async fn set_comment_notifications(
+        &self,
+        post: ReaderPostSaveIdentity,
+        enabled: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        self.context
+            .set_action(Action::CommentNotifications { post }, enabled)
+            .await
+    }
+
+    /// Turns emails for a followed site's new posts on or off. Needs an account.
+    pub async fn set_post_emails(
+        &self,
+        site_id: WpComSiteId,
+        enabled: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        self.set_delivery(site_id, DeliverySetting::PostEmails, enabled)
+            .await
+    }
+
+    /// Turns emails for a followed site's new comments on or off. Needs an account.
+    pub async fn set_comment_emails(
+        &self,
+        site_id: WpComSiteId,
+        enabled: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        self.set_delivery(site_id, DeliverySetting::CommentEmails, enabled)
+            .await
+    }
+
+    /// Turns notifications for a followed site's new posts on or off. Needs an account.
+    pub async fn set_post_notifications(
+        &self,
+        site_id: WpComSiteId,
+        enabled: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        self.set_delivery(site_id, DeliverySetting::Notifications, enabled)
+            .await
+    }
+
+    /// Sets how often a followed site's new posts are emailed. Unlike the on/off settings, this
+    /// one isn't kept to send later: it returns the error if it can't be sent now. Needs an
+    /// account.
+    pub async fn set_post_email_frequency(
+        &self,
+        site_id: WpComSiteId,
+        frequency: wp_api::wp_com::reader_subscriptions::ReaderSubscriptionEmailFrequency,
+    ) -> Result<(), ReaderError> {
+        use wp_api::wp_com::reader_subscriptions::ReaderPostEmailFrequencyParams;
+
+        let context = &self.context;
+        if context.owner == ReaderOwner::SignedOut {
+            return Err(ReaderError::NeedsAccount);
+        }
+        let params = ReaderPostEmailFrequencyParams {
+            delivery_frequency: frequency.clone(),
+            track_source: None,
+        };
+        context
+            .client
+            .reader_subscriptions()
+            .update_post_emails(&site_id, &params)
+            .await?;
+        context.cache.execute(|connection| {
+            ReaderSubscriptionRepository::set_email_frequency(
+                connection,
+                context.owner_row,
+                site_id,
+                &frequency,
+            )
+        })?;
+        Ok(())
+    }
+}
+
+impl ReaderService {
+    async fn set_delivery(
+        &self,
+        site_id: WpComSiteId,
+        setting: DeliverySetting,
+        enabled: bool,
+    ) -> Result<ReaderActionOutcome, ReaderError> {
+        self.context
+            .set_action(Action::Delivery { site_id, setting }, enabled)
+            .await
     }
 }

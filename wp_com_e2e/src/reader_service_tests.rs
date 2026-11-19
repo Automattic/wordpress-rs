@@ -12,8 +12,8 @@ use wp_api::wp_com::reader_posts::{
 };
 use wp_api::wp_com::reader_saved::{ReaderSavedKey, ReaderSavedSource};
 use wp_mobile::service::reader::{
-    ReaderActionOutcome, ReaderError, ReaderService, ReaderStream, ReaderStreamCollection,
-    ReaderStreamItem,
+    ReaderActionOutcome, ReaderError, ReaderFollowTarget, ReaderService, ReaderStream,
+    ReaderStreamCollection, ReaderStreamItem,
 };
 use wp_mobile_cache::WpApiCache;
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
@@ -317,6 +317,195 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         .map_err(|e| e.to_string())?;
                     if is_blocked(&service)? {
                         return Err("The site should be unblocked again".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::menu_sites_subscriptions_and_comments", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // Signed out: the menu's default streams and recommended tags, a site's info,
+                    // and a post's comments.
+                    let signed_out =
+                        new_service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
+                    signed_out.refresh_menu().await.map_err(|e| e.to_string())?;
+                    let menu = signed_out.menu().map_err(|e| e.to_string())?;
+                    if menu.items.is_empty() || menu.recommended_tags.is_empty() {
+                        return Err("Signed out, the menu should have streams and tags".into());
+                    }
+                    if !menu.followed_tags.is_empty() {
+                        return Err("A new signed-out reader follows no tags".into());
+                    }
+                    let site = signed_out
+                        .fetch_site(SITE)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if site.name.is_none() || site.url.is_none() {
+                        return Err("A site should have its name and address".into());
+                    }
+                    let cached = signed_out
+                        .cached_site(Some(SITE), None)
+                        .map_err(|e| e.to_string())?;
+                    if cached != Some(site) {
+                        return Err("The fetched site should be what the cache has".into());
+                    }
+                    if signed_out
+                        .interests()
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .is_empty()
+                    {
+                        return Err("There should be interests to pick from".into());
+                    }
+
+                    // A post of the site that has comments.
+                    let stream = signed_out.stream(ReaderStream::Site { site_id: SITE });
+                    stream.refresh().await.map_err(|e| e.to_string())?;
+                    let items = stream.load_items().await.map_err(|e| e.to_string())?;
+                    let commented = items
+                        .iter()
+                        .find(|item| item.post.comment_count.unwrap_or(0) > 0)
+                        .ok_or("None of the site's newest posts has comments")?;
+                    let comments =
+                        signed_out.comments(SITE, PostId(commented.post.identity.id as i64));
+                    let page = comments.refresh().await.map_err(|e| e.to_string())?;
+                    let loaded = comments.load_items().await.map_err(|e| e.to_string())?;
+                    if page.comment_count == 0 || loaded.len() as u64 != page.comment_count {
+                        return Err("The post's comments should be in the cache".into());
+                    }
+                    if loaded.iter().any(|comment| comment.comment_id.is_none()) {
+                        return Err("A comment from the server has its ID".into());
+                    }
+                    if loaded
+                        .windows(2)
+                        .any(|pair| match (pair[0].date, pair[1].date) {
+                            (Some(first), Some(second)) => first.0 > second.0,
+                            _ => false,
+                        })
+                    {
+                        return Err("Comments should be listed oldest first".into());
+                    }
+
+                    // Signed in: the menu with the account's tags, and its subscriptions.
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    service.refresh_menu().await.map_err(|e| e.to_string())?;
+                    let menu = service.menu().map_err(|e| e.to_string())?;
+                    if !menu.items.iter().any(|item| item.key == "following") {
+                        return Err("Signed in, the menu should have the Following stream".into());
+                    }
+                    let count = service
+                        .refresh_subscriptions()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let subscriptions = service.subscriptions().map_err(|e| e.to_string())?;
+                    if subscriptions.len() as u64 != count {
+                        return Err("The subscriptions should be in the cache".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::a_tag_follow_is_sent_and_put_back", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let slug = ReaderTagSlug("knitting".to_string());
+                    let follows = |service: &ReaderService| {
+                        service
+                            .followed_tags()
+                            .map(|tags| {
+                                tags.iter()
+                                    .any(|tag| tag.slug.as_deref() == Some("knitting"))
+                            })
+                            .map_err(|e| Failed::from(e.to_string()))
+                    };
+                    service.refresh_menu().await.map_err(|e| e.to_string())?;
+                    let was = follows(&service)?;
+
+                    let changed = service.set_tag_followed(slug.clone(), None, !was).await;
+                    // What the server has, read by a service with a cache of its own.
+                    let other = new_service(ctx.delegate.clone(), account())?;
+                    let fetched = match other.refresh_menu().await {
+                        Ok(()) => follows(&other),
+                        Err(error) => Err(error.to_string().into()),
+                    };
+                    // Whatever happened, the tag ends as it was.
+                    let restored = service
+                        .set_tag_followed(slug, None, was)
+                        .await
+                        .map_err(|e| e.to_string())?;
+
+                    if changed.map_err(|e| e.to_string())? != ReaderActionOutcome::Synced
+                        || restored != ReaderActionOutcome::Synced
+                    {
+                        return Err("The tag follow should reach the server".into());
+                    }
+                    if fetched? == was {
+                        return Err("The server's menu should show the change".into());
+                    }
+                    service.refresh_menu().await.map_err(|e| e.to_string())?;
+                    if follows(&service)? != was {
+                        return Err("The tag should be back as it was".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::a_follow_is_sent_and_put_back", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let site_id = ctx.site_id;
+                    let site = service
+                        .fetch_site(site_id)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let was = site.is_following == Some(true);
+                    let target = ReaderFollowTarget {
+                        site_id: Some(site_id),
+                        feed_id: site.feed_id,
+                        url: site.url.clone(),
+                        name: site.name.clone(),
+                    };
+                    let follows = |service: &ReaderService| {
+                        service
+                            .subscriptions()
+                            .map(|all| all.iter().any(|one| one.site_id == Some(site_id)))
+                            .map_err(|e| Failed::from(e.to_string()))
+                    };
+
+                    let changed = service.set_followed(target.clone(), !was).await;
+                    let shown = follows(&service);
+                    // What the server has, read by a service with a cache of its own.
+                    let other = new_service(ctx.delegate.clone(), account())?;
+                    let fetched = match other.refresh_subscriptions().await {
+                        Ok(_) => follows(&other),
+                        Err(error) => Err(error.to_string().into()),
+                    };
+                    // Whatever happened, the site ends as it was.
+                    let restored = service
+                        .set_followed(target, was)
+                        .await
+                        .map_err(|e| e.to_string())?;
+
+                    if changed.map_err(|e| e.to_string())? != ReaderActionOutcome::Synced
+                        || restored != ReaderActionOutcome::Synced
+                    {
+                        return Err("The follow should reach the server".into());
+                    }
+                    if shown? == was || fetched? == was {
+                        return Err("The cache and the server should both show the change".into());
+                    }
+                    service
+                        .refresh_subscriptions()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if follows(&service)? != was {
+                        return Err("The site should be back as it was".into());
                     }
                     Ok(())
                 })

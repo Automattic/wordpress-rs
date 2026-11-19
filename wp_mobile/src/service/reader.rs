@@ -20,20 +20,25 @@ use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 
 mod actions;
 mod collection;
+mod comments;
 mod page_views;
 mod posts;
+mod sites;
 mod stream;
+mod tags;
 
-pub use actions::ReaderActionOutcome;
+pub use actions::{ReaderActionOutcome, ReaderFollowTarget};
 pub use collection::{
     ReaderStreamCard, ReaderStreamCollection, ReaderStreamInfo, ReaderStreamItem,
     ReaderStreamPageResult,
 };
+pub use comments::{ReaderCommentsCollection, ReaderCommentsInfo, ReaderCommentsPageResult};
 pub use page_views::ReaderPageViewOutcome;
 pub use stream::{
     ReaderStream, ReaderStreamCardKind, ReaderStreamCardSite, ReaderStreamCardTag,
     ReaderStreamOrdering, reader_stream_needs_account, reader_stream_ordering,
 };
+pub use tags::ReaderCachedMenu;
 
 use super::reader_saved::ReaderSavedService;
 use actions::ActionQueue;
@@ -64,9 +69,14 @@ pub enum ReaderError {
     #[error("That post isn't in this stream.")]
     PostNotInStream,
 
-    /// The post doesn't have the IDs the API needs for this.
-    #[error("This post is missing the IDs this needs.")]
+    /// What was passed doesn't have the IDs or the address the API needs for this.
+    #[error("This is missing the IDs or the address it needs.")]
     MissingIds,
+
+    /// The server answered, and didn't do what was asked, such as following an address that has
+    /// no feed. `reason` is what it said.
+    #[error("The server didn't accept it: {reason}")]
+    Refused { reason: String },
 
     #[error("{0}")]
     Database(SqliteDbError),

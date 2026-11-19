@@ -1,7 +1,10 @@
 //! One post at a time: fetched by its IDs, by its slug or by its address, and kept in the cache.
 
 use super::{ReaderContext, ReaderError, ReaderService};
+use wp_api::comments::CommentId;
 use wp_api::posts::PostId;
+use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::reader_likes::{ReaderLikesParams, ReaderLikesResponse};
 use wp_api::wp_com::reader_post::{
     ReaderPostBySlugParams, ReaderPostParams, ReaderPostSlug, ReaderResolveUrlParams,
 };
@@ -130,5 +133,40 @@ impl ReaderService {
             url: Some(url),
         })
         .await
+    }
+
+    /// The users who liked a post, newest like first, a page at a time. Pass the default `params`
+    /// for the first page, and the previous page's `next_page_params` for the next. A public
+    /// site's needs no account. Not cached.
+    pub async fn post_likes(
+        &self,
+        site_id: WpComSiteId,
+        post_id: PostId,
+        params: ReaderLikesParams,
+    ) -> Result<ReaderLikesResponse, ReaderError> {
+        Ok(self
+            .context
+            .client
+            .reader_likes()
+            .post_likes(&site_id, &post_id, &params)
+            .await?
+            .data)
+    }
+
+    /// The users who liked a comment, newest like first, a page at a time, as
+    /// [`Self::post_likes`]. Not cached.
+    pub async fn comment_likes(
+        &self,
+        site_id: WpComSiteId,
+        comment_id: CommentId,
+        params: ReaderLikesParams,
+    ) -> Result<ReaderLikesResponse, ReaderError> {
+        Ok(self
+            .context
+            .client
+            .reader_likes()
+            .comment_likes(&site_id, &comment_id, &params)
+            .await?
+            .data)
     }
 }

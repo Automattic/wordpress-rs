@@ -10,6 +10,7 @@ use wp_api::wp_com::reader_posts::{
     ReaderListOwner, ReaderListSlug, ReaderSearchSort, ReaderTagSlug,
 };
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderSavedKey, ReaderSavedSource};
+use wp_mobile_cache::db_types::reader::ReaderPostRecord;
 use wp_mobile_cache::list_metadata::ListState;
 use wp_mobile_cache::repository::reader::ReaderUnreadablePostRepository;
 
@@ -1788,5 +1789,1228 @@ mod posts {
 
         assert_eq!(shown(&stream).await, ["3", "2", "1"]);
         assert_eq!(stream.info().unwrap().unreadable_post_count, 0);
+    }
+}
+
+mod menu_and_sites {
+    use super::*;
+    use wp_api::wp_com::reader_tags::ReaderMenuItemKind;
+
+    fn fixture(json: &str) -> Value {
+        serde_json::from_str(json).expect("the fixture is JSON")
+    }
+
+    fn menu() -> Value {
+        fixture(include_str!(
+            "../../../../wp_api/tests/wpcom/reader_tags/menu.json"
+        ))
+    }
+
+    fn signed_out_menu() -> Value {
+        fixture(include_str!(
+            "../../../../wp_api/tests/wpcom/reader_tags/menu_signed_out.json"
+        ))
+    }
+
+    #[tokio::test]
+    async fn the_menu_is_fetched_and_kept() {
+        let (service, executor) = service();
+        assert!(service.menu().unwrap().items.is_empty());
+        executor.push(Step::Respond(200, menu()));
+
+        service.refresh_menu().await.unwrap();
+
+        let cached = service.menu().unwrap();
+        // The scripted answer is sent with its keys sorted, so the order here is by key. The cache
+        // keeps whatever order the answer has.
+        let keys: Vec<_> = cached.items.iter().map(|item| item.key.as_str()).collect();
+        assert_eq!(
+            keys,
+            [
+                "a8c",
+                "discover",
+                "following",
+                "liked",
+                "list-example-list",
+                "p2"
+            ]
+        );
+        assert_eq!(cached.items[0].kind, ReaderMenuItemKind::Organization);
+        assert_eq!(cached.followed_tags.len(), 2);
+        assert_eq!(cached.recommended_tags.len(), 3);
+        assert_eq!(service.followed_tags().unwrap(), cached.followed_tags);
+        assert_eq!(
+            executor.sent()[0].url,
+            "https://public-api.wordpress.com/rest/v1.3/read/menu"
+        );
+
+        // A second service on the same cache has it without asking.
+        assert_eq!(service.menu().unwrap(), cached);
+    }
+
+    #[tokio::test]
+    async fn signed_out_the_menu_has_the_default_streams_and_recommended_tags() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(Step::Respond(200, signed_out_menu()));
+
+        service.refresh_menu().await.unwrap();
+
+        let cached = service.menu().unwrap();
+        assert_eq!(cached.items.len(), 1);
+        assert_eq!(cached.items[0].key, "discover");
+        assert!(cached.followed_tags.is_empty());
+        assert!(!cached.recommended_tags.is_empty());
+    }
+
+    #[tokio::test]
+    async fn interests_and_a_tags_info_are_fetched_on_request() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(Step::Respond(
+            200,
+            fixture(include_str!(
+                "../../../../wp_api/tests/wpcom/reader_tags/interests.json"
+            )),
+        ));
+        executor.push(Step::Respond(
+            200,
+            fixture(include_str!(
+                "../../../../wp_api/tests/wpcom/reader_tags/tag.json"
+            )),
+        ));
+
+        let interests = service.interests().await.unwrap();
+        let tag = service
+            .tag_info(ReaderTagSlug("photography".to_string()))
+            .await
+            .unwrap();
+
+        assert!(!interests.is_empty());
+        assert!(tag.title.is_some());
+        let sent = executor.sent();
+        assert!(sent[0].url.ends_with("/wpcom/v2/read/interests"));
+        assert!(sent[1].url.ends_with("/rest/v1.2/read/tags/photography"));
+    }
+
+    #[tokio::test]
+    async fn a_site_is_fetched_and_kept() {
+        let (service, executor) = service();
+        let site = fixture(include_str!(
+            "../../../../wp_api/tests/wpcom/reader_sites/site_followed.json"
+        ));
+        let site_id = WpComSiteId(site["ID"].as_u64().unwrap());
+        executor.push(Step::Respond(200, site.clone()));
+
+        let fetched = service.fetch_site(site_id).await.unwrap();
+
+        assert_eq!(fetched.site_id, Some(site_id));
+        assert_eq!(fetched.name.as_deref(), site["name"].as_str());
+        assert_eq!(fetched.is_following, Some(true));
+        assert_eq!(
+            service.cached_site(Some(site_id), None).unwrap(),
+            Some(fetched)
+        );
+        assert_eq!(
+            executor.sent()[0].url,
+            format!(
+                "https://public-api.wordpress.com/rest/v1.2/read/sites/{}?",
+                site_id.0
+            )
+        );
+        assert_eq!(
+            service.cached_site(Some(WpComSiteId(1)), None).unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn a_feed_is_fetched_and_kept_by_its_feed_id() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        let feed = fixture(include_str!(
+            "../../../../wp_api/tests/wpcom/reader_sites/feed.json"
+        ));
+        let feed_id = ReaderFeedId(
+            feed["feed_ID"]
+                .as_str()
+                .map(|id| id.parse().unwrap())
+                .or(feed["feed_ID"].as_u64())
+                .unwrap(),
+        );
+        executor.push(Step::Respond(200, feed));
+
+        let fetched = service.fetch_feed(feed_id).await.unwrap();
+
+        assert_eq!(fetched.feed_id, Some(feed_id));
+        assert_eq!(
+            service.cached_site(fetched.site_id, Some(feed_id)).unwrap(),
+            Some(fetched)
+        );
+    }
+
+    #[tokio::test]
+    async fn the_subscriptions_are_fetched_a_page_at_a_time_and_kept() {
+        let (service, executor) = service();
+        let page = fixture(include_str!(
+            "../../../../wp_api/tests/wpcom/reader_subscriptions/subscriptions.json"
+        ));
+        let listed = page["subscriptions"].as_array().unwrap().len();
+        // The first page says there are more subscriptions than it holds, and the second is short.
+        let mut first = page.clone();
+        first["page"] = json!(1);
+        first["total_subscriptions"] = json!(150);
+        let mut second = page;
+        second["page"] = json!(2);
+        second["total_subscriptions"] = json!(150);
+        second["subscriptions"] = json!([]);
+        executor.push(Step::Respond(200, first));
+        executor.push(Step::Respond(200, second));
+
+        let count = service.refresh_subscriptions().await.unwrap();
+
+        assert_eq!(count as usize, listed);
+        let cached = service.subscriptions().unwrap();
+        assert_eq!(cached.len(), listed);
+        assert!(
+            cached
+                .iter()
+                .all(|subscription| subscription.subscription_id.is_some())
+        );
+        assert_eq!(
+            queries(&executor),
+            ["page=1&number=100", "page=2&number=100"]
+        );
+    }
+
+    #[tokio::test]
+    async fn an_accounts_lists_need_an_account() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        assert!(matches!(
+            service.refresh_subscriptions().await,
+            Err(ReaderError::NeedsAccount)
+        ));
+        assert!(matches!(
+            service
+                .user_profile(wp_api::wp_com::reader_users::WpComUserIdentifier::Login {
+                    value: "someone".to_string()
+                })
+                .await,
+            Err(ReaderError::NeedsAccount)
+        ));
+        assert!(executor.sent().is_empty());
+        assert!(service.subscriptions().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn sites_are_searched_a_page_at_a_time() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(Step::Respond(
+            200,
+            fixture(include_str!(
+                "../../../../wp_api/tests/wpcom/reader_sites/feed_search.json"
+            )),
+        ));
+
+        let results = service
+            .search_sites("photography".to_string(), Some(20))
+            .await
+            .unwrap();
+
+        assert!(!results.feeds.is_empty());
+        assert_eq!(
+            queries(&executor),
+            ["q=photography&offset=20&meta=site%2Cfeed"]
+        );
+    }
+}
+
+mod comments {
+    use super::*;
+    use wp_api::comments::CommentId;
+
+    const SITE: WpComSiteId = WpComSiteId(123);
+    const POST: PostId = PostId(7);
+
+    pub(super) fn comment_json(id: i64, hour: u32, parent: Option<i64>) -> Value {
+        json!({
+            "ID": id,
+            "post": { "ID": 7, "type": "post" },
+            "author": { "ID": 9, "name": "A commenter", "avatar_URL": "https://example.com/a.png" },
+            "date": date(hour),
+            "content": format!("<p>Comment {id}</p>"),
+            "status": "approved",
+            "parent": match parent {
+                Some(parent) => json!({ "ID": parent, "type": "comment" }),
+                None => json!(false),
+            },
+            "type": "comment",
+            "like_count": 0,
+            "i_like": false,
+        })
+    }
+
+    pub(super) fn comments_page(found: u64, comments: Vec<Value>) -> Value {
+        json!({ "found": found, "site_ID": 123, "comments": comments })
+    }
+
+    pub(super) async fn ids(collection: &ReaderCommentsCollection) -> Vec<String> {
+        collection
+            .load_items()
+            .await
+            .unwrap()
+            .iter()
+            .map(|comment| match (&comment.comment_id, &comment.local_id) {
+                (Some(id), _) => id.0.to_string(),
+                (None, _) => "local".to_string(),
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_posts_comments_are_fetched_newest_first_and_shown_oldest_first() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        let comments = service.comments(SITE, POST);
+        assert!(ids(&comments).await.is_empty());
+        assert_eq!(comments.info().unwrap().found, None);
+        executor.push(Step::Respond(
+            200,
+            comments_page(
+                2,
+                vec![comment_json(2, 11, Some(1)), comment_json(1, 10, None)],
+            ),
+        ));
+
+        let result = comments.refresh().await.unwrap();
+
+        assert_eq!(
+            result,
+            ReaderCommentsPageResult {
+                comment_count: 2,
+                has_more: false,
+            }
+        );
+        assert_eq!(ids(&comments).await, ["1", "2"]);
+        let items = comments.load_items().await.unwrap();
+        assert_eq!(items[1].parent_id, Some(CommentId(1)));
+        assert_eq!(items[0].author_name.as_deref(), Some("A commenter"));
+        let info = comments.info().unwrap();
+        assert_eq!(info.found, Some(2));
+        assert!(!info.has_more);
+        assert_eq!(info.state, ListState::Idle);
+        assert_eq!(
+            executor.sent()[0].url,
+            "https://public-api.wordpress.com/rest/v1.1/sites/123/posts/7/replies?number=100&order=DESC&force=wpcom"
+        );
+    }
+
+    #[tokio::test]
+    async fn older_comments_are_loaded_until_the_cache_has_them_all() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        let comments = service.comments(SITE, POST);
+        executor.push(Step::Respond(
+            200,
+            comments_page(
+                3,
+                vec![comment_json(3, 12, None), comment_json(2, 11, None)],
+            ),
+        ));
+        let result = comments.refresh().await.unwrap();
+        assert!(result.has_more);
+
+        executor.push(Step::Respond(
+            200,
+            comments_page(3, vec![comment_json(1, 10, None)]),
+        ));
+        let result = comments.load_more().await.unwrap();
+        assert!(!result.has_more);
+        assert_eq!(ids(&comments).await, ["1", "2", "3"]);
+        assert_eq!(
+            queries(&executor)[1],
+            "number=100&offset=2&order=DESC&force=wpcom"
+        );
+
+        // With them all, nothing more is asked for.
+        comments.load_more().await.unwrap();
+        assert_eq!(executor.sent().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_page_past_the_end_with_nothing_on_it_ends_the_comments() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        let comments = service.comments(SITE, POST);
+        // The server says there are five, and only ever returns two.
+        executor.push(Step::Respond(
+            200,
+            comments_page(
+                5,
+                vec![comment_json(2, 11, None), comment_json(1, 10, None)],
+            ),
+        ));
+        comments.refresh().await.unwrap();
+        executor.push(Step::Respond(200, comments_page(5, vec![])));
+
+        let result = comments.load_more().await.unwrap();
+
+        assert!(!result.has_more);
+        assert!(!comments.info().unwrap().has_more);
+    }
+
+    #[tokio::test]
+    async fn a_deleted_comment_goes_when_the_page_has_every_comment() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        let comments = service.comments(SITE, POST);
+        executor.push(Step::Respond(
+            200,
+            comments_page(
+                2,
+                vec![comment_json(2, 11, None), comment_json(1, 10, None)],
+            ),
+        ));
+        comments.refresh().await.unwrap();
+        executor.push(Step::Respond(
+            200,
+            comments_page(1, vec![comment_json(2, 11, None)]),
+        ));
+
+        comments.refresh().await.unwrap();
+
+        assert_eq!(ids(&comments).await, ["2"]);
+    }
+
+    #[tokio::test]
+    async fn load_more_on_comments_that_have_not_loaded_fetches_the_newest() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        let comments = service.comments(SITE, POST);
+        executor.push(Step::Respond(
+            200,
+            comments_page(1, vec![comment_json(1, 10, None)]),
+        ));
+
+        comments.load_more().await.unwrap();
+
+        assert_eq!(queries(&executor), ["number=100&order=DESC&force=wpcom"]);
+        assert_eq!(ids(&comments).await, ["1"]);
+    }
+
+    #[tokio::test]
+    async fn a_failed_fetch_is_recorded_and_keeps_the_cached_comments() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        let comments = service.comments(SITE, POST);
+        executor.push(Step::Respond(
+            200,
+            comments_page(1, vec![comment_json(1, 10, None)]),
+        ));
+        comments.refresh().await.unwrap();
+        executor.push(Step::Offline);
+
+        assert!(matches!(comments.refresh().await, Err(ReaderError::Api(_))));
+
+        let info = comments.info().unwrap();
+        assert_eq!(info.state, ListState::Error);
+        assert!(info.error_message.is_some());
+        assert_eq!(ids(&comments).await, ["1"]);
+    }
+
+    #[tokio::test]
+    async fn each_posts_comments_are_its_own() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(Step::Respond(
+            200,
+            comments_page(1, vec![comment_json(1, 10, None)]),
+        ));
+        service.comments(SITE, POST).refresh().await.unwrap();
+
+        assert!(ids(&service.comments(SITE, PostId(8))).await.is_empty());
+        assert_eq!(ids(&service.comments(SITE, POST)).await, ["1"]);
+    }
+}
+
+mod more_actions {
+    use super::*;
+    use wp_api::comments::CommentId;
+    use wp_api::wp_com::reader_saved::ReaderPostSaveIdentity;
+    use wp_api::wp_com::reader_subscriptions::ReaderSubscriptionEmailFrequency;
+
+    const SITE: WpComSiteId = WpComSiteId(123);
+
+    fn identity(id: u64) -> ReaderPostSaveIdentity {
+        ReaderPostSaveIdentity {
+            id,
+            site_id: Some(SITE),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        }
+    }
+
+    /// A service whose Following stream has post 1 of site 123, with five likes, not followed.
+    async fn reading() -> (
+        ReaderService,
+        Arc<ScriptedExecutor>,
+        Arc<ReaderStreamCollection>,
+    ) {
+        let (service, executor) = service();
+        let stream = service.stream(ReaderStream::Following);
+        let mut post = post_json(1, 10);
+        post["like_count"] = json!(5);
+        post["i_like"] = json!(false);
+        post["is_following"] = json!(false);
+        post["site_name"] = json!("A site");
+        post["site_URL"] = json!("https://site.example");
+        executor.push(Step::Respond(200, json!({ "posts": [post] })));
+        stream.refresh().await.unwrap();
+        (service, executor, stream)
+    }
+
+    async fn post(stream: &ReaderStreamCollection) -> ReaderPostRecord {
+        stream.load_items().await.unwrap()[0].post.clone()
+    }
+
+    fn sent_after(executor: &ScriptedExecutor, skip: usize) -> Vec<(String, Value)> {
+        executor
+            .sent()
+            .iter()
+            .skip(skip)
+            .map(|sent| {
+                (
+                    sent.url
+                        .trim_start_matches("https://public-api.wordpress.com")
+                        .to_string(),
+                    sent.body.clone().unwrap_or(Value::Null),
+                )
+            })
+            .collect()
+    }
+
+    fn refused(code: &str) -> Step {
+        Step::Respond(400, json!({ "error": code, "message": "" }))
+    }
+
+    fn target() -> ReaderFollowTarget {
+        ReaderFollowTarget {
+            site_id: Some(SITE),
+            feed_id: None,
+            url: Some("https://site.example".to_string()),
+            name: Some("A site".to_string()),
+        }
+    }
+
+    fn subscription_json() -> Value {
+        let page: Value = serde_json::from_str(include_str!(
+            "../../../../wp_api/tests/wpcom/reader_subscriptions/subscriptions.json"
+        ))
+        .unwrap();
+        let mut subscription = page["subscriptions"][0].clone();
+        subscription["blog_ID"] = json!("123");
+        subscription["URL"] = json!("https://site.example");
+        subscription
+    }
+
+    #[tokio::test]
+    async fn a_like_moves_the_count_at_once_and_takes_the_servers_when_it_answers() {
+        let (service, executor, stream) = reading().await;
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({ "success": true, "i_like": true, "like_count": 8 }),
+        ));
+
+        let (outcome, ()) = futures::join!(service.set_post_liked(identity(1), true), async {
+            let post = post(&stream).await;
+            assert_eq!((post.i_like, post.like_count), (Some(true), Some(6)));
+            release.send(()).unwrap();
+        });
+
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        // Others liked it meanwhile, and the server's count says so.
+        let post = post(&stream).await;
+        assert_eq!((post.i_like, post.like_count), (Some(true), Some(8)));
+        assert_eq!(
+            sent_after(&executor, 1)[0].0,
+            "/rest/v1.1/sites/123/posts/1/likes/new"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_refused_like_puts_the_count_back() {
+        let (service, executor, stream) = reading().await;
+        executor.push(refused("like_failed"));
+
+        let result = service.set_post_liked(identity(1), true).await;
+
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        let post = post(&stream).await;
+        assert_eq!((post.i_like, post.like_count), (Some(false), Some(5)));
+    }
+
+    #[tokio::test]
+    async fn an_unlike_is_sent_to_its_own_endpoint_and_a_refresh_keeps_a_like_that_is_waiting() {
+        let (service, executor, stream) = reading().await;
+        executor.push(Step::Offline);
+        service.set_post_liked(identity(1), true).await.unwrap();
+
+        // The server's page doesn't have the like yet.
+        let mut unliked = post_json(1, 10);
+        unliked["like_count"] = json!(5);
+        unliked["i_like"] = json!(false);
+        executor.push(Step::Respond(200, json!({ "posts": [unliked] })));
+        stream.refresh().await.unwrap();
+        let shown = post(&stream).await;
+        assert_eq!((shown.i_like, shown.like_count), (Some(true), Some(6)));
+
+        executor.push(Step::Offline);
+        service.set_post_liked(identity(1), false).await.unwrap();
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "i_like": false, "like_count": 5 }),
+        ));
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+        assert_eq!(
+            sent_after(&executor, 4)[0].0,
+            "/rest/v1.1/sites/123/posts/1/likes/mine/delete"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_rss_post_cannot_be_liked() {
+        let (service, executor) = service();
+        let rss = ReaderPostSaveIdentity {
+            id: 9,
+            site_id: None,
+            feed_id: Some(ReaderFeedId(456)),
+            feed_item_id: None,
+            is_external: true,
+            url: None,
+        };
+
+        let result = service.set_post_liked(rss, true).await;
+
+        assert!(matches!(result, Err(ReaderError::MissingIds)));
+        assert!(executor.sent().is_empty());
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_follow_shows_on_the_sites_posts_and_in_the_subscriptions() {
+        let (service, executor, stream) = reading().await;
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({ "subscribed": true, "subscription": subscription_json() }),
+        ));
+
+        let (outcome, ()) = futures::join!(service.set_followed(target(), true), async {
+            assert_eq!(post(&stream).await.is_following, Some(true));
+            // A stand-in is listed until the server answers.
+            let listed = service.subscriptions().unwrap();
+            assert_eq!(listed.len(), 1);
+            assert_eq!(listed[0].subscription_id, None);
+            assert_eq!(listed[0].name.as_deref(), Some("A site"));
+            release.send(()).unwrap();
+        });
+
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        let listed = service.subscriptions().unwrap();
+        assert_eq!(listed.len(), 1);
+        assert!(listed[0].subscription_id.is_some());
+        assert_eq!(
+            sent_after(&executor, 1),
+            [(
+                "/rest/v1.1/read/following/mine/new".to_string(),
+                json!({ "url": "https://site.example", "source": "reader-ios" })
+            )]
+        );
+
+        // An unfollow goes by the site's ID.
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "is_following": false }),
+        ));
+        service.set_followed(target(), false).await.unwrap();
+        assert_eq!(post(&stream).await.is_following, Some(false));
+        assert!(service.subscriptions().unwrap().is_empty());
+        assert_eq!(
+            sent_after(&executor, 2)[0].0,
+            "/rest/v1.1/sites/123/follows/mine/delete"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_address_that_cannot_be_followed_is_refused_and_put_back() {
+        let (service, executor, stream) = reading().await;
+        executor.push(Step::Respond(
+            200,
+            json!({ "info": "invalid_feed", "subscribed": false }),
+        ));
+
+        let result = service.set_followed(target(), true).await;
+
+        assert!(
+            matches!(&result, Err(ReaderError::Refused { reason }) if reason == "invalid_feed"),
+            "{result:?}"
+        );
+        assert_eq!(post(&stream).await.is_following, Some(false));
+        assert!(service.subscriptions().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn unfollowing_what_is_not_followed_leaves_it_unfollowed() {
+        let (service, executor, stream) = reading().await;
+        executor.push(refused("are_not_subscribed"));
+
+        let outcome = service.set_followed(target(), false).await.unwrap();
+
+        assert_eq!(outcome, ReaderActionOutcome::Synced);
+        assert_eq!(post(&stream).await.is_following, Some(false));
+    }
+
+    #[tokio::test]
+    async fn a_feed_is_followed_and_unfollowed_by_its_address() {
+        let (service, executor) = service();
+        let feed = ReaderFollowTarget {
+            site_id: None,
+            feed_id: Some(ReaderFeedId(456)),
+            url: Some("https://feed.example/rss".to_string()),
+            name: None,
+        };
+        executor.push(Step::Respond(200, json!({ "subscribed": true })));
+        executor.push(Step::Respond(200, json!({ "subscribed": false })));
+
+        service.set_followed(feed.clone(), true).await.unwrap();
+        service.set_followed(feed, false).await.unwrap();
+
+        assert_eq!(
+            sent_after(&executor, 0),
+            [
+                (
+                    "/rest/v1.1/read/following/mine/new".to_string(),
+                    json!({ "url": "https://feed.example/rss", "source": "reader-ios" })
+                ),
+                (
+                    "/rest/v1.1/read/following/mine/delete".to_string(),
+                    json!({ "url": "https://feed.example/rss" })
+                ),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_follow_with_no_address_to_send_is_refused() {
+        let (service, executor) = service();
+        let unknown = ReaderFollowTarget {
+            site_id: Some(WpComSiteId(999)),
+            feed_id: None,
+            url: None,
+            name: None,
+        };
+
+        let result = service.set_followed(unknown, true).await;
+
+        assert!(matches!(result, Err(ReaderError::MissingIds)));
+        assert!(executor.sent().is_empty());
+        assert!(service.subscriptions().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_refresh_of_the_subscriptions_keeps_a_follow_that_is_waiting() {
+        let (service, executor, _) = reading().await;
+        executor.push(Step::Offline);
+        service.set_followed(target(), true).await.unwrap();
+        // The server's list doesn't have it yet.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscriptions": [], "page": 1, "number": 100, "total_subscriptions": 0 }),
+        ));
+
+        service.refresh_subscriptions().await.unwrap();
+
+        let listed = service.subscriptions().unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].site_id, Some(SITE));
+    }
+
+    #[tokio::test]
+    async fn an_account_follows_a_tag_through_the_server() {
+        let (service, executor) = service();
+        let slug = ReaderTagSlug("art".to_string());
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [], "added_tags": [] }),
+        ));
+
+        let outcome = service
+            .set_tag_followed(slug.clone(), Some("Art".to_string()), true)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, ReaderActionOutcome::Synced);
+        let followed = service.followed_tags().unwrap();
+        assert_eq!(followed.len(), 1);
+        assert_eq!(followed[0].title.as_deref(), Some("Art"));
+        assert_eq!(
+            sent_after(&executor, 0),
+            [(
+                "/rest/v1.2/read/tags/mine/new".to_string(),
+                json!({ "tags": ["art"] })
+            )]
+        );
+
+        // The server says it wasn't followed, which leaves it unfollowed.
+        executor.push(refused("not_subscribed"));
+        let outcome = service.set_tag_followed(slug, None, false).await.unwrap();
+        assert_eq!(outcome, ReaderActionOutcome::Synced);
+        assert!(service.followed_tags().unwrap().is_empty());
+        assert_eq!(
+            sent_after(&executor, 1)[0].0,
+            "/rest/v1.1/read/tags/art/mine/delete"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_menu_refresh_keeps_a_tag_follow_that_is_waiting() {
+        let (service, executor) = service();
+        executor.push(Step::Offline);
+        service
+            .set_tag_followed(
+                ReaderTagSlug("art".to_string()),
+                Some("Art".to_string()),
+                true,
+            )
+            .await
+            .unwrap();
+        // The server's menu has no followed tags.
+        executor.push(Step::Respond(
+            200,
+            json!({ "default": {}, "subscribed": [], "recommended": {} }),
+        ));
+
+        service.refresh_menu().await.unwrap();
+
+        assert_eq!(service.followed_tags().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn signed_out_tags_are_followed_on_the_device_and_an_account_takes_them_over() {
+        let cache = cache();
+        let executor = Arc::new(ScriptedExecutor::default());
+        let new = |owner| {
+            ReaderService::new(
+                delegate(executor.clone()),
+                cache.clone(),
+                owner,
+                ReaderSavedSource::Ios,
+            )
+            .unwrap()
+        };
+        let signed_out = new(ReaderOwner::SignedOut);
+        for slug in ["art", "travel"] {
+            let outcome = signed_out
+                .set_tag_followed(ReaderTagSlug(slug.to_string()), None, true)
+                .await
+                .unwrap();
+            assert!(matches!(outcome, ReaderActionOutcome::Pending { .. }));
+        }
+        signed_out
+            .set_tag_followed(ReaderTagSlug("travel".to_string()), None, false)
+            .await
+            .unwrap();
+        assert_eq!(signed_out.followed_tags().unwrap().len(), 1);
+        assert!(executor.sent().is_empty());
+
+        let account = new(ACCOUNT);
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [], "added_tags": [] }),
+        ));
+        let adopted = account.adopt_signed_out_tags().await.unwrap();
+
+        assert_eq!(adopted, 1);
+        assert_eq!(account.followed_tags().unwrap()[0].key, "art");
+        assert!(signed_out.followed_tags().unwrap().is_empty());
+        assert_eq!(executor.sent().len(), 1);
+        // There's nothing left to take over.
+        assert_eq!(account.adopt_signed_out_tags().await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_comment_like_moves_its_count() {
+        let (service, executor) = service();
+        let comments = service.comments(SITE, PostId(7));
+        executor.push(Step::Respond(
+            200,
+            super::comments::comments_page(1, vec![super::comments::comment_json(4, 10, None)]),
+        ));
+        comments.refresh().await.unwrap();
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "i_like": true, "like_count": 3 }),
+        ));
+
+        let outcome = service
+            .set_comment_liked(SITE, CommentId(4), true)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, ReaderActionOutcome::Synced);
+        let comment = comments.load_items().await.unwrap()[0].clone();
+        assert_eq!((comment.i_like, comment.like_count), (Some(true), Some(3)));
+        assert_eq!(
+            sent_after(&executor, 1)[0].0,
+            "/rest/v1.1/sites/123/comments/4/likes/new"
+        );
+
+        // A refused unlike puts the like back.
+        executor.push(refused("comment_like_failed"));
+        let result = service.set_comment_liked(SITE, CommentId(4), false).await;
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        let comment = comments.load_items().await.unwrap()[0].clone();
+        assert_eq!((comment.i_like, comment.like_count), (Some(true), Some(3)));
+    }
+
+    #[tokio::test]
+    async fn a_followed_sites_delivery_settings_change() {
+        let (service, executor, _) = reading().await;
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "subscription": subscription_json() }),
+        ));
+        service.set_followed(target(), true).await.unwrap();
+        let settings = |service: &ReaderService| service.subscriptions().unwrap()[0].clone();
+        let answered = |subscribed: bool| {
+            Step::Respond(200, json!({ "success": true, "subscribed": subscribed }))
+        };
+
+        executor.push(answered(true));
+        service.set_post_emails(SITE, true).await.unwrap();
+        executor.push(answered(true));
+        service.set_comment_emails(SITE, true).await.unwrap();
+        executor.push(answered(true));
+        service.set_post_notifications(SITE, true).await.unwrap();
+        executor.push(answered(false));
+        service.set_post_emails(SITE, false).await.unwrap();
+        executor.push(answered(true));
+        service
+            .set_post_email_frequency(SITE, ReaderSubscriptionEmailFrequency::Weekly)
+            .await
+            .unwrap();
+
+        let stored = settings(&service);
+        assert_eq!(stored.email_posts, Some(false));
+        assert_eq!(stored.email_comments, Some(true));
+        assert_eq!(stored.notify_posts, Some(true));
+        assert_eq!(
+            stored.email_frequency,
+            Some(ReaderSubscriptionEmailFrequency::Weekly)
+        );
+        let paths: Vec<_> = sent_after(&executor, 2)
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect();
+        assert_eq!(
+            paths,
+            [
+                "/rest/v1.2/read/site/123/post_email_subscriptions/new",
+                "/rest/v1.2/read/site/123/comment_email_subscriptions/new",
+                "/wpcom/v2/read/sites/123/notification-subscriptions/new",
+                "/rest/v1.2/read/site/123/post_email_subscriptions/delete",
+                "/rest/v1.2/read/site/123/post_email_subscriptions/update",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn the_frequency_of_emails_is_not_kept_to_send_later() {
+        let (service, executor, _) = reading().await;
+        executor.push(Step::Offline);
+
+        let result = service
+            .set_post_email_frequency(SITE, ReaderSubscriptionEmailFrequency::Daily)
+            .await;
+
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+        let (signed_out, _) = service_for(ReaderOwner::SignedOut);
+        assert!(matches!(
+            signed_out
+                .set_post_email_frequency(SITE, ReaderSubscriptionEmailFrequency::Daily)
+                .await,
+            Err(ReaderError::NeedsAccount)
+        ));
+    }
+}
+
+mod comment_writing {
+    use super::comments::{comment_json, comments_page, ids};
+    use super::*;
+    use wp_api::comments::CommentId;
+    use wp_api::wp_com::reader_saved::ReaderPostSaveIdentity;
+    use wp_mobile_cache::repository::reader_comments::ReaderCommentSendState;
+
+    const SITE: WpComSiteId = WpComSiteId(123);
+    const POST: PostId = PostId(7);
+
+    /// A service whose post 7 has comment 1.
+    async fn with_comments() -> (
+        ReaderService,
+        Arc<ScriptedExecutor>,
+        Arc<ReaderCommentsCollection>,
+    ) {
+        let (service, executor) = service();
+        let comments = service.comments(SITE, POST);
+        executor.push(Step::Respond(
+            200,
+            comments_page(1, vec![comment_json(1, 10, None)]),
+        ));
+        comments.refresh().await.unwrap();
+        (service, executor, comments)
+    }
+
+    fn body_and_path(executor: &ScriptedExecutor) -> (String, Value) {
+        let sent = executor.sent();
+        let last = sent.last().unwrap();
+        (
+            last.url
+                .trim_start_matches("https://public-api.wordpress.com")
+                .to_string(),
+            last.body.clone().unwrap_or(Value::Null),
+        )
+    }
+
+    #[tokio::test]
+    async fn a_comment_shows_while_it_is_sent_and_becomes_the_servers() {
+        let (_service, executor, comments) = with_comments().await;
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(held, 200, comment_json(2, 23, None)));
+
+        let (posted, ()) = futures::join!(
+            comments.post_comment("Nice post!".to_string(), None),
+            async {
+                let items = comments.load_items().await.unwrap();
+                let written = items.last().unwrap();
+                assert_eq!(written.send_state, ReaderCommentSendState::Sending);
+                assert_eq!(written.content.as_deref(), Some("Nice post!"));
+                assert!(written.local_id.is_some());
+                release.send(()).unwrap();
+            }
+        );
+
+        let posted = posted.unwrap();
+        assert_eq!(posted.comment_id, Some(CommentId(2)));
+        assert_eq!(posted.send_state, ReaderCommentSendState::Sent);
+        assert_eq!(ids(&comments).await, ["1", "2"]);
+        assert_eq!(comments.info().unwrap().found, Some(2));
+        assert_eq!(
+            body_and_path(&executor),
+            (
+                "/rest/v1.1/sites/123/posts/7/replies/new".to_string(),
+                json!({ "content": "Nice post!" })
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn a_reply_is_sent_to_the_comment_it_answers() {
+        let (_service, executor, comments) = with_comments().await;
+        executor.push(Step::Respond(200, comment_json(2, 23, Some(1))));
+
+        let posted = comments
+            .post_comment("I agree".to_string(), Some(CommentId(1)))
+            .await
+            .unwrap();
+
+        assert_eq!(posted.parent_id, Some(CommentId(1)));
+        assert_eq!(
+            body_and_path(&executor).0,
+            "/rest/v1.1/sites/123/comments/1/replies/new"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_comment_that_is_not_taken_stays_and_is_never_sent_again_by_itself() {
+        let (service, executor, comments) = with_comments().await;
+        executor.push(Step::Offline);
+
+        let result = comments.post_comment("Nice post!".to_string(), None).await;
+
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        let items = comments.load_items().await.unwrap();
+        let written = items.last().unwrap().clone();
+        assert_eq!(written.send_state, ReaderCommentSendState::Failed);
+        assert!(written.send_error.is_some());
+        let local_id = written.local_id.clone().unwrap();
+
+        // A refresh and a sync of what's waiting leave it alone.
+        executor.push(Step::Respond(
+            200,
+            comments_page(1, vec![comment_json(1, 10, None)]),
+        ));
+        comments.refresh().await.unwrap();
+        service.sync_actions().await.unwrap();
+        assert_eq!(executor.sent().len(), 3);
+        assert_eq!(ids(&comments).await, ["1", "local"]);
+
+        // The reader sends it again, and this time it's taken.
+        executor.push(Step::Respond(200, comment_json(2, 23, None)));
+        let posted = comments.retry_comment(local_id.clone()).await.unwrap();
+        assert_eq!(posted.comment_id, Some(CommentId(2)));
+        assert_eq!(ids(&comments).await, ["1", "2"]);
+        assert_eq!(
+            body_and_path(&executor).1,
+            json!({ "content": "Nice post!" })
+        );
+        // It's gone, so there's nothing to send again.
+        assert!(matches!(
+            comments.retry_comment(local_id).await,
+            Err(ReaderError::Refused { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_refused_comment_can_be_discarded() {
+        let (_service, executor, comments) = with_comments().await;
+        executor.push(Step::Respond(
+            400,
+            json!({ "error": "invalid_input", "message": "Invalid request input" }),
+        ));
+        comments
+            .post_comment("Nice post!".to_string(), None)
+            .await
+            .unwrap_err();
+        let local_id = comments
+            .load_items()
+            .await
+            .unwrap()
+            .last()
+            .unwrap()
+            .local_id
+            .clone()
+            .unwrap();
+
+        assert!(comments.discard_comment(local_id.clone()).unwrap());
+        assert!(!comments.discard_comment(local_id).unwrap());
+        assert_eq!(ids(&comments).await, ["1"]);
+    }
+
+    #[tokio::test]
+    async fn an_empty_comment_and_a_signed_out_reader_send_nothing() {
+        let (_service, executor, comments) = with_comments().await;
+        assert!(matches!(
+            comments.post_comment("  \n".to_string(), None).await,
+            Err(ReaderError::Refused { .. })
+        ));
+        assert_eq!(ids(&comments).await, ["1"]);
+        assert_eq!(executor.sent().len(), 1);
+
+        let (signed_out, executor) = service_for(ReaderOwner::SignedOut);
+        assert!(matches!(
+            signed_out
+                .comments(SITE, POST)
+                .post_comment("Hello".to_string(), None)
+                .await,
+            Err(ReaderError::NeedsAccount)
+        ));
+        assert!(executor.sent().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_comment_being_sent_cannot_be_sent_again_or_discarded() {
+        let (_service, executor, comments) = with_comments().await;
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(held, 200, comment_json(2, 23, None)));
+
+        let (posted, ()) = futures::join!(
+            comments.post_comment("Nice post!".to_string(), None),
+            async {
+                let local_id = comments
+                    .load_items()
+                    .await
+                    .unwrap()
+                    .last()
+                    .unwrap()
+                    .local_id
+                    .clone()
+                    .unwrap();
+                assert!(matches!(
+                    comments.retry_comment(local_id.clone()).await,
+                    Err(ReaderError::Refused { .. })
+                ));
+                assert!(!comments.discard_comment(local_id).unwrap());
+                release.send(()).unwrap();
+            }
+        );
+
+        posted.unwrap();
+        assert_eq!(executor.sent().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn subscribing_to_a_posts_comments_shows_on_the_post() {
+        let (service, executor) = service();
+        let stream = service.stream(ReaderStream::Following);
+        let mut post = post_json(7, 10);
+        post["is_subscribed_comments"] = json!(false);
+        post["subscribed_comments_notifications"] = json!(false);
+        executor.push(Step::Respond(200, json!({ "posts": [post] })));
+        stream.refresh().await.unwrap();
+        let identity = ReaderPostSaveIdentity {
+            id: 7,
+            site_id: Some(SITE),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        };
+        let flags = || async {
+            let post = stream.load_items().await.unwrap()[0].post.clone();
+            (
+                post.is_subscribed_comments,
+                post.receives_comment_notifications,
+            )
+        };
+        let answered = |subscribed: bool, notified: bool| {
+            Step::Respond(
+                200,
+                json!({ "success": true, "i_subscribe": subscribed, "receives_notifications": notified }),
+            )
+        };
+
+        executor.push(answered(true, false));
+        service
+            .set_comments_subscribed(identity.clone(), true)
+            .await
+            .unwrap();
+        executor.push(answered(true, true));
+        service
+            .set_comment_notifications(identity.clone(), true)
+            .await
+            .unwrap();
+        assert_eq!(flags().await, (Some(true), Some(true)));
+
+        // Unsubscribing ends the notifications too.
+        executor.push(answered(false, false));
+        service
+            .set_comments_subscribed(identity, false)
+            .await
+            .unwrap();
+        assert_eq!(flags().await, (Some(false), Some(false)));
+
+        let sent = executor.sent();
+        let paths: Vec<_> = sent[1..]
+            .iter()
+            .map(|sent| {
+                sent.url
+                    .trim_start_matches("https://public-api.wordpress.com/rest/v1.1")
+            })
+            .collect();
+        assert_eq!(
+            paths,
+            [
+                "/sites/123/posts/7/subscribers/new",
+                "/sites/123/posts/7/subscribers/mine/update",
+                "/sites/123/posts/7/subscribers/mine/delete",
+            ]
+        );
+        assert_eq!(sent[2].body, Some(json!({ "receive_notifications": true })));
     }
 }
