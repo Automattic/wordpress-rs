@@ -365,6 +365,29 @@ public typealias ReaderSavedSource = WordPressAPIInternal.ReaderSavedSource
 public typealias ReaderUnsavePostResponse = WordPressAPIInternal.ReaderUnsavePostResponse
 public typealias ReaderUnsavePostParams = WordPressAPIInternal.ReaderUnsavePostParams
 
+// MARK: Reader Seen Status
+public typealias ReaderSeenFeedItemsParams = WordPressAPIInternal.ReaderSeenFeedItemsParams
+public typealias ReaderSeenRequestExecutor = WordPressAPIInternal.ReaderSeenRequestExecutor
+public typealias ReaderSeenRequestFeedItemsSeenResponse = WordPressAPIInternal.ReaderSeenRequestFeedItemsSeenResponse
+public typealias ReaderSeenRequestFeedItemsUnseenResponse =
+    WordPressAPIInternal.ReaderSeenRequestFeedItemsUnseenResponse
+public typealias ReaderSeenRequestSitePostsSeenResponse = WordPressAPIInternal.ReaderSeenRequestSitePostsSeenResponse
+public typealias ReaderSeenRequestSitePostsUnseenResponse =
+    WordPressAPIInternal.ReaderSeenRequestSitePostsUnseenResponse
+public typealias ReaderSeenResponse = WordPressAPIInternal.ReaderSeenResponse
+public typealias ReaderSeenSitePostsParams = WordPressAPIInternal.ReaderSeenSitePostsParams
+public typealias ReaderSeenSource = WordPressAPIInternal.ReaderSeenSource
+
+// MARK: Reader Blocked Sites
+public typealias ReaderBlockSiteResponse = WordPressAPIInternal.ReaderBlockSiteResponse
+public typealias ReaderBlockedSite = WordPressAPIInternal.ReaderBlockedSite
+public typealias ReaderBlockedSitesParams = WordPressAPIInternal.ReaderBlockedSitesParams
+public typealias ReaderBlockedSitesResponse = WordPressAPIInternal.ReaderBlockedSitesResponse
+public typealias ReaderBlocksRequestBlockSiteResponse = WordPressAPIInternal.ReaderBlocksRequestBlockSiteResponse
+public typealias ReaderBlocksRequestExecutor = WordPressAPIInternal.ReaderBlocksRequestExecutor
+public typealias ReaderBlocksRequestListSitesResponse = WordPressAPIInternal.ReaderBlocksRequestListSitesResponse
+public typealias ReaderBlocksRequestUnblockSiteResponse = WordPressAPIInternal.ReaderBlocksRequestUnblockSiteResponse
+
 // MARK: Reader Service
 public typealias ReaderOwner = WordPressAPIInternal.ReaderOwner
 public typealias ReaderError = WordPressAPIInternal.ReaderError

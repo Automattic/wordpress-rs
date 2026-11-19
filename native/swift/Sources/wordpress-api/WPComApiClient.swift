@@ -98,6 +98,16 @@ public final class WPComApiClient: Sendable {
         internalClient.readerSaved()
     }
 
+    /// Marks posts as seen or unseen. Needs an account.
+    public var readerSeen: ReaderSeenRequestExecutor {
+        internalClient.readerSeen()
+    }
+
+    /// The sites the user blocked, and blocking and unblocking one. Needs an account.
+    public var readerBlocks: ReaderBlocksRequestExecutor {
+        internalClient.readerBlocks()
+    }
+
     /// Creates the account's saved Reader posts service. Prefer it over `readerSaved` for anything a
     /// user sees: a save or unsave shows straight away and survives a relaunch, and one the server
     /// hasn't got yet is sent by a later call.
