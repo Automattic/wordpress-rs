@@ -372,6 +372,7 @@ public typealias ReaderDateRange = WordPressAPIInternal.ReaderDateRange
 public typealias ReaderFeaturedMedia = WordPressAPIInternal.ReaderFeaturedMedia
 public typealias ReaderPost = WordPressAPIInternal.ReaderPost
 public typealias ReaderPostAuthor = WordPressAPIInternal.ReaderPostAuthor
+public typealias ReaderPostCardType = WordPressAPIInternal.ReaderPostCardType
 public typealias ReaderPostTag = WordPressAPIInternal.ReaderPostTag
 public typealias ReaderPostsRequestExecutor = WordPressAPIInternal.ReaderPostsRequestExecutor
 public typealias ReaderPostsRequestFollowingResponse = WordPressAPIInternal.ReaderPostsRequestFollowingResponse
