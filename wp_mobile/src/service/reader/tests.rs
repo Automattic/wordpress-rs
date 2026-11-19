@@ -2568,6 +2568,53 @@ mod more_actions {
     }
 
     #[tokio::test]
+    async fn an_unblock_shows_a_subscribed_site_as_followed_again() {
+        let (service, executor, stream) = reading().await;
+        executor.push(Step::Respond(
+            200,
+            json!({
+                "subscriptions": [subscription_json()],
+                "page": 1,
+                "number": 100,
+                "total_subscriptions": 1
+            }),
+        ));
+        service.refresh_subscriptions().await.unwrap();
+        let blocked = json!({ "success": true, "modified_sub": true });
+        executor.push(Step::Respond(200, blocked.clone()));
+        service.set_site_blocked(SITE, true).await.unwrap();
+
+        // While it's blocked, the server says the site isn't followed, without the reader in its
+        // count, as the post it sent says too.
+        executor.push(Step::Respond(200, site_json(false, 0)));
+        service.fetch_site(SITE).await.unwrap();
+        assert_eq!(site_shown(&service), (Some(false), Some(0)));
+
+        // The server kept the subscription, and the unblock brings the follow back.
+        executor.push(Step::Respond(200, blocked));
+        service.set_site_blocked(SITE, false).await.unwrap();
+        assert_eq!(site_shown(&service), (Some(true), Some(1)));
+        assert_eq!(post(&stream).await.is_following, Some(true));
+        assert_eq!(service.subscriptions().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn an_unblock_leaves_a_site_that_is_not_subscribed_unfollowed() {
+        let (service, executor, stream) = reading().await;
+        executor.push(Step::Respond(200, site_json(false, 4)));
+        service.fetch_site(SITE).await.unwrap();
+        let blocked = json!({ "success": true, "modified_sub": true });
+        executor.push(Step::Respond(200, blocked.clone()));
+        executor.push(Step::Respond(200, blocked));
+
+        service.set_site_blocked(SITE, true).await.unwrap();
+        service.set_site_blocked(SITE, false).await.unwrap();
+
+        assert_eq!(site_shown(&service), (Some(false), Some(4)));
+        assert_eq!(post(&stream).await.is_following, Some(false));
+    }
+
+    #[tokio::test]
     async fn an_address_that_cannot_be_followed_is_refused_and_put_back() {
         let (service, executor, stream) = reading().await;
         executor.push(Step::Respond(

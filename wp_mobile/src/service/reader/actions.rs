@@ -462,6 +462,19 @@ impl Action {
                     ReaderSubscriptionRepository::add_first(executor, owner, subscription)?;
                 }
             }
+            // While a site is blocked the server says it isn't followed, but it keeps the
+            // subscription, and the unblock brings the follow back. A fetch made during the block
+            // stored the server's "not followed", so a site the subscriptions list is followed
+            // again.
+            Self::BlockSite { site_id } => {
+                let site_id = Some(*site_id);
+                if !on
+                    && ReaderSubscriptionRepository::is_following(executor, owner, site_id, None)?
+                {
+                    ReaderPostRepository::set_following(executor, owner, site_id, None, true)?;
+                    ReaderSiteRepository::set_following(executor, owner, site_id, None, true)?;
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -955,6 +968,13 @@ impl ReaderService {
 
     /// Blocks or unblocks a site. The Reader's streams leave out a blocked site's posts, straight
     /// away. Needs an account.
+    ///
+    /// A block doesn't unfollow the site. While it's blocked, the server describes the site and
+    /// its posts as not followed, with no email or notification settings, and leaves the reader
+    /// out of its subscriber count, but it keeps the subscription: an unblock brings the follow
+    /// back with its delivery settings as they were. So a fetch made during the block stores "not
+    /// followed", and when the server takes an unblock, a site the cached subscriptions list is
+    /// shown as followed again, on the site and on its posts.
     pub async fn set_site_blocked(
         &self,
         site_id: WpComSiteId,
