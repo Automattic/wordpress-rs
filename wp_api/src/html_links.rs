@@ -26,6 +26,11 @@ impl HtmlLinks {
         Self { document, base_url }
     }
 
+    /// The parsed page, for reading anything other than links.
+    pub(crate) fn document(&self) -> &Html {
+        &self.document
+    }
+
     /// The elements matching `selector` that a browser acts on, in document
     /// order. SVG and MathML elements are left out, and so is anything inside
     /// an HTML `<template>`. HTML elements inside an SVG `<foreignObject>` are

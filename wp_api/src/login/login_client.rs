@@ -321,7 +321,8 @@ impl WpLoginClient {
         }
         // If we can't find the api root in the link header, we parse the HTML page to look for it
         // in the link tags
-        let parse_html_result = ParseHomepageResult::parse_response(&response.body_as_string());
+        let parse_html_result =
+            ParseHomepageResult::parse_response(&response.body_as_string(), &parsed_site_url.inner);
         if let Some(api_root_url) = parse_html_result.api_root_url_from_link_tag {
             return Ok(ApiRootUrl(api_root_url));
         }
