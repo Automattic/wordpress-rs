@@ -1,0 +1,46 @@
+{
+  "ID": 3001,
+  "post": {
+    "ID": 3,
+    "title": "Example post",
+    "type": "post",
+    "link": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/posts/3"
+  },
+  "author": {
+    "ID": 1001,
+    "login": "exampleuser1",
+    "email": "exampleuser1@example.com",
+    "name": "Example User One",
+    "first_name": "Example",
+    "last_name": "One",
+    "nice_name": "exampleuser1",
+    "URL": "",
+    "avatar_URL": "https://1.gravatar.com/avatar/0000000000000000000000000000000000000000000000000000000000000001?s=96&d=identicon&r=G",
+    "profile_URL": "https://gravatar.com/exampleuser1",
+    "ip_address": "192.0.2.1",
+    "site_ID": 2001,
+    "site_visible": true
+  },
+  "date": "2026-11-19T08:06:59+01:00",
+  "URL": "https://example.wordpress.com/2026/11/06/example-post/comment-page-1/#comment-3001",
+  "short_URL": "https://wp.me/pExAm-3%23comment-3001",
+  "content": "<p>An example comment.</p>\n",
+  "raw_content": "An example comment.",
+  "status": "approved",
+  "parent": false,
+  "type": "comment",
+  "like_count": 0,
+  "i_like": false,
+  "meta": {
+    "links": {
+      "self": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/comments/3001",
+      "help": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/comments/3001/help",
+      "site": "https://public-api.wordpress.com/rest/v1.1/sites/100000001",
+      "post": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/posts/3",
+      "replies": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/comments/3001/replies/",
+      "likes": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/comments/3001/likes/"
+    }
+  },
+  "can_moderate": true,
+  "i_replied": false
+}

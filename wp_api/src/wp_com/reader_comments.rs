@@ -1,9 +1,10 @@
-//! A post's comments, and the user's subscription to them.
+//! A post's comments, writing one, and the user's subscription to them.
 //!
 //! A comment's ID is only unique within its site: comment `10` is one comment on one site and
 //! another on the next. With the site's ID it names one comment.
 //!
-//! The comments answer without a token for a public site. The subscription needs one.
+//! The comments answer without a token for a public site. The subscription needs one, and so does
+//! everything that changes something: a new comment, a reply, and a change to the subscription.
 
 use crate::{
     comments::CommentId,
@@ -18,7 +19,8 @@ use crate::{
 use serde::{Deserialize, Deserializer, Serialize};
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
-    LenientVec, deserialize_optional_bool_or_int, deserialize_u64_or_string_or_none,
+    LenientVec, deserialize_bool_or_int, deserialize_optional_bool_or_int,
+    deserialize_u64_or_string_or_none,
 };
 
 /// The order of a post's comments.
@@ -464,8 +466,21 @@ impl TryFrom<RawReaderComment> for ReaderComment {
     }
 }
 
+/// Request body for a new comment, on a post or in reply to another comment.
+///
+/// The answer is the new comment, as a [`ReaderComment`]: the shape the list of comments has it
+/// in. Its author is the user. A top-level comment's `parent_id` is `None`, and a reply's is the
+/// comment it was sent to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderNewCommentParams {
+    /// What the comment says. The answer has it as written in [`ReaderComment::raw_content`], and
+    /// made into HTML in [`ReaderComment::content`]. An empty one is a 400 `invalid_input`.
+    pub content: String,
+}
+
 /// Whether the user is subscribed to a post's comments, from
-/// `GET /rest/v1.1/sites/{site}/posts/{post}/subscribers/mine`.
+/// `GET /rest/v1.1/sites/{site}/posts/{post}/subscribers/mine`. Turning the subscription's
+/// notifications on or off answers with it too.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ReaderPostCommentsSubscription {
     /// Whether the user is subscribed to the post's comments.
@@ -475,6 +490,42 @@ pub struct ReaderPostCommentsSubscription {
     #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
     #[uniffi(default = None)]
     pub receives_notifications: Option<bool>,
+}
+
+/// Request body to subscribe to a post's comments.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderSubscribeToCommentsParams {
+    /// Whether new comments should send the user a notification as well. It wasn't tried, and
+    /// the apps don't send it: a subscription made without it had notifications off.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub receive_notifications: Option<bool>,
+}
+
+/// Request body to turn the notifications of a subscription to a post's comments on or off.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderCommentsNotificationsParams {
+    /// Whether new comments should send the user a notification. The answer calls it
+    /// `receives_notifications`.
+    pub receive_notifications: bool,
+}
+
+/// The answer to subscribing to a post's comments, or unsubscribing from them. It's a
+/// [`ReaderPostCommentsSubscription`] with a `success` as well.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderPostCommentsSubscriptionResponse {
+    /// Whether the user is subscribed to the post's comments now.
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    pub i_subscribe: bool,
+    /// Whether new comments send the user a notification now.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub receives_notifications: Option<bool>,
+    /// `true` in every answer seen, including an unsubscribe with nothing to remove. The iOS app
+    /// reads it as whether the change was made.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub success: Option<bool>,
 }
 
 /// An ID the API sends as a number or a string.
@@ -824,6 +875,144 @@ mod tests {
             serde_json::from_str(json).expect("it parses");
         assert_eq!(subscription.i_subscribe, i_subscribe);
         assert_eq!(subscription.receives_notifications, receives_notifications);
+    }
+
+    /// The answer to a new comment on a post, recorded from WordPress.com, with the author, the
+    /// site and what was written replaced. The author is the user, on a site of their own, so it
+    /// keeps the types the API sent for them: `email` and `ip_address` are strings, where a list
+    /// of comments sends `false`.
+    #[test]
+    fn test_deserialize_new_comment() {
+        let comment: ReaderComment = serde_json::from_str(include_str!(
+            "../../tests/wpcom/reader_comments/new_comment.json"
+        ))
+        .expect("the comment parses");
+
+        assert_eq!(comment.id, CommentId(3001));
+        assert_eq!(comment.post_id, Some(PostId(3)));
+        assert_eq!(comment.parent_id, None, "Sent as `false`");
+        assert_eq!(
+            comment.date,
+            Some("2026-11-19T07:06:59+00:00".parse().unwrap())
+        );
+        assert_eq!(
+            comment.content.as_deref(),
+            Some("<p>An example comment.</p>\n")
+        );
+        assert_eq!(comment.raw_content.as_deref(), Some("An example comment."));
+        assert_eq!(comment.status, Some(ReaderCommentStatus::Approved));
+        assert_eq!(comment.comment_type, Some(ReaderCommentType::Comment));
+        assert_eq!(comment.like_count, Some(0));
+        assert_eq!(comment.i_like, Some(false));
+        assert_eq!(comment.can_moderate, Some(true));
+        let author = comment.author.expect("an author");
+        assert_eq!(author.id, Some(WpComUserId(1001)));
+        assert_eq!(author.login.as_deref(), Some("exampleuser1"));
+        assert_eq!(author.site_id, Some(WpComSiteId(2001)));
+    }
+
+    /// The answer to a reply to that comment. Its `parent` is the comment it was sent to.
+    #[test]
+    fn test_deserialize_new_reply() {
+        let reply: ReaderComment = serde_json::from_str(include_str!(
+            "../../tests/wpcom/reader_comments/new_reply.json"
+        ))
+        .expect("the reply parses");
+
+        assert_eq!(reply.id, CommentId(3002));
+        assert_eq!(reply.post_id, Some(PostId(3)));
+        assert_eq!(reply.parent_id, Some(CommentId(3001)));
+        assert_eq!(reply.raw_content.as_deref(), Some("An example reply."));
+        assert_eq!(
+            reply.url.as_deref(),
+            Some(
+                "https://example.wordpress.com/2026/11/06/example-post/comment-page-1/#comment-3002"
+            )
+        );
+    }
+
+    #[test]
+    fn test_the_body_for_a_new_comment() {
+        let params = ReaderNewCommentParams {
+            content: "A <em>fine</em> post.".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&params).unwrap(),
+            json!({ "content": "A <em>fine</em> post." })
+        );
+    }
+
+    /// What the API sent for a subscribe and for an unsubscribe. A second unsubscribe, with
+    /// nothing to remove, answered the same as the first.
+    #[rstest]
+    #[case::subscribed(
+        r#"{"success":true,"i_subscribe":true,"receives_notifications":false,"meta":{"links":{"site":"https://public-api.wordpress.com/rest/v1.1/sites/100000001"}}}"#,
+        true
+    )]
+    #[case::unsubscribed(
+        r#"{"success":true,"i_subscribe":false,"receives_notifications":false,"meta":{"links":{"site":"https://public-api.wordpress.com/rest/v1.1/sites/100000001"}}}"#,
+        false
+    )]
+    fn test_deserialize_post_comments_subscription_response(
+        #[case] json: &str,
+        #[case] i_subscribe: bool,
+    ) {
+        let answer: ReaderPostCommentsSubscriptionResponse =
+            serde_json::from_str(json).expect("it parses");
+        assert_eq!(
+            answer,
+            ReaderPostCommentsSubscriptionResponse {
+                i_subscribe,
+                receives_notifications: Some(false),
+                success: Some(true),
+            }
+        );
+    }
+
+    #[test]
+    fn test_a_post_comments_subscription_response_with_little_in_it() {
+        let answer: ReaderPostCommentsSubscriptionResponse =
+            serde_json::from_str(r#"{ "i_subscribe": 1 }"#).expect("it parses");
+        assert!(answer.i_subscribe);
+        assert_eq!(answer.receives_notifications, None);
+        assert_eq!(answer.success, None);
+
+        let without = r#"{ "success": true }"#;
+        assert!(serde_json::from_str::<ReaderPostCommentsSubscriptionResponse>(without).is_err());
+    }
+
+    /// Turning notifications on answers with the subscription, and no `success`.
+    #[test]
+    fn test_deserialize_notifications_turned_on() {
+        let answer: ReaderPostCommentsSubscription = serde_json::from_str(
+            r#"{"i_subscribe":true,"receives_notifications":true,"meta":{"links":{"site":"https://public-api.wordpress.com/rest/v1.1/sites/100000001"}}}"#,
+        )
+        .expect("it parses");
+        assert!(answer.i_subscribe);
+        assert_eq!(answer.receives_notifications, Some(true));
+    }
+
+    #[test]
+    fn test_the_bodies_for_a_comments_subscription() {
+        // With nothing set it's an empty object.
+        assert_eq!(
+            serde_json::to_value(ReaderSubscribeToCommentsParams::default()).unwrap(),
+            json!({})
+        );
+        assert_eq!(
+            serde_json::to_value(ReaderSubscribeToCommentsParams {
+                receive_notifications: Some(true),
+            })
+            .unwrap(),
+            json!({ "receive_notifications": true })
+        );
+        assert_eq!(
+            serde_json::to_value(ReaderCommentsNotificationsParams {
+                receive_notifications: false,
+            })
+            .unwrap(),
+            json!({ "receive_notifications": false })
+        );
     }
 
     /// The API reads `order` in upper case only: `asc` is ignored.
