@@ -1,0 +1,84 @@
+{
+  "found": 1768,
+  "i_like": false,
+  "likes": [
+    {
+      "ID": 1001,
+      "login": "exampleuser1",
+      "email": false,
+      "name": "Example User One",
+      "first_name": "Example",
+      "last_name": "One",
+      "nice_name": "exampleuser1",
+      "URL": "http://exampleuser1.wordpress.com",
+      "avatar_URL": "https://0.gravatar.com/avatar/0000000000000000000000000000000000000000000000000000000000000001?s=96&d=retro",
+      "profile_URL": "https://gravatar.com/exampleuser1",
+      "ip_address": false,
+      "site_ID": 2001,
+      "site_visible": true,
+      "default_avatar": false,
+      "date_liked": "2015-10-02 23:40:29",
+      "bio": "An example bio.",
+      "primary_blog": "http://exampleuser1.wordpress.com",
+      "preferred_blog": {
+        "id": 2001,
+        "name": "Example Site One",
+        "url": "http://exampleuser1.wordpress.com",
+        "icon": {
+          "img": "https://exampleuser1.wordpress.com/icon.png",
+          "ico": "https://exampleuser1.wordpress.com/favicon.ico"
+        }
+      }
+    },
+    {
+      "ID": 1002,
+      "login": "exampleuser2",
+      "email": false,
+      "name": "exampleuser2",
+      "first_name": "",
+      "last_name": "",
+      "nice_name": "exampleuser2",
+      "URL": "",
+      "avatar_URL": "https://1.gravatar.com/avatar/0000000000000000000000000000000000000000000000000000000000000002?s=96&d=retro",
+      "profile_URL": "https://gravatar.com/exampleuser2",
+      "ip_address": false,
+      "site_ID": 2002,
+      "site_visible": false,
+      "default_avatar": false,
+      "date_liked": "2013-09-14 06:54:35",
+      "bio": "",
+      "primary_blog": "",
+      "preferred_blog": {
+        "id": null,
+        "name": null,
+        "url": "http://example.com",
+        "icon": null
+      }
+    },
+    {
+      "ID": 1003,
+      "login": "exampleuser3",
+      "email": false,
+      "name": "Example User Three",
+      "first_name": "Example",
+      "last_name": "",
+      "nice_name": "exampleuser3",
+      "URL": "",
+      "avatar_URL": "https://2.gravatar.com/avatar/0000000000000000000000000000000000000000000000000000000000000003?s=96&d=retro",
+      "profile_URL": "https://gravatar.com/exampleuser3",
+      "ip_address": false,
+      "default_avatar": true,
+      "date_liked": "2013-04-09 14:17:15",
+      "bio": "",
+      "primary_blog": "",
+      "preferred_blog": null
+    }
+  ],
+  "meta": {
+    "links": {
+      "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/posts/6014/likes/help",
+      "post": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/posts/6014",
+      "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+    }
+  }
+}

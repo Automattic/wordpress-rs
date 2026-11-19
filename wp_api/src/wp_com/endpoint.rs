@@ -19,6 +19,7 @@ pub mod publicize_endpoint;
 pub mod purchases_endpoint;
 pub mod reader_blocks_endpoint;
 pub mod reader_post_endpoint;
+pub mod reader_likes_endpoint;
 pub mod reader_posts_endpoint;
 pub mod reader_saved_endpoint;
 pub mod reader_seen_endpoint;

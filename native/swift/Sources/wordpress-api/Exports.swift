@@ -453,6 +453,15 @@ public typealias ReaderStreamInfo = WordPressAPIInternal.ReaderStreamInfo
 public typealias ReaderStreamItem = WordPressAPIInternal.ReaderStreamItem
 public typealias ReaderStreamOrdering = WordPressAPIInternal.ReaderStreamOrdering
 public typealias ReaderStreamPageResult = WordPressAPIInternal.ReaderStreamPageResult
+// MARK: Reader Likes
+public typealias ReaderLike = WordPressAPIInternal.ReaderLike
+public typealias ReaderLikePreferredBlog = WordPressAPIInternal.ReaderLikePreferredBlog
+public typealias ReaderLikesParams = WordPressAPIInternal.ReaderLikesParams
+public typealias ReaderLikesRequestExecutor = WordPressAPIInternal.ReaderLikesRequestExecutor
+public typealias ReaderLikesRequestPostLikesResponse = WordPressAPIInternal.ReaderLikesRequestPostLikesResponse
+public typealias ReaderLikesResponse = WordPressAPIInternal.ReaderLikesResponse
+public typealias ReaderUnreadableLike = WordPressAPIInternal.ReaderUnreadableLike
+
 // MARK: Reader Subscriptions
 public typealias ReaderSiteFollowStatus = WordPressAPIInternal.ReaderSiteFollowStatus
 public typealias ReaderSubscription = WordPressAPIInternal.ReaderSubscription
