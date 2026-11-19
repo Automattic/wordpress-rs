@@ -16,6 +16,7 @@ use crate::{
 };
 use rusqlite::{OptionalExtension, Row, params, types::Value};
 use wp_api::date::WpGmtDateTime;
+use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::reader_posts::{ReaderCrossPost, ReaderStreamOrder};
 use wp_api::wp_com::reader_saved::{
@@ -1202,6 +1203,22 @@ impl ReaderPostRepository {
         executor.execute(
             "UPDATE reader_posts SET like_count = ?2 WHERE rowid = ?1",
             params![post, like_count],
+        )?;
+        Ok(())
+    }
+
+    /// Adds one to the comment count of a site's stored post, where the cache has a count: the
+    /// server took a comment on it. The post's next fetch replaces it with the server's count.
+    pub fn add_comment(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        site_id: WpComSiteId,
+        post_id: PostId,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "UPDATE reader_posts SET comment_count = comment_count + 1
+            WHERE account_id = ?1 AND site_id = ?2 AND post_id = ?3 AND comment_count IS NOT NULL",
+            params![account, site_id.0, post_id.0],
         )?;
         Ok(())
     }

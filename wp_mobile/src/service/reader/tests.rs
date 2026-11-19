@@ -2921,6 +2921,35 @@ mod comment_writing {
     }
 
     #[tokio::test]
+    async fn a_comment_the_server_takes_adds_one_to_the_posts_count() {
+        let (service, executor, comments) = with_comments().await;
+        let stream = service.stream(ReaderStream::Following);
+        let mut post = post_json(7, 10);
+        post["discussion"] = json!({ "comment_count": 1, "comments_open": true });
+        executor.push(Step::Respond(200, json!({ "posts": [post] })));
+        stream.refresh().await.unwrap();
+        let count = || async { stream.load_items().await.unwrap()[0].post.comment_count };
+        assert_eq!(count().await, Some(1));
+
+        executor.push(Step::Respond(200, comment_json(2, 23, None)));
+        comments
+            .post_comment("Nice post!".to_string(), None)
+            .await
+            .unwrap();
+        assert_eq!(count().await, Some(2));
+
+        // One held for a moderator isn't in the count yet.
+        let mut held = comment_json(3, 23, Some(2));
+        held["status"] = json!("unapproved");
+        executor.push(Step::Respond(200, held));
+        comments
+            .post_comment("I agree".to_string(), Some(CommentId(2)))
+            .await
+            .unwrap();
+        assert_eq!(count().await, Some(2));
+    }
+
+    #[tokio::test]
     async fn a_comment_that_is_not_taken_stays_and_is_never_sent_again_by_itself() {
         let (service, executor, comments) = with_comments().await;
         executor.push(Step::Offline);

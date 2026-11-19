@@ -12,10 +12,11 @@ use wp_api::date::WpGmtDateTime;
 use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::reader_comments::{
-    ReaderComment, ReaderCommentType, ReaderCommentsOrder, ReaderCommentsParams,
-    ReaderNewCommentParams,
+    ReaderComment, ReaderCommentStatus, ReaderCommentType, ReaderCommentsOrder,
+    ReaderCommentsParams, ReaderNewCommentParams,
 };
 use wp_mobile_cache::list_metadata::ListState;
+use wp_mobile_cache::repository::reader::ReaderPostRepository;
 use wp_mobile_cache::repository::reader_comments::{
     ReaderCommentRecord, ReaderCommentRepository, ReaderCommentSendState,
     ReaderCommentThreadRepository,
@@ -332,6 +333,16 @@ impl ReaderCommentsCollection {
                         thread.found.map(|found| found + 1),
                         None,
                     )?;
+                    // A post's count is of the comments anyone can read, so one held for a
+                    // moderator isn't in it yet.
+                    if taken.status == Some(ReaderCommentStatus::Approved) {
+                        ReaderPostRepository::add_comment(
+                            &transaction,
+                            owner,
+                            self.site_id,
+                            self.post_id,
+                        )?;
+                    }
                     transaction.commit().map_err(SqliteDbError::from)
                 })?;
                 Ok(taken)
