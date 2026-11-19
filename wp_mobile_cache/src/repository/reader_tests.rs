@@ -121,6 +121,52 @@ fn test_a_post_that_is_not_a_cross_post_has_none() {
 }
 
 #[test]
+fn test_a_like_moves_the_count_only_when_it_is_a_change() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let stored = ReaderPostRecord {
+        like_count: Some(5),
+        i_like: Some(false),
+        ..post(456)
+    };
+    let row = ReaderPostRepository::upsert(&conn, account, &stored).unwrap();
+    let likes = || {
+        let (_, post) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+            .unwrap()
+            .unwrap();
+        (post.i_like, post.like_count)
+    };
+
+    ReaderPostRepository::set_liked(&conn, row, true).unwrap();
+    assert_eq!(likes(), (Some(true), Some(6)));
+    // Liking a post that's already liked isn't another like.
+    ReaderPostRepository::set_liked(&conn, row, true).unwrap();
+    assert_eq!(likes(), (Some(true), Some(6)));
+    ReaderPostRepository::set_liked(&conn, row, false).unwrap();
+    assert_eq!(likes(), (Some(false), Some(5)));
+    ReaderPostRepository::set_like_count(&conn, row, 9).unwrap();
+    assert_eq!(likes(), (Some(false), Some(9)));
+}
+
+#[test]
+fn test_following_is_set_on_every_post_of_the_site() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderPostRepository::upsert(&conn, account, &post(1)).unwrap();
+    ReaderPostRepository::upsert(&conn, account, &post(2)).unwrap();
+
+    ReaderPostRepository::set_following(&conn, account, Some(WpComSiteId(123)), None, true)
+        .unwrap();
+
+    for id in [1, 2] {
+        let (_, post) = ReaderPostRepository::select_by_key(&conn, account, &post_key(id))
+            .unwrap()
+            .unwrap();
+        assert_eq!(post.is_following, Some(true));
+    }
+}
+
+#[test]
 fn test_upsert_finds_the_post_by_its_key() {
     let conn = conn();
     let account = account(&conn, 1);

@@ -8,6 +8,8 @@ pub mod post_types;
 pub mod posts;
 pub mod reader;
 pub mod reader_actions;
+pub mod reader_comments;
+pub mod reader_sites;
 pub mod sites;
 pub mod term_relationships;
 pub mod wordpress_com_accounts;

@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use crate::repository::entity_state::EntityStateRepository;
 use crate::repository::list_metadata::ListMetadataRepository;
 use crate::repository::reader::ReaderStreamRepository;
+use crate::repository::reader_comments::{ReaderCommentRepository, ReaderCommentThreadRepository};
 use crate::repository::sites::SiteRepository;
 use crate::repository::wordpress_com_accounts::{ReaderOwner, WordPressComAccountRepository};
 use wp_api::parsed_url::ParsedUrl;
@@ -141,6 +142,16 @@ pub enum DbTable {
     ReaderSyncTimes,
     /// Cards in a Reader stream that aren't posts
     ReaderStreamCards,
+    /// The Reader menu, with the tags a reader follows
+    ReaderMenuItems,
+    /// The sites and feeds an account follows
+    ReaderSubscriptions,
+    /// What the Reader shows of a site or a feed besides its posts
+    ReaderSites,
+    /// Posts' comments, and comments written on this device
+    ReaderComments,
+    /// Where each post's comments are up to
+    ReaderCommentThreads,
 }
 
 impl DbTable {
@@ -177,6 +188,11 @@ impl DbTable {
             DbTable::ReaderMemberSites => "reader_member_sites",
             DbTable::ReaderSyncTimes => "reader_sync_times",
             DbTable::ReaderStreamCards => "reader_stream_cards",
+            DbTable::ReaderMenuItems => "reader_menu_items",
+            DbTable::ReaderSubscriptions => "reader_subscriptions",
+            DbTable::ReaderSites => "reader_sites",
+            DbTable::ReaderComments => "reader_comments",
+            DbTable::ReaderCommentThreads => "reader_comment_threads",
         }
     }
 }
@@ -226,6 +242,11 @@ impl TryFrom<&str> for DbTable {
             "reader_member_sites" => Ok(DbTable::ReaderMemberSites),
             "reader_sync_times" => Ok(DbTable::ReaderSyncTimes),
             "reader_stream_cards" => Ok(DbTable::ReaderStreamCards),
+            "reader_menu_items" => Ok(DbTable::ReaderMenuItems),
+            "reader_subscriptions" => Ok(DbTable::ReaderSubscriptions),
+            "reader_sites" => Ok(DbTable::ReaderSites),
+            "reader_comments" => Ok(DbTable::ReaderComments),
+            "reader_comment_threads" => Ok(DbTable::ReaderCommentThreads),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -379,6 +400,12 @@ impl WpApiCache {
             }
             if let Err(e) = ReaderStreamRepository::reset_stale_fetching_states(connection) {
                 log::warn!("Failed to reset stale Reader stream states: {}", e);
+            }
+            if let Err(e) = ReaderCommentThreadRepository::reset_stale_fetching_states(connection) {
+                log::warn!("Failed to reset stale Reader comment states: {}", e);
+            }
+            if let Err(e) = ReaderCommentRepository::fail_comments_left_sending(connection) {
+                log::warn!("Failed to mark Reader comments left sending: {}", e);
             }
 
             // Clear abandoned fetch operations after migrations complete.
@@ -543,7 +570,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 20] = [
+static MIGRATION_QUERIES: [&str; 22] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -564,6 +591,8 @@ static MIGRATION_QUERIES: [&str; 20] = [
     include_str!("../migrations/0018-create-reader-member-sites-table.sql"),
     include_str!("../migrations/0019-create-reader-stream-cards-table.sql"),
     include_str!("../migrations/0020-add-computed-fields-to-reader-posts.sql"),
+    include_str!("../migrations/0021-create-reader-menu-subscriptions-and-sites-tables.sql"),
+    include_str!("../migrations/0022-create-reader-comments-tables.sql"),
 ];
 
 pub struct MigrationManager<'a> {

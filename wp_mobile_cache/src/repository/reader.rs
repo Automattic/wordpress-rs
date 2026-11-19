@@ -1154,6 +1154,61 @@ impl ReaderPostRepository {
         Ok(())
     }
 
+    /// Records whether the user likes a stored post, and moves its like count by one when that's a
+    /// change: a like the cache didn't have adds one, and one it had taken away takes one off.
+    pub fn set_liked(
+        executor: &impl QueryExecutor,
+        post: RowId,
+        liked: bool,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "UPDATE reader_posts SET
+                like_count = CASE
+                    WHEN COALESCE(i_like, 0) = ?2 THEN like_count
+                    WHEN ?2 THEN COALESCE(like_count, 0) + 1
+                    ELSE MAX(COALESCE(like_count, 0) - 1, 0) END,
+                i_like = ?2
+            WHERE rowid = ?1",
+            params![post, liked],
+        )?;
+        Ok(())
+    }
+
+    /// Sets a stored post's like count to what the server said.
+    pub fn set_like_count(
+        executor: &impl QueryExecutor,
+        post: RowId,
+        like_count: u64,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "UPDATE reader_posts SET like_count = ?2 WHERE rowid = ?1",
+            params![post, like_count],
+        )?;
+        Ok(())
+    }
+
+    /// Records whether the user follows a site or a feed, on every stored post of either.
+    pub fn set_following(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        site_id: Option<WpComSiteId>,
+        feed_id: Option<ReaderFeedId>,
+        following: bool,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "UPDATE reader_posts SET is_following = ?4
+            WHERE account_id = ?1 AND (
+                (?2 IS NOT NULL AND site_id = ?2) OR (?3 IS NOT NULL AND feed_id = ?3))",
+            params![
+                account,
+                site_id.map(|id| id.0),
+                feed_id.map(|id| id.0),
+                following
+            ],
+        )?;
+        Ok(())
+    }
+
     /// The name and URL of a site, from a post of it the cache has.
     pub fn select_site_name_and_url(
         executor: &impl QueryExecutor,
