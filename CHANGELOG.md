@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
+- **BREAKING:** `ApiUrlResolver::resolve` now returns `Result<ParsedUrl, ParseUrlError>`, so a Swift or Kotlin type that implements `ApiUrlResolver` must now be able to throw. Code that only creates a `WpOrgSiteApiUrlResolver` or `WpComDotOrgApiUrlResolver` is unchanged. In Rust, `ParsedUrl::by_extending_and_splitting_by_forward_slash` and `ParsedUrl::by_extending_rest_api_path` also return a `Result`.
+
+### Fixed
+
+- A request built from an API root that can't have a path, such as `data:,`, `about:blank` or `mailto:…`, no longer panics, which crashed the app on Apple platforms and threw an unmapped `InternalException` on Android. It fails with `WpApiError::SiteUrlParsingError` instead, without being sent. The same goes for a `WpComBaseUrl::Custom` base URL and `WpLoginClient.verify_issued_application_password`. XML-RPC discovery for such a site address reports `XmlrpcDiscoveryError::EndpointNotFound` instead of panicking.
 
 ## [0.11.1] - 2026-11-18
 
