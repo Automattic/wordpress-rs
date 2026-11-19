@@ -6,6 +6,11 @@
 //! There are two ways to follow. By its ID, for a WordPress.com or Jetpack site, which the apps
 //! use when they have a site's ID. By its address, for anything with a feed, which is the only way
 //! to follow an RSS feed, and how the web Reader follows.
+//!
+//! A subscription has three delivery settings, each turned on and off by its own pair of requests:
+//! emails of new posts, emails of new comments, and notifications of new posts. They take the
+//! site's ID, so they're for a WordPress.com or Jetpack site. What a subscription has turned on is
+//! in its [`ReaderSubscriptionDeliveryMethods`].
 
 use crate::{
     date::{WpGmtDateTime, deserialize_optional_wp_gmt_date_time},
@@ -399,6 +404,138 @@ pub struct ReaderUnfollowUrlResponse {
     /// web Reader take anything else as a failure.
     #[serde(deserialize_with = "deserialize_bool_or_int")]
     pub subscribed: bool,
+}
+
+/// Request body to start or stop emailing the user a site's new posts.
+///
+/// The apps send none of these, and none was tried: every field is here because the API declares
+/// it.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderPostEmailSubscriptionParams {
+    /// How often to email the posts, for a subscription that's starting. The web Reader sends it
+    /// when it starts one. A subscription started without it was
+    /// [`ReaderSubscriptionEmailFrequency::Instantly`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub delivery_frequency: Option<ReaderSubscriptionEmailFrequency>,
+    /// Where the change was made, which the API records.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub track_source: Option<String>,
+    /// An email's tracking ID, for a change made from an email.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub email_id: Option<String>,
+}
+
+/// Request body to change how often a site's new posts are emailed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderPostEmailFrequencyParams {
+    /// How often to email the posts. Send `Instantly`, `Daily` or `Weekly`: the API takes
+    /// anything else as `Instantly`, without an error.
+    pub delivery_frequency: ReaderSubscriptionEmailFrequency,
+    /// Where the change was made, which the API records. It wasn't tried.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub track_source: Option<String>,
+}
+
+/// The answer to starting, stopping or changing the emails of a site's new posts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderPostEmailSubscriptionResponse {
+    /// Whether the site's new posts are emailed to the user now.
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    pub subscribed: bool,
+    /// Go by [`Self::subscribed`] instead, as the apps do. One request to start the emails
+    /// answered `success: false` with `subscribed: true` and a new subscription. It was sent for a
+    /// site the user had just unfollowed. Every other answer seen had `true`, including a
+    /// frequency change the API didn't apply as sent.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub success: Option<bool>,
+    /// The emails' settings. `None` once they're stopped, which the API sends as `null`.
+    #[serde(default, deserialize_with = "deserialize_object_or_none")]
+    #[uniffi(default = None)]
+    pub subscription: Option<ReaderPostEmailSubscription>,
+}
+
+/// The emails of a site's new posts, in the answer to changing them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderPostEmailSubscription {
+    /// The site. Sent as a string.
+    #[serde(
+        rename = "blog_ID",
+        default,
+        deserialize_with = "deserialize_optional_id"
+    )]
+    #[uniffi(default = None)]
+    pub blog_id: Option<WpComSiteId>,
+    /// How often the posts are emailed now. After a change, check it: a frequency the API doesn't
+    /// know comes back as `Instantly`.
+    #[serde(default, deserialize_with = "deserialize_optional_frequency")]
+    #[uniffi(default = None)]
+    pub delivery_frequency: Option<ReaderSubscriptionEmailFrequency>,
+    /// `active` in every answer seen.
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    #[uniffi(default = None)]
+    pub status: Option<String>,
+    /// When the emails were started, which the API calls `ts`. A frequency change doesn't move it.
+    #[serde(
+        rename = "ts",
+        default,
+        deserialize_with = "deserialize_optional_wp_gmt_date_time"
+    )]
+    #[uniffi(default = None)]
+    pub date_subscribed: Option<WpGmtDateTime>,
+}
+
+/// The answer to starting or stopping the emails of a site's new comments.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderCommentEmailSubscriptionResponse {
+    /// Whether the site's new comments are emailed to the user now.
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    pub subscribed: bool,
+    /// `true` in both answers seen. Go by [`Self::subscribed`], as the apps do.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub success: Option<bool>,
+    /// The emails' settings. `None` once they're stopped, which the API sends as `null`.
+    #[serde(default, deserialize_with = "deserialize_object_or_none")]
+    #[uniffi(default = None)]
+    pub subscription: Option<ReaderCommentEmailSubscription>,
+}
+
+/// The emails of a site's new comments, in the answer to starting them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderCommentEmailSubscription {
+    /// The site. Sent as a string.
+    #[serde(
+        rename = "blog_ID",
+        default,
+        deserialize_with = "deserialize_optional_id"
+    )]
+    #[uniffi(default = None)]
+    pub blog_id: Option<WpComSiteId>,
+    /// When the emails were started, which the API calls `ts`.
+    #[serde(
+        rename = "ts",
+        default,
+        deserialize_with = "deserialize_optional_wp_gmt_date_time"
+    )]
+    #[uniffi(default = None)]
+    pub date_subscribed: Option<WpGmtDateTime>,
+}
+
+/// The answer to turning notifications of a site's new posts on or off.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderNotificationSubscriptionResponse {
+    /// Whether the site's new posts send the user a notification now.
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    pub subscribed: bool,
+    /// `true` in both answers seen. Go by [`Self::subscribed`], as the apps do.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub success: Option<bool>,
 }
 
 /// An ID the API sends as a number or a string, and as `0`, `false`, `""` or `null` when there
@@ -887,6 +1024,177 @@ mod tests {
                 "blog_id": 100000001,
                 "email_id": "abc123",
             })
+        );
+    }
+
+    /// The answer to changing how often a site's posts are emailed, recorded from WordPress.com,
+    /// with the site replaced. Starting the emails answers in the same shape.
+    #[test]
+    fn test_deserialize_post_email_subscription() {
+        let answer: ReaderPostEmailSubscriptionResponse = serde_json::from_str(include_str!(
+            "../../tests/wpcom/reader_subscriptions/post_email_subscription.json"
+        ))
+        .expect("the answer parses");
+
+        assert!(answer.subscribed);
+        assert_eq!(answer.success, Some(true));
+        assert_eq!(
+            answer.subscription,
+            Some(ReaderPostEmailSubscription {
+                blog_id: Some(WpComSiteId(100000001)),
+                delivery_frequency: Some(ReaderSubscriptionEmailFrequency::Daily),
+                status: Some("active".to_string()),
+                // Sent as `2026-11-19 07:14:48`, without an offset, and read as UTC.
+                date_subscribed: Some("2026-11-19T07:14:48+00:00".parse().unwrap()),
+            })
+        );
+    }
+
+    /// What the API sent to start the emails for a site the user had just unfollowed: the emails
+    /// were started, and `success` was `false`.
+    #[test]
+    fn test_post_emails_started_without_success() {
+        let answer: ReaderPostEmailSubscriptionResponse = serde_json::from_value(json!({
+            "success": false,
+            "subscribed": true,
+            "subscription": {
+                "blog_ID": "100000001",
+                "delivery_frequency": "instantly",
+                "status": "active",
+                "ts": "2026-11-19 07:14:48",
+            },
+        }))
+        .expect("the answer parses");
+
+        assert!(answer.subscribed);
+        assert_eq!(answer.success, Some(false));
+        let subscription = answer.subscription.expect("a subscription");
+        assert_eq!(
+            subscription.delivery_frequency,
+            Some(ReaderSubscriptionEmailFrequency::Instantly)
+        );
+    }
+
+    /// What the API sends once the emails of posts are stopped.
+    #[test]
+    fn test_deserialize_post_emails_stopped() {
+        let answer: ReaderPostEmailSubscriptionResponse = serde_json::from_str(
+            r#"{ "success": true, "subscribed": false, "subscription": null }"#,
+        )
+        .expect("the answer parses");
+        assert_eq!(
+            answer,
+            ReaderPostEmailSubscriptionResponse {
+                subscribed: false,
+                success: Some(true),
+                subscription: None,
+            }
+        );
+    }
+
+    /// The answer to starting the emails of a site's comments, recorded from WordPress.com, with
+    /// the site replaced.
+    #[test]
+    fn test_deserialize_comment_email_subscription() {
+        let answer: ReaderCommentEmailSubscriptionResponse = serde_json::from_str(include_str!(
+            "../../tests/wpcom/reader_subscriptions/comment_email_subscription.json"
+        ))
+        .expect("the answer parses");
+
+        assert!(answer.subscribed);
+        assert_eq!(answer.success, Some(true));
+        assert_eq!(
+            answer.subscription,
+            Some(ReaderCommentEmailSubscription {
+                blog_id: Some(WpComSiteId(100000001)),
+                date_subscribed: Some("2026-11-19T07:14:51+00:00".parse().unwrap()),
+            })
+        );
+    }
+
+    /// What the API sends once the emails of comments are stopped.
+    #[test]
+    fn test_deserialize_comment_emails_stopped() {
+        let answer: ReaderCommentEmailSubscriptionResponse = serde_json::from_str(
+            r#"{ "success": true, "subscribed": false, "subscription": null, "meta": { "links": {} } }"#,
+        )
+        .expect("the answer parses");
+        assert!(!answer.subscribed);
+        assert_eq!(answer.subscription, None);
+    }
+
+    #[rstest]
+    #[case(r#"{ "success": true, "subscribed": true }"#, true)]
+    #[case(r#"{ "success": true, "subscribed": false }"#, false)]
+    fn test_deserialize_notification_subscription(#[case] json: &str, #[case] subscribed: bool) {
+        let answer: ReaderNotificationSubscriptionResponse =
+            serde_json::from_str(json).expect("the answer parses");
+        assert_eq!(
+            answer,
+            ReaderNotificationSubscriptionResponse {
+                subscribed,
+                success: Some(true),
+            }
+        );
+    }
+
+    /// Only `subscribed` has to be in each answer.
+    #[test]
+    fn test_delivery_answers_with_only_subscribed() {
+        let json = r#"{ "subscribed": 1 }"#;
+        let posts: ReaderPostEmailSubscriptionResponse = serde_json::from_str(json).unwrap();
+        let comments: ReaderCommentEmailSubscriptionResponse = serde_json::from_str(json).unwrap();
+        let notifications: ReaderNotificationSubscriptionResponse =
+            serde_json::from_str(json).unwrap();
+        assert!(posts.subscribed && comments.subscribed && notifications.subscribed);
+        assert_eq!(
+            (posts.success, comments.success, notifications.success),
+            (None, None, None)
+        );
+
+        let without = r#"{ "success": true }"#;
+        assert!(serde_json::from_str::<ReaderPostEmailSubscriptionResponse>(without).is_err());
+        assert!(serde_json::from_str::<ReaderCommentEmailSubscriptionResponse>(without).is_err());
+        assert!(serde_json::from_str::<ReaderNotificationSubscriptionResponse>(without).is_err());
+    }
+
+    #[test]
+    fn test_the_body_to_start_or_stop_post_emails() {
+        // With nothing set it's an empty object, which is what the trials sent.
+        assert_eq!(
+            serde_json::to_value(ReaderPostEmailSubscriptionParams::default()).unwrap(),
+            json!({})
+        );
+
+        let everything = ReaderPostEmailSubscriptionParams {
+            delivery_frequency: Some(ReaderSubscriptionEmailFrequency::Weekly),
+            track_source: Some("reader".to_string()),
+            email_id: Some("abc123".to_string()),
+        };
+        assert_eq!(
+            serde_json::to_value(&everything).unwrap(),
+            json!({ "delivery_frequency": "weekly", "track_source": "reader", "email_id": "abc123" })
+        );
+    }
+
+    #[test]
+    fn test_the_body_to_change_the_post_email_frequency() {
+        let daily = ReaderPostEmailFrequencyParams {
+            delivery_frequency: ReaderSubscriptionEmailFrequency::Daily,
+            track_source: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&daily).unwrap(),
+            json!({ "delivery_frequency": "daily" })
+        );
+
+        let with_source = ReaderPostEmailFrequencyParams {
+            delivery_frequency: ReaderSubscriptionEmailFrequency::Instantly,
+            track_source: Some("reader".to_string()),
+        };
+        assert_eq!(
+            serde_json::to_value(&with_source).unwrap(),
+            json!({ "delivery_frequency": "instantly", "track_source": "reader" })
         );
     }
 

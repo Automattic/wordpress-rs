@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "subscribed": true,
+  "subscription": {
+    "blog_ID": "100000001",
+    "ts": "2026-11-19 07:14:51"
+  },
+  "meta": {
+    "links": {
+      "site": "https://public-api.wordpress.com/rest/v1.2/sites/100000001",
+      "posts": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/posts/0",
+      "help": "https://public-api.wordpress.com/rest/v1.1/sites/100000001/posts/0/subscribers/help"
+    }
+  }
+}

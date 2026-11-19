@@ -3,9 +3,11 @@ use crate::{
     wp_com::{
         WpComNamespace, WpComSiteId,
         reader_subscriptions::{
-            ReaderFollowSiteResponse, ReaderFollowUrlParams, ReaderFollowUrlResponse,
-            ReaderSiteFollowStatus, ReaderSubscriptionsParams, ReaderSubscriptionsResponse,
-            ReaderUnfollowUrlParams, ReaderUnfollowUrlResponse,
+            ReaderCommentEmailSubscriptionResponse, ReaderFollowSiteResponse,
+            ReaderFollowUrlParams, ReaderFollowUrlResponse, ReaderNotificationSubscriptionResponse,
+            ReaderPostEmailFrequencyParams, ReaderPostEmailSubscriptionParams,
+            ReaderPostEmailSubscriptionResponse, ReaderSiteFollowStatus, ReaderSubscriptionsParams,
+            ReaderSubscriptionsResponse, ReaderUnfollowUrlParams, ReaderUnfollowUrlResponse,
         },
     },
 };
@@ -40,6 +42,32 @@ enum ReaderSubscriptionsRequest {
     // Unfollows a site or a feed, by its subscription's ID or by the address that was followed.
     #[post(url = "/read/following/mine/delete", params = &ReaderUnfollowUrlParams, output = ReaderUnfollowUrlResponse)]
     UnfollowUrl,
+    // Starts emailing the user a site's new posts.
+    #[post(url = "/read/site/<wp_com_site_id>/post_email_subscriptions/new", params = &ReaderPostEmailSubscriptionParams, output = ReaderPostEmailSubscriptionResponse)]
+    SubscribeToPostEmails,
+    // Stops emailing the user a site's new posts.
+    #[post(url = "/read/site/<wp_com_site_id>/post_email_subscriptions/delete", params = &ReaderPostEmailSubscriptionParams, output = ReaderPostEmailSubscriptionResponse)]
+    UnsubscribeFromPostEmails,
+    // Changes how often a site's new posts are emailed. A frequency the API doesn't know is
+    // still a 200 with `success: true`, and sets the emails to `instantly`.
+    #[post(url = "/read/site/<wp_com_site_id>/post_email_subscriptions/update", params = &ReaderPostEmailFrequencyParams, output = ReaderPostEmailSubscriptionResponse)]
+    UpdatePostEmails,
+    // Starts emailing the user the new comments on a site's posts.
+    //
+    // The API declares a `post_id` for this and for stopping them, which it reads from the
+    // address only. A POST here sends its parameters in the body, so no `post_id` is sent, and
+    // both act on the whole site.
+    #[post(url = "/read/site/<wp_com_site_id>/comment_email_subscriptions/new", output = ReaderCommentEmailSubscriptionResponse)]
+    SubscribeToCommentEmails,
+    // Stops emailing the user the new comments on a site's posts.
+    #[post(url = "/read/site/<wp_com_site_id>/comment_email_subscriptions/delete", output = ReaderCommentEmailSubscriptionResponse)]
+    UnsubscribeFromCommentEmails,
+    // Turns on notifications of a site's new posts. It takes no parameters.
+    #[post(url = "/read/sites/<wp_com_site_id>/notification-subscriptions/new", output = ReaderNotificationSubscriptionResponse)]
+    SubscribeToNotifications,
+    // Turns off notifications of a site's new posts. It takes no parameters.
+    #[post(url = "/read/sites/<wp_com_site_id>/notification-subscriptions/delete", output = ReaderNotificationSubscriptionResponse)]
+    UnsubscribeFromNotifications,
 }
 
 impl DerivedRequest for ReaderSubscriptionsRequest {
@@ -47,6 +75,15 @@ impl DerivedRequest for ReaderSubscriptionsRequest {
         match self {
             // The newest list. `rest/v1.1` returns every subscription at once, without paging.
             Self::List => WpComNamespace::RestV1_2,
+            // The versions the apps and the web Reader use, and the newest of each.
+            Self::SubscribeToPostEmails
+            | Self::UnsubscribeFromPostEmails
+            | Self::UpdatePostEmails
+            | Self::SubscribeToCommentEmails
+            | Self::UnsubscribeFromCommentEmails => WpComNamespace::RestV1_2,
+            Self::SubscribeToNotifications | Self::UnsubscribeFromNotifications => {
+                WpComNamespace::V2
+            }
             // The only version of each: `rest/v1.2` has none of them.
             Self::IsFollowingSite
             | Self::FollowSite
@@ -64,7 +101,7 @@ mod tests {
         request::endpoint::ApiUrlResolver,
         wp_com::endpoint::tests::{
             fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
-            validate_wp_com_rest_v1_2_endpoint,
+            validate_wp_com_rest_v1_2_endpoint, validate_wp_com_v2_endpoint,
         },
     };
     use rstest::*;
@@ -114,6 +151,40 @@ mod tests {
     fn follow_and_unfollow_url(endpoint: ReaderSubscriptionsRequestEndpoint) {
         validate_wp_com_rest_v1_1_endpoint(endpoint.follow_url(), "/read/following/mine/new");
         validate_wp_com_rest_v1_1_endpoint(endpoint.unfollow_url(), "/read/following/mine/delete");
+    }
+
+    /// The emails are under `read/site`, and the notifications under `read/sites`.
+    #[rstest]
+    fn delivery_settings(endpoint: ReaderSubscriptionsRequestEndpoint) {
+        let site = WpComSiteId(3584907);
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.subscribe_to_post_emails(&site),
+            "/read/site/3584907/post_email_subscriptions/new",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.unsubscribe_from_post_emails(&site),
+            "/read/site/3584907/post_email_subscriptions/delete",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.update_post_emails(&site),
+            "/read/site/3584907/post_email_subscriptions/update",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.subscribe_to_comment_emails(&site),
+            "/read/site/3584907/comment_email_subscriptions/new",
+        );
+        validate_wp_com_rest_v1_2_endpoint(
+            endpoint.unsubscribe_from_comment_emails(&site),
+            "/read/site/3584907/comment_email_subscriptions/delete",
+        );
+        validate_wp_com_v2_endpoint(
+            endpoint.subscribe_to_notifications(&site),
+            "/read/sites/3584907/notification-subscriptions/new",
+        );
+        validate_wp_com_v2_endpoint(
+            endpoint.unsubscribe_from_notifications(&site),
+            "/read/sites/3584907/notification-subscriptions/delete",
+        );
     }
 
     #[fixture]
