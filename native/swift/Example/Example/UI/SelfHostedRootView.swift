@@ -39,9 +39,11 @@ struct SelfHostedRootView: View {
                 // Initial content for the third column.
                 Text("Select a category of settings in the sidebar.")
             }
+            #if !os(tvOS)
             .sheet(isPresented: $showUploadView) {
                 UploadView(viewModel: UploadViewModel(loginManager: loginManager))
             }
+            #endif
             .toolbar(content: {
                 ToolbarItem(placement: toolbarItemPlacement) {
                     Button("Log Out") {
@@ -52,11 +54,14 @@ struct SelfHostedRootView: View {
                         }
                     }
                 }
+                // The upload screen needs a photo or file picker, and tvOS has neither.
+                #if !os(tvOS)
                 ToolbarItem(placement: toolbarItemPlacement) {
                     Button("Add Media File") {
                         showUploadView = true
                     }
                 }
+                #endif
             })
             .task {
                 do {
