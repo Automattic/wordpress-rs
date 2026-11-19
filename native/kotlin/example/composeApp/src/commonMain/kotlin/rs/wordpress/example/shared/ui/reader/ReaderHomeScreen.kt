@@ -1,0 +1,192 @@
+package rs.wordpress.example.shared.ui.reader
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import uniffi.wp_api.ReaderInterest
+import uniffi.wp_api.ReaderMenuItem
+import uniffi.wp_api.ReaderMenuItemKind
+import uniffi.wp_api.WpComSiteIdentifier
+import uniffi.wp_mobile.ReaderCachedMenu
+import uniffi.wp_mobile.ReaderSavedException
+import uniffi.wp_mobile.ReaderStream
+import uniffi.wp_mobile_cache.DbTable
+import java.net.URLDecoder
+
+/** The tables the Reader home shows something from. */
+private val homeTables = setOf(
+    DbTable.READER_MENU_ITEMS,
+    DbTable.READER_ACTIONS,
+    DbTable.READER_SAVED_STATE,
+    DbTable.READER_SAVED_POSTS
+)
+
+private val listAddress = Regex("/read/list/([^/]+)/([^/]+)")
+
+/** What the Reader home shows, read from the cache, and what its buttons do. */
+@Stable
+internal class ReaderHomeState(val session: ReaderSession, val requests: ReaderRequests) {
+    private val service = session.service
+
+    var menu by mutableStateOf<ReaderCachedMenu?>(null)
+        private set
+
+    /** How many things the reader turned on or off are waiting to be sent. */
+    var pendingActions by mutableStateOf(0uL)
+        private set
+
+    /** How many saves and unsaves WordPress.com doesn't have. */
+    var pendingSaves by mutableIntStateOf(0)
+        private set
+
+    /** The tags a new reader picks from, once asked for. They aren't cached. */
+    var interests by mutableStateOf<List<ReaderInterest>>(emptyList())
+        private set
+
+    val followedTags: List<ReaderMenuItem> get() = menu?.followedTags.orEmpty()
+
+    val followedSlugs: List<String> get() = followedTags.map { it.slug ?: it.key }
+
+    suspend fun reload() {
+        val menu = io { service.menu() }
+        val actions = io { service.pendingActionCount() }
+        val saves = io { service.saved().savedPosts().loadItems().count { it.isPending } }
+        this.menu = menu
+        pendingActions = actions
+        pendingSaves = saves
+    }
+
+    fun refreshMenu() = requests.run {
+        service.refreshMenu()
+        "Fetched the menu."
+    }
+
+    /** Sends what's waiting: what the reader turned on or off, and their saves. */
+    fun sync() = requests.run {
+        val waiting = service.syncActions()
+        // The saved posts are synced even if that fails, and its error is shown with the rest.
+        val saves = try {
+            service.saved().sync()
+            "Saved posts are up to date."
+        } catch (e: ReaderSavedException) {
+            "Saved posts: ${readerErrorText(e)}"
+        }
+        if (session.isSignedIn) {
+            "$waiting actions still waiting to be sent. $saves"
+        } else {
+            "Nothing was sent: this reader's follows and saves stay on this device."
+        }
+    }
+
+    /** Takes over, for the account, the saves and tags from while nobody was signed in. */
+    fun adoptSignedOut() = requests.run {
+        val saves = service.saved().adoptSignedOutSaves()
+        val tags = service.adoptSignedOutTags()
+        "Took over ${saves.imported} saves (${saves.pending} waiting, ${saves.rejected.size} refused, " +
+            "${saves.waitingForRoom} over the limit) and $tags tags."
+    }
+
+    fun setTagFollowed(slug: String, title: String?, followed: Boolean) = requests.run {
+        service.setTagFollowed(slug, title, followed).text()
+    }
+
+    fun loadInterests() = requests.load({ service.interests() }) { loaded ->
+        interests = loaded
+        requests.say("${loaded.size} tags to pick from.")
+    }
+
+    fun cleanUp() = requests.run {
+        service.cleanUp()
+        "Removed what nothing shows any more."
+    }
+
+    /** Fetches a post by its address and opens it. Needs an account. */
+    fun openPostAtUrl(url: String, open: (ReaderDestination) -> Unit) =
+        requests.load({ service.fetchPostAtUrl(url) }) { post ->
+            open(ReaderDestination.Post(post.key, post.identity))
+        }
+
+    /** Fetches a site's post by its slug and opens it. `site` is the site's ID or its domain. */
+    fun openPostBySlug(site: String, slug: String, open: (ReaderDestination) -> Unit) {
+        val identifier = site.toULongOrNull()?.let { WpComSiteIdentifier.Id(it) }
+            ?: WpComSiteIdentifier.Slug(site)
+        requests.load({ service.fetchPostBySlug(identifier, slug) }) { post ->
+            open(ReaderDestination.Post(post.key, post.identity))
+        }
+    }
+
+    /**
+     * The stream a menu entry opens, or `null` for an entry of a kind this screen doesn't know.
+     * Discover is given the followed tags when signed out, since no server knows them.
+     */
+    fun streamOf(item: ReaderMenuItem): ReaderStream? = when (item.kind) {
+        is ReaderMenuItemKind.Stream -> ownStream(item.key, if (session.isSignedIn) emptyList() else followedSlugs)
+        is ReaderMenuItemKind.Organization -> organizationStream(item.slug)
+        is ReaderMenuItemKind.List -> listStream(item.url)
+        is ReaderMenuItemKind.Tag -> ReaderStream.Tag(item.slug ?: item.key)
+        is ReaderMenuItemKind.Other -> null
+    }
+}
+
+/** One of the Reader's own streams, by its key in the menu. */
+private fun ownStream(key: String, discoverTags: List<String>): ReaderStream? = when (key) {
+    "following" -> ReaderStream.Following
+    "liked" -> ReaderStream.Liked
+    "discover" -> ReaderStream.Discover(discoverTags)
+    else -> null
+}
+
+/** The posts of an organization's sites, by the organization's slug in the menu. */
+private fun organizationStream(slug: String?): ReaderStream? = when (slug) {
+    "a8c" -> ReaderStream.Automattic
+    "p2" -> ReaderStream.P2
+    else -> null
+}
+
+/** A list's stream. The list's owner and slug are only in the address of its posts. */
+private fun listStream(url: String?): ReaderStream? = url?.let { listAddress.find(it) }?.let { match ->
+    val (owner, slug) = match.destructured
+    ReaderStream.ReaderList(URLDecoder.decode(owner, "UTF-8"), URLDecoder.decode(slug, "UTF-8"))
+}
+
+/**
+ * The Reader's home: who the reader is, what's waiting to be sent, and every way into the Reader.
+ * It shows the menu the cache has straight away, then fetches it.
+ */
+@Composable
+fun ReaderHomeScreen(
+    session: ReaderSession,
+    open: (ReaderDestination) -> Unit,
+    onBackClicked: () -> Unit
+) {
+    val requests = rememberReaderRequests()
+    val state = remember(session) { ReaderHomeState(session, requests) }
+
+    ReloadWhenCacheChanges(
+        key = state,
+        isRelevantUpdate = { it.table in homeTables },
+        onError = requests::failed
+    ) { state.reload() }
+    OnFirstOpen(state) { state.refreshMenu() }
+
+    ReaderScaffold(title = "Reader", requests = requests, onBackClicked = onBackClicked) {
+        // The list waits for the cache, so that coming back to the screen finds the rows it was
+        // scrolled to.
+        if (state.menu == null) return@ReaderScaffold
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            item { ReaderIdentitySection(state) }
+            readerStreamRows(state, open)
+            readerTagRows(state, open)
+            item { ReaderSearchSection(open) }
+            item { ReaderOpenByIdSection(state, open) }
+            readerLinkRows(state, open)
+        }
+    }
+}

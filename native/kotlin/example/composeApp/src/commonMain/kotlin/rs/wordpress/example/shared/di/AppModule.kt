@@ -7,6 +7,7 @@ import rs.wordpress.api.kotlin.NetworkAvailabilityProvider
 import rs.wordpress.api.kotlin.WpApiClient
 import rs.wordpress.api.kotlin.WpRequestExecutor
 import rs.wordpress.cache.kotlin.WordPressApiCache
+import rs.wordpress.example.shared.ui.reader.ReaderSession
 import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
 import rs.wordpress.api.kotlin.WpComApiClient
 import rs.wordpress.api.kotlin.WpRequestResult
@@ -17,12 +18,13 @@ import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.wpAuthenticationFromUsernameAndPassword
 import uniffi.wp_mobile.Account
 import uniffi.wp_mobile.AccountRepository
-import uniffi.wp_mobile.ReaderSavedService
+import uniffi.wp_mobile.ReaderService
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.ReaderSavedSource
 import uniffi.wp_api.WpComBaseUrl
 import uniffi.wp_api.WpComDotOrgApiUrlResolver
 import uniffi.wp_mobile.SiteInfo
+import uniffi.wp_mobile_cache.ReaderOwner
 import uniffi.wp_mobile.WpService
 import java.io.File
 import java.net.URI
@@ -137,58 +139,87 @@ fun createWpComApiClient(
     )
 }
 
-/** Where the saved posts screen keeps its cache and each account's user ID, across launches. */
-private val readerSavedDirectory = File(System.getProperty("java.io.tmpdir"), "reader-saved-posts")
+/** Where the Reader keeps its cache and each account's user ID, across launches. */
+private val readerDirectory = File(System.getProperty("java.io.tmpdir"), "reader-saved-posts")
 
 /**
- * A cache file that lasts across launches, unlike the shared one in [cacheModule], so the saved
- * posts screen shows its list after a relaunch, offline.
+ * The Reader's cache: a file that lasts across launches, unlike the shared one in [cacheModule],
+ * so the Reader shows its streams and saved posts after a relaunch, offline. Every reader's data
+ * is in it, each under its owner.
  */
-val readerSavedCache: WordPressApiCache by lazy {
-    readerSavedDirectory.mkdirs()
-    WordPressApiCache(File(readerSavedDirectory, "cache.db").toPath()).apply {
+val readerCache: WordPressApiCache by lazy {
+    readerDirectory.mkdirs()
+    WordPressApiCache(File(readerDirectory, "cache.db").toPath()).apply {
         performMigrations()
     }
 }
 
 /**
  * The account's WordPress.com user ID: from `/me` the first time, and remembered after that, as an
- * app would have it, so the saved posts screen opens offline.
+ * app would have it, so the Reader opens offline.
  */
 private suspend fun wpComUserId(account: Account.WpCom, wpComApiClient: WpComApiClient): ULong {
-    val file = File(readerSavedDirectory, "user-${account.id}")
+    val file = File(readerDirectory, "user-${account.id}")
     file.takeIf { it.exists() }?.readText()?.toULongOrNull()?.let { return it }
     val userId = when (val result = wpComApiClient.request { it.me().get() }) {
         is WpRequestResult.Success -> result.response.data.id
         else -> error("Couldn't load the account's user ID: $result")
     }
-    readerSavedDirectory.mkdirs()
+    readerDirectory.mkdirs()
     file.writeText(userId.toString())
     return userId
 }
 
+/** Each reader's Reader, for as long as the app runs: a reader has one service, which every screen shares. */
+private val readerSessions = mutableMapOf<ReaderOwner, ReaderSession>()
+
+private fun readerSession(
+    owner: ReaderOwner,
+    label: String,
+    authentication: WpAuthentication,
+    networkAvailabilityProvider: NetworkAvailabilityProvider
+): ReaderSession = synchronized(readerSessions) {
+    readerSessions.getOrPut(owner) {
+        val service = ReaderService(
+            delegate = WpApiClientDelegate(
+                WpAuthenticationProvider.staticWithAuth(authentication),
+                requestExecutor = WpRequestExecutor(emptyList(), networkAvailabilityProvider),
+                middlewarePipeline = WpApiMiddlewarePipeline(listOf(DebugMiddleware())),
+                appNotifier = EmptyAppNotifier()
+            ),
+            cache = readerCache.cache,
+            owner = owner,
+            savedSource = ReaderSavedSource.ANDROID
+        )
+        ReaderSession(service, label, isSignedIn = owner is ReaderOwner.Account)
+    }
+}
+
 /**
- * The account's saved posts service, kept in [readerSavedCache] under the account's WordPress.com
- * user ID. Create one per account and share it.
+ * The Reader of the reader who isn't signed in to WordPress.com, kept in [readerCache]. Its client
+ * sends no authentication, and what the reader follows and saves stays on this device.
  */
-suspend fun createReaderSavedService(
+fun signedOutReaderSession(
+    networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
+): ReaderSession = readerSession(
+    owner = ReaderOwner.SignedOut,
+    label = "nobody (signed out)",
+    authentication = WpAuthentication.None,
+    networkAvailabilityProvider = networkAvailabilityProvider
+)
+
+/** The account's Reader, kept in [readerCache] under the account's WordPress.com user ID. */
+suspend fun accountReaderSession(
     account: Account.WpCom,
     wpComApiClient: WpComApiClient,
     networkAvailabilityProvider: NetworkAvailabilityProvider = NetworkAvailabilityProvider { true }
-): ReaderSavedService {
+): ReaderSession {
     val userId = wpComUserId(account, wpComApiClient)
-    return ReaderSavedService(
-        delegate = WpApiClientDelegate(
-            WpAuthenticationProvider.staticWithAuth(
-                WpAuthentication.Bearer(token = account.token)
-            ),
-            requestExecutor = WpRequestExecutor(emptyList(), networkAvailabilityProvider),
-            middlewarePipeline = WpApiMiddlewarePipeline(listOf(DebugMiddleware())),
-            appNotifier = EmptyAppNotifier()
-        ),
-        source = ReaderSavedSource.ANDROID,
-        cache = readerSavedCache.cache,
-        userId = userId
+    return readerSession(
+        owner = ReaderOwner.Account(userId),
+        label = "WordPress.com user $userId",
+        authentication = WpAuthentication.Bearer(token = account.token),
+        networkAvailabilityProvider = networkAvailabilityProvider
     )
 }
 

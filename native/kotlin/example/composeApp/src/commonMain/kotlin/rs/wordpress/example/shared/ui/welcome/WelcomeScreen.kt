@@ -40,6 +40,7 @@ import uniffi.wp_mobile.Account
 fun WelcomeScreen(
     authenticationEnabled: Boolean,
     onLoginClicked: () -> Unit,
+    onReaderClicked: () -> Unit,
     onSiteClicked: (Account) -> Unit
 ) {
     val welcomeViewModel = koinInject<WelcomeViewModel>()
@@ -83,6 +84,14 @@ fun WelcomeScreen(
                     headlineText = account.username,
                     onClicked = { onSiteClicked(account) },
                     onDismissed = { welcomeViewModel.deleteSite(account) }
+                )
+            }
+            item {
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text("Reader (signed out)") },
+                    supportingContent = { Text("The Reader without a WordPress.com account") },
+                    modifier = Modifier.clickable { onReaderClicked() }
                 )
             }
             val devUsername = TestCredentials.ADMIN_USERNAME
