@@ -192,7 +192,7 @@ public final class WpRequestExecutor: SafeRequestExecutor {
         #endif
     }
 
-    private func handleHttpsError(
+    func handleHttpsError(
         _ error: Error,
         for request: NetworkRequestContent
     ) -> Result<WpNetworkResponse, RequestExecutionError> {
@@ -215,8 +215,10 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 redirects: executorDelegate.redirects(for: request.requestId()),
                 reason: RequestExecutionErrorReason.invalidSslError(
                     reason: .certificateNotValidForName(
-                        // The request was sent, so its address is a URL. `.host` decodes percent escapes.
-                        hostname: (try? request.url() as URL)?.host ?? "unknown host",
+                        // The host URLSession checked the certificate against, which is the redirect target
+                        // after a redirect. Reading it from the error avoids re-parsing the request's address,
+                        // which `URL(string:)` can reject. See #1759.
+                        hostname: (error as? URLError)?.failingURL?.host ?? "unknown host",
                         presentedHostnames: siteCertificate.presentedHostnames()
                     )
                 ),
@@ -606,20 +608,13 @@ protocol NetworkRequestContent {
 }
 
 extension NetworkRequestContent {
-    /// The request's address as a `URL`, or `URLError(.badURL)` if it isn't a URL.
-    ///
-    /// The address can contain characters, such as `{` in a host or `|` in a path, that `URL(string:)` rejects. Its
-    /// RFC 3986 form percent-encodes them. See #1746 and #1759.
-    func url() throws -> URL {
-        let address: WpEndpointUrl = self.url()
-        guard let rfc3986 = wpEndpointUrlRfc3986(url: address), let url = URL(string: rfc3986) else {
-            throw URLError(.badURL, userInfo: [NSURLErrorFailingURLStringErrorKey: address])
-        }
-        return url
-    }
-
     func buildURLRequest(additionalHeaders: [String: String]) throws -> URLRequest {
-        var request = URLRequest(url: try self.url())
+        // The request's URL can contain characters, such as `{` in a host or `|` in a path, that `URL(string:)`
+        // rejects. Its RFC 3986 form percent-encodes them. See #1746.
+        guard let rfc3986 = wpEndpointUrlRfc3986(url: self.url()), let url = URL(string: rfc3986) else {
+            throw URLError(.badURL, userInfo: [NSURLErrorFailingURLStringErrorKey: self.url()])
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = self.method().rawValue
         request.allHTTPHeaderFields = self.headerMap().toFlatMap()
         request.allHTTPHeaderFields?[requestIdHeaderName] = self.requestId()

@@ -238,30 +238,60 @@ struct SafeRequestExecutorTests {
         #expect(requestUrl == "not a url")
     }
 
-    // Regression test for #1759: the certificate-mismatch error read the host with `URL(string:)` on the
-    // unencoded address, so it named the host "unknown host" for an address `URL(string:)` rejects.
+    // Regression test for #1759: the certificate-mismatch error re-parsed the request's address with
+    // `URL(string:)`, which rejects some addresses, and so named the host "unknown host". It also named the original
+    // host after a redirect, when the certificate came from the redirect target. It now reads the host from the
+    // error's `failingURL`, the address URLSession checked the certificate against. The request here starts on
+    // another host, as after a redirect.
+    #if !os(Linux)
     @Test(
-        "url() as URL names the host of an address URL(string:) rejects",
+        "A certificate-mismatch error names the host the certificate was checked against",
         arguments: [
-            ("https://{cdn}/wp-json/", "{cdn}"),
-            ("https://example.com/wp-json/a|b?q[0]=^", "example.com"),
-            ("https://example.com:8443/wp-json/", "example.com"),
-            ("https://[::1]/wp-json/", "::1")
+            ("https://wrong.example/wp-json/", "wrong.example"),
+            ("https://%7Bcdn%7D/wp-json/", "{cdn}")
         ]
     )
-    func testURLHostOfAddressURLRejects(url: String, expected: String) throws {
-        let url: URL = try StubRequest(url: url).url()
-        #expect(url.host == expected)
+    func testCertificateMismatchNamesFailingHost(failingURL: String, expected: String) throws {
+        let executor = WpRequestExecutor(urlSession: .shared)
+        let error = URLError(
+            .serverCertificateUntrusted,
+            userInfo: [
+                NSURLErrorFailingURLErrorKey: try #require(URL(string: failingURL)),
+                NSURLErrorFailingURLPeerTrustErrorKey: try exampleComTrust()
+            ]
+        )
+
+        let result = executor.handleHttpsError(error, for: StubRequest(url: "http://127.0.0.1/start"))
+
+        guard case .failure(.RequestExecutionFailed(_, _, let reason, _, _)) = result,
+            case .invalidSslError(.certificateNotValidForName(let hostname, let presentedHostnames)) = reason
+        else {
+            Issue.record("Expected .certificateNotValidForName, got \(result)")
+            return
+        }
+        #expect(hostname == expected)
+        #expect(presentedHostnames.contains("example.com"))
     }
 
-    @Test("url() as URL throws .badURL when the address isn't a URL")
-    func testURLOfInvalidAddressThrows() {
-        let error = #expect(throws: URLError.self) {
-            let _: URL = try StubRequest(url: "not a url").url()
-        }
-        #expect(error?.code == .badURL)
-        #expect(error?.failureURLString == "not a url")
+    /// A `SecTrust` for a self-signed certificate for `example.com`, standing in for the chain a server presents.
+    private func exampleComTrust() throws -> SecTrust {
+        let der = [
+            "MIIBejCCASCgAwIBAgIUC0qmNwyABN9Sg/5QF+Rr+xulnUswCgYIKoZIzj0EAwIwFjEUMBIGA1UEAwwLZXhhbXBsZS5jb20w",
+            "IBcNMjYxMTE5MjAzNzI5WhgPMjEyNjEwMjYyMDM3MjlaMBYxFDASBgNVBAMMC2V4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYI",
+            "KoZIzj0DAQcDQgAEaSdlBLYwfAZgkDBgMBNPkjFci+nfJ00K65NrnyAHLUZ415FH8teEpA9LuTdijuJDc22r386XbIms+gnI",
+            "2c8JX6NKMEgwHQYDVR0OBBYEFKD4xx0T45zoa1ouSe/m4txf/A5BMA8GA1UdEwEB/wQFMAMBAf8wFgYDVR0RBA8wDYILZXhh",
+            "bXBsZS5jb20wCgYIKoZIzj0EAwIDSAAwRQIhAOR7tGepLSZ2S7c/dwi60k61h1xe5On7VWhGsbOvdUAqAiA5ayrtBwCgYqRN",
+            "4Adz4i+jQElINq4eN9Irqkanpyfaew=="
+        ]
+        .joined()
+        let data = try #require(Data(base64Encoded: der))
+        let certificate = try #require(SecCertificateCreateWithData(nil, data as CFData))
+        var trust: SecTrust?
+        let status = SecTrustCreateWithCertificates(certificate, SecPolicyCreateSSL(true, nil), &trust)
+        #expect(status == errSecSuccess)
+        return try #require(trust)
     }
+    #endif
 }
 
 /// A `NetworkRequestContent` with a given URL, for testing how a `URLRequest` is built from it. Like
