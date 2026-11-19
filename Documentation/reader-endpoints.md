@@ -457,6 +457,8 @@ Public documentation: `rest/v1.1/help`.
 
 ### `GET /rest/v1.2/read/saved`
 
+The posts the user saved, newest save first, a page at a time. Needs a token.
+
 Request `ReaderSavedRequest::ListPosts`, response `ReaderSavedPostsResponse`.
 
 Parameters the library sends, in the query (`ReaderSavedPostsParams`):
@@ -473,6 +475,8 @@ Public documentation: not listed.
 
 ### `GET /wpcom/v2/read/saved/keys`
 
+The key of every post the user saved, newest first, up to 1,000. Needs a token.
+
 Request `ReaderSavedRequest::ListKeys`, response `ReaderSavedKeysResponse`.
 
 The library sends no parameters.
@@ -480,6 +484,8 @@ The library sends no parameters.
 Public documentation: the `wpcom/v2` route index.
 
 ### `POST /wpcom/v2/read/saved/new`
+
+Saves a post, an RSS post, or a page by its address. Needs a token. A user has at most 1,000 saves: one more is refused with `saved_limit_reached`.
 
 Request `ReaderSavedRequest::Save`, response `ReaderSavePostResponse`.
 
@@ -489,7 +495,7 @@ Parameters the library sends, in the body (`ReaderSavePostParams`):
 - `post_id` (`PostId`): A WordPress.com post.
 - `feed_item_id` (`ReaderFeedItemId`): An RSS post.
 - `url` (`String`): A page that isn't a Reader post. Saving a URL can still return one of the other keys: a URL already saved keeps its key, and the URL of a WordPress.com post resolves to the post.
-- `source` (`ReaderSavedSource`, required): No comment on the field.
+- `source` (`ReaderSavedSource`, required): The app making the save, which is recorded with it.
 - `title` (`String`): What to show for a page saved by URL, which the server doesn't fetch. Kept only when the URL isn't a WordPress.com post.
 - `excerpt` (`String`): What to show for a page saved by URL, which the server doesn't fetch. Kept only when the URL isn't a WordPress.com post.
 - `image_url` (`String`): What to show for a page saved by URL, which the server doesn't fetch. Kept only when the URL isn't a WordPress.com post.
@@ -505,6 +511,8 @@ Declared there, and not sent by the library:
 
 ### `POST /wpcom/v2/read/saved/delete`
 
+Unsaves what a key names. Needs a token.
+
 Request `ReaderSavedRequest::Unsave`, response `ReaderUnsavePostResponse`.
 
 Parameters the library sends, in the body (`ReaderUnsavePostParams`):
@@ -513,7 +521,7 @@ Parameters the library sends, in the body (`ReaderUnsavePostParams`):
 - `post_id` (`PostId`): A WordPress.com post.
 - `feed_item_id` (`ReaderFeedItemId`): An RSS post.
 - `url` (`String`): A page that isn't a Reader post. Saving a URL can still return one of the other keys: a URL already saved keeps its key, and the URL of a WordPress.com post resolves to the post.
-- `source` (`ReaderSavedSource`, required): No comment on the field.
+- `source` (`ReaderSavedSource`, required): The app removing the save.
 
 Public documentation: the `wpcom/v2` route index. It declares `blog_id`, `feed_item_id`, `post_id`, `source`, `url`, which the library sends.
 
@@ -523,12 +531,14 @@ Declared there, and not sent by the library:
 
 ### `POST /wpcom/v2/read/saved/bulk`
 
+Saves up to 100 posts or RSS posts in one request, and answers with one result a key. Needs a token.
+
 Request `ReaderSavedRequest::BulkSave`, response `ReaderSavedBulkResponse`.
 
 Parameters the library sends, in the body (`ReaderSavedBulkParams`):
 
 - `keys` (`Vec<ReaderSavedBulkKey>`, required): The keys to save, newest first: between 1 and 100, or the whole request is rejected. If they would take the user past the 1,000 save cap, the newest are the ones saved.
-- `source` (`ReaderSavedSource`, required): No comment on the field.
+- `source` (`ReaderSavedSource`, required): The app making the saves, which is recorded with each.
 
 Public documentation: the `wpcom/v2` route index. It declares `keys`, `source`, which the library sends.
 
@@ -544,9 +554,9 @@ Request `ReaderSeenRequest::SitePostsSeen`, response `ReaderSeenResponse`.
 
 Parameters the library sends, in the body (`ReaderSeenSitePostsParams`):
 
-- `blog_id` (`WpComSiteId`, required): No comment on the field.
+- `blog_id` (`WpComSiteId`, required): The site the posts are on.
 - `post_ids` (`Vec<PostId>`, required): At least one. The API refuses an empty list with `rest_invalid_param`.
-- `source` (`ReaderSeenSource`, required): No comment on the field.
+- `source` (`ReaderSeenSource`, required): The app marking the posts, which is recorded with the mark.
 
 Public documentation: the `wpcom/v2` route index. It declares `blog_id`, `post_ids`, `source`, which the library sends.
 
@@ -568,9 +578,9 @@ Request `ReaderSeenRequest::FeedItemsSeen`, response `ReaderSeenResponse`.
 
 Parameters the library sends, in the body (`ReaderSeenFeedItemsParams`):
 
-- `feed_id` (`ReaderFeedId`, required): No comment on the field.
+- `feed_id` (`ReaderFeedId`, required): The feed the posts are in.
 - `feed_item_ids` (`Vec<ReaderFeedItemId>`, required): At least one.
-- `source` (`ReaderSeenSource`, required): No comment on the field.
+- `source` (`ReaderSeenSource`, required): The app marking the posts, which is recorded with the mark.
 
 Public documentation: the `wpcom/v2` route index. It declares `feed_id`, `feed_item_ids`, `source`, which the library sends.
 
@@ -684,7 +694,9 @@ Public documentation: `rest/v1.1/help`.
 
 ### `POST /rest/v1.1/sites/$site/follows/new`
 
-Follows a WordPress.com or Jetpack site, by its ID. In trials the API refused the follow with a 400 `follow_failed` and an empty message, for a reason that isn't known, so the answer to a follow that works wasn't seen.
+Follows a WordPress.com or Jetpack site, by its ID, and answers as an unfollow does. For a site the user follows already it's a 400 `already_subscribed`.
+
+When this was first tried, the API refused every follow with a 400 `follow_failed` and an empty message. A day later it took them, with nothing changed on this side.
 
 The API declares a `source` for it, which says where the follow came from, and reads it from the address only: the apps add `?source=android` or `?source=ios`. A POST here sends its parameters in the body, so no `source` is sent. A follow by address takes one.
 

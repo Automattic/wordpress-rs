@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Swift exports `UpdateHook`, `DbTable` and `HookAction` from `WordPressApiCache`, whose own methods use them. Kotlin's `WpComApiClient.makeReaderService` creates the Reader service.
 - `wp_com_e2e` has a trial that likes a post through the Reader service and puts it back. It runs only against a site the account owns, named in `WP_COM_E2E_OWN_SITE_ID`.
 - `scripts/example-app-adb-script.py` drives the Kotlin example app on an Android emulator or device from a script of steps, and saves a screenshot and a list of what's on screen where the script asks, as `scripts/example-app-ui-script.sh` does for the Swift app. Scripts for the Reader signed out and for offline reading come with each app.
+- `Documentation/reader-endpoints.md` lists every WordPress.com Reader endpoint the library calls, with the parameters it sends and how they compare with WordPress.com's public documentation. `scripts/reader-endpoints-doc.py` regenerates it from the code comments, and its `--check` fails when the document is out of date.
 
 ### Changed
 
