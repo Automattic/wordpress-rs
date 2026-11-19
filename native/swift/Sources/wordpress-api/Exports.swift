@@ -515,14 +515,27 @@ public typealias ReaderPostLikeResponse = WordPressAPIInternal.ReaderPostLikeRes
 public typealias ReaderUnreadableLike = WordPressAPIInternal.ReaderUnreadableLike
 
 // MARK: Reader Subscriptions
+public typealias ReaderFollowSiteResponse = WordPressAPIInternal.ReaderFollowSiteResponse
+public typealias ReaderFollowUrlParams = WordPressAPIInternal.ReaderFollowUrlParams
+public typealias ReaderFollowUrlResponse = WordPressAPIInternal.ReaderFollowUrlResponse
 public typealias ReaderSiteFollowStatus = WordPressAPIInternal.ReaderSiteFollowStatus
 public typealias ReaderSubscription = WordPressAPIInternal.ReaderSubscription
 public typealias ReaderSubscriptionsParams = WordPressAPIInternal.ReaderSubscriptionsParams
 public typealias ReaderSubscriptionsRequestExecutor = WordPressAPIInternal.ReaderSubscriptionsRequestExecutor
+public typealias ReaderSubscriptionsRequestFollowSiteResponse =
+    WordPressAPIInternal.ReaderSubscriptionsRequestFollowSiteResponse
+public typealias ReaderSubscriptionsRequestFollowUrlResponse =
+    WordPressAPIInternal.ReaderSubscriptionsRequestFollowUrlResponse
 public typealias ReaderSubscriptionsRequestIsFollowingSiteResponse =
     WordPressAPIInternal.ReaderSubscriptionsRequestIsFollowingSiteResponse
 public typealias ReaderSubscriptionsRequestListResponse = WordPressAPIInternal.ReaderSubscriptionsRequestListResponse
+public typealias ReaderSubscriptionsRequestUnfollowSiteResponse =
+    WordPressAPIInternal.ReaderSubscriptionsRequestUnfollowSiteResponse
+public typealias ReaderSubscriptionsRequestUnfollowUrlResponse =
+    WordPressAPIInternal.ReaderSubscriptionsRequestUnfollowUrlResponse
 public typealias ReaderSubscriptionsResponse = WordPressAPIInternal.ReaderSubscriptionsResponse
+public typealias ReaderUnfollowUrlParams = WordPressAPIInternal.ReaderUnfollowUrlParams
+public typealias ReaderUnfollowUrlResponse = WordPressAPIInternal.ReaderUnfollowUrlResponse
 public typealias ReaderUnreadableSubscription = WordPressAPIInternal.ReaderUnreadableSubscription
 
 // MARK: Reader Menu and Tags

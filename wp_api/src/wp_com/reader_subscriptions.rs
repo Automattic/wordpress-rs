@@ -1,6 +1,11 @@
-//! The sites and feeds the user is subscribed to in the Reader.
+//! The sites and feeds the user is subscribed to in the Reader, and following and unfollowing one.
 //!
-//! Both requests need a token: signed out, each is a 403 `authorization_required`.
+//! The list and the follow check need a token: signed out, each is a 403
+//! `authorization_required`. Following and unfollowing act for the user, so they need one too.
+//!
+//! There are two ways to follow. By its ID, for a WordPress.com or Jetpack site, which the apps
+//! use when they have a site's ID. By its address, for anything with a feed, which is the only way
+//! to follow an RSS feed, and how the web Reader follows.
 
 use crate::{
     date::{WpGmtDateTime, deserialize_optional_wp_gmt_date_time},
@@ -16,7 +21,8 @@ use crate::{
 use serde::{Deserialize, Deserializer, Serialize};
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
-    LenientVec, deserialize_optional_bool_or_int, deserialize_u64_or_string_or_none,
+    LenientVec, deserialize_bool_or_int, deserialize_optional_bool_or_int,
+    deserialize_u64_or_string_or_none,
 };
 
 wp_content_u64_id!(ReaderSubscriptionId);
@@ -306,6 +312,93 @@ pub struct ReaderSubscriptionNotificationDelivery {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ReaderSiteFollowStatus {
     pub is_following: bool,
+}
+
+/// The answer to following or unfollowing a site by its ID.
+///
+/// It's built from the answer to an unfollow, the only one seen. In trials the API refused the
+/// follow with a 400 `follow_failed`. A follow is taken to answer in the same shape: the Android
+/// app reads `is_following` from both.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderFollowSiteResponse {
+    /// Whether the user follows the site now.
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    pub is_following: bool,
+    /// `true` for an unfollow that removed the subscription. An unfollow with nothing to remove
+    /// isn't a `false` here: it's a 400 `are_not_subscribed`.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_or_int")]
+    #[uniffi(default = None)]
+    pub success: Option<bool>,
+}
+
+/// Request body to follow a site or a feed by its address.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderFollowUrlParams {
+    /// The address of the site or feed to follow.
+    pub url: String,
+    /// Where the follow came from. The apps send `android` and `ios`. Other text is taken too,
+    /// and none tried changed the answer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub source: Option<String>,
+}
+
+/// The answer to following a site or a feed by its address.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderFollowUrlResponse {
+    /// Whether the user is subscribed now. `false`, in a 200, when the address wasn't followed:
+    /// [`Self::info`] then says why.
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    pub subscribed: bool,
+    /// The new subscription. `None` when the address wasn't followed.
+    ///
+    /// It's the subscription the list returns, with fewer fields: its IDs, its
+    /// [`ReaderSubscription::url`], when the user subscribed, and its delivery methods. It has no
+    /// name, feed address, icon, counts or flags. Its `url` can differ from the address that was
+    /// sent: one sent with `https` came back with `http`.
+    #[serde(default, deserialize_with = "deserialize_object_or_none")]
+    #[uniffi(default = None)]
+    pub subscription: Option<ReaderSubscription>,
+    /// Why the address wasn't followed: `invalid_feed` for one with no feed, such as a host that
+    /// doesn't exist. `None` when it was followed.
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    #[uniffi(default = None)]
+    pub info: Option<String>,
+}
+
+/// Request body to unfollow a site or a feed, by its subscription or by the address followed.
+/// Send one of [`Self::sub_id`] and [`Self::url`].
+///
+/// Only an unfollow by `url` was tried. The other three are here because the API declares them
+/// and the web Reader can send them: no effect of theirs was seen.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, uniffi::Record)]
+pub struct ReaderUnfollowUrlParams {
+    /// The subscription to remove: a [`ReaderSubscription::id`]. The web Reader sends it rather
+    /// than `url` whenever it has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub sub_id: Option<ReaderSubscriptionId>,
+    /// The address that was followed, for when the subscription's ID isn't known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub url: Option<String>,
+    /// The site to unsubscribe from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub blog_id: Option<WpComSiteId>,
+    /// An email's tracking ID, for an unfollow made from an email.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[uniffi(default = None)]
+    pub email_id: Option<String>,
+}
+
+/// The answer to unfollowing by subscription or by address.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderUnfollowUrlResponse {
+    /// Whether the user is still subscribed: `false` for the one unfollow seen. The apps and the
+    /// web Reader take anything else as a failure.
+    #[serde(deserialize_with = "deserialize_bool_or_int")]
+    pub subscribed: bool,
 }
 
 /// An ID the API sends as a number or a string, and as `0`, `false`, `""` or `null` when there
@@ -623,6 +716,178 @@ mod tests {
         let result =
             serde_json::from_value::<ReaderSubscriptionsResponse>(json!({ "subscriptions": 7 }));
         assert!(result.is_err());
+    }
+
+    /// The answer to unfollowing a site by its ID, recorded from WordPress.com, with the site
+    /// replaced.
+    #[test]
+    fn test_deserialize_unfollow_site() {
+        let answer: ReaderFollowSiteResponse = serde_json::from_str(include_str!(
+            "../../tests/wpcom/reader_subscriptions/unfollow_site.json"
+        ))
+        .expect("the answer parses");
+        assert_eq!(
+            answer,
+            ReaderFollowSiteResponse {
+                is_following: false,
+                success: Some(true),
+            }
+        );
+    }
+
+    /// The shape a follow by ID that works is taken to have, which wasn't seen, and an answer
+    /// with only `is_following` in it.
+    #[rstest]
+    #[case(json!({ "success": true, "is_following": true }), Some(true))]
+    #[case(json!({ "success": 1, "is_following": 1 }), Some(true))]
+    #[case(json!({ "is_following": true }), None)]
+    fn test_a_follow_site_answer(#[case] answer: serde_json::Value, #[case] success: Option<bool>) {
+        let answer: ReaderFollowSiteResponse =
+            serde_json::from_value(answer).expect("the answer parses");
+        assert!(answer.is_following);
+        assert_eq!(answer.success, success);
+    }
+
+    #[test]
+    fn test_a_follow_site_answer_without_is_following_is_an_error() {
+        let result = serde_json::from_value::<ReaderFollowSiteResponse>(json!({ "success": true }));
+        assert!(result.is_err());
+    }
+
+    /// The answer to following a WordPress.com site by its address, recorded from WordPress.com,
+    /// with the site and the IDs replaced. It keeps the types the API sent: the subscription's
+    /// `ID` and `blog_ID` are strings, and its `feed_ID` is a number, which the list sends as a
+    /// string.
+    #[test]
+    fn test_deserialize_follow_url() {
+        let answer: ReaderFollowUrlResponse = serde_json::from_str(include_str!(
+            "../../tests/wpcom/reader_subscriptions/follow_url.json"
+        ))
+        .expect("the answer parses");
+
+        assert!(answer.subscribed);
+        assert_eq!(answer.info, None);
+        let subscription = answer.subscription.expect("a subscription");
+        assert_eq!(subscription.id, Some(ReaderSubscriptionId(900000005)));
+        assert_eq!(subscription.blog_id, Some(WpComSiteId(100000001)));
+        assert_eq!(subscription.feed_id, Some(ReaderFeedId(200000001)));
+        assert_eq!(
+            subscription.url.as_deref(),
+            Some("http://example.wordpress.com")
+        );
+        assert_eq!(
+            subscription.date_subscribed,
+            Some("2026-11-19T07:14:56+00:00".parse().unwrap())
+        );
+        let email = subscription.delivery_methods.email.expect("an email");
+        assert_eq!(email.send_posts, Some(true));
+        assert_eq!(email.send_comments, Some(false));
+        assert_eq!(
+            email.post_delivery_frequency,
+            Some(ReaderSubscriptionEmailFrequency::Instantly)
+        );
+        assert_eq!(
+            subscription.delivery_methods.notification,
+            Some(ReaderSubscriptionNotificationDelivery {
+                send_posts: Some(false)
+            })
+        );
+        // What the list sends and a follow doesn't.
+        assert_eq!(subscription.name, None);
+        assert_eq!(subscription.feed_url, None);
+        assert_eq!(subscription.is_rss, None);
+    }
+
+    /// What the API sends, in a 200, for an address with no feed.
+    #[test]
+    fn test_deserialize_follow_url_without_a_feed() {
+        let answer: ReaderFollowUrlResponse =
+            serde_json::from_str(r#"{ "info": "invalid_feed", "subscribed": false }"#)
+                .expect("the answer parses");
+        assert_eq!(
+            answer,
+            ReaderFollowUrlResponse {
+                subscribed: false,
+                subscription: None,
+                info: Some("invalid_feed".to_string()),
+            }
+        );
+    }
+
+    #[rstest]
+    #[case(json!({ "subscribed": false, "subscription": null, "info": false }))]
+    #[case(json!({ "subscribed": 0, "subscription": [], "info": "" }))]
+    fn test_a_follow_url_answer_with_nothing_set(#[case] answer: serde_json::Value) {
+        let answer: ReaderFollowUrlResponse =
+            serde_json::from_value(answer).expect("the answer parses");
+        assert!(!answer.subscribed);
+        assert_eq!(answer.subscription, None);
+        assert_eq!(answer.info, None);
+    }
+
+    #[test]
+    fn test_deserialize_unfollow_url() {
+        let answer: ReaderUnfollowUrlResponse =
+            serde_json::from_str(r#"{ "subscribed": false }"#).expect("the answer parses");
+        assert!(!answer.subscribed);
+    }
+
+    #[test]
+    fn test_the_body_to_follow_a_url() {
+        let with_source = ReaderFollowUrlParams {
+            url: "https://example.wordpress.com".to_string(),
+            source: Some("ios".to_string()),
+        };
+        assert_eq!(
+            serde_json::to_value(&with_source).unwrap(),
+            json!({ "url": "https://example.wordpress.com", "source": "ios" })
+        );
+
+        let without = ReaderFollowUrlParams {
+            url: "https://example.wordpress.com/feed/".to_string(),
+            source: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&without).unwrap(),
+            json!({ "url": "https://example.wordpress.com/feed/" })
+        );
+    }
+
+    #[test]
+    fn test_the_body_to_unfollow() {
+        let by_url = ReaderUnfollowUrlParams {
+            url: Some("https://example.wordpress.com".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_value(&by_url).unwrap(),
+            json!({ "url": "https://example.wordpress.com" })
+        );
+
+        let by_subscription = ReaderUnfollowUrlParams {
+            sub_id: Some(ReaderSubscriptionId(900000005)),
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_value(&by_subscription).unwrap(),
+            json!({ "sub_id": 900000005 })
+        );
+
+        let everything = ReaderUnfollowUrlParams {
+            sub_id: Some(ReaderSubscriptionId(900000005)),
+            url: Some("https://example.wordpress.com".to_string()),
+            blog_id: Some(WpComSiteId(100000001)),
+            email_id: Some("abc123".to_string()),
+        };
+        assert_eq!(
+            serde_json::to_value(&everything).unwrap(),
+            json!({
+                "sub_id": 900000005,
+                "url": "https://example.wordpress.com",
+                "blog_id": 100000001,
+                "email_id": "abc123",
+            })
+        );
     }
 
     #[rstest]

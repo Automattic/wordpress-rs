@@ -1,0 +1,31 @@
+{
+  "subscription": {
+    "ID": "900000005",
+    "blog_ID": "100000001",
+    "URL": "http://example.wordpress.com",
+    "date_subscribed": "2026-11-19T07:14:56+00:00",
+    "meta": {
+      "links": {
+        "site": "https://public-api.wordpress.com/rest/v1.1/sites/100000001"
+      }
+    },
+    "feed_ID": 200000001,
+    "delivery_methods": {
+      "email": {
+        "send_posts": true,
+        "send_comments": false,
+        "post_delivery_frequency": "instantly",
+        "date_subscribed": "2026-11-19 07:14:57"
+      },
+      "notification": {
+        "send_posts": false
+      }
+    }
+  },
+  "subscribed": true,
+  "meta": {
+    "links": {
+      "site": "https://public-api.wordpress.com/rest/v1.1/sites/100000001"
+    }
+  }
+}
