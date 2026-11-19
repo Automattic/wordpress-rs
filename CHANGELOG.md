@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
+- `ReaderPostRecord` keeps more of a Reader post: its short URL, author ID, cross-post, word count, the site's language and kind, and whether likes and comments are open, whether the user subscribed to its comments and whether they've seen it. Each new field has a default, so code that builds a record still compiles.
 
 ### Fixed
 

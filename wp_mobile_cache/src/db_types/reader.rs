@@ -5,7 +5,9 @@ use std::str::FromStr;
 use wp_api::date::WpGmtDateTime;
 use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
-use wp_api::wp_com::reader_posts::{ReaderPost, ReaderPostTag, reader_post_display_image_url};
+use wp_api::wp_com::reader_posts::{
+    ReaderCrossPost, ReaderPost, ReaderPostTag, reader_post_display_image_url,
+};
 use wp_api::wp_com::reader_saved::{
     ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey, reader_saved_key_for_post,
 };
@@ -74,6 +76,45 @@ pub struct ReaderPostRecord {
     /// saved by URL.
     #[uniffi(default = None)]
     pub comment_count: Option<u64>,
+    #[uniffi(default = None)]
+    pub short_url: Option<String>,
+    /// Whether the site asks readers to see the excerpt rather than the whole post.
+    #[uniffi(default = None)]
+    pub use_excerpt: Option<bool>,
+    /// `0` for an RSS post's author.
+    #[uniffi(default = None)]
+    pub author_id: Option<u64>,
+    /// The site's language, such as `en`.
+    #[uniffi(default = None)]
+    pub site_locale: Option<String>,
+    #[uniffi(default = None)]
+    pub site_is_private: Option<bool>,
+    #[uniffi(default = None)]
+    pub site_is_atomic: Option<bool>,
+    #[uniffi(default = None)]
+    pub is_jetpack: Option<bool>,
+    /// Set for an Automattic (`1`) or P2 (`2`) site.
+    #[uniffi(default = None)]
+    pub organization_id: Option<u64>,
+    /// Set when the post is a cross-post of another.
+    #[uniffi(default = None)]
+    pub cross_post: Option<ReaderCrossPost>,
+    #[uniffi(default = None)]
+    pub likes_enabled: Option<bool>,
+    #[uniffi(default = None)]
+    pub comments_open: Option<bool>,
+    #[uniffi(default = None)]
+    pub can_subscribe_comments: Option<bool>,
+    #[uniffi(default = None)]
+    pub is_subscribed_comments: Option<bool>,
+    /// Whether the user gets notifications for the post's comments.
+    #[uniffi(default = None)]
+    pub receives_comment_notifications: Option<bool>,
+    /// `None` when the post doesn't support seen status.
+    #[uniffi(default = None)]
+    pub is_seen: Option<bool>,
+    #[uniffi(default = None)]
+    pub word_count: Option<u64>,
 }
 
 impl ReaderPostRecord {
@@ -104,6 +145,22 @@ impl ReaderPostRecord {
             site_icon_url: None,
             tags: None,
             comment_count: None,
+            short_url: None,
+            use_excerpt: None,
+            author_id: None,
+            site_locale: None,
+            site_is_private: None,
+            site_is_atomic: None,
+            is_jetpack: None,
+            organization_id: None,
+            cross_post: None,
+            likes_enabled: None,
+            comments_open: None,
+            can_subscribe_comments: None,
+            is_subscribed_comments: None,
+            receives_comment_notifications: None,
+            is_seen: None,
+            word_count: None,
         })
     }
 
@@ -144,6 +201,22 @@ impl ReaderPostRecord {
             site_icon_url: post.site_icon_url.clone(),
             tags: post.tags.clone(),
             comment_count: post.comment_count,
+            short_url: post.short_url.clone(),
+            use_excerpt: post.use_excerpt,
+            author_id: author.and_then(|author| author.id),
+            site_locale: post.site_locale.clone(),
+            site_is_private: post.site_is_private,
+            site_is_atomic: post.site_is_atomic,
+            is_jetpack: post.is_jetpack,
+            organization_id: post.organization_id,
+            cross_post: post.cross_post.clone(),
+            likes_enabled: post.likes_enabled,
+            comments_open: post.comments_open,
+            can_subscribe_comments: post.can_subscribe_comments,
+            is_subscribed_comments: post.is_subscribed_comments,
+            receives_comment_notifications: post.subscribed_comments_notifications,
+            is_seen: post.is_seen,
+            word_count: post.word_count,
             ..Self::from_identity(post.identity.clone())?
         })
     }

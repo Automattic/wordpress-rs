@@ -11,72 +11,158 @@ use crate::{
     list_metadata::ListState,
     repository::QueryExecutor,
 };
-use rusqlite::{OptionalExtension, Row, params};
+use rusqlite::{OptionalExtension, Row, params, types::Value};
 use wp_api::date::WpGmtDateTime;
 use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::reader_posts::ReaderCrossPost;
 use wp_api::wp_com::reader_saved::{
     ReaderFeedId, ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey,
 };
 
-/// The `reader_posts` columns [`ReaderPostRecord`] is read from, in the order [`post_from_row`]
-/// reads them, prefixed with `p.`.
-const POST_COLUMNS: &str = "p.rowid, p.identity_key, p.post_id, p.site_id, p.feed_id, \
-    p.feed_item_id, p.is_external, p.url, p.global_id, p.title, p.excerpt, p.content, p.date, \
-    p.modified, p.author_name, p.author_avatar_url, p.author_url, p.featured_image, p.site_name, \
-    p.site_url, p.feed_url, p.like_count, p.i_like, p.is_following, p.site_icon_url, p.tags, \
-    p.comment_count, p.display_image_url, p.editorial_image_url";
-const POST_COLUMN_COUNT: usize = 29;
+/// The `reader_posts` columns a [`ReaderPostRecord`] is read from.
+const POST_FIELDS: &[&str] = &[
+    "rowid",
+    "identity_key",
+    "post_id",
+    "site_id",
+    "feed_id",
+    "feed_item_id",
+    "is_external",
+    "url",
+    "global_id",
+    "short_url",
+    "title",
+    "excerpt",
+    "content",
+    "use_excerpt",
+    "date",
+    "modified",
+    "author_id",
+    "author_name",
+    "author_avatar_url",
+    "author_url",
+    "featured_image",
+    "display_image_url",
+    "editorial_image_url",
+    "site_name",
+    "site_url",
+    "feed_url",
+    "site_icon_url",
+    "site_locale",
+    "site_is_private",
+    "site_is_atomic",
+    "is_jetpack",
+    "organization_id",
+    "tags",
+    "xpost_site_id",
+    "xpost_post_id",
+    "xpost_post_url",
+    "xpost_comment_url",
+    "like_count",
+    "i_like",
+    "likes_enabled",
+    "is_following",
+    "comment_count",
+    "comments_open",
+    "can_subscribe_comments",
+    "is_subscribed_comments",
+    "receives_comment_notifications",
+    "is_seen",
+    "word_count",
+];
 
-/// Reads a post from `POST_COLUMNS`, starting at column `offset`.
-fn post_from_row(row: &Row, offset: usize) -> Result<(RowId, ReaderPostRecord), SqliteDbError> {
-    let column = |index: usize| offset + index;
-    let optional_date = |index: usize| -> Result<_, SqliteDbError> {
-        row.get::<_, Option<String>>(column(index))?
+/// [`POST_FIELDS`] as a column list for a `SELECT` from `reader_posts p`. Each column is named
+/// `p_<field>`, which is what [`post_from_row`] reads it by, so the list can sit anywhere among a
+/// query's other columns.
+fn post_columns() -> String {
+    POST_FIELDS
+        .iter()
+        .map(|field| format!("p.{field} AS p_{field}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Reads a post from the columns of [`post_columns`].
+fn post_from_row(row: &Row) -> Result<(RowId, ReaderPostRecord), SqliteDbError> {
+    let optional_date = |name: &str| -> Result<_, SqliteDbError> {
+        row.get::<_, Option<String>>(name)?
             .map(|text| reader_date_from_text(&text))
             .transpose()
     };
-    let identity_key: String = row.get(column(1))?;
-    let editorial_image_url: Option<String> = row.get(column(28))?;
+    let identity_key: String = row.get("p_identity_key")?;
+    let editorial_image_url: Option<String> = row.get("p_editorial_image_url")?;
+    let cross_post = ReaderCrossPost {
+        site_id: row
+            .get::<_, Option<u64>>("p_xpost_site_id")?
+            .map(WpComSiteId),
+        post_id: row.get("p_xpost_post_id")?,
+        post_url: row.get("p_xpost_post_url")?,
+        comment_url: row.get("p_xpost_comment_url")?,
+    };
+    let is_cross_post = cross_post.site_id.is_some()
+        || cross_post.post_id.is_some()
+        || cross_post.post_url.is_some()
+        || cross_post.comment_url.is_some();
     let record = ReaderPostRecord {
         key: reader_saved_key_from_text(&identity_key)?,
         identity: ReaderPostSaveIdentity {
-            id: row.get(column(2))?,
-            site_id: row.get::<_, Option<u64>>(column(3))?.map(WpComSiteId),
-            feed_id: row.get::<_, Option<u64>>(column(4))?.map(ReaderFeedId),
-            feed_item_id: row.get::<_, Option<u64>>(column(5))?.map(ReaderFeedItemId),
-            is_external: row.get(column(6))?,
-            url: row.get(column(7))?,
+            id: row.get("p_post_id")?,
+            site_id: row.get::<_, Option<u64>>("p_site_id")?.map(WpComSiteId),
+            feed_id: row.get::<_, Option<u64>>("p_feed_id")?.map(ReaderFeedId),
+            feed_item_id: row
+                .get::<_, Option<u64>>("p_feed_item_id")?
+                .map(ReaderFeedItemId),
+            is_external: row.get("p_is_external")?,
+            url: row.get("p_url")?,
         },
-        global_id: row.get(column(8))?,
-        title: row.get(column(9))?,
-        excerpt: row.get(column(10))?,
-        content: row.get(column(11))?,
-        date: optional_date(12)?,
-        modified: optional_date(13)?,
-        author_name: row.get(column(14))?,
-        author_avatar_url: row.get(column(15))?,
-        author_url: row.get(column(16))?,
-        featured_image: row.get(column(17))?,
-        site_name: row.get(column(18))?,
-        site_url: row.get(column(19))?,
-        feed_url: row.get(column(20))?,
-        like_count: row.get(column(21))?,
-        i_like: row.get(column(22))?,
-        is_following: row.get(column(23))?,
-        site_icon_url: row.get(column(24))?,
+        global_id: row.get("p_global_id")?,
+        title: row.get("p_title")?,
+        excerpt: row.get("p_excerpt")?,
+        content: row.get("p_content")?,
+        date: optional_date("p_date")?,
+        modified: optional_date("p_modified")?,
+        author_name: row.get("p_author_name")?,
+        author_avatar_url: row.get("p_author_avatar_url")?,
+        author_url: row.get("p_author_url")?,
+        featured_image: row.get("p_featured_image")?,
+        site_name: row.get("p_site_name")?,
+        site_url: row.get("p_site_url")?,
+        feed_url: row.get("p_feed_url")?,
+        like_count: row.get("p_like_count")?,
+        i_like: row.get("p_i_like")?,
+        is_following: row.get("p_is_following")?,
+        site_icon_url: row.get("p_site_icon_url")?,
         tags: row
-            .get::<_, Option<String>>(column(25))?
+            .get::<_, Option<String>>("p_tags")?
             .map(|json| serde_json::from_str(&json))
             .transpose()
             .map_err(|error| {
                 SqliteDbError::SqliteError(format!("Invalid Reader post tags: {error}"))
             })?,
-        comment_count: row.get(column(26))?,
+        comment_count: row.get("p_comment_count")?,
         // An editor's pick is shown ahead of the stored image.
-        display_image_url: editorial_image_url.clone().or(row.get(column(27))?),
+        display_image_url: editorial_image_url
+            .clone()
+            .or(row.get("p_display_image_url")?),
         editorial_image_url,
+        short_url: row.get("p_short_url")?,
+        use_excerpt: row.get("p_use_excerpt")?,
+        author_id: row.get("p_author_id")?,
+        site_locale: row.get("p_site_locale")?,
+        site_is_private: row.get("p_site_is_private")?,
+        site_is_atomic: row.get("p_site_is_atomic")?,
+        is_jetpack: row.get("p_is_jetpack")?,
+        organization_id: row.get("p_organization_id")?,
+        cross_post: is_cross_post.then_some(cross_post),
+        likes_enabled: row.get("p_likes_enabled")?,
+        comments_open: row.get("p_comments_open")?,
+        can_subscribe_comments: row.get("p_can_subscribe_comments")?,
+        is_subscribed_comments: row.get("p_is_subscribed_comments")?,
+        receives_comment_notifications: row.get("p_receives_comment_notifications")?,
+        is_seen: row.get("p_is_seen")?,
+        word_count: row.get("p_word_count")?,
     };
-    Ok((row.get(column(0))?, record))
+    Ok((row.get("p_rowid")?, record))
 }
 
 fn collect_rows<T>(
@@ -142,34 +228,6 @@ impl ReaderPostRepository {
         post: &ReaderPostRecord,
         prefer: Prefer,
     ) -> Result<RowId, SqliteDbError> {
-        /// The columns a source may leave out.
-        const OPTIONAL_COLUMNS: [&str; 25] = [
-            "site_id",
-            "feed_id",
-            "feed_item_id",
-            "url",
-            "global_id",
-            "title",
-            "excerpt",
-            "content",
-            "date",
-            "modified",
-            "author_name",
-            "author_avatar_url",
-            "author_url",
-            "featured_image",
-            "site_name",
-            "site_url",
-            "feed_url",
-            "like_count",
-            "i_like",
-            "is_following",
-            "site_icon_url",
-            "tags",
-            "comment_count",
-            "display_image_url",
-            "editorial_image_url",
-        ];
         let identity_key = reader_saved_key_text(&post.key);
         let tags = post
             .tags
@@ -179,12 +237,84 @@ impl ReaderPostRepository {
             .map_err(|error| {
                 SqliteDbError::SqliteError(format!("Couldn't store Reader post tags: {error}"))
             })?;
+        let text = |value: &Option<String>| Value::from(value.clone());
+        let date =
+            |value: &Option<WpGmtDateTime>| Value::from(value.as_ref().map(reader_date_text));
+        let number = |value: Option<u64>| Value::from(value.map(|value| value as i64));
+        let flag = |value: Option<bool>| Value::from(value);
+        let cross_post = post.cross_post.as_ref();
+        // The columns a source may leave out, with the post's value for each.
+        let optional: Vec<(&str, Value)> = vec![
+            ("site_id", number(post.identity.site_id.map(|id| id.0))),
+            ("feed_id", number(post.identity.feed_id.map(|id| id.0))),
+            (
+                "feed_item_id",
+                number(post.identity.feed_item_id.map(|id| id.0)),
+            ),
+            ("url", text(&post.identity.url)),
+            ("global_id", text(&post.global_id)),
+            ("short_url", text(&post.short_url)),
+            ("title", text(&post.title)),
+            ("excerpt", text(&post.excerpt)),
+            ("content", text(&post.content)),
+            ("use_excerpt", flag(post.use_excerpt)),
+            ("date", date(&post.date)),
+            ("modified", date(&post.modified)),
+            ("author_id", number(post.author_id)),
+            ("author_name", text(&post.author_name)),
+            ("author_avatar_url", text(&post.author_avatar_url)),
+            ("author_url", text(&post.author_url)),
+            ("featured_image", text(&post.featured_image)),
+            ("display_image_url", text(&post.display_image_url)),
+            ("editorial_image_url", text(&post.editorial_image_url)),
+            ("site_name", text(&post.site_name)),
+            ("site_url", text(&post.site_url)),
+            ("feed_url", text(&post.feed_url)),
+            ("site_icon_url", text(&post.site_icon_url)),
+            ("site_locale", text(&post.site_locale)),
+            ("site_is_private", flag(post.site_is_private)),
+            ("site_is_atomic", flag(post.site_is_atomic)),
+            ("is_jetpack", flag(post.is_jetpack)),
+            ("organization_id", number(post.organization_id)),
+            ("tags", Value::from(tags)),
+            (
+                "xpost_site_id",
+                number(cross_post.and_then(|post| post.site_id).map(|id| id.0)),
+            ),
+            (
+                "xpost_post_id",
+                number(cross_post.and_then(|post| post.post_id)),
+            ),
+            (
+                "xpost_post_url",
+                Value::from(cross_post.and_then(|post| post.post_url.clone())),
+            ),
+            (
+                "xpost_comment_url",
+                Value::from(cross_post.and_then(|post| post.comment_url.clone())),
+            ),
+            ("like_count", number(post.like_count)),
+            ("i_like", flag(post.i_like)),
+            ("likes_enabled", flag(post.likes_enabled)),
+            ("is_following", flag(post.is_following)),
+            ("comment_count", number(post.comment_count)),
+            ("comments_open", flag(post.comments_open)),
+            ("can_subscribe_comments", flag(post.can_subscribe_comments)),
+            ("is_subscribed_comments", flag(post.is_subscribed_comments)),
+            (
+                "receives_comment_notifications",
+                flag(post.receives_comment_notifications),
+            ),
+            ("is_seen", flag(post.is_seen)),
+            ("word_count", number(post.word_count)),
+        ];
+
         let mut updates: Vec<String> = Vec::new();
         if prefer == Prefer::Incoming {
             updates.push("post_id = excluded.post_id".to_string());
             updates.push("is_external = excluded.is_external".to_string());
         }
-        for column in OPTIONAL_COLUMNS {
+        for (column, _) in &optional {
             updates.push(match prefer {
                 Prefer::Incoming => format!("{column} = COALESCE(excluded.{column}, {column})"),
                 Prefer::Stored => format!("{column} = COALESCE({column}, excluded.{column})"),
@@ -193,52 +323,26 @@ impl ReaderPostRepository {
         if prefer == Prefer::Incoming {
             updates.push("fetched_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')".to_string());
         }
+        let columns: Vec<&str> = optional.iter().map(|(column, _)| *column).collect();
+        let placeholders: Vec<String> = (0..optional.len())
+            .map(|index| format!("?{}", index + 5))
+            .collect();
         let sql = format!(
-            "INSERT INTO reader_posts (
-                account_id, identity_key, post_id, site_id, feed_id, feed_item_id, is_external,
-                url, global_id, title, excerpt, content, date, modified, author_name,
-                author_avatar_url, author_url, featured_image, site_name, site_url, feed_url,
-                like_count, i_like, is_following, site_icon_url, tags, comment_count,
-                display_image_url, editorial_image_url
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17,
-                ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29)
+            "INSERT INTO reader_posts (account_id, identity_key, post_id, is_external, {})
+            VALUES (?1, ?2, ?3, ?4, {})
             ON CONFLICT(account_id, identity_key) DO UPDATE SET {}",
+            columns.join(", "),
+            placeholders.join(", "),
             updates.join(", ")
         );
-        executor.execute(
-            &sql,
-            params![
-                account,
-                identity_key,
-                post.identity.id,
-                post.identity.site_id.map(|id| id.0),
-                post.identity.feed_id.map(|id| id.0),
-                post.identity.feed_item_id.map(|id| id.0),
-                post.identity.is_external,
-                post.identity.url,
-                post.global_id,
-                post.title,
-                post.excerpt,
-                post.content,
-                post.date.as_ref().map(reader_date_text),
-                post.modified.as_ref().map(reader_date_text),
-                post.author_name,
-                post.author_avatar_url,
-                post.author_url,
-                post.featured_image,
-                post.site_name,
-                post.site_url,
-                post.feed_url,
-                post.like_count,
-                post.i_like,
-                post.is_following,
-                post.site_icon_url,
-                tags,
-                post.comment_count,
-                post.display_image_url,
-                post.editorial_image_url,
-            ],
-        )?;
+        let mut values: Vec<Value> = vec![
+            Value::from(account.0),
+            Value::from(identity_key.clone()),
+            Value::from(post.identity.id as i64),
+            Value::from(post.identity.is_external),
+        ];
+        values.extend(optional.into_iter().map(|(_, value)| value));
+        executor.execute(&sql, rusqlite::params_from_iter(values))?;
         let mut statement = executor.prepare(
             "SELECT rowid FROM reader_posts WHERE account_id = ?1 AND identity_key = ?2",
         )?;
@@ -253,12 +357,13 @@ impl ReaderPostRepository {
         key: &ReaderSavedKey,
     ) -> Result<Option<(RowId, ReaderPostRecord)>, SqliteDbError> {
         let sql = format!(
-            "SELECT {POST_COLUMNS} FROM reader_posts p WHERE p.account_id = ?1 AND p.identity_key = ?2"
+            "SELECT {} FROM reader_posts p WHERE p.account_id = ?1 AND p.identity_key = ?2",
+            post_columns()
         );
         let mut statement = executor.prepare(&sql)?;
         let exact = statement
             .query_row(params![account, reader_saved_key_text(key)], |row| {
-                Ok(post_from_row(row, 0))
+                Ok(post_from_row(row))
             })
             .optional()?
             .transpose()?;
@@ -270,14 +375,15 @@ impl ReaderPostRepository {
             return Ok(None);
         };
         let sql = format!(
-            "SELECT {POST_COLUMNS} FROM reader_posts p
+            "SELECT {} FROM reader_posts p
             WHERE p.account_id = ?1 AND p.feed_item_id = ?2
-            ORDER BY p.rowid LIMIT 1"
+            ORDER BY p.rowid LIMIT 1",
+            post_columns()
         );
         let mut statement = executor.prepare(&sql)?;
         statement
             .query_row(params![account, feed_item_id.0], |row| {
-                Ok(post_from_row(row, 0))
+                Ok(post_from_row(row))
             })
             .optional()?
             .transpose()
@@ -477,18 +583,19 @@ impl ReaderStreamRepository {
         stream: RowId,
     ) -> Result<Vec<DbReaderStreamItem>, SqliteDbError> {
         let sql = format!(
-            "SELECT {POST_COLUMNS}, i.sort_key FROM reader_stream_items i
+            "SELECT {}, i.sort_key AS i_sort_key FROM reader_stream_items i
             JOIN reader_posts p ON p.rowid = i.post_id
             WHERE i.stream_id = ?1
-            ORDER BY i.sort_key DESC, i.rowid ASC"
+            ORDER BY i.sort_key DESC, i.rowid ASC",
+            post_columns()
         );
         let mut statement = executor.prepare(&sql)?;
         let rows = statement.query_map([stream], |row| {
-            Ok(post_from_row(row, 0).and_then(|(post_row_id, post)| {
+            Ok(post_from_row(row).and_then(|(post_row_id, post)| {
                 Ok(DbReaderStreamItem {
                     post,
                     post_row_id,
-                    sort_key: row.get(POST_COLUMN_COUNT)?,
+                    sort_key: row.get("i_sort_key")?,
                 })
             }))
         })?;
@@ -554,7 +661,6 @@ const ROW_COLUMNS: &str = "s.rowid, s.key, \
     (SELECT json_group_array(u.url_key) FROM reader_saved_post_urls u WHERE u.saved_post_id = s.rowid), \
     s.feed_item_key, s.saved, s.server, s.in_doubt, s.seq, s.date_saved, s.post_id, s.listed, \
     s.imported, s.waiting_for_room, s.tapped, s.date_known";
-const ROW_COLUMN_COUNT: usize = 15;
 
 fn saved_row_from_row(row: &Row) -> Result<DbReaderSavedRow, SqliteDbError> {
     let key = |index: usize| -> Result<Option<ReaderSavedKey>, SqliteDbError> {
@@ -1248,17 +1354,18 @@ impl ReaderSavedRepository {
         account: RowId,
     ) -> Result<Vec<DbReaderSavedListItem>, SqliteDbError> {
         let sql = format!(
-            "SELECT {ROW_COLUMNS}, {POST_COLUMNS} FROM reader_saved_posts s
+            "SELECT {ROW_COLUMNS}, {} FROM reader_saved_posts s
             LEFT JOIN reader_posts p ON p.rowid = s.post_id
             WHERE s.account_id = ?1 AND s.saved = 1 AND s.listed = 1
-            ORDER BY s.date_saved IS NULL, s.date_saved DESC, s.seq DESC, s.rowid DESC"
+            ORDER BY s.date_saved IS NULL, s.date_saved DESC, s.seq DESC, s.rowid DESC",
+            post_columns()
         );
         let mut statement = executor.prepare(&sql)?;
         let rows = statement.query_map([account], |row| {
             Ok((|| -> Result<DbReaderSavedListItem, SqliteDbError> {
                 let saved = saved_row_from_row(row)?;
                 let post = match saved.post_row_id {
-                    Some(_) => Some(post_from_row(row, ROW_COLUMN_COUNT)?.1),
+                    Some(_) => Some(post_from_row(row)?.1),
                     None => None,
                 };
                 Ok(DbReaderSavedListItem { row: saved, post })

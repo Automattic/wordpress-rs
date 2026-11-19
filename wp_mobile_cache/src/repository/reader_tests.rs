@@ -6,7 +6,7 @@ use crate::{
 use rusqlite::Connection;
 use wp_api::posts::PostId;
 use wp_api::wp_com::me::WpComUserId;
-use wp_api::wp_com::reader_posts::ReaderPostTag;
+use wp_api::wp_com::reader_posts::{ReaderCrossPost, ReaderPostTag};
 
 fn conn() -> Connection {
     let conn = Connection::open_in_memory().unwrap();
@@ -54,18 +54,67 @@ fn count(conn: &Connection, table: &str) -> i64 {
 fn test_reader_posts_columns() {
     // Phase 2 fills the rest of these from the full Reader post, without a migration.
     let columns = get_table_column_names(&conn(), "reader_posts");
-    let read: Vec<&str> = POST_COLUMNS
-        .split(',')
-        .map(|column| column.trim().trim_start_matches("p."))
-        .collect();
-    assert_eq!(read.len(), POST_COLUMN_COUNT);
-    for column in read {
+    for column in POST_FIELDS {
         assert!(
             columns.iter().any(|other| other == column),
             "{column} is read but isn't in reader_posts"
         );
     }
     assert_eq!(columns.len(), 59, "{columns:?}");
+}
+
+#[test]
+fn test_a_post_keeps_what_a_stream_sends() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let stored = ReaderPostRecord {
+        short_url: Some("https://wp.me/p1-2".to_string()),
+        use_excerpt: Some(false),
+        author_id: Some(9),
+        site_locale: Some("en".to_string()),
+        site_is_private: Some(false),
+        site_is_atomic: Some(true),
+        is_jetpack: Some(true),
+        organization_id: Some(2),
+        cross_post: Some(ReaderCrossPost {
+            site_id: Some(WpComSiteId(77)),
+            post_id: Some(5),
+            post_url: Some("https://example.com/5".to_string()),
+            comment_url: None,
+        }),
+        likes_enabled: Some(true),
+        comments_open: Some(false),
+        can_subscribe_comments: Some(true),
+        is_subscribed_comments: Some(false),
+        receives_comment_notifications: Some(false),
+        is_seen: Some(true),
+        word_count: Some(321),
+        ..post(456)
+    };
+    ReaderPostRepository::upsert(&conn, account, &stored).unwrap();
+
+    let (_, read) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(read, stored);
+
+    // A source that sends less leaves them as they are.
+    ReaderPostRepository::upsert(&conn, account, &post(456)).unwrap();
+    let (_, read) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(read, stored);
+}
+
+#[test]
+fn test_a_post_that_is_not_a_cross_post_has_none() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    ReaderPostRepository::upsert(&conn, account, &post(456)).unwrap();
+    let (_, read) = ReaderPostRepository::select_by_key(&conn, account, &post_key(456))
+        .unwrap()
+        .unwrap();
+    assert_eq!(read.cross_post, None);
 }
 
 #[test]
