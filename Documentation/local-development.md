@@ -141,3 +141,26 @@ Keep the output folder outside the checkout when the screens show real content.
 
 One launch argument helps a script: `launch -reader-offline` starts the app with every Reader request failing as it
 does with no connection, which shows the Reader's screens from the cache alone.
+
+`reader-offline-signed-out.txt`, next to that script, saves two posts, downloads their text and images, and opens
+one from the device. It needs a fresh install, so that neither post is saved yet.
+
+## Checking the Kotlin example app's screens from a script
+
+The Kotlin example app can be checked the same way on an Android emulator or device, over `adb`.
+`scripts/example-app-adb-script.py` reads a script of the same kind of steps, finds what's on screen with
+UI Automator, and saves a screenshot and a text list of the screen for each `shot`. The steps it knows are listed
+at the top of the file.
+
+```bash
+cd native/kotlin && ./gradlew :example:androidApp:installDebug -PcargoTarget=arm64 && cd ../..
+
+scripts/example-app-adb-script.py <adb serial> \
+    native/kotlin/example/ui-scripts/reader-signed-out.txt ~/Desktop/reader-screens
+```
+
+`-PcargoTarget=arm64` builds the Rust library for one ABI, which is what an emulator on an Apple Silicon Mac needs.
+`reader-signed-out.txt` goes through the Reader as a reader who isn't signed in, and
+`reader-offline-signed-out.txt` saves two posts, downloads their text and images, and opens one from the device.
+To run a script as an account, sign the app in first with `make example-app-login PLATFORM=android`. To check a
+screen with no connection, turn airplane mode on first: `adb shell cmd connectivity airplane-mode enable`.

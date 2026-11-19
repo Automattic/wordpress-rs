@@ -67,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `reader_stream_for_menu_item` gives the stream a Reader menu entry opens, including a list's, whose owner and slug are only in its address. `reader_likes_next_page_params` gives Swift and Kotlin the next page of likes. `reader_data_is_relevant_update` says whether a change to the cache is one that the menu, the subscriptions, the blocks, what's waiting to be sent, a post or a site shows.
 - Swift exports `UpdateHook`, `DbTable` and `HookAction` from `WordPressApiCache`, whose own methods use them. Kotlin's `WpComApiClient.makeReaderService` creates the Reader service.
 - `wp_com_e2e` has a trial that likes a post through the Reader service and puts it back. It runs only against a site the account owns, named in `WP_COM_E2E_OWN_SITE_ID`.
+- `scripts/example-app-adb-script.py` drives the Kotlin example app on an Android emulator or device from a script of steps, and saves a screenshot and a list of what's on screen where the script asks, as `scripts/example-app-ui-script.sh` does for the Swift app. Scripts for the Reader signed out and for offline reading come with each app.
 
 ### Changed
 
