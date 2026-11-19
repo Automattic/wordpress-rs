@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
+- **Internal:** Moved the browser-style link resolution that `site_icons` uses (relative addresses, `<base href>`, `http`/`https` only) into a shared `html_links` module, so other code that reads links from a page can use it.
 
 ## [0.11.1] - 2026-11-18
 
