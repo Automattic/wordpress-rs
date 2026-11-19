@@ -28,6 +28,7 @@ pub mod decimal2;
 pub mod global_styles;
 pub mod global_styles_revisions;
 pub mod html_entities;
+mod html_links;
 pub mod log_redaction;
 pub mod login;
 pub mod media;

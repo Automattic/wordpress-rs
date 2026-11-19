@@ -15,8 +15,9 @@
 //! picks the one to show at a given size, and falls back to `/favicon.ico` when
 //! the page declares none that an app can show.
 
+use crate::html_links::{HtmlLinks, resolve_web_address};
 use crate::parsed_url::{ParsedUrl, rfc3986_serialization};
-use scraper::{ElementRef, Html, Selector};
+use scraper::{ElementRef, Selector};
 use std::cmp::Reverse;
 use std::sync::Arc;
 use url::Url;
@@ -149,17 +150,14 @@ struct DeclaredIcon {
 }
 
 fn declared_icons(html: &str, page_url: &Url) -> Vec<DeclaredIcon> {
-    let document = Html::parse_document(html);
-    let base_url = document_base_url(&document, page_url);
-
+    let links = HtmlLinks::parse(html, page_url);
     let selector = Selector::parse("link[rel][href], meta[name][content]")
         .expect("the icon selector is valid");
-    document
-        .select(&selector)
-        .filter(|element| is_active_html_element(*element))
+    links
+        .active_elements(&selector)
         .filter_map(|element| {
             let (kind, address) = icon_kind_and_address(element)?;
-            let url = resolve(address, &base_url)?;
+            let url = links.resolve(address)?;
             let attributes = element.value();
             let icon = SiteIcon {
                 url: rfc3986_serialization(&url),
@@ -181,42 +179,13 @@ fn declared_icons(html: &str, page_url: &Url) -> Vec<DeclaredIcon> {
 /// `/favicon.ico` at the root of `page_url`'s origin, as a browser requests it,
 /// or `None` when `page_url` isn't `http` or `https`.
 fn default_favicon(page_url: &Url) -> Option<SiteIcon> {
-    let url = resolve("/favicon.ico", page_url)?;
+    let url = resolve_web_address("/favicon.ico", page_url)?;
     Some(SiteIcon {
         url: rfc3986_serialization(&url),
         kind: SiteIconKind::DefaultFavicon,
         sizes: Vec::new(),
         mime_type: None,
     })
-}
-
-/// The URL relative addresses in `document` resolve against: the first
-/// `<base href>`, resolved against `page_url`, or `page_url` itself.
-///
-/// As in the HTML standard, a base that doesn't parse, or is a `data:` or
-/// `javascript:` URL, is ignored, and so is one a browser ignores because
-/// it's inside a `<template>` or an `<svg>`.
-fn document_base_url(document: &Html, page_url: &Url) -> Url {
-    let selector = Selector::parse("base[href]").expect("the base selector is valid");
-    document
-        .select(&selector)
-        .find(|base| is_active_html_element(*base))
-        .and_then(|base| base.value().attr("href"))
-        .and_then(|href| page_url.join(href).ok())
-        .filter(|base| !matches!(base.scheme(), "data" | "javascript"))
-        .unwrap_or_else(|| page_url.clone())
-}
-
-/// Whether a browser acts on `element`: it's an HTML element, not an SVG or
-/// MathML one, and it isn't inside a `<template>`, whose contents are inert.
-fn is_active_html_element(element: ElementRef<'_>) -> bool {
-    let is_html = &*element.value().name.ns == "http://www.w3.org/1999/xhtml";
-    let in_template = element.ancestors().any(|node| {
-        node.value()
-            .as_element()
-            .is_some_and(|ancestor| ancestor.name() == "template")
-    });
-    is_html && !in_template
 }
 
 fn icon_kind_and_address(element: ElementRef<'_>) -> Option<(SiteIconKind, &str)> {
@@ -255,18 +224,6 @@ fn link_icon_kind(rel: &str) -> Option<SiteIconKind> {
     } else {
         None
     }
-}
-
-/// Resolves `address` against `base_url`, keeping only `http` and `https`.
-fn resolve(address: &str, base_url: &Url) -> Option<Url> {
-    let address = address.trim();
-    if address.is_empty() {
-        return None;
-    }
-    base_url
-        .join(address)
-        .ok()
-        .filter(|url| matches!(url.scheme(), "http" | "https"))
 }
 
 /// Parses a `sizes` attribute, such as `16x16 32x32` or `any`. Entries that

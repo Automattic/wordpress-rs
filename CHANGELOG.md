@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - The Kotlin `WpRequestExecutor` no longer makes `WpApiClient.request` throw an `InternalException` when it's asked to request an address that isn't `http` or `https`, such as a `file:` API root. OkHttp refuses those addresses, and its `IllegalArgumentException` escaped the executor. The request now fails with `GenericError`, as it does with reqwest.
+- **Internal:** Moved the browser-style link resolution that `site_icons` uses (relative addresses, `<base href>`, `http`/`https` only) into a shared `html_links` module, so other code that reads links from a page can use it.
 
 ## [0.11.1] - 2026-11-18
 
