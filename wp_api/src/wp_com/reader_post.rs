@@ -20,6 +20,10 @@
 //!
 //! A post found by its slug comes from the general posts endpoint, which sends a different shape.
 //! See [`ReaderPostBySlug`].
+//!
+//! There are two ways from a post's address to its IDs. Signed in, [`ReaderResolvedUrl`] takes the
+//! whole address, and works for a site on its own domain. Signed out, only the slug does: split the
+//! address into the site's domain and the post's slug, and ask for a [`ReaderPostBySlug`].
 
 use crate::{
     date::WpGmtDateTime,
@@ -36,7 +40,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use wp_derive::WpDeriveParamsField;
-use wp_serde_helper::LenientVec;
+use wp_serde_helper::{LenientVec, deserialize_i64_or_string_as_t, deserialize_u64_or_string_as_t};
 
 /// Query parameters for one post of a site or a feed.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
@@ -304,6 +308,37 @@ impl From<RawReaderRelatedPostsResponse> for ReaderRelatedPostsResponse {
     }
 }
 
+/// Query parameters for resolving a post's address.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct ReaderResolveUrlParams {
+    /// The post's address, such as `https://example.com/2026/11/19/hello-world/`. It needs a
+    /// scheme and a path: the API refuses `example.com`, and `https://example.com/` too.
+    ///
+    /// `http` or `https`, the host in any case, a query and a fragment all resolve the same. The
+    /// address can be on the site's own domain. A short link, such as `https://wp.me/...`, and
+    /// the `?p=123` form don't resolve.
+    pub url: String,
+}
+
+impl AppendUrlQueryPairs for ReaderResolveUrlParams {
+    fn append_query_pairs(&self, query_pairs_mut: &mut QueryPairs) {
+        query_pairs_mut.append_query_value_pair("url", &self.url);
+    }
+}
+
+/// The post an address resolved to. Fetch it with these IDs.
+///
+/// The API resolves a post of a WordPress.com or Jetpack site, including one on a private site
+/// the user can read. It has no answer for anything else: the address of a tag, a feed, a Reader
+/// screen or a post somewhere else is a `post_not_found` error.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderResolvedUrl {
+    #[serde(deserialize_with = "deserialize_u64_or_string_as_t")]
+    pub site_id: WpComSiteId,
+    #[serde(deserialize_with = "deserialize_i64_or_string_as_t")]
+    pub post_id: PostId,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -513,5 +548,37 @@ mod tests {
             .expect("its IDs were read");
         assert_eq!(identity.id, 2);
         assert_eq!(identity.site_id, Some(WpComSiteId(11)));
+    }
+
+    /// A recording of an address resolved to a post, with the IDs replaced.
+    #[test]
+    fn test_deserialize_resolved_url() {
+        let json = include_str!("../../tests/wpcom/reader_post/resolve_url.json");
+        let resolved: ReaderResolvedUrl = serde_json::from_str(json).expect("it parses");
+        assert_eq!(
+            resolved,
+            ReaderResolvedUrl {
+                site_id: WpComSiteId(2001),
+                post_id: PostId(1001),
+            }
+        );
+    }
+
+    #[test]
+    fn test_resolved_url_with_ids_as_strings() {
+        let resolved: ReaderResolvedUrl =
+            serde_json::from_value(json!({ "site_id": "2001", "post_id": "1001" }))
+                .expect("it parses");
+        assert_eq!(resolved.site_id, WpComSiteId(2001));
+        assert_eq!(resolved.post_id, PostId(1001));
+    }
+
+    /// A resolved address is a post, so one without both IDs is an error.
+    #[rstest::rstest]
+    #[case(json!({ "site_id": 2001 }))]
+    #[case(json!({ "post_id": 1001 }))]
+    #[case(json!({}))]
+    fn test_resolved_url_without_its_ids_is_an_error(#[case] resolved: serde_json::Value) {
+        assert!(serde_json::from_value::<ReaderResolvedUrl>(resolved).is_err());
     }
 }

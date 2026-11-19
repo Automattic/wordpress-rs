@@ -5,7 +5,8 @@ use crate::{
         WpComNamespace, WpComSiteId,
         reader_post::{
             ReaderPostBySlug, ReaderPostBySlugParams, ReaderPostParams, ReaderPostSlug,
-            ReaderRelatedPostsParams, ReaderRelatedPostsResponse,
+            ReaderRelatedPostsParams, ReaderRelatedPostsResponse, ReaderResolveUrlParams,
+            ReaderResolvedUrl,
         },
         reader_posts::ReaderPost,
         reader_saved::{ReaderFeedId, ReaderFeedItemId},
@@ -45,6 +46,12 @@ enum ReaderPostRequest {
     // who can't read the site.
     #[get(url = "/read/site/<wp_com_site_id>/post/<post_id>/related", params = &ReaderRelatedPostsParams, output = ReaderRelatedPostsResponse)]
     RelatedPosts,
+    // The site and post IDs of the post at an address. Needs a signed-in user: signed out it's a
+    // 401 `rest_forbidden`. An address that isn't a post's is a 404 `post_not_found`, and one
+    // without a path a 400 `rest_invalid_param`. The API also answers a few addresses with a 500
+    // and no body, such as one on a `wordpress.com` subdomain that doesn't exist.
+    #[get(url = "/mobile/resolve-reader-url", params = &ReaderResolveUrlParams, output = ReaderResolvedUrl)]
+    ResolveUrl,
 }
 
 impl DerivedRequest for ReaderPostRequest {
@@ -55,6 +62,7 @@ impl DerivedRequest for ReaderPostRequest {
             Self::SitePost | Self::RelatedPosts => WpComNamespace::RestV1_2,
             Self::FeedPost => WpComNamespace::RestV1_3,
             Self::PostBySlug => WpComNamespace::RestV1_1,
+            Self::ResolveUrl => WpComNamespace::V2,
         }
     }
 }
@@ -67,6 +75,7 @@ mod tests {
         wp_com::endpoint::tests::{
             fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_1_endpoint,
             validate_wp_com_rest_v1_2_endpoint, validate_wp_com_rest_v1_3_endpoint,
+            validate_wp_com_v2_endpoint,
         },
     };
     use rstest::*;
@@ -175,6 +184,16 @@ mod tests {
                 },
             ),
             "/read/site/3584907/post/29614/related?size_global=2&size_local=3&lang=en&algorithm=a&algorithm_local=b&algorithm_global=c&shuffle_posts_local=true&shuffle_posts_global=false&meta=site&fields=ID%2Csite_ID%2Crailcar",
+        );
+    }
+
+    #[rstest]
+    fn resolve_url(endpoint: ReaderPostRequestEndpoint) {
+        validate_wp_com_v2_endpoint(
+            endpoint.resolve_url(&ReaderResolveUrlParams {
+                url: "https://example.com/2026/11/19/hello-world/?a=b#comments".to_string(),
+            }),
+            "/mobile/resolve-reader-url?url=https%3A%2F%2Fexample.com%2F2026%2F11%2F19%2Fhello-world%2F%3Fa%3Db%23comments",
         );
     }
 

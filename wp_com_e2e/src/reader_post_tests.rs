@@ -7,6 +7,7 @@ use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::reader_post::{
     ReaderPostBySlugParams, ReaderPostParams, ReaderPostSlug, ReaderRelatedPostsParams,
+    ReaderResolveUrlParams,
 };
 use wp_api::wp_com::reader_posts::ReaderStreamParams;
 use wp_api::wp_com::reader_saved::ReaderFeedId;
@@ -20,6 +21,8 @@ const SITE_DOMAIN: &str = "en.blog.wordpress.com";
 /// One of its posts, from 2014.
 const POST: PostId = PostId(29614);
 const POST_SLUG: &str = "new-year-new-blog-make-it-a-great-one";
+const POST_URL: &str =
+    "https://en.blog.wordpress.com/2014/12/29/new-year-new-blog-make-it-a-great-one/";
 /// The xkcd RSS feed, which is public.
 const FEED: ReaderFeedId = ReaderFeedId(8857199);
 
@@ -339,6 +342,81 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         return Err("Without a size, there should be no related posts".into());
                     }
                     Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_post::resolve_url", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // The address as it is, and with what a shared link can carry.
+                    for url in [
+                        POST_URL.to_string(),
+                        format!("{POST_URL}?utm_source=example#comments"),
+                    ] {
+                        let resolved = ctx
+                            .client
+                            .reader_post()
+                            .resolve_url(&ReaderResolveUrlParams { url })
+                            .await
+                            .map_err(|e| e.to_string())?
+                            .data;
+                        if resolved.site_id != SITE || resolved.post_id != POST {
+                            return Err("The address should resolve to the post".into());
+                        }
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_post::resolve_url_that_is_not_a_post", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let resolve = |url: &str| {
+                        let params = ReaderResolveUrlParams {
+                            url: url.to_string(),
+                        };
+                        let ctx = Arc::clone(&ctx);
+                        async move { ctx.client.reader_post().resolve_url(&params).await }
+                    };
+
+                    // A post that isn't there, and a Reader screen.
+                    let missing = "https://en.blog.wordpress.com/2014/12/29/no-such-post-xyzzy/";
+                    expect_error_code(resolve(missing).await, "post_not_found")?;
+                    let reader = "https://wordpress.com/reader/blogs/3584907/posts/29614";
+                    expect_error_code(resolve(reader).await, "post_not_found")?;
+
+                    // A site's address has no path to find a post with.
+                    match resolve("https://en.blog.wordpress.com/").await {
+                        Err(WpApiError::WpError {
+                            error_code: WpErrorCode::InvalidParam,
+                            ..
+                        }) => Ok(()),
+                        other => Err(format!("Expected an invalid parameter: {other:?}").into()),
+                    }
+                })
+            }
+        }),
+        Trial::test("reader_post::resolve_url_signed_out", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let params = ReaderResolveUrlParams {
+                        url: POST_URL.to_string(),
+                    };
+                    match signed_out_client(&ctx)
+                        .reader_post()
+                        .resolve_url(&params)
+                        .await
+                    {
+                        Err(WpApiError::WpError {
+                            error_code: WpErrorCode::Forbidden,
+                            status_code: 401,
+                            ..
+                        }) => Ok(()),
+                        other => Err(format!("Expected a 401: {other:?}").into()),
+                    }
                 })
             }
         }),

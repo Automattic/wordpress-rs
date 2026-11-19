@@ -317,6 +317,9 @@ public typealias ReaderPostBySlugParams = WordPressAPIInternal.ReaderPostBySlugP
 public typealias ReaderPostBySlug = WordPressAPIInternal.ReaderPostBySlug
 public typealias ReaderRelatedPostsParams = WordPressAPIInternal.ReaderRelatedPostsParams
 public typealias ReaderRelatedPostsResponse = WordPressAPIInternal.ReaderRelatedPostsResponse
+public typealias ReaderPostRequestResolveUrlResponse = WordPressAPIInternal.ReaderPostRequestResolveUrlResponse
+public typealias ReaderResolveUrlParams = WordPressAPIInternal.ReaderResolveUrlParams
+public typealias ReaderResolvedUrl = WordPressAPIInternal.ReaderResolvedUrl
 
 // MARK: Reader Saved Posts
 public typealias ReaderFeedId = WordPressAPIInternal.ReaderFeedId
