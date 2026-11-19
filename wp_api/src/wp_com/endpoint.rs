@@ -27,6 +27,7 @@ pub mod reader_seen_endpoint;
 pub mod reader_sites_endpoint;
 pub mod reader_subscriptions_endpoint;
 pub mod reader_tags_endpoint;
+pub mod reader_users_endpoint;
 pub mod segments_endpoint;
 pub mod shopping_cart_endpoint;
 pub mod site_plans_endpoint;

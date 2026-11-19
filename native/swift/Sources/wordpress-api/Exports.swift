@@ -341,6 +341,13 @@ public typealias ReaderFeedSearchSort = WordPressAPIInternal.ReaderFeedSearchSor
 public typealias ReaderFeedSearchResponse = WordPressAPIInternal.ReaderFeedSearchResponse
 public typealias ReaderFeedSearchResult = WordPressAPIInternal.ReaderFeedSearchResult
 
+// MARK: Reader Users
+public typealias ReaderUsersRequestExecutor = WordPressAPIInternal.ReaderUsersRequestExecutor
+public typealias ReaderUsersRequestProfileResponse = WordPressAPIInternal.ReaderUsersRequestProfileResponse
+public typealias ReaderUserProfile = WordPressAPIInternal.ReaderUserProfile
+public typealias ReaderUserPrimarySite = WordPressAPIInternal.ReaderUserPrimarySite
+public typealias WpComUserIdentifier = WordPressAPIInternal.WpComUserIdentifier
+
 // MARK: Reader Saved Posts
 public typealias ReaderFeedId = WordPressAPIInternal.ReaderFeedId
 public typealias ReaderFeedItemId = WordPressAPIInternal.ReaderFeedItemId

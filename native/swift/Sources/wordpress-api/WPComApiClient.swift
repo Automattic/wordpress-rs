@@ -139,6 +139,11 @@ public final class WPComApiClient: Sendable {
         internalClient.readerComments()
     }
 
+    /// A WordPress.com user's public profile, as the Reader shows it.
+    public var readerUsers: ReaderUsersRequestExecutor {
+        internalClient.readerUsers()
+    }
+
     /// Creates the account's saved Reader posts service. Prefer it over `readerSaved` for anything a
     /// user sees: a save or unsave shows straight away and survives a relaunch, and one the server
     /// hasn't got yet is sent by a later call.

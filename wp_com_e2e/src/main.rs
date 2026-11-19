@@ -20,6 +20,7 @@ mod reader_service_tests;
 mod reader_sites_tests;
 mod reader_subscriptions_tests;
 mod reader_tags_tests;
+mod reader_users_tests;
 mod site_plans_tests;
 mod sites_tests;
 mod stats_archives_tests;
@@ -79,6 +80,7 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(reader_subscriptions_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_tags_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_sites_tests::tests(Arc::clone(&ctx)));
+    tests.extend(reader_users_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_archives_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_city_views_tests::tests(Arc::clone(&ctx)));
     tests.extend(stats_country_views_tests::tests(Arc::clone(&ctx)));

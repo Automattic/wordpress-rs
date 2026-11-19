@@ -695,7 +695,9 @@ impl From<RawReaderFeedSearchResult> for ReaderFeedSearchResult {
 
 /// An ID the API can send as a number or a string. `0`, `"0"`, `""`, `false` and `null` all mean
 /// there isn't one.
-fn deserialize_optional_nonzero_id<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+pub(crate) fn deserialize_optional_nonzero_id<'de, D, T>(
+    deserializer: D,
+) -> Result<Option<T>, D::Error>
 where
     D: Deserializer<'de>,
     T: From<u64>,
@@ -710,7 +712,7 @@ where
 
 /// A count the API can send as a number or a string. Anything that isn't a count, such as `null`
 /// or a negative number, reads as `None`.
-fn deserialize_optional_count<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+pub(crate) fn deserialize_optional_count<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -725,7 +727,7 @@ where
 
 /// An object, or `None` for anything else: `null`, `false`, an empty array, or an object that
 /// can't be read, such as the error the API sends in place of a site it can't read.
-fn deserialize_object_or_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+pub(crate) fn deserialize_object_or_none<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
     D: Deserializer<'de>,
     T: DeserializeOwned,

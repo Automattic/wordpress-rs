@@ -22,6 +22,7 @@ use super::endpoint::{
         ReaderSubscriptionsRequestBuilder, ReaderSubscriptionsRequestExecutor,
     },
     reader_tags_endpoint::{ReaderTagsRequestBuilder, ReaderTagsRequestExecutor},
+    reader_users_endpoint::{ReaderUsersRequestBuilder, ReaderUsersRequestExecutor},
     shopping_cart_endpoint::{ShoppingCartRequestBuilder, ShoppingCartRequestExecutor},
     site_plans_endpoint::{SitePlansRequestBuilder, SitePlansRequestExecutor},
     stats_archives_endpoint::{StatsArchivesRequestBuilder, StatsArchivesRequestExecutor},
@@ -109,6 +110,7 @@ pub struct WpComApiRequestBuilder {
     reader_subscriptions: Arc<ReaderSubscriptionsRequestBuilder>,
     reader_tags: Arc<ReaderTagsRequestBuilder>,
     reader_sites: Arc<ReaderSitesRequestBuilder>,
+    reader_users: Arc<ReaderUsersRequestBuilder>,
     shopping_cart: Arc<ShoppingCartRequestBuilder>,
     site_plans: Arc<SitePlansRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
@@ -173,6 +175,7 @@ impl WpComApiRequestBuilder {
             reader_subscriptions,
             reader_tags,
             reader_sites,
+            reader_users,
             shopping_cart,
             site_plans,
             sites,
@@ -244,6 +247,7 @@ pub struct WpComApiClient {
     reader_subscriptions: Arc<ReaderSubscriptionsRequestExecutor>,
     reader_tags: Arc<ReaderTagsRequestExecutor>,
     reader_sites: Arc<ReaderSitesRequestExecutor>,
+    reader_users: Arc<ReaderUsersRequestExecutor>,
     shopping_cart: Arc<ShoppingCartRequestExecutor>,
     site_plans: Arc<SitePlansRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
@@ -305,6 +309,7 @@ impl WpComApiClient {
             reader_subscriptions,
             reader_tags,
             reader_sites,
+            reader_users,
             shopping_cart,
             site_plans,
             sites,
@@ -359,6 +364,7 @@ api_client_generate_endpoint_impl!(WpComApi, reader_seen);
 api_client_generate_endpoint_impl!(WpComApi, reader_subscriptions);
 api_client_generate_endpoint_impl!(WpComApi, reader_tags);
 api_client_generate_endpoint_impl!(WpComApi, reader_sites);
+api_client_generate_endpoint_impl!(WpComApi, reader_users);
 api_client_generate_endpoint_impl!(WpComApi, shopping_cart);
 api_client_generate_endpoint_impl!(WpComApi, site_plans);
 api_client_generate_endpoint_impl!(WpComApi, sites);
