@@ -3047,6 +3047,22 @@ mod comment_writing {
             .await
             .unwrap();
         assert_eq!(count().await, Some(2));
+
+        // One that isn't taken isn't counted, and is counted once it's taken on "Send again".
+        executor.push(Step::Offline);
+        let result = comments.post_comment("Me too".to_string(), None).await;
+        assert!(matches!(result, Err(ReaderError::Api(_))));
+        assert_eq!(count().await, Some(2));
+        let local_id = comments
+            .load_items()
+            .await
+            .unwrap()
+            .into_iter()
+            .find_map(|comment| comment.local_id)
+            .unwrap();
+        executor.push(Step::Respond(200, comment_json(4, 23, None)));
+        comments.retry_comment(local_id).await.unwrap();
+        assert_eq!(count().await, Some(3));
     }
 
     #[tokio::test]
