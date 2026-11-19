@@ -15,6 +15,9 @@ pub(crate) struct LinkValue {
     pub target: String,
     /// The relation types in the entry's first `rel` parameter. Empty when it has none.
     pub rels: Vec<String>,
+    /// The entry's first `anchor` parameter. A link with an anchor describes the resource the
+    /// anchor names, not the response it came with (RFC 8288, section 3.2).
+    pub anchor: Option<String>,
 }
 
 impl LinkValue {
@@ -60,6 +63,7 @@ fn parse_entry(cursor: &mut Cursor<'_>, header: &str) -> Option<LinkValue> {
     }
 
     let mut rels = None;
+    let mut anchor = None;
     loop {
         cursor.skip_whitespace();
         match cursor.peek() {
@@ -82,15 +86,18 @@ fn parse_entry(cursor: &mut Cursor<'_>, header: &str) -> Option<LinkValue> {
         } else {
             String::new()
         };
-        // Only the first `rel` parameter counts.
+        // Only the first `rel` and `anchor` parameters count.
         if rels.is_none() && name.eq_ignore_ascii_case("rel") {
             rels = Some(value.split_ascii_whitespace().map(String::from).collect());
+        } else if anchor.is_none() && name.eq_ignore_ascii_case("anchor") {
+            anchor = Some(value);
         }
     }
 
     Some(LinkValue {
         target,
         rels: rels.unwrap_or_default(),
+        anchor,
     })
 }
 
@@ -130,18 +137,19 @@ impl Cursor<'_> {
         self.advance_until(|b| !b.is_ascii_whitespace() && b != separator);
     }
 
-    /// Moves past the next comma that isn't inside `<…>` or a quoted string.
+    /// Moves past the next comma that isn't inside a quoted string.
+    ///
+    /// This runs after an entry turned out not to be well formed, so it doesn't look for `<…>`:
+    /// a stray `<` in the broken entry would otherwise swallow the next, good, entry. A comma
+    /// inside a `<…>` in a broken entry only splits that entry into more broken pieces.
     fn skip_to_next_entry(&mut self) {
-        let mut in_target = false;
         let mut in_quotes = false;
         while let Some(byte) = self.peek() {
             self.position += 1;
             match byte {
                 b'\\' if in_quotes => self.position += 1,
-                b'"' if !in_target => in_quotes = !in_quotes,
-                b'<' if !in_quotes => in_target = true,
-                b'>' if !in_quotes => in_target = false,
-                b',' if !in_target && !in_quotes => return,
+                b'"' => in_quotes = !in_quotes,
+                b',' if !in_quotes => return,
                 _ => {}
             }
         }
@@ -185,6 +193,7 @@ mod tests {
         LinkValue {
             target: target.to_string(),
             rels: rels.iter().map(|r| r.to_string()).collect(),
+            anchor: None,
         }
     }
 
@@ -240,6 +249,19 @@ mod tests {
         assert_eq!(parse(header), [link("a", rels)]);
     }
 
+    #[rstest]
+    #[case::quoted(r##"<a>; rel=next; anchor="#comments""##, Some("#comments"))]
+    #[case::token("<a>; anchor=/other; rel=next", Some("/other"))]
+    #[case::uppercase_name("<a>; rel=next; ANCHOR=/other", Some("/other"))]
+    #[case::only_the_first("<a>; anchor=/one; anchor=/two; rel=next", Some("/one"))]
+    #[case::none("<a>; rel=next", None)]
+    fn reads_the_anchor_parameter(#[case] header: &str, #[case] anchor: Option<&str>) {
+        let links = parse(header);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].anchor.as_deref(), anchor);
+        assert!(links[0].has_rel("next"));
+    }
+
     #[test]
     fn has_rel_ignores_case() {
         assert!(link("a", &["Next"]).has_rel("next"));
@@ -250,6 +272,8 @@ mod tests {
     #[case::no_brackets(r#"https://example.com/; rel="a", </b>; rel="b""#)]
     #[case::junk_after_target(r#"</a> junk; rel="a", </b>; rel="b""#)]
     #[case::quoted_comma_in_skipped_entry(r#"</a> junk; title="x, y", </b>; rel="b""#)]
+    #[case::stray_open_bracket(r#"junk <, </b>; rel="b""#)]
+    #[case::bracketed_comma_in_skipped_entry(r#"junk <https://a/?i=1,2>; rel="a", </b>; rel="b""#)]
     fn skips_an_entry_that_isnt_well_formed(#[case] header: &str) {
         assert_eq!(parse(header), [link("/b", &["b"])]);
     }

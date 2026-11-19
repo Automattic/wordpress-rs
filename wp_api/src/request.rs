@@ -611,31 +611,41 @@ impl WpNetworkResponse {
     /// The targets of the `Link` header entries with the relation type `name`, in order.
     ///
     /// A target may be relative, such as `</wp-json/>; rel="https://api.w.org/"`. As RFC 8288
-    /// says, it's resolved against the URL of the request this response answers. Targets that
-    /// aren't `http` or `https` once resolved are left out, and so are entries that aren't well
-    /// formed, without affecting the others.
+    /// says, it's resolved against the URL of the request this response answers. Executors
+    /// report the URL that was requested, not where a redirect ended up, so after a redirect a
+    /// relative target may resolve against the wrong address.
+    ///
+    /// Left out: targets that aren't `http` or `https` once resolved, entries that aren't well
+    /// formed (without affecting the others), and entries with an `anchor`, which describe
+    /// another resource.
     pub fn get_link_header(&self, name: &str) -> Vec<Url> {
         let base_url = Url::parse(&self.request_url.0).ok();
         // Header names are case-insensitive, so this finds `Link`, `link` and `LINK`.
         //
-        // `WpNetworkHeaderMap` splits header values at every comma, including the commas
-        // inside a target like `<…?ids=1,2>`, and trims the pieces. Several values of one header
-        // mean the same as one value joined with commas (RFC 9110), so join them back before
-        // parsing. A URL has no whitespace, so joining with a bare `,` restores it exactly.
+        // `WpNetworkHeaderMap` splits header values at every comma, including the commas inside
+        // a target like `<…?ids=1,2>`, trims the pieces, and drops empty ones. Several values of
+        // one header mean the same as one value joined with commas (RFC 9110), so join them
+        // back before parsing. That restores any URL without an empty piece: `?ids=1,,2` comes
+        // back as `?ids=1,2`. A piece that isn't valid UTF-8 is kept, lossily, so its
+        // neighbours aren't joined into a link the server never sent.
         let header = self
             .response_header_map
             .inner
             .get_all(http::header::LINK)
             .into_iter()
-            .filter_map(|value| value.to_str().ok())
+            .map(|value| String::from_utf8_lossy(value.as_bytes()))
             .collect::<Vec<_>>()
             .join(",");
         link_header::parse(&header)
             .into_iter()
             .filter(|link| link.has_rel(name))
+            // An empty anchor names the response itself.
+            .filter(|link| link.anchor.as_deref().is_none_or(str::is_empty))
             .filter_map(|link| match &base_url {
                 Some(base_url) => resolve_web_address(&link.target, base_url),
-                None => Url::parse(&link.target).ok(),
+                None => Url::parse(link.target.trim_ascii())
+                    .ok()
+                    .filter(|url| matches!(url.scheme(), "http" | "https")),
             })
             .collect()
     }
@@ -1384,6 +1394,84 @@ mod tests {
         assert_eq!(
             response.get_link_header("https://api.w.org/"),
             [Url::parse("https://example.com/wp-json/").unwrap()]
+        );
+    }
+
+    fn urls(urls: &[&str]) -> Vec<Url> {
+        urls.iter().map(|url| Url::parse(url).unwrap()).collect()
+    }
+
+    // OkHttp's `toMultimap()` (Kotlin) gives one value per `Link` line.
+    #[test]
+    fn test_link_header_reads_every_line_in_order() {
+        let response = WpNetworkResponse {
+            response_header_map: Arc::new(
+                WpNetworkHeaderMap::from_multi_map(
+                    [(
+                        "link".to_string(),
+                        vec![
+                            r#"</a>; rel="next""#.to_string(),
+                            r#"<https://example.com/?ids=1,2>; rel="next", </c>; rel="prev""#
+                                .to_string(),
+                        ],
+                    )]
+                    .into(),
+                )
+                .unwrap(),
+            ),
+            ..response_with_link_header("https://example.com/", "")
+        };
+        assert_eq!(
+            response.get_link_header("next"),
+            urls(&["https://example.com/a", "https://example.com/?ids=1,2"])
+        );
+        assert_eq!(
+            response.get_link_header("prev"),
+            urls(&["https://example.com/c"])
+        );
+    }
+
+    #[test]
+    fn test_link_header_keeps_a_piece_that_isnt_ascii() {
+        // `WpNetworkHeaderMap` splits this at both commas. The middle piece isn't ASCII; if it
+        // were dropped, the pieces either side would join into `<https://example.com/?a=1,</p>`.
+        let response = response_with_link_header(
+            "https://example.com/",
+            r#"<https://example.com/?a=1,é>; rel="next", </p>; rel="prev""#,
+        );
+        assert_eq!(
+            response.get_link_header("next"),
+            urls(&["https://example.com/?a=1,%C3%A9"])
+        );
+        assert_eq!(
+            response.get_link_header("prev"),
+            urls(&["https://example.com/p"])
+        );
+    }
+
+    #[test]
+    fn test_link_header_without_a_usable_request_url() {
+        // There's nothing to resolve a relative target against, and only `http(s)` targets
+        // are kept.
+        let response = response_with_link_header(
+            "not a url",
+            r#"<https://example.com/a>; rel="next", </b>; rel="next", <mailto:a@example.com>; rel="next", <ftp://example.com/c>; rel="next""#,
+        );
+        assert_eq!(
+            response.get_link_header("next"),
+            urls(&["https://example.com/a"])
+        );
+    }
+
+    #[test]
+    fn test_link_header_leaves_out_links_about_another_resource() {
+        let response = response_with_link_header(
+            "https://example.com/",
+            r##"</a>; rel="next"; anchor="#comments", </b>; rel="next"; anchor="/other", </c>; rel="next"; anchor="", </d>; rel="next""##,
+        );
+        assert_eq!(
+            response.get_link_header("next"),
+            urls(&["https://example.com/c", "https://example.com/d"])
         );
     }
 
