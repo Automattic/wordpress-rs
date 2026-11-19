@@ -101,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unblocking a site with `ReaderService::set_site_blocked` now shows it as followed again when the cached subscriptions list it. While a site is blocked, the server says it isn't followed, but it keeps the subscription and an unblock brings the follow back, so a site fetched during the block read as not followed after the unblock, with the reader left out of its subscriber count, until it was fetched again.
 - The Swift example app's Find sites shows the address of a result that leaves out its own, from the result's site or feed, as the Kotlin app does, and the feed's subscriber count when the result has none. The owner's test site was listed with no address.
 - `ReaderService.set_post_emails` keeps the email frequency the server answers with when it starts a site's post emails. The server drops the frequency while the emails are off, so a subscriptions list fetched then had none, and the Kotlin example app showed "Emailed: not set" after the emails were turned back on, until a refresh.
+- The Kotlin example app's Find sites takes a result's site ID from its site or feed when the result leaves out its own, so the row shows it, opens the site's stream rather than its feed's, and follows by it; and a follow or unfollow made from the row moves its subscriber count. The owner's test site was listed with no site ID, and its count stayed at 0 after Follow.
 
 ## [0.11.1] - 2026-11-18
 

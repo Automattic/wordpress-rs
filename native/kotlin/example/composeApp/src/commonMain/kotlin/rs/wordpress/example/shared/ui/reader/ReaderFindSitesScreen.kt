@@ -23,18 +23,41 @@ import uniffi.wp_api.ReaderFeedSearchResult
 import uniffi.wp_mobile.ReaderFollowTarget
 import uniffi.wp_mobile.ReaderStream
 
+/** Whether the search found the reader following the site or feed. */
+private fun ReaderFeedSearchResult.followedWhenFound(): Boolean = (site?.isFollowing ?: feed?.isFollowing) == true
+
 /** A site or feed a search found, and whether the reader follows it. */
-private data class ReaderFoundSite(val result: ReaderFeedSearchResult, val isFollowing: Boolean) {
+private data class ReaderFoundSite(
+    val result: ReaderFeedSearchResult,
+    val isFollowing: Boolean = result.followedWhenFound()
+) {
     /** A lookup by address sends a result without a title, so its site's or feed's name is used. */
     val name: String
         get() = (result.title ?: result.site?.name ?: result.feed?.name)?.plainText() ?: address ?: "Unnamed"
 
     val address: String? get() = result.url ?: result.site?.url ?: result.feed?.url ?: result.subscribeUrl
 
+    /** A lookup by address can leave out the result's own site ID, which its site or feed has. */
+    val siteId: ULong? get() = (result.siteId ?: result.site?.siteId ?: result.feed?.siteId)?.takeIf { it != 0uL }
+
     val feedId: ULong? get() = result.feedId ?: result.site?.feedId
 
+    /**
+     * The subscriber count the search sent, which counted the reader as they were then, moved by a
+     * follow or an unfollow made here since. The results aren't cached, so nothing else moves it.
+     */
+    val subscribersCount: ULong?
+        get() {
+            val count = result.subscribersCount ?: result.feed?.subscribersCount ?: return null
+            return when {
+                isFollowing == result.followedWhenFound() -> count
+                isFollowing -> count + 1u
+                else -> if (count > 0uL) count - 1u else 0uL
+            }
+        }
+
     val stream: ReaderStream?
-        get() = result.siteId?.let { ReaderStream.Site(it) } ?: feedId?.let { ReaderStream.Feed(it) }
+        get() = siteId?.let { ReaderStream.Site(it) } ?: feedId?.let { ReaderStream.Feed(it) }
 }
 
 /** A search of sites and feeds. Its results aren't cached, so the screen keeps them. */
@@ -77,14 +100,13 @@ private class ReaderFindSitesState(session: ReaderSession, val requests: ReaderR
         }
     }
 
-    private fun ReaderFeedSearchResult.found() =
-        ReaderFoundSite(this, (site?.isFollowing ?: feed?.isFollowing) == true)
+    private fun ReaderFeedSearchResult.found() = ReaderFoundSite(this)
 
     /** Follows or unfollows a result. The search isn't cached, so the result is changed here. */
     fun setFollowed(index: Int, followed: Boolean) {
         val site = sites.getOrNull(index) ?: return
         val target = ReaderFollowTarget(
-            siteId = site.result.siteId,
+            siteId = site.siteId,
             feedId = site.feedId,
             url = site.result.subscribeUrl ?: site.address,
             name = site.name
@@ -150,8 +172,8 @@ private fun ReaderFoundSiteRow(
             Text(
                 listOfNotNull(
                     site.address,
-                    (site.result.subscribersCount ?: site.result.feed?.subscribersCount)?.let { "$it subscribers" },
-                    site.result.siteId?.let { "site $it" },
+                    site.subscribersCount?.let { "$it subscribers" },
+                    site.siteId?.let { "site $it" },
                     site.feedId?.let { "feed $it" }
                 ).joinToString(" · ")
             )
