@@ -9,7 +9,7 @@ extension ReaderStream {
     }
 
     /// What orders the stream's posts.
-    public var order: ReaderStreamOrder {
-        readerStreamOrder(stream: self)
+    public var ordering: ReaderStreamOrdering {
+        readerStreamOrdering(stream: self)
     }
 }

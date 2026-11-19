@@ -32,7 +32,7 @@ pub enum ReaderStream {
 
 /// What orders a stream's posts, which decides how the cache keeps them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
-pub enum ReaderStreamOrder {
+pub enum ReaderStreamOrdering {
     /// By a date each post has. A page is asked for by date, so a refresh merges into what the
     /// cache has, and a page can be loaded anywhere in the stream: at its end, or into a gap.
     Date,
@@ -60,10 +60,10 @@ impl ReaderStream {
         }
     }
 
-    pub(crate) fn order(&self) -> ReaderStreamOrder {
+    pub(crate) fn order(&self) -> ReaderStreamOrdering {
         match self {
-            Self::Following | Self::Site { .. } | Self::Feed { .. } => ReaderStreamOrder::Date,
-            Self::Tag { .. } => ReaderStreamOrder::Server,
+            Self::Following | Self::Site { .. } | Self::Feed { .. } => ReaderStreamOrdering::Date,
+            Self::Tag { .. } => ReaderStreamOrdering::Server,
         }
     }
 
@@ -126,7 +126,7 @@ pub fn reader_stream_needs_account(stream: ReaderStream) -> bool {
 
 /// What orders a stream's posts.
 #[uniffi::export]
-pub fn reader_stream_order(stream: ReaderStream) -> ReaderStreamOrder {
+pub fn reader_stream_ordering(stream: ReaderStream) -> ReaderStreamOrdering {
     stream.order()
 }
 
@@ -170,15 +170,15 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    #[case(ReaderStream::Following, "following", true, ReaderStreamOrder::Date)]
-    #[case(ReaderStream::Site { site_id: WpComSiteId(3584907) }, "site:3584907", false, ReaderStreamOrder::Date)]
-    #[case(ReaderStream::Feed { feed_id: ReaderFeedId(8857199) }, "feed:8857199", false, ReaderStreamOrder::Date)]
-    #[case(ReaderStream::Tag { slug: ReaderTagSlug("photography".to_string()) }, "tag:photography", false, ReaderStreamOrder::Server)]
+    #[case(ReaderStream::Following, "following", true, ReaderStreamOrdering::Date)]
+    #[case(ReaderStream::Site { site_id: WpComSiteId(3584907) }, "site:3584907", false, ReaderStreamOrdering::Date)]
+    #[case(ReaderStream::Feed { feed_id: ReaderFeedId(8857199) }, "feed:8857199", false, ReaderStreamOrdering::Date)]
+    #[case(ReaderStream::Tag { slug: ReaderTagSlug("photography".to_string()) }, "tag:photography", false, ReaderStreamOrdering::Server)]
     fn test_what_each_stream_is(
         #[case] stream: ReaderStream,
         #[case] key: &str,
         #[case] needs_account: bool,
-        #[case] order: ReaderStreamOrder,
+        #[case] order: ReaderStreamOrdering,
     ) {
         assert_eq!(stream.key(), key);
         assert_eq!(stream.needs_account(), needs_account);

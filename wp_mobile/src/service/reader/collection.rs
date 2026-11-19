@@ -1,10 +1,10 @@
 //! A Reader stream as the cache has it, and the fetching that keeps it up to date.
 //!
 //! A page is stored in one transaction, so a reader of the cache never sees half of one. How a
-//! page is merged depends on what orders the stream: see [`ReaderStreamOrder`].
+//! page is merged depends on what orders the stream: see [`ReaderStreamOrdering`].
 
 use super::stream::{StreamCursor, StreamPage};
-use super::{ReaderContext, ReaderError, ReaderStream, ReaderStreamOrder};
+use super::{ReaderContext, ReaderError, ReaderStream, ReaderStreamOrdering};
 use futures::lock::Mutex as AsyncMutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -138,7 +138,7 @@ impl ReaderStreamCollection {
     /// The stream's posts from the cache, in the stream's order, without posts from a site or by a
     /// user the reader blocked.
     pub async fn load_items(&self) -> Result<Vec<ReaderStreamItem>, ReaderError> {
-        let dated = self.stream.order() == ReaderStreamOrder::Date;
+        let dated = self.stream.order() == ReaderStreamOrdering::Date;
         let items = self.context.cache.execute(|connection| {
             let Some(stream) = self.select_stream(&*connection)? else {
                 return Ok(Vec::new());
@@ -243,16 +243,16 @@ impl ReaderStreamCollection {
             return Ok(self.nothing_loaded(&stream));
         } else {
             match (self.stream.order(), last_sort_key, &stream.next_page_handle) {
-                (ReaderStreamOrder::Date, Some(oldest), _) => Some(PageKind::Older {
+                (ReaderStreamOrdering::Date, Some(oldest), _) => Some(PageKind::Older {
                     before: reader_date_from_text(&oldest)?,
                 }),
-                (ReaderStreamOrder::Server, _, Some(handle)) => Some(PageKind::Next {
+                (ReaderStreamOrdering::Server, _, Some(handle)) => Some(PageKind::Next {
                     handle: handle.clone(),
                     version: stream.version,
                 }),
                 // A stream ordered by date with no posts has no date to load from.
-                (ReaderStreamOrder::Date, None, _) => None,
-                (ReaderStreamOrder::Server, _, None) => {
+                (ReaderStreamOrdering::Date, None, _) => None,
+                (ReaderStreamOrdering::Server, _, None) => {
                     return Ok(self.nothing_loaded(&stream));
                 }
             }
@@ -464,8 +464,8 @@ impl ReaderStreamCollection {
                     continue;
                 };
                 let sort_key = match (order, post.sort_date) {
-                    (ReaderStreamOrder::Date, Some(date)) => reader_date_text(&date),
-                    (ReaderStreamOrder::Date, None) => {
+                    (ReaderStreamOrdering::Date, Some(date)) => reader_date_text(&date),
+                    (ReaderStreamOrdering::Date, None) => {
                         unreadable.push((
                             Some(post.post.identity.clone()),
                             "The post has no date to order it by.".to_string(),
@@ -473,7 +473,7 @@ impl ReaderStreamCollection {
                         continue;
                     }
                     // Its place in the page is its place in the stream.
-                    (ReaderStreamOrder::Server, _) => String::new(),
+                    (ReaderStreamOrdering::Server, _) => String::new(),
                 };
                 let row = ReaderPostRepository::upsert(&transaction, owner, &record)?;
                 ReaderUnreadablePostRepository::resolve(&transaction, stream.row_id, &record.key)?;
@@ -515,14 +515,14 @@ impl ReaderStreamCollection {
             let nothing_read = items.is_empty() && !unreadable.is_empty();
             let oldest = items.iter().map(|item| item.sort_key.clone()).min();
             let (outcome, has_more, next_page_handle) = match (order, kind) {
-                (ReaderStreamOrder::Date, PageKind::Next { .. })
-                | (ReaderStreamOrder::Server, PageKind::Older { .. } | PageKind::Gap { .. }) => {
+                (ReaderStreamOrdering::Date, PageKind::Next { .. })
+                | (ReaderStreamOrdering::Server, PageKind::Older { .. } | PageKind::Gap { .. }) => {
                     return Err(SqliteDbError::SqliteError(format!(
                         "A page of the wrong kind was loaded for Reader stream {}",
                         self.key
                     )));
                 }
-                (ReaderStreamOrder::Date, _) => {
+                (ReaderStreamOrdering::Date, _) => {
                     let before = match kind {
                         PageKind::Older { before } | PageKind::Gap { before, .. } => {
                             Some(reader_date_text(before))
@@ -573,12 +573,12 @@ impl ReaderStreamCollection {
                     };
                     (outcome, has_more, None)
                 }
-                (ReaderStreamOrder::Server, PageKind::First) => (
+                (ReaderStreamOrdering::Server, PageKind::First) => (
                     ReaderStreamRepository::replace_items(&transaction, stream.row_id, &items)?,
                     Some(page.next_page_handle.is_some()),
                     page.next_page_handle,
                 ),
-                (ReaderStreamOrder::Server, _) => (
+                (ReaderStreamOrdering::Server, _) => (
                     ReaderStreamRepository::append_items(&transaction, stream.row_id, &items)?,
                     Some(page.next_page_handle.is_some()),
                     page.next_page_handle,
@@ -589,7 +589,7 @@ impl ReaderStreamCollection {
             // A stream ordered by date grows with every page. A refresh is when it's cut back: its
             // oldest posts go, and can be loaded again.
             let trimmed = first
-                && order == ReaderStreamOrder::Date
+                && order == ReaderStreamOrdering::Date
                 && ReaderStreamRepository::trim(&transaction, stream.row_id, MAX_DATED_POSTS)? > 0;
             let now = self.context.now();
             ReaderStreamRepository::finish_page(

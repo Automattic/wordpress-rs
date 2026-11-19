@@ -29,7 +29,7 @@ pub use collection::{
 };
 pub use page_views::ReaderPageViewOutcome;
 pub use stream::{
-    ReaderStream, ReaderStreamOrder, reader_stream_needs_account, reader_stream_order,
+    ReaderStream, ReaderStreamOrdering, reader_stream_needs_account, reader_stream_ordering,
 };
 
 use super::reader_saved::ReaderSavedService;

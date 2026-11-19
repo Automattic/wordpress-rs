@@ -399,7 +399,7 @@ public typealias ReaderStream = WordPressAPIInternal.ReaderStream
 public typealias ReaderStreamCollection = WordPressAPIInternal.ReaderStreamCollection
 public typealias ReaderStreamInfo = WordPressAPIInternal.ReaderStreamInfo
 public typealias ReaderStreamItem = WordPressAPIInternal.ReaderStreamItem
-public typealias ReaderStreamOrder = WordPressAPIInternal.ReaderStreamOrder
+public typealias ReaderStreamOrdering = WordPressAPIInternal.ReaderStreamOrdering
 public typealias ReaderStreamPageResult = WordPressAPIInternal.ReaderStreamPageResult
 
 // MARK: Subscribers
