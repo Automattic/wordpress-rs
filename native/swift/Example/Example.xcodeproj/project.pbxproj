@@ -33,6 +33,9 @@
 		4AE0E03ABFE6F5864011A0DA /* ReaderRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE02A1BF871B30710652166 /* ReaderRoute.swift */; };
 		4AE0A05E06C45B3D90E8F994 /* ReaderStreamViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE04D95CA05984102DD3025 /* ReaderStreamViewModel.swift */; };
 		4AE0A9CF2551DFCF32FDF75E /* ReaderStreamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE0B6D612ADA9130A11C574 /* ReaderStreamView.swift */; };
+		4AE07D8B8D46BAB15E336E04 /* ReaderPostViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE07BAC3947F028EF62EC75 /* ReaderPostViewModel.swift */; };
+		4AE0EA16D2831F2CF2B8748F /* ReaderPostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE08C3E51719502FB3C8338 /* ReaderPostView.swift */; };
+		4AE0F8C1D33F50B2FB4CA669 /* ReaderHTMLView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AE071CF765D27669A87D090 /* ReaderHTMLView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +64,9 @@
 		4AE02A1BF871B30710652166 /* ReaderRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderRoute.swift; sourceTree = "<group>"; };
 		4AE04D95CA05984102DD3025 /* ReaderStreamViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderStreamViewModel.swift; sourceTree = "<group>"; };
 		4AE0B6D612ADA9130A11C574 /* ReaderStreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderStreamView.swift; sourceTree = "<group>"; };
+		4AE07BAC3947F028EF62EC75 /* ReaderPostViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPostViewModel.swift; sourceTree = "<group>"; };
+		4AE08C3E51719502FB3C8338 /* ReaderPostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPostView.swift; sourceTree = "<group>"; };
+		4AE071CF765D27669A87D090 /* ReaderHTMLView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderHTMLView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +103,9 @@
 		4AE04FDB80C1CC01A9E6724A /* Reader */ = {
 			isa = PBXGroup;
 			children = (
+				4AE071CF765D27669A87D090 /* ReaderHTMLView.swift */,
+				4AE08C3E51719502FB3C8338 /* ReaderPostView.swift */,
+				4AE07BAC3947F028EF62EC75 /* ReaderPostViewModel.swift */,
 				4AE0B6D612ADA9130A11C574 /* ReaderStreamView.swift */,
 				4AE04D95CA05984102DD3025 /* ReaderStreamViewModel.swift */,
 				4AE02A1BF871B30710652166 /* ReaderRoute.swift */,
@@ -289,6 +298,9 @@
 				24367DA82F15993D0011BDB8 /* WPComRootView.swift in Sources */,
 				242D64942C3608C6007CA96C /* ListView.swift in Sources */,
 				24367DAA2F159B910011BDB8 /* SelfHostedRootView.swift in Sources */,
+				4AE0F8C1D33F50B2FB4CA669 /* ReaderHTMLView.swift in Sources */,
+				4AE0EA16D2831F2CF2B8748F /* ReaderPostView.swift in Sources */,
+				4AE07D8B8D46BAB15E336E04 /* ReaderPostViewModel.swift in Sources */,
 				4AE0A9CF2551DFCF32FDF75E /* ReaderStreamView.swift in Sources */,
 				4AE0A05E06C45B3D90E8F994 /* ReaderStreamViewModel.swift in Sources */,
 				4AE0E03ABFE6F5864011A0DA /* ReaderRoute.swift in Sources */,
