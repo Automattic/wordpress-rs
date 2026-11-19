@@ -97,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A comment the server takes through `ReaderCommentsCollection::post_comment` or `retry_comment` now adds one to the comment count of the cached post, as a like adds one to its like count. The post's screen and its stream rows showed the old count until the post was fetched again. A comment held for a moderator isn't counted, as the server doesn't count it.
 - Following or unfollowing a site with `ReaderService::set_followed` now counts the reader in or out of the cached site's subscriber count, as a like moves a post's like count, and a refused follow puts it back. The header of a site's stream showed the old count until the site was fetched again. The count moves only when the cached follow changes, never goes below 0, and a site or feed with no count is left without one.
 - Unblocking a site with `ReaderService::set_site_blocked` now shows it as followed again when the cached subscriptions list it. While a site is blocked, the server says it isn't followed, but it keeps the subscription and an unblock brings the follow back, so a site fetched during the block read as not followed after the unblock, with the reader left out of its subscriber count, until it was fetched again.
+- The Swift example app's Find sites shows the address of a result that leaves out its own, from the result's site or feed, as the Kotlin app does, and the feed's subscriber count when the result has none. The owner's test site was listed with no address.
 
 ## [0.11.1] - 2026-11-18
 

@@ -8,7 +8,16 @@ struct ReaderFoundSite: Identifiable {
     var isFollowing: Bool
 
     var title: String {
-        (result.title ?? result.site?.name ?? result.feed?.name)?.decodingHTMLEntities() ?? result.url ?? "A site"
+        (result.title ?? result.site?.name ?? result.feed?.name)?.decodingHTMLEntities() ?? address ?? "A site"
+    }
+
+    /// Some results leave out their own address, but their site or feed has it.
+    var address: String? {
+        result.url ?? result.site?.url ?? result.feed?.url ?? result.subscribeUrl
+    }
+
+    var subscribersCount: UInt64? {
+        result.subscribersCount ?? result.feed?.subscribersCount
     }
 
     /// The site's stream, or its feed's when it has no site ID.
@@ -23,7 +32,7 @@ struct ReaderFoundSite: Identifiable {
         ReaderFollowTarget(
             siteId: result.siteId,
             feedId: result.feedId,
-            url: result.subscribeUrl ?? result.url,
+            url: result.subscribeUrl ?? address,
             name: title
         )
     }
@@ -195,7 +204,7 @@ struct ReaderFindSitesView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(site.title)
             Text(
-                [site.result.url, site.result.subscribersCount.map { readerCount($0, "subscriber") }]
+                [site.address, site.subscribersCount.map { readerCount($0, "subscriber") }]
                     .compactMap { $0 }
                     .joined(separator: " · ")
             )
