@@ -91,13 +91,14 @@ final class ReaderStreamViewModel {
         }
 
         await reloadFromCache()
-        async let header: Void = refreshHeader()
         await refresh()
-        await header
     }
 
+    /// Fetches the stream's first page, and what the header shows of a site, a feed or a tag.
     func refresh() async {
+        async let header: Void = refreshHeader()
         await load { try await self.collection.refresh() }
+        await header
     }
 
     func loadMore() async {
