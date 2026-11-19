@@ -4,9 +4,10 @@
 use crate::{
     RowId, SqliteDbError,
     db_types::reader::{
-        DbReaderSavedKey, DbReaderSavedListItem, DbReaderSavedRow, DbReaderSavedState,
-        DbReaderStream, DbReaderStreamItem, ReaderPostRecord, reader_date_from_text,
-        reader_date_text, reader_saved_key_from_text, reader_saved_key_text,
+        DbReaderPageItem, DbReaderPageOutcome, DbReaderSavedKey, DbReaderSavedListItem,
+        DbReaderSavedRow, DbReaderSavedState, DbReaderStream, DbReaderStreamItem,
+        DbReaderUnreadablePost, ReaderPostRecord, reader_date_from_text, reader_date_text,
+        reader_saved_key_from_text, reader_saved_key_text,
     },
     list_metadata::ListState,
     repository::QueryExecutor,
@@ -71,13 +72,25 @@ const POST_FIELDS: &[&str] = &[
     "word_count",
 ];
 
+/// What to read of each post.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PostContent {
+    Included,
+    /// The content is read as `NULL`. It's most of a post's size, and a list of posts doesn't show
+    /// it.
+    LeftOut,
+}
+
 /// [`POST_FIELDS`] as a column list for a `SELECT` from `reader_posts p`. Each column is named
 /// `p_<field>`, which is what [`post_from_row`] reads it by, so the list can sit anywhere among a
 /// query's other columns.
-fn post_columns() -> String {
+fn post_columns(content: PostContent) -> String {
     POST_FIELDS
         .iter()
-        .map(|field| format!("p.{field} AS p_{field}"))
+        .map(|field| match (*field, content) {
+            ("content", PostContent::LeftOut) => "NULL AS p_content".to_string(),
+            _ => format!("p.{field} AS p_{field}"),
+        })
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -358,7 +371,7 @@ impl ReaderPostRepository {
     ) -> Result<Option<(RowId, ReaderPostRecord)>, SqliteDbError> {
         let sql = format!(
             "SELECT {} FROM reader_posts p WHERE p.account_id = ?1 AND p.identity_key = ?2",
-            post_columns()
+            post_columns(PostContent::Included)
         );
         let mut statement = executor.prepare(&sql)?;
         let exact = statement
@@ -378,7 +391,7 @@ impl ReaderPostRepository {
             "SELECT {} FROM reader_posts p
             WHERE p.account_id = ?1 AND p.feed_item_id = ?2
             ORDER BY p.rowid LIMIT 1",
-            post_columns()
+            post_columns(PostContent::Included)
         );
         let mut statement = executor.prepare(&sql)?;
         statement
@@ -582,12 +595,30 @@ impl ReaderStreamRepository {
         executor: &impl QueryExecutor,
         stream: RowId,
     ) -> Result<Vec<DbReaderStreamItem>, SqliteDbError> {
+        Self::select_items_with(executor, stream, PostContent::Included)
+    }
+
+    /// The stream's posts, newest first, each without its content. For a list of posts, which
+    /// doesn't show it: a post's content is most of its size.
+    pub fn select_items_without_content(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+    ) -> Result<Vec<DbReaderStreamItem>, SqliteDbError> {
+        Self::select_items_with(executor, stream, PostContent::LeftOut)
+    }
+
+    fn select_items_with(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        content: PostContent,
+    ) -> Result<Vec<DbReaderStreamItem>, SqliteDbError> {
         let sql = format!(
-            "SELECT {}, i.sort_key AS i_sort_key FROM reader_stream_items i
+            "SELECT {}, i.sort_key AS i_sort_key, i.gap_before AS i_gap_before
+            FROM reader_stream_items i
             JOIN reader_posts p ON p.rowid = i.post_id
             WHERE i.stream_id = ?1
             ORDER BY i.sort_key DESC, i.rowid ASC",
-            post_columns()
+            post_columns(content)
         );
         let mut statement = executor.prepare(&sql)?;
         let rows = statement.query_map([stream], |row| {
@@ -596,6 +627,7 @@ impl ReaderStreamRepository {
                     post,
                     post_row_id,
                     sort_key: row.get("i_sort_key")?,
+                    gap_before: row.get("i_gap_before")?,
                 })
             }))
         })?;
@@ -631,6 +663,322 @@ impl ReaderStreamRepository {
         rows.map(|row| row.map_err(SqliteDbError::from)).collect()
     }
 
+    /// How many posts the stream has.
+    pub fn count_items(executor: &impl QueryExecutor, stream: RowId) -> Result<u64, SqliteDbError> {
+        let mut statement =
+            executor.prepare("SELECT COUNT(*) FROM reader_stream_items WHERE stream_id = ?1")?;
+        Ok(statement.query_row([stream], |row| row.get(0))?)
+    }
+
+    fn has_item(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        post: RowId,
+    ) -> Result<bool, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT EXISTS(SELECT 1 FROM reader_stream_items WHERE stream_id = ?1 AND post_id = ?2)",
+        )?;
+        Ok(statement.query_row(params![stream, post], |row| row.get(0))?)
+    }
+
+    /// Post rows as a JSON array, for `json_each` in a `NOT IN`.
+    fn rows_json<'a>(rows: impl Iterator<Item = &'a RowId>) -> String {
+        let ids: Vec<String> = rows.map(|row| row.0.to_string()).collect();
+        format!("[{}]", ids.join(","))
+    }
+
+    /// Adds a page to a stream ordered by date, and makes the stream agree with it.
+    ///
+    /// The page is the server's posts older than `before` (`None` for the newest), down to its
+    /// oldest post. So between those two ends the page is the whole truth:
+    ///
+    /// - A post the stream has there that the page doesn't was deleted, or left the stream, and is
+    ///   removed. An empty page means there is nothing older than `before`. `keep` are posts to
+    ///   leave alone, such as ones the page had and couldn't read.
+    /// - Each of the page's posts follows the one above it, so none has a gap before it.
+    /// - If the stream had none of the page's posts, nothing says the page reaches the older posts
+    ///   the stream has. The newest of those is marked as having a gap before it.
+    ///
+    /// A post dated the same as the page's oldest is left as it is: the page may have ended
+    /// between two posts with one date. Call it inside a transaction.
+    pub fn apply_dated_page(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        before: Option<&str>,
+        items: &[DbReaderPageItem],
+        keep: &[RowId],
+    ) -> Result<DbReaderPageOutcome, SqliteDbError> {
+        let mut outcome = DbReaderPageOutcome::default();
+        for item in items {
+            if Self::has_item(executor, stream, item.post)? {
+                outcome.overlapped = true;
+            } else {
+                outcome.added += 1;
+            }
+            executor.execute(
+                "INSERT INTO reader_stream_items (stream_id, post_id, sort_key, railcar, gap_before)
+                VALUES (?1, ?2, ?3, ?4, 0)
+                ON CONFLICT(stream_id, post_id) DO UPDATE SET
+                    sort_key = excluded.sort_key,
+                    railcar = COALESCE(excluded.railcar, railcar),
+                    gap_before = 0",
+                params![stream, item.post, item.sort_key, item.railcar],
+            )?;
+        }
+
+        let oldest = items.iter().map(|item| item.sort_key.as_str()).min();
+        let page = Self::rows_json(items.iter().map(|item| &item.post));
+        let protected = Self::rows_json(items.iter().map(|item| &item.post).chain(keep));
+        outcome.removed = executor.execute(
+            "DELETE FROM reader_stream_items
+            WHERE stream_id = ?1
+                AND (?2 IS NULL OR sort_key < ?2)
+                AND (?3 IS NULL OR sort_key > ?3)
+                AND post_id NOT IN (SELECT value FROM json_each(?4))",
+            params![stream, before, oldest, protected],
+        )? as u64;
+
+        if let Some(oldest) = oldest
+            && !outcome.overlapped
+        {
+            executor.execute(
+                "UPDATE reader_stream_items SET gap_before = 1 WHERE rowid = (
+                    SELECT rowid FROM reader_stream_items
+                    WHERE stream_id = ?1 AND sort_key <= ?2
+                        AND post_id NOT IN (SELECT value FROM json_each(?3))
+                    ORDER BY sort_key DESC, rowid ASC LIMIT 1)",
+                params![stream, oldest, page],
+            )?;
+        }
+        Ok(outcome)
+    }
+
+    /// Where a post sorts in a stream kept in the order the server sent: the first post sorts
+    /// highest, as the newest date does in a stream ordered by date.
+    fn position_sort_key(position: u64) -> String {
+        format!("{:010}", 9_999_999_999u64.saturating_sub(position))
+    }
+
+    /// Makes a stream kept in the order the server sent hold exactly `items`, in that order. For
+    /// the first page of such a stream: its later pages follow from it, so what the stream had
+    /// past it can't be kept. Call it inside a transaction.
+    pub fn replace_items(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        items: &[DbReaderPageItem],
+    ) -> Result<DbReaderPageOutcome, SqliteDbError> {
+        let mut outcome = DbReaderPageOutcome::default();
+        let page = Self::rows_json(items.iter().map(|item| &item.post));
+        outcome.removed = executor.execute(
+            "DELETE FROM reader_stream_items
+            WHERE stream_id = ?1 AND post_id NOT IN (SELECT value FROM json_each(?2))",
+            params![stream, page],
+        )? as u64;
+        let mut position = 0;
+        let mut placed: Vec<RowId> = Vec::new();
+        for item in items {
+            // A post the server sent twice keeps its first place.
+            if placed.contains(&item.post) {
+                continue;
+            }
+            placed.push(item.post);
+            if Self::has_item(executor, stream, item.post)? {
+                outcome.overlapped = true;
+            } else {
+                outcome.added += 1;
+            }
+            executor.execute(
+                "INSERT INTO reader_stream_items (stream_id, post_id, sort_key, railcar, gap_before)
+                VALUES (?1, ?2, ?3, ?4, 0)
+                ON CONFLICT(stream_id, post_id) DO UPDATE SET
+                    sort_key = excluded.sort_key,
+                    railcar = COALESCE(excluded.railcar, railcar),
+                    gap_before = 0",
+                params![
+                    stream,
+                    item.post,
+                    Self::position_sort_key(position),
+                    item.railcar
+                ],
+            )?;
+            position += 1;
+        }
+        Ok(outcome)
+    }
+
+    /// Adds a later page to a stream kept in the order the server sent, after what it has. A post
+    /// the stream already has stays where it is. Call it inside a transaction.
+    pub fn append_items(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        items: &[DbReaderPageItem],
+    ) -> Result<DbReaderPageOutcome, SqliteDbError> {
+        let mut outcome = DbReaderPageOutcome::default();
+        // One past the lowest place taken. Places aren't reused, so this is past every post.
+        let mut statement = executor
+            .prepare("SELECT MIN(sort_key) FROM reader_stream_items WHERE stream_id = ?1")?;
+        let lowest: Option<String> = statement.query_row([stream], |row| row.get(0))?;
+        let mut position = match lowest {
+            Some(key) => {
+                let taken: u64 = key.parse().map_err(|_| {
+                    SqliteDbError::SqliteError(format!("Invalid Reader stream position: {key}"))
+                })?;
+                9_999_999_999u64.saturating_sub(taken) + 1
+            }
+            None => 0,
+        };
+        for item in items {
+            if Self::has_item(executor, stream, item.post)? {
+                outcome.overlapped = true;
+                continue;
+            }
+            executor.execute(
+                "INSERT INTO reader_stream_items (stream_id, post_id, sort_key, railcar)
+                VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    stream,
+                    item.post,
+                    Self::position_sort_key(position),
+                    item.railcar
+                ],
+            )?;
+            outcome.added += 1;
+            position += 1;
+        }
+        Ok(outcome)
+    }
+
+    /// The sort key of the stream's last post: the oldest, in a stream ordered by date.
+    pub fn select_last_sort_key(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+    ) -> Result<Option<String>, SqliteDbError> {
+        let mut statement = executor
+            .prepare("SELECT MIN(sort_key) FROM reader_stream_items WHERE stream_id = ?1")?;
+        Ok(statement.query_row([stream], |row| row.get(0))?)
+    }
+
+    /// A post's place in the stream, if it's in it: its sort key, and whether it has a gap before
+    /// it.
+    pub fn select_item_place(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        post: RowId,
+    ) -> Result<Option<(String, bool)>, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT sort_key, gap_before FROM reader_stream_items
+            WHERE stream_id = ?1 AND post_id = ?2",
+        )?;
+        Ok(statement
+            .query_row(params![stream, post], |row| Ok((row.get(0)?, row.get(1)?)))
+            .optional()?)
+    }
+
+    /// The sort key of the post shown just above a post, or `None` if it's the first.
+    pub fn select_sort_key_above(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        post: RowId,
+    ) -> Result<Option<String>, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT above.sort_key FROM reader_stream_items item
+            JOIN reader_stream_items above ON above.stream_id = item.stream_id
+                AND (above.sort_key > item.sort_key
+                    OR (above.sort_key = item.sort_key AND above.rowid < item.rowid))
+            WHERE item.stream_id = ?1 AND item.post_id = ?2
+            ORDER BY above.sort_key ASC, above.rowid DESC LIMIT 1",
+        )?;
+        Ok(statement
+            .query_row(params![stream, post], |row| row.get(0))
+            .optional()?)
+    }
+
+    /// Records that nothing is missing before a post any more.
+    pub fn clear_gap(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        post: RowId,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "UPDATE reader_stream_items SET gap_before = 0 WHERE stream_id = ?1 AND post_id = ?2",
+            params![stream, post],
+        )?;
+        Ok(())
+    }
+
+    /// Records that a page loaded, and that the stream is idle.
+    ///
+    /// `has_more` is whether the stream has posts past its last one, or `None` to leave what's
+    /// recorded, which a page that didn't reach the end can't say. `next_page_handle` is kept for
+    /// a stream that pages with one. `refreshed_at` is the time, when the page was the first. That
+    /// also bumps the version: a later page that was asked for before it read the old handle.
+    pub fn finish_page(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        has_more: Option<bool>,
+        next_page_handle: Option<&str>,
+        refreshed_at: Option<&WpGmtDateTime>,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "UPDATE reader_streams SET
+                next_page_handle = ?2,
+                has_more = COALESCE(?3, has_more),
+                last_refreshed_at = COALESCE(?4, last_refreshed_at),
+                version = version + CASE WHEN ?4 IS NULL THEN 0 ELSE 1 END,
+                state = ?5,
+                error_message = NULL
+            WHERE rowid = ?1",
+            params![
+                stream,
+                next_page_handle,
+                has_more,
+                refreshed_at.map(reader_date_text),
+                ListState::Idle
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Removes the stream's posts past its first `keep`. In a stream ordered by date those are the
+    /// oldest, and they can be loaded again. Returns how many it removed.
+    pub fn trim(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        keep: u64,
+    ) -> Result<u64, SqliteDbError> {
+        let removed = executor.execute(
+            "DELETE FROM reader_stream_items WHERE rowid IN (
+                SELECT rowid FROM reader_stream_items WHERE stream_id = ?1
+                ORDER BY sort_key DESC, rowid ASC LIMIT -1 OFFSET ?2)",
+            params![stream, keep],
+        )?;
+        Ok(removed as u64)
+    }
+
+    /// Deletes the account's streams last refreshed before `before`, with their posts' places in
+    /// them. `except` is a stream to keep whatever its age, such as the saved list.
+    pub fn delete_stale(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        before: &WpGmtDateTime,
+        except: &str,
+    ) -> Result<u64, SqliteDbError> {
+        let removed = executor.execute(
+            "DELETE FROM reader_streams
+            WHERE account_id = ?1 AND key != ?3
+                AND state NOT IN (?4, ?5)
+                AND (last_refreshed_at IS NULL OR last_refreshed_at < ?2)",
+            params![
+                account,
+                reader_date_text(before),
+                except,
+                ListState::FetchingFirstPage,
+                ListState::FetchingNextPage
+            ],
+        )?;
+        Ok(removed as u64)
+    }
+
     /// Resets streams left fetching when the app quit. Called after migrations.
     pub fn reset_stale_fetching_states(
         executor: &impl QueryExecutor,
@@ -643,6 +991,141 @@ impl ReaderStreamRepository {
                 ListState::FetchingNextPage
             ],
         )
+    }
+}
+
+impl ReaderPostRepository {
+    /// Deletes the account's posts that nothing shows any more: in no stream, not saved, and not
+    /// stored since `fetched_before`. The last part keeps a post that was just fetched on its own,
+    /// such as one opened from a link. Returns how many it deleted.
+    pub fn delete_unused(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        fetched_before: &WpGmtDateTime,
+    ) -> Result<u64, SqliteDbError> {
+        let removed = executor.execute(
+            "DELETE FROM reader_posts
+            WHERE account_id = ?1 AND fetched_at < ?2
+                AND rowid NOT IN (SELECT post_id FROM reader_stream_items)
+                AND rowid NOT IN (
+                    SELECT post_id FROM reader_saved_posts WHERE post_id IS NOT NULL)",
+            params![account, reader_date_text(fetched_before)],
+        )?;
+        Ok(removed as u64)
+    }
+}
+
+/// Posts a stream's page had that couldn't be read. See the `reader_unreadable_posts` table.
+pub struct ReaderUnreadablePostRepository;
+
+impl ReaderUnreadablePostRepository {
+    /// Records that a page of the stream had a post it couldn't read, or that it still can't.
+    pub fn record(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        stream: RowId,
+        key: &ReaderSavedKey,
+        identity: &ReaderPostSaveIdentity,
+        error: &str,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "INSERT INTO reader_unreadable_posts (
+                account_id, stream_id, identity_key, post_id, site_id, feed_id, feed_item_id,
+                is_external, url, error
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            ON CONFLICT(stream_id, identity_key) DO UPDATE SET error = excluded.error",
+            params![
+                account,
+                stream,
+                reader_saved_key_text(key),
+                identity.id,
+                identity.site_id.map(|id| id.0),
+                identity.feed_id.map(|id| id.0),
+                identity.feed_item_id.map(|id| id.0),
+                identity.is_external,
+                identity.url,
+                error,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Forgets a post the stream could read after all. Returns whether it was recorded.
+    pub fn resolve(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+        key: &ReaderSavedKey,
+    ) -> Result<bool, SqliteDbError> {
+        let removed = executor.execute(
+            "DELETE FROM reader_unreadable_posts WHERE stream_id = ?1 AND identity_key = ?2",
+            params![stream, reader_saved_key_text(key)],
+        )?;
+        Ok(removed > 0)
+    }
+
+    /// How many of the stream's posts couldn't be read.
+    pub fn count(executor: &impl QueryExecutor, stream: RowId) -> Result<u64, SqliteDbError> {
+        let mut statement = executor
+            .prepare("SELECT COUNT(*) FROM reader_unreadable_posts WHERE stream_id = ?1")?;
+        Ok(statement.query_row([stream], |row| row.get(0))?)
+    }
+
+    /// The stream's unreadable posts, oldest first.
+    pub fn select(
+        executor: &impl QueryExecutor,
+        stream: RowId,
+    ) -> Result<Vec<DbReaderUnreadablePost>, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT rowid, stream_id, post_id, site_id, feed_id, feed_item_id, is_external, url,
+                error, attempts, last_attempt_at
+            FROM reader_unreadable_posts WHERE stream_id = ?1 ORDER BY rowid",
+        )?;
+        let rows = statement.query_map([stream], |row| {
+            Ok((|| -> Result<DbReaderUnreadablePost, SqliteDbError> {
+                Ok(DbReaderUnreadablePost {
+                    row_id: row.get(0)?,
+                    stream_row_id: row.get(1)?,
+                    identity: ReaderPostSaveIdentity {
+                        id: row.get(2)?,
+                        site_id: row.get::<_, Option<u64>>(3)?.map(WpComSiteId),
+                        feed_id: row.get::<_, Option<u64>>(4)?.map(ReaderFeedId),
+                        feed_item_id: row.get::<_, Option<u64>>(5)?.map(ReaderFeedItemId),
+                        is_external: row.get(6)?,
+                        url: row.get(7)?,
+                    },
+                    error: row.get(8)?,
+                    attempts: row.get(9)?,
+                    last_attempt_at: row
+                        .get::<_, Option<String>>(10)?
+                        .map(|text| reader_date_from_text(&text))
+                        .transpose()?,
+                })
+            })())
+        })?;
+        collect_rows(rows.map(|row| row.map_err(SqliteDbError::from).and_then(|row| row)))
+    }
+
+    /// Records that the post was asked for on its own, at `now`, and still couldn't be read.
+    pub fn record_attempt(
+        executor: &impl QueryExecutor,
+        row: RowId,
+        now: &WpGmtDateTime,
+        error: &str,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "UPDATE reader_unreadable_posts
+            SET attempts = attempts + 1, last_attempt_at = ?2, error = ?3 WHERE rowid = ?1",
+            params![row, reader_date_text(now), error],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete(executor: &impl QueryExecutor, row: RowId) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "DELETE FROM reader_unreadable_posts WHERE rowid = ?1",
+            [row],
+        )?;
+        Ok(())
     }
 }
 
@@ -1358,7 +1841,7 @@ impl ReaderSavedRepository {
             LEFT JOIN reader_posts p ON p.rowid = s.post_id
             WHERE s.account_id = ?1 AND s.saved = 1 AND s.listed = 1
             ORDER BY s.date_saved IS NULL, s.date_saved DESC, s.seq DESC, s.rowid DESC",
-            post_columns()
+            post_columns(PostContent::Included)
         );
         let mut statement = executor.prepare(&sql)?;
         let rows = statement.query_map([account], |row| {

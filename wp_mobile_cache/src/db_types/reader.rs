@@ -241,6 +241,42 @@ pub struct DbReaderStreamItem {
     pub post: ReaderPostRecord,
     pub post_row_id: RowId,
     pub sort_key: String,
+    /// Posts may be missing between this one and the one above it.
+    pub gap_before: bool,
+}
+
+/// A post on a page of a stream, to add to the stream's items.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DbReaderPageItem {
+    /// The post's row in `reader_posts`.
+    pub post: RowId,
+    /// Where the post sorts in a stream ordered by date: [`reader_date_text`] of the date the
+    /// stream orders by. Not used by a stream kept in the order the server sent.
+    pub sort_key: String,
+    pub railcar: Option<String>,
+}
+
+/// What adding a page to a stream did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DbReaderPageOutcome {
+    /// Posts the stream didn't have.
+    pub added: u64,
+    /// Posts the stream had that the server no longer returns.
+    pub removed: u64,
+    /// Whether the stream already had one of the page's posts.
+    pub overlapped: bool,
+}
+
+/// A post a stream's page had that couldn't be read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DbReaderUnreadablePost {
+    pub row_id: RowId,
+    pub stream_row_id: RowId,
+    pub identity: ReaderPostSaveIdentity,
+    pub error: String,
+    /// How many times it's been asked for on its own since.
+    pub attempts: u32,
+    pub last_attempt_at: Option<WpGmtDateTime>,
 }
 
 /// One save on the server, as far as this device knows, and what the user wants for it.

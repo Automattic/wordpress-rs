@@ -1345,3 +1345,403 @@ fn test_deleting_an_account_deletes_its_reader_data() {
             .is_some()
     );
 }
+
+mod stream_pages {
+    use super::*;
+    use crate::db_types::reader::{DbReaderPageItem, DbReaderPageOutcome};
+
+    /// A stream with `(post ID, hour)` posts added as pages. Each post is dated at that hour of one
+    /// day, so a larger hour is a newer post.
+    struct Fixture {
+        conn: Connection,
+        account: RowId,
+        stream: RowId,
+    }
+
+    fn hour(hour: u32) -> String {
+        format!("2026-11-18T{hour:02}:00:00.000Z")
+    }
+
+    impl Fixture {
+        fn new() -> Self {
+            let conn = conn();
+            let account = account(&conn, 1);
+            let stream = ReaderStreamRepository::get_or_create(&conn, account, "following")
+                .unwrap()
+                .row_id;
+            Self {
+                conn,
+                account,
+                stream,
+            }
+        }
+
+        fn row(&self, post_id: u64) -> RowId {
+            ReaderPostRepository::upsert(&self.conn, self.account, &post(post_id)).unwrap()
+        }
+
+        fn items(&self, posts: &[(u64, u32)]) -> Vec<DbReaderPageItem> {
+            posts
+                .iter()
+                .map(|(post_id, at)| DbReaderPageItem {
+                    post: self.row(*post_id),
+                    sort_key: hour(*at),
+                    railcar: None,
+                })
+                .collect()
+        }
+
+        /// Applies a page of posts older than hour `before`.
+        fn page(&self, before: Option<u32>, posts: &[(u64, u32)]) -> DbReaderPageOutcome {
+            ReaderStreamRepository::apply_dated_page(
+                &self.conn,
+                self.stream,
+                before.map(hour).as_deref(),
+                &self.items(posts),
+                &[],
+            )
+            .unwrap()
+        }
+
+        /// The stream's post IDs in order, each with `*` in front if it has a gap before it.
+        fn shown(&self) -> Vec<String> {
+            ReaderStreamRepository::select_items_without_content(&self.conn, self.stream)
+                .unwrap()
+                .iter()
+                .map(|item| {
+                    let gap = if item.gap_before { "*" } else { "" };
+                    format!("{gap}{}", item.post.identity.id)
+                })
+                .collect()
+        }
+    }
+
+    #[test]
+    fn test_a_first_page_fills_an_empty_stream() {
+        let fixture = Fixture::new();
+        let outcome = fixture.page(None, &[(3, 12), (2, 11), (1, 10)]);
+        assert_eq!(
+            outcome,
+            DbReaderPageOutcome {
+                added: 3,
+                removed: 0,
+                overlapped: false
+            }
+        );
+        assert_eq!(fixture.shown(), ["3", "2", "1"]);
+    }
+
+    #[test]
+    fn test_a_refresh_that_reaches_what_the_stream_has_adds_on_top() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(3, 12), (2, 11), (1, 10)]);
+        let outcome = fixture.page(None, &[(5, 14), (4, 13), (3, 12)]);
+        assert_eq!(
+            outcome,
+            DbReaderPageOutcome {
+                added: 2,
+                removed: 0,
+                overlapped: true
+            }
+        );
+        assert_eq!(fixture.shown(), ["5", "4", "3", "2", "1"]);
+    }
+
+    #[test]
+    fn test_a_refresh_that_does_not_reach_what_the_stream_has_leaves_a_gap() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(3, 12), (2, 11), (1, 10)]);
+        let outcome = fixture.page(None, &[(9, 20), (8, 19), (7, 18)]);
+        assert!(!outcome.overlapped);
+        assert_eq!(fixture.shown(), ["9", "8", "7", "*3", "2", "1"]);
+    }
+
+    #[test]
+    fn test_a_page_removes_a_post_the_server_no_longer_has() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(4, 13), (3, 12), (2, 11), (1, 10)]);
+        // 3 was deleted, and 4 is gone too: the page is the newest posts, and has neither.
+        let outcome = fixture.page(None, &[(5, 14), (2, 11)]);
+        assert_eq!(outcome.removed, 2);
+        assert_eq!(fixture.shown(), ["5", "2", "1"]);
+    }
+
+    #[test]
+    fn test_a_post_dated_as_the_oldest_on_the_page_is_kept() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(3, 12), (2, 11), (1, 11)]);
+        // The page ends between two posts dated the same.
+        let outcome = fixture.page(None, &[(4, 13), (3, 12), (2, 11)]);
+        assert_eq!(outcome.removed, 0);
+        assert_eq!(fixture.shown(), ["4", "3", "2", "1"]);
+    }
+
+    #[test]
+    fn test_an_older_page_goes_after_what_the_stream_has() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(6, 15), (5, 14), (4, 13)]);
+        let outcome = fixture.page(Some(13), &[(3, 12), (2, 11)]);
+        assert_eq!(outcome.added, 2);
+        assert_eq!(fixture.shown(), ["6", "5", "4", "3", "2"]);
+    }
+
+    #[test]
+    fn test_filling_a_gap_until_it_reaches_the_older_posts_closes_it() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(3, 12), (2, 11), (1, 10)]);
+        fixture.page(None, &[(9, 20), (8, 19)]);
+        assert_eq!(fixture.shown(), ["9", "8", "*3", "2", "1"]);
+
+        // The first page of the gap doesn't reach post 3, so the gap stays.
+        fixture.page(Some(19), &[(7, 18), (6, 17)]);
+        assert_eq!(fixture.shown(), ["9", "8", "7", "6", "*3", "2", "1"]);
+
+        // The next one does.
+        fixture.page(Some(17), &[(5, 16), (4, 15), (3, 12)]);
+        assert_eq!(
+            fixture.shown(),
+            ["9", "8", "7", "6", "5", "4", "3", "2", "1"]
+        );
+    }
+
+    #[test]
+    fn test_an_empty_older_page_means_nothing_is_older() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(4, 13), (3, 12), (2, 11), (1, 10)]);
+        let outcome = fixture.page(Some(12), &[]);
+        assert_eq!(outcome.removed, 2);
+        assert_eq!(fixture.shown(), ["4", "3"]);
+    }
+
+    #[test]
+    fn test_an_empty_first_page_empties_the_stream() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(2, 11), (1, 10)]);
+        fixture.page(None, &[]);
+        assert!(fixture.shown().is_empty());
+    }
+
+    #[test]
+    fn test_a_post_to_keep_is_not_removed() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(3, 12), (2, 11), (1, 10)]);
+        let kept = fixture.row(2);
+        ReaderStreamRepository::apply_dated_page(
+            &fixture.conn,
+            fixture.stream,
+            None,
+            &fixture.items(&[(3, 12), (1, 10)]),
+            &[kept],
+        )
+        .unwrap();
+        assert_eq!(fixture.shown(), ["3", "2", "1"]);
+    }
+
+    #[test]
+    fn test_a_post_whose_date_changed_moves() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(3, 12), (2, 11), (1, 10)]);
+        fixture.page(None, &[(1, 13), (3, 12), (2, 11)]);
+        assert_eq!(fixture.shown(), ["1", "3", "2"]);
+    }
+
+    #[test]
+    fn test_the_post_above_a_post() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(3, 12), (2, 11), (1, 11)]);
+        let above = |post_id: u64| {
+            ReaderStreamRepository::select_sort_key_above(
+                &fixture.conn,
+                fixture.stream,
+                fixture.row(post_id),
+            )
+            .unwrap()
+        };
+        assert_eq!(above(3), None);
+        assert_eq!(above(2), Some(hour(12)));
+        // Post 1 is dated as post 2 and was added after it, so post 2 is above it.
+        assert_eq!(above(1), Some(hour(11)));
+    }
+
+    #[test]
+    fn test_a_first_page_replaces_a_stream_kept_in_the_servers_order() {
+        let fixture = Fixture::new();
+        let first = fixture.items(&[(1, 0), (2, 0), (3, 0)]);
+        ReaderStreamRepository::replace_items(&fixture.conn, fixture.stream, &first).unwrap();
+        assert_eq!(fixture.shown(), ["1", "2", "3"]);
+
+        let more = fixture.items(&[(4, 0), (2, 0), (5, 0)]);
+        let outcome =
+            ReaderStreamRepository::append_items(&fixture.conn, fixture.stream, &more).unwrap();
+        assert_eq!(outcome.added, 2);
+        assert!(outcome.overlapped);
+        assert_eq!(fixture.shown(), ["1", "2", "3", "4", "5"]);
+
+        // A refresh: the server's first page is now different.
+        let refreshed = fixture.items(&[(6, 0), (2, 0), (6, 0), (1, 0)]);
+        let outcome =
+            ReaderStreamRepository::replace_items(&fixture.conn, fixture.stream, &refreshed)
+                .unwrap();
+        assert_eq!(
+            outcome,
+            DbReaderPageOutcome {
+                added: 1,
+                removed: 3,
+                overlapped: true
+            }
+        );
+        assert_eq!(fixture.shown(), ["6", "2", "1"]);
+
+        // The next page goes after it, though earlier pages took later places.
+        let more = fixture.items(&[(7, 0)]);
+        ReaderStreamRepository::append_items(&fixture.conn, fixture.stream, &more).unwrap();
+        assert_eq!(fixture.shown(), ["6", "2", "1", "7"]);
+    }
+
+    #[test]
+    fn test_trim_removes_the_oldest_posts() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(4, 13), (3, 12), (2, 11), (1, 10)]);
+        let removed = ReaderStreamRepository::trim(&fixture.conn, fixture.stream, 3).unwrap();
+        assert_eq!(removed, 1);
+        assert_eq!(fixture.shown(), ["4", "3", "2"]);
+        assert_eq!(
+            ReaderStreamRepository::trim(&fixture.conn, fixture.stream, 3).unwrap(),
+            0
+        );
+    }
+
+    #[test]
+    fn test_finish_page_keeps_what_is_known_of_the_end() {
+        let fixture = Fixture::new();
+        let stream = || {
+            ReaderStreamRepository::select(&fixture.conn, fixture.account, "following")
+                .unwrap()
+                .unwrap()
+        };
+        assert_eq!(stream().has_more, None);
+
+        let now: WpGmtDateTime = "2026-11-18T10:00:00Z".parse().unwrap();
+        ReaderStreamRepository::finish_page(
+            &fixture.conn,
+            fixture.stream,
+            Some(false),
+            None,
+            Some(&now),
+        )
+        .unwrap();
+        assert_eq!(stream().has_more, Some(false));
+        assert_eq!(stream().last_refreshed_at, Some(now));
+        let version = stream().version;
+
+        // A page that can't say whether there's more leaves it, and a later page isn't a refresh.
+        ReaderStreamRepository::finish_page(&fixture.conn, fixture.stream, None, None, None)
+            .unwrap();
+        assert_eq!(stream().has_more, Some(false));
+        assert_eq!(stream().last_refreshed_at, Some(now));
+        assert_eq!(stream().version, version);
+    }
+
+    #[test]
+    fn test_unused_posts_are_deleted_and_used_ones_kept() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(2, 11), (1, 10)]);
+        fixture.row(3);
+        let saved = fixture.row(4);
+        ReaderSavedRepository::import_save(
+            &fixture.conn,
+            fixture.account,
+            &post_key(4),
+            Some(saved),
+            None,
+        )
+        .unwrap();
+
+        // Nothing is old enough yet.
+        let long_ago: WpGmtDateTime = "2020-01-01T00:00:00Z".parse().unwrap();
+        assert_eq!(
+            ReaderPostRepository::delete_unused(&fixture.conn, fixture.account, &long_ago).unwrap(),
+            0
+        );
+
+        // Post 3 is in no stream and isn't saved.
+        let later: WpGmtDateTime = "2999-01-01T00:00:00Z".parse().unwrap();
+        assert_eq!(
+            ReaderPostRepository::delete_unused(&fixture.conn, fixture.account, &later).unwrap(),
+            1
+        );
+        assert_eq!(count(&fixture.conn, "reader_posts"), 3);
+        assert_eq!(fixture.shown(), ["2", "1"]);
+    }
+
+    #[test]
+    fn test_stale_streams_are_deleted_except_the_one_to_keep() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(1, 10)]);
+        let now: WpGmtDateTime = "2026-11-18T10:00:00Z".parse().unwrap();
+        ReaderStreamRepository::finish_page(&fixture.conn, fixture.stream, None, None, Some(&now))
+            .unwrap();
+        ReaderStreamRepository::get_or_create(&fixture.conn, fixture.account, "saved").unwrap();
+
+        let later: WpGmtDateTime = "2999-01-01T00:00:00Z".parse().unwrap();
+        assert_eq!(
+            ReaderStreamRepository::delete_stale(&fixture.conn, fixture.account, &later, "saved")
+                .unwrap(),
+            1
+        );
+        assert_eq!(count(&fixture.conn, "reader_stream_items"), 0);
+        assert!(
+            ReaderStreamRepository::select(&fixture.conn, fixture.account, "saved")
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn test_unreadable_posts_are_recorded_once_and_resolved() {
+        let fixture = Fixture::new();
+        let record = |error: &str| {
+            ReaderUnreadablePostRepository::record(
+                &fixture.conn,
+                fixture.account,
+                fixture.stream,
+                &post_key(9),
+                &identity(9),
+                error,
+            )
+            .unwrap()
+        };
+        record("a date that can't be read");
+        record("still a date that can't be read");
+        assert_eq!(
+            ReaderUnreadablePostRepository::count(&fixture.conn, fixture.stream).unwrap(),
+            1
+        );
+
+        let posts = ReaderUnreadablePostRepository::select(&fixture.conn, fixture.stream).unwrap();
+        assert_eq!(posts[0].identity, identity(9));
+        assert_eq!(posts[0].error, "still a date that can't be read");
+        assert_eq!(posts[0].attempts, 0);
+
+        let now: WpGmtDateTime = "2026-11-18T10:00:00Z".parse().unwrap();
+        ReaderUnreadablePostRepository::record_attempt(
+            &fixture.conn,
+            posts[0].row_id,
+            &now,
+            "no better",
+        )
+        .unwrap();
+        let posts = ReaderUnreadablePostRepository::select(&fixture.conn, fixture.stream).unwrap();
+        assert_eq!(posts[0].attempts, 1);
+        assert_eq!(posts[0].last_attempt_at, Some(now));
+
+        assert!(
+            ReaderUnreadablePostRepository::resolve(&fixture.conn, fixture.stream, &post_key(9))
+                .unwrap()
+        );
+        assert_eq!(
+            ReaderUnreadablePostRepository::count(&fixture.conn, fixture.stream).unwrap(),
+            0
+        );
+    }
+}

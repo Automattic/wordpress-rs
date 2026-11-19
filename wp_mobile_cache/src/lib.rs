@@ -127,6 +127,8 @@ pub enum DbTable {
     ReaderSavedPosts,
     /// The URLs the server stores as a saved post
     ReaderSavedPostUrls,
+    /// Posts a Reader stream's page had that couldn't be read
+    ReaderUnreadablePosts,
 }
 
 impl DbTable {
@@ -156,6 +158,7 @@ impl DbTable {
             DbTable::ReaderSavedState => "reader_saved_state",
             DbTable::ReaderSavedPosts => "reader_saved_posts",
             DbTable::ReaderSavedPostUrls => "reader_saved_post_urls",
+            DbTable::ReaderUnreadablePosts => "reader_unreadable_posts",
         }
     }
 }
@@ -198,6 +201,7 @@ impl TryFrom<&str> for DbTable {
             "reader_saved_state" => Ok(DbTable::ReaderSavedState),
             "reader_saved_posts" => Ok(DbTable::ReaderSavedPosts),
             "reader_saved_post_urls" => Ok(DbTable::ReaderSavedPostUrls),
+            "reader_unreadable_posts" => Ok(DbTable::ReaderUnreadablePosts),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -515,7 +519,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 15] = [
+static MIGRATION_QUERIES: [&str; 16] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -531,6 +535,7 @@ static MIGRATION_QUERIES: [&str; 15] = [
     include_str!("../migrations/0013-invalidate-post-entity-states-for-meta.sql"),
     include_str!("../migrations/0014-create-media-edit-context-table.sql"),
     include_str!("../migrations/0015-create-wordpress-com-account-and-reader-tables.sql"),
+    include_str!("../migrations/0016-create-reader-unreadable-posts-table.sql"),
 ];
 
 pub struct MigrationManager<'a> {
