@@ -115,10 +115,14 @@ final class ReaderCommentsViewModel {
     func send() async {
         let content = draft
         let parent = replyingTo?.commentId
+        // With an account, the comment is kept in the list whether or not the server takes it, so the field
+        // is emptied either way. Signed out it's refused and nothing keeps it, so the field does.
+        if !session.isSignedOut {
+            draft = ""
+            replyingTo = nil
+        }
         await act("Send") {
             _ = try await self.collection.postComment(content: content, parent: parent)
-            self.draft = ""
-            self.replyingTo = nil
             return "The server took the comment."
         }
     }

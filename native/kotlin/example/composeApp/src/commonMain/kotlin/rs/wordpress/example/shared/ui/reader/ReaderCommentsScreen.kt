@@ -126,7 +126,9 @@ private fun ReaderCommentField(state: ReaderCommentsState) {
     }
 }
 
-private fun ReaderCommentRecord.authorText(): String = authorName?.plainText() ?: "someone"
+/** Who wrote the comment. One written here that the server hasn't taken has no author yet: it's the reader's. */
+private fun ReaderCommentRecord.authorText(): String =
+    authorName?.plainText() ?: if (localId == null) "someone" else "You"
 
 /** A comment, indented by how deep in the thread it is, with what can be done with it. */
 @Composable
