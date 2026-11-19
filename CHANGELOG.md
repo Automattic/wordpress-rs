@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReaderService` keeps the Reader menu (`refresh_menu`, `menu`, `followed_tags`), the account's subscriptions (`refresh_subscriptions`, `subscriptions`) and what it shows of a site or feed (`fetch_site`, `fetch_feed`, `cached_site`) in the cache, and passes on `search_sites`, `interests`, `tag_info`, `user_profile`, `post_likes` and `comment_likes`.
 - `ReaderService::comments` gives a post's comments from the cache as a `ReaderCommentsCollection`. `post_comment` writes a comment or a reply: it shows at once, is sent once, and stays as not taken if that fails, until `retry_comment` or `discard_comment`.
 - Swift: `WPComApiClient.makeReaderService(cache:owner:savedSource:)` creates the `ReaderService` for an account, or for a reader who isn't signed in.
+- The saved list can be sorted: `ReaderSavedPostsParams` has `order_by`, a `ReaderSavedOrderBy` (when each post was saved, or when it was published), and `order`. The API reads `order` only in capitals, which is how it is sent.
+- `reader_post_content_image_urls` lists the images in a Reader post's content, for storing them so the post can be read with no connection. It leaves out tracking pixels, which would count a view when fetched. `reader_post_content_with_stored_images` returns the content with each stored image pointing at its copy.
 
 ### Changed
 
@@ -56,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReaderPostRecord` keeps more of a Reader post: its short URL, author ID, cross-post, word count, the site's language and kind, and whether likes and comments are open, whether the user subscribed to its comments and whether they've seen it. Each new field has a default, so code that builds a record still compiles.
 - `ReaderService::new` takes the app as `saved_source`, which is recorded with each save.
 - `ReaderStreamOrder`, which says whether a stream's posts are ordered by date or kept in the server's order, is now `ReaderStreamOrdering`. The name is free for the `order` parameter of the streams added next.
+- One saved post that can't be read no longer fails its page of the saved list. `ReaderSavedPostsResponse.posts` has the posts that could be read, and the new `unreadable_posts` lists the others with their IDs. Each is still saved.
 
 ### Fixed
 

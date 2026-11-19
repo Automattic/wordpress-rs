@@ -249,6 +249,138 @@ pub fn reader_post_gallery_image_urls(content: &str) -> Vec<String> {
         .collect()
 }
 
+/// The addresses of the images in a post's `content`, in the order they appear and once each,
+/// for an app or the library to store so the post can be read with no connection.
+///
+/// Every `<img>` with an `http` or `https` address counts, whatever its size, and one that starts
+/// with `//` is read as `https`. A tracking pixel doesn't count: fetching it would count a view.
+/// Neither does a `data:` image, which is already in the content, or an address that isn't whole,
+/// such as `/images/a.png`.
+#[uniffi::export]
+pub fn reader_post_content_image_urls(content: &str) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    HtmlTokens::new(content)
+        .filter_map(|token| match token {
+            HtmlToken::Open(tag) if tag.is("img") => storable_image_url(&tag),
+            _ => None,
+        })
+        .filter(|url| seen.insert(url.clone()))
+        .collect()
+}
+
+/// A post's `content` for reading with no connection: each image in `stored`, which maps an
+/// address from [`reader_post_content_image_urls`] to where its copy is, points at that copy.
+///
+/// Such an image loses its `srcset` and `sizes`, which would send a web view back to the network
+/// for another size. So does every `<source>` once any image is stored, so that a `<picture>`
+/// shows its `<img>`. An image that isn't in `stored` is left as it is. The rest of the content
+/// is returned as it was written, byte for byte.
+#[uniffi::export]
+pub fn reader_post_content_with_stored_images(
+    content: &str,
+    stored: std::collections::HashMap<String, String>,
+) -> String {
+    if stored.is_empty() {
+        return content.to_string();
+    }
+    let mut rewritten = String::with_capacity(content.len());
+    // How much of `content` is in `rewritten` so far.
+    let mut copied = 0;
+    for token in HtmlTokens::new(content) {
+        let HtmlToken::Open(tag) = token else {
+            continue;
+        };
+        let copy = if tag.is("img") {
+            storable_image_url(&tag).and_then(|url| stored.get(&url))
+        } else {
+            None
+        };
+        let drops_sizes = copy.is_some() || tag.is("source");
+        if !drops_sizes {
+            continue;
+        }
+        let mut attributes = String::with_capacity(tag.attributes.len());
+        let mut changed = false;
+        for (name, value) in HtmlAttributes::new(tag.attributes) {
+            if is_any_of(name, &["srcset", "sizes"]) {
+                changed = true;
+                continue;
+            }
+            attributes.push(' ');
+            attributes.push_str(name);
+            match copy {
+                Some(copy) if name.eq_ignore_ascii_case("src") => {
+                    changed = true;
+                    attributes.push_str("=\"");
+                    attributes.push_str(&htmlize::escape_attribute(copy.as_str()));
+                    attributes.push('"');
+                }
+                _ => push_attribute_value(&mut attributes, value),
+            }
+        }
+        if !changed {
+            continue;
+        }
+        if tag.is_self_closing {
+            attributes.push_str(" /");
+        }
+        // The tag's attributes are a slice of `content`, so this is where they start in it.
+        let start = tag.attributes.as_ptr() as usize - content.as_ptr() as usize;
+        rewritten.push_str(&content[copied..start]);
+        rewritten.push_str(&attributes);
+        copied = start + tag.attributes.len();
+    }
+    rewritten.push_str(&content[copied..]);
+    rewritten
+}
+
+/// Writes an attribute's value as it was written, in quotes that it doesn't contain.
+fn push_attribute_value(attributes: &mut String, value: &str) {
+    if value.is_empty() {
+        return;
+    }
+    attributes.push('=');
+    if !value.contains('"') {
+        attributes.push('"');
+        attributes.push_str(value);
+        attributes.push('"');
+    } else if !value.contains('\'') {
+        attributes.push('\'');
+        attributes.push_str(value);
+        attributes.push('\'');
+    } else {
+        attributes.push('"');
+        attributes.push_str(&value.replace('"', "&quot;"));
+        attributes.push('"');
+    }
+}
+
+/// The address an `<img>` loads, if it's one to store for reading with no connection.
+fn storable_image_url(tag: &HtmlTag) -> Option<String> {
+    let src = tag.attribute("src")?;
+    let src = src.trim();
+    let url = match src.strip_prefix("//") {
+        Some(rest) => format!("https://{rest}"),
+        None => src.to_string(),
+    };
+    let lowercase = url.to_ascii_lowercase();
+    if !(lowercase.starts_with("https://") || lowercase.starts_with("http://")) {
+        return None;
+    }
+    // WordPress.com's and Jetpack's stats pixels, which count a view when they're fetched.
+    if lowercase.contains("://pixel.wp.com/") || lowercase.contains("://stats.wp.com/") {
+        return None;
+    }
+    let pixels = |name: &str| tag.attribute(name)?.trim().parse::<u32>().ok();
+    if let (Some(width), Some(height)) = (pixels("width"), pixels("height"))
+        // A tracking pixel is 1 pixel wide or tall, and nothing much the other way.
+        && (1..=2).contains(&(u64::from(width) + u64::from(height)))
+    {
+        return None;
+    }
+    Some(url)
+}
+
 fn is_not_empty(text: &str) -> bool {
     !text.is_empty()
 }
@@ -903,6 +1035,131 @@ mod tests {
     use super::*;
     use rstest::rstest;
     use serde_json::json;
+
+    #[test]
+    fn test_content_image_urls_are_every_image_once_in_order() {
+        let content = concat!(
+            r#"<p><img src="https://example.com/a.jpg" width="20" height="20"></p>"#,
+            r#"<img src='//example.com/b.png'/>"#,
+            r#"<img src="https://example.com/a.jpg">"#,
+            r#"<img src="http://example.com/c.gif?w=1&amp;h=2">"#,
+        );
+        assert_eq!(
+            reader_post_content_image_urls(content),
+            [
+                "https://example.com/a.jpg",
+                "https://example.com/b.png",
+                "http://example.com/c.gif?w=1&h=2",
+            ]
+        );
+    }
+
+    #[rstest]
+    #[case::a_data_image(r#"<img src="data:image/png;base64,AAAA">"#)]
+    #[case::an_address_that_is_not_whole(r#"<img src="/images/a.png">"#)]
+    #[case::no_address(r#"<img alt="nothing">"#)]
+    #[case::an_empty_address(r#"<img src=" ">"#)]
+    #[case::a_tracking_pixel(r#"<img src="https://example.com/t.gif" width="1" height="1">"#)]
+    #[case::a_stats_pixel(r#"<img src="https://pixel.wp.com/b.gif?host=example.com">"#)]
+    #[case::a_jetpack_stats_pixel(r#"<img src="//stats.wp.com/g.gif?v=ext">"#)]
+    #[case::an_image_in_a_script(
+        r#"<script>var a = '<img src="https://example.com/a.jpg">';</script>"#
+    )]
+    #[case::an_image_in_a_comment(r#"<!-- <img src="https://example.com/a.jpg"> -->"#)]
+    fn test_content_image_urls_leave_out(#[case] content: &str) {
+        assert_eq!(
+            reader_post_content_image_urls(content),
+            Vec::<String>::new()
+        );
+    }
+
+    fn stored(images: &[(&str, &str)]) -> std::collections::HashMap<String, String> {
+        images
+            .iter()
+            .map(|(url, copy)| (url.to_string(), copy.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn test_stored_images_replace_their_addresses() {
+        let content = concat!(
+            "<p>Before <b>text</b> &amp; more.</p>",
+            r#"<img class="wide" src="https://example.com/a.jpg" srcset="https://example.com/a.jpg 1x, https://example.com/a-2x.jpg 2x" sizes="100vw" alt='An "A"'>"#,
+            r#"<img src="https://example.com/b.jpg" />"#,
+            "<p>After.</p>",
+        );
+        assert_eq!(
+            reader_post_content_with_stored_images(
+                content,
+                stored(&[("https://example.com/a.jpg", "file:///saved/1.jpg")])
+            ),
+            concat!(
+                "<p>Before <b>text</b> &amp; more.</p>",
+                r#"<img class="wide" src="file:///saved/1.jpg" alt='An "A"'>"#,
+                r#"<img src="https://example.com/b.jpg" />"#,
+                "<p>After.</p>",
+            )
+        );
+    }
+
+    #[test]
+    fn test_stored_images_keep_a_tag_that_closes_itself() {
+        assert_eq!(
+            reader_post_content_with_stored_images(
+                r#"<img src="//example.com/a.jpg" hidden/>"#,
+                stored(&[("https://example.com/a.jpg", "reader://a b&c.jpg")])
+            ),
+            r#"<img src="reader://a b&amp;c.jpg" hidden />"#
+        );
+    }
+
+    /// A `<picture>` would otherwise load one of its sources from the network, and never show
+    /// the stored `<img>`.
+    #[test]
+    fn test_stored_images_take_the_sizes_off_a_picture() {
+        let content = concat!(
+            r#"<picture><source srcset="https://example.com/a.webp" type="image/webp">"#,
+            r#"<img src="https://example.com/a.jpg"></picture>"#,
+            r#"<video><source src="https://example.com/v.mp4"></video>"#,
+        );
+        assert_eq!(
+            reader_post_content_with_stored_images(
+                content,
+                stored(&[("https://example.com/a.jpg", "1.jpg")])
+            ),
+            concat!(
+                r#"<picture><source type="image/webp">"#,
+                r#"<img src="1.jpg"></picture>"#,
+                r#"<video><source src="https://example.com/v.mp4"></video>"#,
+            )
+        );
+    }
+
+    #[rstest]
+    #[case::nothing_stored(stored(&[]))]
+    #[case::another_image_stored(stored(&[("https://example.com/other.jpg", "1.jpg")]))]
+    fn test_content_without_a_stored_image_is_unchanged(
+        #[case] stored: std::collections::HashMap<String, String>,
+    ) {
+        let content = r#"<p>Text</p><img src="https://example.com/a.jpg" srcset="a 1x"><br/>"#;
+        assert_eq!(
+            reader_post_content_with_stored_images(content, stored),
+            content
+        );
+    }
+
+    /// Text that isn't ASCII keeps its bytes, since the content is copied by position.
+    #[test]
+    fn test_stored_images_keep_text_that_is_not_ascii() {
+        let content = "<p>Čaj — 茶</p><img src=\"https://example.com/a.jpg\" alt=\"茶\"><p>🍵</p>";
+        assert_eq!(
+            reader_post_content_with_stored_images(
+                content,
+                stored(&[("https://example.com/a.jpg", "1.jpg")])
+            ),
+            "<p>Čaj — 茶</p><img src=\"1.jpg\" alt=\"茶\"><p>🍵</p>"
+        );
+    }
 
     fn post(fields: serde_json::Value) -> ReaderPost {
         let mut post = json!({ "ID": 1, "site_ID": 2, "is_external": false });

@@ -361,7 +361,7 @@ pub struct ReaderUnreadablePost {
 }
 
 /// Sorts a page's posts into the ones that were read and the ones that weren't.
-fn sort_posts<T>(posts: Option<LenientVec<T>>) -> (Vec<T>, Vec<ReaderUnreadablePost>) {
+pub(crate) fn sort_posts<T>(posts: Option<LenientVec<T>>) -> (Vec<T>, Vec<ReaderUnreadablePost>) {
     let posts = posts.unwrap_or_default();
     let unreadable = posts
         .invalid

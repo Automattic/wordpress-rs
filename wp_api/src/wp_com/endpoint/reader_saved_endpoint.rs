@@ -39,9 +39,13 @@ mod tests {
     use super::*;
     use crate::{
         request::endpoint::ApiUrlResolver,
-        wp_com::endpoint::tests::{
-            fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_2_endpoint,
-            validate_wp_com_v2_endpoint,
+        wp_com::{
+            endpoint::tests::{
+                fixture_wp_com_api_url_resolver, validate_wp_com_rest_v1_2_endpoint,
+                validate_wp_com_v2_endpoint,
+            },
+            reader_posts::ReaderStreamOrder,
+            reader_saved::ReaderSavedOrderBy,
         },
     };
     use rstest::*;
@@ -56,8 +60,18 @@ mod tests {
             after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
             before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
             meta: Some("site,feed".to_string()),
+            order_by: Some(ReaderSavedOrderBy::DatePublished),
+            order: Some(ReaderStreamOrder::Asc),
         },
-        "/read/saved?page_handle=abc%3D%3D&number=20&after=2026-10-01T00%3A00%3A00%2B00%3A00&before=2026-11-01T00%3A00%3A00%2B00%3A00&meta=site%2Cfeed"
+        "/read/saved?page_handle=abc%3D%3D&number=20&after=2026-10-01T00%3A00%3A00%2B00%3A00&before=2026-11-01T00%3A00%3A00%2B00%3A00&meta=site%2Cfeed&orderBy=date_published&order=ASC"
+    )]
+    #[case::newest_save_first(
+        ReaderSavedPostsParams {
+            order_by: Some(ReaderSavedOrderBy::Date),
+            order: Some(ReaderStreamOrder::Desc),
+            ..Default::default()
+        },
+        "/read/saved?orderBy=date&order=DESC"
     )]
     fn list_posts(
         endpoint: ReaderSavedRequestEndpoint,

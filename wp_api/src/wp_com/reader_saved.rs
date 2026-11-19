@@ -1,17 +1,21 @@
 use crate::{
     date::WpGmtDateTime,
+    impl_as_query_value_from_to_string,
     posts::PostId,
     url_query::{
         AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
     },
-    wp_com::{WpComSiteId, reader_posts::ReaderPost},
+    wp_com::{
+        WpComSiteId,
+        reader_posts::{ReaderPost, ReaderStreamOrder, ReaderUnreadablePost, sort_posts},
+    },
     wp_content_u64_id,
 };
 use serde::{Deserialize, Serialize};
 use url::Url;
 use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
-    deserialize_null_as_empty_vec, deserialize_u64_or_string, deserialize_u64_or_string_or_none,
+    LenientVec, deserialize_u64_or_string, deserialize_u64_or_string_or_none,
     deserialize_u64_or_string_or_none_as_t,
 };
 
@@ -327,20 +331,81 @@ pub struct ReaderSavedPostsParams {
     /// [`ReaderPost::site_icon_url`] that has one: `feed` adds an RSS feed's image.
     #[uniffi(default = None)]
     pub meta: Option<String>,
+    /// What the list is ordered by: when each post was saved, unless this says otherwise. Send
+    /// the same value with a [`Self::page_handle`] as the request that returned it.
+    #[uniffi(default = None)]
+    #[field_name("orderBy")]
+    pub order_by: Option<ReaderSavedOrderBy>,
+    /// The order of the list: newest first, unless this says otherwise. Send the same value with
+    /// a [`Self::page_handle`] as the request that returned it. The API reads it only in capitals,
+    /// `ASC` and `DESC`, which is how it's sent: it takes `asc` for the default.
+    #[uniffi(default = None)]
+    pub order: Option<ReaderStreamOrder>,
 }
 
-/// Response from `GET /rest/v1.2/read/saved`, newest save first.
+/// What the saved list is ordered by.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    uniffi::Enum,
+    strum_macros::EnumString,
+    strum_macros::Display,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ReaderSavedOrderBy {
+    /// When each post was saved. The API's default.
+    Date,
+    /// When each post was published.
+    DatePublished,
+}
+
+impl_as_query_value_from_to_string!(ReaderSavedOrderBy);
+
+/// Response from `GET /rest/v1.2/read/saved`, newest save first unless the request asked for
+/// another order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderSavedPostsResponse")]
 pub struct ReaderSavedPostsResponse {
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
+    /// The page's posts, without any in [`Self::unreadable_posts`].
     pub posts: Vec<ReaderSavedPost>,
+    /// The posts on the page that couldn't be read. Almost always empty. Each is still saved: a
+    /// post that can't be read is not an unsaved one.
+    #[uniffi(default = [])]
+    pub unreadable_posts: Vec<ReaderUnreadablePost>,
     /// The handle of the next page. Only a missing handle means the end of the list: posts that
     /// can't be shown are skipped, so a page can be short, or even empty, with more to come.
-    #[serde(default)]
     pub next_page_handle: Option<String>,
     /// How many posts the user has saved.
-    #[serde(default)]
     pub found: Option<u64>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderSavedPostsResponse {
+    #[serde(default)]
+    posts: Option<LenientVec<ReaderSavedPost>>,
+    #[serde(default)]
+    next_page_handle: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_u64_or_string_or_none")]
+    found: Option<u64>,
+}
+
+impl From<RawReaderSavedPostsResponse> for ReaderSavedPostsResponse {
+    fn from(raw: RawReaderSavedPostsResponse) -> Self {
+        let (posts, unreadable_posts) = sort_posts(raw.posts);
+        Self {
+            posts,
+            unreadable_posts,
+            next_page_handle: raw.next_page_handle,
+            found: raw.found,
+        }
+    }
 }
 
 /// The fields of a Reader post that decide which key it's saved under.
@@ -1027,6 +1092,56 @@ mod tests {
         let response: ReaderSavedPostsResponse =
             serde_json::from_value(json!({ "posts": [] })).unwrap();
         assert_eq!(response.next_page_handle, None);
+    }
+
+    /// A saved post that can't be read doesn't fail its page, and isn't lost: it's listed with its
+    /// IDs, so it still reads as saved.
+    #[test]
+    fn test_deserialize_list_keeps_the_posts_it_can_read() {
+        let response: ReaderSavedPostsResponse = serde_json::from_value(json!({
+            "posts": [
+                { "ID": 1, "site_ID": 10, "is_external": false, "date_saved": "2026-11-01T00:00:00+00:00" },
+                { "ID": 2, "site_ID": 10, "is_external": false, "date": "2026-11-01T00:00:00+91:00" },
+                "not a post",
+                { "ID": 3, "site_ID": 10, "is_external": false },
+            ],
+            "next_page_handle": "abc",
+            "found": "4",
+        }))
+        .expect("the page parses");
+
+        let ids: Vec<_> = response
+            .posts
+            .iter()
+            .map(|post| post.post.identity.id)
+            .collect();
+        assert_eq!(ids, [1, 3]);
+        let unreadable: Vec<_> = response
+            .unreadable_posts
+            .iter()
+            .map(|post| post.identity.as_ref().map(|identity| identity.id))
+            .collect();
+        assert_eq!(unreadable, [Some(2), None]);
+        assert_eq!(response.next_page_handle.as_deref(), Some("abc"));
+        assert_eq!(response.found, Some(4));
+    }
+
+    #[rstest]
+    #[case(json!({ "posts": null }))]
+    #[case(json!({}))]
+    fn test_deserialize_list_without_posts(#[case] page: serde_json::Value) {
+        let response: ReaderSavedPostsResponse =
+            serde_json::from_value(page).expect("the page parses");
+        assert!(response.posts.is_empty());
+        assert!(response.unreadable_posts.is_empty());
+    }
+
+    /// Only a post that can't be read is passed over. A page that isn't a page is still an error.
+    #[test]
+    fn test_deserialize_list_rejects_posts_that_are_not_a_list() {
+        assert!(
+            serde_json::from_value::<ReaderSavedPostsResponse>(json!({ "posts": "none" })).is_err()
+        );
     }
 
     #[test]

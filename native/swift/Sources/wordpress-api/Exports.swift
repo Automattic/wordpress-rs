@@ -435,6 +435,7 @@ public typealias ReaderSavedRequestListPostsResponse = WordPressAPIInternal.Read
 public typealias ReaderSavedRequestSaveResponse = WordPressAPIInternal.ReaderSavedRequestSaveResponse
 public typealias ReaderSavedRequestUnsaveResponse = WordPressAPIInternal.ReaderSavedRequestUnsaveResponse
 public typealias ReaderSavedResolution = WordPressAPIInternal.ReaderSavedResolution
+public typealias ReaderSavedOrderBy = WordPressAPIInternal.ReaderSavedOrderBy
 public typealias ReaderSavedPostsParams = WordPressAPIInternal.ReaderSavedPostsParams
 public typealias ReaderSavedPostsResponse = WordPressAPIInternal.ReaderSavedPostsResponse
 public typealias ReaderSavedSource = WordPressAPIInternal.ReaderSavedSource
