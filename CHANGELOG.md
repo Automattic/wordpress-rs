@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReaderSavedService::saved_posts_ordered` gives the saved list by when each post was saved or published, newest or oldest first. Each order loads its own pages.
 - Swift: `ReaderPostRecord.galleryImageURLs` and `contentImageURLs` give the images of a Reader post's content.
 - `wp_com_e2e` has two trials that write to WordPress.com through the Reader service: one writes a comment and a reply and deletes both, and one counts a view of a post. They run only against a site the account owns, named in `WP_COM_E2E_OWN_SITE_ID`, and are skipped without it.
+- `Documentation/adding-a-wordpress-com-endpoint.md` is the recipe for adding a WordPress.com endpoint: choosing the version, finding its parameters, modelling from recorded responses, the tests it needs, and the Swift and Kotlin checks.
 
 ### Changed
 
