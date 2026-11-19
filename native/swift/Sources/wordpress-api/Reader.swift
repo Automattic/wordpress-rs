@@ -27,3 +27,40 @@ extension ReaderPostRecord {
         readerPostContentImageUrls(content: content ?? "")
     }
 }
+
+extension ReaderError {
+    /// What the error says, in words, for an app to show.
+    public var message: String {
+        readerErrorMessage(error: self)
+    }
+}
+
+extension ReaderSavedError {
+    /// What the error says, in words, for an app to show.
+    public var message: String {
+        readerSavedErrorMessage(error: self)
+    }
+}
+
+extension ReaderLikesResponse {
+    /// The parameters for the page after this one, asking for `number` likes, or `nil` when this is the last
+    /// page.
+    public func nextPageParams(number: UInt32) -> ReaderLikesParams? {
+        readerLikesNextPageParams(response: self, number: number)
+    }
+}
+
+extension ReaderMenuItem {
+    /// The stream the entry opens, or `nil` for an entry that isn't a stream this version knows.
+    public var stream: ReaderStream? {
+        readerStreamForMenuItem(item: self)
+    }
+}
+
+extension ReaderData {
+    /// Whether a change to the cache is one this shows, so that a screen reloads only when what it shows
+    /// changed.
+    public func isRelevantUpdate(hook: UpdateHook) -> Bool {
+        readerDataIsRelevantUpdate(data: self, hook: hook)
+    }
+}

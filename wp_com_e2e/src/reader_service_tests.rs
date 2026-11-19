@@ -564,6 +564,27 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             }
         })
         .with_ignored_flag(own_site().is_none()),
+        // A like notifies the post's author, so it only runs against a site the account owns.
+        Trial::test("reader_service::a_like_is_sent_and_put_back", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                let Some(site_id) = own_site() else {
+                    return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
+                };
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let post = first_post_of(&service, site_id).await?;
+                    let was = post.i_like == Some(true);
+
+                    let result = like_and_check(&service, &post, !was).await;
+                    // Whatever happened, the post is left as it was found.
+                    let restored = like_and_check(&service, &post, was).await;
+                    result?;
+                    restored
+                })
+            }
+        })
+        .with_ignored_flag(own_site().is_none()),
         // Counts one view, on a post of a site the account owns.
         Trial::test("reader_service::a_page_view_of_an_own_post", {
             let ctx = Arc::clone(&ctx);
@@ -682,6 +703,30 @@ async fn first_post_of(
         .next()
         .ok_or("The site has no posts")?
         .post)
+}
+
+/// Likes or unlikes a post through the service, and checks the server took it and the cache
+/// shows it.
+async fn like_and_check(
+    service: &ReaderService,
+    post: &ReaderPostRecord,
+    liked: bool,
+) -> Result<(), Failed> {
+    let outcome = service
+        .set_post_liked(post.identity.clone(), liked)
+        .await
+        .map_err(|e| format!("Setting the like to {liked} was refused: {e}"))?;
+    if outcome != ReaderActionOutcome::Synced {
+        return Err(format!("Setting the like to {liked} wasn't sent: {outcome:?}").into());
+    }
+    let cached = service
+        .cached_post(post.key.clone())
+        .map_err(|e| e.to_string())?
+        .ok_or("The post left the cache")?;
+    if cached.i_like != Some(liked) {
+        return Err(format!("The cache says i_like is {:?}", cached.i_like).into());
+    }
+    Ok(())
 }
 
 /// Writes a comment and a reply to it through the service, and checks what the cache then

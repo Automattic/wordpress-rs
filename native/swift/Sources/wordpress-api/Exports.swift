@@ -475,6 +475,7 @@ public typealias ReaderPageView = WordPressAPIInternal.ReaderPageView
 public typealias ReaderPageViewOutcome = WordPressAPIInternal.ReaderPageViewOutcome
 public typealias ReaderActionOutcome = WordPressAPIInternal.ReaderActionOutcome
 public typealias ReaderCachedMenu = WordPressAPIInternal.ReaderCachedMenu
+public typealias ReaderData = WordPressAPIInternal.ReaderData
 public typealias ReaderCommentRecord = WordPressAPIInternal.ReaderCommentRecord
 public typealias ReaderCommentSendState = WordPressAPIInternal.ReaderCommentSendState
 public typealias ReaderCommentsCollection = WordPressAPIInternal.ReaderCommentsCollection

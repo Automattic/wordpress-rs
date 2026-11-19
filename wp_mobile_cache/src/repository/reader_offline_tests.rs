@@ -537,3 +537,47 @@ fn test_stale_streams_are_deleted_except_the_saved_list_in_any_order() {
         .collect();
     assert_eq!(keys, ["saved", "saved:date_published:ASC"]);
 }
+
+#[test]
+fn test_saved_key_texts_are_every_key_a_saved_post_is_under() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let other = self::account(&conn, 2);
+    save(&conn, account, 1, "2026-11-01T00:00:00Z", None);
+    save(&conn, account, 2, "2026-11-02T00:00:00Z", None);
+    save(&conn, other, 3, "2026-11-02T00:00:00Z", None);
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(2)]).unwrap();
+
+    let keys = ReaderSavedRepository::select_saved_key_texts(&conn, account).unwrap();
+
+    assert_eq!(keys, ["post:123:1".to_string()].into_iter().collect());
+}
+
+#[test]
+fn test_pending_counts_rows_the_server_does_not_agree_with() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    save(&conn, account, 1, "2026-11-01T00:00:00Z", None);
+    save(&conn, account, 2, "2026-11-02T00:00:00Z", None);
+    assert_eq!(
+        ReaderSavedRepository::count_pending(&conn, account).unwrap(),
+        2
+    );
+
+    conn.execute(
+        "UPDATE reader_saved_posts SET server = 1 WHERE key = 'post:123:1'",
+        [],
+    )
+    .unwrap();
+    assert_eq!(
+        ReaderSavedRepository::count_pending(&conn, account).unwrap(),
+        1
+    );
+
+    // An unsave the server hasn't heard is pending too.
+    ReaderSavedRepository::tap_unsave(&conn, account, &[post_key(1)]).unwrap();
+    assert_eq!(
+        ReaderSavedRepository::count_pending(&conn, account).unwrap(),
+        2
+    );
+}

@@ -878,7 +878,9 @@ async fn a_change_to_a_stream_table_is_relevant() {
     };
     assert!(stream.is_relevant_update(&hook(wp_mobile_cache::DbTable::ReaderStreamItems)));
     assert!(stream.is_relevant_update(&hook(wp_mobile_cache::DbTable::ReaderPosts)));
-    assert!(!stream.is_relevant_update(&hook(wp_mobile_cache::DbTable::ReaderSavedPosts)));
+    // Each item says whether it's saved.
+    assert!(stream.is_relevant_update(&hook(wp_mobile_cache::DbTable::ReaderSavedPosts)));
+    assert!(!stream.is_relevant_update(&hook(wp_mobile_cache::DbTable::ReaderComments)));
 }
 
 #[tokio::test]
@@ -3012,5 +3014,263 @@ mod comment_writing {
             ]
         );
         assert_eq!(sent[2].body, Some(json!({ "receive_notifications": true })));
+    }
+}
+
+/// What the example apps had to work around, and no longer do.
+mod for_the_apps {
+    use super::*;
+    use rstest::rstest;
+    use std::sync::Mutex;
+    use std::time::SystemTime;
+    use wp_api::wp_com::reader_saved::ReaderPostSaveIdentity;
+    use wp_api::wp_com::reader_tags::{ReaderMenuItem, ReaderMenuItemKind};
+
+    fn identity(id: u64) -> ReaderPostSaveIdentity {
+        ReaderPostSaveIdentity {
+            id,
+            site_id: Some(WpComSiteId(123)),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_stream_says_which_of_its_posts_are_saved() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        let stream = service.stream(tag());
+        executor.push(Step::Respond(200, tag_page(&[1, 2], None)));
+        stream.refresh().await.unwrap();
+        let saved_ids = |items: Vec<ReaderStreamItem>| -> Vec<u64> {
+            items
+                .into_iter()
+                .filter(|item| item.is_saved)
+                .map(|item| item.post.identity.id)
+                .collect()
+        };
+        assert_eq!(
+            saved_ids(stream.load_items().await.unwrap()),
+            Vec::<u64>::new()
+        );
+
+        service.saved().save(identity(2)).await.unwrap();
+        assert_eq!(saved_ids(stream.load_items().await.unwrap()), [2]);
+
+        service.saved().unsave(identity(2)).await.unwrap();
+        assert_eq!(
+            saved_ids(stream.load_items().await.unwrap()),
+            Vec::<u64>::new()
+        );
+    }
+
+    /// A post fetched on its own doesn't say when it was featured, which is what Freshly Pressed
+    /// is ordered by. It used to leave the unreadable list and never reach the stream.
+    #[tokio::test]
+    async fn a_freshly_pressed_post_that_reads_on_its_own_takes_the_place_of_its_publish_date() {
+        let executor = Arc::new(ScriptedExecutor::default());
+        let now = Arc::new(Mutex::new(SystemTime::now()));
+        let clock = {
+            let now = now.clone();
+            Arc::new(move || *now.lock().unwrap())
+        };
+        let service = ReaderService::with_clock(
+            delegate(executor.clone()),
+            cache(),
+            ReaderOwner::SignedOut,
+            ReaderSavedSource::Ios,
+            clock,
+        )
+        .unwrap();
+        let stream = service.stream(ReaderStream::FreshlyPressed);
+        let featured = |id: u64, written: u32, displayed: u32| {
+            let mut post = post_json(id, written);
+            post["editorial"] = json!({ "displayed_on": date(displayed) });
+            post
+        };
+        let mut unreadable = featured(2, 11, 21);
+        unreadable["date"] = json!("2026-11-18T11:00:00+91:00");
+        executor.push(Step::Respond(
+            200,
+            json!({ "posts": [featured(3, 12, 22), unreadable, featured(1, 10, 20)] }),
+        ));
+        stream.refresh().await.unwrap();
+        assert_eq!(shown(&stream).await, ["3", "1"]);
+        assert_eq!(stream.info().unwrap().unreadable_post_count, 1);
+
+        *now.lock().unwrap() += Duration::from_secs(61 * 60);
+        // On its own the post reads, and comes without `editorial`.
+        executor.push(Step::Respond(200, post_json(2, 11)));
+        assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 1);
+
+        assert_eq!(stream.info().unwrap().unreadable_post_count, 0);
+        // Written at 11:00, it sorts under the posts featured at 22:00 and 20:00.
+        assert_eq!(shown(&stream).await, ["3", "1", "2"]);
+    }
+
+    #[tokio::test]
+    async fn a_signed_out_readers_posts_have_no_seen_status() {
+        let seen_of = |owner: ReaderOwner| async move {
+            let (service, executor) = service_for(owner);
+            let stream = service.stream(tag());
+            let mut post = post_json(1, 10);
+            post["is_seen"] = json!(false);
+            executor.push(Step::Respond(200, json!({ "posts": [post] })));
+            stream.refresh().await.unwrap();
+            stream.load_items().await.unwrap()[0].post.is_seen
+        };
+
+        assert_eq!(seen_of(ACCOUNT).await, Some(false));
+        assert_eq!(seen_of(ReaderOwner::SignedOut).await, None);
+    }
+
+    #[tokio::test]
+    async fn signed_out_a_follow_is_kept_and_an_unfollow_is_removed() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        let slug = ReaderTagSlug("knitting".to_string());
+        let reason = |outcome: ReaderActionOutcome| match outcome {
+            ReaderActionOutcome::Pending { reason } => reason,
+            other => panic!("expected a pending outcome, got {other:?}"),
+        };
+
+        let followed = service
+            .set_tag_followed(slug.clone(), None, true)
+            .await
+            .unwrap();
+        let unfollowed = service.set_tag_followed(slug, None, false).await.unwrap();
+
+        assert!(reason(followed).contains("kept on this device"));
+        assert!(reason(unfollowed).contains("removed from this device"));
+        assert!(executor.sent().is_empty());
+    }
+
+    fn menu_item(
+        kind: ReaderMenuItemKind,
+        key: &str,
+        slug: Option<&str>,
+        url: Option<&str>,
+    ) -> ReaderMenuItem {
+        ReaderMenuItem {
+            key: key.to_string(),
+            kind,
+            title: None,
+            url: url.map(str::to_string),
+            slug: slug.map(str::to_string),
+            display_name: None,
+            tag_id: None,
+            organization_id: None,
+        }
+    }
+
+    const LIST_URL: &str =
+        "https://public-api.wordpress.com/rest/v1.2/read/list/someone/good-reads/posts";
+
+    #[rstest]
+    #[case(
+        menu_item(ReaderMenuItemKind::Stream, "following", None, None),
+        Some(ReaderStream::Following)
+    )]
+    #[case(
+        menu_item(ReaderMenuItemKind::Stream, "liked", None, None),
+        Some(ReaderStream::Liked)
+    )]
+    #[case(
+        menu_item(ReaderMenuItemKind::Stream, "discover", None, None),
+        Some(ReaderStream::Discover { tags: Vec::new() })
+    )]
+    #[case(
+        menu_item(ReaderMenuItemKind::Stream, "something-new", None, None),
+        None
+    )]
+    #[case(
+        menu_item(ReaderMenuItemKind::Tag, "1234", Some("photography"), None),
+        Some(tag())
+    )]
+    #[case(menu_item(ReaderMenuItemKind::Tag, "1234", None, None), None)]
+    #[case(
+        menu_item(ReaderMenuItemKind::List, "list-good-reads", None, Some(LIST_URL)),
+        Some(ReaderStream::ReaderList {
+            owner: ReaderListOwner("someone".to_string()),
+            slug: ReaderListSlug("good-reads".to_string()),
+        })
+    )]
+    #[case(
+        menu_item(
+            ReaderMenuItemKind::List,
+            "list-good-reads",
+            None,
+            Some("https://example.com/read/list/someone")
+        ),
+        None
+    )]
+    #[case(
+        menu_item(ReaderMenuItemKind::List, "list-good-reads", None, None),
+        None
+    )]
+    #[case(
+        menu_item(ReaderMenuItemKind::Organization, "a8c", Some("a8c"), None),
+        Some(ReaderStream::Automattic)
+    )]
+    #[case(
+        menu_item(ReaderMenuItemKind::Organization, "p2", Some("p2"), None),
+        Some(ReaderStream::P2)
+    )]
+    #[case(menu_item(ReaderMenuItemKind::Other("widget".to_string()), "w", None, None), None)]
+    fn a_menu_entry_opens_its_stream(
+        #[case] item: ReaderMenuItem,
+        #[case] expected: Option<ReaderStream>,
+    ) {
+        assert_eq!(reader_stream_for_menu_item(&item), expected);
+    }
+
+    #[test]
+    fn an_error_has_words_for_an_app_to_show() {
+        assert_eq!(
+            reader_error_message(&ReaderError::NeedsAccount),
+            "Sign in to WordPress.com to use this."
+        );
+        assert_eq!(
+            reader_error_message(&ReaderError::Refused {
+                reason: "no feed there".to_string()
+            }),
+            "The server didn't accept it: no feed there"
+        );
+    }
+
+    #[rstest]
+    #[case(ReaderData::Menu, wp_mobile_cache::DbTable::ReaderMenuItems, true)]
+    #[case(ReaderData::Menu, wp_mobile_cache::DbTable::ReaderPosts, false)]
+    #[case(
+        ReaderData::Subscriptions,
+        wp_mobile_cache::DbTable::ReaderSubscriptions,
+        true
+    )]
+    #[case(ReaderData::Blocks, wp_mobile_cache::DbTable::ReaderBlockedUsers, true)]
+    #[case(
+        ReaderData::PendingActions,
+        wp_mobile_cache::DbTable::ReaderActions,
+        true
+    )]
+    #[case(
+        ReaderData::PendingActions,
+        wp_mobile_cache::DbTable::ReaderSavedPosts,
+        true
+    )]
+    #[case(ReaderData::Post, wp_mobile_cache::DbTable::ReaderPosts, true)]
+    #[case(ReaderData::Site, wp_mobile_cache::DbTable::ReaderSites, true)]
+    #[case(ReaderData::Site, wp_mobile_cache::DbTable::ReaderSubscriptions, false)]
+    fn a_change_is_relevant_to_what_shows_it(
+        #[case] data: ReaderData,
+        #[case] table: wp_mobile_cache::DbTable,
+        #[case] expected: bool,
+    ) {
+        let hook = wp_mobile_cache::UpdateHook {
+            action: wp_mobile_cache::HookAction::Update,
+            db_name: "main".to_string(),
+            table,
+            row_id: 1,
+        };
+        assert_eq!(reader_data_is_relevant_update(data, &hook), expected);
     }
 }

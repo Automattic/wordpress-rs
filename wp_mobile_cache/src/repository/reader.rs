@@ -2019,6 +2019,40 @@ impl ReaderSavedRepository {
         Self::add_aliases(executor, row_id, main, keys)
     }
 
+    /// Every key the account's saved posts are saved under, as stored text: each save's own key,
+    /// its feed item's key, and the addresses the server stores it as. For telling which of many
+    /// posts are saved, in one read.
+    pub fn select_saved_key_texts(
+        executor: &impl QueryExecutor,
+        account: RowId,
+    ) -> Result<std::collections::HashSet<String>, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT s.key FROM reader_saved_posts s WHERE s.account_id = ?1 AND s.saved = 1
+            UNION
+            SELECT s.feed_item_key FROM reader_saved_posts s
+            WHERE s.account_id = ?1 AND s.saved = 1 AND s.feed_item_key IS NOT NULL
+            UNION
+            SELECT u.url_key FROM reader_saved_post_urls u
+            JOIN reader_saved_posts s ON s.rowid = u.saved_post_id
+            WHERE s.account_id = ?1 AND s.saved = 1",
+        )?;
+        let rows = statement.query_map([account], |row| row.get(0))?;
+        rows.map(|row| row.map_err(SqliteDbError::from)).collect()
+    }
+
+    /// How many of the account's rows the server doesn't agree with yet: saves and unsaves
+    /// waiting to be sent, and saves waiting for room.
+    pub fn count_pending(
+        executor: &impl QueryExecutor,
+        account: RowId,
+    ) -> Result<u64, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT COUNT(*) FROM reader_saved_posts
+            WHERE account_id = ?1 AND (server IS NULL OR server != saved)",
+        )?;
+        Ok(statement.query_row([account], |row| row.get(0))?)
+    }
+
     /// Gives a save its post, fetched for it on its own, and shows it in the saved list: the
     /// device now has what the list would have sent.
     pub fn link_post(

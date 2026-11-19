@@ -411,6 +411,49 @@ async fn a_page_saved_by_its_address_that_the_list_never_sends_fails_without_a_r
     assert_eq!(reader.sent(), ["keys", "list"]);
 }
 
+#[tokio::test]
+async fn the_pending_count_is_what_the_server_does_not_have() {
+    let signed_out = Reader::signed_out();
+    signed_out.service.save(identity(1)).await.unwrap();
+    signed_out.service.save(identity(2)).await.unwrap();
+    // No server has a signed-out reader's saves.
+    assert_eq!(signed_out.service.pending_count().unwrap(), 2);
+    signed_out.service.unsave(identity(1)).await.unwrap();
+    assert_eq!(signed_out.service.pending_count().unwrap(), 1);
+
+    let reader = Reader::signed_in();
+    reader.executor.push(Step::Offline);
+    reader.service.save(identity(1)).await.unwrap();
+    assert_eq!(reader.service.pending_count().unwrap(), 1);
+    // A sync sends the save, then reads the keys, which have it.
+    reader.respond(
+        200,
+        json!({ "saved": true, "key": post_json(1), "total": 1, "resolved": "post" }),
+    );
+    reader.respond(200, keys_response(&[post_json(1)]));
+    reader.service.sync().await.unwrap();
+    assert_eq!(reader.service.pending_count().unwrap(), 0);
+}
+
+#[tokio::test]
+async fn signed_out_a_save_is_kept_and_an_unsave_is_removed() {
+    let reader = Reader::signed_out();
+    let reason = |outcome: crate::service::reader_saved::ReaderSavedOutcome| match outcome {
+        crate::service::reader_saved::ReaderSavedOutcome::Pending { reason } => reason,
+        other => panic!("expected a pending outcome, got {other:?}"),
+    };
+
+    let saved = reader.service.save(identity(1)).await.unwrap();
+    let unsaved = reader.service.unsave(identity(1)).await.unwrap();
+
+    assert!(reason(saved).contains("kept on this device"));
+    assert!(reason(unsaved).contains("removed from this device"));
+    assert_eq!(
+        crate::service::reader_saved::reader_saved_error_message(&ReaderSavedError::TooManySaves),
+        "You've reached the limit of saved posts."
+    );
+}
+
 // Images
 
 const TWO_IMAGES: &str = concat!(

@@ -16,6 +16,7 @@ use wp_api::wp_com::reader_posts::{
     ReaderUnreadableCard, ReaderUnreadablePost,
 };
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderPostSaveIdentity};
+use wp_api::wp_com::reader_tags::{ReaderMenuItem, ReaderMenuItemKind};
 
 /// How many posts a page of a stream ordered by date asks for.
 const DATED_PAGE_SIZE: u32 = 20;
@@ -30,6 +31,45 @@ const RELATED_POSTS_OF_EACH_KIND: u32 = 3;
 /// What a stream asks for with each post: the post's site, and an RSS post's feed. They carry the
 /// site's or feed's icon and the site's language, which a post doesn't have without them.
 const POST_META: &str = "site,feed";
+
+/// The stream a Reader menu entry opens: Following, Liked or Discover for the Reader's own, a
+/// tag's or a list's posts, and Automattic or P2 for an organization. `None` for an entry that
+/// isn't a stream this version knows, or a list whose address doesn't name its owner and slug.
+#[uniffi::export]
+pub fn reader_stream_for_menu_item(item: &ReaderMenuItem) -> Option<ReaderStream> {
+    match &item.kind {
+        ReaderMenuItemKind::Stream => match item.key.as_str() {
+            "following" => Some(ReaderStream::Following),
+            "liked" => Some(ReaderStream::Liked),
+            "discover" => Some(ReaderStream::Discover { tags: Vec::new() }),
+            _ => None,
+        },
+        ReaderMenuItemKind::Tag => item.slug.as_ref().map(|slug| ReaderStream::Tag {
+            slug: ReaderTagSlug(slug.clone()),
+        }),
+        ReaderMenuItemKind::List => {
+            // A list's owner and slug are only in the address of its posts:
+            // `…/read/list/{owner}/{slug}/posts`.
+            let url = item.url.as_deref()?;
+            let path = url.split(['?', '#']).next().unwrap_or(url);
+            let mut segments = path
+                .split('/')
+                .skip_while(|segment| *segment != "list")
+                .skip(1);
+            let (owner, slug) = (segments.next()?, segments.next()?);
+            (!owner.is_empty() && !slug.is_empty()).then(|| ReaderStream::ReaderList {
+                owner: ReaderListOwner(owner.to_string()),
+                slug: ReaderListSlug(slug.to_string()),
+            })
+        }
+        ReaderMenuItemKind::Organization => match item.slug.as_deref() {
+            Some("a8c") => Some(ReaderStream::Automattic),
+            Some("p2") => Some(ReaderStream::P2),
+            _ => None,
+        },
+        ReaderMenuItemKind::Other(_) => None,
+    }
+}
 
 /// A stream of posts the Reader shows.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]

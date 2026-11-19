@@ -117,6 +117,13 @@ pub enum ReaderSavedError {
     Database(SqliteDbError),
 }
 
+/// What a saved posts error says, in words, for an app to show. Swift and Kotlin get an error's
+/// case and its fields, and not the sentence that goes with it.
+#[uniffi::export]
+pub fn reader_saved_error_message(error: &ReaderSavedError) -> String {
+    error.to_string()
+}
+
 impl From<WpApiError> for ReaderSavedError {
     fn from(err: WpApiError) -> Self {
         Self::Api(err)
@@ -258,6 +265,14 @@ impl ReaderSavedService {
         Ok(self.cache.execute(|connection| {
             ReaderSavedRepository::count_waiting_for_room(connection, self.account)
         })?)
+    }
+
+    /// How many saves and unsaves the server doesn't have yet: the ones waiting to be sent, and
+    /// the saves waiting for room. A signed-out reader's saves all count: no server has them.
+    pub fn pending_count(&self) -> Result<u64, ReaderSavedError> {
+        Ok(self
+            .cache
+            .execute(|connection| ReaderSavedRepository::count_pending(connection, self.account))?)
     }
 
     /// Saves a post. It reads as saved, and shows in the saved list, straight away.
@@ -506,7 +521,7 @@ impl ReaderSavedService {
         })?;
         if self.signed_out {
             self.notify();
-            return Ok(signed_out_outcome());
+            return Ok(signed_out_outcome(true));
         }
         self.forget_refusals(&[row]);
         let _waiting = Waiting::new(self, vec![row]);
@@ -547,7 +562,7 @@ impl ReaderSavedService {
         if self.signed_out {
             self.notify();
             self.remove_files_of_unsaved_posts()?;
-            return Ok(signed_out_outcome());
+            return Ok(signed_out_outcome(false));
         }
         self.forget_refusals(&waiting);
         let _waiting = Waiting::new(self, waiting.clone());
@@ -1093,10 +1108,15 @@ impl Sent {
     }
 }
 
-/// What becomes of a signed-out reader's save or unsave: it stays on this device.
-fn signed_out_outcome() -> ReaderSavedOutcome {
+/// What becomes of a signed-out reader's save or unsave: it only happens on this device.
+fn signed_out_outcome(saved: bool) -> ReaderSavedOutcome {
+    let reason = if saved {
+        "It's kept on this device until you sign in to WordPress.com."
+    } else {
+        "It's removed from this device. Nothing was sent: you aren't signed in to WordPress.com."
+    };
     ReaderSavedOutcome::Pending {
-        reason: "It's kept on this device until you sign in to WordPress.com.".to_string(),
+        reason: reason.to_string(),
     }
 }
 

@@ -1072,7 +1072,9 @@ impl ReaderService {
         self.pending_action_count()
     }
 
-    /// How many things the user turned on or off are waiting to be sent.
+    /// How many things the user turned on or off are waiting to be sent. Saves aren't among
+    /// them: [`ReaderSavedService::pending_count`](crate::service::reader_saved::ReaderSavedService::pending_count)
+    /// counts those.
     pub fn pending_action_count(&self) -> Result<u64, ReaderError> {
         Ok(self.context.cache.execute(|connection| {
             ReaderActionRepository::count(connection, self.context.owner_row)
@@ -1099,10 +1101,16 @@ pub struct ReaderFollowTarget {
     pub name: Option<String>,
 }
 
-/// What becomes of something a signed-out reader turned on or off: it stays on this device.
-fn kept_on_this_device() -> ReaderActionOutcome {
+/// What becomes of something a signed-out reader turned on or off: it only happens on this
+/// device.
+fn only_on_this_device(on: bool) -> ReaderActionOutcome {
+    let reason = if on {
+        "It's kept on this device until you sign in to WordPress.com."
+    } else {
+        "It's removed from this device. Nothing was sent: you aren't signed in to WordPress.com."
+    };
     ReaderActionOutcome::Pending {
-        reason: "It's kept on this device until you sign in to WordPress.com.".to_string(),
+        reason: reason.to_string(),
     }
 }
 
@@ -1162,7 +1170,7 @@ impl ReaderService {
                     followed,
                 )
             })?;
-            return Ok(kept_on_this_device());
+            return Ok(only_on_this_device(followed));
         }
         context
             .set_action(Action::FollowTag { slug, title }, followed)

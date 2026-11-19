@@ -62,6 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Kotlin example app has an offline reading screen for the Reader. It downloads the saved posts' text, and their images into a folder with a size limit, shows what the device has of each saved post, sorts the list four ways, and opens a saved post from the device with its stored images.
 - The Swift example app has a Reader tab that uses the whole of `ReaderService`. It works without a WordPress.com account, as the reader who isn't signed in, and as the account when the app has one. It has a home screen (the menu's streams and lists, followed and recommended tags, search, a site's or a feed's stream by ID, a post by its slug or address, and the actions waiting to be sent, with a "Sync" button), a screen for any stream (posts, cards, gaps, unreadable posts, and a menu on each post to like, save, mark as seen, follow and block), and screens for a post, its comments, who liked it, the account's subscriptions and their delivery settings, blocked sites, and the search that finds sites. Every screen shows the cache first and reloads when the cache changes. A "Simulate no connection" switch, and the `-reader-offline` launch argument, make every Reader request fail as it does offline. The saved posts screen now uses `ReaderService::saved`, so it works signed out too, and there is one Reader cache. `scripts/example-app-ui-script.sh` runs a script of taps against the app on an iOS Simulator and saves screenshots: see `Documentation/local-development.md`.
 - The Swift example app has an offline reading screen for the Reader. It downloads the saved posts' text, and their images into a folder with a size limit, shows what the device has of each saved post, sorts the list four ways, and opens a saved post from the device with its stored images.
+- `reader_error_message` and `reader_saved_error_message` give a Reader error's sentence to Swift and Kotlin, which otherwise only get its case and fields. In Swift they are `ReaderError.message` and `ReaderSavedError.message`.
+- `ReaderStreamItem.is_saved` says whether each post of a stream is saved, so an app no longer asks for each post. `ReaderSavedService::pending_count` counts the saves and unsaves the server doesn't have yet.
+- `reader_stream_for_menu_item` gives the stream a Reader menu entry opens, including a list's, whose owner and slug are only in its address. `reader_likes_next_page_params` gives Swift and Kotlin the next page of likes. `reader_data_is_relevant_update` says whether a change to the cache is one that the menu, the subscriptions, the blocks, what's waiting to be sent, a post or a site shows.
+- Swift exports `UpdateHook`, `DbTable` and `HookAction` from `WordPressApiCache`, whose own methods use them. Kotlin's `WpComApiClient.makeReaderService` creates the Reader service.
+- `wp_com_e2e` has a trial that likes a post through the Reader service and puts it back. It runs only against a site the account owns, named in `WP_COM_E2E_OWN_SITE_ID`.
 
 ### Changed
 
@@ -71,12 +76,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReaderStreamOrder`, which says whether a stream's posts are ordered by date or kept in the server's order, is now `ReaderStreamOrdering`. The name is free for the `order` parameter of the streams added next.
 - One saved post that can't be read no longer fails its page of the saved list. `ReaderSavedPostsResponse.posts` has the posts that could be read, and the new `unreadable_posts` lists the others with their IDs. Each is still saved.
 - A saved Reader post that can't be read stays in the saved list as a save, and says why its content couldn't be loaded, where it used to fail the list's page.
+- A signed-out reader's Reader posts have no seen status: `is_seen` is `None`, where the API's `false` was kept. Unfollowing a tag or unsaving a post while signed out now says it was removed from the device, where it said it was kept.
 
 ### Fixed
 
 - A page of a Reader stream no longer fails to parse when one of its posts can't be read, such as a post whose date has a UTC offset of `+91:00`, which WordPress.com sends for some posts. `ReaderPostsResponse` keeps the posts that can be read in `posts`, and lists each of the others in the new `unreadable_posts` as a `ReaderUnreadablePost`, with the post's IDs and the reason. The same date in a page's `date_range` no longer fails the page either: the date is `None`, and `ReaderDateRange.unreadable_before` or `unreadable_after` has what the API sent.
 - A page of a Reader stream no longer fails to parse when one of its posts has a featured image with a negative `width` or `height`, which WordPress.com sends for some images. `ReaderFeaturedMedia.width` and `height` are now `None` for a value that isn't a size.
 - A page of a Reader stream no longer fails to parse when one of its posts has a negative comment count, which WordPress.com sends for some posts. `ReaderPost.comment_count` is now `None` for a value that isn't a count.
+- A Liked or Freshly Pressed post that a page couldn't read, and that then read when fetched on its own, left the unreadable list without joining the stream. It is now placed by its publish date until a page gives its place.
 
 ## [0.11.1] - 2026-11-18
 

@@ -34,6 +34,7 @@ pub use collection::{
 };
 pub use comments::{ReaderCommentsCollection, ReaderCommentsInfo, ReaderCommentsPageResult};
 pub use page_views::ReaderPageViewOutcome;
+pub use stream::reader_stream_for_menu_item;
 pub use stream::{
     ReaderStream, ReaderStreamCardKind, ReaderStreamCardSite, ReaderStreamCardTag,
     ReaderStreamOrdering, reader_stream_needs_account, reader_stream_ordering,
@@ -80,6 +81,50 @@ pub enum ReaderError {
 
     #[error("{0}")]
     Database(SqliteDbError),
+}
+
+/// What a Reader error says, in words, for an app to show. Swift and Kotlin get an error's case
+/// and its fields, and not the sentence that goes with it.
+#[uniffi::export]
+pub fn reader_error_message(error: &ReaderError) -> String {
+    error.to_string()
+}
+
+/// Something of the Reader's that the cache keeps and that isn't a collection of its own, for
+/// [`reader_data_is_relevant_update`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ReaderData {
+    /// The menu, with the followed and the recommended tags.
+    Menu,
+    /// The sites and feeds the account follows, with their delivery settings.
+    Subscriptions,
+    /// The blocked sites, and the users blocked on this device.
+    Blocks,
+    /// What the reader turned on or off that is waiting to be sent, saves included.
+    PendingActions,
+    /// A cached post.
+    Post,
+    /// What the cache has of a site or a feed besides its posts.
+    Site,
+}
+
+/// Whether a change to the cache is one that `data` shows, so that a screen reloads only when
+/// what it shows changed. Streams, comments and the saved list answer this themselves.
+#[uniffi::export]
+pub fn reader_data_is_relevant_update(
+    data: ReaderData,
+    hook: &wp_mobile_cache::UpdateHook,
+) -> bool {
+    use wp_mobile_cache::DbTable;
+    let tables: &[DbTable] = match data {
+        ReaderData::Menu => &[DbTable::ReaderMenuItems],
+        ReaderData::Subscriptions => &[DbTable::ReaderSubscriptions],
+        ReaderData::Blocks => &[DbTable::ReaderBlockedSites, DbTable::ReaderBlockedUsers],
+        ReaderData::PendingActions => &[DbTable::ReaderActions, DbTable::ReaderSavedPosts],
+        ReaderData::Post => &[DbTable::ReaderPosts],
+        ReaderData::Site => &[DbTable::ReaderSites],
+    };
+    tables.contains(&hook.table)
 }
 
 impl From<WpApiError> for ReaderError {

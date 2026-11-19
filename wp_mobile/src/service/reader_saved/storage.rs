@@ -243,6 +243,10 @@ impl ReaderSavedService {
     /// saved to this account, with what the device kept of its post, and the signed-out reader's
     /// saved list is emptied. Call it after sign-in, on the account's service. A post the account
     /// already saved stays as it is.
+    ///
+    /// When the account has room for only some of them under its save cap, which ones are saved
+    /// is up to the server: with room for one of two, it took the newer. The rest stay saved on
+    /// the device and wait for room.
     pub async fn adopt_signed_out_saves(
         &self,
     ) -> Result<ReaderSavedImportReport, ReaderSavedError> {

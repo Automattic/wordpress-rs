@@ -11,15 +11,18 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use wp_api::date::WpGmtDateTime;
 use wp_api::prelude::WpApiError;
-use wp_api::wp_com::reader_saved::{ReaderSavedKey, reader_saved_key_for_post};
+use wp_api::wp_com::reader_saved::{
+    ReaderSavedKey, reader_saved_key_for_post, reader_saved_keys_for_post,
+};
 use wp_mobile_cache::db_types::reader::{
     DbReaderPageEntry, DbReaderPageItem, DbReaderPageOutcome, DbReaderStream, ReaderPostRecord,
-    reader_date_from_text, reader_date_text,
+    reader_date_from_text, reader_date_text, reader_saved_key_text,
 };
 use wp_mobile_cache::list_metadata::ListState;
 use wp_mobile_cache::repository::QueryExecutor;
 use wp_mobile_cache::repository::reader::{
-    ReaderPostRepository, ReaderStreamRepository, ReaderUnreadablePostRepository,
+    ReaderPostRepository, ReaderSavedRepository, ReaderStreamRepository,
+    ReaderUnreadablePostRepository,
 };
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
 use wp_mobile_cache::{DbTable, RowId, SqliteDbError, UpdateHook};
@@ -38,8 +41,9 @@ const MAX_UNREADABLE_ATTEMPTS: u32 = 5;
 /// for an hour, so asking sooner gets the same answer.
 const UNREADABLE_RETRY_INTERVAL: Duration = Duration::from_secs(60 * 60);
 
-/// The tables a stream is read from.
-const STREAM_TABLES: [DbTable; 7] = [
+/// The tables a stream is read from. The saved posts are among them: each item says whether it's
+/// saved.
+const STREAM_TABLES: [DbTable; 8] = [
     DbTable::ReaderPosts,
     DbTable::ReaderStreams,
     DbTable::ReaderStreamItems,
@@ -47,6 +51,7 @@ const STREAM_TABLES: [DbTable; 7] = [
     DbTable::ReaderUnreadablePosts,
     DbTable::ReaderBlockedSites,
     DbTable::ReaderBlockedUsers,
+    DbTable::ReaderSavedPosts,
 ];
 
 /// A post in a stream.
@@ -61,6 +66,10 @@ pub struct ReaderStreamItem {
     /// Posts may be missing between this one and the one above it: a refresh didn't reach the
     /// posts the stream already had. [`ReaderStreamCollection::fill_gap`] loads them.
     pub gap_before: bool,
+    /// Whether the reader saved the post, as far as this device knows: what
+    /// [`ReaderSavedService::status`](crate::service::reader_saved::ReaderSavedService::status)
+    /// says for it, without asking for each post.
+    pub is_saved: bool,
 }
 
 /// A card in a stream that isn't a post, such as Discover's recommended sites.
@@ -160,11 +169,17 @@ impl ReaderStreamCollection {
     /// user the reader blocked.
     pub async fn load_items(&self) -> Result<Vec<ReaderStreamItem>, ReaderError> {
         let dated = self.stream.ordering() == ReaderStreamOrdering::Date;
-        let items = self.context.cache.execute(|connection| {
+        let (items, saved) = self.context.cache.execute(|connection| {
             let Some(stream) = self.select_stream(&*connection)? else {
-                return Ok(Vec::new());
+                return Ok((Vec::new(), Default::default()));
             };
-            ReaderStreamRepository::select_items_without_content(&*connection, stream.row_id)
+            Ok::<_, SqliteDbError>((
+                ReaderStreamRepository::select_items_without_content(&*connection, stream.row_id)?,
+                ReaderSavedRepository::select_saved_key_texts(
+                    &*connection,
+                    self.context.owner_row,
+                )?,
+            ))
         })?;
         items
             .into_iter()
@@ -174,6 +189,10 @@ impl ReaderStreamCollection {
                         .then(|| reader_date_from_text(&item.sort_key))
                         .transpose()?,
                     gap_before: item.gap_before,
+                    // A post can be saved under any of its keys.
+                    is_saved: reader_saved_keys_for_post(item.post.identity.clone())
+                        .iter()
+                        .any(|key| saved.contains(&reader_saved_key_text(key))),
                     post: item.post,
                 })
             })
@@ -321,28 +340,51 @@ impl ReaderStreamCollection {
                 }
             };
             let stored = self.context.store_reader_post(&fetched)?;
-            let sort_date = self.stream.sort_date(&fetched);
-            self.context.cache.execute(|connection| {
+            // A post fetched on its own doesn't say when it was liked or featured, which is what
+            // Liked and Freshly Pressed are ordered by. It goes where its publish date puts it,
+            // until a page of the stream gives its place.
+            let sort_date = self.stream.sort_date(&fetched).or(fetched.date);
+            let placed = self.context.cache.execute(|connection| {
                 let transaction = connection.transaction()?;
-                if let (ReaderStreamOrdering::Date, Some(date)) =
-                    (self.stream.ordering(), sort_date)
-                    && let Some(row) = ReaderPostRepository::select_row_id_by_key(
+                let placed = match (self.stream.ordering(), sort_date) {
+                    (ReaderStreamOrdering::Date, Some(date)) => {
+                        if let Some(row) = ReaderPostRepository::select_row_id_by_key(
+                            &transaction,
+                            self.context.owner_row,
+                            &stored.key,
+                        )? {
+                            ReaderStreamRepository::upsert_item(
+                                &transaction,
+                                post.stream_row_id,
+                                row,
+                                &reader_date_text(&date),
+                            )?;
+                        }
+                        true
+                    }
+                    // With no date at all there is nowhere to put it, so it stays listed as
+                    // unreadable, and counts as a try.
+                    (ReaderStreamOrdering::Date, None) => false,
+                    // A stream in the server's order gets the post from its next refresh, which
+                    // replaces what's cached.
+                    (ReaderStreamOrdering::Server, _) => true,
+                };
+                if placed {
+                    ReaderUnreadablePostRepository::delete(&transaction, post.row_id)?;
+                } else {
+                    ReaderUnreadablePostRepository::record_attempt(
                         &transaction,
-                        self.context.owner_row,
-                        &stored.key,
-                    )?
-                {
-                    ReaderStreamRepository::upsert_item(
-                        &transaction,
-                        post.stream_row_id,
-                        row,
-                        &reader_date_text(&date),
+                        post.row_id,
+                        &now,
+                        "The post has no date to place it by.",
                     )?;
                 }
-                ReaderUnreadablePostRepository::delete(&transaction, post.row_id)?;
-                transaction.commit().map_err(SqliteDbError::from)
+                transaction.commit().map_err(SqliteDbError::from)?;
+                Ok::<_, SqliteDbError>(placed)
             })?;
-            readable += 1;
+            if placed {
+                readable += 1;
+            }
         }
         Ok(readable)
     }
@@ -590,7 +632,7 @@ impl ReaderStreamCollection {
                         continue;
                     }
                 };
-                let Some(record) = ReaderPostRecord::from_reader_post(&post.post) else {
+                let Some(record) = self.context.record_of(&post.post) else {
                     unreadable.push((None, "The post has no IDs to keep it by.".to_string()));
                     continue;
                 };

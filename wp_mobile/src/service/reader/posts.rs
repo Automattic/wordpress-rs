@@ -43,12 +43,25 @@ impl ReaderContext {
         }
     }
 
+    /// A post as the cache keeps it for this reader, or `None` if it has no IDs to keep it by.
+    ///
+    /// The API sends a signed-out reader `is_seen: false` for every post, though nobody is there
+    /// for a post to have been seen by. It's kept as unknown, which is what says a post can't be
+    /// marked as seen.
+    pub(crate) fn record_of(&self, post: &ReaderPost) -> Option<ReaderPostRecord> {
+        let mut record = ReaderPostRecord::from_reader_post(post)?;
+        if self.owner == ReaderOwner::SignedOut {
+            record.is_seen = None;
+        }
+        Some(record)
+    }
+
     /// Stores a fetched post, and returns it as the cache now has it, with its content.
     pub(crate) fn store_reader_post(
         &self,
         post: &ReaderPost,
     ) -> Result<ReaderPostRecord, ReaderError> {
-        let record = ReaderPostRecord::from_reader_post(post).ok_or(ReaderError::MissingIds)?;
+        let record = self.record_of(post).ok_or(ReaderError::MissingIds)?;
         Ok(self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
             ReaderPostRepository::upsert(&transaction, self.owner_row, &record)?;

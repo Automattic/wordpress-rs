@@ -89,6 +89,17 @@ impl ReaderLikesResponse {
     }
 }
 
+/// The parameters for the page after `response`, asking for `number` likes, or `None` when it's
+/// the last page. It's [`ReaderLikesResponse::next_page_params`], for Swift and Kotlin, which
+/// can't call a method of a record.
+#[uniffi::export]
+pub fn reader_likes_next_page_params(
+    response: &ReaderLikesResponse,
+    number: u32,
+) -> Option<ReaderLikesParams> {
+    response.next_page_params(number)
+}
+
 /// The most likes the API returns in a page.
 const MAX_PAGE_SIZE: u32 = 90;
 
@@ -438,6 +449,24 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_the_exported_next_page_is_the_methods() {
+        let response: ReaderLikesResponse = serde_json::from_value(serde_json::json!({
+            "likes": [
+                { "ID": 1, "date_liked": "2026-11-18T10:00:00+00:00" },
+                { "ID": 2, "date_liked": "2026-11-18T09:00:00+00:00" },
+            ],
+            "found": 5,
+        }))
+        .expect("the likes parse");
+
+        let next = reader_likes_next_page_params(&response, 2);
+
+        assert!(next.is_some());
+        assert_eq!(next, response.next_page_params(2));
+        assert_eq!(reader_likes_next_page_params(&response, 20), None);
+    }
     use rstest::rstest;
     use serde_json::json;
 

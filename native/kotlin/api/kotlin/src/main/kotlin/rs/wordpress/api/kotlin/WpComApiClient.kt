@@ -4,6 +4,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
+import rs.wordpress.cache.kotlin.WordPressApiCache
+import uniffi.wp_api.ReaderSavedSource
 import uniffi.wp_api.RequestExecutor
 import uniffi.wp_api.UniffiWpComApiClient
 import uniffi.wp_api.WpApiClientDelegate
@@ -12,6 +14,8 @@ import uniffi.wp_api.WpApiMiddlewarePipeline
 import uniffi.wp_api.WpAppNotifier
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpComLanguageProvider
+import uniffi.wp_mobile.ReaderService
+import uniffi.wp_mobile_cache.ReaderOwner
 
 class WpComApiClient(
     authProvider: WpAuthenticationProvider,
@@ -49,18 +53,36 @@ class WpComApiClient(
         languageProvider
     )
 
-    // Don't expose `WpRequestBuilder` directly so we can control how it's used
-    private val requestBuilder by lazy {
-        UniffiWpComApiClient(
-            WpApiClientDelegate(
-                authProvider,
-                requestExecutor = requestExecutor,
-                middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
-                appNotifier,
-                languageProvider = languageProvider
-            )
+    private val delegate by lazy {
+        WpApiClientDelegate(
+            authProvider,
+            requestExecutor = requestExecutor,
+            middlewarePipeline = WpApiMiddlewarePipeline(emptyList()),
+            appNotifier,
+            languageProvider = languageProvider
         )
     }
+
+    // Don't expose `WpRequestBuilder` directly so we can control how it's used
+    private val requestBuilder by lazy { UniffiWpComApiClient(delegate) }
+
+    /**
+     * Creates the Reader service for one reader: an account, or the device when no one is signed
+     * in. It keeps streams, posts, comments, follows and saves in [cache], shows a change at once,
+     * and sends it when it can.
+     *
+     * For a signed-out reader, pass [ReaderOwner.SignedOut] on a client whose `authProvider` sends
+     * no authentication. What that reader follows and saves stays on the device.
+     *
+     * The cache's migrations must have run. [savedSource] is the app, which is recorded with each
+     * save. Create one per reader and share it: it sends one change at a time, and a second
+     * instance would send alongside it.
+     */
+    fun makeReaderService(
+        cache: WordPressApiCache,
+        owner: ReaderOwner,
+        savedSource: ReaderSavedSource
+    ): ReaderService = ReaderService(delegate, cache.cache, owner, savedSource)
 
     // Provides the _only_ way to execute authenticated requests using our Kotlin wrapper.
     //
