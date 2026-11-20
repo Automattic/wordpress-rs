@@ -23,7 +23,8 @@ extension WpNetworkResponse {
             responseHeaderMap: try WpNetworkHeaderMap.fromMap(hashMap: response.httpHeaders),
             requestUrl: request.url(),
             requestMethod: request.method(),
-            requestHeaderMap: request.headerMap()
+            requestHeaderMap: request.headerMap(),
+            responseUrl: response.url?.absoluteString
         )
     }
 }

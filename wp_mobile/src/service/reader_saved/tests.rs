@@ -131,6 +131,7 @@ impl RequestExecutor for ScriptedExecutor {
             request_url: request.url(),
             request_method: request.method(),
             request_header_map: Default::default(),
+            response_url: None,
         })
     }
 

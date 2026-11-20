@@ -51,5 +51,6 @@ pub fn wp_network_response_from_json(json: &str, status_code: u32) -> WpNetworkR
         request_url: WpEndpointUrl("http://example.com".to_string()),
         request_method: RequestMethod::GET,
         request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+        response_url: None,
     }
 }

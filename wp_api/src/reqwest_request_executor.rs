@@ -3,7 +3,7 @@ use crate::{
     request::{
         NetworkRequestAccessor, RequestContext, RequestExecutor, RequestMethod,
         WpMultipartFormField, WpMultipartFormRequest, WpNetworkHeaderMap, WpNetworkRequest,
-        WpNetworkResponse, user_agent,
+        WpNetworkResponse, endpoint::WpEndpointUrl, user_agent,
     },
 };
 use async_trait::async_trait;
@@ -79,6 +79,7 @@ impl ReqwestRequestExecutor {
             request = request.body(body.contents());
         }
         let mut response = request.send().await?;
+        let response_url = response.url().to_string();
         let response_header_map = std::mem::take(response.headers_mut());
 
         let status = response.status();
@@ -91,6 +92,7 @@ impl ReqwestRequestExecutor {
             request_url: wp_request.url(),
             request_method: wp_request.method(),
             request_header_map: wp_request.header_map(),
+            response_url: Some(WpEndpointUrl(response_url)),
         })
     }
 
@@ -162,6 +164,7 @@ impl RequestExecutor for ReqwestRequestExecutor {
             .await
             .map_err(|e| request_execution_error_from_reqwest(e, url, method))?;
 
+        let response_url = response.url().to_string();
         let header_map = std::mem::take(response.headers_mut());
         Ok(WpNetworkResponse {
             status_code: response.status().as_u16() as u32,
@@ -170,6 +173,7 @@ impl RequestExecutor for ReqwestRequestExecutor {
             request_url: upload_request.url(),
             request_method: upload_request.method(),
             request_header_map: upload_request.header_map(),
+            response_url: Some(WpEndpointUrl(response_url)),
         })
     }
 
@@ -365,7 +369,6 @@ pub(crate) fn find_error<'a, E: Error + 'static>(top: &'a (dyn Error + 'static))
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::endpoint::WpEndpointUrl;
 
     // A refused connection — the host resolves (here, loopback), but nothing is
     // listening on the port — must classify as `ConnectionError`, not
@@ -381,6 +384,37 @@ mod tests {
     // fallback that maps to `NonExistentSiteError`. This test guards that
     // ordering so a refactor can't silently reclassify a refused connection as
     // an unreachable site.
+    #[tokio::test]
+    async fn response_url_is_where_a_redirect_ended() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move {
+            // `Connection: close`, so the client opens a new connection for the redirect.
+            for response in [
+                "HTTP/1.1 301 Moved Permanently\r\nLocation: /end/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            ] {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut request = [0; 4096];
+                let _ = socket.read(&mut request).await.unwrap();
+                socket.write_all(response.as_bytes()).await.unwrap();
+            }
+        });
+
+        let request = WpNetworkRequest::get(WpEndpointUrl(format!("{origin}/start")));
+        let response = ReqwestRequestExecutor::new_with_default_timeout(false)
+            .execute(request.into())
+            .await
+            .unwrap();
+        server.await.unwrap();
+
+        assert_eq!(response.status_code, 200);
+        assert_eq!(response.request_url.0, format!("{origin}/start"));
+        assert_eq!(response.final_url().0, format!("{origin}/end/"));
+    }
+
     #[tokio::test]
     async fn refused_connection_is_connection_error() {
         // Port 1 on loopback is privileged, so nothing is bound in any test
