@@ -30,6 +30,9 @@ private val blockTables = setOf(DbTable.READER_BLOCKED_SITES, DbTable.READER_BLO
 private class ReaderBlocksState(session: ReaderSession, val requests: ReaderRequests) {
     private val service = session.service
 
+    /** Blocked sites belong to an account: signed out there are none to fetch. */
+    val isSignedIn = session.isSignedIn
+
     var sites by mutableStateOf<List<ReaderBlockedSite>>(emptyList())
         private set
 
@@ -44,9 +47,16 @@ private class ReaderBlocksState(session: ReaderSession, val requests: ReaderRequ
         this.users = users
     }
 
-    fun refresh() = requests.run {
-        service.refreshBlockedSites()
-        "Fetched the blocked sites."
+    /**
+     * Fetches the account's blocked sites. Signed out the server can only refuse, which isn't news
+     * to show as an error: the screen says so instead, and still lists the users blocked here.
+     */
+    fun refresh() {
+        if (!isSignedIn) return
+        requests.run {
+            service.refreshBlockedSites()
+            "Fetched the blocked sites."
+        }
     }
 
     fun setSiteBlocked(siteId: ULong, blocked: Boolean) = requests.run {
@@ -80,7 +90,14 @@ fun ReaderBlockedSitesScreen(session: ReaderSession, onBackClicked: () -> Unit) 
         LazyColumn(modifier = Modifier.fillMaxSize().testTag("reader_blocked")) {
             item { ReaderBlockSiteField(state) }
             item { ReaderSectionTitle("Blocked sites (${state.sites.size})") }
-            if (state.sites.isEmpty()) {
+            if (!state.isSignedIn) {
+                item {
+                    ReaderNote(
+                        "Sites are blocked by a WordPress.com account. Sign in to see or change them.",
+                        tag = "reader_blocked_sites_signed_out"
+                    )
+                }
+            } else if (state.sites.isEmpty()) {
                 item { ReaderNote("No sites are blocked.") }
             }
             items(state.sites) { site -> ReaderBlockedSiteRow(site, state) }
