@@ -331,9 +331,10 @@ mod tests {
                 tags: tags(),
                 sort: Some(ReaderDiscoverSort::Latest),
                 age_based_decay: Some(0.5),
+                refresh: Some(3),
                 locale: Some("fr".to_string()),
             }),
-            "/read/streams/discover?count=8&page_handle=abc%3D%3D&tags=photography%2Ctravel&sort=latest&age_based_decay=0.5&_locale=fr",
+            "/read/streams/discover?count=8&page_handle=abc%3D%3D&tags=photography%2Ctravel&sort=latest&age_based_decay=0.5&refresh=3&_locale=fr",
         );
     }
 

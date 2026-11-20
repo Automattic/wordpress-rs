@@ -7,7 +7,7 @@ use super::language::ReaderLanguage;
 use super::stream::{ReaderStreamCardKind, StreamCursor, StreamEntry, StreamPage};
 use super::{ReaderContext, ReaderError, ReaderStream, ReaderStreamOrdering};
 use futures::lock::Mutex as AsyncMutex;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use wp_api::date::WpGmtDateTime;
@@ -170,6 +170,8 @@ pub struct ReaderStreamCollection {
     /// The stream's key in the cache.
     key: String,
     lanes: Arc<StreamLanes>,
+    /// How many first pages this collection has fetched, which Discover sends as `refresh`.
+    refreshes_sent: AtomicU32,
 }
 
 #[uniffi::export]
@@ -279,6 +281,12 @@ impl ReaderStreamCollection {
     ///
     /// A call made while another is running waits for it and returns what it did, without
     /// fetching again.
+    ///
+    /// Discover's first page is sent with `refresh`, counting this collection's refreshes from 1,
+    /// as the iOS app counts each Discover screen's: get one collection for a screen, and refresh
+    /// it on each pull. A later page is sent none, as Android sends none. (Android keeps one count
+    /// across launches, from 0; the server is told the same thing either way, that the reader
+    /// refreshed again, and a count per collection needs nothing kept.)
     pub async fn refresh(&self) -> Result<ReaderStreamPageResult, ReaderError> {
         self.check_account()?;
         let ended = self.lanes.refreshes.load(Ordering::SeqCst);
@@ -530,6 +538,7 @@ impl ReaderStreamCollection {
             stream,
             language,
             lanes,
+            refreshes_sent: AtomicU32::new(0),
         }
     }
 
@@ -597,7 +606,9 @@ impl ReaderStreamCollection {
     /// where the next page starts.
     async fn load_page(&self, kind: PageKind) -> Result<ReaderStreamPageResult, ReaderError> {
         let cursor = match &kind {
-            PageKind::First => None,
+            PageKind::First => Some(StreamCursor::Refresh(
+                self.refreshes_sent.fetch_add(1, Ordering::SeqCst) + 1,
+            )),
             PageKind::Older { before } | PageKind::Gap { before, .. } => {
                 Some(StreamCursor::Before(*before))
             }

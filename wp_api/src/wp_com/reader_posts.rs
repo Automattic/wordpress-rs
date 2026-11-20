@@ -1373,6 +1373,12 @@ pub struct ReaderDiscoverParams {
     /// responses that were looked at.
     #[uniffi(default = None)]
     pub age_based_decay: Option<f64>,
+    /// How many times the reader has refreshed Discover, for the first page of a refresh: both
+    /// WordPress apps send one when the reader pulls to refresh, so the server can rotate the posts
+    /// it picks (Android's `ReaderPostRepository.requestPostsForDiscoverStream`, iOS's
+    /// `ReaderDiscoverStreamViewController.fetch`). A live measurement found no difference it makes.
+    #[uniffi(default = None)]
+    pub refresh: Option<u32>,
     /// The language of the posts, sent as `_locale`: only posts in it are returned. The API reads
     /// the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer the
     /// same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts at all

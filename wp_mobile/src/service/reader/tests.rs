@@ -224,7 +224,8 @@ async fn each_stream_reads_its_own_endpoint() {
             ReaderStream::Discover {
                 tags: vec![slug("art")],
             },
-            "/wpcom/v2/read/streams/discover?tags=art",
+            // A refresh's first page says how many this collection has sent.
+            "/wpcom/v2/read/streams/discover?tags=art&refresh=1",
         ),
         (
             ReaderStream::FirstPosts,
@@ -836,6 +837,54 @@ async fn discover_keeps_its_cards_among_its_posts() {
     stream.refresh().await.unwrap();
     assert_eq!(shown(&stream).await, ["4"]);
     assert!(stream.load_cards().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn discover_counts_its_refreshes_on_their_first_pages_only() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let stream = service.stream(ReaderStream::Discover { tags: vec![] });
+    let post_card = |id: u64| json!({ "type": "post", "data": post_json(id, 10) });
+    let page = |id: u64| {
+        Step::Respond(
+            200,
+            json!({ "cards": [post_card(id)], "next_page_handle": "next" }),
+        )
+    };
+
+    executor.push(page(1));
+    stream.refresh().await.unwrap();
+    executor.push(page(2));
+    stream.load_more().await.unwrap();
+    executor.push(page(3));
+    stream.refresh().await.unwrap();
+    executor.push(page(4));
+    stream.refresh().await.unwrap();
+    // Another screen's collection of the same stream counts its own.
+    executor.push(page(5));
+    service
+        .stream(ReaderStream::Discover { tags: vec![] })
+        .refresh()
+        .await
+        .unwrap();
+    // No other stream is sent one.
+    executor.push(Step::Respond(200, json!({ "cards": [post_card(6)] })));
+    service
+        .stream(ReaderStream::FirstPosts)
+        .refresh()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        queries(&executor),
+        [
+            "refresh=1",
+            "page_handle=next",
+            "refresh=2",
+            "refresh=3",
+            "refresh=1",
+            ""
+        ]
+    );
 }
 
 #[tokio::test]

@@ -274,7 +274,7 @@ impl ReaderStream {
     }
 
     /// Fetches a page, in `language` for a stream whose posts depend on it: the first page when
-    /// `cursor` is `None`.
+    /// `cursor` is `None` or [`StreamCursor::Refresh`].
     pub(crate) async fn fetch(
         &self,
         client: &WpComApiClient,
@@ -289,6 +289,10 @@ impl ReaderStream {
         };
         let page_handle = match cursor {
             Some(StreamCursor::Handle(handle)) => Some(handle.clone()),
+            _ => None,
+        };
+        let refresh = match cursor {
+            Some(StreamCursor::Refresh(count)) => Some(*count),
             _ => None,
         };
         let number = Some(DATED_PAGE_SIZE);
@@ -404,6 +408,7 @@ impl ReaderStream {
                     tags: tags.clone(),
                     sort: None,
                     age_based_decay: None,
+                    refresh,
                     locale,
                 };
                 let page = posts.discover(&params).await?.data;
@@ -456,6 +461,11 @@ pub fn reader_stream_ordering(stream: ReaderStream) -> ReaderStreamOrdering {
 /// Where a page starts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum StreamCursor {
+    /// The first page, fetched by a collection's refresh that's the `n`th it sent, from 1. Only
+    /// Discover sends the count, as `refresh`: see [`ReaderStreamCollection::refresh`].
+    ///
+    /// [`ReaderStreamCollection::refresh`]: super::ReaderStreamCollection::refresh
+    Refresh(u32),
     /// The posts older than a date, for a stream ordered by date.
     Before(WpGmtDateTime),
     /// The page a previous page's handle leads to.
