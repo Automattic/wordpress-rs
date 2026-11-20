@@ -70,9 +70,15 @@ final class ReaderPostViewModel {
         reloadFromCache()
     }
 
-    func setLiked(_ liked: Bool) async {
+    /// Likes or unlikes the post. A like counts a view when `countsPageViews` is on, as opening the post does.
+    func setLiked(_ liked: Bool, countsPageViews: Bool) async {
         await act(liked ? "Like" : "Unlike") { post in
-            try await self.service.setPostLiked(post: post.identity, liked: liked).message
+            try await self.service.setPostLiked(
+                post: post.identity,
+                liked: liked,
+                pageView: .fromSwitch(countsPageViews)
+            )
+            .messageOrThrow()
         }
     }
 
@@ -124,10 +130,8 @@ final class ReaderPostViewModel {
     }
 
     private func reportOpened(countsPageViews: Bool) async {
-        let choice: ReaderPageViewChoice =
-            countsPageViews ? .count(userAgent: ReaderPageViewUserAgent.value) : .dontCount
         do {
-            let opened = try await service.postOpened(key: key, pageView: choice)
+            let opened = try await service.postOpened(key: key, pageView: .fromSwitch(countsPageViews))
             seenOnOpen = opened.seen.message
             pageView = opened.pageView.message
         } catch {
@@ -163,20 +167,67 @@ extension ReaderOpenedSeen {
     }
 }
 
+extension ReaderPageViewChoice {
+    /// What the "Count page views" switch asks for: a view sent as the app when it's on, and none when it's off.
+    @MainActor
+    static func fromSwitch(_ countsPageViews: Bool) -> ReaderPageViewChoice {
+        countsPageViews ? .count(userAgent: ReaderPageViewUserAgent.value) : .dontCount
+    }
+}
+
+extension ReaderPageViewOutcome {
+    /// What became of a view the library decided on, in words.
+    var message: String {
+        switch self {
+        case .counted: "Counted."
+        case .notCountedForRssPost: "Not counted: an RSS post has no site stats."
+        case .notCountedForSiteMember: "Not counted: the reader is a member of the post's site."
+        case .notCountedForMissingDetails: "Not counted: the cache lacks the post, or its site's ID or URL."
+        case .notCountedForUserAgent: "Not counted: the app has no User-Agent that stats count a view with."
+        }
+    }
+}
+
 extension ReaderOpenedPageView {
     /// What became of an opened post's view, in words.
     var message: String {
         switch self {
-        case .reported(let outcome):
-            switch outcome {
-            case .counted: "Counted."
-            case .notCountedForRssPost: "Not counted: an RSS post has no site stats."
-            case .notCountedForSiteMember: "Not counted: the reader is a member of the post's site."
-            case .notCountedForMissingDetails: "Not counted: the cache lacks the post, or its site's ID or URL."
-            case .notCountedForUserAgent: "Not counted: the app has no User-Agent that stats count a view with."
-            }
+        case .reported(let outcome): outcome.message
         case .notAsked: "Not sent: \"Count page views\" is off."
         case .failed(let error): "Couldn't be counted. \(readerErrorMessage(error))"
+        }
+    }
+}
+
+extension ReaderLikePageView {
+    /// What became of the view a like may count, in words.
+    var message: String {
+        switch self {
+        case .reported(let outcome): outcome.message
+        case .notAsked: "Not sent: \"Count page views\" is off."
+        case .notForUnlike: "Not sent: an unlike counts no view."
+        case .notForAlreadyLiked: "Not sent: the post was liked already."
+        case .failed(let error): "Couldn't be counted. \(readerErrorMessage(error))"
+        }
+    }
+}
+
+/// A like that failed, with what became of its view, which is reported whether or not the like worked.
+struct ReaderLikeFailure: LocalizedError {
+    let error: ReaderError
+    let pageView: ReaderLikePageView
+
+    var errorDescription: String? {
+        "\(readerErrorMessage(error)) Page view: \(pageView.message)"
+    }
+}
+
+extension ReaderPostLikedOutcome {
+    /// What became of the like and of its view, in words. A like that failed is thrown, with its view's outcome.
+    func messageOrThrow() throws -> String {
+        switch like {
+        case .done(let outcome): return "\(outcome.message) Page view: \(pageView.message)"
+        case .failed(let error): throw ReaderLikeFailure(error: error, pageView: pageView)
         }
     }
 }

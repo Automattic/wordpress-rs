@@ -4,8 +4,14 @@ import uniffi.wp_api.ReaderSearchSort
 import uniffi.wp_api.WpApiException
 import uniffi.wp_api.decodeHtmlEntities
 import uniffi.wp_api.localizedDescription
+import rs.wordpress.example.shared.readerPageViewUserAgent
 import uniffi.wp_mobile.ReaderActionOutcome
 import uniffi.wp_mobile.ReaderException
+import uniffi.wp_mobile.ReaderLikePageView
+import uniffi.wp_mobile.ReaderPageViewChoice
+import uniffi.wp_mobile.ReaderPageViewOutcome
+import uniffi.wp_mobile.ReaderPostLikeResult
+import uniffi.wp_mobile.ReaderPostLikedOutcome
 import uniffi.wp_mobile.ReaderSavedException
 import uniffi.wp_mobile.ReaderSavedOutcome
 import uniffi.wp_mobile.ReaderStream
@@ -26,6 +32,7 @@ private val wordStart = Regex("(?<=[a-z0-9])(?=[A-Z])")
  * the library's sentence for each.
  */
 internal fun readerErrorText(error: Throwable): String = when (error) {
+    is ReaderLikeFailedException -> error.message.orEmpty()
     is ReaderException.Api -> error.v1.localizedDescription()
     is ReaderSavedException.Api -> error.v1.localizedDescription()
     is ReaderException -> readerErrorMessage(error)
@@ -36,6 +43,42 @@ internal fun readerErrorText(error: Throwable): String = when (error) {
             .replaceFirstChar { it.uppercase() }
         listOf(name, error.message.orEmpty()).filter { it.isNotBlank() }.joinToString(": ")
     }
+}
+
+/** What the switch on the Reader home asks for: a view sent as the app when it's on, and none when it's off. */
+internal fun ReaderSession.pageViewChoice(): ReaderPageViewChoice = if (countPageViews) {
+    ReaderPageViewChoice.Count(readerPageViewUserAgent())
+} else {
+    ReaderPageViewChoice.DontCount
+}
+
+internal fun ReaderPageViewOutcome.text(): String = when (this) {
+    ReaderPageViewOutcome.COUNTED -> "Page view counted."
+    ReaderPageViewOutcome.NOT_COUNTED_FOR_RSS_POST -> "Page view not counted: an RSS post has no site stats."
+    ReaderPageViewOutcome.NOT_COUNTED_FOR_SITE_MEMBER ->
+        "Page view not counted: you're a member of this site."
+    ReaderPageViewOutcome.NOT_COUNTED_FOR_MISSING_DETAILS ->
+        "Page view not counted: the cache doesn't have the post's site."
+    ReaderPageViewOutcome.NOT_COUNTED_FOR_USER_AGENT ->
+        "Page view not counted: the app has no User-Agent that stats count a view with."
+}
+
+internal fun ReaderLikePageView.text(): String = when (this) {
+    is ReaderLikePageView.Reported -> outcome.text()
+    ReaderLikePageView.NotAsked -> "Page view not sent: the switch on the Reader home is off."
+    ReaderLikePageView.NotForUnlike -> "Page view not sent: an unlike counts none."
+    ReaderLikePageView.NotForAlreadyLiked -> "Page view not sent: the post was liked already."
+    is ReaderLikePageView.Failed -> "Page view couldn't be counted. ${readerErrorText(error)}"
+}
+
+/** A like that failed, with what became of its view, which is reported whether or not the like worked. */
+internal class ReaderLikeFailedException(error: ReaderException, pageView: ReaderLikePageView) :
+    Exception("${readerErrorText(error)} ${pageView.text()}", error)
+
+/** What became of a like and of its view, in words. A like that failed is thrown, with its view's outcome. */
+internal fun ReaderPostLikedOutcome.text(): String = when (val like = like) {
+    is ReaderPostLikeResult.Done -> "${like.outcome.text()} ${pageView.text()}"
+    is ReaderPostLikeResult.Failed -> throw ReaderLikeFailedException(like.error, pageView)
 }
 
 internal fun ReaderActionOutcome.text(): String = when (this) {

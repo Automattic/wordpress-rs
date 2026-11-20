@@ -77,6 +77,25 @@ fn key(id: i64) -> ReaderSavedKey {
     }
 }
 
+/// Likes or unlikes a post, counting no view, and returns what became of the like itself.
+async fn set_liked(
+    service: &ReaderService,
+    post: wp_api::wp_com::reader_saved::ReaderPostSaveIdentity,
+    liked: bool,
+) -> Result<ReaderActionOutcome, ReaderError> {
+    let outcome = service
+        .set_post_liked(post, liked, ReaderPageViewChoice::DontCount)
+        .await?;
+    assert!(matches!(
+        outcome.page_view,
+        ReaderLikePageView::NotAsked | ReaderLikePageView::NotForUnlike
+    ));
+    match outcome.like {
+        ReaderPostLikeResult::Done { outcome } => Ok(outcome),
+        ReaderPostLikeResult::Failed { error } => Err(error),
+    }
+}
+
 fn tag() -> ReaderStream {
     ReaderStream::Tag {
         slug: ReaderTagSlug("photography".to_string()),
@@ -2826,6 +2845,248 @@ mod opening {
         );
     }
 
+    fn liked() -> Step {
+        Step::Respond(
+            200,
+            json!({ "success": true, "i_like": true, "like_count": 6 }),
+        )
+    }
+
+    fn site_post(id: u64) -> wp_api::wp_com::reader_saved::ReaderPostSaveIdentity {
+        wp_api::wp_com::reader_saved::ReaderPostSaveIdentity {
+            id,
+            site_id: Some(WpComSiteId(123)),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_like_counts_a_view_and_both_are_reported() {
+        let (service, executor) = following(ACCOUNT, vec![followed_post(1, true)]).await;
+        executor.push(liked());
+        executor.push(pixel());
+
+        let outcome = service
+            .set_post_liked(site_post(1), true, count())
+            .await
+            .unwrap();
+
+        assert!(
+            matches!(
+                outcome.like,
+                ReaderPostLikeResult::Done {
+                    outcome: ReaderActionOutcome::Synced
+                }
+            ),
+            "{outcome:?}"
+        );
+        assert!(
+            matches!(
+                outcome.page_view,
+                ReaderLikePageView::Reported {
+                    outcome: ReaderPageViewOutcome::Counted
+                }
+            ),
+            "{outcome:?}"
+        );
+        let paths = sent_paths(&executor);
+        assert_eq!(paths.len(), 2);
+        assert!(paths.contains(&"/rest/v1.1/sites/123/posts/1/likes/new".to_string()));
+        let pixel = executor
+            .sent()
+            .into_iter()
+            .find(|sent| sent.url.starts_with("https://pixel.wp.com/g.gif"))
+            .unwrap();
+        assert!(pixel.url.contains("&blog=123&post=1&"), "{}", pixel.url);
+        // The view goes out as the app, as an opened post's does.
+        assert_eq!(pixel.user_agent.as_deref(), Some(APP));
+    }
+
+    #[tokio::test]
+    async fn an_unlike_a_repeated_like_and_a_like_not_counting_views_count_none() {
+        let mut liked_already = followed_post(2, true);
+        liked_already["i_like"] = json!(true);
+        let (service, executor) =
+            following(ACCOUNT, vec![followed_post(1, true), liked_already]).await;
+        let unliked = || {
+            Step::Respond(
+                200,
+                json!({ "success": true, "i_like": false, "like_count": 4 }),
+            )
+        };
+
+        executor.push(unliked());
+        let unlike = service
+            .set_post_liked(site_post(2), false, count())
+            .await
+            .unwrap();
+        executor.push(liked());
+        let not_asked = service
+            .set_post_liked(site_post(1), true, ReaderPageViewChoice::DontCount)
+            .await
+            .unwrap();
+        // The cache now shows post 1 liked, so a second like is no new one.
+        executor.push(liked());
+        let again = service
+            .set_post_liked(site_post(1), true, count())
+            .await
+            .unwrap();
+
+        assert!(matches!(unlike.page_view, ReaderLikePageView::NotForUnlike));
+        assert!(matches!(not_asked.page_view, ReaderLikePageView::NotAsked));
+        assert!(matches!(
+            again.page_view,
+            ReaderLikePageView::NotForAlreadyLiked
+        ));
+        for outcome in [unlike, not_asked, again] {
+            assert!(
+                matches!(outcome.like, ReaderPostLikeResult::Done { .. }),
+                "{outcome:?}"
+            );
+        }
+        // Only the likes and the unlike were sent.
+        assert!(
+            sent_paths(&executor)
+                .iter()
+                .all(|path| path.starts_with("/rest/v1.1/sites/123/posts/"))
+        );
+        assert_eq!(sent_paths(&executor).len(), 3);
+    }
+
+    #[tokio::test]
+    async fn a_like_follows_the_page_view_rules() {
+        let (service, executor) = following(
+            ACCOUNT,
+            vec![followed_post(1, true), followed_post(2, true)],
+        )
+        .await;
+        service.set_member_sites(vec![WpComSiteId(123)]).unwrap();
+        executor.push(liked());
+
+        let member = service
+            .set_post_liked(site_post(1), true, count())
+            .await
+            .unwrap();
+        assert!(matches!(
+            member.page_view,
+            ReaderLikePageView::Reported {
+                outcome: ReaderPageViewOutcome::NotCountedForSiteMember
+            }
+        ));
+
+        executor.push(liked());
+        let library = wp_api::request::user_agent::default_user_agent("URLSession");
+        let agent = service
+            .set_post_liked(
+                site_post(2),
+                true,
+                ReaderPageViewChoice::Count {
+                    user_agent: library,
+                },
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            agent.page_view,
+            ReaderLikePageView::Reported {
+                outcome: ReaderPageViewOutcome::NotCountedForUserAgent
+            }
+        ));
+        assert!(
+            !sent_paths(&executor)
+                .iter()
+                .any(|path| path.starts_with("https://pixel.wp.com"))
+        );
+    }
+
+    #[tokio::test]
+    async fn offline_the_like_waits_and_its_view_fails_and_is_never_sent() {
+        let (service, executor) = following(ACCOUNT, vec![followed_post(1, true)]).await;
+        executor.push(Step::Offline);
+        executor.push(Step::Offline);
+
+        let outcome = service
+            .set_post_liked(site_post(1), true, count())
+            .await
+            .unwrap();
+
+        assert!(
+            matches!(
+                outcome.like,
+                ReaderPostLikeResult::Done {
+                    outcome: ReaderActionOutcome::Pending { .. }
+                }
+            ),
+            "{outcome:?}"
+        );
+        assert!(
+            matches!(
+                outcome.page_view,
+                ReaderLikePageView::Failed {
+                    error: ReaderError::Api(_)
+                }
+            ),
+            "{outcome:?}"
+        );
+        // Back online, the like is sent and no view goes with it.
+        let before = executor.sent().len();
+        executor.push(liked());
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+        let sent = executor.sent();
+        assert_eq!(sent.len(), before + 1);
+        assert!(sent.last().unwrap().url.ends_with("/likes/new"));
+    }
+
+    #[tokio::test]
+    async fn a_refused_like_is_the_like_parts_error_and_the_view_still_counts() {
+        let mut post = followed_post(1, true);
+        post["i_like"] = json!(false);
+        let (service, executor) = following(ACCOUNT, vec![post]).await;
+        executor.push(Step::Respond(
+            403,
+            json!({ "error": "unauthorized", "message": "" }),
+        ));
+        executor.push(pixel());
+
+        let outcome = service
+            .set_post_liked(site_post(1), true, count())
+            .await
+            .unwrap();
+
+        assert!(
+            matches!(
+                outcome.like,
+                ReaderPostLikeResult::Failed {
+                    error: ReaderError::Api(_)
+                }
+            ),
+            "{outcome:?}"
+        );
+        assert!(matches!(
+            outcome.page_view,
+            ReaderLikePageView::Reported {
+                outcome: ReaderPageViewOutcome::Counted
+            }
+        ));
+        // The like is put back.
+        let post = service.cached_post(key(1)).unwrap().unwrap();
+        assert_eq!(post.i_like, Some(false));
+    }
+
+    #[tokio::test]
+    async fn signed_out_a_like_needs_an_account_and_counts_no_view() {
+        let (service, executor) =
+            following(ReaderOwner::SignedOut, vec![followed_post(1, true)]).await;
+
+        let result = service.set_post_liked(site_post(1), true, count()).await;
+
+        assert!(matches!(result, Err(ReaderError::NeedsAccount)));
+        assert!(sent_paths(&executor).is_empty());
+    }
+
     #[tokio::test]
     async fn a_refused_mark_is_the_seen_parts_error_and_the_view_still_counts() {
         let (service, executor) = following(ACCOUNT, vec![followed_post(1, false)]).await;
@@ -4324,7 +4585,7 @@ mod more_actions {
             json!({ "success": true, "i_like": true, "like_count": 8 }),
         ));
 
-        let (outcome, ()) = futures::join!(service.set_post_liked(identity(1), true), async {
+        let (outcome, ()) = futures::join!(set_liked(&service, identity(1), true), async {
             let post = post(&stream).await;
             assert_eq!((post.i_like, post.like_count), (Some(true), Some(6)));
             release.send(()).unwrap();
@@ -4345,7 +4606,7 @@ mod more_actions {
         let (service, executor, stream) = reading().await;
         executor.push(refused("like_failed"));
 
-        let result = service.set_post_liked(identity(1), true).await;
+        let result = set_liked(&service, identity(1), true).await;
 
         assert!(matches!(result, Err(ReaderError::Api(_))));
         let post = post(&stream).await;
@@ -4356,7 +4617,7 @@ mod more_actions {
     async fn an_unlike_is_sent_to_its_own_endpoint_and_a_refresh_keeps_a_like_that_is_waiting() {
         let (service, executor, stream) = reading().await;
         executor.push(Step::Offline);
-        service.set_post_liked(identity(1), true).await.unwrap();
+        set_liked(&service, identity(1), true).await.unwrap();
 
         // The server's page doesn't have the like yet.
         let mut unliked = post_json(1, 10);
@@ -4368,7 +4629,7 @@ mod more_actions {
         assert_eq!((shown.i_like, shown.like_count), (Some(true), Some(6)));
 
         executor.push(Step::Offline);
-        service.set_post_liked(identity(1), false).await.unwrap();
+        set_liked(&service, identity(1), false).await.unwrap();
         executor.push(Step::Respond(
             200,
             json!({ "success": true, "i_like": false, "like_count": 5 }),
@@ -4392,7 +4653,7 @@ mod more_actions {
             url: None,
         };
 
-        let result = service.set_post_liked(rss, true).await;
+        let result = set_liked(&service, rss, true).await;
 
         assert!(matches!(result, Err(ReaderError::FeedPost)));
         assert!(executor.sent().is_empty());
@@ -4411,7 +4672,7 @@ mod more_actions {
             url: None,
         };
 
-        let result = service.set_post_liked(post, true).await;
+        let result = set_liked(&service, post, true).await;
 
         assert!(matches!(result, Err(ReaderError::MissingIds)));
         assert!(executor.sent().is_empty());
@@ -5740,7 +6001,7 @@ mod feed_items_with_no_post_id {
     async fn one_cannot_be_liked_or_have_its_comments_followed() {
         let (service, executor) = service();
 
-        let liked = service.set_post_liked(identity(100000003), true).await;
+        let liked = set_liked(&service, identity(100000003), true).await;
         let followed = service
             .set_comments_subscribed(identity(100000003), true)
             .await;

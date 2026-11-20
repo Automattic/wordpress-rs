@@ -23,7 +23,7 @@ use wp_api::wp_com::{WpComBaseUrl, WpComSiteId};
 use wp_mobile::service::reader::{
     ReaderActionOutcome, ReaderError, ReaderFollowTarget, ReaderLink, ReaderLinkNotInReader,
     ReaderOpenedPageView, ReaderOpenedSeen, ReaderPageViewChoice, ReaderPageViewOutcome,
-    ReaderService, ReaderStream, ReaderStreamCollection, ReaderStreamItem,
+    ReaderPostLikeResult, ReaderService, ReaderStream, ReaderStreamCollection, ReaderStreamItem,
 };
 use wp_mobile::service::reader_saved::ReaderOfflineState;
 use wp_mobile_cache::WpApiCache;
@@ -1259,10 +1259,21 @@ async fn like_and_check(
     post: &ReaderPostRecord,
     liked: bool,
 ) -> Result<(), Failed> {
+    // A trial counts no view: one on someone's post can't be taken back.
     let outcome = service
-        .set_post_liked(post.identity.clone(), liked)
+        .set_post_liked(
+            post.identity.clone(),
+            liked,
+            ReaderPageViewChoice::DontCount,
+        )
         .await
         .map_err(|e| format!("Setting the like to {liked} was refused: {e}"))?;
+    let outcome = match outcome.like {
+        ReaderPostLikeResult::Done { outcome } => outcome,
+        ReaderPostLikeResult::Failed { error } => {
+            return Err(format!("Setting the like to {liked} was refused: {error}").into());
+        }
+    };
     if outcome != ReaderActionOutcome::Synced {
         return Err(format!("Setting the like to {liked} wasn't sent: {outcome:?}").into());
     }

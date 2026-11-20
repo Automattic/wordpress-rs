@@ -72,7 +72,7 @@ internal class ReaderStreamState(
     private val collection = service.stream(stream)
 
     /** What the reader turns on or off from the stream's rows. */
-    val actions = ReaderStreamActions(service, requests)
+    val actions = ReaderStreamActions(session, requests)
 
     var rows by mutableStateOf<List<ReaderStreamRow>>(emptyList())
         private set

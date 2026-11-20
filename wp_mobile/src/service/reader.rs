@@ -38,8 +38,8 @@ pub use collection::{
 pub use comments::{ReaderCommentsCollection, ReaderCommentsInfo, ReaderCommentsPageResult};
 pub use links::{ReaderLink, ReaderLinkNotInReader, reader_link_not_in_reader_message};
 pub use page_views::{
-    ReaderOpenedPageView, ReaderOpenedSeen, ReaderPageViewChoice, ReaderPageViewOutcome,
-    ReaderPostOpenedOutcome,
+    ReaderLikePageView, ReaderOpenedPageView, ReaderOpenedSeen, ReaderPageViewChoice,
+    ReaderPageViewOutcome, ReaderPostLikeResult, ReaderPostLikedOutcome, ReaderPostOpenedOutcome,
 };
 pub use stream::reader_stream_for_menu_item;
 pub use stream::{

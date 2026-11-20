@@ -105,7 +105,7 @@ struct ReaderPostView: View {
         Section("Actions") {
             let liked = post.iLike == true
             toggleRow("Liked", isOn: liked, turnOn: "Like", turnOff: "Unlike") {
-                await viewModel.setLiked(!liked)
+                await viewModel.setLiked(!liked, countsPageViews: store.countsPageViews)
             }
             toggleRow("Saved", isOn: viewModel.isSaved, turnOn: "Save", turnOff: "Unsave") {
                 await viewModel.setSaved(!viewModel.isSaved)

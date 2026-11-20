@@ -35,9 +35,15 @@ internal fun ReaderSiteRecord.followTarget() = ReaderFollowTarget(
  * stream shows it from the cache, not from what the call returns: that only says whether the
  * server has it, it's waiting, or it was refused, which is shown as the request's outcome.
  */
-internal class ReaderStreamActions(private val service: ReaderService, private val requests: ReaderRequests) {
+internal class ReaderStreamActions(
+    private val session: ReaderSession,
+    private val requests: ReaderRequests
+) {
+    private val service: ReaderService = session.service
+
+    /** Likes or unlikes a post. A like counts a view when the switch on the Reader home is on. */
     fun setLiked(post: ReaderPostRecord, liked: Boolean) = requests.run {
-        service.setPostLiked(post.identity, liked).text()
+        service.setPostLiked(post.identity, liked, session.pageViewChoice()).text()
     }
 
     fun setSaved(post: ReaderPostRecord, saved: Boolean) = requests.run {

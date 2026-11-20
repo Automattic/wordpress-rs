@@ -4,7 +4,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import rs.wordpress.example.shared.readerPageViewUserAgent
 import uniffi.wp_api.ReaderLikesParams
 import uniffi.wp_api.readerLikesNextPageParams
 import uniffi.wp_api.ReaderLikesResponse
@@ -15,8 +14,6 @@ import uniffi.wp_api.WpComUserIdentifier
 import uniffi.wp_mobile.ReaderFollowTarget
 import uniffi.wp_mobile.ReaderOpenedPageView
 import uniffi.wp_mobile.ReaderOpenedSeen
-import uniffi.wp_mobile.ReaderPageViewChoice
-import uniffi.wp_mobile.ReaderPageViewOutcome
 import uniffi.wp_mobile.ReaderSavedStatus
 import uniffi.wp_mobile_cache.DbTable
 import uniffi.wp_mobile_cache.ReaderPostRecord
@@ -40,17 +37,6 @@ private fun ReaderOpenedPageView.text(): String = when (this) {
     is ReaderOpenedPageView.Reported -> outcome.text()
     ReaderOpenedPageView.NotAsked -> "Page view not sent: the switch on the Reader home is off."
     is ReaderOpenedPageView.Failed -> "Page view couldn't be counted. ${readerErrorText(error)}"
-}
-
-private fun ReaderPageViewOutcome.text(): String = when (this) {
-    ReaderPageViewOutcome.COUNTED -> "Page view counted."
-    ReaderPageViewOutcome.NOT_COUNTED_FOR_RSS_POST -> "Page view not counted: an RSS post has no site stats."
-    ReaderPageViewOutcome.NOT_COUNTED_FOR_SITE_MEMBER ->
-        "Page view not counted: you're a member of this site."
-    ReaderPageViewOutcome.NOT_COUNTED_FOR_MISSING_DETAILS ->
-        "Page view not counted: the cache doesn't have the post's site."
-    ReaderPageViewOutcome.NOT_COUNTED_FOR_USER_AGENT ->
-        "Page view not counted: the app has no User-Agent that stats count a view with."
 }
 
 /** A post's screen: the post from the cache, and what its buttons do. */
@@ -113,11 +99,7 @@ internal class ReaderPostState(
             service.fetchPost(identity)
             "Up to date with WordPress.com."
         }
-        val choice = if (session.countPageViews) {
-            ReaderPageViewChoice.Count(readerPageViewUserAgent())
-        } else {
-            ReaderPageViewChoice.DontCount
-        }
+        val choice = session.pageViewChoice()
         requests.launch {
             val opened = io { service.postOpened(key, choice) }
             seenOnOpen = opened.seen.text()
@@ -125,7 +107,10 @@ internal class ReaderPostState(
         }
     }
 
-    fun setLiked(liked: Boolean) = requests.run { service.setPostLiked(identity, liked).text() }
+    /** Likes or unlikes the post. A like counts a view when the switch on the Reader home is on. */
+    fun setLiked(liked: Boolean) = requests.run {
+        service.setPostLiked(identity, liked, session.pageViewChoice()).text()
+    }
 
     fun setPostSaved(saved: Boolean) = requests.run {
         if (saved) service.saved().save(identity).text() else service.saved().unsave(identity).text()

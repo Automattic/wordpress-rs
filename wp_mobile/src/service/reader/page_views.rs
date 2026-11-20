@@ -19,6 +19,22 @@
 //!
 //! A view that can't be sent, such as offline, isn't kept to send later.
 //!
+//! Liking a post counts a view of it too, under the same rule, as both WordPress apps count one:
+//! iOS in `ReaderLikeAction.execute` and Android in `PostLikeUseCase.trackEvent`, each "to solve a
+//! long-standing question from folks who ask 'why do I have more likes than page views?'". From
+//! what the apps do:
+//!
+//! - Only a like counts one, not an unlike, from a stream or the post's screen alike.
+//! - A like of a post the cache shows liked already counts none, as iOS checks (`!post.isLiked`).
+//!   Android counts it before it checks whether the like changes anything; iOS's rule is the one
+//!   that matches "a like counts a view".
+//! - Neither app skips a view because one was counted lately, such as when the post was opened,
+//!   and neither does the library.
+//! - The view is sent when the reader likes the post, alongside the like. A like made offline
+//!   waits and is sent by [`ReaderService::sync_actions`], but its view isn't: it fails at the tap
+//!   and is dropped, like any view that can't be sent. iOS sends its view at the tap whether or not
+//!   the like gets through, and Android sends neither offline: neither ever counts one later.
+//!
 //! A view is sent with the app's `User-Agent`, which the app passes each time: stats don't count
 //! one sent with the library's own. See
 //! [`reader_page_view_user_agent_counts`](wp_api::wp_com::reader_page_views::reader_page_view_user_agent_counts).
@@ -114,6 +130,43 @@ pub enum ReaderOpenedPageView {
     Failed { error: ReaderError },
 }
 
+/// What liking or unliking a post did. Each part is reported on its own, so one failing doesn't
+/// hide the other.
+#[derive(Debug, uniffi::Record)]
+pub struct ReaderPostLikedOutcome {
+    pub like: ReaderPostLikeResult,
+    pub page_view: ReaderLikePageView,
+}
+
+/// What became of the like or unlike itself.
+#[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
+#[derive(Debug, uniffi::Enum)]
+pub enum ReaderPostLikeResult {
+    /// It shows, and `outcome` says whether the server has it yet, or it waits to be sent with
+    /// [`ReaderService::sync_actions`].
+    Done { outcome: ReaderActionOutcome },
+    /// It wasn't done: the server refused it, so the post shows as it was, or it can't be sent,
+    /// such as a feed's post ([`ReaderError::FeedPost`]), or the cache couldn't keep it.
+    Failed { error: ReaderError },
+}
+
+/// What became of the view a like may count.
+#[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
+#[derive(Debug, uniffi::Enum)]
+pub enum ReaderLikePageView {
+    /// It was decided as `outcome` says: counted, or not counted and why.
+    Reported { outcome: ReaderPageViewOutcome },
+    /// Not counted, as asked with [`ReaderPageViewChoice::DontCount`]. Nothing was sent.
+    NotAsked,
+    /// Not sent: an unlike counts no view.
+    NotForUnlike,
+    /// Not sent: the cache showed the post liked already, so the like is no new one.
+    NotForAlreadyLiked,
+    /// The view couldn't be sent, such as offline. It isn't sent again later, even when the like
+    /// is.
+    Failed { error: ReaderError },
+}
+
 #[uniffi::export]
 impl ReaderService {
     /// Reports that a post was opened: marks it as seen, and counts a view of it when `page_view`
@@ -192,7 +245,30 @@ impl ReaderContext {
         }
     }
 
-    /// Counts a view of an opened post, if it's one that counts.
+    /// The view a like or an unlike of `post` counts, as the module's documentation says. `post`
+    /// is the cache's, as it was before the like.
+    pub(super) async fn like_page_view(
+        &self,
+        post: Option<&ReaderPostRecord>,
+        liked: bool,
+        choice: ReaderPageViewChoice,
+    ) -> ReaderLikePageView {
+        if !liked {
+            return ReaderLikePageView::NotForUnlike;
+        }
+        let ReaderPageViewChoice::Count { user_agent } = choice else {
+            return ReaderLikePageView::NotAsked;
+        };
+        if post.and_then(|post| post.i_like) == Some(true) {
+            return ReaderLikePageView::NotForAlreadyLiked;
+        }
+        match self.count_view(post, user_agent).await {
+            Ok(outcome) => ReaderLikePageView::Reported { outcome },
+            Err(error) => ReaderLikePageView::Failed { error },
+        }
+    }
+
+    /// Counts a view of a post, if it's one that counts.
     async fn count_view(
         &self,
         post: Option<&ReaderPostRecord>,

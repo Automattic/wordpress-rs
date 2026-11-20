@@ -173,6 +173,9 @@ private struct ReaderStreamPostRow: View {
     let isSaved: Bool
     let viewModel: ReaderStreamViewModel
 
+    @Environment(ReaderStore.self)
+    private var store
+
     var body: some View {
         HStack(alignment: .top) {
             NavigationLink(value: ReaderRoute.post(post)) {
@@ -236,7 +239,7 @@ private struct ReaderStreamPostRow: View {
         Menu {
             let liked = post.iLike == true
             Button(liked ? "Unlike" : "Like") {
-                Task { await viewModel.setLiked(post, !liked) }
+                Task { await viewModel.setLiked(post, !liked, countsPageViews: store.countsPageViews) }
             }
             Button(isSaved ? "Unsave" : "Save") {
                 Task { await viewModel.setSaved(post, !isSaved) }

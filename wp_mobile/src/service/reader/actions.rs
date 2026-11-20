@@ -13,6 +13,7 @@
 //! A refresh that brings the server's older state for something still waiting doesn't undo the
 //! tap: what's waiting is shown again after every page is stored.
 
+use super::page_views::{ReaderPageViewChoice, ReaderPostLikeResult, ReaderPostLikedOutcome};
 use super::{ReaderContext, ReaderError, ReaderService};
 use futures::lock::Mutex as AsyncMutex;
 use serde::{Deserialize, Serialize};
@@ -1328,17 +1329,51 @@ fn only_on_this_device(on: bool) -> ReaderActionOutcome {
 
 #[uniffi::export]
 impl ReaderService {
-    /// Likes or unlikes a post. The post's like count moves with it, straight away, and is set to
-    /// the server's once it answers. Needs an account. Only a post of a WordPress.com or Jetpack
-    /// site can be liked: a feed's post is refused with [`ReaderError::FeedPost`].
+    /// Likes or unlikes a post, and counts a view of it for a like when `page_view` asks and it's
+    /// one that counts. The post's like count moves with it, straight away, and is set to the
+    /// server's once it answers. Only a post of a WordPress.com or Jetpack site can be liked: a
+    /// feed's post is refused with [`ReaderError::FeedPost`].
+    ///
+    /// Pass the same `page_view` as to [`Self::post_opened`]. A like counts a view under the same
+    /// rules as opening the post, as both WordPress apps count one: an unlike, or a like of a post
+    /// the cache shows liked already, counts none, and a like made offline is sent later but its
+    /// view isn't. See [`super::page_views`].
+    ///
+    /// The like and the view are done together and reported apart: an error of one is in its own
+    /// part of the outcome. The call fails with [`ReaderError::NeedsAccount`] signed out, sending
+    /// nothing, and otherwise only when the cache can't be read.
     pub async fn set_post_liked(
         &self,
         post: ReaderPostSaveIdentity,
         liked: bool,
-    ) -> Result<ReaderActionOutcome, ReaderError> {
-        self.context
-            .set_action(Action::LikePost { post }, liked)
-            .await
+        page_view: ReaderPageViewChoice,
+    ) -> Result<ReaderPostLikedOutcome, ReaderError> {
+        let context = &self.context;
+        if context.owner == ReaderOwner::SignedOut {
+            return Err(ReaderError::NeedsAccount);
+        }
+        let cached = match reader_saved_key_for_post(post.clone()) {
+            Some(key) => context
+                .cache
+                .execute(|connection| {
+                    ReaderPostRepository::select_by_key(
+                        connection,
+                        context.owner_row,
+                        &key.normalized(),
+                    )
+                })?
+                .map(|(_, post)| post),
+            None => None,
+        };
+        let (like, page_view) = futures::join!(
+            context.set_action(Action::LikePost { post }, liked),
+            context.like_page_view(cached.as_ref(), liked, page_view)
+        );
+        let like = match like {
+            Ok(outcome) => ReaderPostLikeResult::Done { outcome },
+            Err(error) => ReaderPostLikeResult::Failed { error },
+        };
+        Ok(ReaderPostLikedOutcome { like, page_view })
     }
 
     /// Follows or unfollows a site or a feed. Every cached post of it, what's cached of the site,
