@@ -455,6 +455,22 @@ The library sends no parameters.
 
 Public documentation: `rest/v1.1/help`.
 
+### `GET /rest/v1.1/users/suggest`
+
+The people of a site to suggest when a reader types `@` in a comment, as both WordPress apps and the web's notifications panel ask for them. Signed in, it answers for any site: its users, such as only the owner on a site of one, and 175 on the WordPress.com Blog, which the account isn't a member of. Signed out it answers 200 with no suggestions, for any site. Measured on 2026-11-21.
+
+Request `ReaderUsersRequest::Suggestions`, response `ReaderUserSuggestionsResponse`.
+
+Parameters the library sends, in the query (`ReaderUserSuggestionsParams`):
+
+- `site_id` (`WpComSiteId`): The site whose people to suggest. The API answers 403 `invalid_query` with neither this nor `site`, and 403 `unauthorized` for a site that isn't there.
+- `site` (`String`): The site by its domain, instead of `site_id`, which it overrides.
+- `filter` (`String`): Only the people whose login or name matches it: on the WordPress.com Blog, `j` left 30 of its 175 and `ja` left 4, not all of them starting with it. Without it, all of them. Both WordPress apps fetch them all and filter as the reader types.
+- `image_size` (`u32`): The size of the avatars in `ReaderUserSuggestion::image_url`, in pixels: 96 by default, between 1 and 2048. Not every avatar comes at it: on the WordPress.com Blog, 21 of 175 came at 32 whatever was asked (2026-11-21).
+- `client` (`String`): A name for the app asking. It changed nothing in the answers that were looked at.
+
+Public documentation: `rest/v1.1/help`. It declares `client`, `filter`, `image_size`, `site`, `site_id`, which the library sends.
+
 ## Saved posts
 
 `wp_api/src/wp_com/endpoint/reader_saved_endpoint.rs`

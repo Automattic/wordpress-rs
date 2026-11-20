@@ -393,7 +393,7 @@ investigate the relevant code before making decisions based on this document.
 ## Suggestions
 
 - [ ] `GET /rest/v1/sites/$site/tags` — fetch site tags for suggestions
-- [ ] `GET /rest/v1/users/suggest` — fetch username suggestions
+- [x] `GET /rest/v1.1/users/suggest` — fetch username suggestions
 
 ## Timezones
 

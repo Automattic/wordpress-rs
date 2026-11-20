@@ -6,8 +6,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import uniffi.wp_api.ReaderLikesParams
 import uniffi.wp_api.ReaderLikesResponse
+import uniffi.wp_api.ReaderUserSuggestion
 import uniffi.wp_mobile.ReaderCommentsInfo
 import uniffi.wp_mobile.ReaderCommentsPageResult
+import uniffi.wp_mobile.ReaderException
 import uniffi.wp_mobile_cache.ReaderCommentRecord
 import uniffi.wp_mobile_cache.UpdateHook
 
@@ -42,6 +44,22 @@ private fun threaded(comments: List<ReaderCommentRecord>): List<ReaderCommentRow
     return rows
 }
 
+/**
+ * An `@` that ends the draft, at its start or after a space, and the letters typed after it: what
+ * to suggest people for. An email address's `@` isn't one.
+ */
+private val mentionAtEnd = Regex("(?:^|\\s)@([\\p{L}\\p{N}_.-]*)$")
+
+/** The letters typed after an `@` that ends the draft, or `null` when the draft doesn't end with one. */
+internal fun mentionPrefix(draft: String): String? = mentionAtEnd.find(draft)?.groupValues?.get(1)
+
+/** The draft with the person's login in place of what's typed after its last `@`. */
+internal fun withMention(draft: String, prefix: String, suggestion: ReaderUserSuggestion): String =
+    draft.dropLast(prefix.length) + suggestion.userLogin + " "
+
+/** How many people are offered at a time. */
+private const val MENTIONS_SHOWN = 5
+
 private fun ReaderCommentsPageResult.text(what: String): String =
     "$what: $commentCount comments, ${if (hasMore) "more to load" else "no more"}."
 
@@ -67,6 +85,44 @@ internal class ReaderCommentsState(
 
     var likes by mutableStateOf<ReaderCommentLikes?>(null)
         private set
+
+    /** The site's people to suggest after an `@`, once fetched. */
+    var mentionSuggestions by mutableStateOf<List<ReaderUserSuggestion>?>(null)
+        private set
+
+    /** Why the people to suggest couldn't be fetched. */
+    var mentionError by mutableStateOf<String?>(null)
+        private set
+
+    private var fetchingMentions = false
+
+    /** Fetches the site's people to suggest, the first time the draft ends with an `@`. */
+    fun loadMentionsIfNeeded() {
+        if (mentionSuggestions != null || mentionError != null || fetchingMentions) return
+        fetchingMentions = true
+        requests.launch {
+            try {
+                val response = io { collection.mentionSuggestions() }
+                mentionSuggestions = response.suggestions
+                if (response.unreadableSuggestions.isNotEmpty()) {
+                    requests.say("${response.unreadableSuggestions.size} suggestions couldn't be read.")
+                }
+            } catch (e: ReaderException) {
+                mentionError = readerErrorText(e)
+            } finally {
+                fetchingMentions = false
+            }
+        }
+    }
+
+    /**
+     * The people whose login or name starts with [prefix], in any case, as both WordPress apps
+     * match them. `null` until they're fetched.
+     */
+    fun mentionMatches(prefix: String): List<ReaderUserSuggestion>? = mentionSuggestions?.filter {
+        it.userLogin.startsWith(prefix, ignoreCase = true) ||
+            it.displayName?.plainText()?.startsWith(prefix, ignoreCase = true) == true
+    }?.take(MENTIONS_SHOWN)
 
     fun isRelevantUpdate(hook: UpdateHook): Boolean = collection.isRelevantUpdate(hook)
 

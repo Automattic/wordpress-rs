@@ -344,7 +344,11 @@ public typealias ReaderFeedSearchResult = WordPressAPIInternal.ReaderFeedSearchR
 // MARK: Reader Users
 public typealias ReaderUsersRequestExecutor = WordPressAPIInternal.ReaderUsersRequestExecutor
 public typealias ReaderUsersRequestProfileResponse = WordPressAPIInternal.ReaderUsersRequestProfileResponse
+public typealias ReaderUsersRequestSuggestionsResponse = WordPressAPIInternal.ReaderUsersRequestSuggestionsResponse
 public typealias ReaderUserProfile = WordPressAPIInternal.ReaderUserProfile
+public typealias ReaderUserSuggestionsParams = WordPressAPIInternal.ReaderUserSuggestionsParams
+public typealias ReaderUserSuggestionsResponse = WordPressAPIInternal.ReaderUserSuggestionsResponse
+public typealias ReaderUserSuggestion = WordPressAPIInternal.ReaderUserSuggestion
 public typealias ReaderUserPrimarySite = WordPressAPIInternal.ReaderUserPrimarySite
 public typealias WpComUserIdentifier = WordPressAPIInternal.WpComUserIdentifier
 

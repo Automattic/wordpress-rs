@@ -4,6 +4,9 @@
 //! `GET /me` returns as [`WPComUserInfo`](super::me::WPComUserInfo) with the user's email,
 //! language and sites, and the two share only an ID, a display name and an avatar.
 
+use crate::url_query::{
+    AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
+};
 use crate::wp_com::{
     WpComSiteId,
     me::WpComUserId,
@@ -14,6 +17,8 @@ use crate::wp_com::{
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use wp_derive::WpDeriveParamsField;
+use wp_serde_helper::LenientVec;
 
 /// Identifies a WordPress.com user, by login or by ID.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
@@ -147,6 +152,96 @@ pub struct ReaderUserPrimarySite {
     pub icon_url: Option<String>,
 }
 
+/// Query parameters for the people of a site to suggest when a reader types `@` in a comment.
+/// Name the site with `site_id` or `site`.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // It answers with every suggestion at once.
+pub struct ReaderUserSuggestionsParams {
+    /// The site whose people to suggest. The API answers 403 `invalid_query` with neither this
+    /// nor `site`, and 403 `unauthorized` for a site that isn't there.
+    #[uniffi(default = None)]
+    pub site_id: Option<WpComSiteId>,
+    /// The site by its domain, instead of `site_id`, which it overrides.
+    #[uniffi(default = None)]
+    pub site: Option<String>,
+    /// Only the people whose login or name matches it: on the WordPress.com Blog, `j` left 30 of
+    /// its 175 and `ja` left 4, not all of them starting with it. Without it, all of them. Both
+    /// WordPress apps fetch them all and filter as the reader types.
+    #[uniffi(default = None)]
+    pub filter: Option<String>,
+    /// The size of the avatars in [`ReaderUserSuggestion::image_url`], in pixels: 96 by default,
+    /// between 1 and 2048. Not every avatar comes at it: on the WordPress.com Blog, 21 of 175 came
+    /// at 32 whatever was asked (2026-11-21).
+    #[uniffi(default = None)]
+    pub image_size: Option<u32>,
+    /// A name for the app asking. It changed nothing in the answers that were looked at.
+    #[uniffi(default = None)]
+    pub client: Option<String>,
+}
+
+/// The people of a site to suggest when a reader types `@` in a comment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+#[serde(from = "RawReaderUserSuggestionsResponse")]
+pub struct ReaderUserSuggestionsResponse {
+    /// Ordered as the server sent them, without any in [`Self::unreadable_suggestions`].
+    pub suggestions: Vec<ReaderUserSuggestion>,
+    /// Why each suggestion that couldn't be read couldn't be. Almost always empty.
+    #[uniffi(default = [])]
+    pub unreadable_suggestions: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct RawReaderUserSuggestionsResponse {
+    #[serde(default)]
+    suggestions: Option<LenientVec<ReaderUserSuggestion>>,
+}
+
+impl From<RawReaderUserSuggestionsResponse> for ReaderUserSuggestionsResponse {
+    fn from(raw: RawReaderUserSuggestionsResponse) -> Self {
+        let suggestions = raw.suggestions.unwrap_or_default();
+        Self {
+            unreadable_suggestions: suggestions
+                .invalid
+                .into_iter()
+                .map(|suggestion| suggestion.error.to_string())
+                .collect(),
+            suggestions: suggestions.valid,
+        }
+    }
+}
+
+/// Someone to suggest when a reader types `@` in a comment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct ReaderUserSuggestion {
+    /// What goes after the `@`.
+    pub user_login: String,
+    #[serde(
+        rename = "ID",
+        default,
+        deserialize_with = "deserialize_optional_nonzero_id"
+    )]
+    #[uniffi(default = None)]
+    pub user_id: Option<WpComUserId>,
+    /// Can carry character references such as `&amp;`. Decode it with
+    /// `decode_html_entities` to show it as text.
+    #[serde(default, deserialize_with = "deserialize_optional_text")]
+    #[uniffi(default = None)]
+    pub display_name: Option<String>,
+    /// The person's avatar, at the size asked for with
+    /// [`ReaderUserSuggestionsParams::image_size`].
+    #[serde(
+        rename = "image_URL",
+        default,
+        deserialize_with = "deserialize_optional_text"
+    )]
+    #[uniffi(default = None)]
+    pub image_url: Option<String>,
+    /// Why the person is suggested. Every one seen was `site`: a user of the site.
+    #[serde(default)]
+    #[uniffi(default = [])]
+    pub source: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,6 +284,48 @@ mod tests {
     }
 
     /// What the API sends for a user with no site, no names and nothing about themselves.
+    #[test]
+    fn test_suggestions() {
+        let json = include_str!("../../tests/wpcom/reader_users/suggest.json");
+        let response: ReaderUserSuggestionsResponse =
+            serde_json::from_str(json).expect("the suggestions parse");
+
+        assert_eq!(response.suggestions.len(), 2);
+        assert!(response.unreadable_suggestions.is_empty());
+        let first = &response.suggestions[0];
+        assert_eq!(first.user_login, "exampleauthor");
+        assert_eq!(first.user_id, Some(WpComUserId(100000001)));
+        assert_eq!(first.display_name.as_deref(), Some("Example Author"));
+        assert!(first.image_url.as_deref().unwrap().contains("s=96"));
+        assert_eq!(first.source, ["site"]);
+        assert_eq!(
+            response.suggestions[1].display_name.as_deref(),
+            Some("Jane &amp; Co")
+        );
+    }
+
+    /// Signed out, and for a site with no one to suggest, the list is empty. One suggestion that
+    /// can't be read doesn't fail the others.
+    #[test]
+    fn test_no_suggestions_and_one_that_cant_be_read() {
+        let empty: ReaderUserSuggestionsResponse =
+            serde_json::from_value(json!({ "suggestions": [] })).expect("an empty list parses");
+        assert!(empty.suggestions.is_empty());
+
+        let mixed: ReaderUserSuggestionsResponse = serde_json::from_value(json!({
+            "suggestions": [
+                { "ID": "100000003", "user_login": "someone", "display_name": "" },
+                { "ID": 100000004, "display_name": "No login" },
+            ],
+        }))
+        .expect("the suggestions parse");
+        assert_eq!(mixed.suggestions.len(), 1);
+        assert_eq!(mixed.suggestions[0].user_id, Some(WpComUserId(100000003)));
+        assert_eq!(mixed.suggestions[0].display_name, None);
+        assert!(mixed.suggestions[0].source.is_empty());
+        assert_eq!(mixed.unreadable_suggestions.len(), 1);
+    }
+
     #[test]
     fn test_a_profile_without_a_site() {
         let profile: ReaderUserProfile = serde_json::from_value(json!({

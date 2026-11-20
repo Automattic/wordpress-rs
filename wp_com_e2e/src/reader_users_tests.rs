@@ -3,7 +3,7 @@ use std::sync::Arc;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_sites::ReaderSiteParams;
-use wp_api::wp_com::reader_users::WpComUserIdentifier;
+use wp_api::wp_com::reader_users::{ReaderUserSuggestionsParams, WpComUserIdentifier};
 use wp_api::wp_com::sites::WpComSiteIdentifier;
 
 use crate::context::TestContext;
@@ -110,6 +110,103 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         })
                         .await;
                     expect_error_code(signed_out, "authorization_required")
+                })
+            }
+        }),
+        Trial::test("reader_users::suggestions", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let suggest = |filter: Option<&str>, image_size| {
+                        let params = ReaderUserSuggestionsParams {
+                            site_id: Some(SITE),
+                            filter: filter.map(str::to_string),
+                            image_size,
+                            ..Default::default()
+                        };
+                        let ctx = &ctx;
+                        async move {
+                            ctx.client
+                                .reader_users()
+                                .suggestions(&params)
+                                .await
+                                .map_err(|e| e.to_string())
+                                .map(|response| response.data)
+                        }
+                    };
+                    // The account isn't a member of the site, and its people are suggested.
+                    let all = suggest(None, None).await?;
+                    if all.suggestions.len() < 10 || !all.unreadable_suggestions.is_empty() {
+                        return Err(format!(
+                            "The site should have many people to suggest, all readable: {} and {} unreadable",
+                            all.suggestions.len(),
+                            all.unreadable_suggestions.len()
+                        )
+                        .into());
+                    }
+                    if all.suggestions.iter().any(|suggestion| {
+                        suggestion.user_login.is_empty() || suggestion.image_url.is_none()
+                    }) {
+                        return Err("Each suggestion should have a login and an avatar".into());
+                    }
+
+                    // A filter narrows them, and the avatars come at the size asked for.
+                    let filtered = suggest(Some("j"), Some(40)).await?;
+                    if filtered.suggestions.is_empty()
+                        || filtered.suggestions.len() >= all.suggestions.len()
+                    {
+                        return Err("The filter should leave some of the people, not all".into());
+                    }
+                    // Most of the avatars come at the size asked for; a few come at 32 whatever
+                    // is asked.
+                    let sized = filtered
+                        .suggestions
+                        .iter()
+                        .filter(|suggestion| {
+                            suggestion
+                                .image_url
+                                .as_deref()
+                                .is_some_and(|url| url.contains("s=40"))
+                        })
+                        .count();
+                    if sized * 2 < filtered.suggestions.len() {
+                        return Err("Most avatars should be at the size asked for".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_users::suggestions_signed_out", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // Signed out the API answers, with no one.
+                    let signed_out = signed_out_client(&ctx)
+                        .reader_users()
+                        .suggestions(&ReaderUserSuggestionsParams {
+                            site_id: Some(SITE),
+                            ..Default::default()
+                        })
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .data;
+                    if !signed_out.suggestions.is_empty() {
+                        return Err("Signed out there should be no one to suggest".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_users::suggestions_without_a_site", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let missing = ctx
+                        .client
+                        .reader_users()
+                        .suggestions(&ReaderUserSuggestionsParams::default())
+                        .await;
+                    expect_error_code(missing, "invalid_query")
                 })
             }
         }),

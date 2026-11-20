@@ -70,6 +70,11 @@ final class ReaderCommentsViewModel {
     private var working = 0
 
     var draft = ""
+    /// The site's people to suggest after an `@`, once fetched.
+    private(set) var mentionSuggestions: [ReaderUserSuggestion]?
+    /// Why the people to suggest couldn't be fetched.
+    private(set) var mentionError: String?
+    @ObservationIgnored private var isFetchingMentions = false
     /// What went wrong loading the comments, shown in their status.
     var loadError: String?
     /// What went wrong with something the reader did, shown as an alert.
@@ -109,6 +114,54 @@ final class ReaderCommentsViewModel {
 
     func reply(to comment: ReaderCommentRecord?) {
         replyingTo = comment
+    }
+
+    /// The letters typed after an `@` that ends the draft, or `nil` when the draft doesn't end with one. The `@`
+    /// starts the draft or follows a space, so an email address isn't one.
+    var mentionPrefix: String? {
+        guard let at = draft.lastIndex(of: "@") else { return nil }
+        let typed = draft[draft.index(after: at)...]
+        let startsWord = at == draft.startIndex || draft[draft.index(before: at)].isWhitespace
+        let isName = typed.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" || $0 == "." }
+        return startsWord && isName ? String(typed) : nil
+    }
+
+    /// The people whose login or name starts with what's typed after the `@`, in any case, as both WordPress apps
+    /// match them. `nil` when the draft doesn't end with an `@` and letters.
+    var mentionMatches: [ReaderUserSuggestion]? {
+        guard let prefix = mentionPrefix, let suggestions = mentionSuggestions else { return nil }
+        let typed = prefix.lowercased()
+        return Array(
+            suggestions.filter { suggestion in
+                suggestion.userLogin.lowercased().hasPrefix(typed)
+                    || (suggestion.displayName?.decodingHTMLEntities().lowercased().hasPrefix(typed) ?? false)
+            }
+            .prefix(5)
+        )
+    }
+
+    /// Fetches the site's people to suggest the first time the draft ends with an `@`.
+    func draftChanged() async {
+        guard mentionPrefix != nil, mentionSuggestions == nil, mentionError == nil, !isFetchingMentions else {
+            return
+        }
+        isFetchingMentions = true
+        defer { isFetchingMentions = false }
+        do {
+            let response = try await collection.mentionSuggestions()
+            mentionSuggestions = response.suggestions
+            if !response.unreadableSuggestions.isEmpty {
+                notice = "\(readerCount(response.unreadableSuggestions.count, "suggestion")) couldn't be read."
+            }
+        } catch {
+            mentionError = readerErrorMessage(error)
+        }
+    }
+
+    /// Puts the person's login in place of what's typed after the `@`.
+    func insertMention(_ suggestion: ReaderUserSuggestion) {
+        guard let prefix = mentionPrefix else { return }
+        draft = String(draft.dropLast(prefix.count)) + suggestion.userLogin + " "
     }
 
     /// Sends what's in the field, as a comment on the post or a reply to the comment picked.
@@ -283,6 +336,33 @@ struct ReaderCommentsView: View {
             }
             TextField("Write a comment", text: $viewModel.draft, axis: .vertical)
                 .accessibilityIdentifier("comment-draft")
+                .task(id: viewModel.draft) { await viewModel.draftChanged() }
+            if viewModel.mentionPrefix != nil {
+                if let error = viewModel.mentionError {
+                    Text("No one to suggest: \(error)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if let matches = viewModel.mentionMatches {
+                    if matches.isEmpty {
+                        Text("No one on the site matches.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(matches, id: \.userLogin) { suggestion in
+                        Button {
+                            viewModel.insertMention(suggestion)
+                        } label: {
+                            Text("@\(suggestion.userLogin) · \(suggestion.displayName?.decodingHTMLEntities() ?? "")")
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityIdentifier("mention-\(suggestion.userLogin)")
+                    }
+                } else {
+                    Text("Finding people to suggest…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Button(viewModel.replyingTo == nil ? "Send comment" : "Send reply") {
                 Task { await viewModel.send() }
             }

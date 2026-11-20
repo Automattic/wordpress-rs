@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import uniffi.wp_api.ReaderUserSuggestion
 import uniffi.wp_mobile_cache.ListState
 import uniffi.wp_mobile_cache.ReaderCommentRecord
 import uniffi.wp_mobile_cache.ReaderCommentSendState
@@ -115,7 +116,10 @@ private fun ReaderCommentField(state: ReaderCommentsState) {
         ReaderControlsRow {
             OutlinedTextField(
                 value = text,
-                onValueChange = { text = it },
+                onValueChange = {
+                    text = it
+                    if (mentionPrefix(it) != null) state.loadMentionsIfNeeded()
+                },
                 label = {
                     Text(if (state.session.isSignedIn) "Write a comment" else "Write a comment (needs an account)")
                 },
@@ -129,6 +133,29 @@ private fun ReaderCommentField(state: ReaderCommentsState) {
                 },
                 enabled = text.isNotBlank()
             ) { Text("Send comment") }
+        }
+        mentionPrefix(text)?.let { prefix ->
+            ReaderMentions(state, prefix) { suggestion -> text = withMention(text, prefix, suggestion) }
+        }
+    }
+}
+
+/** The site's people whose login or name starts with what's typed after the `@`, to pick one. */
+@Composable
+private fun ReaderMentions(state: ReaderCommentsState, prefix: String, pick: (ReaderUserSuggestion) -> Unit) {
+    val error = state.mentionError
+    val matches = state.mentionMatches(prefix)
+    Column {
+        when {
+            error != null -> Text("No one to suggest: $error", style = MaterialTheme.typography.bodySmall)
+            matches == null -> Text("Finding people to suggest…", style = MaterialTheme.typography.bodySmall)
+            matches.isEmpty() -> Text("No one on the site matches.", style = MaterialTheme.typography.bodySmall)
+            else -> matches.forEach { suggestion ->
+                TextButton(
+                    onClick = { pick(suggestion) },
+                    modifier = Modifier.testTag("mention-${suggestion.userLogin}")
+                ) { Text("@${suggestion.userLogin} · ${suggestion.displayName?.plainText().orEmpty()}") }
+            }
         }
     }
 }

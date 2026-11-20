@@ -4295,6 +4295,61 @@ mod comments {
     }
 
     #[tokio::test]
+    async fn the_mention_suggestions_are_the_sites_people() {
+        let (service, executor) = service();
+        executor.push(Step::Respond(
+            200,
+            serde_json::from_str(include_str!(
+                "../../../../wp_api/tests/wpcom/reader_users/suggest.json"
+            ))
+            .unwrap(),
+        ));
+
+        let suggestions = service
+            .comments(SITE, POST)
+            .mention_suggestions()
+            .await
+            .unwrap();
+
+        let logins: Vec<&str> = suggestions
+            .suggestions
+            .iter()
+            .map(|suggestion| suggestion.user_login.as_str())
+            .collect();
+        assert_eq!(logins, ["exampleauthor", "janedoe"]);
+        assert_eq!(executor.sent().len(), 1);
+        assert_eq!(
+            executor.sent()[0].url,
+            "https://public-api.wordpress.com/rest/v1.1/users/suggest?site_id=123"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_mention_suggestions_need_an_account_and_a_failure_is_the_error() {
+        let (signed_out, signed_out_executor) = service_for(ReaderOwner::SignedOut);
+        assert!(matches!(
+            signed_out.comments(SITE, POST).mention_suggestions().await,
+            Err(ReaderError::NeedsAccount)
+        ));
+        assert!(signed_out_executor.sent().is_empty());
+
+        let (service, executor) = service();
+        executor.push(Step::Respond(
+            403,
+            json!({ "error": "unauthorized", "message": "User cannot access this restricted blog" }),
+        ));
+        assert!(matches!(
+            service.comments(SITE, POST).mention_suggestions().await,
+            Err(ReaderError::Api(_))
+        ));
+        executor.push(Step::Offline);
+        assert!(matches!(
+            service.comments(SITE, POST).mention_suggestions().await,
+            Err(ReaderError::Api(_))
+        ));
+    }
+
+    #[tokio::test]
     async fn a_posts_comments_are_fetched_newest_first_and_shown_oldest_first() {
         let (service, executor) = service_for(ReaderOwner::SignedOut);
         let comments = service.comments(SITE, POST);

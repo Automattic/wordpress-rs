@@ -24,6 +24,7 @@ use wp_api::wp_com::reader_comments::{
     ReaderComment, ReaderCommentStatus, ReaderCommentType, ReaderCommentsOrder,
     ReaderCommentsParams, ReaderNewCommentParams,
 };
+use wp_api::wp_com::reader_users::{ReaderUserSuggestionsParams, ReaderUserSuggestionsResponse};
 use wp_mobile_cache::list_metadata::ListState;
 use wp_mobile_cache::repository::reader::ReaderPostRepository;
 use wp_mobile_cache::repository::reader_comments::{
@@ -299,6 +300,33 @@ impl ReaderCommentsCollection {
                     _ => Ok::<_, SqliteDbError>(false),
                 }
             })?)
+    }
+
+    /// The people of the post's site to suggest when the reader types `@` in a comment: the
+    /// site's users, for any site, as both WordPress apps ask for them
+    /// (`GET rest/v1.1/users/suggest?site_id=`, iOS's `SuggestionService`, Android's
+    /// `SuggestionService.updateSuggestions`). Every one is fetched each time, and nothing is
+    /// kept: filter them as the reader types, by the start of `user_login` or of `display_name`,
+    /// in any case, which both apps do (iOS's `SuggestionsListViewModel`; Android's
+    /// `SuggestionAdapter` also matches the start of any word of the name).
+    ///
+    /// Needs an account: signed out, the server answers with no one, so it fails with
+    /// [`ReaderError::NeedsAccount`] and sends nothing.
+    pub async fn mention_suggestions(&self) -> Result<ReaderUserSuggestionsResponse, ReaderError> {
+        if self.context.owner == ReaderOwner::SignedOut {
+            return Err(ReaderError::NeedsAccount);
+        }
+        let params = ReaderUserSuggestionsParams {
+            site_id: Some(self.site_id),
+            ..Default::default()
+        };
+        Ok(self
+            .context
+            .client
+            .reader_users()
+            .suggestions(&params)
+            .await?
+            .data)
     }
 
     /// Whether a change to the cache is one the comments show, a user blocked or unblocked among
