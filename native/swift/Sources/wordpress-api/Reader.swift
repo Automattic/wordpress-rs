@@ -35,6 +35,13 @@ extension ReaderError {
     }
 }
 
+extension ReaderLinkNotInReader {
+    /// Why the link opens nothing in the Reader, in words, for an app to show.
+    public var message: String {
+        readerLinkNotInReaderMessage(reason: self)
+    }
+}
+
 extension ReaderSavedError {
     /// What the error says, in words, for an app to show.
     public var message: String {

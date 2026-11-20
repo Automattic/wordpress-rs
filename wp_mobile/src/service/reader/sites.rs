@@ -29,7 +29,7 @@ const SUBSCRIPTIONS_PAGE_SIZE: u32 = 100;
 /// going.
 const MAX_SUBSCRIPTION_PAGES: u32 = 50;
 
-fn site_record(site: &ReaderSite) -> ReaderSiteRecord {
+pub(crate) fn site_record(site: &ReaderSite) -> ReaderSiteRecord {
     ReaderSiteRecord {
         site_id: Some(site.site_id),
         feed_id: site.feed_id,
@@ -47,7 +47,7 @@ fn site_record(site: &ReaderSite) -> ReaderSiteRecord {
     }
 }
 
-fn feed_record(feed: &ReaderFeed) -> ReaderSiteRecord {
+pub(crate) fn feed_record(feed: &ReaderFeed) -> ReaderSiteRecord {
     ReaderSiteRecord {
         site_id: feed.site_id,
         feed_id: Some(feed.feed_id),
@@ -93,7 +93,10 @@ pub(crate) fn subscription_record(subscription: &ReaderSubscription) -> ReaderSu
 
 impl ReaderContext {
     /// Stores what was fetched of a site or feed, and returns it as the cache now has it.
-    fn store_site(&self, site: ReaderSiteRecord) -> Result<ReaderSiteRecord, SqliteDbError> {
+    pub(crate) fn store_site(
+        &self,
+        site: ReaderSiteRecord,
+    ) -> Result<ReaderSiteRecord, SqliteDbError> {
         let now = self.now();
         self.cache.execute(|connection| {
             let transaction = connection.transaction()?;

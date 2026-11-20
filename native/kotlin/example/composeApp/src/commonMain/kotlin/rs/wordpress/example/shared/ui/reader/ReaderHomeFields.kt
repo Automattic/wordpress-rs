@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.intl.Locale
 import uniffi.wp_api.ReaderSearchSort
@@ -120,13 +121,17 @@ private fun ReaderPostAddressField(state: ReaderHomeState, open: (ReaderDestinat
         OutlinedTextField(
             value = url,
             onValueChange = { url = it },
-            label = { Text("Post address") },
+            label = { Text("Address of a post, site or feed") },
             singleLine = true,
             modifier = Modifier.weight(1f)
         )
-        Button(onClick = { state.openPostAtUrl(url.trim(), open) }, enabled = url.isNotBlank()) {
+        Button(onClick = { state.openLink(url.trim(), open) }, enabled = url.isNotBlank()) {
             Text("Open address")
         }
+    }
+    Text("A post's address needs an account. A site's or a feed's doesn't.")
+    state.linkAnswer?.let { answer ->
+        Text(answer, modifier = Modifier.testTag("reader_link_answer"))
     }
 }
 

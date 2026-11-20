@@ -1727,26 +1727,6 @@ mod posts {
     }
 
     #[tokio::test]
-    async fn an_address_is_resolved_to_a_post_for_an_account_only() {
-        let (signed_out, executor) = service_for(ReaderOwner::SignedOut);
-        let url = "https://example.wordpress.com/2026/11/18/hello-world/".to_string();
-        assert!(matches!(
-            signed_out.fetch_post_at_url(url.clone()).await,
-            Err(ReaderError::NeedsAccount)
-        ));
-        assert!(executor.sent().is_empty());
-
-        let (service, executor) = service();
-        executor.push(Step::Respond(200, json!({ "site_id": 123, "post_id": 7 })));
-        executor.push(Step::Respond(200, post_json(7, 10)));
-
-        let post = service.fetch_post_at_url(url).await.unwrap();
-
-        assert_eq!(post.identity.id, 7);
-        assert!(paths(&executor)[0].starts_with("/wpcom/v2/mobile/resolve-reader-url?url=https"));
-    }
-
-    #[tokio::test]
     async fn related_posts_are_a_stream_of_one_page() {
         let (service, executor) = service_for(ReaderOwner::SignedOut);
         let stream = service.stream(ReaderStream::Related {
@@ -1882,6 +1862,304 @@ mod posts {
 
         assert_eq!(shown(&stream).await, ["3", "2", "1"]);
         assert_eq!(stream.info().unwrap().unreadable_post_count, 0);
+    }
+}
+
+mod links {
+    use super::*;
+
+    const POST_URL: &str = "https://example.wordpress.com/2026/11/18/hello-world/";
+
+    fn paths(executor: &ScriptedExecutor) -> Vec<String> {
+        executor
+            .sent()
+            .iter()
+            .map(|sent| {
+                sent.url
+                    .trim_start_matches("https://public-api.wordpress.com")
+                    .to_string()
+            })
+            .collect()
+    }
+
+    fn error(status: u32, code: &str) -> Step {
+        Step::Respond(status, json!({ "error": code, "message": "" }))
+    }
+
+    /// The server's answer to a post address on a site that isn't on WordPress.com or Jetpack.
+    fn server_error() -> Step {
+        Step::Respond(500, json!(null))
+    }
+
+    fn site(id: u64) -> Step {
+        Step::Respond(
+            200,
+            json!({ "ID": id, "name": "A site", "URL": "https://example.com", "feed_ID": 456 }),
+        )
+    }
+
+    /// The feeds found at an address: one of site `site`, or of no site.
+    fn feeds(feed_id: u64, site: Option<u64>) -> Step {
+        let mut feed = json!({ "feed_ID": feed_id, "name": "A feed", "URL": "https://example.com", "feed_URL": "https://example.com/feed/" });
+        if let Some(site) = site {
+            feed["blog_ID"] = json!(site);
+        }
+        Step::Respond(
+            200,
+            json!({ "feeds": [{ "subscribe_URL": "https://example.com/feed/", "feed_ID": feed_id.to_string(), "meta": { "data": { "feed": feed } } }] }),
+        )
+    }
+
+    fn not_in_reader(reason: ReaderLinkNotInReader) -> ReaderLink {
+        ReaderLink::NotInReader { reason }
+    }
+
+    #[tokio::test]
+    async fn a_post_link_resolves_to_the_post_for_an_account() {
+        let (service, executor) = service();
+        executor.push(Step::Respond(200, json!({ "site_id": 123, "post_id": 7 })));
+        executor.push(Step::Respond(200, post_json(7, 10)));
+
+        let link = service.resolve_link(POST_URL.to_string()).await.unwrap();
+
+        let ReaderLink::Post { post } = link else {
+            panic!("{link:?}")
+        };
+        assert_eq!(post.identity.id, 7);
+        assert!(service.cached_post(key(7)).unwrap().is_some());
+        assert_eq!(
+            paths(&executor),
+            [
+                "/wpcom/v2/mobile/resolve-reader-url?url=https%3A%2F%2Fexample.wordpress.com%2F2026%2F11%2F18%2Fhello-world%2F",
+                "/rest/v1.2/read/sites/123/posts/7?meta=site%2Cfeed",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_post_link_needs_an_account_and_sends_nothing_signed_out() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        assert!(matches!(
+            service.resolve_link(POST_URL.to_string()).await,
+            Err(ReaderError::NeedsAccount)
+        ));
+        assert!(executor.sent().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_sites_home_address_opens_the_site_signed_out_too() {
+        for owner in [ACCOUNT, ReaderOwner::SignedOut] {
+            let (service, executor) = service_for(owner);
+            executor.push(site(123));
+
+            // Typed without a scheme, and with no slash.
+            let link = service
+                .resolve_link("example.wordpress.com".to_string())
+                .await
+                .unwrap();
+
+            let ReaderLink::Site { site_id, site } = link else {
+                panic!("{link:?}")
+            };
+            assert_eq!(site_id, WpComSiteId(123));
+            assert_eq!(site.name.as_deref(), Some("A site"));
+            assert_eq!(
+                service
+                    .cached_site(Some(WpComSiteId(123)), None)
+                    .unwrap()
+                    .and_then(|site| site.name),
+                Some("A site".to_string())
+            );
+            assert_eq!(
+                paths(&executor),
+                ["/rest/v1.2/read/sites/example.wordpress.com?"]
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_home_address_of_a_site_that_is_only_a_feed_opens_the_feed() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(error(404, "unknown_blog"));
+        executor.push(feeds(456, None));
+
+        let link = service
+            .resolve_link("https://example.com/".to_string())
+            .await
+            .unwrap();
+
+        let ReaderLink::Feed { feed_id, site } = link else {
+            panic!("{link:?}")
+        };
+        assert_eq!(feed_id, ReaderFeedId(456));
+        assert_eq!(site.name.as_deref(), Some("A feed"));
+        assert_eq!(
+            paths(&executor),
+            [
+                "/rest/v1.2/read/sites/example.com?",
+                "/rest/v1.1/read/feed?url=https%3A%2F%2Fexample.com%2F&meta=feed",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_home_address_with_no_site_or_feed_says_so() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(error(404, "unknown_blog"));
+        executor.push(error(404, "no_such_feed"));
+
+        let link = service
+            .resolve_link("https://example.com".to_string())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            link,
+            not_in_reader(ReaderLinkNotInReader::NotWordPressOrFeed)
+        );
+        assert_eq!(executor.sent().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn an_address_on_a_site_with_no_post_or_feed_there_says_so() {
+        let (service, executor) = service();
+        executor.push(error(404, "post_not_found"));
+        executor.push(error(404, "no_such_feed"));
+
+        let link = service.resolve_link(POST_URL.to_string()).await.unwrap();
+
+        assert_eq!(link, not_in_reader(ReaderLinkNotInReader::NothingThere));
+        assert!(paths(&executor)[1].starts_with("/rest/v1.1/read/feed?url=https"));
+    }
+
+    #[tokio::test]
+    async fn a_sites_address_with_a_path_opens_the_site_of_its_feed() {
+        let (service, executor) = service();
+        executor.push(error(404, "post_not_found"));
+        executor.push(feeds(456, Some(123)));
+
+        let link = service
+            .resolve_link("https://wordpress.com/blog/".to_string())
+            .await
+            .unwrap();
+
+        let ReaderLink::Site { site_id, .. } = link else {
+            panic!("{link:?}")
+        };
+        assert_eq!(site_id, WpComSiteId(123));
+    }
+
+    #[tokio::test]
+    async fn an_address_on_another_site_is_its_feed_or_nothing() {
+        let (service, executor) = service();
+        // The server fails on it, and no WordPress.com or Jetpack site has the domain.
+        executor.push(server_error());
+        executor.push(error(404, "unknown_blog"));
+        executor.push(error(404, "no_such_feed"));
+        let link = service
+            .resolve_link("https://example.com/learn".to_string())
+            .await
+            .unwrap();
+        assert_eq!(
+            link,
+            not_in_reader(ReaderLinkNotInReader::NotWordPressOrFeed)
+        );
+        assert_eq!(
+            paths(&executor)[1..],
+            [
+                "/rest/v1.2/read/sites/example.com?",
+                "/rest/v1.1/read/feed?url=https%3A%2F%2Fexample.com%2Flearn&meta=feed",
+            ]
+        );
+
+        // A post of a site with a feed opens the feed.
+        executor.push(server_error());
+        executor.push(error(404, "unknown_blog"));
+        executor.push(feeds(456, None));
+        let link = service
+            .resolve_link("https://example.com/2026/11/18/a-post/".to_string())
+            .await
+            .unwrap();
+        assert!(
+            matches!(
+                link,
+                ReaderLink::Feed {
+                    feed_id: ReaderFeedId(456),
+                    ..
+                }
+            ),
+            "{link:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_servers_failure_on_a_sites_address_is_the_error() {
+        let (service, executor) = service();
+        executor.push(server_error());
+        executor.push(site(123));
+
+        let result = service.resolve_link(POST_URL.to_string()).await;
+
+        assert!(
+            matches!(&result, Err(ReaderError::Api(error)) if error.status_code() == Some(500)),
+            "{result:?}"
+        );
+        // Nothing more was asked once the domain turned out to be a site's.
+        assert_eq!(executor.sent().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_refusal_is_the_error() {
+        let (service, executor) = service();
+        executor.push(error(403, "unauthorized"));
+        assert!(matches!(
+            service
+                .resolve_link("https://private.example.com/".to_string())
+                .await,
+            Err(ReaderError::Api(_))
+        ));
+
+        executor.push(Step::Respond(
+            401,
+            json!({ "code": "rest_forbidden", "message": "Sorry, you are not allowed to do that.", "data": { "status": 401 } }),
+        ));
+        assert!(matches!(
+            service.resolve_link(POST_URL.to_string()).await,
+            Err(ReaderError::Api(_))
+        ));
+        executor.push(Step::Offline);
+        assert!(matches!(
+            service.resolve_link(POST_URL.to_string()).await,
+            Err(ReaderError::Api(_))
+        ));
+        assert_eq!(executor.sent().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn a_short_link_and_what_is_not_an_address_send_nothing() {
+        let (service, executor) = service();
+        for (link, reason) in [
+            ("https://wp.me/pf2B5-oJs", ReaderLinkNotInReader::ShortLink),
+            ("WP.ME/pf2B5-oJs", ReaderLinkNotInReader::ShortLink),
+            ("not a link", ReaderLinkNotInReader::NotAnAddress),
+            ("", ReaderLinkNotInReader::NotAnAddress),
+            (
+                "mailto:someone@example.com",
+                ReaderLinkNotInReader::NotAnAddress,
+            ),
+            (
+                "ftp://example.com/file",
+                ReaderLinkNotInReader::NotAnAddress,
+            ),
+        ] {
+            assert_eq!(
+                service.resolve_link(link.to_string()).await.unwrap(),
+                not_in_reader(reason),
+                "{link}"
+            );
+        }
+        assert!(executor.sent().is_empty());
+        assert!(!reader_link_not_in_reader_message(ReaderLinkNotInReader::ShortLink).is_empty());
     }
 }
 

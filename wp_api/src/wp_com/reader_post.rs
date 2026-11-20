@@ -329,8 +329,11 @@ impl AppendUrlQueryPairs for ReaderResolveUrlParams {
 /// The post an address resolved to. Fetch it with these IDs.
 ///
 /// The API resolves a post of a WordPress.com or Jetpack site, including one on a private site
-/// the user can read. It has no answer for anything else: the address of a tag, a feed, a Reader
-/// screen or a post somewhere else is a `post_not_found` error.
+/// the user can read. It has no answer for anything else. Any other address on a WordPress.com or
+/// Jetpack site, such as a tag's, a feed's, a Reader screen's, a short link or a page that isn't
+/// there, is a 404 `post_not_found` error. An address on a site that isn't on WordPress.com or
+/// Jetpack is a 500 with no body. Signed out, every address with a path is a 401
+/// `rest_forbidden`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ReaderResolvedUrl {
     #[serde(deserialize_with = "deserialize_u64_or_string_as_t")]

@@ -21,6 +21,7 @@ use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 mod actions;
 mod collection;
 mod comments;
+mod links;
 mod page_views;
 mod posts;
 mod sites;
@@ -33,6 +34,7 @@ pub use collection::{
     ReaderStreamPageResult,
 };
 pub use comments::{ReaderCommentsCollection, ReaderCommentsInfo, ReaderCommentsPageResult};
+pub use links::{ReaderLink, ReaderLinkNotInReader, reader_link_not_in_reader_message};
 pub use page_views::ReaderPageViewOutcome;
 pub use stream::reader_stream_for_menu_item;
 pub use stream::{

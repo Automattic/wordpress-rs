@@ -49,6 +49,8 @@ final class ReaderHomeViewModel {
     var siteID = ""
     var feedID = ""
     var postURL = ""
+    /// Why the last link opened nothing, in words.
+    private(set) var linkAnswer: String?
     var postSite = ""
     var postSlug = ""
 
@@ -142,13 +144,24 @@ final class ReaderHomeViewModel {
         }
     }
 
-    /// Fetches the post at `postURL`, and returns the screen that shows it.
-    func openPostAtURL() async -> ReaderRoute? {
+    /// Finds what the link in `postURL` opens, and returns the screen that shows it: a post, or a site's or a
+    /// feed's stream. A link the Reader can't show sets `linkAnswer` to why, and returns `nil`.
+    func openLink() async -> ReaderRoute? {
         let url = postURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !url.isEmpty else { return nil }
+        linkAnswer = nil
         var route: ReaderRoute?
         await run {
-            route = .post(try await self.service.fetchPostAtUrl(url: url))
+            switch try await self.service.resolveLink(url: url) {
+            case .post(let post):
+                route = .post(post)
+            case .site(let siteId, _):
+                route = .stream(.site(siteId: siteId))
+            case .feed(let feedId, _):
+                route = .stream(.feed(feedId: feedId))
+            case .notInReader(let reason):
+                self.linkAnswer = reason.message
+            }
         }
         return route
     }

@@ -239,13 +239,13 @@ struct ReaderHomeView: View {
     private var postSection: some View {
         Section("Open a post") {
             HStack {
-                TextField("Post address (needs an account)", text: $viewModel.postURL)
+                TextField("Address of a post, site or feed", text: $viewModel.postURL)
                     .autocorrectionDisabled()
                     .readerPlainInput()
                     .accessibilityIdentifier("post-url")
                 Button("Open") {
                     Task {
-                        if let route = await viewModel.openPostAtURL() {
+                        if let route = await viewModel.openLink() {
                             path.append(route)
                         }
                     }
@@ -253,6 +253,13 @@ struct ReaderHomeView: View {
                 .buttonStyle(.borderless)
                 .disabled(viewModel.postURL.isEmpty || viewModel.isWorking)
                 .accessibilityIdentifier("open-post-at-url")
+            }
+            Text("A post's address needs an account. A site's or a feed's doesn't.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let answer = viewModel.linkAnswer {
+                Text(answer)
+                    .accessibilityIdentifier("link-answer")
             }
             TextField("Site ID or domain", text: $viewModel.postSite)
                 .autocorrectionDisabled()

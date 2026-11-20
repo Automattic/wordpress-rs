@@ -15,8 +15,10 @@ import uniffi.wp_api.ReaderMenuItem
 import uniffi.wp_api.ReaderMenuItemKind
 import uniffi.wp_api.WpComSiteIdentifier
 import uniffi.wp_mobile.ReaderCachedMenu
+import uniffi.wp_mobile.ReaderLink
 import uniffi.wp_mobile.ReaderSavedException
 import uniffi.wp_mobile.ReaderStream
+import uniffi.wp_mobile.readerLinkNotInReaderMessage
 import uniffi.wp_mobile.readerStreamForMenuItem
 import uniffi.wp_mobile_cache.DbTable
 
@@ -106,11 +108,26 @@ internal class ReaderHomeState(val session: ReaderSession, val requests: ReaderR
         "Removed what nothing shows any more."
     }
 
-    /** Fetches a post by its address and opens it. Needs an account. */
-    fun openPostAtUrl(url: String, open: (ReaderDestination) -> Unit) =
-        requests.load({ service.fetchPostAtUrl(url) }) { post ->
-            open(ReaderDestination.Post(post.key, post.identity))
+    /** Why the last link opened nothing, in words. */
+    var linkAnswer by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * Finds what a link opens and opens it: a post, or a site's or a feed's stream. A link the
+     * Reader can't show sets [linkAnswer] to why. A post's address needs an account.
+     */
+    fun openLink(url: String, open: (ReaderDestination) -> Unit) {
+        linkAnswer = null
+        val openStream = { stream: ReaderStream -> open(ReaderDestination.Stream(stream, stream.title())) }
+        requests.load({ service.resolveLink(url) }) { link ->
+            when (link) {
+                is ReaderLink.Post -> open(ReaderDestination.Post(link.post.key, link.post.identity))
+                is ReaderLink.Site -> openStream(ReaderStream.Site(link.siteId))
+                is ReaderLink.Feed -> openStream(ReaderStream.Feed(link.feedId))
+                is ReaderLink.NotInReader -> linkAnswer = readerLinkNotInReaderMessage(link.reason)
+            }
         }
+    }
 
     /** Fetches a site's post by its slug and opens it. `site` is the site's ID or its domain. */
     fun openPostBySlug(site: String, slug: String, open: (ReaderDestination) -> Unit) {

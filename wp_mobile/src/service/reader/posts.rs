@@ -5,9 +5,7 @@ use wp_api::comments::CommentId;
 use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::reader_likes::{ReaderLikesParams, ReaderLikesResponse};
-use wp_api::wp_com::reader_post::{
-    ReaderPostBySlugParams, ReaderPostParams, ReaderPostSlug, ReaderResolveUrlParams,
-};
+use wp_api::wp_com::reader_post::{ReaderPostBySlugParams, ReaderPostParams, ReaderPostSlug};
 use wp_api::wp_com::reader_posts::ReaderPost;
 use wp_api::wp_com::reader_saved::{ReaderFeedItemId, ReaderPostSaveIdentity};
 use wp_api::wp_com::sites::WpComSiteIdentifier;
@@ -119,31 +117,6 @@ impl ReaderService {
             feed_item_id: None,
             is_external: false,
             url: found.url,
-        })
-        .await
-    }
-
-    /// Fetches the post at an address, such as a link the reader tapped, stores it in the cache,
-    /// and returns it with its content. Needs an account: the API doesn't resolve an address
-    /// signed out.
-    pub async fn fetch_post_at_url(&self, url: String) -> Result<ReaderPostRecord, ReaderError> {
-        if self.context.owner == ReaderOwner::SignedOut {
-            return Err(ReaderError::NeedsAccount);
-        }
-        let resolved = self
-            .context
-            .client
-            .reader_post()
-            .resolve_url(&ReaderResolveUrlParams { url: url.clone() })
-            .await?
-            .data;
-        self.fetch_post(ReaderPostSaveIdentity {
-            id: resolved.post_id.0 as u64,
-            site_id: Some(resolved.site_id),
-            feed_id: None,
-            feed_item_id: None,
-            is_external: false,
-            url: Some(url),
         })
         .await
     }
