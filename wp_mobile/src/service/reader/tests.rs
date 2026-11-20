@@ -5231,6 +5231,221 @@ mod more_actions {
         assert!(followed(&service).is_empty());
     }
 
+    fn knitting() -> ReaderTagSlug {
+        ReaderTagSlug("knitting".to_string())
+    }
+
+    /// A followed tag as the answer to following or unfollowing one lists it.
+    fn knitting_json() -> Value {
+        json!({ "ID": "1336", "slug": "knitting", "title": "knitting", "display_name": "knitting" })
+    }
+
+    fn followed_slugs(service: &ReaderService) -> Vec<Option<String>> {
+        service
+            .followed_tags()
+            .unwrap()
+            .into_iter()
+            .map(|tag| tag.slug)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_tag_follow_waits_for_a_menu_read_on_its_way() {
+        let (service, executor) = service();
+        // The server's menu, read before the follow, doesn't have the tag.
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({ "default": {}, "subscribed": [], "recommended": {} }),
+        ));
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [knitting_json()], "added_tags": [1336] }),
+        ));
+
+        let (refreshed, (followed, sent_while_reading)) =
+            futures::join!(service.refresh_menu(), async {
+                futures::join!(service.set_tag_followed(knitting(), None, true), async {
+                    // Gives the follow every chance to be sent before the menu arrives.
+                    for _ in 0..20 {
+                        tokio::task::yield_now().await;
+                    }
+                    let sent = executor.sent().len();
+                    release.send(()).unwrap();
+                    sent
+                })
+            });
+
+        refreshed.unwrap();
+        assert_eq!(followed.unwrap(), ReaderActionOutcome::Synced);
+        // The follow isn't sent while the menu is being read, and the menu read before it
+        // doesn't unfollow the tag here.
+        assert_eq!(sent_while_reading, 1);
+        let paths: Vec<_> = sent_after(&executor, 0)
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect();
+        assert!(paths[0].starts_with("/rest/v1.3/read/menu"), "{paths:?}");
+        assert_eq!(paths[1], "/rest/v1.2/read/tags/mine/new");
+        assert_eq!(followed_slugs(&service), [Some("knitting".to_string())]);
+    }
+
+    #[tokio::test]
+    async fn a_tag_follow_whose_answer_lists_the_tag_is_synced() {
+        let (service, executor) = service();
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [knitting_json()], "added_tags": [1336] }),
+        ));
+
+        let outcome = service.set_tag_followed(knitting(), None, true).await;
+
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(followed_slugs(&service), [Some("knitting".to_string())]);
+    }
+
+    #[tokio::test]
+    async fn a_tag_follow_whose_answer_leaves_the_tag_out_is_refused_and_shown_unfollowed() {
+        let (service, executor) = service();
+        // Seen live: the server answered that it added the tag, and listed the account's tags
+        // without it.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [], "added_tags": [1336] }),
+        ));
+
+        let outcome = service.set_tag_followed(knitting(), None, true).await;
+
+        assert!(
+            matches!(outcome, Err(ReaderError::Refused { ref reason }) if reason.contains("don't include it")),
+            "{outcome:?}"
+        );
+        assert!(service.followed_tags().unwrap().is_empty());
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_tag_follow_whose_answer_has_an_unreadable_tag_is_synced() {
+        let (service, executor) = service();
+        // The tag that couldn't be read may be the added one.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [{ "ID": "1336" }], "added_tags": [1336] }),
+        ));
+
+        let outcome = service.set_tag_followed(knitting(), None, true).await;
+
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(followed_slugs(&service), [Some("knitting".to_string())]);
+    }
+
+    #[tokio::test]
+    async fn a_tag_follow_whose_answer_has_a_tag_with_no_readable_id_is_synced() {
+        let (service, executor) = service();
+        // Neither the tag nor its ID could be read, so it may be the added one.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [{ "title": "knitting" }], "added_tags": [1336] }),
+        ));
+
+        let outcome = service.set_tag_followed(knitting(), None, true).await;
+
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(followed_slugs(&service), [Some("knitting".to_string())]);
+    }
+
+    #[tokio::test]
+    async fn a_tag_follow_whose_answer_has_another_unreadable_tag_is_refused() {
+        let (service, executor) = service();
+        // The tag that couldn't be read has another ID, so it isn't the added one.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [{ "ID": "9003" }], "added_tags": [1336] }),
+        ));
+
+        let outcome = service.set_tag_followed(knitting(), None, true).await;
+
+        assert!(
+            matches!(outcome, Err(ReaderError::Refused { ref reason }) if reason.contains("don't include it")),
+            "{outcome:?}"
+        );
+        assert!(service.followed_tags().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_frequency_of_emails_waits_for_a_tag_follow_on_its_way() {
+        let (service, executor, _) = reading().await;
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({ "subscribed": true, "tags": [knitting_json()], "added_tags": [1336] }),
+        ));
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "subscribed": true }),
+        ));
+
+        let (followed, changed, sent_while_following) = futures::join!(
+            service.set_tag_followed(knitting(), None, true),
+            service.set_post_email_frequency(SITE, ReaderSubscriptionEmailFrequency::Weekly),
+            async {
+                // Gives the change of frequency every chance to be sent before the follow is
+                // answered.
+                for _ in 0..20 {
+                    tokio::task::yield_now().await;
+                }
+                let sent = executor.sent().len();
+                release.send(()).unwrap();
+                sent
+            }
+        );
+
+        assert_eq!(followed.unwrap(), ReaderActionOutcome::Synced);
+        changed.unwrap();
+        // The stream's refresh and the follow.
+        assert_eq!(sent_while_following, 2);
+        let paths: Vec<_> = sent_after(&executor, 1)
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect();
+        assert_eq!(
+            paths,
+            [
+                "/rest/v1.2/read/tags/mine/new",
+                "/rest/v1.2/read/site/123/post_email_subscriptions/update",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_tag_unfollow_whose_answer_still_lists_the_tag_is_refused_and_shown_followed() {
+        let (service, executor) = service();
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [knitting_json()], "added_tags": [1336] }),
+        ));
+        service
+            .set_tag_followed(knitting(), None, true)
+            .await
+            .unwrap();
+        // Seen live: the server answered that it removed the tag, and listed it still.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": false, "tags": [knitting_json()], "removed_tag": "1336" }),
+        ));
+
+        let outcome = service.set_tag_followed(knitting(), None, false).await;
+
+        assert!(
+            matches!(outcome, Err(ReaderError::Refused { ref reason }) if reason.contains("still include it")),
+            "{outcome:?}"
+        );
+        assert_eq!(followed_slugs(&service), [Some("knitting".to_string())]);
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
     #[tokio::test]
     async fn signed_out_tags_are_followed_on_the_device_and_an_account_takes_them_over() {
         let cache = cache();
@@ -5503,6 +5718,45 @@ mod comment_writing {
                 "/rest/v1.1/sites/123/posts/7/replies/new".to_string(),
                 json!({ "content": "Nice post!" })
             )
+        );
+    }
+
+    #[tokio::test]
+    async fn a_comment_waits_for_a_tag_follow_on_its_way() {
+        let (service, executor, comments) = with_comments().await;
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({
+                "subscribed": true,
+                "tags": [{ "ID": "1336", "slug": "knitting", "title": "knitting" }],
+                "added_tags": [1336],
+            }),
+        ));
+        executor.push(Step::Respond(200, comment_json(2, 23, None)));
+
+        let (followed, posted, sent_while_following) = futures::join!(
+            service.set_tag_followed(ReaderTagSlug("knitting".to_string()), None, true),
+            comments.post_comment("Nice post!".to_string(), None),
+            async {
+                // Gives the comment every chance to be sent before the follow is answered.
+                for _ in 0..20 {
+                    tokio::task::yield_now().await;
+                }
+                let sent = executor.sent().len();
+                release.send(()).unwrap();
+                sent
+            }
+        );
+
+        assert_eq!(followed.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(posted.unwrap().comment_id, Some(CommentId(2)));
+        // The comments' refresh and the follow.
+        assert_eq!(sent_while_following, 2);
+        assert_eq!(
+            body_and_path(&executor).0,
+            "/rest/v1.1/sites/123/posts/7/replies/new"
         );
     }
 

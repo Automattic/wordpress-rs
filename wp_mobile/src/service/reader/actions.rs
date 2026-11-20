@@ -40,7 +40,9 @@ use wp_api::wp_com::reader_subscriptions::{
     ReaderFollowUrlParams, ReaderPostEmailSubscriptionParams, ReaderSubscriptionEmailFrequency,
     ReaderUnfollowUrlParams,
 };
-use wp_api::wp_com::reader_tags::ReaderFollowTagsParams;
+use wp_api::wp_com::reader_tags::{
+    ReaderFollowTagsParams, ReaderTag, ReaderTagId, ReaderUnreadableTag,
+};
 use wp_api::wp_com::sites::WpComSiteIdentifier;
 use wp_mobile_cache::db_types::reader::reader_saved_key_text;
 use wp_mobile_cache::repository::QueryExecutor;
@@ -143,9 +145,21 @@ struct Confirmation {
     email_frequency: Option<ReaderSubscriptionEmailFrequency>,
     /// A post's comment subscription as the server answered a change to it.
     comment_subscription: Option<CommentSubscription>,
+    /// Whether the tags the server answered a follow or unfollow with have the tag, when that
+    /// isn't what was asked.
+    tag_listed: Option<bool>,
     /// Why the server's answer, though a success, says it didn't do what was asked. The cache
     /// then shows what the server answered, and the tap is refused with this reason.
     contradicted: Option<String>,
+}
+
+impl Confirmation {
+    /// Whether the server's answer shows `action` on, when the answer says.
+    fn shows(&self, action: &Action) -> Option<bool> {
+        self.comment_subscription
+            .map(|answer| answer.shows(action))
+            .or(self.tag_listed)
+    }
 }
 
 /// A post's comment subscription, as the server answers a change to it.
@@ -601,6 +615,14 @@ impl Action {
                     show_pending(executor, owner)?;
                 }
             }
+            // The tag shows as the server's answer lists it, when that isn't what was asked. A
+            // newer tap that's still waiting to be sent is shown over it.
+            Self::FollowTag { slug, title } => {
+                if let Some(listed) = confirmation.tag_listed {
+                    super::tags::show_tag_followed(executor, owner, slug, title.clone(), listed)?;
+                    show_pending(executor, owner)?;
+                }
+            }
             Self::Follow { .. } => {
                 if let (true, Some(subscription)) = (on, &confirmation.subscription) {
                     ReaderSubscriptionRepository::add_first(executor, owner, subscription)?;
@@ -762,20 +784,55 @@ impl Action {
                     }
                 }
             }
+            // Each answers with every tag the user follows. The server can answer 200 to a change
+            // it doesn't keep (see `ReaderService::set_tag_followed`), and its list then most
+            // often says so: a follow's added tag isn't in it, or an unfollowed tag still is.
             Self::FollowTag { slug, .. } => {
                 let tags = context.client.reader_tags();
                 if on {
-                    tags.follow_tags(&ReaderFollowTagsParams {
-                        tags: vec![slug.clone()],
-                    })
-                    .await?;
+                    let answer = tags
+                        .follow_tags(&ReaderFollowTagsParams {
+                            tags: vec![slug.clone()],
+                        })
+                        .await?
+                        .data;
+                    // `added_tags` is empty when the tag was followed already, which says nothing
+                    // about this follow.
+                    if !answer.added_tags.is_empty()
+                        && answer.added_tags.iter().all(|id| {
+                            tag_listed(&answer.tags, &answer.unreadable_tags, *id, slug)
+                                == Some(false)
+                        })
+                    {
+                        confirmation.tag_listed = Some(false);
+                        confirmation.contradicted = Some(
+                            "The server answered that it followed the tag, but the tags it \
+                             says you follow don't include it."
+                                .to_string(),
+                        );
+                    }
                 } else {
-                    // Unfollowing a tag that isn't followed is refused, and leaves it unfollowed.
                     match tags.unfollow_tag(slug).await {
+                        Ok(answer) => {
+                            let answer = answer.data;
+                            if let Some(id) = answer.removed_tag
+                                && tag_listed(&answer.tags, &answer.unreadable_tags, id, slug)
+                                    == Some(true)
+                            {
+                                confirmation.tag_listed = Some(true);
+                                confirmation.contradicted = Some(
+                                    "The server answered that it unfollowed the tag, but the \
+                                     tags it says you follow still include it."
+                                        .to_string(),
+                                );
+                            }
+                        }
+                        // Unfollowing a tag that isn't followed is refused, and leaves it
+                        // unfollowed.
                         Err(error) if !says_already(&error, &["not_subscribed"]) => {
                             return Err(error.into());
                         }
-                        _ => {}
+                        Err(_) => {}
                     }
                 }
             }
@@ -895,14 +952,38 @@ pub(crate) fn show_pending(
     Ok(())
 }
 
+/// Whether the tags a follow or unfollow answered with have the tag `id`, `slug`. `None` when a
+/// tag the answer couldn't read could be it.
+fn tag_listed(
+    listed: &[ReaderTag],
+    unreadable: &[ReaderUnreadableTag],
+    id: ReaderTagId,
+    slug: &ReaderTagSlug,
+) -> Option<bool> {
+    if listed
+        .iter()
+        .any(|tag| tag.id == Some(id) || tag.slug == *slug)
+        || unreadable.iter().any(|tag| tag.id == Some(id))
+    {
+        Some(true)
+    } else if unreadable.iter().any(|tag| tag.id.is_none()) {
+        None
+    } else {
+        Some(false)
+    }
+}
+
 /// A target a tap waits on: its action's kind and target.
 type Target = (i64, String);
 
 /// The sending of what the user turned on or off, one request at a time.
 #[derive(Default)]
 pub(crate) struct ActionQueue {
-    /// Held while rows are sent, so they go in order.
-    lane: AsyncMutex<()>,
+    /// Held while rows are sent, so they go in order; while the service's other changes are sent
+    /// (a site's email frequency, a comment), so no two of its changes overlap; and by the
+    /// refreshes whose reads must not overlap one: see [`ReaderService::set_tag_followed`],
+    /// [`ReaderService::refresh_blocked_sites`] and [`ReaderService::refresh_menu`].
+    pub(super) lane: AsyncMutex<()>,
     /// The targets taps are waiting on, and how many taps wait on each.
     waiting: Mutex<HashMap<Target, usize>>,
     /// Why the server refused a target a tap is waiting on, until the tap takes it. The call that
@@ -1162,12 +1243,8 @@ impl ReaderContext {
                 // since: what the server answered is kept, with the newer tap shown over it, and
                 // is what the newer tap goes back to.
                 (Err((Some(confirmation), _)), false) => {
-                    if let Some(answer) = confirmation.comment_subscription {
-                        ReaderActionRepository::set_was(
-                            &transaction,
-                            row.row_id,
-                            answer.shows(action),
-                        )?;
+                    if let Some(answered) = confirmation.shows(action) {
+                        ReaderActionRepository::set_was(&transaction, row.row_id, answered)?;
                     }
                     action.confirm(&transaction, self.owner_row, row.wanted, confirmation)?;
                 }
@@ -1536,6 +1613,45 @@ impl ReaderService {
     ///
     /// Signed out, the tag is followed on this device only, and nothing is sent:
     /// [`Self::adopt_signed_out_tags`] takes such tags over after sign-in.
+    ///
+    /// The server can answer 200 to a follow or unfollow it doesn't keep. As measured on
+    /// 2026-11-20 with one account:
+    ///
+    /// - Two of the account's tag changes sent at the same moment keep only one: 6 times in 6,
+    ///   whether a follow and an unfollow or two follows, each answered 200 with the tag it
+    ///   added or removed. The next change of the tags is kept.
+    /// - Follows sent while the account's other changes were being sent answered 200 with the
+    ///   tag in `added_tags`, and weren't kept: beside the live trial that likes a post alone, 2
+    ///   of 2; beside the one that marks posts seen alone, 2 of 2; beside the seven trials that
+    ///   make a change and put it back, 13 of 14; beside every Reader trial, 7 of 19. Every read
+    ///   then said the tag wasn't followed, and unfollowing it was refused as `not_subscribed`.
+    ///   None was lost beside the block trial alone (4 follows) or beside trials that only read
+    ///   (4 follows).
+    /// - Once, during such a run, an unfollow left the tag listed as followed by every read
+    ///   (`read/tags` in `rest/v1.1` and `rest/v1.2`, `read/tags/{slug}/mine`, the menu) for 13
+    ///   to 16 minutes. Seven more unfollows each answered 200 with the tag in `removed_tag`, and
+    ///   a follow answered with nothing added, and none of them changed it; it ended on its own.
+    ///   That wasn't seen again.
+    /// - Reads of the tags or the menu on their way during a follow or unfollow, or made straight
+    ///   after one, never left the tags wrong (21 tries).
+    ///
+    /// The answer lists every tag the user then follows. When that list doesn't have a tag the
+    /// follow says it added, or still has the tag an unfollow says it removed, the change is
+    /// refused with [`ReaderError::Refused`] and the tag shows as the list has it. A tag in the
+    /// list that couldn't be read is taken as the added or removed one when its ID matches, and
+    /// leaves the follow unchecked when its ID couldn't be read either. That caught 22 of the 24
+    /// follows that weren't kept: the other two answers listed the tag and the server still
+    /// dropped it. No read says otherwise once the server has dropped a change, so nothing else
+    /// is checked.
+    ///
+    /// This service sends its own changes one at a time, in one lane: everything it turns on or
+    /// off (tags, likes, seen, follows, blocks, a comment's like, comment subscriptions and a
+    /// site's delivery settings), [`Self::set_post_email_frequency`], and the comments posted
+    /// through [`Self::comments`]. So a tag change of this service's never overlaps another of
+    /// its changes, and [`Self::refresh_menu`] doesn't read the menu while one is being sent.
+    /// Saves aren't in that lane ([`Self::saved`] sends them in its own), nor are page views,
+    /// which count a view rather than change the account; neither was measured beside a tag
+    /// follow. Nothing here holds back another device or app signed in to the account.
     pub async fn set_tag_followed(
         &self,
         slug: ReaderTagSlug,
@@ -1703,7 +1819,7 @@ impl ReaderService {
 
     /// Sets how often a followed site's new posts are emailed. Unlike the on/off settings, this
     /// one isn't kept to send later: it returns the error if it can't be sent now. Needs an
-    /// account.
+    /// account. It's sent once no other change of this service's is being sent.
     pub async fn set_post_email_frequency(
         &self,
         site_id: WpComSiteId,
@@ -1719,6 +1835,9 @@ impl ReaderService {
             delivery_frequency: frequency.clone(),
             track_source: None,
         };
+        // Sent in the lane, so it doesn't overlap another change of this service's: see
+        // `Self::set_tag_followed`.
+        let _lane = context.actions.lane.lock().await;
         context
             .client
             .reader_subscriptions()

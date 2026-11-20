@@ -212,7 +212,8 @@ impl ReaderCommentsCollection {
     /// once. When the server takes it, the server's comment replaces it. When it doesn't, the
     /// comment stays, marked as not taken with the reason, and the error is returned: nothing
     /// sends it again until [`Self::retry_comment`] is called, so a comment is never posted twice
-    /// by itself.
+    /// by itself. It's sent once no other change of the Reader's is being sent: see
+    /// [`ReaderService::set_tag_followed`](super::ReaderService::set_tag_followed).
     pub async fn post_comment(
         &self,
         content: String,
@@ -357,15 +358,20 @@ impl ReaderCommentsCollection {
             content: written.content.clone().unwrap_or_default(),
         };
         let comments = self.context.client.reader_comments();
-        let sent = match written.parent_id {
-            Some(parent) => comments
-                .new_reply(&self.site_id, &parent, &params)
-                .await
-                .map(|response| response.data),
-            None => comments
-                .new_comment(&self.site_id, &self.post_id, &params)
-                .await
-                .map(|response| response.data),
+        let sent = {
+            // Sent in the lane the service's other changes are sent in, so it doesn't overlap
+            // one: see `ReaderService::set_tag_followed`.
+            let _lane = self.context.actions.lane.lock().await;
+            match written.parent_id {
+                Some(parent) => comments
+                    .new_reply(&self.site_id, &parent, &params)
+                    .await
+                    .map(|response| response.data),
+                None => comments
+                    .new_comment(&self.site_id, &self.post_id, &params)
+                    .await
+                    .map(|response| response.data),
+            }
         };
         match sent {
             Ok(comment) => {
