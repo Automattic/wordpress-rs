@@ -1047,7 +1047,7 @@ impl ReaderContext {
 /// A request timeout and a rate limit pass, so their rows are sent again later. Any other answer
 /// in the 400s won't change by asking again, and nor will an action that's missing what it needs
 /// to be sent.
-fn is_refused(error: &ReaderError) -> bool {
+pub(super) fn is_refused(error: &ReaderError) -> bool {
     /// Request timeout, too many requests.
     const TEMPORARY: [u32; 2] = [408, 429];
     match error {

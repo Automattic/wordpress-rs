@@ -2586,12 +2586,115 @@ mod links {
     }
 
     #[tokio::test]
-    async fn a_post_link_needs_an_account_and_sends_nothing_signed_out() {
+    async fn signed_out_a_post_link_opens_the_post_found_by_its_slug() {
         let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(Step::Respond(
+            200,
+            json!({ "ID": 7, "site_ID": 123, "slug": "hello-world", "title": "Post 7" }),
+        ));
+        executor.push(Step::Respond(200, post_json(7, 10)));
+
+        let link = service.resolve_link(POST_URL.to_string()).await.unwrap();
+
+        let ReaderLink::Post { post } = link else {
+            panic!("{link:?}")
+        };
+        assert_eq!(post.identity.id, 7);
+        assert!(service.cached_post(key(7)).unwrap().is_some());
+        // The resolver isn't asked: it needs an account.
+        assert_eq!(
+            paths(&executor),
+            [
+                "/rest/v1.1/sites/example.wordpress.com/posts/slug:hello-world?",
+                "/rest/v1.2/read/sites/123/posts/7?meta=site%2Cfeed",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn signed_out_the_slug_is_the_last_part_of_the_path_decoded() {
+        for (link, sent) in [
+            (
+                "https://example.com/a-post/",
+                "/rest/v1.1/sites/example.com/posts/slug:a-post?",
+            ),
+            (
+                "https://Example.com/blog/2026/11/a-post?share=1#comments",
+                "/rest/v1.1/sites/example.com/posts/slug:a-post?",
+            ),
+            (
+                "https://example.com/2026/11/19/%e5%86%99%e7%9c%9f/",
+                "/rest/v1.1/sites/example.com/posts/slug:%E5%86%99%E7%9C%9F?",
+            ),
+        ] {
+            let (service, executor) = service_for(ReaderOwner::SignedOut);
+            executor.push(error(404, "unknown_post"));
+            let _ = service.resolve_link(link.to_string()).await;
+            assert_eq!(paths(&executor), [sent], "{link}");
+        }
+    }
+
+    #[tokio::test]
+    async fn signed_out_a_post_link_the_slug_does_not_find_needs_an_account() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        // No post with the slug, a host that's no site's, and a private site: the resolver, with
+        // an account, might still find a post there.
+        for answer in [
+            error(404, "unknown_post"),
+            error(404, "unknown_blog"),
+            error(403, "unauthorized"),
+        ] {
+            executor.push(answer);
+            assert!(matches!(
+                service.resolve_link(POST_URL.to_string()).await,
+                Err(ReaderError::NeedsAccount)
+            ));
+        }
+        assert_eq!(executor.sent().len(), 3);
+
+        // A request that fails isn't a refusal, so it's the error.
+        for answer in [Step::Offline, Step::Respond(500, json!(null))] {
+            executor.push(answer);
+            assert!(matches!(
+                service.resolve_link(POST_URL.to_string()).await,
+                Err(ReaderError::Api(_))
+            ));
+        }
+        // So is a failure to fetch the post the slug found.
+        executor.push(Step::Respond(
+            200,
+            json!({ "ID": 7, "site_ID": 123, "slug": "hello-world" }),
+        ));
+        executor.push(Step::Offline);
         assert!(matches!(
             service.resolve_link(POST_URL.to_string()).await,
-            Err(ReaderError::NeedsAccount)
+            Err(ReaderError::Api(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn signed_out_a_post_link_with_no_slug_needs_an_account_and_sends_nothing() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        for link in [
+            // Archives, a feed, a page of posts and a file: WordPress gives no post such a slug.
+            "https://example.com/2026/11/",
+            "https://example.com/2026/11/18/",
+            "https://example.com/feed/",
+            "https://example.com/tag/cats/RSS2",
+            "https://example.com/page/2",
+            "https://example.com/page2",
+            "https://example.com/index.php",
+            // Escapes that don't spell UTF-8.
+            "https://example.com/%ff%fe/",
+        ] {
+            assert!(
+                matches!(
+                    service.resolve_link(link.to_string()).await,
+                    Err(ReaderError::NeedsAccount)
+                ),
+                "{link}"
+            );
+        }
         assert!(executor.sent().is_empty());
     }
 

@@ -34,10 +34,11 @@
 //! 404 `no_such_item`. The Reader's other pages, such as a tag's, a list's, search or Discover,
 //! open a stream that isn't a site or a feed, and `ReaderLink` has nothing for them yet.
 
+use super::actions::is_refused;
 use super::{ReaderError, ReaderService};
 use wp_api::prelude::{WpApiError, WpErrorCode};
 use wp_api::wp_com::WpComSiteId;
-use wp_api::wp_com::reader_post::ReaderResolveUrlParams;
+use wp_api::wp_com::reader_post::{ReaderPostBySlugParams, ReaderPostSlug, ReaderResolveUrlParams};
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderFeedItemId, ReaderPostSaveIdentity};
 use wp_api::wp_com::reader_sites::{ReaderFeedSearchParams, ReaderSiteParams};
 use wp_api::wp_com::sites::WpComSiteIdentifier;
@@ -124,6 +125,61 @@ fn parse_link(link: &str) -> Option<url::Url> {
     };
     let is_web = matches!(parsed.scheme(), "http" | "https");
     (is_web && parsed.host_str().is_some_and(|host| !host.is_empty())).then_some(parsed)
+}
+
+/// Decodes a path segment's `%XX` escapes. `None` when what they spell isn't UTF-8.
+fn percent_decoded(segment: &str) -> Option<String> {
+    let bytes = segment.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+    while at < bytes.len() {
+        let escaped = (bytes[at] == b'%')
+            .then(|| bytes.get(at + 1..at + 3))
+            .flatten()
+            .and_then(|hex| std::str::from_utf8(hex).ok())
+            .and_then(|hex| u8::from_str_radix(hex, 16).ok());
+        match escaped {
+            Some(byte) => {
+                decoded.push(byte);
+                at += 3;
+            }
+            None => {
+                decoded.push(bytes[at]);
+                at += 1;
+            }
+        }
+    }
+    String::from_utf8(decoded).ok()
+}
+
+/// The slug of the post at an address: the last part of its path, decoded. `None` when that part
+/// can't be a post's slug, so there's nothing to look up. WordPress never gives a post a slug of
+/// only digits, `page` and digits or a feed's name (`wp_unique_post_slug`), nor one with a `.`
+/// (`sanitize_title_with_dashes`), so such a part is an archive page, a feed or a file.
+///
+/// It's how the Android app opens a post's address without an account: the host is the site, and
+/// the slug what follows the date in `/{year}/{month}/{day}/{slug}/`. Taking the last part of the
+/// path covers that and other permalinks. Measured signed out on 2026-11-20, looking up
+/// `sites/{host}/posts/slug:{slug}` for real posts' addresses:
+///
+/// - WordPress.com sites: 45 of 45 Discover posts (`/{year}/{month}/{day}/{slug}/`, on
+///   `*.wordpress.com` and mapped domains) and 16 of 16 posts of eight well-known sites
+///   (`/{year}/{month}/{slug}/`, `/{slug}/` under a path such as `/blog/` or `/posts/`) were
+///   found, with the post's own IDs.
+/// - Jetpack sites: 12 of 14 posts of seven sites (`/{slug}/` and dated). The two not found
+///   (404 `unknown_post`) were under `/recipes/`, likely another post type.
+/// - A site in a folder of its domain, such as `wordpress.org/news/`: 0 of 2. The host is another
+///   site, which answers `unknown_post`.
+/// - A slug the site doesn't have is a 404 `unknown_post`, a host that's no WordPress.com or
+///   Jetpack site's a 404 `unknown_blog`, and a private site a 403 `unauthorized`.
+fn post_slug(url: &url::Url) -> Option<String> {
+    let last = url.path_segments()?.rev().find(|part| !part.is_empty())?;
+    let slug = percent_decoded(last)?;
+    let lower = slug.to_lowercase();
+    let digits = lower.strip_prefix("page").unwrap_or(&lower);
+    let is_numeric = !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit());
+    let is_feed = matches!(lower.as_str(), "feed" | "rdf" | "rss" | "rss2" | "atom");
+    (!is_numeric && !is_feed && !slug.contains('.') && !slug.trim().is_empty()).then_some(slug)
 }
 
 /// The hosts the Reader's own pages are on.
@@ -219,9 +275,15 @@ impl ReaderService {
     /// - A site's home address, such as `https://example.com/`, is looked up as a WordPress.com
     ///   or Jetpack site, then as an address with a feed. It needs no account.
     /// - Any other address is resolved to a post, which needs an account: the server only does it
-    ///   with a token, so signed out it's [`ReaderError::NeedsAccount`], and nothing is sent.
-    ///   Where the server finds no post, the address is looked up for a feed, so a site's address
-    ///   with a path, such as `https://wordpress.com/blog/`, opens the site.
+    ///   with a token. Where the server finds no post, the address is looked up for a feed, so a
+    ///   site's address with a path, such as `https://wordpress.com/blog/`, opens the site.
+    /// - Signed out, such an address is tried as a post by its slug instead, as the Android app
+    ///   tries it: the address's host is the site, and the last part of its path the slug. A post
+    ///   found that way is a [`ReaderLink::Post`]. Anything else is
+    ///   [`ReaderError::NeedsAccount`], since the resolver might find what the slug didn't: a
+    ///   server's refusal of the slug, such as no post with it, a host that's no site's, or a
+    ///   private site, and an address with no slug, for which nothing is sent. A request that
+    ///   fails, rather than being refused, is the error. See [`post_slug`] for what was measured.
     /// - The server answers an address that isn't on a WordPress.com or Jetpack site with a 500.
     ///   The site's domain is then looked up, and when no WordPress.com or Jetpack site has it,
     ///   the address is looked up for a feed. When one does, the 500 is the error.
@@ -254,7 +316,7 @@ impl ReaderService {
             ReaderLinkNotInReader::NotWordPressOrFeed
         } else {
             if self.context.owner == ReaderOwner::SignedOut {
-                return Err(ReaderError::NeedsAccount);
+                return self.post_by_slug_signed_out(&host, &parsed).await;
             }
             let resolved = self
                 .context
@@ -349,6 +411,48 @@ impl ReaderService {
                 reason: ReaderLinkNotInReader::NothingThere,
             },
         })
+    }
+
+    /// Signed out, the post at an address by its slug, on the site of its host. Anything the server
+    /// refuses, and an address with no slug, is [`ReaderError::NeedsAccount`]: the resolver, which
+    /// needs an account, might still find it. See [`ReaderService::resolve_link`].
+    async fn post_by_slug_signed_out(
+        &self,
+        host: &str,
+        url: &url::Url,
+    ) -> Result<ReaderLink, ReaderError> {
+        let Some(slug) = post_slug(url) else {
+            return Err(ReaderError::NeedsAccount);
+        };
+        let found = self
+            .context
+            .client
+            .reader_post()
+            .post_by_slug(
+                &WpComSiteIdentifier::Slug {
+                    value: host.to_string(),
+                },
+                &ReaderPostSlug(slug),
+                &ReaderPostBySlugParams::default(),
+            )
+            .await
+            .map_err(ReaderError::from);
+        let found = match found {
+            Ok(found) => found.data,
+            Err(error) if is_refused(&error) => return Err(ReaderError::NeedsAccount),
+            Err(error) => return Err(error),
+        };
+        let post = self
+            .fetch_post(ReaderPostSaveIdentity {
+                id: found.post_id.0 as u64,
+                site_id: Some(found.site_id),
+                feed_id: None,
+                feed_item_id: None,
+                is_external: false,
+                url: found.url.or(Some(url.to_string())),
+            })
+            .await?;
+        Ok(ReaderLink::Post { post })
     }
 
     /// The WordPress.com or Jetpack site with a domain, now in the cache, or `None` when no site
