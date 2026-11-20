@@ -262,6 +262,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
     let static_language_provider = &config.static_types.language_provider;
     let static_wp_network_request_type = &config.static_types.wp_network_request;
     let static_wp_multipart_form_request_type = &config.static_types.wp_multipart_form_request;
+    let crate_ident = &config.crate_ident;
     let generated_endpoint_ident = &config.generated_idents.endpoint;
     let generated_request_builder_ident = &config.generated_idents.request_builder;
 
@@ -303,7 +304,7 @@ fn generate_request_builder(config: &Config, parsed_enum: &ParsedEnum) -> TokenS
                 static_wp_network_request_type
             };
             quote! {
-                pub #fn_signature -> #return_type {
+                pub #fn_signature -> Result<#return_type, #crate_ident::api_error::RequestExecutionError> {
                     #url_from_endpoint
                     #fn_body_build_request_from_url
                 }
