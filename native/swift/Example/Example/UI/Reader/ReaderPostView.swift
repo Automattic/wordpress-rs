@@ -51,6 +51,10 @@ struct ReaderPostView: View {
                     .foregroundStyle(.red)
                     .accessibilityIdentifier("post-error")
             }
+            if let seen = viewModel.seenOnOpen {
+                LabeledContent("Seen on opening", value: seen)
+                    .accessibilityIdentifier("post-seen-on-open")
+            }
             if let pageView = viewModel.pageView {
                 LabeledContent("Page view", value: pageView)
             }

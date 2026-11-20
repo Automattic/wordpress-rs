@@ -19,6 +19,8 @@ final class ReaderPostViewModel {
     private(set) var hasFetched = false
     /// What became of the view this opening may have counted.
     private(set) var pageView: String?
+    /// What became of marking the post as seen when it was opened.
+    private(set) var seenOnOpen: String?
     private(set) var notice: String?
     private var working = 0
 
@@ -37,7 +39,8 @@ final class ReaderPostViewModel {
 
     var isWorking: Bool { working > 0 }
 
-    /// Shows the cached post, fetches it again, and reports that it was opened when `countsPageViews` is on.
+    /// Shows the cached post, fetches it again, and reports that it was opened, which marks it as seen. The view
+    /// is only counted when `countsPageViews` is on.
     func start(countsPageViews: Bool) async {
         guard !hasStarted else { return }
         hasStarted = true
@@ -121,23 +124,18 @@ final class ReaderPostViewModel {
     }
 
     private func reportOpened(countsPageViews: Bool) async {
-        guard countsPageViews else {
-            pageView = "Not reported: \"Count page views\" is off."
-            return
-        }
+        let choice: ReaderPageViewChoice =
+            countsPageViews ? .count(userAgent: ReaderPageViewUserAgent.value) : .dontCount
         do {
-            let outcome = try await service.postOpened(key: key, userAgent: ReaderPageViewUserAgent.value)
-            pageView =
-                switch outcome {
-                case .counted: "Counted."
-                case .notCountedForRssPost: "Not counted: an RSS post has no site stats."
-                case .notCountedForSiteMember: "Not counted: the reader is a member of the post's site."
-                case .notCountedForMissingDetails: "Not counted: the cache lacks the post, or its site's ID or URL."
-                case .notCountedForUserAgent: "Not counted: the app has no User-Agent that stats count a view with."
-                }
+            let opened = try await service.postOpened(key: key, pageView: choice)
+            seenOnOpen = opened.seen.message
+            pageView = opened.pageView.message
         } catch {
-            pageView = "Couldn't be counted. \(readerErrorMessage(error))"
+            let message = "Couldn't be reported. \(readerErrorMessage(error))"
+            seenOnOpen = message
+            pageView = message
         }
+        reloadFromCache()
     }
 
     private func reloadFromCache() {
@@ -148,6 +146,37 @@ final class ReaderPostViewModel {
             }
         } catch {
             loadError = readerErrorMessage(error)
+        }
+    }
+}
+
+extension ReaderOpenedSeen {
+    /// What became of marking an opened post as seen, in words.
+    var message: String {
+        switch self {
+        case .marked(let outcome): "Marked as seen. \(outcome.message)"
+        case .alreadySeen: "It was seen already."
+        case .noSeenState: "Not marked: the post has no seen state."
+        case .notCached: "Not marked: the cache doesn't have the post."
+        case .failed(let error): "Couldn't be marked. \(readerErrorMessage(error))"
+        }
+    }
+}
+
+extension ReaderOpenedPageView {
+    /// What became of an opened post's view, in words.
+    var message: String {
+        switch self {
+        case .reported(let outcome):
+            switch outcome {
+            case .counted: "Counted."
+            case .notCountedForRssPost: "Not counted: an RSS post has no site stats."
+            case .notCountedForSiteMember: "Not counted: the reader is a member of the post's site."
+            case .notCountedForMissingDetails: "Not counted: the cache lacks the post, or its site's ID or URL."
+            case .notCountedForUserAgent: "Not counted: the app has no User-Agent that stats count a view with."
+            }
+        case .notAsked: "Not sent: \"Count page views\" is off."
+        case .failed(let error): "Couldn't be counted. \(readerErrorMessage(error))"
         }
     }
 }

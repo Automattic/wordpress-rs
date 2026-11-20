@@ -19,8 +19,9 @@ use wp_api::wp_com::reader_subscriptions::ReaderSubscriptionEmailFrequency;
 use wp_api::wp_com::stats_post::StatsPostTarget;
 use wp_api::wp_com::{WpComBaseUrl, WpComSiteId};
 use wp_mobile::service::reader::{
-    ReaderActionOutcome, ReaderError, ReaderFollowTarget, ReaderPageViewOutcome, ReaderService,
-    ReaderStream, ReaderStreamCollection, ReaderStreamItem,
+    ReaderActionOutcome, ReaderError, ReaderFollowTarget, ReaderOpenedPageView, ReaderOpenedSeen,
+    ReaderPageViewChoice, ReaderPageViewOutcome, ReaderService, ReaderStream,
+    ReaderStreamCollection, ReaderStreamItem,
 };
 use wp_mobile::service::reader_saved::ReaderOfflineState;
 use wp_mobile_cache::WpApiCache;
@@ -728,12 +729,33 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let post_id = PostId(post.identity.id as i64);
                     let views_before = views_of(&ctx, site_id, post_id).await?;
 
-                    // The library doesn't count a member's view of a public site, and does count
-                    // a private site's.
-                    let outcome = service
-                        .post_opened(post.key.clone(), PAGE_VIEW_USER_AGENT.to_string())
+                    // Opening the post also marks it as seen when it isn't: what it was is put
+                    // back below.
+                    let was_seen = post.is_seen;
+                    let opened = service
+                        .post_opened(
+                            post.key.clone(),
+                            ReaderPageViewChoice::Count {
+                                user_agent: PAGE_VIEW_USER_AGENT.to_string(),
+                            },
+                        )
                         .await
                         .map_err(|e| e.to_string())?;
+                    if was_seen == Some(false) {
+                        service
+                            .set_post_seen(post.identity.clone(), false)
+                            .await
+                            .map_err(|e| e.to_string())?;
+                    }
+                    if let ReaderOpenedSeen::Failed { error } = &opened.seen {
+                        return Err(
+                            format!("Opening the post didn't mark it as seen: {error}").into()
+                        );
+                    }
+
+                    // The library doesn't count a member's view of a public site, and does count
+                    // a private site's.
+                    let outcome = page_view_outcome(opened.page_view)?;
                     let expected = if post.site_is_private == Some(true) {
                         ReaderPageViewOutcome::Counted
                     } else {
@@ -745,10 +767,16 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
                     // Nor does it send a view as the library, which stats wouldn't count.
                     let library = wp_api::request::user_agent::default_user_agent("reqwest");
-                    let outcome = service
-                        .post_opened(post.key.clone(), library)
+                    let opened = service
+                        .post_opened(
+                            post.key.clone(),
+                            ReaderPageViewChoice::Count {
+                                user_agent: library,
+                            },
+                        )
                         .await
                         .map_err(|e| e.to_string())?;
+                    let outcome = page_view_outcome(opened.page_view)?;
                     if outcome != ReaderPageViewOutcome::NotCountedForUserAgent {
                         return Err(format!("As the library, got {outcome:?}").into());
                     }
@@ -1542,4 +1570,13 @@ fn check_newest_first(items: &[ReaderStreamItem]) -> Result<(), Failed> {
         return Err("The stream isn't newest first".into());
     }
     Ok(())
+}
+
+/// What became of an opened post's view, or the error it failed with.
+fn page_view_outcome(page_view: ReaderOpenedPageView) -> Result<ReaderPageViewOutcome, Failed> {
+    match page_view {
+        ReaderOpenedPageView::Reported { outcome } => Ok(outcome),
+        ReaderOpenedPageView::NotAsked => Err("The view wasn't asked for".into()),
+        ReaderOpenedPageView::Failed { error } => Err(error.to_string().into()),
+    }
 }

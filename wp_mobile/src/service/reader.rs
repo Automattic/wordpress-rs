@@ -35,7 +35,10 @@ pub use collection::{
 };
 pub use comments::{ReaderCommentsCollection, ReaderCommentsInfo, ReaderCommentsPageResult};
 pub use links::{ReaderLink, ReaderLinkNotInReader, reader_link_not_in_reader_message};
-pub use page_views::ReaderPageViewOutcome;
+pub use page_views::{
+    ReaderOpenedPageView, ReaderOpenedSeen, ReaderPageViewChoice, ReaderPageViewOutcome,
+    ReaderPostOpenedOutcome,
+};
 pub use stream::reader_stream_for_menu_item;
 pub use stream::{
     ReaderStream, ReaderStreamCardKind, ReaderStreamCardSite, ReaderStreamCardTag,

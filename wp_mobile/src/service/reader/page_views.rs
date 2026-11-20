@@ -1,9 +1,13 @@
-//! Counting a view when a post is opened in the Reader.
+//! What opening a post in the Reader does: it marks the post as seen, and may count a view of it.
 //!
-//! The app says a post was opened. Whether that counts as a view, and the request that counts it,
-//! are decided here, so both apps count the same views.
+//! The app says a post was opened. What follows is decided here, so both apps do the same.
 //!
-//! The rule:
+//! A post is marked as seen when the reader has an account, the post has a seen state and it isn't
+//! seen yet. The mark goes through the same path as [`ReaderService::set_post_seen`]: it shows in
+//! every stream that has the post straight away, and one made offline is sent later. (Both
+//! WordPress apps mark an opened post this way, and the Android one only when online.)
+//!
+//! Whether opening counts as a view, the rule:
 //!
 //! - Only a post of a WordPress.com or Jetpack site counts. An RSS post has no site stats to count
 //!   it in. (The iOS app's rule. The Android app sends an RSS post's feed ID as a site ID, which
@@ -19,6 +23,7 @@
 //! one sent with the library's own. See
 //! [`reader_page_view_user_agent_counts`](wp_api::wp_com::reader_page_views::reader_page_view_user_agent_counts).
 
+use super::actions::{Action, ReaderActionOutcome};
 use super::{ReaderContext, ReaderError, ReaderService};
 use std::time::Duration;
 use wp_api::posts::PostId;
@@ -28,6 +33,7 @@ use wp_api::wp_com::reader_page_views::{ReaderPageView, reader_page_view_user_ag
 use wp_api::wp_com::reader_saved::ReaderSavedKey;
 use wp_api::wp_com::sites::SitesListParams;
 use wp_mobile_cache::SqliteDbError;
+use wp_mobile_cache::db_types::reader::ReaderPostRecord;
 use wp_mobile_cache::db_types::reader::{reader_date_from_text, reader_date_text};
 use wp_mobile_cache::repository::reader::ReaderPostRepository;
 use wp_mobile_cache::repository::reader_actions::{
@@ -57,25 +63,75 @@ pub enum ReaderPageViewOutcome {
     NotCountedForUserAgent,
 }
 
-#[uniffi::export]
-impl ReaderService {
-    /// Reports that a post was opened, and counts a view of it if it's one that counts. `key` is
-    /// the post's key in the cache. Call it once each time the reader opens the post.
-    ///
-    /// `user_agent` is the `User-Agent` the view is sent with: the one the app's web view sends,
-    /// which the WordPress apps follow with their own name, as in
+/// Whether opening a post counts a view of it.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum ReaderPageViewChoice {
+    /// Count a view, if it's one that counts, sent with `user_agent`: the one the app's web view
+    /// sends, which the WordPress apps follow with their own name, as in
     /// `… Mobile/15E148 wp-iphone/26.4`. Not the library's own, which stats don't count a view
     /// with: that's [`ReaderPageViewOutcome::NotCountedForUserAgent`], whatever the post.
+    Count { user_agent: String },
+    /// Don't count one, such as when the reader turned counting off: nothing is sent for the view.
+    /// A counted view on someone's post can't be taken back.
+    DontCount,
+}
+
+/// What opening a post did. Each part is reported on its own, so one failing doesn't hide the
+/// other.
+#[derive(Debug, uniffi::Record)]
+pub struct ReaderPostOpenedOutcome {
+    pub seen: ReaderOpenedSeen,
+    pub page_view: ReaderOpenedPageView,
+}
+
+/// What became of marking an opened post as seen.
+#[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
+#[derive(Debug, uniffi::Enum)]
+pub enum ReaderOpenedSeen {
+    /// Marked as seen, which shows straight away. `outcome` says whether the server has it yet,
+    /// or it waits to be sent with [`ReaderService::sync_actions`].
+    Marked { outcome: ReaderActionOutcome },
+    /// It was seen already. Nothing was sent.
+    AlreadySeen,
+    /// The post has no seen state, so it isn't marked. A signed-out reader's posts never have one,
+    /// and a post from a stream that doesn't send one, such as a tag's, has none. Nothing was sent.
+    NoSeenState,
+    /// The cache doesn't have the post. Nothing was sent.
+    NotCached,
+    /// The server refused the mark, so the post shows as not seen again, or the cache couldn't
+    /// keep it.
+    Failed { error: ReaderError },
+}
+
+/// What became of the view an opened post may count.
+#[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
+#[derive(Debug, uniffi::Enum)]
+pub enum ReaderOpenedPageView {
+    /// It was decided as `outcome` says: counted, or not counted and why.
+    Reported { outcome: ReaderPageViewOutcome },
+    /// Not counted, as asked with [`ReaderPageViewChoice::DontCount`]. Nothing was sent.
+    NotAsked,
+    /// The view couldn't be sent, such as offline. It isn't sent again later.
+    Failed { error: ReaderError },
+}
+
+#[uniffi::export]
+impl ReaderService {
+    /// Reports that a post was opened: marks it as seen, and counts a view of it when `page_view`
+    /// asks and it's one that counts. `key` is the post's key in the cache. Call it once each time
+    /// the reader opens the post.
     ///
-    /// Works signed out. A view that fails to send returns the error, and isn't sent again later.
+    /// The mark is only for an account, and only for a post that has a seen state and isn't seen
+    /// yet. It shows straight away in every stream that has the post, and one made offline is sent
+    /// later. A view works signed out.
+    ///
+    /// The two are done together and reported apart: an error of one is in its own part of the
+    /// outcome. The call itself only fails when the cache can't be read.
     pub async fn post_opened(
         &self,
         key: ReaderSavedKey,
-        user_agent: String,
-    ) -> Result<ReaderPageViewOutcome, ReaderError> {
-        if !reader_page_view_user_agent_counts(&user_agent) {
-            return Ok(ReaderPageViewOutcome::NotCountedForUserAgent);
-        }
+        page_view: ReaderPageViewChoice,
+    ) -> Result<ReaderPostOpenedOutcome, ReaderError> {
         let context = &self.context;
         let post = context
             .cache
@@ -83,45 +139,19 @@ impl ReaderService {
                 ReaderPostRepository::select_by_key(connection, context.owner_row, &key)
             })?
             .map(|(_, post)| post);
-        let Some(post) = post else {
-            return Ok(ReaderPageViewOutcome::NotCountedForMissingDetails);
-        };
-        if post.identity.is_external {
-            return Ok(ReaderPageViewOutcome::NotCountedForRssPost);
-        }
-        let (Some(site_id), Some(site_url)) = (
-            post.identity.site_id.filter(|site| site.0 != 0),
-            post.site_url.clone(),
-        ) else {
-            return Ok(ReaderPageViewOutcome::NotCountedForMissingDetails);
-        };
-        let site_is_private = post.site_is_private == Some(true);
-        if !site_is_private && context.is_member_of(site_id).await? {
-            return Ok(ReaderPageViewOutcome::NotCountedForSiteMember);
-        }
-        let view = ReaderPageView {
-            site_id,
-            post_id: PostId(post.identity.id as i64),
-            site_url,
-            site_is_private,
-            user_agent,
-        };
-        let Some(request) = view.request() else {
-            return Ok(ReaderPageViewOutcome::NotCountedForMissingDetails);
-        };
-        let response = context
-            .request_executor
-            .execute(request.into())
-            .await
-            .map_err(WpApiError::from)?;
-        if !(200..300).contains(&response.status_code) {
-            return Err(ReaderError::Api(WpApiError::InvalidHttpStatusCode {
-                status_code: response.status_code,
-                request_url: response.request_url.0,
-                request_method: response.request_method,
-            }));
-        }
-        Ok(ReaderPageViewOutcome::Counted)
+        let (seen, page_view) =
+            futures::join!(context.mark_opened_post_seen(post.as_ref()), async {
+                match page_view {
+                    ReaderPageViewChoice::DontCount => ReaderOpenedPageView::NotAsked,
+                    ReaderPageViewChoice::Count { user_agent } => {
+                        match context.count_view(post.as_ref(), user_agent).await {
+                            Ok(outcome) => ReaderOpenedPageView::Reported { outcome },
+                            Err(error) => ReaderOpenedPageView::Failed { error },
+                        }
+                    }
+                }
+            });
+        Ok(ReaderPostOpenedOutcome { seen, page_view })
     }
 
     /// Tells the Reader which sites the account is a member of, for an app that already has
@@ -141,6 +171,78 @@ impl ReaderService {
 }
 
 impl ReaderContext {
+    async fn mark_opened_post_seen(&self, post: Option<&ReaderPostRecord>) -> ReaderOpenedSeen {
+        let Some(post) = post else {
+            return ReaderOpenedSeen::NotCached;
+        };
+        if self.owner == ReaderOwner::SignedOut {
+            return ReaderOpenedSeen::NoSeenState;
+        }
+        match post.is_seen {
+            None => ReaderOpenedSeen::NoSeenState,
+            Some(true) => ReaderOpenedSeen::AlreadySeen,
+            Some(false) => {
+                let action = Action::Seen {
+                    post: post.identity.clone(),
+                };
+                match self.set_action(action, true).await {
+                    Ok(outcome) => ReaderOpenedSeen::Marked { outcome },
+                    Err(error) => ReaderOpenedSeen::Failed { error },
+                }
+            }
+        }
+    }
+
+    /// Counts a view of an opened post, if it's one that counts.
+    async fn count_view(
+        &self,
+        post: Option<&ReaderPostRecord>,
+        user_agent: String,
+    ) -> Result<ReaderPageViewOutcome, ReaderError> {
+        if !reader_page_view_user_agent_counts(&user_agent) {
+            return Ok(ReaderPageViewOutcome::NotCountedForUserAgent);
+        }
+        let Some(post) = post else {
+            return Ok(ReaderPageViewOutcome::NotCountedForMissingDetails);
+        };
+        if post.identity.is_external {
+            return Ok(ReaderPageViewOutcome::NotCountedForRssPost);
+        }
+        let (Some(site_id), Some(site_url)) = (
+            post.identity.site_id.filter(|site| site.0 != 0),
+            post.site_url.clone(),
+        ) else {
+            return Ok(ReaderPageViewOutcome::NotCountedForMissingDetails);
+        };
+        let site_is_private = post.site_is_private == Some(true);
+        if !site_is_private && self.is_member_of(site_id).await? {
+            return Ok(ReaderPageViewOutcome::NotCountedForSiteMember);
+        }
+        let view = ReaderPageView {
+            site_id,
+            post_id: PostId(post.identity.id as i64),
+            site_url,
+            site_is_private,
+            user_agent,
+        };
+        let Some(request) = view.request() else {
+            return Ok(ReaderPageViewOutcome::NotCountedForMissingDetails);
+        };
+        let response = self
+            .request_executor
+            .execute(request.into())
+            .await
+            .map_err(WpApiError::from)?;
+        if !(200..300).contains(&response.status_code) {
+            return Err(ReaderError::Api(WpApiError::InvalidHttpStatusCode {
+                status_code: response.status_code,
+                request_url: response.request_url.0,
+                request_method: response.request_method,
+            }));
+        }
+        Ok(ReaderPageViewOutcome::Counted)
+    }
+
     fn store_member_sites(&self, site_ids: &[WpComSiteId]) -> Result<(), SqliteDbError> {
         let now = reader_date_text(&self.now());
         self.cache.execute(|connection| {

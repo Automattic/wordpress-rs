@@ -1377,6 +1377,22 @@ mod page_views {
     /// A `User-Agent` an app sends a view with.
     const APP: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 wp-iphone/26.4";
 
+    /// Opens a post, counting a view, and returns what became of the view.
+    async fn view(
+        service: &ReaderService,
+        key: ReaderSavedKey,
+        user_agent: &str,
+    ) -> Result<ReaderPageViewOutcome, ReaderError> {
+        let choice = ReaderPageViewChoice::Count {
+            user_agent: user_agent.to_string(),
+        };
+        match service.post_opened(key, choice).await.unwrap().page_view {
+            ReaderOpenedPageView::Reported { outcome } => Ok(outcome),
+            ReaderOpenedPageView::Failed { error } => Err(error),
+            ReaderOpenedPageView::NotAsked => panic!("A view was asked for"),
+        }
+    }
+
     fn pixel() -> Step {
         // The pixel answers with an image, which nothing reads.
         Step::Respond(200, json!(null))
@@ -1402,7 +1418,7 @@ mod page_views {
         let (service, executor) = reading(ReaderOwner::SignedOut, vec![site_post(1, false)]).await;
         executor.push(pixel());
 
-        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
+        let outcome = view(&service, key(1), APP).await.unwrap();
 
         assert_eq!(outcome, ReaderPageViewOutcome::Counted);
         let sent = executor.sent();
@@ -1426,10 +1442,7 @@ mod page_views {
         let library = wp_api::request::user_agent::default_user_agent("URLSession");
 
         for user_agent in ["", " ", library.as_str()] {
-            let outcome = service
-                .post_opened(key(1), user_agent.to_string())
-                .await
-                .unwrap();
+            let outcome = view(&service, key(1), user_agent).await.unwrap();
             assert_eq!(
                 outcome,
                 ReaderPageViewOutcome::NotCountedForUserAgent,
@@ -1448,7 +1461,7 @@ mod page_views {
         // The account's sites are fetched the first time a post is opened.
         executor.push(sites(&[123]));
 
-        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
+        let outcome = view(&service, key(1), APP).await.unwrap();
 
         assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForSiteMember);
         assert!(
@@ -1460,7 +1473,7 @@ mod page_views {
                 .starts_with("https://public-api.wordpress.com/rest/v1.2/me/sites")
         );
         // They're kept, so the next post asks for nothing.
-        let outcome = service.post_opened(key(2), APP.to_string()).await.unwrap();
+        let outcome = view(&service, key(2), APP).await.unwrap();
         assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForSiteMember);
         assert_eq!(executor.sent().len(), 2);
     }
@@ -1471,7 +1484,7 @@ mod page_views {
         service.set_member_sites(vec![WpComSiteId(999)]).unwrap();
         executor.push(pixel());
 
-        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
+        let outcome = view(&service, key(1), APP).await.unwrap();
 
         assert_eq!(outcome, ReaderPageViewOutcome::Counted);
         // The app said which sites the account belongs to, so they weren't fetched.
@@ -1484,7 +1497,7 @@ mod page_views {
         service.set_member_sites(vec![WpComSiteId(123)]).unwrap();
         executor.push(pixel());
 
-        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
+        let outcome = view(&service, key(1), APP).await.unwrap();
 
         assert_eq!(outcome, ReaderPageViewOutcome::Counted);
         assert!(executor.sent().last().unwrap().url.ends_with("&priv=1"));
@@ -1501,7 +1514,7 @@ mod page_views {
             feed_item_id: wp_api::wp_com::reader_saved::ReaderFeedItemId(9),
         };
 
-        let outcome = service.post_opened(key, APP.to_string()).await.unwrap();
+        let outcome = view(&service, key, APP).await.unwrap();
 
         assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForRssPost);
         assert_eq!(executor.sent().len(), 1);
@@ -1513,10 +1526,7 @@ mod page_views {
         let (service, executor) = reading(ReaderOwner::SignedOut, vec![post_json(1, 10)]).await;
 
         for post in [1, 99] {
-            let outcome = service
-                .post_opened(key(post), APP.to_string())
-                .await
-                .unwrap();
+            let outcome = view(&service, key(post), APP).await.unwrap();
             assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForMissingDetails);
         }
         assert_eq!(executor.sent().len(), 1);
@@ -1527,7 +1537,7 @@ mod page_views {
         let (service, executor) = reading(ReaderOwner::SignedOut, vec![site_post(1, false)]).await;
         executor.push(Step::Offline);
 
-        let result = service.post_opened(key(1), APP.to_string()).await;
+        let result = view(&service, key(1), APP).await;
 
         assert!(matches!(result, Err(ReaderError::Api(_))));
         assert_eq!(service.pending_action_count().unwrap(), 0);
@@ -1559,13 +1569,13 @@ mod page_views {
         // Two days later the list is stale, and the device is offline.
         *now.lock().unwrap() += Duration::from_secs(2 * 24 * 60 * 60);
         executor.push(Step::Offline);
-        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
+        let outcome = view(&service, key(1), APP).await.unwrap();
         assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForSiteMember);
 
         // Back online, the list says the account has left the site.
         executor.push(sites(&[999]));
         executor.push(pixel());
-        let outcome = service.post_opened(key(1), APP.to_string()).await.unwrap();
+        let outcome = view(&service, key(1), APP).await.unwrap();
         assert_eq!(outcome, ReaderPageViewOutcome::Counted);
     }
 
@@ -1574,7 +1584,7 @@ mod page_views {
         let (service, executor) = reading(ACCOUNT, vec![site_post(1, false)]).await;
         executor.push(Step::Offline);
 
-        let result = service.post_opened(key(1), APP.to_string()).await;
+        let result = view(&service, key(1), APP).await;
 
         assert!(matches!(result, Err(ReaderError::Api(_))));
         assert!(matches!(
@@ -1862,6 +1872,253 @@ mod posts {
 
         assert_eq!(shown(&stream).await, ["3", "2", "1"]);
         assert_eq!(stream.info().unwrap().unreadable_post_count, 0);
+    }
+}
+
+mod opening {
+    use super::*;
+
+    const APP: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 wp-iphone/26.4";
+
+    /// A followed post of site 123, with a seen state and the site's address.
+    fn followed_post(id: u64, seen: bool) -> Value {
+        let mut post = post_json(id, 10);
+        post["is_seen"] = json!(seen);
+        post["site_URL"] = json!("https://example.wordpress.com");
+        post["site_is_private"] = json!(false);
+        post
+    }
+
+    /// A service whose Following stream has `posts`, and whose account is a member of no site.
+    async fn following(
+        owner: ReaderOwner,
+        posts: Vec<Value>,
+    ) -> (ReaderService, Arc<ScriptedExecutor>) {
+        let (service, executor) = service_for(owner);
+        executor.push(Step::Respond(200, json!({ "posts": posts.clone() })));
+        if owner == ReaderOwner::SignedOut {
+            // Signed out there's no Following stream: the posts come from a tag.
+            service.stream(tag()).refresh().await.unwrap();
+        } else {
+            service
+                .stream(ReaderStream::Following)
+                .refresh()
+                .await
+                .unwrap();
+            service.set_member_sites(vec![WpComSiteId(999)]).unwrap();
+        }
+        (service, executor)
+    }
+
+    fn is_seen(service: &ReaderService, id: i64) -> Option<bool> {
+        service.cached_post(key(id)).unwrap().unwrap().is_seen
+    }
+
+    fn marked() -> Step {
+        Step::Respond(200, json!({ "status": true }))
+    }
+
+    fn pixel() -> Step {
+        Step::Respond(200, json!(null))
+    }
+
+    fn count() -> ReaderPageViewChoice {
+        ReaderPageViewChoice::Count {
+            user_agent: APP.to_string(),
+        }
+    }
+
+    /// The paths of the requests sent after the stream's.
+    fn sent_paths(executor: &ScriptedExecutor) -> Vec<String> {
+        executor
+            .sent()
+            .iter()
+            .skip(1)
+            .map(|sent| {
+                let url = sent
+                    .url
+                    .trim_start_matches("https://public-api.wordpress.com");
+                url.split('?').next().unwrap_or(url).to_string()
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn opening_a_post_marks_it_seen_in_every_stream_that_shows_it() {
+        let (service, executor) = following(ACCOUNT, vec![followed_post(1, false)]).await;
+        // The same post in its site's stream.
+        executor.push(Step::Respond(
+            200,
+            json!({ "posts": [followed_post(1, false)] }),
+        ));
+        let site = service.stream(ReaderStream::Site {
+            site_id: WpComSiteId(123),
+        });
+        site.refresh().await.unwrap();
+        executor.push(marked());
+
+        let opened = service
+            .post_opened(key(1), ReaderPageViewChoice::DontCount)
+            .await
+            .unwrap();
+
+        assert!(
+            matches!(
+                opened.seen,
+                ReaderOpenedSeen::Marked {
+                    outcome: ReaderActionOutcome::Synced
+                }
+            ),
+            "{opened:?}"
+        );
+        assert!(matches!(opened.page_view, ReaderOpenedPageView::NotAsked));
+        for stream in [service.stream(ReaderStream::Following), site] {
+            let items = stream.load_items().await.unwrap();
+            assert_eq!(items[0].post.is_seen, Some(true));
+        }
+        // Only the mark was sent: no view, as asked.
+        assert_eq!(executor.sent().len(), 3);
+        assert!(
+            executor.sent()[2]
+                .url
+                .ends_with("/wpcom/v2/seen-posts/seen/blog/new")
+        );
+    }
+
+    #[tokio::test]
+    async fn the_mark_and_the_view_are_both_done_and_reported() {
+        let (service, executor) = following(ACCOUNT, vec![followed_post(1, false)]).await;
+        executor.push(marked());
+        executor.push(pixel());
+
+        let opened = service.post_opened(key(1), count()).await.unwrap();
+
+        assert!(matches!(opened.seen, ReaderOpenedSeen::Marked { .. }));
+        assert!(matches!(
+            opened.page_view,
+            ReaderOpenedPageView::Reported {
+                outcome: ReaderPageViewOutcome::Counted
+            }
+        ));
+        let paths = sent_paths(&executor);
+        assert_eq!(paths.len(), 2);
+        assert!(paths.contains(&"/wpcom/v2/seen-posts/seen/blog/new".to_string()));
+        assert!(
+            paths
+                .iter()
+                .any(|path| path.starts_with("https://pixel.wp.com/g.gif"))
+        );
+    }
+
+    #[tokio::test]
+    async fn a_seen_post_and_one_with_no_seen_state_send_no_mark() {
+        let mut no_state = post_json(2, 10);
+        no_state["site_URL"] = json!("https://example.wordpress.com");
+        let (service, executor) = following(ACCOUNT, vec![followed_post(1, true), no_state]).await;
+
+        let seen = service
+            .post_opened(key(1), ReaderPageViewChoice::DontCount)
+            .await
+            .unwrap();
+        let without = service
+            .post_opened(key(2), ReaderPageViewChoice::DontCount)
+            .await
+            .unwrap();
+        let missing = service
+            .post_opened(key(99), ReaderPageViewChoice::DontCount)
+            .await
+            .unwrap();
+
+        assert!(matches!(seen.seen, ReaderOpenedSeen::AlreadySeen));
+        assert!(matches!(without.seen, ReaderOpenedSeen::NoSeenState));
+        assert!(matches!(missing.seen, ReaderOpenedSeen::NotCached));
+        assert!(sent_paths(&executor).is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_signed_out_reader_opens_a_post_without_a_mark() {
+        let (service, executor) =
+            following(ReaderOwner::SignedOut, vec![followed_post(1, false)]).await;
+        executor.push(pixel());
+
+        let opened = service.post_opened(key(1), count()).await.unwrap();
+
+        assert!(matches!(opened.seen, ReaderOpenedSeen::NoSeenState));
+        assert!(matches!(
+            opened.page_view,
+            ReaderOpenedPageView::Reported {
+                outcome: ReaderPageViewOutcome::Counted
+            }
+        ));
+        assert_eq!(sent_paths(&executor).len(), 1);
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn offline_the_mark_waits_and_the_view_fails_and_both_are_said() {
+        let (service, executor) = following(ACCOUNT, vec![followed_post(1, false)]).await;
+        executor.push(Step::Offline);
+        executor.push(Step::Offline);
+
+        let opened = service.post_opened(key(1), count()).await.unwrap();
+
+        assert!(
+            matches!(
+                opened.seen,
+                ReaderOpenedSeen::Marked {
+                    outcome: ReaderActionOutcome::Pending { .. }
+                }
+            ),
+            "{opened:?}"
+        );
+        assert!(
+            matches!(
+                opened.page_view,
+                ReaderOpenedPageView::Failed {
+                    error: ReaderError::Api(_)
+                }
+            ),
+            "{opened:?}"
+        );
+        // It shows as seen, and is sent once the device is back online. The view isn't.
+        assert_eq!(is_seen(&service, 1), Some(true));
+        assert_eq!(service.pending_action_count().unwrap(), 1);
+        executor.push(marked());
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+        assert_eq!(
+            sent_paths(&executor).last().map(String::as_str),
+            Some("/wpcom/v2/seen-posts/seen/blog/new")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_refused_mark_is_the_seen_parts_error_and_the_view_still_counts() {
+        let (service, executor) = following(ACCOUNT, vec![followed_post(1, false)]).await;
+        executor.push(Step::Respond(
+            403,
+            json!({ "code": "rest_forbidden", "message": "Sorry, you are not allowed to do that.", "data": { "status": 403 } }),
+        ));
+        executor.push(pixel());
+
+        let opened = service.post_opened(key(1), count()).await.unwrap();
+
+        assert!(
+            matches!(
+                opened.seen,
+                ReaderOpenedSeen::Failed {
+                    error: ReaderError::Api(_)
+                }
+            ),
+            "{opened:?}"
+        );
+        assert!(matches!(
+            opened.page_view,
+            ReaderOpenedPageView::Reported {
+                outcome: ReaderPageViewOutcome::Counted
+            }
+        ));
+        assert_eq!(is_seen(&service, 1), Some(false));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
     }
 }
 

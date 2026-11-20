@@ -96,6 +96,13 @@ private fun ReaderPostHeading(post: ReaderPostRecord, state: ReaderPostState) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary
         )
+        state.seenOnOpen?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.testTag("reader_post_seen_on_open")
+            )
+        }
         state.pageView?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
         post.identity.url?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
     }

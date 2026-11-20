@@ -13,6 +13,9 @@ import uniffi.wp_api.ReaderSavedKey
 import uniffi.wp_api.ReaderUserProfile
 import uniffi.wp_api.WpComUserIdentifier
 import uniffi.wp_mobile.ReaderFollowTarget
+import uniffi.wp_mobile.ReaderOpenedPageView
+import uniffi.wp_mobile.ReaderOpenedSeen
+import uniffi.wp_mobile.ReaderPageViewChoice
 import uniffi.wp_mobile.ReaderPageViewOutcome
 import uniffi.wp_mobile.ReaderSavedStatus
 import uniffi.wp_mobile_cache.DbTable
@@ -24,6 +27,20 @@ internal val postScreenTables = setOf(
     DbTable.READER_SAVED_STATE,
     DbTable.READER_SAVED_POSTS
 )
+
+private fun ReaderOpenedSeen.text(): String = when (this) {
+    is ReaderOpenedSeen.Marked -> "Marked as seen on opening. ${outcome.text()}"
+    ReaderOpenedSeen.AlreadySeen -> "Seen already when opened."
+    ReaderOpenedSeen.NoSeenState -> "Not marked as seen: the post has no seen state."
+    ReaderOpenedSeen.NotCached -> "Not marked as seen: the cache doesn't have the post."
+    is ReaderOpenedSeen.Failed -> "Couldn't be marked as seen. ${readerErrorText(error)}"
+}
+
+private fun ReaderOpenedPageView.text(): String = when (this) {
+    is ReaderOpenedPageView.Reported -> outcome.text()
+    ReaderOpenedPageView.NotAsked -> "Page view not sent: the switch on the Reader home is off."
+    is ReaderOpenedPageView.Failed -> "Page view couldn't be counted. ${readerErrorText(error)}"
+}
 
 private fun ReaderPageViewOutcome.text(): String = when (this) {
     ReaderPageViewOutcome.COUNTED -> "Page view counted."
@@ -60,6 +77,10 @@ internal class ReaderPostState(
     var pageView by mutableStateOf<String?>(null)
         private set
 
+    /** What became of marking the post as seen when it was opened. */
+    var seenOnOpen by mutableStateOf<String?>(null)
+        private set
+
     /** The users who liked the post, as far as they've been loaded. They aren't cached. */
     var likes by mutableStateOf<ReaderLikesResponse?>(null)
         private set
@@ -84,20 +105,23 @@ internal class ReaderPostState(
     }
 
     /**
-     * Brings the post up to date from WordPress.com, and counts a view of it when the switch on
-     * the Reader home is on.
+     * Brings the post up to date from WordPress.com, and reports that it was opened, which marks
+     * it as seen. A view is only counted when the switch on the Reader home is on.
      */
     fun opened() {
         requests.run {
             service.fetchPost(identity)
             "Up to date with WordPress.com."
         }
+        val choice = if (session.countPageViews) {
+            ReaderPageViewChoice.Count(readerPageViewUserAgent())
+        } else {
+            ReaderPageViewChoice.DontCount
+        }
         requests.launch {
-            pageView = if (session.countPageViews) {
-                io { service.postOpened(key, readerPageViewUserAgent()) }.text()
-            } else {
-                "Page view not sent: the switch on the Reader home is off."
-            }
+            val opened = io { service.postOpened(key, choice) }
+            seenOnOpen = opened.seen.text()
+            pageView = opened.pageView.text()
         }
     }
 
