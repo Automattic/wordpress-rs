@@ -252,7 +252,6 @@ struct SafeRequestExecutorTests {
         ]
     )
     func testCertificateMismatchNamesFailingHost(failingURL: String, expected: String) throws {
-        let executor = WpRequestExecutor(urlSession: .shared)
         let error = URLError(
             .serverCertificateUntrusted,
             userInfo: [
@@ -261,16 +260,43 @@ struct SafeRequestExecutorTests {
             ]
         )
 
-        let result = executor.handleHttpsError(error, for: StubRequest(url: "http://127.0.0.1/start"))
+        #expect(certificateMismatchHostname(for: error, requestURL: "http://127.0.0.1/start") == expected)
+    }
+
+    // URLSession sets `failingURL` on these errors, but an error built by hand, such as by an app's own
+    // `URLProtocol`, may not. The error then names the request's host, read from the RFC 3986 form
+    // `buildURLRequest` sends, as `URL(string:)` rejects some addresses as given.
+    @Test(
+        "A certificate-mismatch error without a failing URL names the request's host",
+        arguments: [
+            ("https://{cdn}/wp-json/", "{cdn}"),
+            ("https://example.com/wp-json/a|b?q[0]=^", "example.com"),
+            ("https://example.com/wp-json/", "example.com")
+        ]
+    )
+    func testCertificateMismatchWithoutFailingURLNamesRequestHost(url: String, expected: String) throws {
+        let error = URLError(
+            .serverCertificateUntrusted,
+            userInfo: [NSURLErrorFailingURLPeerTrustErrorKey: try exampleComTrust()]
+        )
+
+        #expect(certificateMismatchHostname(for: error, requestURL: url) == expected)
+    }
+
+    /// The host named by the certificate-mismatch error `handleHttpsError` makes from `error`, or `nil` if it makes
+    /// another error.
+    private func certificateMismatchHostname(for error: URLError, requestURL: String) -> String? {
+        let executor = WpRequestExecutor(urlSession: .shared)
+        let result = executor.handleHttpsError(error, for: StubRequest(url: requestURL))
 
         guard case .failure(.RequestExecutionFailed(_, _, let reason, _, _)) = result,
             case .invalidSslError(.certificateNotValidForName(let hostname, let presentedHostnames)) = reason
         else {
             Issue.record("Expected .certificateNotValidForName, got \(result)")
-            return
+            return nil
         }
-        #expect(hostname == expected)
         #expect(presentedHostnames.contains("example.com"))
+        return hostname
     }
 
     /// A `SecTrust` for a self-signed certificate for `example.com`, standing in for the chain a server presents.

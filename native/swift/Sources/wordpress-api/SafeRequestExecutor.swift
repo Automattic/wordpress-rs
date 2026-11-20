@@ -216,9 +216,13 @@ public final class WpRequestExecutor: SafeRequestExecutor {
                 reason: RequestExecutionErrorReason.invalidSslError(
                     reason: .certificateNotValidForName(
                         // The host URLSession checked the certificate against, which is the redirect target
-                        // after a redirect. Reading it from the error avoids re-parsing the request's address,
-                        // which `URL(string:)` can reject. See #1759.
-                        hostname: (error as? URLError)?.failingURL?.host ?? "unknown host",
+                        // after a redirect. URLSession sets `failingURL`, but an error built by hand, such as
+                        // by an app's own `URLProtocol`, may not. The request's host is then read from the
+                        // RFC 3986 form `buildURLRequest` sends, as `URL(string:)` rejects some addresses as
+                        // given. See #1759.
+                        hostname: (error as? URLError)?.failingURL?.host
+                            ?? wpEndpointUrlRfc3986(url: request.url()).flatMap { URL(string: $0) }?.host
+                            ?? "unknown host",
                         presentedHostnames: siteCertificate.presentedHostnames()
                     )
                 ),
