@@ -280,18 +280,38 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             move || {
                 ctx.runtime.block_on(async {
                     let client = signed_out_client(&ctx);
-                    let page = client
-                        .reader_likes()
-                        .comment_likes(&SITE, &LIKED_COMMENT, &ReaderLikesParams::default())
-                        .await
-                        .map_err(|e| e.to_string())?
-                        .data;
-                    if let Some(unreadable) = page.unreadable_likes.first() {
-                        return Err(format!("A like couldn't be read: {}", unreadable.error).into());
-                    }
-                    if page.likes.is_empty() || page.found != Some(page.likes.len() as u64) {
-                        return Err("Expected every one of the comment's few likes".into());
-                    }
+                    // The page has every one of the comment's few likes, as many as its count
+                    // says. A like or unlike as the page is put together can leave the two apart
+                    // for a moment, so the page is asked for again before that fails the trial.
+                    let mut answers = Vec::new();
+                    let page = loop {
+                        let page = client
+                            .reader_likes()
+                            .comment_likes(&SITE, &LIKED_COMMENT, &ReaderLikesParams::default())
+                            .await
+                            .map_err(|e| e.to_string())?
+                            .data;
+                        if let Some(unreadable) = page.unreadable_likes.first() {
+                            return Err(
+                                format!("A like couldn't be read: {}", unreadable.error).into()
+                            );
+                        }
+                        if page.likes.is_empty() {
+                            return Err("The comment should have likes".into());
+                        }
+                        if page.found == Some(page.likes.len() as u64) {
+                            break page;
+                        }
+                        answers.push((page.likes.len(), page.found));
+                        if answers.len() == 3 {
+                            return Err(format!(
+                                "Each page had a different number of likes from its count, as \
+                                 (likes, count): {answers:?}"
+                            )
+                            .into());
+                        }
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    };
                     if page.likes.iter().any(|like| like.date_liked.is_none()) {
                         return Err("A like has no date".into());
                     }

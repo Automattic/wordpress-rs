@@ -4,12 +4,12 @@ use wp_api::date::WpGmtDateTime;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::reader_posts::{
-    ReaderCard, ReaderDiscoverParams, ReaderFirstPostsParams, ReaderFreshlyPressedParams,
-    ReaderLikedPostsParams, ReaderListOwner, ReaderListPostsParams, ReaderListPostsResponse,
-    ReaderListSlug, ReaderOrganizationPostsParams, ReaderPost, ReaderPostsResponse,
-    ReaderSearchPostsParams, ReaderSearchPostsResponse, ReaderSearchSort, ReaderStreamParams,
-    ReaderTagPostsParams, ReaderTagPostsResponse, ReaderTagPostsSort, ReaderTagSlug,
-    ReaderTagsPostsParams,
+    ReaderCard, ReaderDiscoverParams, ReaderDiscoverResponse, ReaderFirstPostsParams,
+    ReaderFirstPostsResponse, ReaderFreshlyPressedParams, ReaderLikedPostsParams, ReaderListOwner,
+    ReaderListPostsParams, ReaderListPostsResponse, ReaderListSlug, ReaderOrganizationPostsParams,
+    ReaderPost, ReaderPostsResponse, ReaderSearchPostsParams, ReaderSearchPostsResponse,
+    ReaderSearchSort, ReaderStreamParams, ReaderTagPostsParams, ReaderTagPostsResponse,
+    ReaderTagPostsSort, ReaderTagSlug, ReaderTagsPostsParams,
 };
 use wp_api::wp_com::reader_saved::ReaderFeedId;
 
@@ -340,26 +340,32 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     }
 
                     // By date: every post says when the search picked it up, and the next page
-                    // is other posts.
-                    let sort = Some(ReaderSearchSort::Date);
-                    let first = search(&ctx.client, sort, None).await?;
-                    if first.posts.is_empty() || first.posts.iter().any(|p| p.date_added.is_none())
-                    {
+                    // with posts is other posts. A search by date pages by time window, and a
+                    // window can be empty without being the last.
+                    let by_date =
+                        |handle| search(&ctx.client, Some(ReaderSearchSort::Date), handle);
+                    let has_posts = |page: &ReaderSearchPostsResponse| !page.posts.is_empty();
+                    let next = |page: &ReaderSearchPostsResponse| page.next_page_handle.clone();
+                    let first =
+                        first_page_with_posts("By date", None, by_date, has_posts, next).await?;
+                    if first.posts.iter().any(|p| p.date_added.is_none()) {
                         return Err("A result by date should say when it was picked up".into());
                     }
                     let handle = first
                         .next_page_handle
                         .clone()
-                        .ok_or("The first page by date has no handle for the next")?;
-                    let second = search(&ctx.client, sort, Some(handle)).await?;
+                        .ok_or("The first page by date with posts has no handle for the next")?;
+                    let second =
+                        first_page_with_posts("By date", Some(handle), by_date, has_posts, next)
+                            .await?;
                     let seen = |page: &ReaderSearchPostsResponse| {
                         page.posts
                             .iter()
                             .map(|result| (result.post.identity.site_id, result.post.identity.id))
                             .collect::<std::collections::HashSet<_>>()
                     };
-                    if second.posts.is_empty() || !seen(&first).is_disjoint(&seen(&second)) {
-                        return Err("The second page by date should be other posts".into());
+                    if !seen(&first).is_disjoint(&seen(&second)) {
+                        return Err("The next page by date should be other posts".into());
                     }
                     Ok(())
                 })
@@ -369,25 +375,28 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             let ctx = Arc::clone(&ctx);
             move || {
                 ctx.runtime.block_on(async {
-                    let first = list_posts(&ctx.client, None).await?;
-                    if first.posts.is_empty() {
-                        return Err("The list has no posts".into());
-                    }
+                    let fetch = |handle| list_posts(&ctx.client, handle);
+                    let has_posts = |page: &ReaderListPostsResponse| !page.posts.is_empty();
+                    let next = |page: &ReaderListPostsResponse| page.next_page_handle.clone();
+                    let first =
+                        first_page_with_posts("The list", None, fetch, has_posts, next).await?;
                     let handle = first
                         .next_page_handle
                         .clone()
                         .ok_or("The first page has no handle for the next")?;
 
-                    // Paging by handle: the next page is other posts.
-                    let second = list_posts(&ctx.client, Some(handle)).await?;
+                    // Paging by handle: the next page with posts is other posts.
+                    let second =
+                        first_page_with_posts("The list", Some(handle), fetch, has_posts, next)
+                            .await?;
                     let seen = |page: &ReaderListPostsResponse| {
                         page.posts
                             .iter()
                             .map(|post| (post.identity.site_id, post.identity.id))
                             .collect::<std::collections::HashSet<_>>()
                     };
-                    if second.posts.is_empty() || !seen(&first).is_disjoint(&seen(&second)) {
-                        return Err("The second page should be other posts".into());
+                    if !seen(&first).is_disjoint(&seen(&second)) {
+                        return Err("The next page should be other posts".into());
                     }
                     Ok(())
                 })
@@ -414,11 +423,19 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         }
                     };
 
+                    let by_handle = |page_handle| {
+                        page(ReaderDiscoverParams {
+                            page_handle,
+                            ..Default::default()
+                        })
+                    };
+                    let has_posts =
+                        |page: &ReaderDiscoverResponse| !card_posts(&page.cards).is_empty();
+                    let next = |page: &ReaderDiscoverResponse| page.next_page_handle.clone();
+
                     // A page is posts, with a card of recommended sites among them.
-                    let first = page(ReaderDiscoverParams::default()).await?;
-                    if card_posts(&first.cards).is_empty() {
-                        return Err("Discover has no posts".into());
-                    }
+                    let first =
+                        first_page_with_posts("Discover", None, by_handle, has_posts, next).await?;
                     if !first
                         .cards
                         .iter()
@@ -431,17 +448,12 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         .clone()
                         .ok_or("The first page has no handle for the next")?;
 
-                    // Paging by handle: the next page is other posts.
-                    let second = page(ReaderDiscoverParams {
-                        page_handle: Some(handle),
-                        ..Default::default()
-                    })
-                    .await?;
-                    let second_posts = card_posts(&second.cards);
-                    if second_posts.is_empty()
-                        || !card_posts(&first.cards).is_disjoint(&second_posts)
-                    {
-                        return Err("The second page should be other posts".into());
+                    // Paging by handle: the next page with posts is other posts.
+                    let second =
+                        first_page_with_posts("Discover", Some(handle), by_handle, has_posts, next)
+                            .await?;
+                    if !card_posts(&first.cards).is_disjoint(&card_posts(&second.cards)) {
+                        return Err("The next page should be other posts".into());
                     }
 
                     // Asked for with tags, a page ends with a card of tags the user may like.
@@ -482,11 +494,13 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         }
                     };
 
+                    let has_posts =
+                        |page: &ReaderFirstPostsResponse| !card_posts(&page.cards).is_empty();
+                    let next = |page: &ReaderFirstPostsResponse| page.next_page_handle.clone();
+
                     // A page is posts, then a card of new sites.
-                    let first = page(None).await?;
-                    if card_posts(&first.cards).is_empty() {
-                        return Err("The stream has no posts".into());
-                    }
+                    let first =
+                        first_page_with_posts("The stream", None, page, has_posts, next).await?;
                     if !matches!(first.cards.last(), Some(ReaderCard::NewSites { .. })) {
                         return Err("A page should end with a card of new sites".into());
                     }
@@ -495,13 +509,12 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         .clone()
                         .ok_or("The first page has no handle for the next")?;
 
-                    // Paging by handle: the next page is other posts.
-                    let second = page(Some(handle)).await?;
-                    let second_posts = card_posts(&second.cards);
-                    if second_posts.is_empty()
-                        || !card_posts(&first.cards).is_disjoint(&second_posts)
-                    {
-                        return Err("The second page should be other posts".into());
+                    // Paging by handle: the next page with posts is other posts.
+                    let second =
+                        first_page_with_posts("The stream", Some(handle), page, has_posts, next)
+                            .await?;
+                    if !card_posts(&first.cards).is_disjoint(&card_posts(&second.cards)) {
+                        return Err("The next page should be other posts".into());
                     }
                     Ok(())
                 })
@@ -519,24 +532,28 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     };
 
                     // By date, the next page is the one the handle names.
-                    let first = tags_posts(&ctx.client, ReaderTagsPostsParams::default()).await?;
-                    if first.posts.is_empty() {
-                        return Err("The tags have no posts".into());
-                    }
+                    let by_date = |page_handle| {
+                        tags_posts(
+                            &ctx.client,
+                            ReaderTagsPostsParams {
+                                page_handle,
+                                ..Default::default()
+                            },
+                        )
+                    };
+                    let has_posts = |page: &ReaderTagPostsResponse| !page.posts.is_empty();
+                    let next = |page: &ReaderTagPostsResponse| page.next_page_handle.clone();
+                    let first =
+                        first_page_with_posts("The tags", None, by_date, has_posts, next).await?;
                     let handle = first
                         .next_page_handle
                         .clone()
                         .ok_or("The first page has no handle for the next")?;
-                    let second = tags_posts(
-                        &ctx.client,
-                        ReaderTagsPostsParams {
-                            page_handle: Some(handle),
-                            ..Default::default()
-                        },
-                    )
-                    .await?;
-                    if second.posts.is_empty() || !seen(&first).is_disjoint(&seen(&second)) {
-                        return Err("The second page by date should be other posts".into());
+                    let second =
+                        first_page_with_posts("The tags", Some(handle), by_date, has_posts, next)
+                            .await?;
+                    if !seen(&first).is_disjoint(&seen(&second)) {
+                        return Err("The next page by date should be other posts".into());
                     }
 
                     // By popularity, the next page is the next page number.
@@ -643,6 +660,39 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             }
         }),
     ]
+}
+
+/// How many pages a trial asks for, from a handle, to find one with posts.
+const MAX_PAGES_TO_POSTS: usize = 12;
+
+/// The first page from `handle` on that has posts. A stream that pages by handle can send a page
+/// with none that isn't its last: a search by date pages by time window, and six empty windows in
+/// a row have been seen. So an empty page is followed, and the trial fails if one has no handle
+/// for the next, or if no page of the first [`MAX_PAGES_TO_POSTS`] has posts.
+async fn first_page_with_posts<P, F, Fut>(
+    what: &str,
+    mut handle: Option<String>,
+    fetch: F,
+    has_posts: impl Fn(&P) -> bool,
+    next_handle: impl Fn(&P) -> Option<String>,
+) -> Result<P, String>
+where
+    F: Fn(Option<String>) -> Fut,
+    Fut: std::future::Future<Output = Result<P, String>>,
+{
+    for _ in 0..MAX_PAGES_TO_POSTS {
+        let page = fetch(handle.take()).await?;
+        if has_posts(&page) {
+            return Ok(page);
+        }
+        handle =
+            Some(next_handle(&page).ok_or_else(|| {
+                format!("{what}: a page with no posts has no handle for the next")
+            })?);
+    }
+    Err(format!(
+        "{what}: none of {MAX_PAGES_TO_POSTS} pages in a row has posts"
+    ))
 }
 
 /// A page of a search for a word that always has results.

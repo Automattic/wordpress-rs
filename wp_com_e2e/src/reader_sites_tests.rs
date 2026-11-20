@@ -234,26 +234,31 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                                 .map_err(|e| e.to_string())
                         }
                     };
-                    let first = search(None).await?;
-                    if first.feeds.len() != 5 || first.total.is_none_or(|total| total <= 5) {
-                        return Err("The search should find more than a page of results".into());
-                    }
-                    if first.feeds.iter().any(|result| result.title.is_none()) {
-                        return Err("A search result should have a title".into());
-                    }
-                    if first.next_page_handle.is_some() {
-                        return Err("Sorted by relevance, a search pages by offset".into());
-                    }
+                    // Paging by offset: the next page is other results. A result that moves up
+                    // the ranking between the two requests is on both, so two pages that share
+                    // one are asked for again before that fails the trial.
+                    for _ in 0..3 {
+                        let first = search(None).await?;
+                        if first.feeds.len() != 5 || first.total.is_none_or(|total| total <= 5) {
+                            return Err("The search should find more than a page of results".into());
+                        }
+                        if first.feeds.iter().any(|result| result.title.is_none()) {
+                            return Err("A search result should have a title".into());
+                        }
+                        if first.next_page_handle.is_some() {
+                            return Err("Sorted by relevance, a search pages by offset".into());
+                        }
 
-                    // Paging by offset: the next page is other results.
-                    let offset = first.next_offset.ok_or("There should be a next offset")?;
-                    let second = search(Some(offset)).await?;
-                    if second.feeds.is_empty()
-                        || !keys(&first.feeds).is_disjoint(&keys(&second.feeds))
-                    {
-                        return Err("The second page should be other results".into());
+                        let offset = first.next_offset.ok_or("There should be a next offset")?;
+                        let second = search(Some(offset)).await?;
+                        if second.feeds.is_empty() {
+                            return Err("The second page should have results".into());
+                        }
+                        if keys(&first.feeds).is_disjoint(&keys(&second.feeds)) {
+                            return Ok(());
+                        }
                     }
-                    Ok(())
+                    Err("Three times, the second page had a result of the first".into())
                 })
             }
         }),

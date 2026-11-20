@@ -1,8 +1,6 @@
 use async_trait::async_trait;
 use integration_test_credentials::WpComTestCredentials;
-use std::sync::{
-    Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard,
-};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Duration;
 use tokio::runtime::Runtime;
 use wp_api::{
