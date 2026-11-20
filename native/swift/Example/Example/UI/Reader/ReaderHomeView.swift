@@ -194,7 +194,9 @@ struct ReaderHomeView: View {
                 Text("Newest").tag(ReaderSearchSort.date)
             }
             Button("Search") {
-                path.append(.stream(.search(query: searchQuery, sort: viewModel.searchSort)))
+                // The device's language, so the results are in it. The library sends only its first part.
+                let lang = Locale.preferredLanguages.first
+                path.append(.stream(.search(query: searchQuery, sort: viewModel.searchSort, lang: lang)))
             }
             .disabled(searchQuery.isEmpty)
             .accessibilityIdentifier("search-posts")

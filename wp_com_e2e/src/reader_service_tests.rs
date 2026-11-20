@@ -138,10 +138,12 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         ReaderStream::Search {
                             query: "wordpress".to_string(),
                             sort: ReaderSearchSort::Relevance,
+                            lang: Some("en".to_string()),
                         },
                         ReaderStream::Search {
                             query: "wordpress".to_string(),
                             sort: ReaderSearchSort::Date,
+                            lang: Some("en".to_string()),
                         },
                         ReaderStream::ReaderList {
                             owner: ReaderListOwner("automattic".to_string()),

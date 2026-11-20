@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.intl.Locale
 import uniffi.wp_api.ReaderSearchSort
 import uniffi.wp_mobile.ReaderStream
 
@@ -55,7 +56,9 @@ internal fun ReaderSearchSection(open: (ReaderDestination) -> Unit) {
             )
             Button(
                 onClick = {
-                    val stream = ReaderStream.Search(query.trim(), sort)
+                    // The device's language, so the results are in it. The library sends only
+                    // its first part.
+                    val stream = ReaderStream.Search(query.trim(), sort, Locale.current.toLanguageTag())
                     open(ReaderDestination.Stream(stream, stream.title()))
                 },
                 enabled = query.isNotBlank()

@@ -95,10 +95,17 @@ pub enum ReaderStream {
     Tag { slug: ReaderTagSlug },
     /// The newest posts of several tags, which is Discover's "latest" tab.
     Tags { slugs: Vec<ReaderTagSlug> },
-    /// A search of posts.
+    /// A search of posts. `query` is sent whole, `&` and all.
+    ///
+    /// `lang` is the language to search in: pass the device's, such as `fr-CA` or `pt_BR`. The
+    /// server answers posts in that language, and only reads its first part, in lower case, so the
+    /// library sends `fr` or `pt`. A search in another language is another stream, with its own
+    /// cached posts. `None` sends no language, and the server answers as it does for `en`. A value
+    /// whose first part isn't letters, such as `""`, is sent as no language.
     Search {
         query: String,
         sort: ReaderSearchSort,
+        lang: Option<String>,
     },
     /// A Reader list's posts.
     ReaderList {
@@ -129,6 +136,15 @@ pub enum ReaderStreamOrdering {
     Server,
 }
 
+/// The language a search is sent with: the first part of a language tag such as `fr-CA` or
+/// `pt_BR`, in lower case. The server reads no more than that (`fr-CA` and `fr` answer the same),
+/// and answers no posts at all to `FR`. `None` when the first part isn't letters.
+fn search_language(lang: Option<&str>) -> Option<String> {
+    let language = lang?.trim().split(['-', '_']).next()?;
+    (!language.is_empty() && language.chars().all(|c| c.is_ascii_alphabetic()))
+        .then(|| language.to_ascii_lowercase())
+}
+
 fn tags_key(slugs: &[ReaderTagSlug]) -> String {
     let mut slugs: Vec<&str> = slugs.iter().map(|slug| slug.0.as_str()).collect();
     slugs.sort_unstable();
@@ -150,7 +166,10 @@ impl ReaderStream {
             Self::Feed { feed_id } => format!("feed:{}", feed_id.0),
             Self::Tag { slug } => format!("tag:{}", slug.0),
             Self::Tags { slugs } => format!("tags:{}", tags_key(slugs)),
-            Self::Search { query, sort } => format!("search:{sort}:{query}"),
+            Self::Search { query, sort, lang } => format!(
+                "search:{sort}:{}:{query}",
+                search_language(lang.as_deref()).unwrap_or_default()
+            ),
             Self::ReaderList { owner, slug } => format!("list:{}/{}", owner.0, slug.0),
             Self::Discover { tags } => format!("discover:{}", tags_key(tags)),
             Self::FirstPosts => "first-posts".to_string(),
@@ -301,7 +320,7 @@ impl ReaderStream {
                 };
                 tag_page(posts.tags_posts(&params).await?.data)
             }
-            Self::Search { query, sort } => {
+            Self::Search { query, sort, lang } => {
                 let params = ReaderSearchPostsParams {
                     q: query.clone(),
                     number: Some(SEARCH_PAGE_SIZE),
@@ -310,7 +329,7 @@ impl ReaderStream {
                     sort: Some(*sort),
                     before: None,
                     after: None,
-                    lang: None,
+                    lang: search_language(lang.as_deref()),
                     algorithm: None,
                     meta,
                     fields: None,
@@ -578,7 +597,8 @@ mod tests {
     #[case(ReaderStream::Feed { feed_id: ReaderFeedId(8857199) }, "feed:8857199", false, ReaderStreamOrdering::Date)]
     #[case(ReaderStream::Tag { slug: slug("photography") }, "tag:photography", false, ReaderStreamOrdering::Server)]
     #[case(ReaderStream::Tags { slugs: vec![slug("travel"), slug("art"), slug("travel")] }, "tags:art,travel", false, ReaderStreamOrdering::Server)]
-    #[case(ReaderStream::Search { query: "cats and dogs".to_string(), sort: ReaderSearchSort::Date }, "search:date:cats and dogs", false, ReaderStreamOrdering::Server)]
+    #[case(ReaderStream::Search { query: "cats and dogs".to_string(), sort: ReaderSearchSort::Date, lang: None }, "search:date::cats and dogs", false, ReaderStreamOrdering::Server)]
+    #[case(ReaderStream::Search { query: "cats".to_string(), sort: ReaderSearchSort::Relevance, lang: Some("fr-CA".to_string()) }, "search:relevance:fr:cats", false, ReaderStreamOrdering::Server)]
     #[case(ReaderStream::ReaderList { owner: ReaderListOwner("automattic".to_string()), slug: ReaderListSlug("design".to_string()) }, "list:automattic/design", false, ReaderStreamOrdering::Server)]
     #[case(ReaderStream::Discover { tags: vec![] }, "discover:", false, ReaderStreamOrdering::Server)]
     #[case(ReaderStream::Discover { tags: vec![slug("b"), slug("a")] }, "discover:a,b", false, ReaderStreamOrdering::Server)]
@@ -598,6 +618,24 @@ mod tests {
         assert_eq!(stream.key(), key);
         assert_eq!(stream.needs_account(), needs_account);
         assert_eq!(stream.ordering(), ordering);
+    }
+
+    #[rstest]
+    #[case(None, None)]
+    #[case(Some("fr"), Some("fr"))]
+    #[case(Some("fr-CA"), Some("fr"))]
+    #[case(Some("pt_BR"), Some("pt"))]
+    #[case(Some("zh-Hant-TW"), Some("zh"))]
+    #[case(Some("FR"), Some("fr"))]
+    #[case(Some(" de "), Some("de"))]
+    #[case(Some(""), None)]
+    #[case(Some("-CA"), None)]
+    #[case(Some("12"), None)]
+    fn test_the_language_a_search_is_sent_with(
+        #[case] lang: Option<&str>,
+        #[case] sent: Option<&str>,
+    ) {
+        assert_eq!(search_language(lang).as_deref(), sent);
     }
 
     #[test]

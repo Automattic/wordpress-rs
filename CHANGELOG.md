@@ -85,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WPCOM_REST_API_CHECKLIST.md` ticks the WordPress.com Reader endpoints the library now has, and adds the ones it has that the list lacked. A line says so where the library uses a newer version than the one listed.
 - `ReaderStream::Liked`'s documentation says that a post unliked since the stream was fetched stays in it, shown as not liked, until the stream is refreshed, since the stream is the server's list.
 - `wp_com_e2e`'s comment subscription trial now fails when subscribing isn't sent at once, as its other steps do. Until now it failed only when the subscription was refused, so a subscription left waiting to be sent passed.
+- `ReaderStream::Search` takes the language to search in, `lang`, so the results match the reader's language: pass the device's, such as `fr-CA`. The server reads only the first part of it, in lower case (it answers no posts to `FR`), so the library sends `fr`, and a search in another language is another cached stream. A phrase with `&` in it reaches the server whole. The Swift and Kotlin example apps search in the device's language.
 
 ### Fixed
 

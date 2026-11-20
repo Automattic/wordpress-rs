@@ -190,8 +190,17 @@ async fn each_stream_reads_its_own_endpoint() {
             ReaderStream::Search {
                 query: "cats and dogs".to_string(),
                 sort: ReaderSearchSort::Date,
+                lang: None,
             },
             "/rest/v1.2/read/search?q=cats+and+dogs&number=20&sort=date&meta=site%2Cfeed",
+        ),
+        (
+            ReaderStream::Search {
+                query: "cats & dogs".to_string(),
+                sort: ReaderSearchSort::Relevance,
+                lang: Some("fr-CA".to_string()),
+            },
+            "/rest/v1.2/read/search?q=cats+%26+dogs&number=20&sort=relevance&lang=fr&meta=site%2Cfeed",
         ),
         (
             ReaderStream::ReaderList {
@@ -300,6 +309,7 @@ async fn a_search_follows_its_page_handles() {
     let stream = service.stream(ReaderStream::Search {
         query: "cats".to_string(),
         sort: ReaderSearchSort::Relevance,
+        lang: None,
     });
     executor.push(Step::Respond(
         200,
@@ -318,6 +328,58 @@ async fn a_search_follows_its_page_handles() {
         queries(&executor)[1],
         "q=cats&number=20&page_handle=20&sort=relevance&meta=site%2Cfeed"
     );
+}
+
+/// The query a request was sent with, read back as the server reads it.
+fn sent_query(executor: &ScriptedExecutor, index: usize) -> Vec<(String, String)> {
+    let url = url::Url::parse(&executor.sent()[index].url).expect("the request has an address");
+    url.query_pairs()
+        .map(|(name, value)| (name.into_owned(), value.into_owned()))
+        .collect()
+}
+
+#[tokio::test]
+async fn a_search_phrase_reaches_the_server_whole_with_the_readers_language() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let stream = service.stream(ReaderStream::Search {
+        query: "cats & dogs=friends?".to_string(),
+        sort: ReaderSearchSort::Relevance,
+        lang: Some("pt_BR".to_string()),
+    });
+    executor.push(Step::Respond(200, json!({ "posts": [post_json(1, 10)] })));
+    stream.refresh().await.unwrap();
+
+    let query = sent_query(&executor, 0);
+    let value = |name: &str| {
+        query
+            .iter()
+            .filter(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
+            .collect::<Vec<_>>()
+    };
+    // The `&` and `=` are in the phrase, not the start of another parameter.
+    assert_eq!(value("q"), ["cats & dogs=friends?"]);
+    assert!(value(" dogs").is_empty());
+    assert_eq!(value("lang"), ["pt"]);
+}
+
+#[tokio::test]
+async fn a_search_in_another_language_is_another_stream() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let search = |lang: &str| ReaderStream::Search {
+        query: "chat".to_string(),
+        sort: ReaderSearchSort::Relevance,
+        lang: Some(lang.to_string()),
+    };
+    executor.push(Step::Respond(200, json!({ "posts": [post_json(1, 10)] })));
+    service.stream(search("fr")).refresh().await.unwrap();
+    executor.push(Step::Respond(200, json!({ "posts": [post_json(2, 10)] })));
+    service.stream(search("en")).refresh().await.unwrap();
+
+    assert_eq!(shown(&service.stream(search("fr"))).await, ["1"]);
+    assert_eq!(shown(&service.stream(search("en"))).await, ["2"]);
+    // The server answers `fr-CA` as it does `fr`, so the two are one stream.
+    assert_eq!(shown(&service.stream(search("fr-CA"))).await, ["1"]);
 }
 
 #[tokio::test]
