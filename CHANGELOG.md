@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `wp_com_e2e` fetches a Jetpack site's post and a VIP site's post through the site's and the feed's single-post endpoints, and checks the fields that tell each kind apart. Anonymized fixtures of both kinds have unit tests. Nothing in the library changes.
 - `wp_com_e2e` runs `ReaderService::resolve_link` against the live API: a post's address with an account, a site's and a feed-only site's home address, an address that is neither, and a post's address signed out, which sends nothing. Nothing in the library changes.
 - `reader_sweep`'s check for a post with words but no summary or reading time only counts words a reader sees, leaving out CSS, scripts, attribute values and other hidden markup. It's a test tool: nothing in the library changes.
+- `ReaderService::resolve_link` opens the Reader's own addresses on wordpress.com, such as `/read/blogs/{site}/posts/{post}`, `/reader/feeds/{feed}` and the older `/read/post/id/{site}/{post}`, as the site, feed or post they name, with no request to the resolver and no account needed; one that names nothing is `NothingThere`.
 
 ### Changed
 

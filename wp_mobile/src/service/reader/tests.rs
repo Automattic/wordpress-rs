@@ -2810,6 +2810,226 @@ mod links {
         assert!(executor.sent().is_empty());
         assert!(!reader_link_not_in_reader_message(ReaderLinkNotInReader::ShortLink).is_empty());
     }
+
+    /// A feed, of site `site` or of none (`0`).
+    fn feed(feed_id: u64, site: u64) -> Step {
+        Step::Respond(
+            200,
+            json!({ "feed_ID": feed_id.to_string(), "blog_ID": site.to_string(), "name": "A feed", "URL": "https://example.com", "feed_URL": "https://example.com/feed/" }),
+        )
+    }
+
+    #[tokio::test]
+    async fn the_readers_own_address_of_a_site_opens_the_site_signed_out() {
+        for link in [
+            "https://wordpress.com/read/blogs/123",
+            "https://wordpress.com/reader/blogs/123/",
+            "https://wordpress.com/read/blogs/123/posts",
+            "https://www.wordpress.com/READ/Blogs/123",
+            "https://wordpress.com/read/blog/id/123",
+            "wordpress.com/reader/blogs/123?ref=share#top",
+        ] {
+            let (service, executor) = service_for(ReaderOwner::SignedOut);
+            executor.push(site(123));
+
+            let opened = service.resolve_link(link.to_string()).await.unwrap();
+
+            let ReaderLink::Site { site_id, site } = opened else {
+                panic!("{link}: {opened:?}")
+            };
+            assert_eq!(site_id, WpComSiteId(123), "{link}");
+            assert_eq!(site.name.as_deref(), Some("A site"), "{link}");
+            assert_eq!(paths(&executor), ["/rest/v1.2/read/sites/123?"], "{link}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_readers_own_address_of_a_feed_opens_the_feed_or_its_site_signed_out() {
+        for link in [
+            "https://wordpress.com/read/feeds/456",
+            "https://wordpress.com/reader/feeds/456/posts/",
+            "https://wordpress.com/read/blog/feed/456",
+        ] {
+            let (service, executor) = service_for(ReaderOwner::SignedOut);
+            executor.push(feed(456, 0));
+
+            let opened = service.resolve_link(link.to_string()).await.unwrap();
+
+            let ReaderLink::Feed { feed_id, site } = opened else {
+                panic!("{link}: {opened:?}")
+            };
+            assert_eq!(feed_id, ReaderFeedId(456), "{link}");
+            assert_eq!(site.name.as_deref(), Some("A feed"), "{link}");
+            assert_eq!(paths(&executor), ["/rest/v1.1/read/feed/456"], "{link}");
+        }
+
+        // A WordPress.com or Jetpack site's feed opens the site, as the web Reader opens it.
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(feed(456, 123));
+        let opened = service
+            .resolve_link("https://wordpress.com/reader/feeds/456".to_string())
+            .await
+            .unwrap();
+        assert!(
+            matches!(
+                opened,
+                ReaderLink::Site {
+                    site_id: WpComSiteId(123),
+                    ..
+                }
+            ),
+            "{opened:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_readers_own_address_of_a_sites_post_opens_the_post_signed_out() {
+        for link in [
+            "https://wordpress.com/read/blogs/123/posts/7",
+            "https://wordpress.com/reader/blogs/123/posts/7/",
+            "https://wordpress.com/read/post/id/123/7",
+        ] {
+            let (service, executor) = service_for(ReaderOwner::SignedOut);
+            executor.push(Step::Respond(200, post_json(7, 10)));
+
+            let opened = service.resolve_link(link.to_string()).await.unwrap();
+
+            let ReaderLink::Post { post } = opened else {
+                panic!("{link}: {opened:?}")
+            };
+            assert_eq!(post.identity.id, 7, "{link}");
+            assert!(service.cached_post(key(7)).unwrap().is_some(), "{link}");
+            assert_eq!(
+                paths(&executor),
+                ["/rest/v1.2/read/sites/123/posts/7?meta=site%2Cfeed"],
+                "{link}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_readers_own_address_of_a_feeds_post_opens_the_post_signed_out() {
+        for link in [
+            "https://wordpress.com/read/feeds/456/posts/9",
+            "https://wordpress.com/reader/feeds/456/posts/9",
+            "https://wordpress.com/read/post/feed/456/9",
+        ] {
+            let (service, executor) = service_for(ReaderOwner::SignedOut);
+            executor.push(Step::Respond(
+                200,
+                json!({ "ID": 9, "feed_ID": 456, "feed_item_ID": 9, "is_external": true, "title": "From a feed" }),
+            ));
+
+            let opened = service.resolve_link(link.to_string()).await.unwrap();
+
+            let ReaderLink::Post { post } = opened else {
+                panic!("{link}: {opened:?}")
+            };
+            assert_eq!(post.title.as_deref(), Some("From a feed"), "{link}");
+            assert_eq!(
+                paths(&executor),
+                ["/rest/v1.3/read/feed/456/posts/9?meta=site%2Cfeed"],
+                "{link}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_readers_own_address_that_names_nothing_says_so_and_sends_nothing() {
+        for owner in [ACCOUNT, ReaderOwner::SignedOut] {
+            let (service, executor) = service_for(owner);
+            for link in [
+                "https://wordpress.com/read",
+                "https://wordpress.com/reader/",
+                "https://wordpress.com/read/blogs",
+                "https://wordpress.com/read/blogs/example.com",
+                "https://wordpress.com/read/blogs/0",
+                "https://wordpress.com/read/blogs/+123",
+                "https://wordpress.com/read/blogs/123/posts/a-post",
+                "https://wordpress.com/read/blogs/123/posts/7/likes",
+                "https://wordpress.com/read/feeds/456/items/9",
+                // The older addresses are only under `/read/`.
+                "https://wordpress.com/reader/blog/id/123",
+                // Streams that aren't a site or a feed.
+                "https://wordpress.com/read/tag/photography",
+                "https://wordpress.com/reader/list/someone/a-list",
+                "https://wordpress.com/read/search?q=cats",
+                "https://wordpress.com/reader/a8c",
+            ] {
+                assert_eq!(
+                    service.resolve_link(link.to_string()).await.unwrap(),
+                    not_in_reader(ReaderLinkNotInReader::NothingThere),
+                    "{link}"
+                );
+            }
+            assert!(executor.sent().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn a_readers_own_address_with_ids_the_server_does_not_have_says_so() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        for (link, answer) in [
+            (
+                "https://wordpress.com/read/blogs/123",
+                error(404, "unknown_blog"),
+            ),
+            (
+                "https://wordpress.com/read/blogs/123",
+                error(410, "site_gone"),
+            ),
+            (
+                "https://wordpress.com/read/feeds/456",
+                error(404, "no_such_feed"),
+            ),
+            (
+                "https://wordpress.com/read/blogs/123/posts/7",
+                error(404, "unknown_post"),
+            ),
+            (
+                "https://wordpress.com/read/feeds/456/posts/9",
+                error(404, "no_such_item"),
+            ),
+        ] {
+            executor.push(answer);
+            assert_eq!(
+                service.resolve_link(link.to_string()).await.unwrap(),
+                not_in_reader(ReaderLinkNotInReader::NothingThere),
+                "{link}"
+            );
+        }
+
+        // A refusal, such as for a private site, and a request that fails are the error.
+        executor.push(error(403, "unauthorized"));
+        assert!(matches!(
+            service
+                .resolve_link("https://wordpress.com/read/blogs/123".to_string())
+                .await,
+            Err(ReaderError::Api(_))
+        ));
+        executor.push(Step::Offline);
+        assert!(matches!(
+            service
+                .resolve_link("https://wordpress.com/read/blogs/123/posts/7".to_string())
+                .await,
+            Err(ReaderError::Api(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_read_address_on_another_host_is_not_the_readers() {
+        let (service, executor) = service();
+        executor.push(error(404, "post_not_found"));
+        executor.push(error(404, "no_such_feed"));
+
+        let link = service
+            .resolve_link("https://example.com/read/blogs/123".to_string())
+            .await
+            .unwrap();
+
+        assert_eq!(link, not_in_reader(ReaderLinkNotInReader::NothingThere));
+        assert!(paths(&executor)[0].starts_with("/wpcom/v2/mobile/resolve-reader-url"));
+    }
 }
 
 mod menu_and_sites {

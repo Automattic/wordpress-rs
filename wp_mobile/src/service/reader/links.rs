@@ -12,12 +12,33 @@
 //!   signed out too, and is a 404 `unknown_blog` for any other domain.
 //! - `GET /rest/v1.1/read/feed?url=` finds the feeds at an address, on any site, signed out too,
 //!   and is a 404 `no_such_feed` where it finds none, as at a page that isn't there.
+//!
+//! The Reader's own pages on `wordpress.com` name a site, a feed or a post by its IDs, so they're
+//! read here rather than sent to the resolver. The shapes, from the web Reader's routes and its
+//! redirects of older addresses (Calypso's `client/reader/index.ts`, `full-post/index.js` and
+//! `setupReadRoutes` in `controller.jsx`, 2026-11-18) and the Android app's
+//! `ReaderPostPagerActivity` and `ReaderLinkHandler` (2026-11-17), each under `/read/` or
+//! `/reader/`:
+//!
+//! - `blogs/{site}` and `blogs/{site}/posts`: a site.
+//! - `feeds/{feed}` and `feeds/{feed}/posts`: a feed. The web Reader opens a feed of a
+//!   WordPress.com or Jetpack site as the site.
+//! - `blogs/{site}/posts/{post}`: a site's post.
+//! - `feeds/{feed}/posts/{item}`: a feed's post.
+//! - Under `/read/` only, older addresses the web redirects: `blog/id/{site}`, `blog/feed/{feed}`,
+//!   `post/id/{site}/{post}` and `post/feed/{feed}/{item}`.
+//!
+//! The IDs are numbers, as the web's routes require. Asked about with IDs that name nothing,
+//! `read/sites/{id}` is a 404 `unknown_blog` (410 `site_gone` for a deleted site),
+//! `read/feed/{id}` a 404 `no_such_feed`, a site's post a 404 `unknown_post` and a feed's item a
+//! 404 `no_such_item`. The Reader's other pages, such as a tag's, a list's, search or Discover,
+//! open a stream that isn't a site or a feed, and `ReaderLink` has nothing for them yet.
 
 use super::{ReaderError, ReaderService};
 use wp_api::prelude::{WpApiError, WpErrorCode};
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::reader_post::ReaderResolveUrlParams;
-use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderPostSaveIdentity};
+use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderFeedItemId, ReaderPostSaveIdentity};
 use wp_api::wp_com::reader_sites::{ReaderFeedSearchParams, ReaderSiteParams};
 use wp_api::wp_com::sites::WpComSiteIdentifier;
 use wp_mobile_cache::db_types::reader::ReaderPostRecord;
@@ -58,7 +79,8 @@ pub enum ReaderLinkNotInReader {
     /// open it.
     ShortLink,
     /// The address is on a WordPress.com or Jetpack site, and the server has no post there and no
-    /// feed, such as a page that isn't there.
+    /// feed, such as a page that isn't there. Or it's one of the Reader's own addresses, and it
+    /// names no site, feed or post: one the Reader doesn't have, or one of its other pages.
     NothingThere,
     /// There's no WordPress.com or Jetpack site at the address, and no feed.
     NotWordPressOrFeed,
@@ -104,6 +126,83 @@ fn parse_link(link: &str) -> Option<url::Url> {
     (is_web && parsed.host_str().is_some_and(|host| !host.is_empty())).then_some(parsed)
 }
 
+/// The hosts the Reader's own pages are on.
+const READER_HOSTS: [&str; 2] = ["wordpress.com", "www.wordpress.com"];
+
+/// What one of the Reader's own addresses names. See the module's documentation for the shapes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReaderAddress {
+    Site(WpComSiteId),
+    Feed(ReaderFeedId),
+    SitePost(WpComSiteId, u64),
+    FeedPost(ReaderFeedId, ReaderFeedItemId),
+    /// A Reader address that names no site, feed or post.
+    Nothing,
+}
+
+/// An ID in a Reader address: a number above zero, in digits only.
+fn reader_id(segment: &str) -> Option<u64> {
+    if segment.is_empty() || !segment.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    segment.parse().ok().filter(|id| *id != 0)
+}
+
+/// What a Reader address names, or `None` when the address isn't one of the Reader's: on
+/// another host, or with a path that doesn't start with `read` or `reader`. `host` is in lower
+/// case.
+fn reader_address(host: &str, url: &url::Url) -> Option<ReaderAddress> {
+    if !READER_HOSTS.contains(&host) {
+        return None;
+    }
+    let segments: Vec<&str> = url
+        .path_segments()?
+        .filter(|segment| !segment.is_empty())
+        .collect();
+    let (first, rest) = segments.split_first()?;
+    let is_read = first.eq_ignore_ascii_case("read");
+    if !is_read && !first.eq_ignore_ascii_case("reader") {
+        return None;
+    }
+    // The web matches the words of a Reader address in any case, and the IDs as digits.
+    let words: Vec<String> = rest.iter().map(|word| word.to_ascii_lowercase()).collect();
+    let words: Vec<&str> = words.iter().map(String::as_str).collect();
+    let site = |id: &str| reader_id(id).map(WpComSiteId);
+    let feed = |id: &str| reader_id(id).map(ReaderFeedId);
+    let named = match words.as_slice() {
+        ["blogs", id] | ["blogs", id, "posts"] => site(id).map(ReaderAddress::Site),
+        ["feeds", id] | ["feeds", id, "posts"] => feed(id).map(ReaderAddress::Feed),
+        ["blogs", id, "posts", post] => site(id)
+            .zip(reader_id(post))
+            .map(|(site, post)| ReaderAddress::SitePost(site, post)),
+        ["feeds", id, "posts", item] => feed(id)
+            .zip(reader_id(item).map(ReaderFeedItemId))
+            .map(|(feed, item)| ReaderAddress::FeedPost(feed, item)),
+        ["blog", "id", id] if is_read => site(id).map(ReaderAddress::Site),
+        ["blog", "feed", id] if is_read => feed(id).map(ReaderAddress::Feed),
+        ["post", "id", id, post] if is_read => site(id)
+            .zip(reader_id(post))
+            .map(|(site, post)| ReaderAddress::SitePost(site, post)),
+        ["post", "feed", id, item] if is_read => feed(id)
+            .zip(reader_id(item).map(ReaderFeedItemId))
+            .map(|(feed, item)| ReaderAddress::FeedPost(feed, item)),
+        _ => None,
+    };
+    Some(named.unwrap_or(ReaderAddress::Nothing))
+}
+
+/// Whether an error is the server's answer that IDs in a Reader address name nothing.
+fn names_nothing(error: &ReaderError) -> bool {
+    const NOTHING: [&str; 5] = [
+        "unknown_blog",
+        "site_gone",
+        "no_such_feed",
+        "unknown_post",
+        "no_such_item",
+    ];
+    matches!(error, ReaderError::Api(error) if NOTHING.iter().any(|code| is_code(error, code)))
+}
+
 #[uniffi::export]
 impl ReaderService {
     /// Finds what a link opens in the Reader: a post, a site, a feed, or nothing the Reader can
@@ -111,6 +210,12 @@ impl ReaderService {
     /// the cache, and a site or feed's details are too. An error is the server refusing, such as
     /// for a private site the reader can't see, or the request failing.
     ///
+    /// - One of the Reader's own addresses, such as `https://wordpress.com/read/blogs/{site}` or
+    ///   `https://wordpress.com/reader/feeds/{feed}/posts/{item}`, is read for the site, feed or
+    ///   post it names, which is then fetched as [`Self::fetch_site`], [`Self::fetch_feed`] or
+    ///   [`Self::fetch_post`] fetch it: nothing is sent to the resolver, and a public site's or a
+    ///   feed's needs no account. One that names nothing, or names IDs the server doesn't have, is
+    ///   [`ReaderLinkNotInReader::NothingThere`]. The module's documentation lists the shapes.
     /// - A site's home address, such as `https://example.com/`, is looked up as a WordPress.com
     ///   or Jetpack site, then as an address with a feed. It needs no account.
     /// - Any other address is resolved to a post, which needs an account: the server only does it
@@ -129,6 +234,14 @@ impl ReaderService {
         let host = parsed.host_str().unwrap_or_default().to_ascii_lowercase();
         if host == SHORT_LINK_HOST {
             return not_in_reader(ReaderLinkNotInReader::ShortLink);
+        }
+        if let Some(named) = reader_address(&host, &parsed) {
+            return match self.open_reader_address(named).await {
+                Err(error) if names_nothing(&error) => {
+                    not_in_reader(ReaderLinkNotInReader::NothingThere)
+                }
+                opened => opened,
+            };
         }
         let address = parsed.to_string();
 
@@ -193,6 +306,51 @@ impl ReaderService {
 }
 
 impl ReaderService {
+    /// Opens what a Reader address names. A feed of a WordPress.com or Jetpack site opens as the
+    /// site, as the web Reader opens it.
+    async fn open_reader_address(&self, named: ReaderAddress) -> Result<ReaderLink, ReaderError> {
+        Ok(match named {
+            ReaderAddress::Site(site_id) => ReaderLink::Site {
+                site_id,
+                site: self.fetch_site(site_id).await?,
+            },
+            ReaderAddress::Feed(feed_id) => {
+                let site = self.fetch_feed(feed_id).await?;
+                match site.site_id.filter(|site_id| site_id.0 != 0) {
+                    Some(site_id) => ReaderLink::Site { site_id, site },
+                    None => ReaderLink::Feed { feed_id, site },
+                }
+            }
+            ReaderAddress::SitePost(site_id, post_id) => ReaderLink::Post {
+                post: self
+                    .fetch_post(ReaderPostSaveIdentity {
+                        id: post_id,
+                        site_id: Some(site_id),
+                        feed_id: None,
+                        feed_item_id: None,
+                        is_external: false,
+                        url: None,
+                    })
+                    .await?,
+            },
+            ReaderAddress::FeedPost(feed_id, item_id) => ReaderLink::Post {
+                post: self
+                    .fetch_post(ReaderPostSaveIdentity {
+                        id: item_id.0,
+                        site_id: None,
+                        feed_id: Some(feed_id),
+                        feed_item_id: Some(item_id),
+                        is_external: true,
+                        url: None,
+                    })
+                    .await?,
+            },
+            ReaderAddress::Nothing => ReaderLink::NotInReader {
+                reason: ReaderLinkNotInReader::NothingThere,
+            },
+        })
+    }
+
     /// The WordPress.com or Jetpack site with a domain, now in the cache, or `None` when no site
     /// has it.
     async fn site_at(&self, domain: &str) -> Result<Option<ReaderLink>, ReaderError> {
