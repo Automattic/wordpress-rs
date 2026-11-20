@@ -9,6 +9,7 @@ use wp_api::comments::{CommentDeleteParams, CommentId};
 use wp_api::posts::PostId;
 use wp_api::prelude::*;
 use wp_api::wp_com::endpoint::WpComDotOrgApiUrlResolver;
+use wp_api::wp_com::language::WPComLanguage;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_likes::ReaderLikesParams;
 use wp_api::wp_com::reader_page_views::ReaderPageView;
@@ -151,12 +152,10 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         ReaderStream::Search {
                             query: "wordpress".to_string(),
                             sort: ReaderSearchSort::Relevance,
-                            lang: Some("en".to_string()),
                         },
                         ReaderStream::Search {
                             query: "wordpress".to_string(),
                             sort: ReaderSearchSort::Date,
-                            lang: Some("en".to_string()),
                         },
                         ReaderStream::ReaderList {
                             owner: ReaderListOwner("automattic".to_string()),
@@ -170,6 +169,54 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     ];
                     for stream in streams {
                         walk_two_pages(&service, stream).await?;
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::tag_and_discover_in_french_signed_out", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // One cache, so a French stream showing English posts would be a leak.
+                    let service = new_service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
+                    let streams = [
+                        ReaderStream::Tag {
+                            slug: ReaderTagSlug("photography".to_string()),
+                        },
+                        ReaderStream::Discover { tags: vec![] },
+                    ];
+                    for stream in streams {
+                        service.set_language(None);
+                        let english = refreshed_post_ids(&service, &stream).await?;
+                        service.set_language(Some(WPComLanguage::French));
+                        let french_stream = service.stream(stream.clone());
+                        if french_stream.language() != Some(WPComLanguage::French) {
+                            return Err(format!("{stream:?} isn't in French").into());
+                        }
+                        let french = refreshed_post_ids(&service, &stream).await?;
+                        if english.is_empty() || french.is_empty() {
+                            return Err(format!("{stream:?} has no posts in a language").into());
+                        }
+                        // The server picks other posts in French. Live data moves, so a few in
+                        // both are allowed: yesterday's probes had none.
+                        let shared = french.intersection(&english).count();
+                        if shared * 2 > french.len() {
+                            return Err(format!(
+                                "{stream:?}: {shared} of the {} French posts are English ones",
+                                french.len()
+                            )
+                            .into());
+                        }
+                        // Each language's posts are cached apart.
+                        service.set_language(None);
+                        if cached_post_ids(&service, &stream).await? != english {
+                            return Err(format!("{stream:?} in English changed").into());
+                        }
+                        service.set_language(Some(WPComLanguage::FrenchCanada));
+                        if cached_post_ids(&service, &stream).await? != french {
+                            return Err(format!("{stream:?} isn't French for Canada").into());
+                        }
                     }
                     Ok(())
                 })
@@ -1841,6 +1888,35 @@ fn signed_out(delegate: &WpApiClientDelegate) -> WpApiClientDelegate {
         auth_provider: Arc::new(WpAuthenticationProvider::none()),
         ..delegate.clone()
     }
+}
+
+/// Refreshes a stream in the service's language, and returns the IDs of the posts it then has.
+async fn refreshed_post_ids(
+    service: &ReaderService,
+    stream: &ReaderStream,
+) -> Result<HashSet<String>, Failed> {
+    service
+        .stream(stream.clone())
+        .refresh()
+        .await
+        .map_err(|e| e.to_string())?;
+    cached_post_ids(service, stream).await
+}
+
+/// The IDs of the posts a stream has in the cache, in the service's language.
+async fn cached_post_ids(
+    service: &ReaderService,
+    stream: &ReaderStream,
+) -> Result<HashSet<String>, Failed> {
+    let items = service
+        .stream(stream.clone())
+        .load_items()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(items
+        .iter()
+        .map(|item| format!("{:?}", item.post.key))
+        .collect())
 }
 
 /// Refreshes a stream, loads its next page if it has one, and checks what the cache then holds.

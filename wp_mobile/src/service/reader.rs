@@ -10,6 +10,7 @@ use wp_api::date::WpGmtDateTime;
 use wp_api::prelude::{WpApiClientDelegate, WpApiError};
 use wp_api::request::RequestExecutor;
 use wp_api::wp_com::client::WpComApiClient;
+use wp_api::wp_com::language::WPComLanguage;
 use wp_api::wp_com::reader_saved::{ReaderSavedKey, ReaderSavedSource};
 use wp_mobile_cache::db_types::reader::ReaderPostRecord;
 use wp_mobile_cache::repository::reader::{ReaderPostRepository, ReaderStreamRepository};
@@ -21,6 +22,7 @@ use wp_mobile_cache::{RowId, SqliteDbError, WpApiCache};
 mod actions;
 mod collection;
 mod comments;
+mod language;
 mod links;
 mod page_views;
 mod posts;
@@ -49,6 +51,7 @@ pub use tags::ReaderCachedMenu;
 use super::reader_saved::ReaderSavedService;
 use actions::ActionQueue;
 use collection::StreamLanes;
+use language::ReaderLanguage;
 
 /// How long a stream nobody refreshes is kept.
 const STREAM_LIFETIME: Duration = Duration::from_secs(30 * 24 * 60 * 60);
@@ -165,10 +168,16 @@ pub(crate) struct ReaderContext {
     pub(crate) actions: ActionQueue,
     /// Sends requests that aren't to the API, such as the one that counts a view.
     pub(crate) request_executor: Arc<dyn RequestExecutor>,
+    /// The reader's language: see [`ReaderService::set_language`].
+    language: Mutex<Option<WPComLanguage>>,
     clock: Clock,
 }
 
 impl ReaderContext {
+    pub(crate) fn language(&self) -> Option<WPComLanguage> {
+        *self.language.lock().expect("language lock poisoned")
+    }
+
     pub(crate) fn now(&self) -> WpGmtDateTime {
         WpGmtDateTime(chrono::DateTime::<chrono::Utc>::from((self.clock)()))
     }
@@ -207,6 +216,11 @@ impl ReaderContext {
 /// no authentication: a stream that needs an account then fails with
 /// [`ReaderError::NeedsAccount`] without sending anything.
 ///
+/// Tell it the reader's language with [`Self::set_language`], straight after creating it and again
+/// whenever it changes. The delegate's `language_provider` isn't used: the Reader sends its own
+/// language, and only on the requests whose answer it changes, so that what it caches is always in
+/// the language its key says.
+///
 /// [`WpApiCache::remove_reader_data`] deletes everything it keeps.
 #[derive(uniffi::Object)]
 pub struct ReaderService {
@@ -242,18 +256,47 @@ impl ReaderService {
         self.context.owner
     }
 
-    /// A stream's posts, as the cache has them. Getting it doesn't touch the network.
+    /// Sets the reader's language: pass the device's, or the app's own if it has one. `None`, the
+    /// default, sends no language, and WordPress.com answers in English.
+    ///
+    /// The Reader sends it where it changes the answer: a tag's posts, several tags' posts,
+    /// Discover, the first posts of new sites and a search are picked in it, and the menu and
+    /// [`Self::interests`] are translated into it. Other streams, such as a site's, are the same in
+    /// any language and are sent none.
+    ///
+    /// Each language's posts are cached apart: a stream got after a change is the new language's,
+    /// and shows none of the other's. A stream got before keeps its language: see
+    /// [`ReaderStreamCollection`]. The cached menu stays in the language it was fetched in until
+    /// [`Self::refresh_menu`] runs again.
+    pub fn set_language(&self, language: Option<WPComLanguage>) {
+        *self
+            .context
+            .language
+            .lock()
+            .expect("language lock poisoned") = language;
+    }
+
+    /// The reader's language, as last set with [`Self::set_language`].
+    pub fn language(&self) -> Option<WPComLanguage> {
+        self.context.language()
+    }
+
+    /// A stream's posts, as the cache has them, in the reader's language for a stream whose posts
+    /// depend on it. Getting it doesn't touch the network.
     pub fn stream(&self, stream: ReaderStream) -> Arc<ReaderStreamCollection> {
+        let language = self.context.language();
+        let key = stream.key(language.map(ReaderLanguage::new));
         let lanes = self
             .lanes
             .lock()
             .expect("stream lanes lock poisoned")
-            .entry(stream.key())
+            .entry(key)
             .or_default()
             .clone();
         Arc::new(ReaderStreamCollection::new(
             self.context.clone(),
             stream,
+            language,
             lanes,
         ))
     }
@@ -306,13 +349,18 @@ impl ReaderService {
         Ok(Self {
             saved: Arc::new(saved),
             context: Arc::new(ReaderContext {
-                client: WpComApiClient::new(delegate),
+                // The Reader sends its own language: see `ReaderService`.
+                client: WpComApiClient::new(WpApiClientDelegate {
+                    language_provider: None,
+                    ..delegate
+                }),
                 cache,
                 owner,
                 owner_row,
                 source: saved_source,
                 actions: ActionQueue::default(),
                 request_executor,
+                language: Mutex::default(),
                 clock,
             }),
             lanes: Mutex::default(),

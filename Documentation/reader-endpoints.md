@@ -91,12 +91,12 @@ Parameters the library sends, in the query (`ReaderTagPostsParams`):
 - `sort` (`ReaderTagPostsSort`): The order of the posts. The API's default is `ReaderTagPostsSort::Date`.
 - `before` (`WpGmtDateTime`): Only return posts published before this time.
 - `after` (`WpGmtDateTime`): Only return posts published after this time.
+- `_locale` (`String`): The language of the posts, sent as `_locale`: only posts in it are returned. The API reads the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer the same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts at all to `FR`, to an empty value, to a language it doesn't know such as `xx`, and to an old code such as `iw` (send `he`) or `in` (send `id`). Without it, the posts are those of `en`. Measured on 2026-11-20. `_locale` is a global parameter of the WordPress REST API, read whether or not a route lists it. It's sent after the one a `crate::wp_com::language::WpComLanguageProvider` adds, and the API reads the last one. `lang` and `locale` change nothing.
 
-Public documentation: the `wpcom/v2` route index. It declares `after`, `before`, `number`, `page`, `page_handle`, `sort`, which the library sends.
+Public documentation: the `wpcom/v2` route index. It declares `_locale`, `after`, `before`, `number`, `page`, `page_handle`, `sort`, which the library sends.
 
 Declared there, and not sent by the library:
 
-- `_locale`: (string) Locale of the client.
 - `tag`: (string) Tag to fetch posts for.
 
 ### `GET /rest/v1.2/read/liked`
@@ -183,7 +183,7 @@ Parameters the library sends, in the query (`ReaderSearchPostsParams`):
 - `sort` (`ReaderSearchSort`): The order of the results. The API's default is `ReaderSearchSort::Relevance`.
 - `before` (`WpGmtDateTime`): Only return posts published before this time.
 - `after` (`WpGmtDateTime`): Only return posts published after this time.
-- `lang` (`String`): The language to search in, such as `fr`.
+- `lang` (`String`): The language of the posts to search, such as `fr`: only posts in it are returned. The API reads the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer the same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts to `FR`, to a language it doesn't know such as `xx`, and to an old code such as `iw` (send `he`). WordPress.com's own code is the one it reads where that isn't the two-letter one: `bel` for Belarusian and `kir` for Kyrgyz find posts, and `be` and `ky` find none. Without it, or empty, the results are those of `en`. Measured on 2026-11-20. `locale` and `_locale` change nothing here.
 - `algorithm` (`String`): The name of the algorithm to search with. The API sends back the name it's given, in `ReaderSearchPostsResponse::algorithm` and in the page handle. Another name changed nothing in the results that were looked at.
 - `meta` (`String`): Extra data to include, comma-separated, as in `ReaderStreamParams::meta`.
 - `fields` (`String`): The fields of each post to return, comma-separated, as in `ReaderStreamParams::fields`. A search with no results still answers with a page, not an empty list.
@@ -220,6 +220,7 @@ Parameters the library sends, in the query (`ReaderDiscoverParams`):
 - `tags` (`Vec<ReaderTagSlug>`, required): Tags to lean the stream toward. With any, the page also ends with a card of tags the user may like, which isn't counted in `count`.
 - `sort` (`ReaderDiscoverSort`): How the posts are picked. The API's default is `ReaderDiscoverSort::Popular`.
 - `age_based_decay` (`f64`): How much to hold a post's age against it, between 0 and 1. It changed nothing in the responses that were looked at.
+- `_locale` (`String`): The language of the posts, sent as `_locale`: only posts in it are returned. The API reads the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer the same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts at all to `FR`, to an empty value, to a language it doesn't know such as `xx`, and to an old code such as `iw` (send `he`) or `in` (send `id`). Without it, the posts are those of `en`. Measured on 2026-11-20. `_locale` is a global parameter of the WordPress REST API, read whether or not a route lists it. It's sent after the one a `crate::wp_com::language::WpComLanguageProvider` adds, and the API reads the last one. `lang` and `locale` change nothing.
 
 Public documentation: not listed.
 
@@ -233,6 +234,7 @@ Parameters the library sends, in the query (`ReaderFirstPostsParams`):
 
 - `count` (`u32`): The number of cards to ask for: 8 by default. A page has fewer posts than that, often half as many. Asked for 16 or more, the API returns no posts and no handle, and it answers 500 to `0`.
 - `page_handle` (`String`): The previous page's `ReaderFirstPostsResponse::next_page_handle`. The API answers a handle it didn't send with the first page.
+- `_locale` (`String`): The language of the posts, sent as `_locale`: only posts in it are returned. The API reads the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer the same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts at all to `FR`, to an empty value, to a language it doesn't know such as `xx`, and to an old code such as `iw` (send `he`) or `in` (send `id`). Without it, the posts are those of `en`. Measured on 2026-11-20. `_locale` is a global parameter of the WordPress REST API, read whether or not a route lists it. It's sent after the one a `crate::wp_com::language::WpComLanguageProvider` adds, and the API reads the last one. `lang` and `locale` change nothing.
 
 Public documentation: not listed.
 
@@ -251,12 +253,9 @@ Parameters the library sends, in the query (`ReaderTagsPostsParams`):
 - `sort` (`ReaderTagPostsSort`): The order of the posts. The API's default is `ReaderTagPostsSort::Date`.
 - `before` (`WpGmtDateTime`): Only return posts published before this time.
 - `after` (`WpGmtDateTime`): Only return posts published after this time.
+- `_locale` (`String`): The language of the posts, sent as `_locale`: only posts in it are returned. The API reads the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer the same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts at all to `FR`, to an empty value, to a language it doesn't know such as `xx`, and to an old code such as `iw` (send `he`) or `in` (send `id`). Without it, the posts are those of `en`. Measured on 2026-11-20. `_locale` is a global parameter of the WordPress REST API, read whether or not a route lists it. It's sent after the one a `crate::wp_com::language::WpComLanguageProvider` adds, and the API reads the last one. `locale` changes nothing.
 
-Public documentation: the `wpcom/v2` route index. It declares `after`, `before`, `number`, `page`, `page_handle`, `sort`, `tags`, which the library sends.
-
-Declared there, and not sent by the library:
-
-- `_locale`: (string) Locale of the client.
+Public documentation: the `wpcom/v2` route index. It declares `_locale`, `after`, `before`, `number`, `page`, `page_handle`, `sort`, `tags`, which the library sends.
 
 ## Single posts
 
@@ -311,7 +310,7 @@ Parameters the library sends, in the query (`ReaderRelatedPostsParams`):
 
 - `size_global` (`u32`): How many posts from other sites to return: 20 at most, or the request fails.
 - `size_local` (`u32`): How many posts from the same site to return: 20 at most, or the request fails.
-- `lang` (`String`): The language to look for posts in. It showed no effect when this was written: posts from other sites came back in the post's own language whatever was asked for.
+- `lang` (`String`): The language to look for posts in. It showed no effect when this was written: posts from other sites came back in the post's own language whatever was asked for. Nor did `locale` or `_locale` (measured on 2026-11-20).
 - `algorithm` (`String`): The name of the algorithm to pick every post with. The response names it back. A name the API doesn't know still returns posts.
 - `algorithm_local` (`String`): The name of the algorithm to pick the same site's posts with.
 - `algorithm_global` (`String`): The name of the algorithm to pick other sites' posts with.
@@ -391,9 +390,11 @@ The Reader menu: its streams, the tags the user follows, and tags to suggest. An
 
 Request `ReaderTagsRequest::Menu`, response `ReaderMenu`.
 
-The library sends no parameters.
+Parameters the library sends, in the query (`ReaderMenuParams`):
 
-Public documentation: `rest/v1.3/help`.
+- `locale` (`String`): The language of the names of the Reader's own streams, such as `Découvrir` for Discover in `fr`. The entries are the same in any language, and a tag's name isn't translated. The API reads a WordPress.com locale, in either case and with `-` or `_`: `pt-br` and `pt` are Brazilian and European Portuguese, and `zh-cn` and `zh-tw` Simplified and Traditional Chinese. It falls back to the language's first part for some, such as `fr-ca`, and answers in English to others, such as `es-mx`, `de-ch` and `de_formal` (send `es` or `de`), to `zh` (send `zh-cn`), and to a language it doesn't know. Measured on 2026-11-20. `_locale` changes nothing. It's sent after the `locale` a `crate::wp_com::language::WpComLanguageProvider` adds, and the API reads the last one.
+
+Public documentation: `rest/v1.3/help`. It doesn't declare `locale`.
 
 ### `GET /rest/v1.2/read/tags/$tag`
 
@@ -411,9 +412,11 @@ The tags a new reader picks from. Answers signed out.
 
 Request `ReaderTagsRequest::Interests`, response `ReaderInterestsResponse`.
 
-The library sends no parameters.
+Parameters the library sends, in the query (`ReaderInterestsParams`):
 
-Public documentation: the `wpcom/v2` route index.
+- `_locale` (`String`): The language of the interests, sent as `_locale`. It changes which tags are listed, and their names: `Alimentation` and `Livres` in `fr` are `Food` and `Books` in English. The API reads a WordPress.com locale, in either case and with `-` or `_`: `pt-br` is Brazilian Portuguese, and `zh-cn`, `zh-tw` and `zh-hk` are three lists of Chinese. A regional form it doesn't have falls back to the language's first part, as `fr-ca` and `es-mx` do. It answers in English to `pt` and `zh` (send `pt-br` or `zh-cn`), and to a language it doesn't know. Measured on 2026-11-20. `locale` changes nothing. `_locale` is a global parameter of the WordPress REST API, read whether or not a route lists it. It's sent after the one a `crate::wp_com::language::WpComLanguageProvider` adds, and the API reads the last one.
+
+Public documentation: the `wpcom/v2` route index. It doesn't declare `_locale`.
 
 ### `POST /rest/v1.2/read/tags/mine/new`
 

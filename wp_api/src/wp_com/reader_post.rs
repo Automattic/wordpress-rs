@@ -228,7 +228,8 @@ pub struct ReaderRelatedPostsParams {
     #[uniffi(default = None)]
     pub size_local: Option<u32>,
     /// The language to look for posts in. It showed no effect when this was written: posts from
-    /// other sites came back in the post's own language whatever was asked for.
+    /// other sites came back in the post's own language whatever was asked for. Nor did `locale`
+    /// or `_locale` (measured on 2026-11-20).
     #[uniffi(default = None)]
     pub lang: Option<String>,
     /// The name of the algorithm to pick every post with. The response names it back. A name the

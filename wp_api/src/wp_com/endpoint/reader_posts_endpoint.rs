@@ -159,9 +159,10 @@ mod tests {
                     sort: Some(ReaderTagPostsSort::Popularity),
                     before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
                     after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
+                    locale: Some("fr".to_string()),
                 },
             ),
-            "/read/tags/photography/posts?number=10&page_handle=abc%3D%3D&page=2&sort=popularity&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00",
+            "/read/tags/photography/posts?number=10&page_handle=abc%3D%3D&page=2&sort=popularity&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00&_locale=fr",
         );
     }
 
@@ -330,8 +331,9 @@ mod tests {
                 tags: tags(),
                 sort: Some(ReaderDiscoverSort::Latest),
                 age_based_decay: Some(0.5),
+                locale: Some("fr".to_string()),
             }),
-            "/read/streams/discover?count=8&page_handle=abc%3D%3D&tags=photography%2Ctravel&sort=latest&age_based_decay=0.5",
+            "/read/streams/discover?count=8&page_handle=abc%3D%3D&tags=photography%2Ctravel&sort=latest&age_based_decay=0.5&_locale=fr",
         );
     }
 
@@ -345,8 +347,9 @@ mod tests {
             endpoint.first_posts(&ReaderFirstPostsParams {
                 count: Some(8),
                 page_handle: Some("abc==".to_string()),
+                locale: Some("fr".to_string()),
             }),
-            "/read/streams/first-posts?count=8&page_handle=abc%3D%3D",
+            "/read/streams/first-posts?count=8&page_handle=abc%3D%3D&_locale=fr",
         );
     }
 
@@ -368,8 +371,9 @@ mod tests {
                 sort: Some(ReaderTagPostsSort::Popularity),
                 before: Some("2026-11-01T00:00:00Z".parse().unwrap()),
                 after: Some("2026-10-01T00:00:00Z".parse().unwrap()),
+                locale: Some("fr".to_string()),
             }),
-            "/read/tags/posts?tags=photography%2Ctravel&number=10&page_handle=abc%3D%3D&page=2&sort=popularity&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00",
+            "/read/tags/posts?tags=photography%2Ctravel&number=10&page_handle=abc%3D%3D&page=2&sort=popularity&before=2026-11-01T00%3A00%3A00%2B00%3A00&after=2026-10-01T00%3A00%3A00%2B00%3A00&_locale=fr",
         );
     }
 

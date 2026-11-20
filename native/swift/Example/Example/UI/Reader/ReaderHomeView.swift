@@ -47,6 +47,8 @@ struct ReaderHomeView: View {
     private var readerSection: some View {
         Section("Reader") {
             LabeledContent("Reading as", value: viewModel.session.name)
+            LabeledContent("Language", value: languageText)
+                .accessibilityIdentifier("reader-language")
             if let readerPicker {
                 Toggle("Read signed out", isOn: readerPicker)
             }
@@ -75,6 +77,14 @@ struct ReaderHomeView: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+
+    /// The reader's language, as the service has it, or what having none means.
+    private var languageText: String {
+        guard let language = viewModel.session.service.language() else {
+            return "None, so English"
+        }
+        return "\(language.displayName()) (\(language.slug()))"
     }
 
     private var streamsSection: some View {
@@ -194,9 +204,8 @@ struct ReaderHomeView: View {
                 Text("Newest").tag(ReaderSearchSort.date)
             }
             Button("Search") {
-                // The device's language, so the results are in it. The library sends only its first part.
-                let lang = Locale.preferredLanguages.first
-                path.append(.stream(.search(query: searchQuery, sort: viewModel.searchSort, lang: lang)))
+                // In the reader's language, which the service has.
+                path.append(.stream(.search(query: searchQuery, sort: viewModel.searchSort)))
             }
             .disabled(searchQuery.isEmpty)
             .accessibilityIdentifier("search-posts")

@@ -72,8 +72,7 @@ internal fun ReaderStream.title(): String = when (this) {
     is ReaderStream.Site -> "Site $siteId"
     is ReaderStream.Feed -> "Feed $feedId"
     is ReaderStream.Tag -> "Tag: $slug"
-    is ReaderStream.Search ->
-        (if (sort == ReaderSearchSort.DATE) "Newest for: $query" else "Search: $query") + " (${lang ?: "no language"})"
+    is ReaderStream.Search -> if (sort == ReaderSearchSort.DATE) "Newest for: $query" else "Search: $query"
     is ReaderStream.ReaderList -> "List: $owner/$slug"
     else -> fixedTitle()
 }

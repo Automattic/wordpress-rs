@@ -11,6 +11,9 @@
 //! request escapes the slug it's given, and the encoded form, escaped again, names no tag.
 
 use crate::{
+    url_query::{
+        AppendUrlQueryPairs, FromUrlQueryPairs, QueryPairs, QueryPairsExtension, UrlQueryPairsMap,
+    },
     wp_com::{reader_posts::ReaderTagSlug, reader_saved::deserialize_optional_text},
     wp_content_u64_id,
 };
@@ -19,6 +22,7 @@ use serde::{
     de::{MapAccess, SeqAccess, Visitor},
 };
 use std::fmt;
+use wp_derive::WpDeriveParamsField;
 use wp_serde_helper::{
     LenientVec, deserialize_bool_or_int, deserialize_u64_or_string_or_none,
     deserialize_u64_or_string_or_none_as_t,
@@ -270,7 +274,29 @@ struct RawReaderMenuItem {
     organization_id: Option<u64>,
 }
 
+/// Query parameters for the Reader menu.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // The menu has one page.
+pub struct ReaderMenuParams {
+    /// The language of the names of the Reader's own streams, such as `Découvrir` for Discover in
+    /// `fr`. The entries are the same in any language, and a tag's name isn't translated.
+    ///
+    /// The API reads a WordPress.com locale, in either case and with `-` or `_`: `pt-br` and `pt` are
+    /// Brazilian and European Portuguese, and `zh-cn` and `zh-tw` Simplified and Traditional Chinese.
+    /// It falls back to the language's first part for some, such as `fr-ca`, and answers in English
+    /// to others, such as `es-mx`, `de-ch` and `de_formal` (send `es` or `de`), to `zh` (send
+    /// `zh-cn`), and to a language it doesn't know. Measured on 2026-11-20. `_locale` changes nothing.
+    ///
+    /// It's sent after the `locale` a [`crate::wp_com::language::WpComLanguageProvider`] adds, and the
+    /// API reads the last one.
+    #[uniffi(default = None)]
+    pub locale: Option<String>,
+}
+
 /// Response from `GET /rest/v1.2/read/tags/{slug}`.
+///
+/// A tag's name isn't translated: with `locale` or `_locale` it's the same (measured on
+/// 2026-11-20).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct ReaderTagResponse {
     pub tag: ReaderTag,
@@ -478,6 +504,27 @@ fn tag_id(value: &serde_json::Value) -> Option<ReaderTagId> {
         _ => None,
     }
     .map(ReaderTagId)
+}
+
+/// Query parameters for the interests a new reader picks from.
+#[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
+#[supports_pagination(false)] // The interests have one page.
+pub struct ReaderInterestsParams {
+    /// The language of the interests, sent as `_locale`. It changes which tags are listed, and their
+    /// names: `Alimentation` and `Livres` in `fr` are `Food` and `Books` in English.
+    ///
+    /// The API reads a WordPress.com locale, in either case and with `-` or `_`: `pt-br` is
+    /// Brazilian Portuguese, and `zh-cn`, `zh-tw` and `zh-hk` are three lists of Chinese. A regional
+    /// form it doesn't have falls back to the language's first part, as `fr-ca` and `es-mx` do. It
+    /// answers in English to `pt` and `zh` (send `pt-br` or `zh-cn`), and to a language it doesn't
+    /// know. Measured on 2026-11-20. `locale` changes nothing.
+    ///
+    /// `_locale` is a global parameter of the WordPress REST API, read whether or not a route lists
+    /// it. It's sent after the one a [`crate::wp_com::language::WpComLanguageProvider`] adds, and
+    /// the API reads the last one.
+    #[uniffi(default = None)]
+    #[field_name("_locale")]
+    pub locale: Option<String>,
 }
 
 /// Response from `GET /wpcom/v2/read/interests`: the tags a new reader picks from, in the order

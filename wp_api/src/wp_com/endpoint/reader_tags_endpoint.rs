@@ -4,8 +4,9 @@ use crate::{
         WpComNamespace,
         reader_posts::ReaderTagSlug,
         reader_tags::{
-            ReaderFollowTagsParams, ReaderFollowTagsResponse, ReaderInterestsResponse, ReaderMenu,
-            ReaderTagResponse, ReaderUnfollowTagResponse,
+            ReaderFollowTagsParams, ReaderFollowTagsResponse, ReaderInterestsParams,
+            ReaderInterestsResponse, ReaderMenu, ReaderMenuParams, ReaderTagResponse,
+            ReaderUnfollowTagResponse,
         },
     },
 };
@@ -15,13 +16,13 @@ use wp_derive_request_builder::WpDerivedRequest;
 enum ReaderTagsRequest {
     // The Reader menu: its streams, the tags the user follows, and tags to suggest. Answers
     // signed out, with Discover and the suggested tags only.
-    #[get(url = "/read/menu", output = ReaderMenu)]
+    #[get(url = "/read/menu", params = &ReaderMenuParams, output = ReaderMenu)]
     Menu,
     // A tag, by its slug. Answers signed out. A slug that names no tag is a 404 `invalid_tag`.
     #[get(url = "/read/tags/<reader_tag_slug>", output = ReaderTagResponse)]
     Tag,
     // The tags a new reader picks from. Answers signed out.
-    #[get(url = "/read/interests", output = ReaderInterestsResponse)]
+    #[get(url = "/read/interests", params = &ReaderInterestsParams, output = ReaderInterestsResponse)]
     Interests,
     // Follows one or more tags, and answers with every tag the user now follows. For a tag the
     // user already follows it's still a 200, with nothing in `added_tags`.
@@ -66,7 +67,16 @@ mod tests {
 
     #[rstest]
     fn menu(endpoint: ReaderTagsRequestEndpoint) {
-        validate_wp_com_rest_v1_3_endpoint(endpoint.menu(), "/read/menu");
+        validate_wp_com_rest_v1_3_endpoint(
+            endpoint.menu(&ReaderMenuParams::default()),
+            "/read/menu?",
+        );
+        validate_wp_com_rest_v1_3_endpoint(
+            endpoint.menu(&ReaderMenuParams {
+                locale: Some("pt-br".to_string()),
+            }),
+            "/read/menu?locale=pt-br",
+        );
     }
 
     #[rstest]
@@ -88,7 +98,16 @@ mod tests {
 
     #[rstest]
     fn interests(endpoint: ReaderTagsRequestEndpoint) {
-        validate_wp_com_v2_endpoint(endpoint.interests(), "/read/interests");
+        validate_wp_com_v2_endpoint(
+            endpoint.interests(&ReaderInterestsParams::default()),
+            "/read/interests?",
+        );
+        validate_wp_com_v2_endpoint(
+            endpoint.interests(&ReaderInterestsParams {
+                locale: Some("zh-tw".to_string()),
+            }),
+            "/read/interests?_locale=zh-tw",
+        );
     }
 
     #[rstest]

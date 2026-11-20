@@ -4,10 +4,12 @@
 //! signed out too, with the default streams and the recommended tags. The tags a signed-out reader
 //! follows are kept on this device only: no server has them.
 
+use super::language::ReaderLanguage;
 use super::{ReaderContext, ReaderError, ReaderService};
 use wp_api::wp_com::reader_posts::ReaderTagSlug;
 use wp_api::wp_com::reader_tags::{
-    ReaderInterest, ReaderMenuItem, ReaderMenuItemKind, ReaderMenuSection, ReaderTag,
+    ReaderInterest, ReaderInterestsParams, ReaderMenuItem, ReaderMenuItemKind, ReaderMenuParams,
+    ReaderMenuSection, ReaderTag,
 };
 use wp_mobile_cache::RowId;
 use wp_mobile_cache::SqliteDbError;
@@ -92,6 +94,12 @@ pub(crate) fn is_tag_followed(
 }
 
 impl ReaderContext {
+    /// The reader's language, in the form the menu and the interests read.
+    fn locale(&self) -> Option<String> {
+        self.language()
+            .map(|language| ReaderLanguage::new(language).locale.to_string())
+    }
+
     pub(crate) fn followed_tags(&self) -> Result<Vec<ReaderMenuItem>, SqliteDbError> {
         self.cache.execute(|connection| {
             ReaderMenuRepository::select_section(
@@ -125,9 +133,17 @@ impl ReaderService {
     ///
     /// For an account, the followed tags become the server's, apart from a follow or unfollow
     /// made here that's still waiting to be sent.
+    ///
+    /// The names of the Reader's own streams are in the reader's language, such as `Découvrir` for
+    /// Discover: see [`Self::set_language`]. The entries are the same in any language, and tags'
+    /// names aren't translated. The menu is cached in the language it was fetched in, so after a
+    /// change of language, it's the new language's once this has run again.
     pub async fn refresh_menu(&self) -> Result<(), ReaderError> {
         let context = &self.context;
-        let menu = context.client.reader_tags().menu().await?.data;
+        let params = ReaderMenuParams {
+            locale: context.locale(),
+        };
+        let menu = context.client.reader_tags().menu(&params).await?.data;
         let now = reader_date_text(&context.now());
         context.cache.execute(|connection| {
             let transaction = connection.transaction()?;
@@ -165,13 +181,17 @@ impl ReaderService {
         Ok(self.context.followed_tags()?)
     }
 
-    /// The tags a new reader picks from. Works signed out. Not cached.
+    /// The tags a new reader picks from, in the reader's language: which tags they are, and their
+    /// names, depend on it. See [`Self::set_language`]. Works signed out. Not cached.
     pub async fn interests(&self) -> Result<Vec<ReaderInterest>, ReaderError> {
+        let params = ReaderInterestsParams {
+            locale: self.context.locale(),
+        };
         Ok(self
             .context
             .client
             .reader_tags()
-            .interests()
+            .interests(&params)
             .await?
             .data
             .interests)

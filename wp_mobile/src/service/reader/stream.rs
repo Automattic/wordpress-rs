@@ -18,6 +18,8 @@ use wp_api::wp_com::reader_posts::{
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderPostSaveIdentity};
 use wp_api::wp_com::reader_tags::{ReaderMenuItem, ReaderMenuItemKind};
 
+use super::language::ReaderLanguage;
+
 /// How many posts a page of a stream ordered by date asks for.
 const DATED_PAGE_SIZE: u32 = 20;
 
@@ -93,31 +95,26 @@ pub enum ReaderStream {
     Site { site_id: WpComSiteId },
     /// An RSS feed's posts.
     Feed { feed_id: ReaderFeedId },
-    /// A tag's posts, newest first.
+    /// A tag's posts, newest first, in the reader's language.
     Tag { slug: ReaderTagSlug },
-    /// The newest posts of several tags, which is Discover's "latest" tab.
+    /// The newest posts of several tags, which is Discover's "latest" tab, in the reader's
+    /// language.
     Tags { slugs: Vec<ReaderTagSlug> },
-    /// A search of posts. `query` is sent whole, `&` and all.
-    ///
-    /// `lang` is the language to search in: pass the device's, such as `fr-CA` or `pt_BR`. The
-    /// server answers posts in that language, and only reads its first part, in lower case, so the
-    /// library sends `fr` or `pt`. A search in another language is another stream, with its own
-    /// cached posts. `None` sends no language, and the server answers as it does for `en`. A value
-    /// whose first part isn't letters, such as `""`, is sent as no language.
+    /// A search of posts in the reader's language. `query` is sent whole, `&` and all.
     Search {
         query: String,
         sort: ReaderSearchSort,
-        lang: Option<String>,
     },
     /// A Reader list's posts.
     ReaderList {
         owner: ReaderListOwner,
         slug: ReaderListSlug,
     },
-    /// Discover's recommended posts, with cards of sites and tags among them. `tags` are the
-    /// reader's interests, for a reader the server doesn't know them for: a signed-out one.
+    /// Discover's recommended posts in the reader's language, with cards of sites and tags among
+    /// them. `tags` are the reader's interests, for a reader the server doesn't know them for: a
+    /// signed-out one.
     Discover { tags: Vec<ReaderTagSlug> },
-    /// The first posts of new sites.
+    /// The first posts of new sites, in the reader's language.
     FirstPosts,
     /// The posts related to a site's post: some from the same site, and some from others. It has
     /// one page.
@@ -138,15 +135,6 @@ pub enum ReaderStreamOrdering {
     Server,
 }
 
-/// The language a search is sent with: the first part of a language tag such as `fr-CA` or
-/// `pt_BR`, in lower case. The server reads no more than that (`fr-CA` and `fr` answer the same),
-/// and answers no posts at all to `FR`. `None` when the first part isn't letters.
-fn search_language(lang: Option<&str>) -> Option<String> {
-    let language = lang?.trim().split(['-', '_']).next()?;
-    (!language.is_empty() && language.chars().all(|c| c.is_ascii_alphabetic()))
-        .then(|| language.to_ascii_lowercase())
-}
-
 fn tags_key(slugs: &[ReaderTagSlug]) -> String {
     let mut slugs: Vec<&str> = slugs.iter().map(|slug| slug.0.as_str()).collect();
     slugs.sort_unstable();
@@ -155,9 +143,57 @@ fn tags_key(slugs: &[ReaderTagSlug]) -> String {
 }
 
 impl ReaderStream {
-    /// The stream's key in the cache. It never changes for a stream, since the cache finds the
-    /// stream's posts by it. The same tags in another order are the same stream.
-    pub(crate) fn key(&self) -> String {
+    /// Whether the stream's posts depend on the reader's language. Those streams are sent the
+    /// language, and each language is a stream of its own in the cache.
+    pub(crate) fn uses_language(&self) -> bool {
+        match self {
+            Self::Tag { .. }
+            | Self::Tags { .. }
+            | Self::Search { .. }
+            | Self::Discover { .. }
+            | Self::FirstPosts => true,
+            Self::Following
+            | Self::Liked
+            | Self::Automattic
+            | Self::P2
+            | Self::FreshlyPressed
+            | Self::Site { .. }
+            | Self::Feed { .. }
+            | Self::ReaderList { .. }
+            | Self::Related { .. } => false,
+        }
+    }
+
+    /// The language the stream is sent, in the form that picks posts: `None` when the reader has
+    /// none, or when the stream's posts don't depend on it.
+    fn language(&self, language: Option<ReaderLanguage>) -> Option<&'static str> {
+        language
+            .filter(|_| self.uses_language())
+            .map(|language| language.posts)
+    }
+
+    /// The stream's key in the cache, in the reader's language. It never changes for a stream in
+    /// a language, since the cache finds the stream's posts by it. The same tags in another order
+    /// are the same stream.
+    ///
+    /// With no language, or for a stream that doesn't depend on it, the key is the stream's own,
+    /// as it was before the Reader had a language, so what's cached stays found. In a language, a
+    /// stream's key starts with `lang:` and the language, such as `lang:fr:tag:photography`, which
+    /// no stream's own key does. A search keeps the language in its own key, where it has always
+    /// been: `search:relevance:fr:cats`, or `search:relevance::cats` with none.
+    pub(crate) fn key(&self, language: Option<ReaderLanguage>) -> String {
+        let language = self.language(language);
+        if let Self::Search { query, sort } = self {
+            return format!("search:{sort}:{}:{query}", language.unwrap_or_default());
+        }
+        let key = self.key_in_no_language();
+        match language {
+            Some(language) => format!("lang:{language}:{key}"),
+            None => key,
+        }
+    }
+
+    fn key_in_no_language(&self) -> String {
         match self {
             Self::Following => "following".to_string(),
             Self::Liked => "liked".to_string(),
@@ -168,10 +204,7 @@ impl ReaderStream {
             Self::Feed { feed_id } => format!("feed:{}", feed_id.0),
             Self::Tag { slug } => format!("tag:{}", slug.0),
             Self::Tags { slugs } => format!("tags:{}", tags_key(slugs)),
-            Self::Search { query, sort, lang } => format!(
-                "search:{sort}:{}:{query}",
-                search_language(lang.as_deref()).unwrap_or_default()
-            ),
+            Self::Search { query, sort } => format!("search:{sort}::{query}"),
             Self::ReaderList { owner, slug } => format!("list:{}/{}", owner.0, slug.0),
             Self::Discover { tags } => format!("discover:{}", tags_key(tags)),
             Self::FirstPosts => "first-posts".to_string(),
@@ -240,13 +273,16 @@ impl ReaderStream {
         }
     }
 
-    /// Fetches a page: the first when `cursor` is `None`.
+    /// Fetches a page, in `language` for a stream whose posts depend on it: the first page when
+    /// `cursor` is `None`.
     pub(crate) async fn fetch(
         &self,
         client: &WpComApiClient,
         cursor: Option<&StreamCursor>,
+        language: Option<ReaderLanguage>,
     ) -> Result<StreamPage, WpApiError> {
         let posts = client.reader_posts();
+        let locale = self.language(language).map(str::to_string);
         let before = match cursor {
             Some(StreamCursor::Before(date)) => Some(*date),
             _ => None,
@@ -306,6 +342,7 @@ impl ReaderStream {
                 let params = ReaderTagPostsParams {
                     page_handle,
                     sort: Some(ReaderTagPostsSort::Date),
+                    locale,
                     ..Default::default()
                 };
                 tag_page(posts.tag_posts(slug, &params).await?.data)
@@ -319,10 +356,11 @@ impl ReaderStream {
                     sort: Some(ReaderTagPostsSort::Date),
                     before: None,
                     after: None,
+                    locale,
                 };
                 tag_page(posts.tags_posts(&params).await?.data)
             }
-            Self::Search { query, sort, lang } => {
+            Self::Search { query, sort } => {
                 let params = ReaderSearchPostsParams {
                     q: query.clone(),
                     number: Some(SEARCH_PAGE_SIZE),
@@ -331,7 +369,7 @@ impl ReaderStream {
                     sort: Some(*sort),
                     before: None,
                     after: None,
-                    lang: search_language(lang.as_deref()),
+                    lang: locale,
                     algorithm: None,
                     meta,
                     fields: None,
@@ -366,6 +404,7 @@ impl ReaderStream {
                     tags: tags.clone(),
                     sort: None,
                     age_based_decay: None,
+                    locale,
                 };
                 let page = posts.discover(&params).await?.data;
                 card_page(page.cards, page.unreadable_cards, page.next_page_handle)
@@ -374,6 +413,7 @@ impl ReaderStream {
                 let params = ReaderFirstPostsParams {
                     count: None,
                     page_handle,
+                    locale,
                 };
                 let page = posts.first_posts(&params).await?.data;
                 card_page(page.cards, page.unreadable_cards, page.next_page_handle)
@@ -579,6 +619,7 @@ fn card_page(
 mod tests {
     use super::*;
     use rstest::rstest;
+    use wp_api::wp_com::language::WPComLanguage;
 
     fn slug(slug: &str) -> ReaderTagSlug {
         ReaderTagSlug(slug.to_string())
@@ -599,8 +640,7 @@ mod tests {
     #[case(ReaderStream::Feed { feed_id: ReaderFeedId(8857199) }, "feed:8857199", false, ReaderStreamOrdering::Date)]
     #[case(ReaderStream::Tag { slug: slug("photography") }, "tag:photography", false, ReaderStreamOrdering::Server)]
     #[case(ReaderStream::Tags { slugs: vec![slug("travel"), slug("art"), slug("travel")] }, "tags:art,travel", false, ReaderStreamOrdering::Server)]
-    #[case(ReaderStream::Search { query: "cats and dogs".to_string(), sort: ReaderSearchSort::Date, lang: None }, "search:date::cats and dogs", false, ReaderStreamOrdering::Server)]
-    #[case(ReaderStream::Search { query: "cats".to_string(), sort: ReaderSearchSort::Relevance, lang: Some("fr-CA".to_string()) }, "search:relevance:fr:cats", false, ReaderStreamOrdering::Server)]
+    #[case(ReaderStream::Search { query: "cats and dogs".to_string(), sort: ReaderSearchSort::Date }, "search:date::cats and dogs", false, ReaderStreamOrdering::Server)]
     #[case(ReaderStream::ReaderList { owner: ReaderListOwner("automattic".to_string()), slug: ReaderListSlug("design".to_string()) }, "list:automattic/design", false, ReaderStreamOrdering::Server)]
     #[case(ReaderStream::Discover { tags: vec![] }, "discover:", false, ReaderStreamOrdering::Server)]
     #[case(ReaderStream::Discover { tags: vec![slug("b"), slug("a")] }, "discover:a,b", false, ReaderStreamOrdering::Server)]
@@ -617,27 +657,66 @@ mod tests {
         #[case] needs_account: bool,
         #[case] ordering: ReaderStreamOrdering,
     ) {
-        assert_eq!(stream.key(), key);
+        assert_eq!(stream.key(None), key);
         assert_eq!(stream.needs_account(), needs_account);
         assert_eq!(stream.ordering(), ordering);
     }
 
+    /// Every stream's key in each language. With no language, each key is what it was before the
+    /// Reader had a language, so a cache that has them still finds its streams: don't change the
+    /// first column.
     #[rstest]
-    #[case(None, None)]
-    #[case(Some("fr"), Some("fr"))]
-    #[case(Some("fr-CA"), Some("fr"))]
-    #[case(Some("pt_BR"), Some("pt"))]
-    #[case(Some("zh-Hant-TW"), Some("zh"))]
-    #[case(Some("FR"), Some("fr"))]
-    #[case(Some(" de "), Some("de"))]
-    #[case(Some(""), None)]
-    #[case(Some("-CA"), None)]
-    #[case(Some("12"), None)]
-    fn test_the_language_a_search_is_sent_with(
-        #[case] lang: Option<&str>,
-        #[case] sent: Option<&str>,
+    #[case(ReaderStream::Following, "following", "following")]
+    #[case(ReaderStream::Liked, "liked", "liked")]
+    #[case(ReaderStream::Automattic, "a8c", "a8c")]
+    #[case(ReaderStream::P2, "p2", "p2")]
+    #[case(ReaderStream::FreshlyPressed, "freshly-pressed", "freshly-pressed")]
+    #[case(ReaderStream::Site { site_id: WpComSiteId(3584907) }, "site:3584907", "site:3584907")]
+    #[case(ReaderStream::Feed { feed_id: ReaderFeedId(8857199) }, "feed:8857199", "feed:8857199")]
+    #[case(ReaderStream::Tag { slug: slug("photography") }, "tag:photography", "lang:pt:tag:photography")]
+    #[case(ReaderStream::Tags { slugs: vec![slug("travel"), slug("art")] }, "tags:art,travel", "lang:pt:tags:art,travel")]
+    #[case(ReaderStream::Search { query: "cats".to_string(), sort: ReaderSearchSort::Relevance }, "search:relevance::cats", "search:relevance:pt:cats")]
+    #[case(ReaderStream::Search { query: "a:b".to_string(), sort: ReaderSearchSort::Date }, "search:date::a:b", "search:date:pt:a:b")]
+    #[case(ReaderStream::ReaderList { owner: ReaderListOwner("automattic".to_string()), slug: ReaderListSlug("design".to_string()) }, "list:automattic/design", "list:automattic/design")]
+    #[case(ReaderStream::Discover { tags: vec![] }, "discover:", "lang:pt:discover:")]
+    #[case(ReaderStream::Discover { tags: vec![slug("b"), slug("a")] }, "discover:a,b", "lang:pt:discover:a,b")]
+    #[case(ReaderStream::FirstPosts, "first-posts", "lang:pt:first-posts")]
+    #[case(ReaderStream::Related { site_id: WpComSiteId(1), post_id: PostId(2) }, "related:1:2", "related:1:2")]
+    fn test_each_streams_key_with_and_without_a_language(
+        #[case] stream: ReaderStream,
+        #[case] in_no_language: &str,
+        #[case] in_brazilian_portuguese: &str,
     ) {
-        assert_eq!(search_language(lang).as_deref(), sent);
+        assert_eq!(stream.key(None), in_no_language);
+        let language = ReaderLanguage::new(WPComLanguage::PortugueseBrazil);
+        assert_eq!(stream.key(Some(language)), in_brazilian_portuguese);
+        // A stream that depends on the language is another stream in it.
+        assert_eq!(
+            stream.uses_language(),
+            in_no_language != in_brazilian_portuguese
+        );
+    }
+
+    /// A key in a language can't be any stream's key in no language, whatever its slug or query.
+    #[test]
+    fn test_a_key_in_a_language_is_no_streams_key_in_none() {
+        let french = Some(ReaderLanguage::new(WPComLanguage::French));
+        let tag = |slug: &str| ReaderStream::Tag {
+            slug: ReaderTagSlug(slug.to_string()),
+        };
+        assert_ne!(tag("photography").key(french), tag("photography").key(None));
+        // No slug makes a key in no language start with `lang:`.
+        assert!(
+            !tag("lang:fr:tag:photography")
+                .key(None)
+                .starts_with("lang:")
+        );
+        let search = |query: &str| ReaderStream::Search {
+            query: query.to_string(),
+            sort: ReaderSearchSort::Relevance,
+        };
+        // A query that starts with a colon is still another search than one in French.
+        assert_ne!(search("cats").key(french), search(":fr:cats").key(None));
     }
 
     #[test]

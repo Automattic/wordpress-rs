@@ -3,7 +3,7 @@ use std::sync::Arc;
 use wp_api::prelude::*;
 use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::reader_posts::ReaderTagSlug;
-use wp_api::wp_com::reader_tags::ReaderMenuItemKind;
+use wp_api::wp_com::reader_tags::{ReaderInterestsParams, ReaderMenuItemKind, ReaderMenuParams};
 
 use crate::context::TestContext;
 
@@ -40,7 +40,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let menu = ctx
                         .client
                         .reader_tags()
-                        .menu()
+                        .menu(&ReaderMenuParams::default())
                         .await
                         .map_err(|e| e.to_string())?
                         .data;
@@ -72,7 +72,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 ctx.runtime.block_on(async {
                     let menu = signed_out_client(&ctx)
                         .reader_tags()
-                        .menu()
+                        .menu(&ReaderMenuParams::default())
                         .await
                         .map_err(|e| e.to_string())?
                         .data;
@@ -150,7 +150,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 ctx.runtime.block_on(async {
                     let interests = signed_out_client(&ctx)
                         .reader_tags()
-                        .interests()
+                        .interests(&ReaderInterestsParams::default())
                         .await
                         .map_err(|e| e.to_string())?
                         .data

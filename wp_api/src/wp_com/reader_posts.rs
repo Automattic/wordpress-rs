@@ -430,6 +430,9 @@ impl From<RawReaderPostsResponse> for ReaderPostsResponse {
 ///
 /// The other streams that page by date have parameters of their own: [`ReaderLikedPostsParams`],
 /// [`ReaderOrganizationPostsParams`] and [`ReaderFreshlyPressedParams`].
+///
+/// None of them takes a language: `lang`, `locale` and `_locale` left a site's posts and the
+/// Following stream as they were (measured on 2026-11-20).
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(false)] // The streams page by date rather than page number.
 pub struct ReaderStreamParams {
@@ -494,6 +497,10 @@ impl_as_query_value_from_to_string!(ReaderStreamOrder);
 /// `after` compare with that time rather than with when a post was published. For the next page,
 /// pass the page's [`ReaderDateRange::after`] as `before`: it's the last post's
 /// [`ReaderPost::date_liked`]. The stream has ended when a page has no posts.
+///
+/// It takes no language: with `lang`, `locale` or `_locale` it's the same posts (measured on
+/// 2026-11-20). `locale` only changes how some characters are written, such as `&rsquo;` for
+/// `&#8217;`.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(false)] // The stream pages by the date of the like rather than a page number.
 pub struct ReaderLikedPostsParams {
@@ -575,7 +582,9 @@ pub struct ReaderOrganizationPostsParams {
 /// page, pass the page's [`ReaderDateRange::after`] as `before`. The stream has ended when a page
 /// has no posts.
 ///
-/// The API also takes `format=rss`, which redirects to an RSS feed, so it isn't here.
+/// The API also takes `format=rss`, which redirects to an RSS feed, so it isn't here. It takes no
+/// language: with `lang`, `locale` or `_locale` it's the same posts (measured on 2026-11-20).
+/// `locale` only changes how some characters are written, such as `&rsquo;` for `&#8217;`.
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(false)] // The stream pages by date rather than page number.
 pub struct ReaderFreshlyPressedParams {
@@ -661,7 +670,15 @@ pub struct ReaderSearchPostsParams {
     /// Only return posts published after this time.
     #[uniffi(default = None)]
     pub after: Option<WpGmtDateTime>,
-    /// The language to search in, such as `fr`.
+    /// The language of the posts to search, such as `fr`: only posts in it are returned. The API
+    /// reads the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer
+    /// the same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts to
+    /// `FR`, to a language it doesn't know such as `xx`, and to an old code such as `iw` (send `he`).
+    /// WordPress.com's own code is the one it reads where that isn't the two-letter one: `bel` for
+    /// Belarusian and `kir` for Kyrgyz find posts, and `be` and `ky` find none. Without it, or empty,
+    /// the results are those of `en`. Measured on 2026-11-20.
+    ///
+    /// `locale` and `_locale` change nothing here.
     #[uniffi(default = None)]
     pub lang: Option<String>,
     /// The name of the algorithm to search with. The API sends back the name it's given, in
@@ -780,7 +797,9 @@ wp_content_string_id!(ReaderListSlug);
 /// [`ReaderListPostsResponse::next_page_handle`] as `page_handle`.
 ///
 /// The API declares `page`, `order`, `before` and `after` too. None of them changed anything in
-/// the responses that were looked at, and neither did `meta`. `fields` empties the response.
+/// the responses that were looked at, and neither did `meta`. `fields` empties the response. Nor
+/// does a language: `lang`, `locale` and `_locale` left the list's posts as they were (measured on
+/// 2026-11-20).
 #[derive(Debug, Default, PartialEq, Eq, uniffi::Record, WpDeriveParamsField)]
 #[supports_pagination(false)] // The stream pages with `page_handle` rather than a page number.
 pub struct ReaderListPostsParams {
@@ -942,6 +961,21 @@ pub struct ReaderTagPostsParams {
     /// Only return posts published after this time.
     #[uniffi(default = None)]
     pub after: Option<WpGmtDateTime>,
+    /// The language of the posts, sent as `_locale`: only posts in it are returned. The API reads
+    /// the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer the
+    /// same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts at all
+    /// to `FR`, to an empty value, to a language it doesn't know such as `xx`, and to an old code
+    /// such as `iw` (send `he`) or `in` (send `id`). Without it, the posts are those of `en`.
+    /// Measured on 2026-11-20.
+    ///
+    /// `_locale` is a global parameter of the WordPress REST API, read whether or not a route lists
+    /// it. It's sent after the one a [`crate::wp_com::language::WpComLanguageProvider`] adds, and
+    /// the API reads the last one.
+    ///
+    /// `lang` and `locale` change nothing.
+    #[uniffi(default = None)]
+    #[field_name("_locale")]
+    pub locale: Option<String>,
 }
 
 /// A page of the posts of a tag, or of several tags.
@@ -1016,6 +1050,21 @@ pub struct ReaderTagsPostsParams {
     /// Only return posts published after this time.
     #[uniffi(default = None)]
     pub after: Option<WpGmtDateTime>,
+    /// The language of the posts, sent as `_locale`: only posts in it are returned. The API reads
+    /// the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer the
+    /// same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts at all
+    /// to `FR`, to an empty value, to a language it doesn't know such as `xx`, and to an old code
+    /// such as `iw` (send `he`) or `in` (send `id`). Without it, the posts are those of `en`.
+    /// Measured on 2026-11-20.
+    ///
+    /// `_locale` is a global parameter of the WordPress REST API, read whether or not a route lists
+    /// it. It's sent after the one a [`crate::wp_com::language::WpComLanguageProvider`] adds, and
+    /// the API reads the last one.
+    ///
+    /// `locale` changes nothing.
+    #[uniffi(default = None)]
+    #[field_name("_locale")]
+    pub locale: Option<String>,
 }
 
 /// A card in a stream of cards, such as Discover.
@@ -1324,6 +1373,21 @@ pub struct ReaderDiscoverParams {
     /// responses that were looked at.
     #[uniffi(default = None)]
     pub age_based_decay: Option<f64>,
+    /// The language of the posts, sent as `_locale`: only posts in it are returned. The API reads
+    /// the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer the
+    /// same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts at all
+    /// to `FR`, to an empty value, to a language it doesn't know such as `xx`, and to an old code
+    /// such as `iw` (send `he`) or `in` (send `id`). Without it, the posts are those of `en`.
+    /// Measured on 2026-11-20.
+    ///
+    /// `_locale` is a global parameter of the WordPress REST API, read whether or not a route lists
+    /// it. It's sent after the one a [`crate::wp_com::language::WpComLanguageProvider`] adds, and
+    /// the API reads the last one.
+    ///
+    /// `lang` and `locale` change nothing.
+    #[uniffi(default = None)]
+    #[field_name("_locale")]
+    pub locale: Option<String>,
 }
 
 /// A page of Discover's stream of cards.
@@ -1384,6 +1448,21 @@ pub struct ReaderFirstPostsParams {
     /// handle it didn't send with the first page.
     #[uniffi(default = None)]
     pub page_handle: Option<String>,
+    /// The language of the posts, sent as `_locale`: only posts in it are returned. The API reads
+    /// the language's first part only, and only in lower case: `fr`, `fr-ca` and `fr_FR` answer the
+    /// same posts, `pt-br` the same as `pt`, and `zh-tw` the same as `zh`. It answers no posts at all
+    /// to `FR`, to an empty value, to a language it doesn't know such as `xx`, and to an old code
+    /// such as `iw` (send `he`) or `in` (send `id`). Without it, the posts are those of `en`.
+    /// Measured on 2026-11-20.
+    ///
+    /// `_locale` is a global parameter of the WordPress REST API, read whether or not a route lists
+    /// it. It's sent after the one a [`crate::wp_com::language::WpComLanguageProvider`] adds, and
+    /// the API reads the last one.
+    ///
+    /// `lang` and `locale` change nothing.
+    #[uniffi(default = None)]
+    #[field_name("_locale")]
+    pub locale: Option<String>,
 }
 
 /// A page of the stream of new sites' first posts: post cards, then a card of new sites.

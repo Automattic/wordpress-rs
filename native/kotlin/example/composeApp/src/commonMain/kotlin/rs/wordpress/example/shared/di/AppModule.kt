@@ -10,6 +10,7 @@ import rs.wordpress.cache.kotlin.WordPressApiCache
 import rs.wordpress.example.shared.ui.reader.ReaderSession
 import rs.wordpress.example.shared.ui.welcome.WelcomeViewModel
 import rs.wordpress.api.kotlin.WpComApiClient
+import rs.wordpress.api.kotlin.fromLocale
 import rs.wordpress.api.kotlin.WpRequestResult
 import uniffi.wp_api.WpApiClientDelegate
 import uniffi.wp_api.WpApiMiddlewarePipeline
@@ -23,11 +24,13 @@ import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.ReaderSavedSource
 import uniffi.wp_api.WpComBaseUrl
 import uniffi.wp_api.WpComDotOrgApiUrlResolver
+import uniffi.wp_api.WpComLanguage
 import uniffi.wp_mobile.SiteInfo
 import uniffi.wp_mobile_cache.ReaderOwner
 import uniffi.wp_mobile.WpService
 import java.io.File
 import java.net.URI
+import java.util.Locale
 
 val cacheModule = module {
     single {
@@ -198,6 +201,11 @@ private fun readerSession(
             savedSource = ReaderSavedSource.ANDROID
         )
         ReaderSession(service, label, isSignedIn = owner is ReaderOwner.Account)
+    }.also { session ->
+        // The device's language, set each time a screen asks for the session, since Android can
+        // change the app's language while it runs. Streams got after a change are in the new
+        // language. `null` for a language WordPress.com doesn't have, which reads in English.
+        session.service.setLanguage(WpComLanguage.fromLocale(Locale.getDefault()))
     }
 }
 

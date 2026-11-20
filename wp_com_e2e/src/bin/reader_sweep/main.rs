@@ -667,6 +667,7 @@ async fn fetch_once(
             let params = ReaderFirstPostsParams {
                 count: Some(args.page_size.min(FIRST_POSTS_PAGE_SIZE_MAX)),
                 page_handle,
+                ..Default::default()
             };
             let page = posts.first_posts(&params).await?.data;
             card_page(page.cards, page.unreadable_cards, page.next_page_handle)

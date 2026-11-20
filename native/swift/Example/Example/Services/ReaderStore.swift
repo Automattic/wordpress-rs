@@ -156,7 +156,16 @@ final class ReaderStore {
         let cache = try sharedCache()
         let client = makeClient(authentication: authentication)
         let service = try client.makeReaderService(cache: cache, owner: owner, savedSource: .ios)
+        // The device's language, so tag streams, Discover, searches, the menu and the interests are in it. iOS
+        // relaunches the app when the reader changes it, so it's set once.
+        service.setLanguage(language: Self.deviceLanguage)
         return ReaderSession(service: service, cache: cache, owner: owner, name: name, client: client)
+    }
+
+    /// The reader's first preferred language as a WordPress.com language, or `nil` when WordPress.com doesn't
+    /// have it. `Locale.current` isn't it: that's the app's language, and the app is only in English.
+    private static var deviceLanguage: WPComLanguage? {
+        Locale.preferredLanguages.first.flatMap { WPComLanguage(locale: Locale(identifier: $0)) }
     }
 
     private func makeClient(authentication: WpAuthentication) -> WPComApiClient {

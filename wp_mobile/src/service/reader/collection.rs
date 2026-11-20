@@ -3,6 +3,7 @@
 //! A page is stored in one transaction, so a reader of the cache never sees half of one. How a
 //! page is merged depends on what orders the stream: see [`ReaderStreamOrdering`].
 
+use super::language::ReaderLanguage;
 use super::stream::{ReaderStreamCardKind, StreamCursor, StreamEntry, StreamPage};
 use super::{ReaderContext, ReaderError, ReaderStream, ReaderStreamOrdering};
 use futures::lock::Mutex as AsyncMutex;
@@ -11,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use wp_api::date::WpGmtDateTime;
 use wp_api::prelude::WpApiError;
+use wp_api::wp_com::language::WPComLanguage;
 use wp_api::wp_com::reader_saved::{
     ReaderSavedKey, reader_saved_key_for_post, reader_saved_keys_for_post,
 };
@@ -154,10 +156,17 @@ enum PageKind {
 /// [`Self::is_relevant_update`] says a change to the cache is one it shows. [`Self::refresh`]
 /// fetches the first page, [`Self::load_more`] the next, and [`Self::fill_gap`] the posts a refresh
 /// skipped.
+///
+/// A stream whose posts depend on the reader's language, such as a tag's or Discover, keeps the
+/// language the service had when the stream was got: it fetches in that language, and reads and
+/// stores that language's posts. After [`super::ReaderService::set_language`], get the stream again
+/// for the new language's posts.
 #[derive(uniffi::Object)]
 pub struct ReaderStreamCollection {
     context: Arc<ReaderContext>,
     stream: ReaderStream,
+    /// The language the stream is in, when its posts depend on one.
+    language: Option<WPComLanguage>,
     /// The stream's key in the cache.
     key: String,
     lanes: Arc<StreamLanes>,
@@ -167,6 +176,13 @@ pub struct ReaderStreamCollection {
 impl ReaderStreamCollection {
     pub fn stream(&self) -> ReaderStream {
         self.stream.clone()
+    }
+
+    /// The language the stream's posts are in: the reader's language when the stream was got.
+    /// `None` when the reader had none, or when the stream's posts don't depend on it, such as a
+    /// site's.
+    pub fn language(&self) -> Option<WPComLanguage> {
+        self.language
     }
 
     /// The stream's posts from the cache, in the stream's order, without posts from a site or by a
@@ -500,15 +516,19 @@ impl ReaderStreamCollection {
 }
 
 impl ReaderStreamCollection {
+    /// `language` is the reader's, and `lanes` are those of the stream's key in it.
     pub(crate) fn new(
         context: Arc<ReaderContext>,
         stream: ReaderStream,
+        language: Option<WPComLanguage>,
         lanes: Arc<StreamLanes>,
     ) -> Self {
+        let language = language.filter(|_| stream.uses_language());
         Self {
-            key: stream.key(),
+            key: stream.key(language.map(ReaderLanguage::new)),
             context,
             stream,
+            language,
             lanes,
         }
     }
@@ -583,9 +603,10 @@ impl ReaderStreamCollection {
             }
             PageKind::Next { handle, .. } => Some(StreamCursor::Handle(handle.clone())),
         };
+        let language = self.language.map(ReaderLanguage::new);
         let mut page = self
             .stream
-            .fetch(&self.context.client, cursor.as_ref())
+            .fetch(&self.context.client, cursor.as_ref(), language)
             .await?;
         if self.stream.ordering() == ReaderStreamOrdering::Server {
             let mut followed = 0;
@@ -596,7 +617,11 @@ impl ReaderStreamCollection {
             {
                 page = self
                     .stream
-                    .fetch(&self.context.client, Some(&StreamCursor::Handle(handle)))
+                    .fetch(
+                        &self.context.client,
+                        Some(&StreamCursor::Handle(handle)),
+                        language,
+                    )
                     .await?;
                 followed += 1;
             }

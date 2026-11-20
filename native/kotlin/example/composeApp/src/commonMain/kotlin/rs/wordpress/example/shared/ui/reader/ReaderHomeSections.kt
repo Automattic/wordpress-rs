@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import uniffi.wp_api.ReaderMenuItem
+import uniffi.wp_api.WpComLanguage
 import uniffi.wp_api.ReaderMenuItemKind
 import uniffi.wp_mobile.ReaderStream
 
@@ -26,6 +27,7 @@ internal fun ReaderIdentitySection(state: ReaderHomeState) {
     Column {
         ReaderSectionTitle("Reader")
         ReaderNote("Reading as: ${session.label}")
+        ReaderNote("Language: ${session.service.language().describe()}")
         ReaderNote("Waiting to be sent: ${state.pendingActions} actions, ${state.pendingSaves} saves")
         ReaderControlsRow {
             Button(onClick = { state.sync() }) { Text("Sync") }
@@ -48,6 +50,10 @@ internal fun ReaderIdentitySection(state: ReaderHomeState) {
         }
     }
 }
+
+/** The reader's language, as the service has it, or what having none means. */
+private fun WpComLanguage?.describe(): String =
+    this?.let { "${it.displayName()} (${it.slug()})" } ?: "none, so English"
 
 /** The menu's streams and lists, with the two streams the menu doesn't have. */
 internal fun LazyListScope.readerStreamRows(state: ReaderHomeState, open: (ReaderDestination) -> Unit) {

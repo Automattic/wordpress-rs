@@ -113,8 +113,7 @@ extension ReaderStream {
         case .feed(let feedId): "Feed \(feedId)"
         case .tag(let slug): "Tag: \(slug)"
         case .tags(let slugs): "Latest from \(slugs.count) tags"
-        case .search(let query, let sort, let lang):
-            "Search: \(query) (\(sort == .date ? "newest" : "best match"), in \(lang ?? "no language"))"
+        case .search(let query, let sort): "Search: \(query) (\(sort == .date ? "newest" : "best match"))"
         case .readerList(let owner, let slug): "List: \(owner)/\(slug)"
         case .related(let siteId, let postId): "Related to \(siteId)/\(postId)"
         default: "Stream"

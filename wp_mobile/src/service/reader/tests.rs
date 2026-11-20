@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 use std::time::Duration;
 use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
+use wp_api::wp_com::language::{WPComLanguage, WpComLanguageProvider};
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::reader_posts::{
     ReaderListOwner, ReaderListSlug, ReaderSearchSort, ReaderTagSlug,
@@ -190,17 +191,8 @@ async fn each_stream_reads_its_own_endpoint() {
             ReaderStream::Search {
                 query: "cats and dogs".to_string(),
                 sort: ReaderSearchSort::Date,
-                lang: None,
             },
             "/rest/v1.2/read/search?q=cats+and+dogs&number=20&sort=date&meta=site%2Cfeed",
-        ),
-        (
-            ReaderStream::Search {
-                query: "cats & dogs".to_string(),
-                sort: ReaderSearchSort::Relevance,
-                lang: Some("fr-CA".to_string()),
-            },
-            "/rest/v1.2/read/search?q=cats+%26+dogs&number=20&sort=relevance&lang=fr&meta=site%2Cfeed",
         ),
         (
             ReaderStream::ReaderList {
@@ -309,7 +301,6 @@ async fn a_search_follows_its_page_handles() {
     let stream = service.stream(ReaderStream::Search {
         query: "cats".to_string(),
         sort: ReaderSearchSort::Relevance,
-        lang: None,
     });
     executor.push(Step::Respond(
         200,
@@ -334,7 +325,6 @@ fn search_by_date() -> ReaderStream {
     ReaderStream::Search {
         query: "cats".to_string(),
         sort: ReaderSearchSort::Date,
-        lang: None,
     }
 }
 
@@ -465,10 +455,10 @@ fn sent_query(executor: &ScriptedExecutor, index: usize) -> Vec<(String, String)
 #[tokio::test]
 async fn a_search_phrase_reaches_the_server_whole_with_the_readers_language() {
     let (service, executor) = service_for(ReaderOwner::SignedOut);
+    service.set_language(Some(WPComLanguage::PortugueseBrazil));
     let stream = service.stream(ReaderStream::Search {
         query: "cats & dogs=friends?".to_string(),
         sort: ReaderSearchSort::Relevance,
-        lang: Some("pt_BR".to_string()),
     });
     executor.push(Step::Respond(200, json!({ "posts": [post_json(1, 10)] })));
     stream.refresh().await.unwrap();
@@ -487,23 +477,283 @@ async fn a_search_phrase_reaches_the_server_whole_with_the_readers_language() {
     assert_eq!(value("lang"), ["pt"]);
 }
 
+/// What each request was sent as its language: `_locale`, `locale` or `lang`, whichever it has.
+fn sent_languages(executor: &ScriptedExecutor) -> Vec<Option<String>> {
+    (0..executor.sent().len())
+        .map(|index| {
+            let languages: Vec<_> = sent_query(executor, index)
+                .iter()
+                .filter(|(name, _)| ["_locale", "locale", "lang"].contains(&name.as_str()))
+                .map(|(name, value)| format!("{name}={value}"))
+                .collect();
+            assert!(languages.len() <= 1, "{languages:?}");
+            languages.into_iter().next()
+        })
+        .collect()
+}
+
+/// Every kind of stream, with the language it's sent in Brazilian Portuguese: none for those whose
+/// posts are the same in any language.
+fn streams_and_their_language() -> Vec<(ReaderStream, Option<&'static str>)> {
+    let slug = |slug: &str| ReaderTagSlug(slug.to_string());
+    vec![
+        (ReaderStream::Following, None),
+        (ReaderStream::Liked, None),
+        (ReaderStream::Automattic, None),
+        (ReaderStream::P2, None),
+        (ReaderStream::FreshlyPressed, None),
+        (
+            ReaderStream::Site {
+                site_id: WpComSiteId(123),
+            },
+            None,
+        ),
+        (
+            ReaderStream::Feed {
+                feed_id: ReaderFeedId(456),
+            },
+            None,
+        ),
+        (tag(), Some("_locale=pt")),
+        (
+            ReaderStream::Tags {
+                slugs: vec![slug("art"), slug("travel")],
+            },
+            Some("_locale=pt"),
+        ),
+        (
+            ReaderStream::Search {
+                query: "cats".to_string(),
+                sort: ReaderSearchSort::Date,
+            },
+            Some("lang=pt"),
+        ),
+        (
+            ReaderStream::ReaderList {
+                owner: ReaderListOwner("automattic".to_string()),
+                slug: ReaderListSlug("design".to_string()),
+            },
+            None,
+        ),
+        (
+            ReaderStream::Discover {
+                tags: vec![slug("art")],
+            },
+            Some("_locale=pt"),
+        ),
+        (ReaderStream::FirstPosts, Some("_locale=pt")),
+        (
+            ReaderStream::Related {
+                site_id: WpComSiteId(123),
+                post_id: PostId(1),
+            },
+            None,
+        ),
+    ]
+}
+
 #[tokio::test]
-async fn a_search_in_another_language_is_another_stream() {
+async fn each_stream_is_sent_the_readers_language_where_it_picks_the_posts() {
+    let (service, executor) = service();
+    service.set_language(Some(WPComLanguage::PortugueseBrazil));
+    assert_eq!(service.language(), Some(WPComLanguage::PortugueseBrazil));
+    let streams = streams_and_their_language();
+    for (stream, sent) in &streams {
+        executor.push(Step::Respond(200, page(&[(1, 10)])));
+        let collection = service.stream(stream.clone());
+        collection.refresh().await.unwrap();
+        // A stream reports the language its posts are in: none for one they don't depend on.
+        let language = sent.map(|_| WPComLanguage::PortugueseBrazil);
+        assert_eq!(collection.language(), language, "{stream:?}");
+    }
+    let expected: Vec<_> = streams
+        .iter()
+        .map(|(_, sent)| sent.map(str::to_string))
+        .collect();
+    assert_eq!(sent_languages(&executor), expected);
+}
+
+#[tokio::test]
+async fn with_no_language_none_is_sent() {
+    let (service, executor) = service();
+    assert_eq!(service.language(), None);
+    let streams = streams_and_their_language();
+    for (stream, _) in &streams {
+        executor.push(Step::Respond(200, page(&[(1, 10)])));
+        let collection = service.stream(stream.clone());
+        collection.refresh().await.unwrap();
+        assert_eq!(collection.language(), None);
+    }
+    executor.push(Step::Respond(200, json!({ "default": [] })));
+    service.refresh_menu().await.unwrap();
+    executor.push(Step::Respond(200, json!({ "interests": [] })));
+    service.interests().await.unwrap();
+
+    assert_eq!(sent_languages(&executor), vec![None; streams.len() + 2]);
+}
+
+#[tokio::test]
+async fn the_menu_and_the_interests_are_sent_the_readers_locale() {
     let (service, executor) = service_for(ReaderOwner::SignedOut);
-    let search = |lang: &str| ReaderStream::Search {
+    for language in [
+        WPComLanguage::PortugueseBrazil,
+        WPComLanguage::ChineseTraditional,
+        WPComLanguage::SpanishMexico,
+    ] {
+        service.set_language(Some(language));
+        executor.push(Step::Respond(200, json!({ "default": [] })));
+        service.refresh_menu().await.unwrap();
+        executor.push(Step::Respond(200, json!({ "interests": [] })));
+        service.interests().await.unwrap();
+    }
+    let sent = |name: &str, value: &str| Some(format!("{name}={value}"));
+    assert_eq!(
+        sent_languages(&executor),
+        [
+            sent("locale", "pt-br"),
+            sent("_locale", "pt-br"),
+            sent("locale", "zh-tw"),
+            sent("_locale", "zh-tw"),
+            // The menu answers `es-mx` in English, and `es` in Spanish.
+            sent("locale", "es"),
+            sent("_locale", "es"),
+        ]
+    );
+    let sent = executor.sent();
+    assert!(sent[0].url.contains("/rest/v1.3/read/menu?"));
+    assert!(sent[1].url.contains("/wpcom/v2/read/interests?"));
+}
+
+#[tokio::test]
+async fn a_stream_in_another_language_is_another_stream() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let search = ReaderStream::Search {
         query: "chat".to_string(),
         sort: ReaderSearchSort::Relevance,
-        lang: Some(lang.to_string()),
     };
-    executor.push(Step::Respond(200, json!({ "posts": [post_json(1, 10)] })));
-    service.stream(search("fr")).refresh().await.unwrap();
-    executor.push(Step::Respond(200, json!({ "posts": [post_json(2, 10)] })));
-    service.stream(search("en")).refresh().await.unwrap();
+    let discover = ReaderStream::Discover { tags: Vec::new() };
+    for stream in [tag(), search, discover, ReaderStream::FirstPosts] {
+        // Discover and the first posts send their posts as cards.
+        let answer = |id: u64| match stream {
+            ReaderStream::Discover { .. } | ReaderStream::FirstPosts => {
+                json!({ "cards": [{ "type": "post", "data": post_json(id, 10) }] })
+            }
+            _ => json!({ "posts": [post_json(id, 10)] }),
+        };
+        service.set_language(Some(WPComLanguage::French));
+        executor.push(Step::Respond(200, answer(1)));
+        service.stream(stream.clone()).refresh().await.unwrap();
+        service.set_language(None);
+        executor.push(Step::Respond(200, answer(2)));
+        service.stream(stream.clone()).refresh().await.unwrap();
 
-    assert_eq!(shown(&service.stream(search("fr"))).await, ["1"]);
-    assert_eq!(shown(&service.stream(search("en"))).await, ["2"]);
-    // The server answers `fr-CA` as it does `fr`, so the two are one stream.
-    assert_eq!(shown(&service.stream(search("fr-CA"))).await, ["1"]);
+        assert_eq!(
+            shown(&service.stream(stream.clone())).await,
+            ["2"],
+            "{stream:?}"
+        );
+        service.set_language(Some(WPComLanguage::French));
+        assert_eq!(
+            shown(&service.stream(stream.clone())).await,
+            ["1"],
+            "{stream:?}"
+        );
+        // The server answers Canadian French with French posts, so the two are one stream.
+        service.set_language(Some(WPComLanguage::FrenchCanada));
+        assert_eq!(
+            shown(&service.stream(stream.clone())).await,
+            ["1"],
+            "{stream:?}"
+        );
+        // A language that hasn't been fetched in shows nothing of the others.
+        service.set_language(Some(WPComLanguage::Japanese));
+        assert!(
+            shown(&service.stream(stream.clone())).await.is_empty(),
+            "{stream:?}"
+        );
+        service.set_language(None);
+    }
+}
+
+#[tokio::test]
+async fn a_stream_got_before_a_change_of_language_keeps_its_own() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    service.set_language(Some(WPComLanguage::French));
+    let french = service.stream(tag());
+    executor.push(Step::Respond(200, tag_page(&[1], None)));
+    french.refresh().await.unwrap();
+
+    service.set_language(Some(WPComLanguage::German));
+    // A refresh of the French stream after the change is still sent in French, and stored as
+    // French: German shows none of it.
+    executor.push(Step::Respond(200, tag_page(&[3, 1], None)));
+    french.refresh().await.unwrap();
+    assert_eq!(french.language(), Some(WPComLanguage::French));
+    assert_eq!(shown(&french).await, ["3", "1"]);
+    let german = service.stream(tag());
+    assert_eq!(german.language(), Some(WPComLanguage::German));
+    assert!(shown(&german).await.is_empty());
+    executor.push(Step::Respond(200, tag_page(&[2], None)));
+    german.refresh().await.unwrap();
+    assert_eq!(shown(&german).await, ["2"]);
+    assert_eq!(shown(&french).await, ["3", "1"]);
+    assert_eq!(
+        sent_languages(&executor),
+        [
+            Some("_locale=fr".to_string()),
+            Some("_locale=fr".to_string()),
+            Some("_locale=de".to_string()),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_stream_the_language_doesnt_change_is_one_stream_in_any() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let site = ReaderStream::Site {
+        site_id: WpComSiteId(123),
+    };
+    service.set_language(Some(WPComLanguage::French));
+    executor.push(Step::Respond(200, page(&[(1, 10)])));
+    service.stream(site.clone()).refresh().await.unwrap();
+
+    service.set_language(Some(WPComLanguage::Japanese));
+    assert_eq!(shown(&service.stream(site.clone())).await, ["1"]);
+    service.set_language(None);
+    assert_eq!(shown(&service.stream(site)).await, ["1"]);
+}
+
+#[tokio::test]
+async fn the_delegates_language_provider_isnt_sent() {
+    #[derive(Debug)]
+    struct German;
+    impl WpComLanguageProvider for German {
+        fn current_language(&self) -> Option<WPComLanguage> {
+            Some(WPComLanguage::German)
+        }
+    }
+    let executor = Arc::new(ScriptedExecutor::default());
+    let service = ReaderService::new(
+        WpApiClientDelegate {
+            language_provider: Some(Arc::new(German)),
+            ..delegate(executor.clone())
+        },
+        cache(),
+        ReaderOwner::SignedOut,
+        ReaderSavedSource::Ios,
+    )
+    .unwrap();
+    // A stream cached in no language is sent none, or it would hold German posts.
+    executor.push(Step::Respond(200, tag_page(&[1], None)));
+    service.stream(tag()).refresh().await.unwrap();
+    service.set_language(Some(WPComLanguage::French));
+    executor.push(Step::Respond(200, tag_page(&[2], None)));
+    service.stream(tag()).refresh().await.unwrap();
+
+    assert_eq!(
+        sent_languages(&executor),
+        [None, Some("_locale=fr".to_string())]
+    );
 }
 
 #[tokio::test]
@@ -3184,7 +3434,7 @@ mod menu_and_sites {
         assert_eq!(service.followed_tags().unwrap(), cached.followed_tags);
         assert_eq!(
             executor.sent()[0].url,
-            "https://public-api.wordpress.com/rest/v1.3/read/menu"
+            "https://public-api.wordpress.com/rest/v1.3/read/menu?"
         );
 
         // A second service on the same cache has it without asking.
@@ -3230,7 +3480,7 @@ mod menu_and_sites {
         assert!(!interests.is_empty());
         assert!(tag.title.is_some());
         let sent = executor.sent();
-        assert!(sent[0].url.ends_with("/wpcom/v2/read/interests"));
+        assert!(sent[0].url.ends_with("/wpcom/v2/read/interests?"));
         assert!(sent[1].url.ends_with("/rest/v1.2/read/tags/photography"));
     }
 
