@@ -60,6 +60,7 @@ pub mod response_helpers {
             request_url: WpEndpointUrl("".to_string()),
             request_method: RequestMethod::GET,
             request_header_map: WpNetworkHeaderMap::default().into(),
+            response_url: None,
         }
     }
 
@@ -87,6 +88,7 @@ pub mod response_helpers {
             request_url: WpEndpointUrl("".to_string()),
             request_method: RequestMethod::GET,
             request_header_map: WpNetworkHeaderMap::default().into(),
+            response_url: None,
         }
     }
 
@@ -104,6 +106,7 @@ pub mod response_helpers {
             request_url: WpEndpointUrl("".to_string()),
             request_method: RequestMethod::GET,
             request_header_map: WpNetworkHeaderMap::default().into(),
+            response_url: None,
         }
     }
 
@@ -115,6 +118,7 @@ pub mod response_helpers {
             request_url: WpEndpointUrl("".to_string()),
             request_method: RequestMethod::GET,
             request_header_map: WpNetworkHeaderMap::default().into(),
+            response_url: None,
         }
     }
 }

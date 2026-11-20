@@ -194,6 +194,24 @@ struct SafeRequestExecutorTests {
         }
     }
     #endif // !os(watchOS)
+
+    // `example.test` redirects to `www.example.test`, whose `Link` header is relative, so the API root
+    // is only found on `www` if the executor reports where the redirect ended. Excluded on watchOS,
+    // where the `protocolClasses` stub isn't dependably consulted (see the timeout tests above).
+    #if !os(watchOS)
+    @Test("Login discovery resolves a relative link against where a redirect ended")
+    func testRelativeLinkResolvesAgainstWhereARedirectEnded() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RedirectingURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.finishTasksAndInvalidate() }
+
+        let details = try await WordPressLoginClient(urlSession: session)
+            .details(ofSite: "https://example.test")
+
+        #expect(details.apiRootUrl.url() == "https://www.example.test/wp-json/")
+    }
+    #endif // !os(watchOS)
     #endif
 }
 
@@ -268,6 +286,63 @@ private struct FailingRequest: NetworkRequestContent {
         request.setValue(String(code.rawValue), forHTTPHeaderField: FailingURLProtocol.codeHeader)
         return try await session.data(for: request)
     }
+}
+
+/// A `URLProtocol` for a site at `www.example.test` that `example.test` redirects to. Its homepage
+/// advertises the REST API with a relative `Link` header.
+private final class RedirectingURLProtocol: URLProtocol {
+    static let apiRoot = """
+        {
+          "name": "Site", "description": "", "gmt_offset": 0, "timezone_string": "",
+          "url": "https://www.example.test", "home": "https://www.example.test",
+          "namespaces": ["wp/v2"], "routes": {},
+          "authentication": {
+            "application-passwords": {
+              "endpoints": {"authorization": "https://www.example.test/wp-admin/authorize-application.php"}
+            }
+          }
+        }
+        """
+
+    /// The headers and body each URL on `www.example.test` answers with. Any other URL gets a 404.
+    static let routes: [String: (headers: [String: String], body: String)] = [
+        "https://www.example.test/": (["Link": #"</wp-json/>; rel="https://api.w.org/""#], "<html></html>"),
+        "https://www.example.test/wp-json/": (["Content-Type": "application/json"], apiRoot)
+    ]
+
+    override static func canInit(with request: URLRequest) -> Bool { true }
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let url = request.url,
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else { return }
+
+        if components.host == "example.test" {
+            components.host = "www.example.test"
+            let destination = components.url!
+            let redirect = HTTPURLResponse(
+                url: url,
+                statusCode: 301,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Location": destination.absoluteString]
+            )!
+            client?.urlProtocol(self, wasRedirectedTo: URLRequest(url: destination), redirectResponse: redirect)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+
+        let route = Self.routes[url.absoluteString]
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: route == nil ? 404 : 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: route?.headers
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data((route?.body ?? "").utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }
 #endif // !os(watchOS)
 #endif

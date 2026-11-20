@@ -4,7 +4,7 @@ use crate::{
     html_links::{HtmlLinks, resolve_web_address},
     login::KnownAuthenticationBlockingPlugin,
     parsed_url::{ParseUrlError, ParsedUrl},
-    request::{ResponseBodyType, WpRedirect},
+    request::{ResponseBodyType, WpNetworkResponse, WpRedirect},
 };
 use itertools::Itertools;
 use scraper::{Html, Selector};
@@ -776,17 +776,21 @@ impl XmlrpcDiscoveryError {
     }
 }
 
-/// The address relative links on a site's homepage resolve against, when the homepage was
-/// requested at `site_url`.
+/// Returns the URL relative links on a site's homepage resolve against: the URL `homepage`
+/// came from, after any redirects, as a directory. `site_url`, where the homepage was
+/// requested, is used if that URL doesn't parse.
+pub(crate) fn homepage_base_url(homepage: &WpNetworkResponse, site_url: &Url) -> Url {
+    let page_url = Url::parse(&homepage.final_url().0).unwrap_or_else(|_| site_url.clone());
+    site_directory_url(&page_url)
+}
+
+/// Returns `page_url` with a trailing slash added to its path.
 ///
-/// A site address is a directory, so this adds a trailing slash: links on `example.com/blog`
-/// resolve as they would on `example.com/blog/`, where WordPress redirects it. Without the
-/// slash, `wp-json/` would resolve to `example.com/wp-json/`.
-///
-/// The response doesn't say where a redirect ended up, so a homepage that redirects to another
-/// host or path still resolves against `site_url`.
-pub(crate) fn site_directory_url(site_url: &Url) -> Url {
-    let mut directory = site_url.clone();
+/// A site address is a directory, so links on `example.com/blog` resolve as they would on
+/// `example.com/blog/`. Without the slash, `wp-json/` would resolve to `example.com/wp-json/`,
+/// which can be another site.
+pub(crate) fn site_directory_url(page_url: &Url) -> Url {
+    let mut directory = page_url.clone();
     if !directory.cannot_be_a_base() && !directory.path().ends_with('/') {
         let path = format!("{}/", directory.path());
         directory.set_path(&path);

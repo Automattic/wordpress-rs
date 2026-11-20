@@ -221,7 +221,8 @@ class WpRequestExecutor @JvmOverloads constructor(
                     responseHeaderMap = WpNetworkHeaderMap.fromMultiMap(response.headers.toMultimap()),
                     requestUrl = requestUrl,
                     requestMethod = requestMethod,
-                    requestHeaderMap = requestHeaderMap
+                    requestHeaderMap = requestHeaderMap,
+                    responseUrl = response.request.url.toString()
                 )
             }
         } catch (e: CancellationException) {

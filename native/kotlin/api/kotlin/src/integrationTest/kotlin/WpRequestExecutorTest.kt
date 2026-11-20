@@ -7,8 +7,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.mockwebserver.SocketPolicy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -384,6 +386,29 @@ class WpRequestExecutorTest {
      * Resolves media fixtures (e.g. `test_media.jpg`) from the test classpath so uploads can be
      * built without touching the real filesystem layout.
      */
+    @Test
+    fun `a relative link resolves against where a redirect ended`() = runTest {
+        // The homepage at `/start` redirects to `/blog/`, whose `Link` header is relative.
+        val home = mockWebServer.url("/blog").toString()
+        val apiRoot = """{"name":"Site","description":"","url":"$home","home":"$home","gmt_offset":0,""" +
+            """"timezone_string":"","namespaces":["wp/v2"],"authentication":{"application-passwords":""" +
+            """{"endpoints":{"authorization":"$home/wp-admin/authorize-application.php"}}},"routes":{}}"""
+        mockWebServer.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
+                "/start" -> MockResponse().setResponseCode(301).setHeader("Location", "/blog/")
+                "/blog/" -> MockResponse().setHeader("Link", "<wp-json/>; rel=\"https://api.w.org/\"")
+                "/blog/wp-json/" -> MockResponse().setHeader("Content-Type", "application/json").setBody(apiRoot)
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+
+        val result = WpLoginClient(emptyList(), NetworkAvailabilityProvider { true })
+            .apiDiscovery(mockWebServer.url("/start").toString())
+
+        assertIs<ApiDiscoveryResult.Success>(result)
+        assertEquals(mockWebServer.url("/blog/wp-json/").toString(), result.success.apiRootUrl.url())
+    }
+
     private class ClasspathFileResolver : FileResolver {
         override fun getFile(path: String): File? =
             this::class.java.classLoader?.getResource(path)?.file?.let { File(it) }

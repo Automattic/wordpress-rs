@@ -294,6 +294,7 @@ impl RequestExecutor for MediaErrNetworking {
             request_url: upload_request.url(),
             request_method: upload_request.method(),
             request_header_map: upload_request.header_map(),
+            response_url: None,
         })
     }
 
