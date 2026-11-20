@@ -57,6 +57,34 @@ pub fn alone(lock: &Mutex<()>) -> MutexGuard<'_, ()> {
     lock.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+/// How many times [`read_back`] asks, and how long it waits between asks.
+const READ_BACK_TRIES: u32 = 5;
+const READ_BACK_PAUSE: Duration = Duration::from_secs(2);
+
+/// Reads back something the server took, asking again until `shows_it` accepts the answer.
+///
+/// For a moment after a change, a read can be answered with what the server had before it: seen
+/// marks, a post's comment notifications and a followed site's notifications have all read back
+/// stale straight after the server took the change, and then caught up. So the read is asked
+/// again, [`READ_BACK_PAUSE`] apart, until `shows_it` accepts it or it has been asked
+/// [`READ_BACK_TRIES`] times. The last answer is returned either way, for the trial to compare
+/// exactly and fail with its own message. A read that fails isn't asked again: its error is
+/// returned.
+pub async fn read_back<T>(
+    mut read: impl AsyncFnMut() -> Result<T, libtest_mimic::Failed>,
+    shows_it: impl Fn(&T) -> bool,
+) -> Result<T, libtest_mimic::Failed> {
+    let mut answer = read().await?;
+    for _ in 1..READ_BACK_TRIES {
+        if shows_it(&answer) {
+            break;
+        }
+        tokio::time::sleep(READ_BACK_PAUSE).await;
+        answer = read().await?;
+    }
+    Ok(answer)
+}
+
 #[derive(Debug)]
 struct EmptyAppNotifier;
 

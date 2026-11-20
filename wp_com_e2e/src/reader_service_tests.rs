@@ -30,7 +30,7 @@ use wp_mobile_cache::db_types::reader::ReaderPostRecord;
 use wp_mobile_cache::repository::reader_comments::ReaderCommentSendState;
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
 
-use crate::context::{TestContext, alone, changing, reading};
+use crate::context::{TestContext, alone, changing, read_back, reading};
 
 /// The WordPress.com Blog, which is public and has years of posts.
 const SITE: WpComSiteId = WpComSiteId(3584907);
@@ -321,7 +321,11 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let blocked = service.set_site_blocked(site, true).await;
                     // What the server has, read by a service with a cache of its own.
                     settle_after_a_block().await;
-                    let other = service_for_blocks(&ctx).await;
+                    let listed = read_back(
+                        async || is_blocked(&service_for_blocks(&ctx).await?),
+                        |listed| *listed,
+                    )
+                    .await;
                     // Whatever happened, the site ends unblocked.
                     let unblocked = service
                         .set_site_blocked(site, false)
@@ -333,17 +337,24 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     {
                         return Err("The block should reach the server".into());
                     }
-                    if !is_blocked(&other?)? {
+                    if !listed? {
                         return Err(
                             "The server's list should have the site while it's blocked".into()
                         );
                     }
                     settle_after_a_block().await;
-                    service
-                        .refresh_blocked_sites()
-                        .await
-                        .map_err(|e| e.to_string())?;
-                    if is_blocked(&service)? {
+                    let listed = read_back(
+                        async || {
+                            service
+                                .refresh_blocked_sites()
+                                .await
+                                .map_err(|e| e.to_string())?;
+                            is_blocked(&service)
+                        },
+                        |listed| !*listed,
+                    )
+                    .await?;
+                    if listed {
                         return Err("The site should be unblocked again".into());
                     }
                     Ok(())
@@ -456,11 +467,15 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
                     let changed = service.set_tag_followed(slug.clone(), None, !was).await;
                     // What the server has, read by a service with a cache of its own.
-                    let other = new_service(ctx.delegate.clone(), account())?;
-                    let fetched = match other.refresh_menu().await {
-                        Ok(()) => follows(&other),
-                        Err(error) => Err(error.to_string().into()),
-                    };
+                    let fetched = read_back(
+                        async || {
+                            let other = new_service(ctx.delegate.clone(), account())?;
+                            other.refresh_menu().await.map_err(|e| e.to_string())?;
+                            follows(&other)
+                        },
+                        |follows| *follows != was,
+                    )
+                    .await;
                     // Whatever happened, the tag ends as it was.
                     let restored = service
                         .set_tag_followed(slug, None, was)
@@ -475,8 +490,15 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     if fetched? == was {
                         return Err("The server's menu should show the change".into());
                     }
-                    service.refresh_menu().await.map_err(|e| e.to_string())?;
-                    if follows(&service)? != was {
+                    let back = read_back(
+                        async || {
+                            service.refresh_menu().await.map_err(|e| e.to_string())?;
+                            follows(&service)
+                        },
+                        |follows| *follows == was,
+                    )
+                    .await?;
+                    if back != was {
                         return Err("The tag should be back as it was".into());
                     }
                     Ok(())
@@ -520,11 +542,18 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let changed = service.set_followed(target.clone(), !was).await;
                     let shown = follows(&service);
                     // What the server has, read by a service with a cache of its own.
-                    let other = new_service(ctx.delegate.clone(), account())?;
-                    let fetched = match other.refresh_subscriptions().await {
-                        Ok(_) => follows(&other),
-                        Err(error) => Err(error.to_string().into()),
-                    };
+                    let fetched = read_back(
+                        async || {
+                            let other = new_service(ctx.delegate.clone(), account())?;
+                            other
+                                .refresh_subscriptions()
+                                .await
+                                .map_err(|e| e.to_string())?;
+                            follows(&other)
+                        },
+                        |follows| *follows != was,
+                    )
+                    .await;
                     // Whatever happened, the site ends as it was.
                     let restored = service
                         .set_followed(target, was)
@@ -548,11 +577,18 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     if shown? == was || fetched? == was {
                         return Err("The cache and the server should both show the change".into());
                     }
-                    service
-                        .refresh_subscriptions()
-                        .await
-                        .map_err(|e| e.to_string())?;
-                    if follows(&service)? != was {
+                    let back = read_back(
+                        async || {
+                            service
+                                .refresh_subscriptions()
+                                .await
+                                .map_err(|e| e.to_string())?;
+                            follows(&service)
+                        },
+                        |follows| *follows == was,
+                    )
+                    .await?;
+                    if back != was {
                         return Err("The site should be back as it was".into());
                     }
                     Ok(())
@@ -1065,28 +1101,22 @@ pub(crate) async fn settle_after_a_block() {
 }
 
 /// A post's seen state in the Following stream, as the server answers a service with a cache of
-/// its own. For a moment after a change, the server can answer with the state from before it, so
-/// it's asked again, 2 seconds apart, until it answers `expected` or has been asked 5 times. The
-/// last answer is returned.
+/// its own, read back until it's `expected` (see [`read_back`]).
 async fn seen_on_the_server(
     ctx: &TestContext,
     key: &ReaderSavedKey,
     expected: Option<bool>,
 ) -> Result<Option<bool>, Failed> {
-    let mut seen = None;
-    for attempt in 0..5 {
-        if attempt > 0 {
-            tokio::time::sleep(Duration::from_secs(2)).await;
-        }
-        let other = new_service(ctx.delegate.clone(), account())?;
-        let stream = other.stream(ReaderStream::Following);
-        stream.refresh().await.map_err(|e| e.to_string())?;
-        seen = seen_in(&stream, key).await?;
-        if seen == expected {
-            break;
-        }
-    }
-    Ok(seen)
+    read_back(
+        async || {
+            let other = new_service(ctx.delegate.clone(), account())?;
+            let stream = other.stream(ReaderStream::Following);
+            stream.refresh().await.map_err(|e| e.to_string())?;
+            seen_in(&stream, key).await
+        },
+        |seen| *seen == expected,
+    )
+    .await
 }
 
 /// The seen state of a post in a stream's cached items.
@@ -1196,7 +1226,12 @@ async fn like_and_check(
     if cached.i_like != Some(liked) {
         return Err(format!("The cache says i_like is {:?}", cached.i_like).into());
     }
-    if server_says_post_liked(ctx, post).await? != liked {
+    let has = read_back(
+        async || server_says_post_liked(ctx, post).await,
+        |has| *has == liked,
+    )
+    .await?;
+    if has != liked {
         return Err(format!("The server doesn't have the like set to {liked}").into());
     }
     Ok(())
@@ -1235,7 +1270,12 @@ async fn like_comment_and_check(
         if outcome != ReaderActionOutcome::Synced {
             return Err(format!("The comment's like wasn't sent: {outcome:?}").into());
         }
-        if server_says_comment_liked(ctx, site_id, comment_id).await? != liked {
+        let has = read_back(
+            async || server_says_comment_liked(ctx, site_id, comment_id).await,
+            |has| *has == liked,
+        )
+        .await?;
+        if has != liked {
             return Err(
                 format!("The server doesn't have the comment's like set to {liked}").into(),
             );
@@ -1275,7 +1315,11 @@ async fn expect_comment_subscription(
     if outcome != ReaderActionOutcome::Synced {
         return Err(format!("The change wasn't sent: {outcome:?}").into());
     }
-    let has = comment_subscription(ctx, post).await?;
+    let has = read_back(
+        async || comment_subscription(ctx, post).await,
+        |has| *has == expected,
+    )
+    .await?;
     if has != expected {
         return Err(format!(
             "The server has (subscribed, notified) as {has:?}, expected {expected:?}"
@@ -1305,7 +1349,7 @@ async fn subscribe_to_comments_and_check(
     expect_synced("Subscribing", sent)?;
     // Whether a new subscription notifies is the server's to choose, so only the subscription is
     // checked here.
-    let subscribed = comment_subscription(ctx, post).await?;
+    let subscribed = read_back(async || comment_subscription(ctx, post).await, |has| has.0).await?;
     if !subscribed.0 {
         return Err("The server doesn't have the subscription".into());
     }
@@ -1342,7 +1386,11 @@ async fn restore_comment_subscription(
             .await
             .map_err(|e| e.to_string())?;
     }
-    let now = comment_subscription(ctx, post).await?;
+    let now = read_back(
+        async || comment_subscription(ctx, post).await,
+        |now| *now == was,
+    )
+    .await?;
     if now != was {
         return Err(format!("The subscription is {now:?}, and was {was:?}").into());
     }
@@ -1404,7 +1452,12 @@ async fn change_delivery_and_check(
             "Comment emails",
             service.set_comment_emails(site_id, on).await,
         )?;
-        if delivery_on_the_server(ctx, site_id).await?.email_comments != on {
+        let has = read_back(
+            async || delivery_on_the_server(ctx, site_id).await,
+            |has| has.email_comments == on,
+        )
+        .await?;
+        if has.email_comments != on {
             return Err(format!("The server doesn't have comment emails set to {on}").into());
         }
     }
@@ -1413,7 +1466,12 @@ async fn change_delivery_and_check(
             "Notifications",
             service.set_post_notifications(site_id, on).await,
         )?;
-        if delivery_on_the_server(ctx, site_id).await?.notify_posts != on {
+        let has = read_back(
+            async || delivery_on_the_server(ctx, site_id).await,
+            |has| has.notify_posts == on,
+        )
+        .await?;
+        if has.notify_posts != on {
             return Err(format!("The server doesn't have notifications set to {on}").into());
         }
     }
@@ -1433,7 +1491,12 @@ async fn change_delivery_and_check(
                 .set_post_email_frequency(site_id, frequency.clone())
                 .await
                 .map_err(|e| format!("The frequency was refused: {e}"))?;
-            let has = delivery_on_the_server(ctx, site_id).await?.frequency;
+            let has = read_back(
+                async || delivery_on_the_server(ctx, site_id).await,
+                |has| has.frequency.as_ref() == Some(&frequency),
+            )
+            .await?
+            .frequency;
             if has != Some(frequency.clone()) {
                 return Err(
                     format!("The server has the frequency as {has:?}, not {frequency:?}").into(),
@@ -1443,7 +1506,12 @@ async fn change_delivery_and_check(
     }
     for on in [!was.email_posts, was.email_posts] {
         expect_synced("Post emails", service.set_post_emails(site_id, on).await)?;
-        if delivery_on_the_server(ctx, site_id).await?.email_posts != on {
+        let has = read_back(
+            async || delivery_on_the_server(ctx, site_id).await,
+            |has| has.email_posts == on,
+        )
+        .await?;
+        if has.email_posts != on {
             return Err(format!("The server doesn't have post emails set to {on}").into());
         }
     }
@@ -1489,7 +1557,11 @@ async fn restore_delivery(
             .await
             .map_err(|e| e.to_string())?;
     }
-    let now = delivery_on_the_server(ctx, site_id).await?;
+    let now = read_back(
+        async || delivery_on_the_server(ctx, site_id).await,
+        |now| now == was,
+    )
+    .await?;
     if &now != was {
         return Err(format!("The settings are {now:?}, and were {was:?}").into());
     }
@@ -1532,7 +1604,12 @@ async fn set_followed_by_id(
     if answer.is_following != followed || answer.success != Some(true) {
         return Err(format!("The answer to setting the follow to {followed} is {answer:?}").into());
     }
-    if follows_by_id(ctx, site_id).await? != followed {
+    let has = read_back(
+        async || follows_by_id(ctx, site_id).await,
+        |has| *has == followed,
+    )
+    .await?;
+    if has != followed {
         return Err(format!("The server doesn't have the follow set to {followed}").into());
     }
     Ok(())

@@ -10,7 +10,7 @@ use wp_api::wp_com::reader_seen::{
     ReaderSeenFeedItemsParams, ReaderSeenSitePostsParams, ReaderSeenSource,
 };
 
-use crate::context::{TestContext, alone, changing, reading};
+use crate::context::{TestContext, alone, changing, read_back, reading};
 use crate::reader_service_tests::settle_after_a_block;
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
@@ -34,7 +34,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         .await
                         .map_err(|e| e.to_string());
                     settle_after_a_block().await;
-                    let listed = is_blocked(&ctx).await;
+                    let listed = read_back(async || is_blocked(&ctx).await, |listed| *listed).await;
                     // Whatever happened, the site ends unblocked.
                     let unblocked = ctx
                         .client
@@ -48,7 +48,9 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         return Err("Blocking the site should list it as blocked".into());
                     }
                     settle_after_a_block().await;
-                    if !unblocked.success || is_blocked(&ctx).await? {
+                    if !unblocked.success
+                        || read_back(async || is_blocked(&ctx).await, |listed| !*listed).await?
+                    {
                         return Err("Unblocking the site should take it off the list".into());
                     }
                     // Unblocking a site that isn't blocked changes nothing, and says so.
@@ -133,29 +135,24 @@ async fn seen_posts(ctx: &TestContext) -> Result<Vec<ReaderPost>, Failed> {
         .collect())
 }
 
-/// A post's seen state, as the server answers. For a moment after a change, the server can answer
-/// with the state from before it, so it's asked again, 2 seconds apart, until it answers
-/// `expected` or has been asked 5 times. The last answer is returned.
+/// A post's seen state, as the server answers, read back until it's `expected` (see
+/// [`read_back`]).
 async fn seen_state(
     ctx: &TestContext,
     post: &ReaderPost,
     expected: Option<bool>,
 ) -> Result<Option<bool>, Failed> {
-    let mut seen = None;
-    for attempt in 0..5 {
-        if attempt > 0 {
-            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        }
-        seen = seen_posts(ctx)
-            .await?
-            .into_iter()
-            .find(|other| other.identity == post.identity)
-            .and_then(|post| post.is_seen);
-        if seen == expected {
-            break;
-        }
-    }
-    Ok(seen)
+    read_back(
+        async || {
+            Ok(seen_posts(ctx)
+                .await?
+                .into_iter()
+                .find(|other| other.identity == post.identity)
+                .and_then(|post| post.is_seen))
+        },
+        |seen| *seen == expected,
+    )
+    .await
 }
 
 /// Marks a post as seen or unseen, by its site and post IDs, or by its feed's for an RSS post.
