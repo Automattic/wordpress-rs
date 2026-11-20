@@ -3,6 +3,7 @@
 use libtest_mimic::{Failed, Trial};
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use wp_api::comments::{CommentDeleteParams, CommentId};
 use wp_api::posts::PostId;
@@ -19,9 +20,9 @@ use wp_api::wp_com::reader_subscriptions::ReaderSubscriptionEmailFrequency;
 use wp_api::wp_com::stats_post::StatsPostTarget;
 use wp_api::wp_com::{WpComBaseUrl, WpComSiteId};
 use wp_mobile::service::reader::{
-    ReaderActionOutcome, ReaderError, ReaderFollowTarget, ReaderOpenedPageView, ReaderOpenedSeen,
-    ReaderPageViewChoice, ReaderPageViewOutcome, ReaderService, ReaderStream,
-    ReaderStreamCollection, ReaderStreamItem,
+    ReaderActionOutcome, ReaderError, ReaderFollowTarget, ReaderLink, ReaderLinkNotInReader,
+    ReaderOpenedPageView, ReaderOpenedSeen, ReaderPageViewChoice, ReaderPageViewOutcome,
+    ReaderService, ReaderStream, ReaderStreamCollection, ReaderStreamItem,
 };
 use wp_mobile::service::reader_saved::ReaderOfflineState;
 use wp_mobile_cache::WpApiCache;
@@ -33,6 +34,17 @@ use crate::context::TestContext;
 
 /// The WordPress.com Blog, which is public and has years of posts.
 const SITE: WpComSiteId = WpComSiteId(3584907);
+/// The WordPress.com Blog's home address.
+const SITE_URL: &str = "https://en.blog.wordpress.com/";
+/// One of its posts, from 2014, and the post's address.
+const POST: PostId = PostId(29614);
+const POST_URL: &str =
+    "https://en.blog.wordpress.com/2014/12/29/new-year-new-blog-make-it-a-great-one/";
+/// xkcd, a site that isn't on WordPress.com or Jetpack and has a feed.
+const FEED_ONLY_SITE_URL: &str = "https://xkcd.com/";
+/// The first website, which CERN keeps as it was: not on WordPress.com or Jetpack, and with no
+/// feed. Not `example.com`: a private WordPress.com site has that domain, so the Reader refuses it.
+const NEITHER_URL: &str = "https://info.cern.ch/";
 
 /// The `User-Agent` a page view is sent with here. An app passes its web view's.
 const PAGE_VIEW_USER_AGENT: &str = "wp-rs-e2e/1.0 reqwest";
@@ -817,6 +829,142 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             }
         })
         .with_ignored_flag(own_site().is_none()),
+        Trial::test("reader_service::resolve_link_to_a_post", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let link = service
+                        .resolve_link(POST_URL.to_string())
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let ReaderLink::Post { post } = link else {
+                        return Err(
+                            format!("The post's address should open the post: {link:?}").into()
+                        );
+                    };
+                    if post.identity.site_id != Some(SITE) || post.identity.id != POST.0 as u64 {
+                        return Err(format!(
+                            "It isn't the post at the address: {:?}",
+                            post.identity
+                        )
+                        .into());
+                    }
+                    if post.content.is_none() {
+                        return Err("The post should come with its content".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::resolve_link_to_a_site", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // A home address needs no account, so it's checked both ways.
+                    let services = [
+                        new_service(ctx.delegate.clone(), account())?,
+                        new_service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?,
+                    ];
+                    for service in services {
+                        let link = service
+                            .resolve_link(SITE_URL.to_string())
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        let ReaderLink::Site { site_id, site } = link else {
+                            return Err(format!(
+                                "A site's home address should open the site: {link:?}"
+                            )
+                            .into());
+                        };
+                        if site_id != SITE || site.site_id != Some(SITE) || site.name.is_none() {
+                            return Err(
+                                format!("It isn't the site at the address: {site:?}").into()
+                            );
+                        }
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::resolve_link_to_a_feed", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    let link = service
+                        .resolve_link(FEED_ONLY_SITE_URL.to_string())
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let ReaderLink::Feed { feed_id, site } = link else {
+                        return Err(format!(
+                            "A feed-only site's home address should open its feed: {link:?}"
+                        )
+                        .into());
+                    };
+                    if site.feed_id != Some(feed_id) || site.site_id.is_some() {
+                        return Err(format!(
+                            "It should be a feed of no WordPress.com site: {site:?}"
+                        )
+                        .into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::resolve_link_that_is_not_in_the_reader", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let service = new_service(ctx.delegate.clone(), account())?;
+                    // A home address, looked up as a site and then for a feed, and an address with
+                    // a path, which the server answers with a 500 before the same lookups.
+                    let neither_with_a_path = format!("{NEITHER_URL}some/page/");
+                    for address in [NEITHER_URL, neither_with_a_path.as_str()] {
+                        let link = service
+                            .resolve_link(address.to_string())
+                            .await
+                            .map_err(|e| format!("{address}: {e}"))?;
+                        let expected = ReaderLink::NotInReader {
+                            reason: ReaderLinkNotInReader::NotWordPressOrFeed,
+                        };
+                        if link != expected {
+                            return Err(format!(
+                                "{address} should be neither a site nor a feed: {link:?}"
+                            )
+                            .into());
+                        }
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test("reader_service::resolve_link_to_a_post_needs_an_account", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    let executor = Arc::new(CountingExecutor {
+                        inner: Arc::clone(&ctx.delegate.request_executor),
+                        sent: AtomicU64::new(0),
+                    });
+                    let delegate = WpApiClientDelegate {
+                        request_executor: executor.clone(),
+                        ..signed_out(&ctx.delegate)
+                    };
+                    let service = new_service(delegate, ReaderOwner::SignedOut)?;
+                    match service.resolve_link(POST_URL.to_string()).await {
+                        Err(ReaderError::NeedsAccount) => {}
+                        other => return Err(format!("Expected NeedsAccount, got {other:?}").into()),
+                    }
+                    match executor.sent.load(Ordering::SeqCst) {
+                        0 => Ok(()),
+                        sent => {
+                            Err(format!("Nothing should be sent, but {sent} requests were").into())
+                        }
+                    }
+                })
+            }
+        }),
         Trial::test("reader_service::following_needs_an_account", {
             let ctx = Arc::clone(&ctx);
             move || {
@@ -1475,6 +1623,39 @@ async fn download_saved_posts(
         return Err(format!("A second download lost content: {again:?}").into());
     }
     Ok(())
+}
+
+/// A request executor that counts the requests it sends.
+struct CountingExecutor {
+    inner: Arc<dyn RequestExecutor>,
+    sent: AtomicU64,
+}
+
+#[async_trait::async_trait]
+impl RequestExecutor for CountingExecutor {
+    async fn execute(
+        &self,
+        request: Arc<WpNetworkRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        self.sent.fetch_add(1, Ordering::SeqCst);
+        self.inner.execute(request).await
+    }
+
+    async fn upload(
+        &self,
+        request: Arc<wp_api::request::WpMultipartFormRequest>,
+    ) -> Result<WpNetworkResponse, RequestExecutionError> {
+        self.sent.fetch_add(1, Ordering::SeqCst);
+        self.inner.upload(request).await
+    }
+
+    async fn sleep(&self, millis: u64) {
+        self.inner.sleep(millis).await
+    }
+
+    fn cancel(&self, context: Arc<wp_api::request::RequestContext>) {
+        self.inner.cancel(context)
+    }
 }
 
 /// A service with a new, empty cache.
