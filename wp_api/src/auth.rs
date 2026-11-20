@@ -1,4 +1,4 @@
-use http::{HeaderMap, HeaderValue};
+use http::{HeaderMap, HeaderValue, header::InvalidHeaderValue};
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
@@ -37,23 +37,27 @@ impl WpAuthentication {
         }
     }
 
-    pub fn insert_header(&self, headers: &mut http::HeaderMap) {
+    /// Adds the header this authentication sends to `headers`.
+    ///
+    /// Fails when the token or nonce has a character a header can't carry, such as a line break.
+    /// Apps build `WpAuthentication` themselves, so the value isn't checked anywhere earlier.
+    pub fn insert_header(&self, headers: &mut http::HeaderMap) -> Result<(), InvalidHeaderValue> {
         match self {
             Self::None => {}
             Self::AuthorizationHeader { token } => {
-                let value = HeaderValue::from_str(&format!("Basic {token}"))
-                .expect("It shouldn't be possible to build WpAuthentication::AuthorizationHeader with an invalid token");
+                let value = HeaderValue::from_str(&format!("Basic {token}"))?;
                 headers.insert(http::header::AUTHORIZATION, value);
             }
             Self::Bearer { token } => {
-                let value = HeaderValue::from_str(&format!("Bearer {token}")).expect("It shouldn't be possible to build WpAuthentication::Bearer with an invalid token");
+                let value = HeaderValue::from_str(&format!("Bearer {token}"))?;
                 headers.insert(http::header::AUTHORIZATION, value);
             }
             Self::Nonce { nonce } => {
-                let value = HeaderValue::from_str(nonce).expect("It shouldn't be possible to build WpAuthentication::Nonce with an invalid nonce");
+                let value = HeaderValue::from_str(nonce)?;
                 headers.insert("X-WP-Nonce", value);
             }
         }
+        Ok(())
     }
 }
 
@@ -80,7 +84,7 @@ impl ModifiableAuthenticationProvider {
 }
 
 impl ModifiableAuthenticationProvider {
-    pub fn insert_header(&self, headers: &mut http::HeaderMap) {
+    pub fn insert_header(&self, headers: &mut http::HeaderMap) -> Result<(), InvalidHeaderValue> {
         self.auth
             .read()
             .expect("If the lock is poisoned, there isn't much we can do")
@@ -304,7 +308,7 @@ impl WpAuthenticationProvider {
         }
     }
 
-    pub fn insert_header(&self, headers: &mut HeaderMap) {
+    pub fn insert_header(&self, headers: &mut HeaderMap) -> Result<(), InvalidHeaderValue> {
         match self {
             WpAuthenticationProvider::StaticAuthenticationProvider { auth } => {
                 auth.insert_header(headers)

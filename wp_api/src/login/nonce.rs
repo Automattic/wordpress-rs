@@ -155,17 +155,26 @@ impl WpRestNonceRetrieval {
             .await
             .map_err(Into::<WpApiError>::into)?;
 
-        if response.status_code == 200 {
-            let body = response.body_as_string();
-            if (2..=50).contains(&body.len()) {
-                return Ok(body);
-            }
+        if response.status_code == 200
+            && let Some(nonce) = nonce_from_response_body(&response.body_as_string())
+        {
+            return Ok(nonce);
         }
         Err(NonceRetrievalError::UnexpectedResponse {
             status_code: response.status_code,
             body: response.body_as_string(),
         })
     }
+}
+
+/// Returns the nonce in a `rest-nonce` response body, or `None` when the body isn't one.
+///
+/// Drops surrounding whitespace and byte-order marks: a PHP file that prints them outside its
+/// `<?php` tags adds them to every response.
+fn nonce_from_response_body(body: &str) -> Option<String> {
+    let nonce = body.trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
+    ((2..=50).contains(&nonce.len()) && HeaderValue::from_str(nonce).is_ok())
+        .then(|| nonce.to_string())
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error, WpDeriveLocalizable)]
@@ -192,5 +201,26 @@ impl WpSupportsLocalization for NonceRetrievalError {
 impl From<WpApiError> for NonceRetrievalError {
     fn from(error: WpApiError) -> Self {
         NonceRetrievalError::ApiError { error }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+
+    #[rstest]
+    #[case::plain("abc123def0", Some("abc123def0"))]
+    #[case::trailing_newline("abc123def0\n", Some("abc123def0"))]
+    #[case::surrounding_whitespace("\r\n abc123def0 \t\n", Some("abc123def0"))]
+    #[case::byte_order_mark("\u{feff}abc123def0", Some("abc123def0"))]
+    #[case::byte_order_mark_and_newline("\u{feff}\nabc123def0\n", Some("abc123def0"))]
+    #[case::line_break_inside("abc123\ndef0", None)]
+    #[case::control_character_inside("abc123\u{0}def0", None)]
+    #[case::only_whitespace(" \n ", None)]
+    #[case::too_short("a", None)]
+    #[case::too_long(&"a".repeat(51), None)]
+    fn reads_the_nonce_in_a_response_body(#[case] body: &str, #[case] expected: Option<&str>) {
+        assert_eq!(nonce_from_response_body(body).as_deref(), expected);
     }
 }
