@@ -28,17 +28,12 @@ impl ReaderContext {
             fields: None,
         };
         let posts = self.client.reader_post();
-        match (post.is_external, post.feed_id, post.site_id) {
-            (true, Some(feed_id), _) => {
-                let item = post.feed_item_id.unwrap_or(ReaderFeedItemId(post.id));
-                Ok(posts.feed_post(&feed_id, &item, &params).await?.data)
-            }
-            (_, _, Some(site_id)) if site_id.0 != 0 => Ok(posts
-                .site_post(&site_id, &PostId(post.id as i64), &params)
-                .await?
-                .data),
-            _ => Err(ReaderError::MissingIds),
+        if let (true, Some(feed_id)) = (post.is_feed_item(), post.feed_id) {
+            let item = post.feed_item_id.unwrap_or(ReaderFeedItemId(post.id));
+            return Ok(posts.feed_post(&feed_id, &item, &params).await?.data);
         }
+        let (site_id, post_id) = post.site_post().ok_or(ReaderError::MissingIds)?;
+        Ok(posts.site_post(&site_id, &post_id, &params).await?.data)
     }
 
     /// A post as the cache keeps it for this reader, or `None` if it has no IDs to keep it by.

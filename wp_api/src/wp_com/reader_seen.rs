@@ -2,7 +2,9 @@
 //!
 //! A post supports seen status when the stream sent it with `is_seen`, which the Following stream
 //! does. A post from a WordPress.com or Jetpack site is marked by its site and post IDs, and an RSS
-//! post by its feed and feed item IDs: use the pair that matches the post's `is_external`.
+//! post by its feed and feed item IDs: use the pair that matches
+//! [`ReaderPostSaveIdentity::is_feed_item`](crate::wp_com::reader_saved::ReaderPostSaveIdentity::is_feed_item).
+//! A feed item with no post ID (`0`) comes with `is_external: false`, and is marked by its feed.
 
 use crate::{
     posts::PostId,

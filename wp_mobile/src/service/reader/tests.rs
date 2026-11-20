@@ -1681,6 +1681,19 @@ mod page_views {
     }
 
     #[tokio::test]
+    async fn a_view_of_a_feed_item_with_no_post_id_is_not_counted() {
+        let item = feed_items_with_no_post_id::page()["posts"][0].clone();
+        let (service, executor) = reading(ReaderOwner::SignedOut, vec![item]).await;
+
+        let outcome = view(&service, feed_items_with_no_post_id::key(100000003), APP)
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, ReaderPageViewOutcome::NotCountedForRssPost);
+        assert_eq!(executor.sent().len(), 1);
+    }
+
+    #[tokio::test]
     async fn a_post_the_cache_lacks_or_knows_too_little_of_is_not_counted() {
         // Post 1 has no site URL.
         let (service, executor) = reading(ReaderOwner::SignedOut, vec![post_json(1, 10)]).await;
@@ -4458,5 +4471,130 @@ mod for_the_apps {
             row_id: 1,
         };
         assert_eq!(reader_data_is_relevant_update(data, &hook), expected);
+    }
+}
+
+/// The items of a feed whose site the API no longer serves: `ID: 0`, `is_external: false`, the
+/// site's ID, and a feed item ID.
+mod feed_items_with_no_post_id {
+    use super::*;
+    use wp_api::wp_com::reader_saved::{ReaderFeedItemId, ReaderPostSaveIdentity};
+
+    const FEED: ReaderFeedId = ReaderFeedId(100000002);
+
+    /// A page of the feed, with items 100000003 and 100000004.
+    pub(super) fn page() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../../wp_api/tests/wpcom/reader_posts/feed_posts_of_a_site_gone.json"
+        ))
+        .unwrap()
+    }
+
+    pub(super) fn key(feed_item_id: u64) -> ReaderSavedKey {
+        ReaderSavedKey::FeedItem {
+            feed_item_id: ReaderFeedItemId(feed_item_id),
+        }
+    }
+
+    fn identity(feed_item_id: u64) -> ReaderPostSaveIdentity {
+        ReaderPostSaveIdentity {
+            id: 0,
+            site_id: Some(WpComSiteId(100000001)),
+            feed_id: Some(FEED),
+            feed_item_id: Some(ReaderFeedItemId(feed_item_id)),
+            is_external: false,
+            url: None,
+        }
+    }
+
+    fn paths(executor: &ScriptedExecutor) -> Vec<String> {
+        executor
+            .sent()
+            .iter()
+            .map(|sent| {
+                sent.url
+                    .trim_start_matches("https://public-api.wordpress.com")
+                    .to_string()
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_stream_keeps_them_by_their_feed_items() {
+        let (service, executor) = service();
+        let stream = service.stream(ReaderStream::Feed { feed_id: FEED });
+        executor.push(Step::Respond(200, page()));
+
+        let result = stream.refresh().await.unwrap();
+
+        assert_eq!(result.post_count, 2);
+        assert_eq!(result.unreadable_post_count, 0);
+        let keys: Vec<_> = stream
+            .load_items()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|item| item.post.key)
+            .collect();
+        assert_eq!(keys, [key(100000003), key(100000004)]);
+        assert!(service.cached_post(key(100000003)).unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn one_is_fetched_from_its_feed() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(Step::Respond(200, page()["posts"][0].clone()));
+
+        let post = service.fetch_post(identity(100000003)).await.unwrap();
+
+        assert_eq!(post.key, key(100000003));
+        assert_eq!(
+            paths(&executor),
+            ["/rest/v1.3/read/feed/100000002/posts/100000003?meta=site%2Cfeed"]
+        );
+    }
+
+    #[tokio::test]
+    async fn one_is_marked_as_seen_by_its_feed() {
+        let (service, executor) = service();
+        executor.push(Step::Respond(200, json!({ "status": true })));
+
+        service
+            .set_post_seen(identity(100000003), true)
+            .await
+            .unwrap();
+
+        let sent = executor.sent();
+        assert_eq!(
+            sent[0]
+                .url
+                .trim_start_matches("https://public-api.wordpress.com"),
+            "/wpcom/v2/seen-posts/seen/new"
+        );
+        assert_eq!(
+            sent[0].body,
+            Some(
+                json!({ "feed_id": 100000002, "feed_item_ids": [100000003], "source": "reader-ios" })
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn one_cannot_be_liked_or_have_its_comments_followed() {
+        let (service, executor) = service();
+
+        let liked = service.set_post_liked(identity(100000003), true).await;
+        let followed = service
+            .set_comments_subscribed(identity(100000003), true)
+            .await;
+        let notified = service
+            .set_comment_notifications(identity(100000003), true)
+            .await;
+
+        assert!(matches!(liked, Err(ReaderError::MissingIds)));
+        assert!(matches!(followed, Err(ReaderError::MissingIds)));
+        assert!(matches!(notified, Err(ReaderError::MissingIds)));
+        assert!(executor.sent().is_empty());
+        assert_eq!(service.pending_action_count().unwrap(), 0);
     }
 }

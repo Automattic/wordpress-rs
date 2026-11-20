@@ -1993,6 +1993,36 @@ mod tests {
         assert_eq!(post.site_locale, None, "Not asked for with meta=site");
     }
 
+    /// A feed whose site the API no longer serves, shaped like a recording, with every ID, name,
+    /// address and text replaced. Its items have `ID: 0` and `is_external: false`: they're feed
+    /// items, and are kept by their feed item IDs.
+    #[test]
+    fn test_deserialize_feed_posts_of_a_site_gone() {
+        let json = include_str!("../../tests/wpcom/reader_posts/feed_posts_of_a_site_gone.json");
+        let response: ReaderPostsResponse =
+            serde_json::from_str(json).expect("Failed to deserialize feed posts");
+        assert!(response.unreadable_posts.is_empty());
+        let keys: Vec<_> = response
+            .posts
+            .iter()
+            .map(|post| {
+                assert_eq!(post.identity.id, 0);
+                assert!(!post.identity.is_external);
+                assert_eq!(post.identity.site_id, Some(WpComSiteId(100000001)));
+                assert_eq!(post.identity.feed_id, Some(ReaderFeedId(100000002)));
+                assert!(post.identity.is_feed_item());
+                assert_eq!(post.identity.site_post(), None);
+                reader_saved_key_for_post(post.identity.clone())
+            })
+            .collect();
+        assert_eq!(
+            keys,
+            [100000003, 100000004].map(|id| Some(ReaderSavedKey::FeedItem {
+                feed_item_id: ReaderFeedItemId(id)
+            }))
+        );
+    }
+
     /// A recording of the Liked stream on WordPress.com, trimmed, with the site, author and post
     /// details replaced. Its `date_range` is in the times the posts were liked.
     #[test]

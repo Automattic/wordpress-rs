@@ -26,7 +26,6 @@
 use super::actions::{Action, ReaderActionOutcome};
 use super::{ReaderContext, ReaderError, ReaderService};
 use std::time::Duration;
-use wp_api::posts::PostId;
 use wp_api::prelude::WpApiError;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::reader_page_views::{ReaderPageView, reader_page_view_user_agent_counts};
@@ -205,13 +204,12 @@ impl ReaderContext {
         let Some(post) = post else {
             return Ok(ReaderPageViewOutcome::NotCountedForMissingDetails);
         };
-        if post.identity.is_external {
+        if post.identity.is_feed_item() {
             return Ok(ReaderPageViewOutcome::NotCountedForRssPost);
         }
-        let (Some(site_id), Some(site_url)) = (
-            post.identity.site_id.filter(|site| site.0 != 0),
-            post.site_url.clone(),
-        ) else {
+        let (Some((site_id, post_id)), Some(site_url)) =
+            (post.identity.site_post(), post.site_url.clone())
+        else {
             return Ok(ReaderPageViewOutcome::NotCountedForMissingDetails);
         };
         let site_is_private = post.site_is_private == Some(true);
@@ -220,7 +218,7 @@ impl ReaderContext {
         }
         let view = ReaderPageView {
             site_id,
-            post_id: PostId(post.identity.id as i64),
+            post_id,
             site_url,
             site_is_private,
             user_agent,

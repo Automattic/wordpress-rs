@@ -461,12 +461,36 @@ impl ReaderPostSaveIdentity {
     fn nonzero_feed_item_id(&self) -> Option<ReaderFeedItemId> {
         self.feed_item_id.filter(|id| id.0 != 0)
     }
+
+    /// Whether the post is a feed item rather than a post of a WordPress.com or Jetpack site: one
+    /// the API says is external, or one with no post ID (`0`) and a feed item ID. The API sends the
+    /// second kind for a feed whose site it no longer serves, with `is_external: false` and the
+    /// site's ID. Such a post is read, marked as seen and saved by its feed item, and can't be
+    /// liked or have its comments followed.
+    pub fn is_feed_item(&self) -> bool {
+        self.is_external || (self.id == 0 && self.nonzero_feed_item_id().is_some())
+    }
+
+    /// The post's site and its ID on that site, or `None` for a feed item or a post missing either
+    /// ID. What a like, a page view or a comment subscription is sent with.
+    pub fn site_post(&self) -> Option<(WpComSiteId, PostId)> {
+        if self.is_feed_item() {
+            return None;
+        }
+        let site_id = self.site_id.filter(|id| id.0 != 0)?;
+        let post_id = i64::try_from(self.id).ok().filter(|id| *id > 0)?;
+        Some((site_id, PostId(post_id)))
+    }
 }
 
 /// The key to save a post under: `feed_item_id` for an RSS post, `blog_id` + `post_id` for
-/// everything else, or `None` when the post is missing the IDs it needs.
+/// everything else, or `None` when the post is missing the IDs it needs. It's also the key the
+/// cache keeps a post by.
 ///
-/// Matches `savedKeyForPost()` in wp-calypso, so a post is saved the same way on every platform.
+/// Matches `savedKeyForPost()` in wp-calypso, so a post is saved the same way on every platform,
+/// with one difference: a post with no post ID (`0`) and a feed item ID is a feed item (see
+/// [`ReaderPostSaveIdentity::is_feed_item`]), and is keyed by its feed item. wp-calypso gives such
+/// a post no key, though its streams key it by its feed and feed item.
 #[uniffi::export]
 pub fn reader_saved_key_for_post(post: ReaderPostSaveIdentity) -> Option<ReaderSavedKey> {
     if post.is_snapshot() && post.nonzero_feed_item_id().is_none() {
@@ -476,7 +500,7 @@ pub fn reader_saved_key_for_post(post: ReaderPostSaveIdentity) -> Option<ReaderS
             .map(|url| ReaderSavedKey::Url { url });
     }
 
-    if post.is_external {
+    if post.is_feed_item() {
         let feed_item_id = post
             .nonzero_feed_item_id()
             .or(Some(ReaderFeedItemId(post.id)))
@@ -484,12 +508,8 @@ pub fn reader_saved_key_for_post(post: ReaderPostSaveIdentity) -> Option<ReaderS
         return Some(ReaderSavedKey::FeedItem { feed_item_id });
     }
 
-    let blog_id = post.site_id.filter(|id| id.0 != 0)?;
-    let post_id = i64::try_from(post.id).ok().filter(|id| *id != 0)?;
-    Some(ReaderSavedKey::Post {
-        blog_id,
-        post_id: PostId(post_id),
-    })
+    let (blog_id, post_id) = post.site_post()?;
+    Some(ReaderSavedKey::Post { blog_id, post_id })
 }
 
 /// Every key a post may already be saved under, starting with [`reader_saved_key_for_post`].
@@ -499,7 +519,7 @@ pub fn reader_saved_key_for_post(post: ReaderPostSaveIdentity) -> Option<ReaderS
 /// of these keys is, and unsave with the keys that matched.
 #[uniffi::export]
 pub fn reader_saved_keys_for_post(post: ReaderPostSaveIdentity) -> Vec<ReaderSavedKey> {
-    let feed_item_id = post.nonzero_feed_item_id().filter(|_| !post.is_external);
+    let feed_item_id = post.nonzero_feed_item_id().filter(|_| !post.is_feed_item());
     let Some(key) = reader_saved_key_for_post(post) else {
         return vec![];
     };
@@ -667,6 +687,49 @@ mod tests {
             is_external: false,
             url: None,
         }
+    }
+
+    /// An item of a feed whose site the API no longer serves: `ID` is `0`, it isn't external, and
+    /// it has its site's ID.
+    fn feed_item_with_no_post_id() -> ReaderPostSaveIdentity {
+        ReaderPostSaveIdentity {
+            id: 0,
+            feed_id: Some(ReaderFeedId(5)),
+            feed_item_id: Some(ReaderFeedItemId(789)),
+            ..identity()
+        }
+    }
+
+    #[rstest]
+    #[case::wp_com_post(identity(), false, Some((WpComSiteId(123), PostId(456))))]
+    #[case::wp_com_post_read_through_following(
+        ReaderPostSaveIdentity {
+            feed_id: Some(ReaderFeedId(5)),
+            feed_item_id: Some(ReaderFeedItemId(789)),
+            ..identity()
+        },
+        false,
+        Some((WpComSiteId(123), PostId(456)))
+    )]
+    #[case::rss_post(
+        ReaderPostSaveIdentity { is_external: true, ..identity() },
+        true,
+        None
+    )]
+    #[case::feed_item_with_no_post_id(feed_item_with_no_post_id(), true, None)]
+    #[case::zero_post(ReaderPostSaveIdentity { id: 0, ..identity() }, false, None)]
+    #[case::zero_site(
+        ReaderPostSaveIdentity { site_id: Some(WpComSiteId(0)), ..identity() },
+        false,
+        None
+    )]
+    fn test_feed_item_or_site_post(
+        #[case] post: ReaderPostSaveIdentity,
+        #[case] is_feed_item: bool,
+        #[case] site_post: Option<(WpComSiteId, PostId)>,
+    ) {
+        assert_eq!(post.is_feed_item(), is_feed_item);
+        assert_eq!(post.site_post(), site_post);
     }
 
     fn deleted_feed_item_or_url_save() -> ReaderPostSaveIdentity {
@@ -1370,6 +1433,8 @@ mod tests {
         ReaderPostSaveIdentity { id: 0, is_external: true, ..identity() },
         None
     )]
+    // A feed whose site the API no longer serves sends its items this way.
+    #[case::feed_item_with_no_post_id(feed_item_with_no_post_id(), Some(feed_item_key(789)))]
     #[case::url_save(deleted_feed_item_or_url_save(), Some(url_key()))]
     #[case::url_save_without_url(
         ReaderPostSaveIdentity { url: None, ..deleted_feed_item_or_url_save() },
@@ -1403,6 +1468,7 @@ mod tests {
         },
         vec![feed_item_key(789)]
     )]
+    #[case::feed_item_with_no_post_id(feed_item_with_no_post_id(), vec![feed_item_key(789)])]
     #[case::unsaveable(ReaderPostSaveIdentity { id: 0, ..identity() }, vec![])]
     fn test_saved_keys_for_post(
         #[case] post: ReaderPostSaveIdentity,

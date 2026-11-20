@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use wp_api::comments::CommentId;
-use wp_api::posts::PostId;
 use wp_api::prelude::{WpApiError, WpErrorCode};
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::me::WpComUserId;
@@ -184,10 +183,15 @@ impl Action {
     /// that say.
     fn target(&self) -> Option<String> {
         match self {
-            Self::Seen { post }
-            | Self::LikePost { post }
+            Self::Seen { post } => reader_saved_key_for_post(post.clone())
+                .map(|key| reader_saved_key_text(&key.normalized())),
+            // Only a post of a WordPress.com or Jetpack site can be liked, or have its comments
+            // followed, so a feed item has nothing to send them with.
+            Self::LikePost { post }
             | Self::SubscribeComments { post }
-            | Self::CommentNotifications { post } => reader_saved_key_for_post(post.clone())
+            | Self::CommentNotifications { post } => post
+                .site_post()
+                .and(reader_saved_key_for_post(post.clone()))
                 .map(|key| reader_saved_key_text(&key.normalized())),
             Self::BlockSite { site_id } | Self::Delivery { site_id, .. } => {
                 Some(format!("site:{}", site_id.0))
@@ -507,7 +511,7 @@ impl Action {
                 };
                 let seen = context.client.reader_seen();
                 // An RSS post is marked by its feed's IDs, and any other by its site's.
-                if let (true, Some(feed_id)) = (post.is_external, post.feed_id) {
+                if let (true, Some(feed_id)) = (post.is_feed_item(), post.feed_id) {
                     let params = ReaderSeenFeedItemsParams {
                         feed_id,
                         feed_item_ids: vec![post.feed_item_id.unwrap_or(ReaderFeedItemId(post.id))],
@@ -519,9 +523,10 @@ impl Action {
                         seen.feed_items_unseen(&params).await?;
                     }
                 } else {
+                    let (blog_id, post_id) = post.site_post().ok_or(ReaderError::MissingIds)?;
                     let params = ReaderSeenSitePostsParams {
-                        blog_id: post.site_id.ok_or(ReaderError::MissingIds)?,
-                        post_ids: vec![PostId(post.id as i64)],
+                        blog_id,
+                        post_ids: vec![post_id],
                         source,
                     };
                     if on {
@@ -542,11 +547,7 @@ impl Action {
             }
             Self::LikePost { post } => {
                 // Only a post of a WordPress.com or Jetpack site can be liked.
-                let site_id = post
-                    .site_id
-                    .filter(|site| site.0 != 0 && !post.is_external)
-                    .ok_or(ReaderError::MissingIds)?;
-                let post_id = PostId(post.id as i64);
+                let (site_id, post_id) = post.site_post().ok_or(ReaderError::MissingIds)?;
                 let likes = context.client.reader_likes();
                 confirmation.like_count = if on {
                     likes.like_post(&site_id, &post_id).await?.data.like_count
@@ -690,11 +691,7 @@ impl Action {
             }
             Self::SubscribeComments { post } | Self::CommentNotifications { post } => {
                 // Only a post of a WordPress.com or Jetpack site has comments to subscribe to.
-                let site_id = post
-                    .site_id
-                    .filter(|site| site.0 != 0 && !post.is_external)
-                    .ok_or(ReaderError::MissingIds)?;
-                let post_id = PostId(post.id as i64);
+                let (site_id, post_id) = post.site_post().ok_or(ReaderError::MissingIds)?;
                 let comments = context.client.reader_comments();
                 match (self, on) {
                     (Self::SubscribeComments { .. }, true) => {
