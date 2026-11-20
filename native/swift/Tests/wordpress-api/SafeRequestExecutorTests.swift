@@ -3,6 +3,10 @@ import Testing
 @testable import WordPressAPI
 @testable import WordPressAPIInternal
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 @Suite("SafeRequestExecutor")
 struct SafeRequestExecutorTests {
 
