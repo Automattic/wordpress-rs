@@ -5,7 +5,7 @@ use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::reader_posts::ReaderTagSlug;
 use wp_api::wp_com::reader_tags::{ReaderInterestsParams, ReaderMenuItemKind, ReaderMenuParams};
 
-use crate::context::TestContext;
+use crate::context::{TestContext, reading};
 
 /// A client with no token, for what the Reader shows signed out.
 pub(crate) fn signed_out_client(ctx: &TestContext) -> WpComApiClient {
@@ -36,6 +36,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_tags::menu", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _tags = reading(&ctx.locks.tags);
                 ctx.runtime.block_on(async {
                     let menu = ctx
                         .client

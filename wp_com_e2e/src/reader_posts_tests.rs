@@ -13,7 +13,7 @@ use wp_api::wp_com::reader_posts::{
 };
 use wp_api::wp_com::reader_saved::ReaderFeedId;
 
-use crate::context::TestContext;
+use crate::context::{TestContext, reading};
 
 /// The WordPress.com Blog, which is public.
 const SITE: WpComSiteId = WpComSiteId(3584907);
@@ -405,6 +405,9 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_posts::discover", {
             let ctx = Arc::clone(&ctx);
             move || {
+                // With no tags asked for, Discover is the account's own, which can depend on the tags it
+                // follows, and two pages are compared.
+                let _tags = reading(&ctx.locks.tags);
                 ctx.runtime.block_on(async {
                     let page = |params: ReaderDiscoverParams| {
                         let ctx = Arc::clone(&ctx);
@@ -523,6 +526,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_posts::tags_posts", {
             let ctx = Arc::clone(&ctx);
             move || {
+                // The posts of the tags the account follows.
+                let _tags = reading(&ctx.locks.tags);
                 ctx.runtime.block_on(async {
                     let seen = |page: &ReaderTagPostsResponse| {
                         page.posts

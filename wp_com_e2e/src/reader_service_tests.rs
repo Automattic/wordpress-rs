@@ -18,6 +18,7 @@ use wp_api::wp_com::reader_posts::{
 };
 use wp_api::wp_com::reader_saved::{ReaderSavedKey, ReaderSavedSource};
 use wp_api::wp_com::reader_subscriptions::ReaderSubscriptionEmailFrequency;
+use wp_api::wp_com::reader_tags::ReaderFollowTagsParams;
 use wp_api::wp_com::stats_post::StatsPostTarget;
 use wp_api::wp_com::{WpComBaseUrl, WpComSiteId};
 use wp_mobile::service::reader::{
@@ -31,7 +32,9 @@ use wp_mobile_cache::db_types::reader::ReaderPostRecord;
 use wp_mobile_cache::repository::reader_comments::ReaderCommentSendState;
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
 
-use crate::context::{TestContext, alone, changing, read_back, reading};
+use crate::context::{
+    TestContext, alone, changing, changing_alone, making_a_change, read_back, reading,
+};
 
 /// The WordPress.com Blog, which is public and has years of posts.
 const SITE: WpComSiteId = WpComSiteId(3584907);
@@ -299,6 +302,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::seen_is_shown_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _follows = reading(&ctx.locks.follows);
                 let _seen = alone(&ctx.locks.seen);
                 ctx.runtime.block_on(async {
@@ -345,6 +349,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_block_is_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _follows = changing(&ctx.locks.follows);
                 ctx.runtime.block_on(async {
                     let service = new_service(ctx.delegate.clone(), account())?;
@@ -411,6 +416,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::menu_sites_subscriptions_and_comments", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _tags = reading(&ctx.locks.tags);
                 let _follows = reading(&ctx.locks.follows);
                 ctx.runtime.block_on(async {
                     // Signed out: the menu's default streams and recommended tags, a site's info,
@@ -497,58 +503,20 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_tag_follow_is_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                // A tag follow sent while another change of the account is sent is often not
+                // kept, so no other trial changes the account meanwhile; and the trials that read
+                // the account's tags don't run while they change.
+                let _changes = changing_alone(&ctx.locks);
+                let _tags = changing(&ctx.locks.tags);
                 ctx.runtime.block_on(async {
-                    let service = new_service(ctx.delegate.clone(), account())?;
-                    let slug = ReaderTagSlug("knitting".to_string());
-                    let follows = |service: &ReaderService| {
-                        service
-                            .followed_tags()
-                            .map(|tags| {
-                                tags.iter()
-                                    .any(|tag| tag.slug.as_deref() == Some("knitting"))
-                            })
-                            .map_err(|e| Failed::from(e.to_string()))
-                    };
-                    service.refresh_menu().await.map_err(|e| e.to_string())?;
-                    let was = follows(&service)?;
+                    let slug = ReaderTagSlug(TRIAL_TAG.to_string());
+                    let was = tag_followed_on_the_server(&ctx).await?;
 
-                    let changed = service.set_tag_followed(slug.clone(), None, !was).await;
-                    // What the server has, read by a service with a cache of its own.
-                    let fetched = read_back(
-                        async || {
-                            let other = new_service(ctx.delegate.clone(), account())?;
-                            other.refresh_menu().await.map_err(|e| e.to_string())?;
-                            follows(&other)
-                        },
-                        |follows| *follows != was,
-                    )
-                    .await;
-                    // Whatever happened, the tag ends as it was.
-                    let restored = service
-                        .set_tag_followed(slug, None, was)
-                        .await
-                        .map_err(|e| e.to_string())?;
-
-                    if changed.map_err(|e| e.to_string())? != ReaderActionOutcome::Synced
-                        || restored != ReaderActionOutcome::Synced
-                    {
-                        return Err("The tag follow should reach the server".into());
-                    }
-                    if fetched? == was {
-                        return Err("The server's menu should show the change".into());
-                    }
-                    let back = read_back(
-                        async || {
-                            service.refresh_menu().await.map_err(|e| e.to_string())?;
-                            follows(&service)
-                        },
-                        |follows| *follows == was,
-                    )
-                    .await?;
-                    if back != was {
-                        return Err("The tag should be back as it was".into());
-                    }
-                    Ok(())
+                    let result = follow_tag_and_check(&ctx, &slug, was).await;
+                    // Whatever happened, the tag is left as it was found.
+                    let restored = put_tag_back(&ctx, &slug, was).await;
+                    result?;
+                    restored
                 })
             }
         }),
@@ -557,6 +525,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_follow_is_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _follows = changing(&ctx.locks.follows);
                 ctx.runtime.block_on(async {
                     let service = new_service(ctx.delegate.clone(), account())?;
@@ -663,6 +632,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_comment_is_written_shown_and_deleted", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _own_post = alone(&ctx.locks.own_post);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
@@ -688,6 +658,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_like_is_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _own_post = alone(&ctx.locks.own_post);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
@@ -710,6 +681,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_comment_like_is_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _own_post = alone(&ctx.locks.own_post);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
@@ -746,6 +718,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             {
                 let ctx = Arc::clone(&ctx);
                 move || {
+                    let _changes = making_a_change(&ctx.locks);
                     // It reads the site's comment emails, which only a followed site has.
                     let _follows = reading(&ctx.locks.follows);
                     let _own_post = alone(&ctx.locks.own_post);
@@ -773,6 +746,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::delivery_settings_are_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _follows = changing(&ctx.locks.follows);
                 // Turning the site's comment emails on and off subscribes the account to its
                 // post's comments and unsubscribes it, which the comment subscription trial reads.
@@ -802,6 +776,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_site_is_followed_and_unfollowed_by_id", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _follows = changing(&ctx.locks.follows);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
@@ -828,6 +803,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_page_view_of_an_own_post", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _follows = reading(&ctx.locks.follows);
                 let _seen = alone(&ctx.locks.seen);
                 let Some(site_id) = own_site() else {
@@ -1673,6 +1649,147 @@ async fn restore_delivery(
 }
 
 /// Whether the account follows a site, as the server answers for the site's ID.
+/// The tag the tag follow trial follows and unfollows: one the account doesn't follow.
+const TRIAL_TAG: &str = "knitting";
+
+/// How many times [`put_tag_back`] sends the change that puts the trial's tag back.
+const TAG_PUT_BACK_TRIES: u32 = 3;
+
+/// Whether a service's cached menu has the trial's tag among the followed ones.
+fn follows_trial_tag(service: &ReaderService) -> Result<bool, Failed> {
+    service
+        .followed_tags()
+        .map(|tags| {
+            tags.iter()
+                .any(|tag| tag.slug.as_deref() == Some(TRIAL_TAG))
+        })
+        .map_err(|e| Failed::from(e.to_string()))
+}
+
+/// Whether the server's menu has the trial's tag among the followed ones, read by a service with
+/// a cache of its own.
+async fn tag_followed_on_the_server(ctx: &TestContext) -> Result<bool, Failed> {
+    let service = new_service(ctx.delegate.clone(), account())?;
+    service.refresh_menu().await.map_err(|e| e.to_string())?;
+    follows_trial_tag(&service)
+}
+
+/// Follows the trial's tag if `was` is false, or unfollows it, checks the server has it, and puts
+/// it back with the service.
+async fn follow_tag_and_check(
+    ctx: &TestContext,
+    slug: &ReaderTagSlug,
+    was: bool,
+) -> Result<(), Failed> {
+    let service = new_service(ctx.delegate.clone(), account())?;
+    service.refresh_menu().await.map_err(|e| e.to_string())?;
+    if follows_trial_tag(&service)? != was {
+        return Err("Two reads of the menu disagree about the trial's tag".into());
+    }
+
+    let changed = service.set_tag_followed(slug.clone(), None, !was).await;
+    let fetched = read_back(
+        async || tag_followed_on_the_server(ctx).await,
+        |follows| *follows != was,
+    )
+    .await;
+    // Whatever happened, the service puts the tag back. `put_tag_back` checks it took.
+    let restored = service.set_tag_followed(slug.clone(), None, was).await;
+
+    let changed = changed.map_err(|e| format!("The tag follow wasn't taken: {e}"))?;
+    let restored = restored.map_err(|e| format!("Putting the tag back wasn't taken: {e}"))?;
+    if changed != ReaderActionOutcome::Synced || restored != ReaderActionOutcome::Synced {
+        return Err(format!(
+            "The tag follow should reach the server: {changed:?}, then {restored:?}"
+        )
+        .into());
+    }
+    if fetched? == was {
+        return Err("The server's menu should show the change".into());
+    }
+    let back = read_back(
+        async || {
+            service.refresh_menu().await.map_err(|e| e.to_string())?;
+            follows_trial_tag(&service)
+        },
+        |follows| *follows == was,
+    )
+    .await?;
+    if back != was {
+        return Err("The tag should be back as it was".into());
+    }
+    Ok(())
+}
+
+/// Leaves the trial's tag followed if `was`, and not followed otherwise, whatever the trial did:
+/// reads the server's menu, and while it disagrees, sends the change, up to
+/// [`TAG_PUT_BACK_TRIES`] times. The server can answer 200 to a tag change it doesn't keep (see
+/// `ReaderService::set_tag_followed`), so a change is only taken to be done once the menu shows
+/// it. Fails, naming the tag, if the account is left otherwise.
+async fn put_tag_back(ctx: &TestContext, slug: &ReaderTagSlug, was: bool) -> Result<(), Failed> {
+    let unread = |error: Failed| {
+        Failed::from(format!(
+            "Couldn't read whether the account follows the tag `{TRIAL_TAG}` after the trial: \
+             {}. Check it by hand.",
+            error.message().unwrap_or_default()
+        ))
+    };
+    let mut follows = read_back(
+        async || tag_followed_on_the_server(ctx).await,
+        |follows| *follows == was,
+    )
+    .await
+    .map_err(unread)?;
+    let mut sent = 0;
+    while follows != was && sent < TAG_PUT_BACK_TRIES {
+        let tags = ctx.client.reader_tags();
+        let answer = if was {
+            tags.follow_tags(&ReaderFollowTagsParams {
+                tags: vec![slug.clone()],
+            })
+            .await
+            .map(|_| ())
+        } else {
+            tags.unfollow_tag(slug).await.map(|_| ())
+        };
+        sent += 1;
+        match answer {
+            Ok(()) => {}
+            // Unfollowing a tag the account doesn't follow is refused: the menu decides.
+            Err(WpApiError::WpError { error_code, .. })
+                if !was && error_code == WpErrorCode::CustomError("not_subscribed".to_string()) => {
+            }
+            Err(error) => {
+                return Err(format!(
+                    "Putting the tag `{TRIAL_TAG}` back failed: {error}. The account is left {}.",
+                    if follows {
+                        "following it"
+                    } else {
+                        "not following it"
+                    }
+                )
+                .into());
+            }
+        }
+        follows = read_back(
+            async || tag_followed_on_the_server(ctx).await,
+            |follows| *follows == was,
+        )
+        .await
+        .map_err(unread)?;
+    }
+    if follows != was {
+        return Err(format!(
+            "The account is left {} the tag `{TRIAL_TAG}`, which it {} before the trial, after {sent} \
+             changes sent to put it back. Put it back by hand.",
+            if follows { "following" } else { "not following" },
+            if was { "followed" } else { "didn't follow" },
+        )
+        .into());
+    }
+    Ok(())
+}
+
 async fn follows_by_id(ctx: &TestContext, site_id: WpComSiteId) -> Result<bool, Failed> {
     Ok(ctx
         .client

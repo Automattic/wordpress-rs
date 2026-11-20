@@ -10,7 +10,7 @@ use wp_api::wp_com::reader_seen::{
     ReaderSeenFeedItemsParams, ReaderSeenSitePostsParams, ReaderSeenSource,
 };
 
-use crate::context::{TestContext, alone, changing, read_back, reading};
+use crate::context::{TestContext, alone, changing, making_a_change, read_back, reading};
 use crate::reader_service_tests::settle_after_a_block;
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
@@ -18,6 +18,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_blocks::block_and_unblock_a_site", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _follows = changing(&ctx.locks.follows);
                 ctx.runtime.block_on(async {
                     let site = ctx.site_id;
@@ -71,6 +72,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_seen::mark_a_post_and_put_it_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _changes = making_a_change(&ctx.locks);
                 let _follows = reading(&ctx.locks.follows);
                 let _seen = alone(&ctx.locks.seen);
                 ctx.runtime.block_on(async {

@@ -26,9 +26,17 @@ pub struct TestContext {
 /// Account state that some trials change and put back, and others read and compare exactly. CI
 /// runs every trial at once, so a trial that changes some holds its lock for writing for the whole
 /// trial, and one whose checks it would break holds it for reading. A trial that needs more than
-/// one takes them in the order of these fields.
+/// one takes them in the order of these fields, at its start, so no two trials wait on each other.
 #[derive(Default)]
 pub struct AccountLocks {
+    /// Any change of the account. Every trial that sends one holds it with [`making_a_change`],
+    /// so they still run side by side. The tag follow trial holds it with [`changing_alone`],
+    /// so it runs while no other trial changes anything: a tag follow sent while the account's
+    /// other changes are sent is often answered 200 and not kept (24 of 37 on 2026-11-20, see
+    /// `ReaderService::set_tag_followed`).
+    pub changes: RwLock<()>,
+    /// The tags the account follows, which the menu lists, and the streams made of them.
+    pub tags: RwLock<()>,
     /// The sites the account follows, how each reaches it (emails and notifications), and the
     /// sites it blocks: a blocked site reads as not followed, and a follow of one is refused. The
     /// Following stream is made of them.
@@ -57,6 +65,18 @@ pub fn reading(lock: &RwLock<()>) -> RwLockReadGuard<'_, ()> {
 /// Holds account state that only trials that change it use.
 pub fn alone(lock: &Mutex<()>) -> MutexGuard<'_, ()> {
     lock.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Held for the whole of a trial that sends any change of the account. See
+/// [`AccountLocks::changes`].
+pub fn making_a_change(locks: &AccountLocks) -> RwLockReadGuard<'_, ()> {
+    reading(&locks.changes)
+}
+
+/// Held for the whole of a trial whose changes must not overlap any other trial's. See
+/// [`AccountLocks::changes`].
+pub fn changing_alone(locks: &AccountLocks) -> RwLockWriteGuard<'_, ()> {
+    changing(&locks.changes)
 }
 
 /// How many times [`read_back`] asks, and how long it waits between asks.
