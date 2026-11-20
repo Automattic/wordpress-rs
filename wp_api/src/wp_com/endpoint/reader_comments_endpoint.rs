@@ -31,15 +31,18 @@ enum ReaderCommentsRequest {
     // Adds a reply to a comment, and answers with it.
     #[post(url = "/sites/<wp_com_site_id>/comments/<comment_id>/replies/new", params = &ReaderNewCommentParams, output = ReaderComment)]
     NewReply,
-    // Subscribes the user to a post's comments.
+    // Subscribes the user to a post's comments, and answers with the subscription as it now is.
     #[post(url = "/sites/<wp_com_site_id>/posts/<post_id>/subscribers/new", params = &ReaderSubscribeToCommentsParams, output = ReaderPostCommentsSubscriptionResponse)]
     Subscribe,
-    // Unsubscribes the user from a post's comments. It takes no parameters. With nothing to
-    // remove it's still a 200 with `success: true`.
+    // Unsubscribes the user from a post's comments, and answers with the subscription as it now
+    // is. It takes no parameters. With nothing to remove it's still a 200 with `success: true`.
+    // While the site's comments are emailed to the user, it's a 200 with `success: true` and
+    // `i_subscribe: true`: the post stays subscribed.
     #[post(url = "/sites/<wp_com_site_id>/posts/<post_id>/subscribers/mine/delete", output = ReaderPostCommentsSubscriptionResponse)]
     Unsubscribe,
     // Turns the notifications of the user's subscription to a post's comments on or off, and
-    // answers with the subscription.
+    // answers with the subscription as it now is. For a post the user isn't subscribed to, it's
+    // a 200 with `i_subscribe: false` and `receives_notifications: false`.
     #[post(url = "/sites/<wp_com_site_id>/posts/<post_id>/subscribers/mine/update", params = &ReaderCommentsNotificationsParams, output = ReaderPostCommentsSubscription)]
     UpdateSubscription,
 }

@@ -141,6 +141,58 @@ struct Confirmation {
     /// How often a site's new posts are emailed, once the emails are started. The server picks
     /// it when the request doesn't, and drops it when the emails stop.
     email_frequency: Option<ReaderSubscriptionEmailFrequency>,
+    /// A post's comment subscription as the server answered a change to it.
+    comment_subscription: Option<CommentSubscription>,
+    /// Why the server's answer, though a success, says it didn't do what was asked. The cache
+    /// then shows what the server answered, and the tap is refused with this reason.
+    contradicted: Option<String>,
+}
+
+/// A post's comment subscription, as the server answers a change to it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CommentSubscription {
+    /// Whether the user is subscribed to the post's comments.
+    subscribed: bool,
+    /// Whether new comments notify the user, when the answer says.
+    notified: Option<bool>,
+}
+
+impl CommentSubscription {
+    /// Whether it shows `action` on: the subscription for [`Action::SubscribeComments`], and its
+    /// notifications for [`Action::CommentNotifications`], which are off when the answer doesn't
+    /// say they're on.
+    fn shows(self, action: &Action) -> bool {
+        match action {
+            Action::CommentNotifications { .. } => self.subscribed && self.notified == Some(true),
+            _ => self.subscribed,
+        }
+    }
+
+    /// Why this answer to turning `action` on or off says the server didn't, or `None` when it
+    /// did.
+    fn contradiction(self, action: &Action, on: bool) -> Option<String> {
+        if self.shows(action) == on {
+            return None;
+        }
+        Some(
+            match (action, on) {
+                (Action::SubscribeComments { .. }, true) => {
+                    "The server didn't subscribe you to the post's comments."
+                }
+                (Action::SubscribeComments { .. }, false) => {
+                    "The server kept your subscription to the post's comments. While a site's new \
+                     comments are emailed to you, its posts' comments stay subscribed."
+                }
+                (_, true) if !self.subscribed => {
+                    "The server has no subscription to the post's comments to notify you of. \
+                     Subscribe to them first."
+                }
+                (_, true) => "The server didn't turn on notifications for the post's comments.",
+                (_, false) => "The server didn't turn off notifications for the post's comments.",
+            }
+            .to_string(),
+        )
+    }
 }
 
 /// The app, as the Reader's requests name it.
@@ -518,6 +570,37 @@ impl Action {
                     )?;
                 }
             }
+            // The post shows the subscription the server answered with, which is the server's
+            // choice of notifications for a new one, and can differ from what was asked.
+            Self::SubscribeComments { post } | Self::CommentNotifications { post } => {
+                if let (Some(row), Some(answer)) = (
+                    Self::post_row(post, executor, owner)?,
+                    confirmation.comment_subscription,
+                ) {
+                    ReaderPostRepository::set_flag(
+                        executor,
+                        row,
+                        ReaderPostFlag::IsSubscribedComments,
+                        answer.subscribed,
+                    )?;
+                    let notified = match answer.notified {
+                        Some(notified) => Some(answer.subscribed && notified),
+                        None if !answer.subscribed => Some(false),
+                        None => None,
+                    };
+                    if let Some(notified) = notified {
+                        ReaderPostRepository::set_flag(
+                            executor,
+                            row,
+                            ReaderPostFlag::ReceivesCommentNotifications,
+                            notified,
+                        )?;
+                    }
+                    // The answer covers both of the post's settings, so a change to the other one
+                    // that's still waiting to be sent is shown again.
+                    show_pending(executor, owner)?;
+                }
+            }
             Self::Follow { .. } => {
                 if let (true, Some(subscription)) = (on, &confirmation.subscription) {
                     ReaderSubscriptionRepository::add_first(executor, owner, subscription)?;
@@ -755,25 +838,43 @@ impl Action {
                 // Only a post of a WordPress.com or Jetpack site has comments to subscribe to.
                 let (site_id, post_id) = post.site_post().ok_or_else(|| self.unsendable())?;
                 let comments = context.client.reader_comments();
-                match (self, on) {
+                // Each answers 200 with the subscription as the server now has it, which isn't
+                // always what was asked: turning notifications on for a post the user isn't
+                // subscribed to answers "not subscribed".
+                let answer = match (self, on) {
                     (Self::SubscribeComments { .. }, true) => {
                         let params = ReaderSubscribeToCommentsParams {
                             receive_notifications: None,
                         };
-                        comments.subscribe(&site_id, &post_id, &params).await?;
+                        let answer = comments.subscribe(&site_id, &post_id, &params).await?.data;
+                        CommentSubscription {
+                            subscribed: answer.i_subscribe,
+                            notified: answer.receives_notifications,
+                        }
                     }
                     (Self::SubscribeComments { .. }, false) => {
-                        comments.unsubscribe(&site_id, &post_id).await?;
+                        let answer = comments.unsubscribe(&site_id, &post_id).await?.data;
+                        CommentSubscription {
+                            subscribed: answer.i_subscribe,
+                            notified: answer.receives_notifications,
+                        }
                     }
                     _ => {
                         let params = ReaderCommentsNotificationsParams {
                             receive_notifications: on,
                         };
-                        comments
+                        let answer = comments
                             .update_subscription(&site_id, &post_id, &params)
-                            .await?;
+                            .await?
+                            .data;
+                        CommentSubscription {
+                            subscribed: answer.i_subscribe,
+                            notified: answer.receives_notifications,
+                        }
                     }
-                }
+                };
+                confirmation.comment_subscription = Some(answer);
+                confirmation.contradicted = answer.contradiction(self, on);
             }
         }
         Ok(confirmation)
@@ -1026,6 +1127,15 @@ impl ReaderContext {
         answer: Result<Confirmation, ReaderError>,
     ) -> Result<(), SqliteDbError> {
         let target = (row.kind, row.target.clone());
+        // A success whose answer says the server didn't do what was asked is a refusal, but the
+        // cache takes what the server answered rather than going back to what it showed before.
+        let answer = match answer {
+            Ok(mut confirmation) => match confirmation.contradicted.take() {
+                Some(reason) => Err((Some(confirmation), ReaderError::Refused { reason })),
+                None => Ok(confirmation),
+            },
+            Err(error) => Err((None, error)),
+        };
         let finished = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
             let finished = ReaderActionRepository::finish(&transaction, row.row_id, row.seq)?;
@@ -1035,12 +1145,34 @@ impl ReaderContext {
                     action.confirm(&transaction, self.owner_row, row.wanted, confirmation)?;
                 }
                 // Taken, and the user tapped again since: the server now has what was sent,
-                // which is what the newer tap goes back to if it's refused.
-                (Ok(_), false) => {
+                // which is what the newer tap goes back to if it's refused. A comment
+                // subscription's answer is kept too, and the newer tap shown over it.
+                (Ok(confirmation), false) => {
                     ReaderActionRepository::set_was(&transaction, row.row_id, row.wanted)?;
+                    if confirmation.comment_subscription.is_some() {
+                        action.confirm(&transaction, self.owner_row, row.wanted, confirmation)?;
+                    }
+                }
+                // Answered with something other than what was asked, with no tap since: the
+                // cache shows what the server answered.
+                (Err((Some(confirmation), _)), true) => {
+                    action.confirm(&transaction, self.owner_row, row.wanted, confirmation)?;
+                }
+                // Answered with something other than what was asked, and the user tapped again
+                // since: what the server answered is kept, with the newer tap shown over it, and
+                // is what the newer tap goes back to.
+                (Err((Some(confirmation), _)), false) => {
+                    if let Some(answer) = confirmation.comment_subscription {
+                        ReaderActionRepository::set_was(
+                            &transaction,
+                            row.row_id,
+                            answer.shows(action),
+                        )?;
+                    }
+                    action.confirm(&transaction, self.owner_row, row.wanted, confirmation)?;
                 }
                 // Refused, with no tap since: the cache goes back to what it showed before.
-                (Err(_), true) => {
+                (Err((None, _)), true) => {
                     if let Some(was) = row.was {
                         let shown = action.shown(&transaction, self.owner_row)?;
                         action.show(&transaction, self.owner_row, was)?;
@@ -1049,11 +1181,12 @@ impl ReaderContext {
                 }
                 // Refused, with a tap since, which is newer than what was refused and is sent
                 // next.
-                (Err(_), false) => {}
+                (Err((None, _)), false) => {}
             }
             transaction.commit()?;
             Ok::<_, SqliteDbError>(finished)
         })?;
+        let answer = answer.map_err(|(_, error)| error);
         if let (Ok(_), Action::BlockSite { site_id }) = (&answer, action) {
             self.actions
                 .confirmed_blocks
@@ -1491,6 +1624,19 @@ impl ReaderService {
     /// Subscribes the user to a post's comments, or unsubscribes them. Unsubscribing ends the
     /// post's comment notifications too. Needs an account, and a post of a WordPress.com or
     /// Jetpack site: a feed's post is refused with [`ReaderError::FeedPost`].
+    ///
+    /// The server answers with the subscription as it now has it, and the cached post shows that
+    /// answer: a new subscription's notifications are off unless the server says otherwise. An
+    /// answer that isn't what was asked is refused with [`ReaderError::Refused`], and the post
+    /// shows what the server answered rather than going back.
+    ///
+    /// A post's subscription follows the site's comment emails ([`Self::set_comment_emails`]).
+    /// As measured on 2026-11-20, on a site the account owns with one post: turning the site's
+    /// comment emails on made the post read as subscribed with notifications off, and while they
+    /// were on, an unsubscribe answered `success: true` and still subscribed (so it's refused
+    /// here). Turning them off unsubscribed the post, including a subscription made before they
+    /// were turned on. Turning them off when they were already off left the post's subscription
+    /// alone. Posting a comment on the post didn't subscribe the user to it.
     pub async fn set_comments_subscribed(
         &self,
         post: ReaderPostSaveIdentity,
@@ -1504,6 +1650,12 @@ impl ReaderService {
     /// Turns notifications for the comments of a post the user is subscribed to on or off. Needs
     /// an account, and a post of a WordPress.com or Jetpack site: a feed's post is refused with
     /// [`ReaderError::FeedPost`].
+    ///
+    /// The server answers with the subscription as it now has it, and the cached post shows that
+    /// answer. For a post the user isn't subscribed to, turning them on still answers 200, with
+    /// "not subscribed": that's refused with [`ReaderError::Refused`], and the post shows as not
+    /// subscribed. While the site's comment emails are on, turning them on answers with them
+    /// off, and is refused the same way. See [`Self::set_comments_subscribed`].
     pub async fn set_comment_notifications(
         &self,
         post: ReaderPostSaveIdentity,
@@ -1525,6 +1677,11 @@ impl ReaderService {
     }
 
     /// Turns emails for a followed site's new comments on or off. Needs an account.
+    ///
+    /// The server ties it to the site's posts' comment subscriptions: turning it on subscribes
+    /// the user to them, with notifications off, and turning it off unsubscribes them, as
+    /// measured on a site with one post (see [`Self::set_comments_subscribed`]). Posts already in
+    /// the cache keep the subscription they had until they're fetched again.
     pub async fn set_comment_emails(
         &self,
         site_id: WpComSiteId,

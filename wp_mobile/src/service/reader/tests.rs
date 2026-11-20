@@ -6127,3 +6127,252 @@ mod feed_items_with_no_post_id {
         assert_eq!(service.pending_action_count().unwrap(), 0);
     }
 }
+
+mod comment_subscriptions {
+    use super::*;
+    use wp_api::wp_com::reader_saved::ReaderPostSaveIdentity;
+
+    const SITE: WpComSiteId = WpComSiteId(123);
+
+    /// A service whose Following stream has post 7, with its comment subscription as given.
+    async fn with_post(
+        subscribed: bool,
+        notified: bool,
+    ) -> (
+        ReaderService,
+        Arc<ScriptedExecutor>,
+        Arc<ReaderStreamCollection>,
+    ) {
+        let (service, executor) = service();
+        let stream = service.stream(ReaderStream::Following);
+        let mut post = post_json(7, 10);
+        post["is_subscribed_comments"] = json!(subscribed);
+        post["subscribed_comments_notifications"] = json!(notified);
+        executor.push(Step::Respond(200, json!({ "posts": [post] })));
+        stream.refresh().await.unwrap();
+        (service, executor, stream)
+    }
+
+    fn identity() -> ReaderPostSaveIdentity {
+        ReaderPostSaveIdentity {
+            id: 7,
+            site_id: Some(SITE),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        }
+    }
+
+    /// Whether the cached post 7 is subscribed to, and notifies.
+    async fn flags(stream: &ReaderStreamCollection) -> (Option<bool>, Option<bool>) {
+        let post = stream.load_items().await.unwrap()[0].post.clone();
+        (
+            post.is_subscribed_comments,
+            post.receives_comment_notifications,
+        )
+    }
+
+    /// The server's answer to a change: the subscription as it now has it.
+    fn answered(subscribed: bool, notified: bool) -> Step {
+        Step::Respond(
+            200,
+            json!({ "success": true, "i_subscribe": subscribed, "receives_notifications": notified }),
+        )
+    }
+
+    fn refused_with(outcome: &Result<ReaderActionOutcome, ReaderError>, expected: &str) {
+        assert!(
+            matches!(outcome, Err(ReaderError::Refused { reason }) if reason == expected),
+            "{outcome:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn notifications_for_a_post_the_server_has_no_subscription_to_are_refused() {
+        // The cache says subscribed, and the server dropped the subscription meanwhile, which
+        // it answers with a 200.
+        let (service, executor, stream) = with_post(true, false).await;
+        executor.push(answered(false, false));
+
+        let outcome = service.set_comment_notifications(identity(), true).await;
+
+        refused_with(
+            &outcome,
+            "The server has no subscription to the post's comments to notify you of. Subscribe \
+             to them first.",
+        );
+        // The post shows what the server answered, not what the cache showed before.
+        assert_eq!(flags(&stream).await, (Some(false), Some(false)));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn notifications_the_server_leaves_off_are_refused() {
+        let (service, executor, stream) = with_post(true, false).await;
+        executor.push(answered(true, false));
+
+        let outcome = service.set_comment_notifications(identity(), true).await;
+
+        refused_with(
+            &outcome,
+            "The server didn't turn on notifications for the post's comments.",
+        );
+        assert_eq!(flags(&stream).await, (Some(true), Some(false)));
+    }
+
+    #[tokio::test]
+    async fn notifications_the_server_leaves_on_are_refused() {
+        let (service, executor, stream) = with_post(true, true).await;
+        executor.push(answered(true, true));
+
+        let outcome = service.set_comment_notifications(identity(), false).await;
+
+        refused_with(
+            &outcome,
+            "The server didn't turn off notifications for the post's comments.",
+        );
+        assert_eq!(flags(&stream).await, (Some(true), Some(true)));
+    }
+
+    #[tokio::test]
+    async fn notifications_off_for_a_post_not_subscribed_to_are_taken() {
+        // Off is off, subscribed or not; the post shows that it isn't subscribed.
+        let (service, executor, stream) = with_post(true, true).await;
+        executor.push(answered(false, false));
+
+        let outcome = service.set_comment_notifications(identity(), false).await;
+
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(flags(&stream).await, (Some(false), Some(false)));
+    }
+
+    #[tokio::test]
+    async fn a_subscription_the_server_doesnt_make_is_refused() {
+        let (service, executor, stream) = with_post(false, false).await;
+        executor.push(answered(false, false));
+
+        let outcome = service.set_comments_subscribed(identity(), true).await;
+
+        refused_with(
+            &outcome,
+            "The server didn't subscribe you to the post's comments.",
+        );
+        assert_eq!(flags(&stream).await, (Some(false), Some(false)));
+    }
+
+    #[tokio::test]
+    async fn an_unsubscribe_the_server_keeps_the_subscription_through_is_refused() {
+        // While the site's comments are emailed, an unsubscribe answers `success: true` and
+        // still subscribed.
+        let (service, executor, stream) = with_post(true, true).await;
+        executor.push(answered(true, false));
+
+        let outcome = service.set_comments_subscribed(identity(), false).await;
+
+        refused_with(
+            &outcome,
+            "The server kept your subscription to the post's comments. While a site's new \
+             comments are emailed to you, its posts' comments stay subscribed.",
+        );
+        assert_eq!(flags(&stream).await, (Some(true), Some(false)));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_new_subscription_shows_the_notifications_the_server_answers_with() {
+        let (service, executor, stream) = with_post(false, true).await;
+        executor.push(answered(true, false));
+        let outcome = service.set_comments_subscribed(identity(), true).await;
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(flags(&stream).await, (Some(true), Some(false)));
+
+        executor.push(answered(false, false));
+        service
+            .set_comments_subscribed(identity(), false)
+            .await
+            .unwrap();
+        executor.push(answered(true, true));
+        let outcome = service.set_comments_subscribed(identity(), true).await;
+        assert_eq!(outcome.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(flags(&stream).await, (Some(true), Some(true)));
+    }
+
+    #[tokio::test]
+    async fn a_refused_change_with_a_tap_since_goes_back_to_what_the_server_answered() {
+        // The first tap turns notifications on and is answered "not subscribed". The second,
+        // made while the first is on its way, turns them off, and the server refuses it: the
+        // post goes back to what the server answered to the first, not to what it showed.
+        let (service, executor, stream) = with_post(true, false).await;
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({ "i_subscribe": false, "receives_notifications": false }),
+        ));
+        executor.push(Step::Respond(
+            403,
+            json!({ "error": "unauthorized", "message": "Not allowed." }),
+        ));
+
+        let (first, second) =
+            futures::join!(service.set_comment_notifications(identity(), true), async {
+                let second = service.set_comment_notifications(identity(), false);
+                release.send(()).unwrap();
+                second.await
+            });
+
+        // The two taps share a target, so the newer one's refusal reaches one of the two calls.
+        let refusals = [&first, &second]
+            .into_iter()
+            .filter(|outcome| matches!(outcome, Err(ReaderError::Api(_))))
+            .count();
+        assert_eq!(refusals, 1, "{first:?} {second:?}");
+        // Back to the server's answer to the first tap, not to the "on" the first tap showed.
+        assert_eq!(flags(&stream).await, (Some(false), Some(false)));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_change_still_waiting_shows_after_the_other_ones_answer() {
+        // Subscribing, then turning notifications on while the subscribe is on its way: the
+        // subscribe's answer has notifications off, which mustn't hide the second tap.
+        let (service, executor, stream) = with_post(false, false).await;
+        let (release, held) = oneshot::channel();
+        let (seen_release, seen_held) = oneshot::channel::<()>();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({ "success": true, "i_subscribe": true, "receives_notifications": false }),
+        ));
+        executor.push(Step::Hold(
+            seen_held,
+            200,
+            json!({ "i_subscribe": true, "receives_notifications": true }),
+        ));
+
+        let before = executor.sent().len();
+        let (first, second, ()) = futures::join!(
+            service.set_comments_subscribed(identity(), true),
+            service.set_comment_notifications(identity(), true),
+            async {
+                release.send(()).unwrap();
+                // The second request goes once the subscribe's answer is stored.
+                for _ in 0..1000 {
+                    if executor.sent().len() == before + 2 {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+                assert_eq!(executor.sent().len(), before + 2);
+                // The waiting tap still shows, though the answer said notifications are off.
+                assert_eq!(flags(&stream).await, (Some(true), Some(true)));
+                seen_release.send(()).unwrap();
+            }
+        );
+
+        assert_eq!(first.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(second.unwrap(), ReaderActionOutcome::Synced);
+        assert_eq!(flags(&stream).await, (Some(true), Some(true)));
+    }
+}

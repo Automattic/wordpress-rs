@@ -807,7 +807,7 @@ Public documentation: `rest/v1.2/help`. It declares `delivery_frequency`, `track
 
 ### `POST /rest/v1.2/read/site/$site/comment_email_subscriptions/new`
 
-Starts emailing the user the new comments on a site's posts.
+Starts emailing the user the new comments on a site's posts. On a site with one post, it also subscribed the user to that post's comments, with notifications off, and stopping the emails unsubscribed them, even from a subscription made before the emails started.
 
 The API declares a `post_id` for this and for stopping them, which it reads from the address only. A POST here sends its parameters in the body, so no `post_id` is sent, and both act on the whole site.
 
@@ -953,7 +953,7 @@ Public documentation: `rest/v1.1/help`. It declares `content`, which the library
 
 ### `POST /rest/v1.1/sites/$site/posts/$post_id/subscribers/new`
 
-Subscribes the user to a post's comments.
+Subscribes the user to a post's comments, and answers with the subscription as it now is.
 
 Request `ReaderCommentsRequest::Subscribe`, response `ReaderPostCommentsSubscriptionResponse`.
 
@@ -965,7 +965,7 @@ Public documentation: `rest/v1.1/help`. It declares `receive_notifications`, whi
 
 ### `POST /rest/v1.1/sites/$site/posts/$post_id/subscribers/mine/delete`
 
-Unsubscribes the user from a post's comments. It takes no parameters. With nothing to remove it's still a 200 with `success: true`.
+Unsubscribes the user from a post's comments, and answers with the subscription as it now is. It takes no parameters. With nothing to remove it's still a 200 with `success: true`. While the site's comments are emailed to the user, it's a 200 with `success: true` and `i_subscribe: true`: the post stays subscribed.
 
 Request `ReaderCommentsRequest::Unsubscribe`, response `ReaderPostCommentsSubscriptionResponse`.
 
@@ -975,7 +975,7 @@ Public documentation: `rest/v1.1/help`.
 
 ### `POST /rest/v1.1/sites/$site/posts/$post_id/subscribers/mine/update`
 
-Turns the notifications of the user's subscription to a post's comments on or off, and answers with the subscription.
+Turns the notifications of the user's subscription to a post's comments on or off, and answers with the subscription as it now is. For a post the user isn't subscribed to, it's a 200 with `i_subscribe: false` and `receives_notifications: false`.
 
 Request `ReaderCommentsRequest::UpdateSubscription`, response `ReaderPostCommentsSubscription`.
 

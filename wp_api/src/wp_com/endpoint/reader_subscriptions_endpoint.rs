@@ -54,7 +54,9 @@ enum ReaderSubscriptionsRequest {
     // still a 200 with `success: true`, and sets the emails to `instantly`.
     #[post(url = "/read/site/<wp_com_site_id>/post_email_subscriptions/update", params = &ReaderPostEmailFrequencyParams, output = ReaderPostEmailSubscriptionResponse)]
     UpdatePostEmails,
-    // Starts emailing the user the new comments on a site's posts.
+    // Starts emailing the user the new comments on a site's posts. On a site with one post, it
+    // also subscribed the user to that post's comments, with notifications off, and stopping the
+    // emails unsubscribed them, even from a subscription made before the emails started.
     //
     // The API declares a `post_id` for this and for stopping them, which it reads from the
     // address only. A POST here sends its parameters in the body, so no `post_id` is sent, and
