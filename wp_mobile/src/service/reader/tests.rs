@@ -330,6 +330,130 @@ async fn a_search_follows_its_page_handles() {
     );
 }
 
+fn search_by_date() -> ReaderStream {
+    ReaderStream::Search {
+        query: "cats".to_string(),
+        sort: ReaderSearchSort::Date,
+        lang: None,
+    }
+}
+
+/// A page of a search, with the handle of the next.
+fn search_page(posts: &[u64], next_page: Option<&str>) -> Value {
+    let posts: Vec<Value> = posts.iter().map(|id| post_json(*id, 10)).collect();
+    json!({ "posts": posts, "next_page": next_page })
+}
+
+/// The `page_handle` each request was sent with, or `-` for none.
+fn page_handles(executor: &ScriptedExecutor) -> Vec<String> {
+    (0..executor.sent().len())
+        .map(|index| {
+            sent_query(executor, index)
+                .into_iter()
+                .find(|(name, _)| name == "page_handle")
+                .map(|(_, value)| value)
+                .unwrap_or_else(|| "-".to_string())
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn empty_search_pages_that_are_not_the_last_are_followed_to_posts() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let stream = service.stream(search_by_date());
+    executor.push(Step::Respond(200, search_page(&[], Some("w1"))));
+    executor.push(Step::Respond(200, search_page(&[], Some("w2"))));
+    executor.push(Step::Respond(200, search_page(&[1, 2], Some("w3"))));
+
+    let result = stream.refresh().await.unwrap();
+
+    assert_eq!(
+        result,
+        ReaderStreamPageResult {
+            post_count: 2,
+            new_post_count: 2,
+            unreadable_post_count: 0,
+            has_more: true,
+        }
+    );
+    assert_eq!(shown(&stream).await, ["1", "2"]);
+    assert_eq!(page_handles(&executor), ["-", "w1", "w2"]);
+
+    // A later page does the same, and the next starts where the last one fetched said.
+    executor.push(Step::Respond(200, search_page(&[], Some("w4"))));
+    executor.push(Step::Respond(200, search_page(&[3], Some("w5"))));
+    let result = stream.load_more().await.unwrap();
+    assert_eq!(result.post_count, 1);
+    assert_eq!(result.new_post_count, 1);
+    assert!(result.has_more);
+    assert_eq!(shown(&stream).await, ["1", "2", "3"]);
+    executor.push(Step::Respond(200, search_page(&[4], None)));
+    stream.load_more().await.unwrap();
+    assert_eq!(page_handles(&executor), ["-", "w1", "w2", "w3", "w4", "w5"]);
+}
+
+#[tokio::test]
+async fn a_call_stops_following_empty_search_pages_at_the_limit() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let stream = service.stream(search_by_date());
+    // The first page, and the 8 more a call follows, all empty.
+    let empty_pages = 9;
+    for index in 0..empty_pages {
+        let handle = format!("w{index}");
+        executor.push(Step::Respond(200, search_page(&[], Some(&handle))));
+    }
+
+    let result = stream.refresh().await.unwrap();
+
+    assert_eq!(
+        result,
+        ReaderStreamPageResult {
+            post_count: 0,
+            new_post_count: 0,
+            unreadable_post_count: 0,
+            has_more: true,
+        }
+    );
+    assert_eq!(executor.sent().len(), empty_pages);
+    assert_eq!(stream.info().unwrap().has_more, Some(true));
+    assert!(shown(&stream).await.is_empty());
+
+    // The next call starts from the handle of the last page fetched.
+    executor.push(Step::Respond(200, search_page(&[1], None)));
+    let result = stream.load_more().await.unwrap();
+    assert_eq!(result.post_count, 1);
+    assert!(!result.has_more);
+    assert_eq!(
+        page_handles(&executor).last().unwrap(),
+        &format!("w{}", empty_pages - 1)
+    );
+}
+
+#[tokio::test]
+async fn an_empty_search_page_with_no_handle_is_the_end() {
+    let (service, executor) = service_for(ReaderOwner::SignedOut);
+    let stream = service.stream(search_by_date());
+    executor.push(Step::Respond(200, search_page(&[], None)));
+    let result = stream.refresh().await.unwrap();
+    assert_eq!(result.post_count, 0);
+    assert!(!result.has_more);
+    assert_eq!(executor.sent().len(), 1);
+
+    // On a later page too, after an empty page that wasn't the end.
+    executor.push(Step::Respond(200, search_page(&[1], Some("w1"))));
+    stream.refresh().await.unwrap();
+    executor.push(Step::Respond(200, search_page(&[], Some("w2"))));
+    executor.push(Step::Respond(200, search_page(&[], None)));
+    let result = stream.load_more().await.unwrap();
+    assert_eq!(result.post_count, 0);
+    assert!(!result.has_more);
+    assert_eq!(stream.info().unwrap().has_more, Some(false));
+    assert_eq!(page_handles(&executor), ["-", "-", "w1", "w2"]);
+    // At the end, nothing more is sent.
+    stream.load_more().await.unwrap();
+    assert_eq!(executor.sent().len(), 4);
+}
+
 /// The query a request was sent with, read back as the server reads it.
 fn sent_query(executor: &ScriptedExecutor, index: usize) -> Vec<(String, String)> {
     let url = url::Url::parse(&executor.sent()[index].url).expect("the request has an address");

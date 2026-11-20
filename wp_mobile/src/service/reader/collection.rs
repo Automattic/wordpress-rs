@@ -31,6 +31,10 @@ use wp_mobile_cache::{DbTable, RowId, SqliteDbError, UpdateHook};
 /// can be loaded again.
 const MAX_DATED_POSTS: u64 = 500;
 
+/// How many pages in a row with no posts a call follows past, in a stream that pages with a handle.
+/// A search by date pages by time window, and six empty windows in a row have been seen live.
+const MAX_EMPTY_PAGES_FOLLOWED: usize = 8;
+
 /// How many of a stream's unreadable posts are asked for again at a time.
 const UNREADABLE_RETRIES_AT_A_TIME: usize = 5;
 
@@ -251,6 +255,12 @@ impl ReaderStreamCollection {
     /// the newest of them is marked with [`ReaderStreamItem::gap_before`]. In a stream kept in the
     /// server's order, the page replaces what the cache had.
     ///
+    /// A stream kept in the server's order can send a page with no posts that isn't its last, as a
+    /// search by date does for a time window with none. Such a page's handle is followed within
+    /// the call, so it returns posts, or the end. It stops after 8 empty pages past the first:
+    /// then it returns no posts with `has_more` true, and [`Self::load_more`] carries on from the
+    /// last page fetched.
+    ///
     /// A call made while another is running waits for it and returns what it did, without
     /// fetching again.
     pub async fn refresh(&self) -> Result<ReaderStreamPageResult, ReaderError> {
@@ -391,6 +401,9 @@ impl ReaderStreamCollection {
 
     /// Fetches the page after the stream's last post, or refreshes if the stream hasn't loaded
     /// yet. Does nothing when the stream has no more.
+    ///
+    /// Pages with no posts that aren't the last are followed past, as [`Self::refresh`] follows
+    /// them, and with the same limit.
     pub async fn load_more(&self) -> Result<ReaderStreamPageResult, ReaderError> {
         self.check_account()?;
         let lane = self.lanes.page.lock().await;
@@ -557,6 +570,11 @@ impl ReaderStreamCollection {
         self.record_failure(result)
     }
 
+    /// Fetches a page and stores it. In a stream kept in the server's order, a page with nothing on
+    /// it that has a next handle isn't the end, so the handle is followed, up to
+    /// [`MAX_EMPTY_PAGES_FOLLOWED`] times. The page stored is the first with anything on it, or the
+    /// last one fetched: the empty pages before it add nothing to the stream, and its handle is
+    /// where the next page starts.
     async fn load_page(&self, kind: PageKind) -> Result<ReaderStreamPageResult, ReaderError> {
         let cursor = match &kind {
             PageKind::First => None,
@@ -565,10 +583,24 @@ impl ReaderStreamCollection {
             }
             PageKind::Next { handle, .. } => Some(StreamCursor::Handle(handle.clone())),
         };
-        let page = self
+        let mut page = self
             .stream
             .fetch(&self.context.client, cursor.as_ref())
             .await?;
+        if self.stream.ordering() == ReaderStreamOrdering::Server {
+            let mut followed = 0;
+            while followed < MAX_EMPTY_PAGES_FOLLOWED
+                && page.entries.is_empty()
+                && page.unreadable.is_empty()
+                && let Some(handle) = page.next_page_handle.take()
+            {
+                page = self
+                    .stream
+                    .fetch(&self.context.client, Some(&StreamCursor::Handle(handle)))
+                    .await?;
+                followed += 1;
+            }
+        }
         Ok(self.store_page(&kind, page)?)
     }
 

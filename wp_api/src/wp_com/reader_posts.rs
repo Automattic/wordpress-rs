@@ -726,7 +726,8 @@ pub struct ReaderSearchPost {
 #[serde(from = "RawReaderSearchPostsResponse")]
 pub struct ReaderSearchPostsResponse {
     /// The page's posts, without any in [`Self::unreadable_posts`]. A page of a search by date can
-    /// have fewer than were asked for and not be the last.
+    /// have fewer than were asked for, or none at all, and not be the last: it pages by time
+    /// window, and a window can be empty.
     pub posts: Vec<ReaderSearchPost>,
     /// The posts on the page that couldn't be read. Almost always empty.
     #[uniffi(default = [])]
