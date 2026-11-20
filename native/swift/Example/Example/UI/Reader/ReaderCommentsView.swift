@@ -144,6 +144,17 @@ final class ReaderCommentsViewModel {
         }
     }
 
+    /// Blocks the comment's author on this device: their comments, and the replies under them, are hidden at once.
+    /// Blocked sites unblocks them.
+    func blockAuthor(_ comment: ReaderCommentRecord) async {
+        guard let authorID = comment.authorId, authorID != 0 else { return }
+        let name = comment.authorName?.decodingHTMLEntities() ?? "the author"
+        await act("Block \(name)") {
+            try self.session.service.setUserBlocked(userId: authorID, blocked: true)
+            return "Their comments are hidden."
+        }
+    }
+
     func setLiked(_ comment: ReaderCommentRecord, _ liked: Bool) async {
         guard let commentID = comment.commentId else { return }
         await act(liked ? "Like" : "Unlike") {
@@ -241,6 +252,10 @@ struct ReaderCommentsView: View {
                 }
             }
             LabeledContent("On the server", value: viewModel.info?.found.map { "\($0)" } ?? "Unknown")
+            if let hidden = viewModel.info?.hidden, hidden > 0 {
+                LabeledContent("Hidden from blocked users", value: "\(hidden)")
+                    .accessibilityIdentifier("comments-hidden")
+            }
             LabeledContent(
                 "Last refreshed",
                 value: viewModel.info?.lastRefreshedAt?.readerLabel ?? "Never"
@@ -347,6 +362,15 @@ private struct ReaderCommentRowView: View {
             }
             .font(.callout)
             .buttonStyle(.borderless)
+            // A guest's or a pingback's author has no ID to block by.
+            if let authorID = comment.authorId, authorID != 0 {
+                Button("Block author") {
+                    Task { await viewModel.blockAuthor(comment) }
+                }
+                .font(.callout)
+                .buttonStyle(.borderless)
+                .disabled(viewModel.isWorking)
+            }
         }
     }
 

@@ -3,6 +3,15 @@
 //! Comments are fetched newest first, a page at a time, and shown oldest first with each reply
 //! pointing at the comment it answers. A comment the reader writes is kept as a row of its own
 //! until the server takes it: see [`ReaderCommentsCollection::post_comment`].
+//!
+//! A user blocked with [`ReaderService::set_user_blocked`] has their comments hidden, with every
+//! reply under them, at any depth: a reply answers something the reader chose not to see, and
+//! without it the reply would read as an answer to nothing. They're hidden when read, not deleted,
+//! so an unblock shows them again with no fetch. A comment written on this device that the server
+//! hasn't taken stays shown, so it can be sent again or discarded. The server's count,
+//! [`ReaderCommentsInfo::found`], still counts them, and [`ReaderCommentsInfo::hidden`] says how
+//! many of the cached ones are hidden. (Neither WordPress app hides a blocked user's comments, so
+//! there's no behaviour of theirs to match.)
 
 use super::{ReaderContext, ReaderError, ReaderService};
 use futures::lock::Mutex as AsyncMutex;
@@ -31,8 +40,12 @@ const COMMENTS_PAGE_SIZE: u32 = 100;
 /// likes.
 const FORCE_WPCOM: &str = "wpcom";
 
-/// The tables a post's comments are read from.
-const COMMENT_TABLES: [DbTable; 2] = [DbTable::ReaderComments, DbTable::ReaderCommentThreads];
+/// The tables a post's comments are read from: the blocked users hide some.
+const COMMENT_TABLES: [DbTable; 3] = [
+    DbTable::ReaderComments,
+    DbTable::ReaderCommentThreads,
+    DbTable::ReaderBlockedUsers,
+];
 
 /// Whether a post's comments are loading, and how many there are.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -40,9 +53,13 @@ pub struct ReaderCommentsInfo {
     pub state: ListState,
     #[uniffi(default = None)]
     pub error_message: Option<String>,
-    /// How many comments the server has, as of the newest page. `None` until a page loads.
+    /// How many comments the server has, as of the newest page. `None` until a page loads. It
+    /// counts the hidden ones.
     #[uniffi(default = None)]
     pub found: Option<u64>,
+    /// How many of the cached comments are hidden because of a blocked user: the user's own, and
+    /// the replies under them. [`ReaderCommentsCollection::load_items`] leaves them out.
+    pub hidden: u64,
     /// Whether the server has comments the cache doesn't.
     pub has_more: bool,
     #[uniffi(default = None)]
@@ -102,7 +119,7 @@ pub struct ReaderCommentsCollection {
 impl ReaderCommentsCollection {
     /// The post's comments from the cache, oldest first, with the ones written on this device
     /// that the server hasn't taken. A reply's `parent_id` is the comment it answers, at any
-    /// depth.
+    /// depth. A blocked user's comments, and the replies under them, are left out.
     pub async fn load_items(&self) -> Result<Vec<ReaderCommentRecord>, ReaderError> {
         Ok(self.context.cache.execute(|connection| {
             ReaderCommentRepository::select_post(
@@ -130,18 +147,26 @@ impl ReaderCommentsCollection {
                 self.site_id,
                 self.post_id,
             )?;
+            let hidden = ReaderCommentRepository::count_hidden(
+                &*connection,
+                owner,
+                self.site_id,
+                self.post_id,
+            )?;
             Ok::<_, SqliteDbError>(match thread {
                 Some(thread) => ReaderCommentsInfo {
                     has_more: thread.found.is_some_and(|found| stored < found),
                     state: thread.state,
                     error_message: thread.error_message,
                     found: thread.found,
+                    hidden,
                     last_refreshed_at: thread.last_refreshed_at,
                 },
                 None => ReaderCommentsInfo {
                     state: ListState::Idle,
                     error_message: None,
                     found: None,
+                    hidden,
                     has_more: false,
                     last_refreshed_at: None,
                 },
@@ -276,7 +301,8 @@ impl ReaderCommentsCollection {
             })?)
     }
 
-    /// Whether a change to the cache is one the comments show.
+    /// Whether a change to the cache is one the comments show, a user blocked or unblocked among
+    /// them.
     pub fn is_relevant_update(&self, hook: &UpdateHook) -> bool {
         COMMENT_TABLES.contains(&hook.table)
     }

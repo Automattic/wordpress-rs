@@ -88,6 +88,7 @@ private fun ReaderCommentsStatus(state: ReaderCommentsState) {
         text = listOfNotNull(
             "$taken of ${info.found?.toString() ?: "an unknown number of"} comments",
             "$notTaken not sent yet".takeIf { notTaken > 0 },
+            "${info.hidden} hidden from blocked users".takeIf { info.hidden > 0uL },
             info.state.text(),
             info.lastRefreshedAt?.let { "refreshed ${it.readerText()}" } ?: "never refreshed"
         ).joinToString(" · "),
@@ -182,6 +183,13 @@ private fun ReaderCommentActions(comment: ReaderCommentRecord, state: ReaderComm
             onClick = { state.loadLikes(comment) },
             modifier = Modifier.semantics { contentDescription = "Who liked the comment by $author" }
         ) { Text("Who liked it") }
+    }
+    // A guest's or a pingback's author has no ID to block by.
+    if (comment.authorId?.let { it != 0uL } == true) {
+        TextButton(
+            onClick = { state.blockAuthor(comment) },
+            modifier = Modifier.semantics { contentDescription = "Block $author" }
+        ) { Text("Block author") }
     }
 }
 

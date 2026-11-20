@@ -2729,6 +2729,95 @@ mod comments {
         );
     }
 
+    /// A comment by user `author`.
+    fn comment_by(id: i64, hour: u32, parent: Option<i64>, author: u64) -> Value {
+        let mut comment = comment_json(id, hour, parent);
+        comment["author"]["ID"] = json!(author);
+        comment
+    }
+
+    #[tokio::test]
+    async fn a_blocked_users_comments_and_the_replies_under_them_are_hidden_until_unblocked() {
+        let (service, executor) = service();
+        let comments = service.comments(SITE, POST);
+        // 2 is by user 8, 3 answers it and 4 answers 3; 1 and 5 aren't under it.
+        executor.push(Step::Respond(
+            200,
+            comments_page(
+                5,
+                vec![
+                    comment_by(5, 14, Some(1), 9),
+                    comment_by(4, 13, Some(3), 9),
+                    comment_by(3, 12, Some(2), 9),
+                    comment_by(2, 11, None, 8),
+                    comment_by(1, 10, None, 9),
+                ],
+            ),
+        ));
+        comments.refresh().await.unwrap();
+
+        service.set_user_blocked(WpComUserId(8), true).unwrap();
+
+        assert_eq!(ids(&comments).await, ["1", "5"]);
+        let info = comments.info().unwrap();
+        assert_eq!(info.hidden, 3);
+        // The server's count still has them, and the cache has every comment.
+        assert_eq!(info.found, Some(5));
+        assert!(!info.has_more);
+        assert!(
+            comments
+                .load_more()
+                .await
+                .is_ok_and(|page| page.comment_count == 0)
+        );
+
+        // Unblocking shows them again, with nothing fetched.
+        service.set_user_blocked(WpComUserId(8), false).unwrap();
+        assert_eq!(ids(&comments).await, ["1", "2", "3", "4", "5"]);
+        assert_eq!(comments.info().unwrap().hidden, 0);
+        assert_eq!(executor.sent().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_page_fetched_while_a_user_is_blocked_leaves_out_their_comments() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        // Blocking works signed out: the list is the device's.
+        service.set_user_blocked(WpComUserId(8), true).unwrap();
+        let comments = service.comments(SITE, POST);
+        executor.push(Step::Respond(
+            200,
+            comments_page(
+                2,
+                vec![comment_by(2, 11, None, 8), comment_by(1, 10, None, 9)],
+            ),
+        ));
+
+        comments.refresh().await.unwrap();
+
+        assert_eq!(ids(&comments).await, ["1"]);
+        assert_eq!(comments.info().unwrap().hidden, 1);
+    }
+
+    #[tokio::test]
+    async fn the_comments_reload_when_a_user_is_blocked_or_unblocked() {
+        let (service, _) = service();
+        let comments = service.comments(SITE, POST);
+        let hook = |table| wp_mobile_cache::UpdateHook {
+            action: wp_mobile_cache::HookAction::Insert,
+            db_name: "main".to_string(),
+            table,
+            row_id: 1,
+        };
+        for table in [
+            wp_mobile_cache::DbTable::ReaderComments,
+            wp_mobile_cache::DbTable::ReaderCommentThreads,
+            wp_mobile_cache::DbTable::ReaderBlockedUsers,
+        ] {
+            assert!(comments.is_relevant_update(&hook(table)), "{table:?}");
+        }
+        assert!(!comments.is_relevant_update(&hook(wp_mobile_cache::DbTable::ReaderBlockedSites)));
+    }
+
     #[tokio::test]
     async fn older_comments_are_loaded_until_the_cache_has_them_all() {
         let (service, executor) = service_for(ReaderOwner::SignedOut);

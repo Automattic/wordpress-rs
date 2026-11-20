@@ -131,6 +131,20 @@ fn send_state_number(state: ReaderCommentSendState) -> i64 {
     }
 }
 
+/// The rows of a post's comments that are hidden because of a blocked user, as a `hidden(rowid)`
+/// table: a comment written by a user in `reader_blocked_users`, and every reply under one, at any
+/// depth. A comment written on this device that the server hasn't taken isn't among them, so it
+/// can still be sent again or discarded. Takes the account, site and post as `?1`, `?2` and `?3`.
+const HIDDEN_COMMENTS: &str = "WITH RECURSIVE hidden(rowid, comment_id) AS (
+        SELECT c.rowid, c.comment_id FROM reader_comments c
+        JOIN reader_blocked_users u ON u.account_id = c.account_id AND u.user_id = c.author_id
+        WHERE c.account_id = ?1 AND c.site_id = ?2 AND c.post_id = ?3 AND c.local_id IS NULL
+        UNION
+        SELECT c.rowid, c.comment_id FROM reader_comments c
+        JOIN hidden h ON c.parent_id = h.comment_id
+        WHERE c.account_id = ?1 AND c.site_id = ?2 AND c.post_id = ?3 AND c.local_id IS NULL
+    )";
+
 const COMMENT_COLUMNS: &str = "site_id, post_id, comment_id, local_id, parent_id, author_id, \
     author_name, author_avatar_url, author_url, date, content, status, comment_type, like_count, \
     i_like, send_state, send_error";
@@ -241,6 +255,9 @@ impl ReaderCommentRepository {
     }
 
     /// A post's comments, oldest first, with the ones written here that the server hasn't taken.
+    ///
+    /// A blocked user's comments are left out, with every reply under them: see
+    /// [`Self::count_hidden`]. They stay stored, so an unblock shows them again.
     pub fn select_post(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -248,8 +265,10 @@ impl ReaderCommentRepository {
         post_id: PostId,
     ) -> Result<Vec<ReaderCommentRecord>, SqliteDbError> {
         let sql = format!(
-            "SELECT {COMMENT_COLUMNS} FROM reader_comments
+            "{HIDDEN_COMMENTS}
+            SELECT {COMMENT_COLUMNS} FROM reader_comments
             WHERE account_id = ?1 AND site_id = ?2 AND post_id = ?3
+                AND rowid NOT IN (SELECT rowid FROM hidden)
             ORDER BY date IS NULL, date, rowid"
         );
         let mut statement = executor.prepare(&sql)?;
@@ -258,6 +277,19 @@ impl ReaderCommentRepository {
         })?;
         rows.map(|row| row.map_err(SqliteDbError::from).and_then(|row| row))
             .collect()
+    }
+
+    /// How many of a post's stored comments [`Self::select_post`] leaves out because of a blocked
+    /// user: the user's own, and the replies under them.
+    pub fn count_hidden(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        site_id: WpComSiteId,
+        post_id: PostId,
+    ) -> Result<u64, SqliteDbError> {
+        let sql = format!("{HIDDEN_COMMENTS} SELECT COUNT(*) FROM hidden");
+        let mut statement = executor.prepare(&sql)?;
+        Ok(statement.query_row(params![account, site_id.0, post_id.0], |row| row.get(0))?)
     }
 
     /// How many of a post's comments from the server are stored.
@@ -535,6 +567,52 @@ mod tests {
                 (None, None) => "?".to_string(),
             })
             .collect()
+    }
+
+    #[test]
+    fn test_a_blocked_users_comments_and_the_replies_under_them_are_hidden_until_unblocked() {
+        use crate::repository::reader_actions::ReaderBlockRepository;
+        let (conn, account) = conn();
+        let by = |id: i64, hour: u32, author: u64, parent: Option<i64>| ReaderCommentRecord {
+            author_id: Some(author),
+            parent_id: parent.map(CommentId),
+            ..comment(id, hour)
+        };
+        // 2 is by the blocked user, 3 answers it, 4 answers 3, and 5 is on its own.
+        for comment in [
+            by(1, 10, 7, None),
+            by(2, 11, 8, None),
+            by(3, 12, 7, Some(2)),
+            by(4, 13, 7, Some(3)),
+            by(5, 14, 7, Some(1)),
+        ] {
+            ReaderCommentRepository::upsert(&conn, account, &comment).unwrap();
+        }
+        // A reply written here to the blocked user's comment, not taken yet.
+        let reply = ReaderCommentRecord {
+            parent_id: Some(CommentId(2)),
+            ..written("local-1", 15)
+        };
+        ReaderCommentRepository::upsert(&conn, account, &reply).unwrap();
+
+        ReaderBlockRepository::set_user_blocked(&conn, account, WpComUserId(8), true).unwrap();
+        assert_eq!(ids(&conn, account), ["1", "5", "local-1"]);
+        assert_eq!(
+            ReaderCommentRepository::count_hidden(&conn, account, SITE, POST).unwrap(),
+            3
+        );
+        // They're still stored: the server's count of what's cached doesn't change.
+        assert_eq!(
+            ReaderCommentRepository::count_sent(&conn, account, SITE, POST).unwrap(),
+            5
+        );
+
+        ReaderBlockRepository::set_user_blocked(&conn, account, WpComUserId(8), false).unwrap();
+        assert_eq!(ids(&conn, account), ["1", "2", "3", "4", "5", "local-1"]);
+        assert_eq!(
+            ReaderCommentRepository::count_hidden(&conn, account, SITE, POST).unwrap(),
+            0
+        );
     }
 
     #[test]

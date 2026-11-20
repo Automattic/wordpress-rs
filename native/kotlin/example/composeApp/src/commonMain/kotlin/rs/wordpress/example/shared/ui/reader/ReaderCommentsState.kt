@@ -86,6 +86,18 @@ internal class ReaderCommentsState(
         requests.run { service.setCommentLiked(siteId, commentId, liked).text() }
     }
 
+    /**
+     * Blocks the comment's author on this device: their comments, and the replies under them, are
+     * hidden at once. The blocked sites screen unblocks them.
+     */
+    fun blockAuthor(comment: ReaderCommentRecord) {
+        val authorId = comment.authorId?.takeIf { it != 0uL } ?: return
+        requests.run {
+            service.setUserBlocked(authorId, true)
+            "Blocked ${comment.authorName?.plainText() ?: "the author"}: their comments are hidden."
+        }
+    }
+
     fun loadLikes(comment: ReaderCommentRecord) {
         val commentId = comment.commentId ?: return
         requests.load({ service.commentLikes(siteId, commentId, ReaderLikesParams()) }) {

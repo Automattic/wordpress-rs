@@ -1073,7 +1073,9 @@ impl ReaderService {
         Ok(())
     }
 
-    /// Blocks or unblocks a user. The Reader's streams leave out a blocked user's posts.
+    /// Blocks or unblocks a user. The Reader's streams leave out a blocked user's posts, and a
+    /// post's comments leave out their comments and the replies under them. Nothing is deleted, so
+    /// an unblock shows them again.
     ///
     /// WordPress.com keeps no list of blocked users, so this one lives on this device only, and
     /// works signed out too.
