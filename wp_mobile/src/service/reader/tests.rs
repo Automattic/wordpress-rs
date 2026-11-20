@@ -1603,7 +1603,8 @@ mod actions {
             .collect()
     }
 
-    const SITE_CHECK: &str = "/rest/v1.2/read/sites/123?fields=ID%2Cis_blocked";
+    /// The whole site, with no `fields`: the server keeps an answer for each value of `fields`.
+    const SITE_CHECK: &str = "/rest/v1.2/read/sites/123?";
     const BLOCKED_LIST: &str = "/wpcom/v2/me/blocks/sites?page=1&per_page=100";
 
     fn paths_after(executor: &ScriptedExecutor, skip: usize) -> Vec<String> {

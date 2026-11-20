@@ -948,12 +948,12 @@ impl ReaderContext {
                 && match self
                     .client
                     .reader_sites()
+                    // The whole site, as `fetch_site` asks for it. With `fields`, the server
+                    // keeps an answer for each value of it, and a kept answer is what this check
+                    // gets around.
                     .site(
                         &WpComSiteIdentifier::Id { value: site_id.0 },
-                        &ReaderSiteParams {
-                            fields: Some("ID,is_blocked".to_string()),
-                            options: None,
-                        },
+                        &ReaderSiteParams::default(),
                     )
                     .await
                 {
@@ -1144,6 +1144,12 @@ impl ReaderService {
     /// asked about, such as a deleted one (410), is taken as the list has it. A site is asked
     /// about only until the list agrees with the change, and only by the service that made it: a
     /// new service, such as after a restart, takes the list as it is.
+    ///
+    /// The site is asked for whole, with no `fields`, as [`Self::fetch_site`] asks: the server
+    /// keeps an answer for each value of `fields`, and a kept answer is what the check gets
+    /// around. On 2026-11-20 that request answered `is_blocked: false` for a site that wasn't
+    /// blocked, and 410 `site_gone` for the only site the account had blocked, a deleted one, so
+    /// its `is_blocked: true` for a blocked site rests on the measurements above.
     pub async fn refresh_blocked_sites(&self) -> Result<(), ReaderError> {
         let context = &self.context;
         if context.owner == ReaderOwner::SignedOut {
