@@ -129,7 +129,10 @@ private fun ReaderPostAddressField(state: ReaderHomeState, open: (ReaderDestinat
             Text("Open address")
         }
     }
-    Text("A post's address needs an account. A site's or a feed's doesn't.")
+    Text(
+        "A site's, a feed's or a Reader address needs no account. Signed out, a post's address opens " +
+            "when the Reader finds the post by its slug, and otherwise needs an account."
+    )
     state.linkAnswer?.let { answer ->
         Text(answer, modifier = Modifier.testTag("reader_link_answer"))
     }

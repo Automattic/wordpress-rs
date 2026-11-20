@@ -114,7 +114,9 @@ internal class ReaderHomeState(val session: ReaderSession, val requests: ReaderR
 
     /**
      * Finds what a link opens and opens it: a post, or a site's or a feed's stream. A link the
-     * Reader can't show sets [linkAnswer] to why. A post's address needs an account.
+     * Reader can't show sets [linkAnswer] to why. A site's, a feed's or a Reader address needs no
+     * account; signed out, a post's address opens when the post is found by its slug, and
+     * otherwise needs an account.
      */
     fun openLink(url: String, open: (ReaderDestination) -> Unit) {
         linkAnswer = null
