@@ -102,6 +102,14 @@ Test credentials are configured in:
 - Platform bindings are generated automatically - don't edit generated files directly
 - For URL columns in the `wp_mobile_cache` database (e.g. `self_hosted_sites.url`), compare with the `urls_eq(a, b)` scalar function rather than `=`. It compares via `ParsedUrl` parsing, so lookups tolerate trailing-slash and other URL-normalization differences.
 
+## Text in errors and outcomes
+
+App developers read the text in `#[error]` and `Display`. App users only see what each app chooses to show.
+
+- Error text names the operation and the value that was wrong. Don't call the thing that failed "this" or "it".
+- Don't put sentences meant for app users in Rust. Return an enum case, and let each app write the sentence in its own localized strings. For example, WordPress-iOS shows its own string for `ReaderSavedError::TooManySaves`.
+- If the library must supply text that users see, add it to `wp_localization/localization/en-US/main.ftl` and implement `WpSupportsLocalization`, as `WpApiError` does. A plain `String` shows in English in every language.
+
 ## PR Description Format
 
 When writing PR descriptions, use the template in `.github/PULL_REQUEST_TEMPLATE.md` as the base format.
