@@ -1506,6 +1506,23 @@ mod stream_pages {
     }
 
     #[test]
+    fn test_a_post_the_page_has_twice_is_placed_once_and_does_not_count_as_reached() {
+        let fixture = Fixture::new();
+        fixture.page(None, &[(3, 12), (2, 11), (1, 10)]);
+        // The server sent 8 twice, the second time with another date. The page doesn't reach 3.
+        let outcome = fixture.page(None, &[(9, 20), (8, 19), (8, 15), (7, 18)]);
+        assert_eq!(
+            outcome,
+            DbReaderPageOutcome {
+                added: 3,
+                removed: 0,
+                overlapped: false
+            }
+        );
+        assert_eq!(fixture.shown(), ["9", "8", "7", "*3", "2", "1"]);
+    }
+
+    #[test]
     fn test_a_page_removes_a_post_the_server_no_longer_has() {
         let fixture = Fixture::new();
         fixture.page(None, &[(4, 13), (3, 12), (2, 11), (1, 10)]);

@@ -119,6 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Swift example app's Blocked sites screen no longer asks the server for blocked sites when the reader isn't signed in, which it could only refuse, and no longer shows that refusal as an error: it says sites are blocked by an account, and still lists the users blocked on the device.
 - The Kotlin example app's Blocked sites screen, like the Swift one, no longer asks the server for blocked sites when the reader isn't signed in, and no longer shows that refusal as an error: it says sites are blocked by an account, and still lists the users blocked on the device.
 - A Reader post whose content is inside a declarative shadow root, `<template shadowrootmode="open">`, gets its reading time, and its summary when it has no excerpt: `reader_post_reading_time_minutes` and `reader_post_summary` left out the text of every `<template>`, though a browser shows that one.
+- A Reader stream page that has the same post twice, which the server sometimes sends, now counts the post once in `ReaderStreamPageResult::post_count`. The stream already kept one copy, so a first page with a repeat on an empty stream said `post_count: 10, new_post_count: 9`. In a stream ordered by date, the second copy also no longer counts as a post the stream already had, so a refresh that doesn't reach the stream's older posts marks the gap before them again.
 
 ## [0.11.1] - 2026-11-18
 

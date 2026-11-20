@@ -743,7 +743,8 @@ impl ReaderStreamRepository {
     ///   the stream has. The newest of those is marked as having a gap before it.
     ///
     /// A post dated the same as the page's oldest is left as it is: the page may have ended
-    /// between two posts with one date. Call it inside a transaction.
+    /// between two posts with one date. A post the page has twice is placed by its first copy, and
+    /// the second isn't one the stream already had. Call it inside a transaction.
     pub fn apply_dated_page(
         executor: &impl QueryExecutor,
         stream: RowId,
@@ -751,8 +752,16 @@ impl ReaderStreamRepository {
         items: &[DbReaderPageItem],
         keep: &[RowId],
     ) -> Result<DbReaderPageOutcome, SqliteDbError> {
-        let mut outcome = DbReaderPageOutcome::default();
+        let mut placed: Vec<&DbReaderPageItem> = Vec::new();
         for item in items {
+            if !placed.iter().any(|first| first.post == item.post) {
+                placed.push(item);
+            }
+        }
+        let items = placed;
+
+        let mut outcome = DbReaderPageOutcome::default();
+        for item in &items {
             if Self::has_item(executor, stream, item.post)? {
                 outcome.overlapped = true;
             } else {
@@ -771,7 +780,7 @@ impl ReaderStreamRepository {
 
         let oldest = items.iter().map(|item| item.sort_key.as_str()).min();
         let page = Self::rows_json(items.iter().map(|item| &item.post));
-        let protected = Self::rows_json(items.iter().map(|item| &item.post).chain(keep));
+        let protected = Self::rows_json(items.iter().map(|item| &item.post).chain(keep.iter()));
         outcome.removed = executor.execute(
             "DELETE FROM reader_stream_items
             WHERE stream_id = ?1

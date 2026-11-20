@@ -85,7 +85,7 @@ pub struct ReaderStreamCard {
 /// What loading a page of a stream did.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct ReaderStreamPageResult {
-    /// The posts the page had that could be read.
+    /// The posts the page had that could be read. A post the server sent twice counts once.
     pub post_count: u64,
     /// How many of them the stream didn't have.
     pub new_post_count: u64,
@@ -650,6 +650,11 @@ impl ReaderStreamCollection {
                 };
                 let row = ReaderPostRepository::upsert(&transaction, owner, &record)?;
                 ReaderUnreadablePostRepository::resolve(&transaction, stream.row_id, &record.key)?;
+                // The server can send a post twice in one page. The stream has it once, where it
+                // first came, and the page counts it once.
+                if items.iter().any(|item: &DbReaderPageItem| item.post == row) {
+                    continue;
+                }
                 let item = DbReaderPageItem {
                     post: row,
                     sort_key,

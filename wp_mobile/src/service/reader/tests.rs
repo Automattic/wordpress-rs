@@ -817,6 +817,42 @@ async fn a_tag_stream_follows_its_page_handles_and_a_refresh_replaces_it() {
 }
 
 #[tokio::test]
+async fn a_post_a_page_has_twice_is_counted_and_shown_once() {
+    let (service, executor) = service();
+    let stream = service.stream(tag());
+    executor.push(Step::Respond(200, tag_page(&[1, 2, 1], None)));
+
+    let result = stream.refresh().await.unwrap();
+
+    assert_eq!(
+        result,
+        ReaderStreamPageResult {
+            post_count: 2,
+            new_post_count: 2,
+            unreadable_post_count: 0,
+            has_more: false,
+        }
+    );
+    assert_eq!(shown(&stream).await, ["1", "2"]);
+}
+
+#[tokio::test]
+async fn a_post_a_dated_page_has_twice_does_not_hide_a_gap() {
+    let (service, executor) = service();
+    let stream = service.stream(ReaderStream::Following);
+    executor.push(Step::Respond(200, page(&[(1, 10)])));
+    stream.refresh().await.unwrap();
+
+    // The newest posts, with 3 twice. None of them is 1, so posts may be missing above it.
+    executor.push(Step::Respond(200, page(&[(3, 14), (2, 13), (3, 14)])));
+    let result = stream.refresh().await.unwrap();
+
+    assert_eq!(shown(&stream).await, ["3", "2", "*1"]);
+    assert_eq!(result.post_count, 2);
+    assert_eq!(result.new_post_count, 2);
+}
+
+#[tokio::test]
 async fn a_tag_page_that_arrives_after_a_refresh_is_discarded() {
     let (service, executor) = service();
     let stream = service.stream(tag());
