@@ -949,6 +949,34 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 })
             }
         }),
+        Trial::test("reader_service::resolve_link_to_a_post_signed_out", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime.block_on(async {
+                    // Signed out, a post's address opens by its slug on the address's site.
+                    let service = new_service(signed_out(&ctx.delegate), ReaderOwner::SignedOut)?;
+                    let link = service
+                        .resolve_link(POST_URL.to_string())
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let ReaderLink::Post { post } = link else {
+                        return Err(format!(
+                            "Signed out, the post's address should open the post by its slug: \
+                             {link:?}"
+                        )
+                        .into());
+                    };
+                    if post.identity.site_id != Some(SITE) || post.identity.id != POST.0 as u64 {
+                        return Err(format!(
+                            "It isn't the post at the address: {:?}",
+                            post.identity
+                        )
+                        .into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
         Trial::test("reader_service::resolve_link_to_a_post_needs_an_account", {
             let ctx = Arc::clone(&ctx);
             move || {
@@ -962,16 +990,31 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         ..signed_out(&ctx.delegate)
                     };
                     let service = new_service(delegate, ReaderOwner::SignedOut)?;
-                    match service.resolve_link(POST_URL.to_string()).await {
-                        Err(ReaderError::NeedsAccount) => {}
-                        other => return Err(format!("Expected NeedsAccount, got {other:?}").into()),
-                    }
-                    match executor.sent.load(Ordering::SeqCst) {
-                        0 => Ok(()),
-                        sent => {
-                            Err(format!("Nothing should be sent, but {sent} requests were").into())
+                    // Signed out, an address whose path ends in no slug (a day's archive) sends
+                    // nothing, and a slug the site doesn't have is refused after one request. Only
+                    // the resolver, which needs an account, could still find either.
+                    let no_slug = format!("{SITE_URL}2014/12/29/");
+                    let unknown_slug = format!("{SITE_URL}2014/12/29/no-post-has-this-slug-wp-rs-e2e/");
+                    for (address, expected_sent) in [(no_slug, 0), (unknown_slug, 1)] {
+                        let sent_before = executor.sent.load(Ordering::SeqCst);
+                        match service.resolve_link(address.clone()).await {
+                            Err(ReaderError::NeedsAccount) => {}
+                            other => {
+                                return Err(
+                                    format!("{address}: expected NeedsAccount, got {other:?}")
+                                        .into(),
+                                );
+                            }
+                        }
+                        let sent = executor.sent.load(Ordering::SeqCst) - sent_before;
+                        if sent != expected_sent {
+                            return Err(format!(
+                                "{address}: {expected_sent} requests should be sent, but {sent} were"
+                            )
+                            .into());
                         }
                     }
+                    Ok(())
                 })
             }
         }),
