@@ -714,11 +714,13 @@ fn separates_words(name: &str) -> bool {
 /// Whether what the element `tag` opens holds is left out of the text.
 fn hides_text(tag: &HtmlTag, which: Text) -> bool {
     // Not text a reader sees.
-    if is_any_of(
-        tag.name,
-        &["script", "style", "noscript", "template", "iframe", "svg"],
-    ) {
+    if is_any_of(tag.name, &["script", "style", "noscript", "iframe", "svg"]) {
         return true;
+    }
+    // A template isn't shown, unless it's a declarative shadow root: a browser shows what that
+    // holds in place of the element around it. A post can be nothing else.
+    if tag.is("template") {
+        return tag.attribute("shadowrootmode").is_none();
     }
     if which == Text::All {
         return false;
@@ -1559,6 +1561,23 @@ mod tests {
         json!({ "content": format!("<figure><figcaption>{}</figcaption></figure>", "word ".repeat(201)) }),
         2
     )]
+    // A post written as a page of its own, inside a declarative shadow root. Recorded from a
+    // public post, with its text replaced.
+    #[case::a_shadow_root(
+        json!({ "content": format!(
+            concat!(
+                r#"<div class="is-reader"><div class="example-html" style="display: block;">"#,
+                r#"<template shadowrootmode="open"><div style='all: initial; display: block;'>"#,
+                "<!-- Title: An example -->",
+                r#"<header class="hero"><h1>An example</h1></header><section><p>{}</p>"#,
+                r#"<svg viewbox="0 0 10 10" role="img"><title>A chart</title></svg></section>"#,
+                r#"<script type="application/ld+json">{{"@type": "BlogPosting"}}</script>"#,
+                "</div></template></div></div>",
+            ),
+            "word ".repeat(400),
+        ) }),
+        3
+    )]
     fn test_reading_time_counts_the_words_in_the_content(
         #[case] fields: serde_json::Value,
         #[case] minutes: u32,
@@ -1919,6 +1938,11 @@ mod tests {
     #[case::a_self_closed_frame("One<iframe src=\"x\"/>Two", "One Two")]
     #[case::a_frame("One<iframe src=\"x\">Not shown</iframe>Two", "One Two")]
     #[case::no_script("One<noscript>Turn on JavaScript</noscript> two", "One two")]
+    #[case::a_template("One<template><p>Not shown</p></template> two", "One two")]
+    #[case::a_shadow_root(
+        r#"<div><template shadowrootmode="open"><p>Shown</p></template></div> too"#,
+        "Shown too"
+    )]
     #[case::an_icon("One <svg><title>Icon</title><path d=\"M0 0\"/></svg>two", "One two")]
     #[case::nested_hidden_elements("One<svg><svg>in</svg>still in</svg> two", "One two")]
     #[case::non_ascii(
