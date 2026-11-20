@@ -3290,6 +3290,25 @@ mod more_actions {
 
         let result = service.set_post_liked(rss, true).await;
 
+        assert!(matches!(result, Err(ReaderError::FeedPost)));
+        assert!(executor.sent().is_empty());
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_site_post_with_no_post_id_cannot_be_liked_for_missing_its_ids() {
+        let (service, executor) = service();
+        let post = ReaderPostSaveIdentity {
+            id: 0,
+            site_id: Some(WpComSiteId(123)),
+            feed_id: None,
+            feed_item_id: None,
+            is_external: false,
+            url: None,
+        };
+
+        let result = service.set_post_liked(post, true).await;
+
         assert!(matches!(result, Err(ReaderError::MissingIds)));
         assert!(executor.sent().is_empty());
         assert_eq!(service.pending_action_count().unwrap(), 0);
@@ -4625,9 +4644,16 @@ mod feed_items_with_no_post_id {
             .set_comment_notifications(identity(100000003), true)
             .await;
 
-        assert!(matches!(liked, Err(ReaderError::MissingIds)));
-        assert!(matches!(followed, Err(ReaderError::MissingIds)));
-        assert!(matches!(notified, Err(ReaderError::MissingIds)));
+        for outcome in [&liked, &followed, &notified] {
+            let Err(error) = outcome else {
+                panic!("{outcome:?}");
+            };
+            assert!(matches!(error, ReaderError::FeedPost), "{error:?}");
+            assert_eq!(
+                reader_error_message(error),
+                "A feed's post can't be liked, and its comments can't be followed."
+            );
+        }
         assert!(executor.sent().is_empty());
         assert_eq!(service.pending_action_count().unwrap(), 0);
     }

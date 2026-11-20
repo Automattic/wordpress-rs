@@ -179,6 +179,21 @@ impl Action {
         }
     }
 
+    /// Why the action has nothing to send it with, when [`Self::target`] is `None`: a like or a
+    /// comment subscription of a feed's post, or an action missing the IDs or the address it needs.
+    fn unsendable(&self) -> ReaderError {
+        match self {
+            Self::LikePost { post }
+            | Self::SubscribeComments { post }
+            | Self::CommentNotifications { post }
+                if post.is_feed_item() =>
+            {
+                ReaderError::FeedPost
+            }
+            _ => ReaderError::MissingIds,
+        }
+    }
+
     /// What the action is about, in `reader_actions.target`, or `None` when it's missing the IDs
     /// that say.
     fn target(&self) -> Option<String> {
@@ -556,7 +571,7 @@ impl Action {
             }
             Self::LikePost { post } => {
                 // Only a post of a WordPress.com or Jetpack site can be liked.
-                let (site_id, post_id) = post.site_post().ok_or(ReaderError::MissingIds)?;
+                let (site_id, post_id) = post.site_post().ok_or_else(|| self.unsendable())?;
                 let likes = context.client.reader_likes();
                 confirmation.like_count = if on {
                     likes.like_post(&site_id, &post_id).await?.data.like_count
@@ -700,7 +715,7 @@ impl Action {
             }
             Self::SubscribeComments { post } | Self::CommentNotifications { post } => {
                 // Only a post of a WordPress.com or Jetpack site has comments to subscribe to.
-                let (site_id, post_id) = post.site_post().ok_or(ReaderError::MissingIds)?;
+                let (site_id, post_id) = post.site_post().ok_or_else(|| self.unsendable())?;
                 let comments = context.client.reader_comments();
                 match (self, on) {
                     (Self::SubscribeComments { .. }, true) => {
@@ -804,7 +819,7 @@ impl ReaderContext {
         }
         let target = (
             action.kind(),
-            action.target().ok_or(ReaderError::MissingIds)?,
+            action.target().ok_or_else(|| action.unsendable())?,
         );
         let payload = serde_json::to_string(&action)
             .map_err(|error| SqliteDbError::SqliteError(error.to_string()))?;
@@ -971,7 +986,7 @@ fn is_refused(error: &ReaderError) -> bool {
             | WpApiError::InvalidHttpStatusCode { status_code, .. }
             | WpApiError::UnknownError { status_code, .. },
         ) => (400..500).contains(status_code) && !TEMPORARY.contains(status_code),
-        ReaderError::Refused { .. } | ReaderError::MissingIds => true,
+        ReaderError::Refused { .. } | ReaderError::MissingIds | ReaderError::FeedPost => true,
         _ => false,
     }
 }
@@ -1165,7 +1180,7 @@ fn only_on_this_device(on: bool) -> ReaderActionOutcome {
 impl ReaderService {
     /// Likes or unlikes a post. The post's like count moves with it, straight away, and is set to
     /// the server's once it answers. Needs an account. Only a post of a WordPress.com or Jetpack
-    /// site can be liked.
+    /// site can be liked: a feed's post is refused with [`ReaderError::FeedPost`].
     pub async fn set_post_liked(
         &self,
         post: ReaderPostSaveIdentity,
@@ -1290,7 +1305,7 @@ impl ReaderService {
 
     /// Subscribes the user to a post's comments, or unsubscribes them. Unsubscribing ends the
     /// post's comment notifications too. Needs an account, and a post of a WordPress.com or
-    /// Jetpack site.
+    /// Jetpack site: a feed's post is refused with [`ReaderError::FeedPost`].
     pub async fn set_comments_subscribed(
         &self,
         post: ReaderPostSaveIdentity,
@@ -1302,7 +1317,8 @@ impl ReaderService {
     }
 
     /// Turns notifications for the comments of a post the user is subscribed to on or off. Needs
-    /// an account.
+    /// an account, and a post of a WordPress.com or Jetpack site: a feed's post is refused with
+    /// [`ReaderError::FeedPost`].
     pub async fn set_comment_notifications(
         &self,
         post: ReaderPostSaveIdentity,

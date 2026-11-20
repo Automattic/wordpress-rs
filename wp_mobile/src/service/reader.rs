@@ -79,6 +79,12 @@ pub enum ReaderError {
     #[error("This is missing the IDs or the address it needs.")]
     MissingIds,
 
+    /// The post is a feed's, not a WordPress.com or Jetpack site's: an RSS post, or a feed item
+    /// with no post ID. Such a post can't be liked, and its comments can't be followed, so a like
+    /// or a comment subscription of one is refused. Nothing was sent.
+    #[error("A feed's post can't be liked, and its comments can't be followed.")]
+    FeedPost,
+
     /// The server answered, and didn't do what was asked, such as following an address that has
     /// no feed. `reason` is what it said.
     #[error("The server didn't accept it: {reason}")]
