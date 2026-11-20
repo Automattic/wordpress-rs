@@ -1,4 +1,5 @@
 use crate::cloudflare::{CloudflareErrorKind, CloudflareErrorResponse};
+use crate::parsed_url::ParseUrlError;
 use crate::request::WpRedirect;
 use crate::request::{
     HttpAuthMethod, HttpAuthMethodParsingError, RequestMethod, WpNetworkResponse,
@@ -993,10 +994,48 @@ impl From<RequestExecutionError> for WpApiError {
     }
 }
 
+/// A request whose address couldn't be built, for example from an API root
+/// that can't have a path, such as `data:,`.
+///
+/// `reason` is only the `ParseUrlError` case name, so a log line can include it
+/// unredacted. A case's own text, such as an app resolver's error description,
+/// can contain an address.
+impl From<ParseUrlError> for WpApiError {
+    fn from(value: ParseUrlError) -> Self {
+        let case_name: &'static str = (&value).into();
+        Self::SiteUrlParsingError {
+            reason: case_name.to_string(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use rstest::rstest;
+
+    // Log lines print `reason` unredacted, so it must never carry text from
+    // the error, which can include an address.
+    #[rstest]
+    #[case(
+        ParseUrlError::RelativeUrlWithCannotBeABaseBase,
+        "RelativeUrlWithCannotBeABaseBase"
+    )]
+    #[case(
+        ParseUrlError::Generic { reason: "https://user:secret@example.com".to_string() },
+        "Generic"
+    )]
+    fn a_parse_url_error_reason_is_its_case_name(
+        #[case] error: ParseUrlError,
+        #[case] expected_reason: &str,
+    ) {
+        assert_eq!(
+            WpApiError::from(error),
+            WpApiError::SiteUrlParsingError {
+                reason: expected_reason.to_string()
+            }
+        );
+    }
 
     fn non_existent_site() -> RequestExecutionErrorReason {
         RequestExecutionErrorReason::NonExistentSiteError {

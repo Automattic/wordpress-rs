@@ -432,3 +432,50 @@ macro_rules! api_client_generate_api_client {
         }
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        EmptyAppNotifier, api_error::WpApiError, parsed_url::ParsedUrl,
+        request::endpoint::WpOrgSiteApiUrlResolver, unit_test_common::UnreachableExecutor,
+    };
+    use rstest::rstest;
+
+    // Building a request from an API root that can't have a path, such as
+    // `data:,`, used to panic (#1781). The `rest_route` form used to be sent.
+    #[rstest]
+    #[case::data("data:,")]
+    #[case::about_blank("about:blank")]
+    #[case::mailto("mailto:someone@example.com")]
+    #[case::data_rest_route("data:,?rest_route=/")]
+    #[case::about_blank_rest_route("about:blank?rest_route=/")]
+    #[tokio::test]
+    async fn a_request_from_an_api_root_that_cannot_have_a_path_fails(#[case] api_root: &str) {
+        let client = WpApiClient::new(
+            Arc::new(WpOrgSiteApiUrlResolver::new(
+                ParsedUrl::parse(api_root).expect("valid url").into(),
+            )),
+            WpApiClientDelegate {
+                auth_provider: Arc::new(WpAuthenticationProvider::none()),
+                request_executor: Arc::new(UnreachableExecutor),
+                middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
+                app_notifier: Arc::new(EmptyAppNotifier),
+                language_provider: None,
+            },
+        );
+
+        let error = client
+            .users()
+            .retrieve_me_with_edit_context()
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            WpApiError::SiteUrlParsingError {
+                reason: "RelativeUrlWithCannotBeABaseBase".to_string()
+            }
+        );
+    }
+}

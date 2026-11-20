@@ -9,6 +9,7 @@ use wp_localization_macro::WpDeriveLocalizable;
 use crate::{
     EmptyAppNotifier,
     login::url_discovery::AutoDiscoveryAttemptSuccess,
+    parsed_url::ParseUrlError,
     prelude::*,
     request::{
         RequestMethod, WpNetworkRequestBody, endpoint::users_endpoint::UsersRequestExecutor,
@@ -50,13 +51,16 @@ impl WpRestNonceRetrieval {
     ) -> Result<String, NonceRetrievalError> {
         // First, try to get the nonce directly. This HTTP request returns
         // a valid nonce if the underlying `request_executor` has valid cookies.
-        let mut nonce = self.nonce_from_request(self.nonce_request()).await;
+        let mut nonce = self
+            .nonce_from_request(self.nonce_request().map_err(WpApiError::from)?)
+            .await;
 
         // If that fails, try to log in with the provided username and password
         if nonce.is_err() {
-            nonce = self
-                .nonce_from_request(self.nonce_request_via_login(&username, &password))
-                .await;
+            let request = self
+                .nonce_request_via_login(&username, &password)
+                .map_err(WpApiError::from)?;
+            nonce = self.nonce_from_request(request).await;
         }
 
         // Since the "cookies" part is out of our control, we need to verify that the nonce we got
@@ -89,37 +93,42 @@ impl WpRestNonceRetrieval {
 }
 
 impl WpRestNonceRetrieval {
-    fn derived_login_url(&self) -> Url {
+    /// Fails for a site address that can't have a path, such as `data:,`.
+    fn derived_login_url(&self) -> Result<Url, ParseUrlError> {
         let mut url = self.details.parsed_site_url.inner.clone();
         url.path_segments_mut()
-            .expect("The site url is a full URL")
+            .map_err(|()| ParseUrlError::RelativeUrlWithCannotBeABaseBase)?
             .push("wp-login.php");
-        url
+        Ok(url)
     }
 
-    fn derived_rest_nonce_url(&self) -> Url {
-        let mut url = self.derived_login_url();
+    fn derived_rest_nonce_url(&self) -> Result<Url, ParseUrlError> {
+        let mut url = self.derived_login_url()?;
         url.path_segments_mut()
-            .expect("The site url is a full URL")
+            .map_err(|()| ParseUrlError::RelativeUrlWithCannotBeABaseBase)?
             .pop() // Remove the "wp-login.php" part
             .push("wp-admin")
             .push("admin-ajax.php");
         url.query_pairs_mut().append_pair("action", "rest-nonce");
-        url
+        Ok(url)
     }
 
-    fn nonce_request(&self) -> WpNetworkRequest {
-        WpNetworkRequest {
+    fn nonce_request(&self) -> Result<WpNetworkRequest, ParseUrlError> {
+        Ok(WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
             retry_count: 0,
             method: RequestMethod::GET,
-            url: self.derived_rest_nonce_url().into(),
+            url: self.derived_rest_nonce_url()?.into(),
             header_map: WpNetworkHeaderMap::default().into(),
             body: None,
-        }
+        })
     }
 
-    fn nonce_request_via_login(&self, username: &str, password: &str) -> WpNetworkRequest {
+    fn nonce_request_via_login(
+        &self,
+        username: &str,
+        password: &str,
+    ) -> Result<WpNetworkRequest, ParseUrlError> {
         let mut headers = http::HeaderMap::new();
         headers.insert(
             http::header::CONTENT_TYPE,
@@ -130,19 +139,19 @@ impl WpRestNonceRetrieval {
             ["log", username],
             ["pwd", password],
             ["rememberme", "false"],
-            ["redirect_to", self.derived_rest_nonce_url().as_str()],
+            ["redirect_to", self.derived_rest_nonce_url()?.as_str()],
         ])
         .map(|s| WpNetworkRequestBody::new(s.into_bytes()))
         .ok();
 
-        WpNetworkRequest {
+        Ok(WpNetworkRequest {
             uuid: Uuid::new_v4().into(),
             retry_count: 0,
             method: RequestMethod::POST,
-            url: self.derived_login_url().into(),
+            url: self.derived_login_url()?.into(),
             header_map: WpNetworkHeaderMap::new(headers).into(),
             body: body.map(Into::into),
-        }
+        })
     }
 
     async fn nonce_from_request(
@@ -192,5 +201,50 @@ impl WpSupportsLocalization for NonceRetrievalError {
 impl From<WpApiError> for NonceRetrievalError {
     fn from(error: WpApiError) -> Self {
         NonceRetrievalError::ApiError { error }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        login::{WpApiDetails, url_discovery::DiscoveredAuthenticationMechanism},
+        unit_test_common::UnreachableExecutor,
+    };
+
+    // A site address that can't have a path, such as `data:,`, has no login
+    // page. Looking for one used to panic (#1781).
+    #[tokio::test]
+    async fn get_nonce_for_a_site_address_that_cannot_have_a_path_fails() {
+        let site_url: Arc<ParsedUrl> = ParsedUrl::parse("data:,").unwrap().into();
+        let api_details: WpApiDetails = serde_json::from_str(
+            r#"{"name":"","description":"","url":"","home":"","namespaces":[],"authentication":[],"routes":{}}"#,
+        )
+        .unwrap();
+        let retrieval = WpRestNonceRetrieval::new(
+            AutoDiscoveryAttemptSuccess {
+                parsed_site_url: site_url.clone(),
+                api_root_url: site_url.clone(),
+                api_details: api_details.into(),
+                authentication: DiscoveredAuthenticationMechanism::ApplicationPasswords {
+                    authentication_url: site_url,
+                },
+            },
+            Arc::new(UnreachableExecutor),
+        );
+
+        let result = retrieval
+            .get_nonce("demo".to_string(), "password".to_string())
+            .await;
+
+        assert!(
+            matches!(
+                &result,
+                Err(NonceRetrievalError::ApiError {
+                    error: WpApiError::SiteUrlParsingError { reason }
+                }) if reason == "RelativeUrlWithCannotBeABaseBase"
+            ),
+            "{result:#?}"
+        );
     }
 }

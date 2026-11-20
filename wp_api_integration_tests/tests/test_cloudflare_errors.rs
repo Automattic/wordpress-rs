@@ -13,7 +13,7 @@ use wp_api::{
     cloudflare::CloudflareErrorKind,
     media::MediaCreateParams,
     middleware::{RetryAfterMiddleware, WpApiMiddleware},
-    parsed_url::ParsedUrl,
+    parsed_url::{ParseUrlError, ParsedUrl},
     request::endpoint::WpEndpointUrl,
 };
 use wp_api_integration_tests::prelude::*;
@@ -450,8 +450,8 @@ async fn other_errors_from_the_site_are_unchanged(#[case] file_name: &str, #[cas
 struct FixedUrlResolver(Arc<ParsedUrl>);
 
 impl ApiUrlResolver for FixedUrlResolver {
-    fn resolve(&self, _: String, _: Vec<String>) -> Arc<ParsedUrl> {
-        self.0.clone()
+    fn resolve(&self, _: String, _: Vec<String>) -> Result<Arc<ParsedUrl>, ParseUrlError> {
+        Ok(self.0.clone())
     }
 
     fn route_path(&self, namespace: String, endpoint_path: String) -> String {
