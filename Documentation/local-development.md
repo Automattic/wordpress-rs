@@ -74,7 +74,7 @@ The Kotlin step builds for the **host**, not Android, so it needs no NDK. Only
 
 ## Signing an example app into WordPress.com
 
-The Swift and Android example apps accept a WordPress.com bearer token at launch and store it as
+The Swift and Android example apps read a WordPress.com bearer token at launch and store it as
 their WordPress.com account, so you can sign a Simulator or emulator in without configuring OAuth
 app credentials in `wp_com_test_credentials.json`. Build and install the app first, then:
 
@@ -100,19 +100,10 @@ The token is resolved from, in order:
 There's deliberately no command-line token flag — a token passed as an argument would be saved in
 your shell history.
 
-The app only uses the token when no WordPress.com account is signed in, and only once per launch,
-so signing out stays signed out. To launch with a token by hand:
-
-```bash
-# iOS Simulator
-xcrun simctl launch --terminate-running-process booted com.automattic.Example -wpcom-token <token>
-
-# Android (single-quote the token — the device shell interprets it)
-adb shell am start -S -n rs.wordpress.example/.ui.welcome.WelcomeActivity --es wpcom-token "'<token>'"
-```
-
-Either way, the token briefly appears in the process list while the launch command runs; that's
-inherent to passing it as a launch argument.
+The script hands the token over in a file, never on a command line, where the process list would
+show it: the Swift example app's `Library/wpcom-token` in its Simulator data container, or the
+Android example app's private `files/wpcom-token`. The app reads the file at launch, deletes it, and
+uses the token only when no WordPress.com account is signed in, so signing out stays signed out.
 
 ## Checking the Swift example app's screens from a script
 

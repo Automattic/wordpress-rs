@@ -2,9 +2,9 @@
 #
 # Sign an example app into WordPress.com with a bearer token, in one command.
 #
-# Launches the Swift example app on an iOS Simulator (`xcrun simctl launch -wpcom-token`), or writes
-# the token to the Android example app's private `files/wpcom-token` on an emulator/device and
-# launches it. The app stores the token as its WordPress.com account at launch — no OAuth app
+# Writes the token to the Swift example app's `Library/wpcom-token` on an iOS Simulator, or to the
+# Android example app's private `files/wpcom-token` on an emulator/device, and launches the app. The
+# app stores the token as its WordPress.com account at launch and deletes the file — no OAuth app
 # credentials or taps required.
 # Build and install the app first (e.g. from Xcode or Android Studio).
 
@@ -205,7 +205,17 @@ if [[ "$platform" == ios ]]; then
     if [[ "$reset" == true ]]; then
         reset_ios_app
     fi
-    xcrun simctl launch --terminate-running-process "$device" "$IOS_BUNDLE_ID" -wpcom-token "$token"
+    # The token goes to the app through a file in its data container, written by this shell (`printf`
+    # is a builtin), so it's on no command line that `ps` would show. The app reads the file at launch
+    # and deletes it.
+    if ! data_container=$(xcrun simctl get_app_container "$device" "$IOS_BUNDLE_ID" data); then
+        echo "error: couldn't find $IOS_BUNDLE_ID's data on '$device'. Build and run it from Xcode first." >&2
+        exit 1
+    fi
+    mkdir -p "$data_container/Library"
+    (umask 077 && printf '%s' "$token" > "$data_container/Library/wpcom-token")
+    # Terminates a running instance first, so the file is read by a fresh launch.
+    xcrun simctl launch --terminate-running-process "$device" "$IOS_BUNDLE_ID" > /dev/null
 else
     if [[ "$reset" == true ]]; then
         reset_android_app
