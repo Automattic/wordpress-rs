@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.Call
+import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType
@@ -104,7 +105,7 @@ class WpRequestExecutor @JvmOverloads constructor(
                 }
             )
 
-            addRequestHeaders(requestBuilder, request.headerMap())
+            setRequestHeaders(requestBuilder, request.headerMap())
             val urlRequest = requestBuilder.build()
 
             executeRequestSafely(urlRequest, request.url(), request.method(), request.headerMap())
@@ -117,7 +118,7 @@ class WpRequestExecutor @JvmOverloads constructor(
             val requestBuilder = Request.Builder().url(request.url())
             requestBuilder.method(request.method().toString(), bodyWithProgress)
 
-            addRequestHeaders(requestBuilder, request.headerMap())
+            setRequestHeaders(requestBuilder, request.headerMap())
             val urlRequest = requestBuilder.build()
 
             executeRequestSafely(
@@ -177,12 +178,16 @@ class WpRequestExecutor @JvmOverloads constructor(
         }
     }
 
-    private fun addRequestHeaders(requestBuilder: Request.Builder, headerMap: WpNetworkHeaderMap) {
+    private fun setRequestHeaders(requestBuilder: Request.Builder, headerMap: WpNetworkHeaderMap) {
+        val headers = Headers.Builder()
         headerMap.toMap().forEach { (key, values) ->
             values.forEach { value ->
-                requestBuilder.addHeader(key, value)
+                // `addHeader` throws for a non-ASCII value; this sends it as UTF-8, as reqwest does.
+                // Skipping OkHttp's value checks is safe: `http::HeaderValue` already refuses CR and LF.
+                headers.addUnsafeNonAscii(key, value)
             }
         }
+        requestBuilder.headers(headers.build())
         // Use header() instead of addHeader() to ensure User-Agent cannot be overridden
         requestBuilder.header(
             USER_AGENT_HEADER_NAME,

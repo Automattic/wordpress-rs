@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
 
+### Fixed
+
+- The Kotlin `WpRequestExecutor` no longer makes `WpApiClient.request` throw an `InternalException` when a request header has a non-ASCII character, such as an app's token or a nonce a site sends with a byte-order mark. OkHttp refuses those values. The executor now sends them as UTF-8, as reqwest does, and the site's answer decides the result.
+
 ## [0.11.1] - 2026-11-18
 
 ### Fixed
