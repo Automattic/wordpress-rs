@@ -437,52 +437,19 @@ macro_rules! api_client_generate_api_client {
 mod tests {
     use super::*;
     use crate::{
-        EmptyAppNotifier,
-        api_error::{RequestExecutionError, WpApiError},
-        parsed_url::ParsedUrl,
-        request::{
-            RequestContext, WpMultipartFormRequest, WpNetworkRequest, WpNetworkResponse,
-            endpoint::WpOrgSiteApiUrlResolver,
-        },
+        EmptyAppNotifier, api_error::WpApiError, parsed_url::ParsedUrl,
+        request::endpoint::WpOrgSiteApiUrlResolver, unit_test_common::UnreachableExecutor,
     };
     use rstest::rstest;
 
-    /// Fails the test if a request reaches it.
-    struct UnreachableExecutor;
-
-    #[async_trait::async_trait]
-    impl RequestExecutor for UnreachableExecutor {
-        async fn execute(
-            &self,
-            request: Arc<WpNetworkRequest>,
-        ) -> Result<WpNetworkResponse, RequestExecutionError> {
-            panic!(
-                "No request should be sent, but one was sent to {:?}",
-                request.url
-            );
-        }
-
-        async fn upload(
-            &self,
-            request: Arc<WpMultipartFormRequest>,
-        ) -> Result<WpNetworkResponse, RequestExecutionError> {
-            panic!(
-                "No request should be sent, but one was sent to {:?}",
-                request.url
-            );
-        }
-
-        async fn sleep(&self, _: u64) {}
-
-        fn cancel(&self, _: Arc<RequestContext>) {}
-    }
-
     // Building a request from an API root that can't have a path, such as
-    // `data:,`, used to panic (#1781).
+    // `data:,`, used to panic (#1781). The `rest_route` form used to be sent.
     #[rstest]
     #[case::data("data:,")]
     #[case::about_blank("about:blank")]
     #[case::mailto("mailto:someone@example.com")]
+    #[case::data_rest_route("data:,?rest_route=/")]
+    #[case::about_blank_rest_route("about:blank?rest_route=/")]
     #[tokio::test]
     async fn a_request_from_an_api_root_that_cannot_have_a_path_fails(#[case] api_root: &str) {
         let client = WpApiClient::new(

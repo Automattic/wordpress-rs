@@ -10,11 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
-- **BREAKING:** `ApiUrlResolver::resolve` now returns `Result<ParsedUrl, ParseUrlError>`, so a Swift or Kotlin type that implements `ApiUrlResolver` must now be able to throw. Code that only creates a `WpOrgSiteApiUrlResolver` or `WpComDotOrgApiUrlResolver` is unchanged. In Rust, `ParsedUrl::by_extending_and_splitting_by_forward_slash` and `ParsedUrl::by_extending_rest_api_path` also return a `Result`.
+- **BREAKING:** `ApiUrlResolver::resolve` now returns `Result<Arc<ParsedUrl>, ParseUrlError>`. In Swift and Kotlin, a type that implements `ApiUrlResolver` must now be able to throw, and code that calls `resolve` on a `WpOrgSiteApiUrlResolver` or `WpComDotOrgApiUrlResolver` must handle the error. Code that only creates one is unchanged. In Rust, `ParsedUrl::by_extending_and_splitting_by_forward_slash`, `ParsedUrl::by_extending_rest_api_path` and the generated request builder and endpoint functions also return a `Result`.
+- **BREAKING:** `ParseUrlError` has a new `UnexpectedResolverError` case. An app's own `ApiUrlResolver` that throws an error other than `ParseUrlError` now fails the request with it, rather than crashing the app.
 
 ### Fixed
 
-- A request built from an API root that can't have a path, such as `data:,`, `about:blank` or `mailto:…`, no longer panics, which crashed the app on Apple platforms and threw an unmapped `InternalException` on Android. It fails with `WpApiError::SiteUrlParsingError` instead, without being sent. The same goes for a `WpComBaseUrl::Custom` base URL and `WpLoginClient.verify_issued_application_password`. XML-RPC discovery for such a site address reports `XmlrpcDiscoveryError::EndpointNotFound` instead of panicking.
+- A request built from an API root that can't have a path, such as `data:,`, `about:blank` or `mailto:…`, no longer panics, which crashed the app on Apple platforms and threw an unmapped `InternalException` on Android. It fails with `WpApiError::SiteUrlParsingError` instead, without being sent. The same goes for the `rest_route` form of such an API root, such as `data:,?rest_route=/`, which used to be sent. It also goes for a `WpComBaseUrl::Custom` base URL, `WpLoginClient.verify_issued_application_password` and `WpRestNonceRetrieval.get_nonce`. XML-RPC discovery for such a site address reports `XmlrpcDiscoveryError::EndpointNotFound` instead of panicking.
 
 ## [0.11.1] - 2026-11-18
 

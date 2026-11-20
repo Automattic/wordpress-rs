@@ -51,13 +51,18 @@ impl ParsedUrl {
     /// into the `rest_route` value rather than the path. Otherwise we extend
     /// the path as before.
     ///
-    /// Fails like [`Self::by_extending_and_splitting_by_forward_slash`] when
-    /// the path form is needed and the URL can't have a path.
+    /// Fails like [`Self::by_extending_and_splitting_by_forward_slash`] for a
+    /// URL that can't have a path, in either form. `data:,?rest_route=/` has a
+    /// `rest_route`, but it isn't a site.
     pub fn by_extending_rest_api_path<I>(&self, segments: I) -> Result<Url, ParseUrlError>
     where
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
+        if self.inner.cannot_be_a_base() {
+            return Err(ParseUrlError::RelativeUrlWithCannotBeABaseBase);
+        }
+
         let appended_path = segments
             .into_iter()
             .flat_map(|s| {
@@ -222,9 +227,12 @@ fn is_rfc3986_path_query_or_fragment_char(byte: u8) -> bool {
     thiserror::Error,
     uniffi::Error,
     WpDeriveLocalizable,
+    strum_macros::IntoStaticStr,
 )]
 pub enum ParseUrlError {
-    Generic { reason: String },
+    Generic {
+        reason: String,
+    },
     EmptyHost,
     IdnaError,
     InvalidPort,
@@ -235,6 +243,22 @@ pub enum ParseUrlError {
     RelativeUrlWithCannotBeABaseBase,
     SetHostOnCannotBeABaseUrl,
     Overflow,
+    /// A Swift or Kotlin `ApiUrlResolver` threw an error that isn't a
+    /// `ParseUrlError`. `reason` describes that error.
+    UnexpectedResolverError {
+        reason: String,
+    },
+}
+
+/// UniFFI uses this for an error that a Swift or Kotlin implementation of a
+/// trait method returning `ParseUrlError` throws without declaring it. Without
+/// it, UniFFI panics instead.
+impl From<uniffi::UnexpectedUniFFICallbackError> for ParseUrlError {
+    fn from(value: uniffi::UnexpectedUniFFICallbackError) -> Self {
+        Self::UnexpectedResolverError {
+            reason: value.reason,
+        }
+    }
 }
 
 impl WpSupportsLocalization for ParseUrlError {
@@ -423,6 +447,8 @@ mod tests {
     #[case::data("data:,")]
     #[case::about_blank("about:blank")]
     #[case::mailto("mailto:someone@example.com")]
+    #[case::data_rest_route("data:,?rest_route=/")]
+    #[case::about_blank_rest_route("about:blank?rest_route=/")]
     fn extending_a_url_that_cannot_have_a_path_fails(#[case] input: &str) {
         let parsed = ParsedUrl::parse(input).unwrap();
         assert_eq!(

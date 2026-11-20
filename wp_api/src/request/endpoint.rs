@@ -277,11 +277,13 @@ mod tests {
     }
 
     // An API root that can't have a path, such as `data:,`, used to panic
-    // here (#1781).
+    // here (#1781). The `rest_route` form used to resolve.
     #[rstest]
     #[case::data("data:,")]
     #[case::about_blank("about:blank")]
     #[case::mailto("mailto:someone@example.com")]
+    #[case::data_rest_route("data:,?rest_route=/")]
+    #[case::about_blank_rest_route("about:blank?rest_route=/")]
     fn wp_org_resolver_rejects_an_api_root_that_cannot_have_a_path(#[case] api_root: &str) {
         let resolver =
             WpOrgSiteApiUrlResolver::new(ParsedUrl::parse(api_root).expect("valid url").into());
@@ -290,6 +292,29 @@ mod tests {
                 .resolve("/wp/v2".to_string(), vec!["users".to_string()])
                 .unwrap_err(),
             ParseUrlError::RelativeUrlWithCannotBeABaseBase
+        );
+    }
+
+    // A Swift or Kotlin `ApiUrlResolver` can throw any error from `resolve`.
+    // UniFFI hands one that isn't a `ParseUrlError` to this hook, which used
+    // to panic. The app's error text stays out of `reason`, because log lines
+    // print `reason` unredacted.
+    #[test]
+    fn a_foreign_resolver_error_that_is_not_a_parse_url_error_is_reported() {
+        use uniffi::LiftReturn;
+
+        let error = <Result<Arc<ParsedUrl>, ParseUrlError> as LiftReturn<crate::UniFfiTag>>::handle_callback_unexpected_error(
+            uniffi::UnexpectedUniFFICallbackError {
+                reason: "AppError(address: https://example.com/private)".to_string(),
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            crate::api_error::WpApiError::from(error),
+            crate::api_error::WpApiError::SiteUrlParsingError {
+                reason: "UnexpectedResolverError".to_string()
+            }
         );
     }
 }
