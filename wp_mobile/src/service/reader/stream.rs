@@ -25,8 +25,10 @@ const DATED_PAGE_SIZE: u32 = 20;
 const SEARCH_PAGE_SIZE: u32 = 20;
 
 /// How many related posts are asked for from the post's own site, and how many from other sites.
-/// The API returns none of a kind that isn't asked for.
-const RELATED_POSTS_OF_EACH_KIND: u32 = 3;
+/// The API returns none of a kind that isn't asked for. Two of each, as both WordPress apps ask
+/// for (Android's `NUM_RELATED_POSTS_TO_REQUEST` and iOS's `fetchRelatedPosts` default, on their
+/// trunks of 2026-11-17).
+const RELATED_POSTS_OF_EACH_KIND: u32 = 2;
 
 /// What a stream asks for with each post: the post's site, and an RSS post's feed. They carry the
 /// site's or feed's icon and the site's language, which a post doesn't have without them.

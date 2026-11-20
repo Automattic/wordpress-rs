@@ -2143,7 +2143,7 @@ mod posts {
         assert_eq!(shown(&stream).await, ["8", "9"]);
         assert_eq!(
             paths(&executor),
-            ["/rest/v1.2/read/site/123/post/7/related?size_global=3&size_local=3&meta=site%2Cfeed"]
+            ["/rest/v1.2/read/site/123/post/7/related?size_global=2&size_local=2&meta=site%2Cfeed"]
         );
     }
 
