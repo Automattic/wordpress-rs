@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `reader_sweep` walks every Reader stream: Liked, Automattic, P2, Freshly Pressed, several tags' posts, search, a list's posts, Discover and first posts, each paged as the library pages it. It counts each kind of card a stream of cards sends, reports a kind the library doesn't know, and works out each post's summary, reading time and card type. It's a test tool: nothing in the library changes.
 - `wp_com_e2e` fetches a Jetpack site's post and a VIP site's post through the site's and the feed's single-post endpoints, and checks the fields that tell each kind apart. Anonymized fixtures of both kinds have unit tests. Nothing in the library changes.
 - `wp_com_e2e` runs `ReaderService::resolve_link` against the live API: a post's address with an account, a site's and a feed-only site's home address, an address that is neither, and a post's address signed out, which sends nothing. Nothing in the library changes.
+- `reader_sweep`'s check for a post with words but no summary or reading time only counts words a reader sees, leaving out CSS, scripts, attribute values and other hidden markup. It's a test tool: nothing in the library changes.
 
 ### Changed
 

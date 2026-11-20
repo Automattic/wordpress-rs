@@ -998,21 +998,68 @@ fn computed_fields(post: &ReaderPost) -> ComputedFields {
     fields
 }
 
-/// Whether HTML has a letter or a digit outside its tags and character references: a rough check,
-/// to tell a post with nothing to summarize, such as one that is only an image, from one the
-/// functions should have summarized.
+/// Whether HTML has a letter or a digit a reader would see: outside tags, their attribute values,
+/// comments, character references, and elements that aren't shown, such as `<style>`. A rough
+/// check, to tell a post with nothing to summarize, such as one that is only an image, from one
+/// the functions should have summarized.
 fn has_words(html: Option<&str>) -> bool {
-    let mut inside = None;
-    for c in html.unwrap_or_default().chars() {
-        match (inside, c) {
-            (None, '<') => inside = Some('>'),
-            (None, '&') => inside = Some(';'),
-            (Some(end), c) if c == end => inside = None,
-            // A `&` that starts no reference ends at the next space.
-            (Some(';'), c) if c.is_whitespace() => inside = None,
-            (None, c) if c.is_alphanumeric() => return true,
-            _ => {}
+    const HIDDEN: [&str; 5] = ["script", "style", "noscript", "iframe", "svg"];
+    let html = html.unwrap_or_default();
+    let lower = html.to_ascii_lowercase();
+    let mut at = 0;
+    while at < html.len() {
+        let rest = &html[at..];
+        let c = rest.chars().next().expect("not at the end");
+        if rest.starts_with("<!--") {
+            at = lower[at..]
+                .find("-->")
+                .map_or(html.len(), |end| at + end + 3);
+            continue;
         }
+        if c == '<' && rest[1..].starts_with(|c: char| c.is_ascii_alphabetic() || c == '/') {
+            // The tag ends at the first `>` outside a quoted attribute value.
+            let mut quote = None;
+            let mut end = html.len();
+            for (offset, c) in rest.char_indices().skip(1) {
+                match (quote, c) {
+                    (None, '"' | '\'') => quote = Some(c),
+                    (Some(open), c) if c == open => quote = None,
+                    (None, '>') => {
+                        end = at + offset + 1;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            let tag = &lower[at + 1..end.min(html.len())];
+            let name: String = tag
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric())
+                .collect();
+            let hidden = HIDDEN.contains(&name.as_str())
+                || (name == "template" && !tag.contains("shadowrootmode"));
+            at = end;
+            if hidden && !tag.trim_end_matches('>').ends_with('/') {
+                let close = format!("</{name}");
+                at = lower[at..]
+                    .find(&close)
+                    .map_or(html.len(), |found| at + found);
+            }
+            continue;
+        }
+        if c == '&' {
+            let reference = rest[1..]
+                .find(|c: char| c == ';' || c.is_whitespace())
+                .filter(|&end| rest.as_bytes()[end + 1] == b';');
+            if let Some(end) = reference {
+                at += end + 2;
+                continue;
+            }
+        }
+        if c.is_alphanumeric() {
+            return true;
+        }
+        at += c.len_utf8();
     }
     false
 }
@@ -1089,5 +1136,21 @@ mod tests {
             "<figure><img src=\"a.jpg\" alt=\"A photo\"></figure>"
         )));
         assert!(!has_words(Some("<p>&nbsp;&#8230;</p>\n")));
+        assert!(has_words(Some("<p>1 < 2</p>")));
+        assert!(!has_words(Some(
+            "<style>#gallery-1 { margin: auto; }</style><div></div>"
+        )));
+        assert!(!has_words(Some(
+            "<SCRIPT>var a = 1;</SCRIPT><svg><title>Icon</title></svg>"
+        )));
+        assert!(!has_words(Some(
+            "<img data-meta='{\"a\": \"b > c\"}' alt=\"x\">"
+        )));
+        assert!(!has_words(Some(
+            "<!-- wp:gallery --><template><p>Hidden</p></template>"
+        )));
+        assert!(has_words(Some(
+            "<template shadowrootmode=\"open\"><p>Shown</p></template>"
+        )));
     }
 }
