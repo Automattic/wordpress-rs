@@ -1012,9 +1012,11 @@ async fn service_for_blocks(ctx: &TestContext) -> Result<ReaderService, Failed> 
 /// How long a trial waits after a block or an unblock before it reads the list of blocked sites.
 ///
 /// The server keeps its answer to the list, for each page and page size, until the next block or
-/// unblock clears it. A read straight after one can be answered from data that hasn't caught up
-/// yet, and that answer is then kept: once, the list still had a site 14 minutes after it was
-/// unblocked, and another unblock cleared it. A short wait lets the data catch up first.
+/// unblock clears it. Once, in a parallel run, the list still had a site 14 minutes after it was
+/// unblocked, and another unblock cleared it. Measured since, a read on its way while the server
+/// takes an unblock leaves it stale like that, and a read that starts after the unblock is
+/// answered doesn't (`ReaderService::refresh_blocked_sites` has the details); what overlapped the
+/// unblock in that run wasn't found, so the wait stays.
 pub(crate) async fn settle_after_a_block() {
     tokio::time::sleep(Duration::from_secs(3)).await;
 }

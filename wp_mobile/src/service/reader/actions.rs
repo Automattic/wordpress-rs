@@ -34,11 +34,13 @@ use wp_api::wp_com::reader_saved::{
 use wp_api::wp_com::reader_seen::{
     ReaderSeenFeedItemsParams, ReaderSeenSitePostsParams, ReaderSeenSource,
 };
+use wp_api::wp_com::reader_sites::ReaderSiteParams;
 use wp_api::wp_com::reader_subscriptions::{
     ReaderFollowUrlParams, ReaderPostEmailSubscriptionParams, ReaderSubscriptionEmailFrequency,
     ReaderUnfollowUrlParams,
 };
 use wp_api::wp_com::reader_tags::ReaderFollowTagsParams;
+use wp_api::wp_com::sites::WpComSiteIdentifier;
 use wp_mobile_cache::db_types::reader::reader_saved_key_text;
 use wp_mobile_cache::repository::QueryExecutor;
 use wp_mobile_cache::repository::reader::{ReaderPostFlag, ReaderPostRepository};
@@ -769,6 +771,10 @@ pub(crate) struct ActionQueue {
     /// Why the server refused a target a tap is waiting on, until the tap takes it. The call that
     /// sends a row isn't always its tap's: whichever call holds the lane sends every row.
     refusals: Mutex<HashMap<Target, ReaderError>>,
+    /// Blocks and unblocks the server took from this service, by site, until the server's list
+    /// of blocked sites agrees: whether the site was blocked. See
+    /// [`ReaderService::refresh_blocked_sites`].
+    confirmed_blocks: Mutex<HashMap<WpComSiteId, bool>>,
 }
 
 /// Marks a target a tap waits on, while it waits, so a refusal is kept for it. Dropping it,
@@ -918,6 +924,63 @@ impl ReaderContext {
         }
     }
 
+    /// The sites a list of blocked sites from the server is stale about: a block or unblock the
+    /// server took from this service that the list disagrees with, and that `read/sites/{id}`
+    /// says still holds. What the cache has of them is kept. A change the list agrees with, or
+    /// that the site says no longer holds, is forgotten. Call it holding the lane, so no change is
+    /// sent meanwhile.
+    async fn sites_the_list_is_stale_about(
+        &self,
+        listed: &[DbReaderBlockedSite],
+    ) -> Result<Vec<WpComSiteId>, ReaderError> {
+        let confirmed: Vec<(WpComSiteId, bool)> = self
+            .actions
+            .confirmed_blocks
+            .lock()
+            .expect("confirmed blocks lock poisoned")
+            .iter()
+            .map(|(site_id, blocked)| (*site_id, *blocked))
+            .collect();
+        let mut stale = Vec::new();
+        for (site_id, blocked) in confirmed {
+            let is_listed = listed.iter().any(|site| site.site_id == site_id);
+            let still_holds = is_listed != blocked
+                && match self
+                    .client
+                    .reader_sites()
+                    .site(
+                        &WpComSiteIdentifier::Id { value: site_id.0 },
+                        &ReaderSiteParams {
+                            fields: Some("ID,is_blocked".to_string()),
+                            options: None,
+                        },
+                    )
+                    .await
+                {
+                    Ok(site) => site.data.is_blocked == Some(blocked),
+                    Err(error) => {
+                        let error = ReaderError::from(error);
+                        // The site can't be asked about, such as a deleted one, so the list
+                        // decides.
+                        if !is_refused(&error) {
+                            return Err(error);
+                        }
+                        false
+                    }
+                };
+            if still_holds {
+                stale.push(site_id);
+            } else {
+                self.actions
+                    .confirmed_blocks
+                    .lock()
+                    .expect("confirmed blocks lock poisoned")
+                    .remove(&site_id);
+            }
+        }
+        Ok(stale)
+    }
+
     /// Records the server's answer to a row: it took it, or refused it.
     fn action_answered(
         &self,
@@ -952,6 +1015,13 @@ impl ReaderContext {
             transaction.commit()?;
             Ok::<_, SqliteDbError>(finished)
         })?;
+        if let (Ok(_), Action::BlockSite { site_id }) = (&answer, action) {
+            self.actions
+                .confirmed_blocks
+                .lock()
+                .expect("confirmed blocks lock poisoned")
+                .insert(*site_id, row.wanted);
+        }
         if let (Err(error), true) = (answer, finished) {
             let is_waited_on = self
                 .actions
@@ -1015,6 +1085,13 @@ impl ReaderService {
     /// back with its delivery settings as they were. So a fetch made during the block stores "not
     /// followed", and when the server takes an unblock, a site the cached subscriptions list is
     /// shown as followed again, on the site and on its posts.
+    ///
+    /// The server answers a block or unblock with `success: false` when the site was already as
+    /// asked, which is taken as done. It doesn't read the list of blocked sites back: the cache
+    /// already has the change. The server's list can go on listing a site after an unblock it
+    /// took, when reads of the list were on their way meanwhile, until the next block or unblock;
+    /// [`Self::refresh_blocked_sites`] says how it guards against that. Unblocking the site
+    /// again, a no-op, clears it.
     pub async fn set_site_blocked(
         &self,
         site_id: WpComSiteId,
@@ -1043,11 +1120,39 @@ impl ReaderService {
     /// Fetches the sites the user blocked, so a block made on another device shows on this one. A
     /// block or unblock made here that's still waiting to be sent stays as the user left it. Needs
     /// an account.
+    ///
+    /// The server's list can be wrong about a site just unblocked, and stay wrong. As measured on
+    /// 2026-11-20:
+    ///
+    /// - The server keeps its answer for each page and page size. Page 1 and 100 a page are the
+    ///   defaults, so `page=1&per_page=100`, `per_page=100` and no parameters share one answer;
+    ///   another page size has its own. A cache-busting parameter doesn't change it.
+    /// - When reads of the list are on their way while the server takes an unblock, the server
+    ///   can go on listing the site for that page size: 3 times in 3 tries, for at least 10
+    ///   minutes (14 in an earlier run), until the next block or unblock, which a second, no-op
+    ///   unblock of the site is. `read/sites/{id}`'s `is_blocked` was right throughout.
+    /// - A read that starts after the unblock is answered was right (6 tries), as were reads
+    ///   during a block (no list left the site out, 3 tries) and reads of the Following stream
+    ///   on their way during an unblock (3 tries). One live run did get a stale list with no other
+    ///   read of the list found to overlap the unblock, so not every cause is known.
+    ///
+    /// So this doesn't read the list while a block or unblock of this service's is being sent,
+    /// and doesn't send one while it reads. And when the list disagrees with a block or unblock
+    /// the server took from this service, the site is asked about by `read/sites/{id}`, and its
+    /// `is_blocked` decides: what the cache has is kept when it agrees with that change, and the
+    /// list is taken when it doesn't (blocked or unblocked elsewhere since). A site that can't be
+    /// asked about, such as a deleted one (410), is taken as the list has it. A site is asked
+    /// about only until the list agrees with the change, and only by the service that made it: a
+    /// new service, such as after a restart, takes the list as it is.
     pub async fn refresh_blocked_sites(&self) -> Result<(), ReaderError> {
         let context = &self.context;
         if context.owner == ReaderOwner::SignedOut {
             return Err(ReaderError::NeedsAccount);
         }
+        // Held from the first read to the store, so no block or unblock of this service's is sent
+        // while the list is being read. It also keeps a list read before an unblock from being
+        // stored after the unblock is confirmed, which would block the site again here.
+        let _lane = context.actions.lane.lock().await;
         let mut sites = Vec::new();
         let mut page = 1;
         loop {
@@ -1072,9 +1177,10 @@ impl ReaderService {
             }
             page += 1;
         }
+        let kept = context.sites_the_list_is_stale_about(&sites).await?;
         context.cache.execute(|connection| {
             let transaction = connection.transaction()?;
-            let waiting: Vec<WpComSiteId> =
+            let mut keep: Vec<WpComSiteId> =
                 ReaderActionRepository::select_all(&transaction, context.owner_row)?
                     .iter()
                     .filter_map(|row| serde_json::from_str::<Action>(&row.payload).ok())
@@ -1083,12 +1189,8 @@ impl ReaderService {
                         _ => None,
                     })
                     .collect();
-            ReaderBlockRepository::replace_sites(
-                &transaction,
-                context.owner_row,
-                &sites,
-                &waiting,
-            )?;
+            keep.extend(kept);
+            ReaderBlockRepository::replace_sites(&transaction, context.owner_row, &sites, &keep)?;
             transaction.commit().map_err(SqliteDbError::from)
         })?;
         Ok(())

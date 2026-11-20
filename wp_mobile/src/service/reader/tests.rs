@@ -1507,6 +1507,209 @@ mod actions {
     }
 
     #[tokio::test]
+    async fn an_unblock_waits_for_a_read_of_the_blocked_sites_on_its_way() {
+        let (service, executor, stream) = following().await;
+        let changed = json!({ "success": true, "modified_sub": true });
+        executor.push(Step::Respond(200, changed.clone()));
+        service
+            .set_site_blocked(WpComSiteId(123), true)
+            .await
+            .unwrap();
+        // The server's list, read before the unblock, still has the site.
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(
+            held,
+            200,
+            json!({
+                "sites": [{ "ID": 123, "name": "A site", "URL": "https://a.example" }],
+                "page": 1,
+                "count": 1,
+            }),
+        ));
+        executor.push(Step::Respond(200, changed));
+        let before = executor.sent().len();
+
+        let (refreshed, (unblocked, sent_while_reading)) =
+            futures::join!(service.refresh_blocked_sites(), async {
+                futures::join!(service.set_site_blocked(WpComSiteId(123), false), async {
+                    // Gives the unblock every chance to be sent before the list arrives.
+                    for _ in 0..20 {
+                        tokio::task::yield_now().await;
+                    }
+                    let sent = executor.sent().len() - before;
+                    release.send(()).unwrap();
+                    sent
+                })
+            });
+
+        refreshed.unwrap();
+        assert_eq!(unblocked.unwrap(), ReaderActionOutcome::Synced);
+        // The unblock isn't sent while the list is being read, and the list read before it
+        // doesn't block the site again.
+        assert_eq!(sent_while_reading, 1);
+        let paths: Vec<_> = sent_after(&executor, before)
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect();
+        assert_eq!(
+            paths,
+            [
+                "/wpcom/v2/me/blocks/sites?page=1&per_page=100",
+                "/rest/v1.1/me/block/sites/123/delete"
+            ]
+        );
+        assert!(service.blocked_sites().unwrap().is_empty());
+        assert_eq!(shown(&stream).await, ["2", "1"]);
+    }
+
+    fn blocked_list(ids: &[u64]) -> Step {
+        let sites: Vec<Value> = ids
+            .iter()
+            .map(|id| json!({ "ID": id, "name": "A site", "URL": "https://a.example" }))
+            .collect();
+        Step::Respond(
+            200,
+            json!({ "sites": sites, "page": 1, "count": ids.len() }),
+        )
+    }
+
+    fn site_is_blocked(blocked: bool) -> Step {
+        Step::Respond(200, json!({ "ID": 123, "is_blocked": blocked }))
+    }
+
+    /// Blocks site 123, then unblocks it if `unblock`, both taken by the server.
+    async fn blocked_then(service: &ReaderService, executor: &ScriptedExecutor, unblock: bool) {
+        let changed = json!({ "success": true, "modified_sub": true });
+        executor.push(Step::Respond(200, changed.clone()));
+        service
+            .set_site_blocked(WpComSiteId(123), true)
+            .await
+            .unwrap();
+        if unblock {
+            executor.push(Step::Respond(200, changed));
+            service
+                .set_site_blocked(WpComSiteId(123), false)
+                .await
+                .unwrap();
+        }
+    }
+
+    fn blocked_ids(service: &ReaderService) -> Vec<u64> {
+        service
+            .blocked_sites()
+            .unwrap()
+            .iter()
+            .map(|site| site.id.0)
+            .collect()
+    }
+
+    const SITE_CHECK: &str = "/rest/v1.2/read/sites/123?fields=ID%2Cis_blocked";
+    const BLOCKED_LIST: &str = "/wpcom/v2/me/blocks/sites?page=1&per_page=100";
+
+    fn paths_after(executor: &ScriptedExecutor, skip: usize) -> Vec<String> {
+        sent_after(executor, skip)
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_list_still_listing_a_site_after_its_unblock_does_not_block_it_again() {
+        let (service, executor, stream) = following().await;
+        blocked_then(&service, &executor, true).await;
+        let before = executor.sent().len();
+
+        // The server's list is stale, and the site itself says it isn't blocked.
+        executor.push(blocked_list(&[123, 7]));
+        executor.push(site_is_blocked(false));
+        service.refresh_blocked_sites().await.unwrap();
+
+        assert_eq!(blocked_ids(&service), [7]);
+        assert_eq!(shown(&stream).await, ["2", "1"]);
+        assert_eq!(paths_after(&executor, before), [BLOCKED_LIST, SITE_CHECK]);
+
+        // While the list stays stale, the site is asked about again.
+        executor.push(blocked_list(&[123, 7]));
+        executor.push(site_is_blocked(false));
+        service.refresh_blocked_sites().await.unwrap();
+        assert_eq!(blocked_ids(&service), [7]);
+        assert_eq!(
+            paths_after(&executor, before + 2),
+            [BLOCKED_LIST, SITE_CHECK]
+        );
+
+        // Once the list agrees, the change is forgotten: a later block made elsewhere is taken
+        // from the list, with nothing more asked.
+        executor.push(blocked_list(&[7]));
+        service.refresh_blocked_sites().await.unwrap();
+        executor.push(blocked_list(&[123, 7]));
+        service.refresh_blocked_sites().await.unwrap();
+        assert_eq!(blocked_ids(&service), [7, 123]);
+        assert_eq!(
+            paths_after(&executor, before + 4),
+            [BLOCKED_LIST, BLOCKED_LIST]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_list_leaving_out_a_site_after_its_block_does_not_unblock_it() {
+        let (service, executor, stream) = following().await;
+        blocked_then(&service, &executor, false).await;
+        let before = executor.sent().len();
+
+        executor.push(blocked_list(&[]));
+        executor.push(site_is_blocked(true));
+        service.refresh_blocked_sites().await.unwrap();
+
+        assert_eq!(blocked_ids(&service), [123]);
+        assert!(shown(&stream).await.is_empty());
+        assert_eq!(paths_after(&executor, before), [BLOCKED_LIST, SITE_CHECK]);
+    }
+
+    #[tokio::test]
+    async fn a_site_blocked_again_elsewhere_after_an_unblock_is_taken_from_the_list() {
+        let (service, executor, stream) = following().await;
+        blocked_then(&service, &executor, true).await;
+
+        executor.push(blocked_list(&[123]));
+        executor.push(site_is_blocked(true));
+        service.refresh_blocked_sites().await.unwrap();
+
+        assert_eq!(blocked_ids(&service), [123]);
+        assert!(shown(&stream).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_site_that_cannot_be_asked_about_is_taken_from_the_list() {
+        let (service, executor, _) = following().await;
+        blocked_then(&service, &executor, true).await;
+
+        // A deleted site.
+        executor.push(blocked_list(&[123]));
+        executor.push(Step::Respond(
+            410,
+            json!({ "error": "site_gone", "message": "The site has been deleted" }),
+        ));
+        service.refresh_blocked_sites().await.unwrap();
+
+        assert_eq!(blocked_ids(&service), [123]);
+    }
+
+    #[tokio::test]
+    async fn a_site_check_that_gets_no_answer_fails_the_refresh_and_changes_nothing() {
+        let (service, executor, stream) = following().await;
+        blocked_then(&service, &executor, true).await;
+
+        executor.push(blocked_list(&[123, 7]));
+        executor.push(Step::Offline);
+        let result = service.refresh_blocked_sites().await;
+
+        assert!(result.is_err());
+        assert!(blocked_ids(&service).is_empty());
+        assert_eq!(shown(&stream).await, ["2", "1"]);
+    }
+
+    #[tokio::test]
     async fn blocking_a_user_hides_their_posts_on_this_device() {
         let (service, executor, stream) = following().await;
 
