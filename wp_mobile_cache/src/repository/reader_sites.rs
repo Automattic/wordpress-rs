@@ -357,6 +357,30 @@ impl ReaderSubscriptionRepository {
         Self::insert(executor, account, subscription, position)
     }
 
+    /// Moves the count of posts the reader hasn't seen of a followed site or feed by `change`,
+    /// never below zero, on the subscriptions to whichever of the two is given. A missing count
+    /// stays missing. The next fetch of the subscriptions replaces it with the server's count.
+    pub fn add_to_unseen_count(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        site_id: Option<WpComSiteId>,
+        feed_id: Option<ReaderFeedId>,
+        change: i64,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "UPDATE reader_subscriptions SET unseen_count = MAX(unseen_count + ?4, 0)
+            WHERE account_id = ?1 AND unseen_count IS NOT NULL AND (
+                (?2 IS NOT NULL AND site_id = ?2) OR (?3 IS NOT NULL AND feed_id = ?3))",
+            params![
+                account,
+                site_id.map(|id| id.0),
+                feed_id.map(|id| id.0),
+                change
+            ],
+        )?;
+        Ok(())
+    }
+
     /// Removes the subscriptions to a site, a feed or an address: whichever of the three is
     /// given and matches. Returns how many it removed.
     pub fn remove(

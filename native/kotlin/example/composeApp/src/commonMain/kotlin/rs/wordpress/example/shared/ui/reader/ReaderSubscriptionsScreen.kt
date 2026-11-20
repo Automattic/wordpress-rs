@@ -151,6 +151,7 @@ private fun ReaderSubscriptionRow(
                         subscription.url ?: subscription.feedUrl,
                         siteId?.let { "site $it" },
                         subscription.feedId?.let { "feed $it" },
+                        subscription.unseenCount?.let { "$it not seen" },
                         "waiting to be sent".takeIf { subscription.subscriptionId == null }
                     ).joinToString(" · ")
                 )

@@ -1556,6 +1556,99 @@ mod actions {
         assert_eq!(service.pending_action_count().unwrap(), 0);
     }
 
+    /// Gives the cache the subscriptions: site 123, with `unseen` posts not seen, and a feed's.
+    async fn subscribed(service: &ReaderService, executor: &ScriptedExecutor, unseen: u64) {
+        let mut page: Value = serde_json::from_str(include_str!(
+            "../../../../wp_api/tests/wpcom/reader_subscriptions/subscriptions.json"
+        ))
+        .unwrap();
+        page["subscriptions"][0]["blog_ID"] = json!("123");
+        page["subscriptions"][0]["unseen_count"] = json!(unseen);
+        page["total_subscriptions"] = json!(page["subscriptions"].as_array().unwrap().len());
+        executor.push(Step::Respond(200, page));
+        service.refresh_subscriptions().await.unwrap();
+    }
+
+    /// The cached unseen count of each subscription to site 123, and of the others.
+    fn unseen_counts(service: &ReaderService) -> (Vec<Option<u64>>, Vec<Option<u64>>) {
+        let (site, others): (Vec<_>, Vec<_>) = service
+            .subscriptions()
+            .unwrap()
+            .into_iter()
+            .partition(|subscription| subscription.site_id == Some(WpComSiteId(123)));
+        let counts =
+            |list: Vec<wp_mobile_cache::repository::reader_sites::ReaderSubscriptionRecord>| {
+                list.iter()
+                    .map(|subscription| subscription.unseen_count)
+                    .collect()
+            };
+        (counts(site), counts(others))
+    }
+
+    #[tokio::test]
+    async fn marking_a_post_seen_or_unseen_moves_its_sites_unseen_count() {
+        let (service, executor, _stream) = following().await;
+        subscribed(&service, &executor, 5).await;
+        let (_, others) = unseen_counts(&service);
+        let (release, held) = oneshot::channel();
+        executor.push(Step::Hold(held, 200, json!({ "status": true })));
+
+        let (outcome, ()) = futures::join!(service.set_post_seen(identity(2), true), async {
+            // It moves with the tap, before the server answers.
+            assert_eq!(unseen_counts(&service).0, [Some(4)]);
+            release.send(()).unwrap();
+        });
+        outcome.unwrap();
+        assert_eq!(unseen_counts(&service), (vec![Some(4)], others.clone()));
+
+        // A post already seen doesn't move it again.
+        executor.push(marked());
+        service.set_post_seen(identity(2), true).await.unwrap();
+        assert_eq!(unseen_counts(&service).0, [Some(4)]);
+
+        executor.push(marked());
+        service.set_post_seen(identity(2), false).await.unwrap();
+        assert_eq!(unseen_counts(&service), (vec![Some(5)], others));
+    }
+
+    #[tokio::test]
+    async fn the_unseen_count_goes_back_when_the_server_refuses_and_never_below_zero() {
+        let (service, executor, _stream) = following().await;
+        subscribed(&service, &executor, 1).await;
+
+        executor.push(refused());
+        assert!(service.set_post_seen(identity(2), true).await.is_err());
+        assert_eq!(unseen_counts(&service).0, [Some(1)]);
+
+        executor.push(marked());
+        service.set_post_seen(identity(2), true).await.unwrap();
+        executor.push(marked());
+        service.set_post_seen(identity(1), true).await.unwrap();
+        assert_eq!(unseen_counts(&service).0, [Some(0)]);
+    }
+
+    #[tokio::test]
+    async fn a_mark_waiting_to_be_sent_is_counted_once_however_often_the_stream_is_fetched() {
+        let (service, executor, stream) = following().await;
+        subscribed(&service, &executor, 5).await;
+        executor.push(Step::Offline);
+        service.set_post_seen(identity(2), true).await.unwrap();
+        assert_eq!(unseen_counts(&service).0, [Some(4)]);
+
+        // The stream comes back with the post not seen, and the waiting mark shows on it again.
+        executor.push(Step::Respond(
+            200,
+            json!({ "posts": [followed_post(2, 11), followed_post(1, 10)] }),
+        ));
+        stream.refresh().await.unwrap();
+        assert_eq!(is_seen(&stream, 2).await, Some(true));
+        assert_eq!(unseen_counts(&service).0, [Some(4)]);
+
+        executor.push(marked());
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+        assert_eq!(unseen_counts(&service).0, [Some(4)]);
+    }
+
     #[tokio::test]
     async fn turning_it_on_and_off_offline_sends_only_the_last() {
         let (service, executor, stream) = following().await;

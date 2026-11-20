@@ -194,6 +194,11 @@ private struct ReaderSubscriptionRowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if let unseen = subscription.unseenCount {
+                Text("\(unseen) not seen")
+                    .font(.caption)
+                    .accessibilityIdentifier("subscription-unseen-count")
+            }
             if subscription.subscriptionId == nil {
                 ReaderBadge("Not sent yet")
             }

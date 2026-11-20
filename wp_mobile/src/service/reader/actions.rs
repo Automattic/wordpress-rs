@@ -450,6 +450,41 @@ impl Action {
         Ok(())
     }
 
+    /// Moves the followed site's or feed's count of unseen posts when marking a post seen or unseen
+    /// changes what the cache showed: `was` is what it showed, and `on` what it shows now. Any
+    /// other action, or a mark that changes nothing, leaves the count.
+    ///
+    /// As Android does (`ReaderSeenStatusToggleUseCase`, which calls `ReaderBlogTable`'s
+    /// `decrementUnseenCount` when a post is marked seen and `incrementUnseenCount` when it's
+    /// marked unseen, only when the post's seen state changes). Android moves it once the server
+    /// has taken the mark; here it moves with the tap, as the post's seen state does, and goes back
+    /// with it if the server refuses. An RSS post moves its feed's count, as the subscriptions list
+    /// counts a feed's unseen posts too; Android keys the count by the post's site only.
+    ///
+    /// It isn't done in [`Self::show`], which [`show_pending`] runs again after every fetch of a
+    /// stream, and which would count a mark that waits to be sent each time.
+    fn move_unseen_count(
+        &self,
+        executor: &impl QueryExecutor,
+        owner: RowId,
+        was: Option<bool>,
+        on: bool,
+    ) -> Result<(), SqliteDbError> {
+        let Self::Seen { post } = self else {
+            return Ok(());
+        };
+        if was != Some(!on) {
+            return Ok(());
+        }
+        let (site_id, feed_id) = if post.is_feed_item() {
+            (None, post.feed_id)
+        } else {
+            (post.site_id, None)
+        };
+        let change = if on { -1 } else { 1 };
+        ReaderSubscriptionRepository::add_to_unseen_count(executor, owner, site_id, feed_id, change)
+    }
+
     /// Keeps what the server said when it took the action.
     fn confirm(
         &self,
@@ -833,6 +868,7 @@ impl ReaderContext {
             let transaction = connection.transaction()?;
             let was = action.shown(&transaction, self.owner_row)?;
             action.show(&transaction, self.owner_row, on)?;
+            action.move_unseen_count(&transaction, self.owner_row, was, on)?;
             ReaderActionRepository::tap(
                 &transaction,
                 self.owner_row,
@@ -1005,7 +1041,9 @@ impl ReaderContext {
                 // Refused, with no tap since: the cache goes back to what it showed before.
                 (Err(_), true) => {
                     if let Some(was) = row.was {
+                        let shown = action.shown(&transaction, self.owner_row)?;
                         action.show(&transaction, self.owner_row, was)?;
+                        action.move_unseen_count(&transaction, self.owner_row, shown, was)?;
                     }
                 }
                 // Refused, with a tap since, which is newer than what was refused and is sent
@@ -1068,6 +1106,10 @@ impl ReaderService {
     /// A post has a seen state when the stream that sent it gave it one, which the Following
     /// stream does: [`wp_mobile_cache::db_types::reader::ReaderPostRecord::is_seen`] is `None`
     /// for a post that has none, and marking such a post is refused by the server.
+    ///
+    /// When it changes the cached post's seen state, the followed site's (or an RSS post's feed's)
+    /// [`ReaderSubscriptionRecord::unseen_count`] goes down by one for seen, never below zero, and
+    /// up by one for unseen, as Android moves it, and goes back if the server refuses.
     pub async fn set_post_seen(
         &self,
         post: ReaderPostSaveIdentity,
