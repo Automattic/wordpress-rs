@@ -112,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Swift example app's Subscriptions shows "Not set" for a site's email frequency when the cache has none, as the Kotlin app's "Emailed: not set" does. It showed Instantly, so a frequency the server had dropped while post emails were off read as set.
 - `wp_com_e2e`'s `reader_post::feed_post_of_a_site` trial now uses the newest post of the site that is in its feed. It took the newest post, and failed for a few hours after each new one, which the server sends without a feed item ID until the feed picks it up.
 - `wp_com_e2e`'s `reader_service::a_follow_is_sent_and_put_back` trial now follows and unfollows the site in `WP_COM_E2E_OWN_SITE_ID` when it's set, and the trial's site otherwise. When the site was already followed, it now also puts the site's emails and notifications back after following it again, and fails if they don't come back as they were.
+- The Swift example app's Blocked sites screen no longer asks the server for blocked sites when the reader isn't signed in, which it could only refuse, and no longer shows that refusal as an error: it says sites are blocked by an account, and still lists the users blocked on the device.
 
 ## [0.11.1] - 2026-11-18
 

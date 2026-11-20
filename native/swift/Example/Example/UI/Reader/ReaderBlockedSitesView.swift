@@ -43,6 +43,12 @@ final class ReaderBlockedSitesViewModel {
     }
 
     func refresh() async {
+        // Blocked sites belong to an account. Signed out the server can only refuse, which isn't news to show as
+        // an error: the screen says so instead, and still lists the users blocked on this device.
+        guard !session.isSignedOut else {
+            reloadFromCache()
+            return
+        }
         working += 1
         defer { working -= 1 }
         do {
@@ -122,6 +128,11 @@ struct ReaderBlockedSitesView: View {
             }
 
             Section(readerCount(viewModel.sites.count, "blocked site")) {
+                if viewModel.session.isSignedOut {
+                    Text("Sites are blocked by a WordPress.com account. Sign in to see or change them.")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("blocked-sites-signed-out")
+                }
                 ForEach(viewModel.sites, id: \.id) { site in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
