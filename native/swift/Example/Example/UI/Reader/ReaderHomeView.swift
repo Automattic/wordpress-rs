@@ -254,9 +254,12 @@ struct ReaderHomeView: View {
                 .disabled(viewModel.postURL.isEmpty || viewModel.isWorking)
                 .accessibilityIdentifier("open-post-at-url")
             }
-            Text("A post's address needs an account. A site's or a feed's doesn't.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(
+                "A site's, a feed's or a Reader address needs no account. Signed out, a post's address opens "
+                    + "when the Reader finds the post by its slug, and otherwise needs an account."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
             if let answer = viewModel.linkAnswer {
                 Text(answer)
                     .accessibilityIdentifier("link-answer")
