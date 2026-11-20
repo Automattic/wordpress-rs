@@ -17,10 +17,12 @@ enum ReaderUsersRequest {
     #[get(url = "/users/<wp_com_user_identifier>", output = ReaderUserProfile)]
     Profile,
     // The people of a site to suggest when a reader types `@` in a comment, as both WordPress apps
-    // and the web's notifications panel ask for them. Signed in, it answers for any site: its
-    // users, such as only the owner on a site of one, and 175 on the WordPress.com Blog, which the
-    // account isn't a member of. Signed out it answers 200 with no suggestions, for any site.
-    // Measured on 2026-11-21.
+    // and the web's notifications panel ask for them. Signed in, it answers with the site's users
+    // when the account is a member of it: only the owner on a site of one, 2 on a site of two, and
+    // 175 on the WordPress.com Blog for an account that's a member. For a site the account isn't a
+    // member of, it answers 200 with no one: 4 sites of 4 tried, and the WordPress.com Blog for
+    // an account that isn't a member. Signed out it answers 200 with no suggestions, for any site.
+    // Measured on 2026-11-21, and the sites the account isn't a member of on 2026-11-20 (UTC).
     #[get(url = "/users/suggest", params = &ReaderUserSuggestionsParams, output = ReaderUserSuggestionsResponse)]
     Suggestions,
 }

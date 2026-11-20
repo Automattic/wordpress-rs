@@ -304,12 +304,15 @@ impl ReaderCommentsCollection {
     }
 
     /// The people of the post's site to suggest when the reader types `@` in a comment: the
-    /// site's users, for any site, as both WordPress apps ask for them
+    /// site's users, as both WordPress apps ask for them
     /// (`GET rest/v1.1/users/suggest?site_id=`, iOS's `SuggestionService`, Android's
     /// `SuggestionService.updateSuggestions`). Every one is fetched each time, and nothing is
     /// kept: filter them as the reader types, by the start of `user_login` or of `display_name`,
     /// in any case, which both apps do (iOS's `SuggestionsListViewModel`; Android's
     /// `SuggestionAdapter` also matches the start of any word of the name).
+    ///
+    /// The server only suggests the users of a site the account is a member of. For any other
+    /// site it answers with no one, which isn't an error.
     ///
     /// Needs an account: signed out, the server answers with no one, so it fails with
     /// [`ReaderError::NeedsAccount`] and sends nothing.

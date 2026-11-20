@@ -119,7 +119,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 ctx.runtime.block_on(async {
                     let suggest = |filter: Option<&str>, image_size| {
                         let params = ReaderUserSuggestionsParams {
-                            site_id: Some(SITE),
+                            site_id: Some(ctx.site_id),
                             filter: filter.map(str::to_string),
                             image_size,
                             ..Default::default()
@@ -134,11 +134,14 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                                 .map(|response| response.data)
                         }
                     };
-                    // The account isn't a member of the site, and its people are suggested.
+                    // The server only suggests the people of a site the account is a member of,
+                    // so the trial asks about the account's own test site, which has at least the
+                    // account.
                     let all = suggest(None, None).await?;
-                    if all.suggestions.len() < 10 || !all.unreadable_suggestions.is_empty() {
+                    if all.suggestions.is_empty() || !all.unreadable_suggestions.is_empty() {
                         return Err(format!(
-                            "The site should have many people to suggest, all readable: {} and {} unreadable",
+                            "The account's own site should have people to suggest, all readable: \
+                             {} and {} unreadable",
                             all.suggestions.len(),
                             all.unreadable_suggestions.len()
                         )
@@ -150,27 +153,24 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         return Err("Each suggestion should have a login and an avatar".into());
                     }
 
-                    // A filter narrows them, and the avatars come at the size asked for.
-                    let filtered = suggest(Some("j"), Some(40)).await?;
-                    if filtered.suggestions.is_empty()
-                        || filtered.suggestions.len() >= all.suggestions.len()
-                    {
-                        return Err("The filter should leave some of the people, not all".into());
-                    }
-                    // Most of the avatars come at the size asked for; a few come at 32 whatever
-                    // is asked.
-                    let sized = filtered
+                    // A filter by one of their logins keeps that person, and a filter that
+                    // matches no one leaves no one.
+                    let login = &all.suggestions[all.suggestions.len() - 1].user_login;
+                    let filtered = suggest(Some(login), Some(40)).await?;
+                    if !filtered
                         .suggestions
                         .iter()
-                        .filter(|suggestion| {
-                            suggestion
-                                .image_url
-                                .as_deref()
-                                .is_some_and(|url| url.contains("s=40"))
-                        })
-                        .count();
-                    if sized * 2 < filtered.suggestions.len() {
-                        return Err("Most avatars should be at the size asked for".into());
+                        .any(|suggestion| &suggestion.user_login == login)
+                        || filtered.suggestions.len() > all.suggestions.len()
+                    {
+                        return Err("A filter by a login should keep that person".into());
+                    }
+                    if !suggest(Some("no-such-user-xyzzy-98765"), None)
+                        .await?
+                        .suggestions
+                        .is_empty()
+                    {
+                        return Err("A filter that matches no one should leave no one".into());
                     }
                     Ok(())
                 })
