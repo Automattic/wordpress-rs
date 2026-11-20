@@ -136,6 +136,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Swift example app's Reader home no longer says a post's address needs an account: a Reader address needs none, and signed out a post's address opens when the post is found by its slug.
 - The Kotlin example app's Reader home no longer says a post's address needs an account: a Reader address needs none, and signed out a post's address opens when the post is found by its slug.
 
+### Security
+
+- Kotlin: `DebugMiddleware` no longer prints credentials. It prints `<redacted>` in place of the value of the `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie` and `X-WP-Nonce` headers (keeping an `Authorization` scheme such as `Bearer`), on requests and responses, redacts secret query values in the URL, and redacts secret members such as `access_token` and `password` in a JSON response body.
+
 ## [0.11.1] - 2026-11-18
 
 ### Fixed
