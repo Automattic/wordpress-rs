@@ -772,6 +772,9 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             let ctx = Arc::clone(&ctx);
             move || {
                 let _follows = changing(&ctx.locks.follows);
+                // Turning the site's comment emails on and off subscribes the account to its
+                // post's comments and unsubscribes it, which the comment subscription trial reads.
+                let _own_post = alone(&ctx.locks.own_post);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
                 };
@@ -1362,9 +1365,26 @@ async fn comment_subscription(
     ))
 }
 
-/// Sends one change to a post's comment subscription, and checks what the server then has.
+/// The post's comment subscription as the service's cache shows it.
+fn cached_comment_subscription(
+    service: &ReaderService,
+    post: &ReaderPostRecord,
+) -> Result<(Option<bool>, Option<bool>), Failed> {
+    let cached = service
+        .cached_post(post.key.clone())
+        .map_err(|e| e.to_string())?
+        .ok_or("The post left the cache")?;
+    Ok((
+        cached.is_subscribed_comments,
+        cached.receives_comment_notifications,
+    ))
+}
+
+/// Sends one change to a post's comment subscription, and checks what the server then has and
+/// what the cache shows.
 async fn expect_comment_subscription(
     ctx: &TestContext,
+    service: &ReaderService,
     post: &ReaderPostRecord,
     sent: Result<ReaderActionOutcome, ReaderError>,
     expected: (bool, bool),
@@ -1372,6 +1392,13 @@ async fn expect_comment_subscription(
     let outcome = sent.map_err(|e| format!("The change was refused: {e}"))?;
     if outcome != ReaderActionOutcome::Synced {
         return Err(format!("The change wasn't sent: {outcome:?}").into());
+    }
+    let cached = cached_comment_subscription(service, post)?;
+    if cached != (Some(expected.0), Some(expected.1)) {
+        return Err(format!(
+            "The cache has (subscribed, notified) as {cached:?}, expected {expected:?}"
+        )
+        .into());
     }
     let has = read_back(
         async || comment_subscription(ctx, post).await,
@@ -1388,39 +1415,56 @@ async fn expect_comment_subscription(
 }
 
 /// Subscribes to a post's comments, turns their notifications on and off, and unsubscribes,
-/// checking the server after each.
+/// checking the server and the cache after each.
 async fn subscribe_to_comments_and_check(
     ctx: &TestContext,
     service: &ReaderService,
     post: &ReaderPostRecord,
 ) -> Result<(), Failed> {
+    // While the site's comments are emailed, the server keeps every post's comments subscribed,
+    // with notifications off, whatever is sent for the post.
+    let site_id = post.identity.site_id.ok_or("The post has no site")?;
+    if delivery_on_the_server(ctx, site_id).await?.email_comments {
+        return Err(
+            "The site's comments are emailed to the account, which keeps its posts' \
+                    comments subscribed: turn the site's comment emails off first"
+                .into(),
+        );
+    }
     let identity = post.identity.clone();
     if comment_subscription(ctx, post).await?.0 {
         let sent = service
             .set_comments_subscribed(identity.clone(), false)
             .await;
-        expect_comment_subscription(ctx, post, sent, (false, false)).await?;
+        expect_comment_subscription(ctx, service, post, sent, (false, false)).await?;
     }
     let sent = service
         .set_comments_subscribed(identity.clone(), true)
         .await;
     expect_synced("Subscribing", sent)?;
     // Whether a new subscription notifies is the server's to choose, so only the subscription is
-    // checked here.
+    // checked here, and that the cache shows what the server chose.
     let subscribed = read_back(async || comment_subscription(ctx, post).await, |has| has.0).await?;
     if !subscribed.0 {
         return Err("The server doesn't have the subscription".into());
     }
+    let cached = cached_comment_subscription(service, post)?;
+    if cached != (Some(true), Some(subscribed.1)) {
+        return Err(format!(
+            "The cache has (subscribed, notified) as {cached:?}, the server {subscribed:?}"
+        )
+        .into());
+    }
     let sent = service
         .set_comment_notifications(identity.clone(), true)
         .await;
-    expect_comment_subscription(ctx, post, sent, (true, true)).await?;
+    expect_comment_subscription(ctx, service, post, sent, (true, true)).await?;
     let sent = service
         .set_comment_notifications(identity.clone(), false)
         .await;
-    expect_comment_subscription(ctx, post, sent, (true, false)).await?;
+    expect_comment_subscription(ctx, service, post, sent, (true, false)).await?;
     let sent = service.set_comments_subscribed(identity, false).await;
-    expect_comment_subscription(ctx, post, sent, (false, false)).await
+    expect_comment_subscription(ctx, service, post, sent, (false, false)).await
 }
 
 /// Puts a post's comment subscription back to what it was.

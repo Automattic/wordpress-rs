@@ -37,7 +37,9 @@ pub struct AccountLocks {
     /// same post.
     pub seen: Mutex<()>,
     /// The newest post of the account's own test site: the account's like of it, its comments,
-    /// and the account's subscription to them.
+    /// and the account's subscription to them. The site's comment emails change that
+    /// subscription too: turning them on subscribes the account to the post's comments, and
+    /// turning them off unsubscribes it.
     pub own_post: Mutex<()>,
 }
 
@@ -64,8 +66,10 @@ const READ_BACK_PAUSE: Duration = Duration::from_secs(2);
 /// Reads back something the server took, asking again until `shows_it` accepts the answer.
 ///
 /// For a moment after a change, a read can be answered with what the server had before it: seen
-/// marks, a post's comment notifications and a followed site's notifications have all read back
-/// stale straight after the server took the change, and then caught up. So the read is asked
+/// marks and a followed site's notifications have read back stale straight after the server took
+/// the change, and then caught up. (A post's comment subscription once seemed to, but that was
+/// another trial changing the site's comment emails meanwhile, which the `own_post` lock now
+/// keeps apart.) So the read is asked
 /// again, [`READ_BACK_PAUSE`] apart, until `shows_it` accepts it or it has been asked
 /// [`READ_BACK_TRIES`] times. The last answer is returned either way, for the trial to compare
 /// exactly and fail with its own message. A read that fails isn't asked again: its error is
