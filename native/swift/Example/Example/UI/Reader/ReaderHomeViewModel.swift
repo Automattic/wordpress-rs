@@ -144,8 +144,9 @@ final class ReaderHomeViewModel {
         }
     }
 
-    /// Finds what the link in `postURL` opens, and returns the screen that shows it: a post, or a site's or a
-    /// feed's stream. A link the Reader can't show sets `linkAnswer` to why, and returns `nil`.
+    /// Finds what the link in `postURL` opens, and returns the screen that shows it: a post, or a stream, such as
+    /// a site's, a tag's or a search. A link the Reader can't show sets `linkAnswer` to why, and returns `nil`, as
+    /// does the search page's address, which has no query.
     func openLink() async -> ReaderRoute? {
         let url = postURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !url.isEmpty else { return nil }
@@ -159,6 +160,13 @@ final class ReaderHomeViewModel {
                 route = .stream(.site(siteId: siteId))
             case .feed(let feedId, _):
                 route = .stream(.feed(feedId: feedId))
+            case .stream(.discover(let tags)) where tags.isEmpty && self.session.isSignedOut:
+                // Discover from an address names no tags: ask for the reader's, as the menu's Discover does.
+                route = .stream(.discover(tags: self.followedTags.map(\.slug)))
+            case .stream(let stream):
+                route = .stream(stream)
+            case .search:
+                self.linkAnswer = "That's the Reader's search. Type what to search for under Search posts."
             case .notInReader(let reason):
                 self.linkAnswer = reason.message
             }

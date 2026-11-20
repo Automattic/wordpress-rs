@@ -3292,8 +3292,6 @@ mod links {
         for owner in [ACCOUNT, ReaderOwner::SignedOut] {
             let (service, executor) = service_for(owner);
             for link in [
-                "https://wordpress.com/read",
-                "https://wordpress.com/reader/",
                 "https://wordpress.com/read/blogs",
                 "https://wordpress.com/read/blogs/example.com",
                 "https://wordpress.com/read/blogs/0",
@@ -3303,11 +3301,26 @@ mod links {
                 "https://wordpress.com/read/feeds/456/items/9",
                 // The older addresses are only under `/read/`.
                 "https://wordpress.com/reader/blog/id/123",
-                // Streams that aren't a site or a feed.
-                "https://wordpress.com/read/tag/photography",
-                "https://wordpress.com/reader/list/someone/a-list",
-                "https://wordpress.com/read/search?q=cats",
-                "https://wordpress.com/reader/a8c",
+                // Near misses of the addresses of other streams.
+                "https://wordpress.com/tag/",
+                "https://wordpress.com/tag/cats/dogs",
+                "https://wordpress.com/tag/cats.dogs",
+                "https://wordpress.com/tag/a+b",
+                "https://wordpress.com/tag/%20%20",
+                "https://wordpress.com/reader/tag/cats",
+                "https://wordpress.com/read/tags",
+                "https://wordpress.com/read/list/someone",
+                "https://wordpress.com/reader/list/new",
+                "https://wordpress.com/reader/list/someone/a-list/edit",
+                "https://wordpress.com/read/list/someone/a-list/posts",
+                "https://wordpress.com/discover/add-new",
+                "https://wordpress.com/discover/tags?selectedTag=a.b",
+                "https://wordpress.com/activities/comments",
+                "https://wordpress.com/following/manage",
+                "https://wordpress.com/reader/subscriptions",
+                "https://wordpress.com/reader/likes",
+                "https://wordpress.com/reader/conversations",
+                "https://wordpress.com/fr/reader/a8c/more",
             ] {
                 assert_eq!(
                     service.resolve_link(link.to_string()).await.unwrap(),
@@ -3317,6 +3330,226 @@ mod links {
             }
             assert!(executor.sent().is_empty());
         }
+    }
+
+    fn tag(slug: &str) -> ReaderStream {
+        ReaderStream::Tag {
+            slug: ReaderTagSlug(slug.to_string()),
+        }
+    }
+
+    fn search(query: &str, sort: ReaderSearchSort) -> ReaderStream {
+        ReaderStream::Search {
+            query: query.to_string(),
+            sort,
+        }
+    }
+
+    fn discover(tags: &[&str]) -> ReaderStream {
+        ReaderStream::Discover {
+            tags: tags
+                .iter()
+                .map(|tag| ReaderTagSlug(tag.to_string()))
+                .collect(),
+        }
+    }
+
+    #[tokio::test]
+    async fn the_readers_own_address_of_another_stream_opens_it_and_sends_nothing() {
+        let list = ReaderStream::ReaderList {
+            owner: ReaderListOwner("someone".to_string()),
+            slug: ReaderListSlug("a-list".to_string()),
+        };
+        let cases = [
+            // A tag's.
+            ("https://wordpress.com/tag/photography", tag("photography")),
+            (
+                "https://www.wordpress.com/TAG/Photography/",
+                tag("photography"),
+            ),
+            (
+                "wordpress.com/tag/photography?sort=relevance",
+                tag("photography"),
+            ),
+            (
+                "https://wordpress.com/fr/tag/photographie",
+                tag("photographie"),
+            ),
+            (
+                "https://wordpress.com/pt-br/tag/fotografia",
+                tag("fotografia"),
+            ),
+            ("https://wordpress.com/tag/#photography", tag("photography")),
+            (
+                "https://wordpress.com/tag/Daily%20Prompt",
+                tag("daily-prompt"),
+            ),
+            ("https://wordpress.com/tag/%E5%86%99%E7%9C%9F", tag("写真")),
+            ("https://wordpress.com/tag/l_a--b", tag("l_a-b")),
+            (
+                "https://wordpress.com/read/tag/photography",
+                tag("photography"),
+            ),
+            (
+                "https://wordpress.com/read/tags/photography",
+                tag("photography"),
+            ),
+            (
+                "https://wordpress.com/reader/tags/photography/",
+                tag("photography"),
+            ),
+            // A list's.
+            (
+                "https://wordpress.com/read/list/someone/a-list",
+                list.clone(),
+            ),
+            (
+                "https://wordpress.com/reader/list/someone/a-list/",
+                list.clone(),
+            ),
+            (
+                "https://wordpress.com/reader/list/someone/a-list/posts",
+                list.clone(),
+            ),
+            // A search.
+            (
+                "https://wordpress.com/read/search?q=cats",
+                search("cats", ReaderSearchSort::Relevance),
+            ),
+            (
+                "https://wordpress.com/reader/search?q=cats+%26+dogs&sort=date",
+                search("cats & dogs", ReaderSearchSort::Date),
+            ),
+            (
+                "https://wordpress.com/discover/search?sort=relevance&q=cats",
+                search("cats", ReaderSearchSort::Relevance),
+            ),
+            (
+                "https://wordpress.com/es/discover/search?q=gatos&sort=nonsense",
+                search("gatos", ReaderSearchSort::Relevance),
+            ),
+            (
+                "https://wordpress.com/recommendations?q=cats",
+                search("cats", ReaderSearchSort::Relevance),
+            ),
+            // Discover, and its tabs.
+            ("https://wordpress.com/discover", discover(&[])),
+            ("https://wordpress.com/discover/", discover(&[])),
+            ("https://wordpress.com/discover/recommended", discover(&[])),
+            ("https://wordpress.com/discover/latest", discover(&[])),
+            ("https://wordpress.com/de/discover", discover(&[])),
+            ("https://wordpress.com/read/discover", discover(&[])),
+            ("https://wordpress.com/reader/discover", discover(&[])),
+            (
+                "https://wordpress.com/discover/tags?selectedTag=art",
+                discover(&["art"]),
+            ),
+            (
+                "https://wordpress.com/discover/tags",
+                discover(&["dailyprompt"]),
+            ),
+            (
+                "https://wordpress.com/discover/freshly-pressed",
+                ReaderStream::FreshlyPressed,
+            ),
+        ];
+        for owner in [ACCOUNT, ReaderOwner::SignedOut] {
+            let (service, executor) = service_for(owner);
+            for (link, stream) in &cases {
+                assert_eq!(
+                    service.resolve_link(link.to_string()).await.unwrap(),
+                    ReaderLink::Stream {
+                        stream: stream.clone()
+                    },
+                    "{link}"
+                );
+            }
+            for link in [
+                "https://wordpress.com/read/search",
+                "https://wordpress.com/reader/search?q=%20",
+                "https://wordpress.com/discover/search?sort=date",
+                "https://wordpress.com/recommendations",
+            ] {
+                assert_eq!(
+                    service.resolve_link(link.to_string()).await.unwrap(),
+                    ReaderLink::Search,
+                    "{link}"
+                );
+            }
+            assert!(executor.sent().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn the_address_of_an_accounts_stream_opens_it_and_needs_an_account_signed_out() {
+        let cases = [
+            ("https://wordpress.com/read", ReaderStream::Following),
+            ("https://wordpress.com/reader/", ReaderStream::Following),
+            ("https://wordpress.com/fr/read", ReaderStream::Following),
+            (
+                "https://wordpress.com/read/following",
+                ReaderStream::Following,
+            ),
+            (
+                "https://wordpress.com/reader/following",
+                ReaderStream::Following,
+            ),
+            ("https://wordpress.com/following", ReaderStream::Following),
+            (
+                "https://wordpress.com/activities/likes",
+                ReaderStream::Liked,
+            ),
+            ("https://wordpress.com/read/a8c", ReaderStream::Automattic),
+            ("https://wordpress.com/reader/a8c", ReaderStream::Automattic),
+            ("https://wordpress.com/read/p2", ReaderStream::P2),
+            ("https://wordpress.com/reader/p2/", ReaderStream::P2),
+        ];
+        let (service, executor) = service();
+        let (signed_out, signed_out_executor) = service_for(ReaderOwner::SignedOut);
+        for (link, stream) in cases {
+            assert_eq!(
+                service.resolve_link(link.to_string()).await.unwrap(),
+                ReaderLink::Stream {
+                    stream: stream.clone()
+                },
+                "{link}"
+            );
+            assert!(
+                matches!(
+                    signed_out.resolve_link(link.to_string()).await,
+                    Err(ReaderError::NeedsAccount)
+                ),
+                "{link}"
+            );
+        }
+        assert!(executor.sent().is_empty());
+        assert!(signed_out_executor.sent().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_path_like_a_readers_stream_elsewhere_is_not_read_as_one() {
+        // On another host, or with a first part that isn't a language, these are addresses on a
+        // site, resolved as any other.
+        let (service, executor) = service();
+        executor.push(error(404, "post_not_found"));
+        executor.push(error(404, "no_such_feed"));
+        assert_eq!(
+            service
+                .resolve_link("https://example.wordpress.com/tag/cats".to_string())
+                .await
+                .unwrap(),
+            not_in_reader(ReaderLinkNotInReader::NothingThere)
+        );
+        executor.push(error(404, "post_not_found"));
+        executor.push(error(404, "no_such_feed"));
+        assert_eq!(
+            service
+                .resolve_link("https://wordpress.com/blog/tag/cats".to_string())
+                .await
+                .unwrap(),
+            not_in_reader(ReaderLinkNotInReader::NothingThere)
+        );
+        assert_eq!(executor.sent().len(), 4);
     }
 
     #[tokio::test]

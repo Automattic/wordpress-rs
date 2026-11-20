@@ -113,10 +113,11 @@ internal class ReaderHomeState(val session: ReaderSession, val requests: ReaderR
         private set
 
     /**
-     * Finds what a link opens and opens it: a post, or a site's or a feed's stream. A link the
-     * Reader can't show sets [linkAnswer] to why. A site's, a feed's or a Reader address needs no
-     * account; signed out, a post's address opens when the post is found by its slug, and
-     * otherwise needs an account.
+     * Finds what a link opens and opens it: a post, or a stream, such as a site's, a tag's or a
+     * search. A link the Reader can't show sets [linkAnswer] to why, as does the search page's
+     * address, which has no query. A site's, a feed's or a Reader address needs no account but for
+     * the account's own streams; signed out, a post's address opens when the post is found by its
+     * slug, and otherwise needs an account.
      */
     fun openLink(url: String, open: (ReaderDestination) -> Unit) {
         linkAnswer = null
@@ -126,6 +127,13 @@ internal class ReaderHomeState(val session: ReaderSession, val requests: ReaderR
                 is ReaderLink.Post -> open(ReaderDestination.Post(link.post.key, link.post.identity))
                 is ReaderLink.Site -> openStream(ReaderStream.Site(link.siteId))
                 is ReaderLink.Feed -> openStream(ReaderStream.Feed(link.feedId))
+                // Discover from an address names no tags: ask for the reader's, as the menu's does.
+                is ReaderLink.Stream -> {
+                    val stream = link.stream
+                    val asksForTags = stream is ReaderStream.Discover && stream.tags.isEmpty() && !session.isSignedIn
+                    openStream(if (asksForTags) ReaderStream.Discover(followedSlugs) else stream)
+                }
+                ReaderLink.Search -> linkAnswer = "That's the Reader's search. Type what to search for under Search."
                 is ReaderLink.NotInReader -> linkAnswer = readerLinkNotInReaderMessage(link.reason)
             }
         }

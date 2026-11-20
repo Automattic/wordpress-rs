@@ -31,14 +31,49 @@
 //! The IDs are numbers, as the web's routes require. Asked about with IDs that name nothing,
 //! `read/sites/{id}` is a 404 `unknown_blog` (410 `site_gone` for a deleted site),
 //! `read/feed/{id}` a 404 `no_such_feed`, a site's post a 404 `unknown_post` and a feed's item a
-//! 404 `no_such_item`. The Reader's other pages, such as a tag's, a list's, search or Discover,
-//! open a stream that isn't a site or a feed, and `ReaderLink` has nothing for them yet.
+//! 404 `no_such_item`.
+//!
+//! The Reader's pages that open a stream that isn't a site's or a feed's are read here too, and
+//! need no request. Their shapes, from the web's routes and redirects (Calypso's
+//! `client/reader/index.ts`, `controller.jsx`'s `setupReadRoutes`, `tag-stream/`, `discover/` and
+//! `liked-stream/`, 2026-11-18), Android's `ReaderLinkHandler` and manifest, and iOS's
+//! `ReaderRoute` (both 2026-11-17):
+//!
+//! - Following: `read`, `reader`, `read/following`, `reader/following` and `following`.
+//! - Liked: `activities/likes`. Automattic: `read/a8c`, `reader/a8c`. P2: `read/p2`, `reader/p2`.
+//!   These need an account, as their streams do.
+//! - A tag: `tag/{slug}`, `tag/#{slug}` (the web moves the fragment into the path), `read/tag/{slug}`
+//!   (the web redirects it), and `read/tags/{slug}` and `reader/tags/{slug}`, the API's own form,
+//!   which nothing routes but a reader may paste. The slug is read as the web reads it: decoded,
+//!   trimmed, in lower case, with spaces as dashes. It must then be letters, digits, `_` and `-`,
+//!   or characters outside ASCII, as Android's `ReaderUtils.isValidTagSlug` requires. The web's
+//!   `?sort=relevance` (its popular posts of a tag) isn't a stream the library has, so it's not read.
+//! - A list: `read/list/{owner}/{slug}`, `reader/list/{owner}/{slug}`, and
+//!   `reader/list/{owner}/{slug}/{view}` but for the `edit`, `export` and `delete` pages.
+//! - A search: `read/search`, `reader/search`, `discover/search` and `recommendations`, with the
+//!   query in `q` and `sort=date` for the newest first; any other sort is the web's default, best
+//!   match. With no query, it's the search page: [`ReaderLink::Search`].
+//! - Discover: `discover`, `discover/recommended`, `read/discover` and `reader/discover`.
+//!   `discover/tags?selectedTag={slug}` is Discover of that one tag, as the web asks for it
+//!   (`tags={slug}`), and of `dailyprompt` with none, the web's default.
+//!   `discover/freshly-pressed` is Freshly Pressed. `discover/latest` is the latest posts of the
+//!   reader's tags, which the address doesn't name, so it opens Discover.
+//! - `tag`, `discover`, `read` and `reader` can follow a language, such as `fr/tag/{slug}`. The
+//!   stream is in the reader's language, as [`ReaderService::set_language`] sets it, not the
+//!   address's.
+//!
+//! Neither app reads a search's query or Discover's tag from the address: Android opens its search
+//! and Discover screens, iOS too, and both open a tag by its slug. The library follows the web,
+//! which does read them.
 
 use super::actions::is_refused;
-use super::{ReaderError, ReaderService};
+use super::{ReaderError, ReaderService, ReaderStream};
 use wp_api::prelude::{WpApiError, WpErrorCode};
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::reader_post::{ReaderPostBySlugParams, ReaderPostSlug, ReaderResolveUrlParams};
+use wp_api::wp_com::reader_posts::{
+    ReaderListOwner, ReaderListSlug, ReaderSearchSort, ReaderTagSlug,
+};
 use wp_api::wp_com::reader_saved::{ReaderFeedId, ReaderFeedItemId, ReaderPostSaveIdentity};
 use wp_api::wp_com::reader_sites::{ReaderFeedSearchParams, ReaderSiteParams};
 use wp_api::wp_com::sites::WpComSiteIdentifier;
@@ -67,6 +102,16 @@ pub enum ReaderLink {
         feed_id: ReaderFeedId,
         site: ReaderSiteRecord,
     },
+    /// One of the Reader's own pages of a stream that isn't a site's or a feed's: a tag's, a
+    /// list's, a search, Discover, Freshly Pressed, or one of the account's streams. Open
+    /// `stream`. Nothing was sent.
+    ///
+    /// A [`ReaderStream::Discover`] from an address has no tags: open it as Discover is opened
+    /// from the menu, with the reader's interests when signed out.
+    Stream { stream: ReaderStream },
+    /// The Reader's search page, with no query in the address: open the search screen. Nothing was
+    /// sent.
+    Search,
     /// Nothing the Reader can show.
     NotInReader { reason: ReaderLinkNotInReader },
 }
@@ -81,7 +126,8 @@ pub enum ReaderLinkNotInReader {
     ShortLink,
     /// The address is on a WordPress.com or Jetpack site, and the server has no post there and no
     /// feed, such as a page that isn't there. Or it's one of the Reader's own addresses, and it
-    /// names no site, feed or post: one the Reader doesn't have, or one of its other pages.
+    /// names nothing the Reader has: a site, feed or post the server doesn't have, or a page that
+    /// isn't a stream, such as the subscriptions manager.
     NothingThere,
     /// There's no WordPress.com or Jetpack site at the address, and no feed.
     NotWordPressOrFeed,
@@ -96,7 +142,7 @@ pub fn reader_link_not_in_reader_message(reason: ReaderLinkNotInReader) -> Strin
             "The Reader can't open a wp.me short link. Open it in a browser."
         }
         ReaderLinkNotInReader::NothingThere => {
-            "There's no post, site or feed at that address for the Reader to show."
+            "There's nothing at that address for the Reader to show."
         }
         ReaderLinkNotInReader::NotWordPressOrFeed => {
             "That address isn't a WordPress.com or Jetpack site, and has no feed the Reader can show."
@@ -186,12 +232,16 @@ fn post_slug(url: &url::Url) -> Option<String> {
 const READER_HOSTS: [&str; 2] = ["wordpress.com", "www.wordpress.com"];
 
 /// What one of the Reader's own addresses names. See the module's documentation for the shapes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ReaderAddress {
     Site(WpComSiteId),
     Feed(ReaderFeedId),
     SitePost(WpComSiteId, u64),
     FeedPost(ReaderFeedId, ReaderFeedItemId),
+    /// A stream that isn't a site's or a feed's.
+    Stream(ReaderStream),
+    /// The search page, with no query.
+    SearchPage,
     /// A Reader address that names no site, feed or post.
     Nothing,
 }
@@ -204,42 +254,158 @@ fn reader_id(segment: &str) -> Option<u64> {
     segment.parse().ok().filter(|id| *id != 0)
 }
 
+/// The words a Reader address starts with, after any language.
+const READER_WORDS: [&str; 7] = [
+    "read",
+    "reader",
+    "tag",
+    "discover",
+    "following",
+    "activities",
+    "recommendations",
+];
+
+/// Whether a path's first part is a language, as the web puts one before some Reader pages:
+/// `fr`, `pt-br`, `zh-tw`.
+fn is_language(word: &str) -> bool {
+    let (language, region) = word.split_once('-').unwrap_or((word, ""));
+    let letters = |part: &str, sizes: std::ops::RangeInclusive<usize>| {
+        sizes.contains(&part.len()) && part.bytes().all(|byte| byte.is_ascii_lowercase())
+    };
+    letters(language, 2..=3) && (region.is_empty() || letters(region, 2..=4))
+}
+
+/// A tag's slug as it's written in an address, read as the web reads it (Calypso's
+/// `tag-stream/controller.jsx`): decoded, trimmed, in lower case, with spaces as dashes and no
+/// two dashes together. `None` unless what's left is letters, digits, `_` and `-`, or characters
+/// outside ASCII that aren't spaces or controls, as Android's `ReaderUtils.isValidTagSlug` requires.
+fn tag_slug(written: &str) -> Option<ReaderTagSlug> {
+    let decoded = percent_decoded(written)?.trim().to_lowercase();
+    let mut slug = String::with_capacity(decoded.len());
+    for character in decoded.chars() {
+        let character = if character.is_whitespace() {
+            '-'
+        } else {
+            character
+        };
+        if !(character == '-' && slug.ends_with('-')) {
+            slug.push(character);
+        }
+    }
+    let allowed = |character: char| {
+        character.is_ascii_alphanumeric()
+            || matches!(character, '_' | '-')
+            || (!character.is_ascii() && !character.is_whitespace() && !character.is_control())
+    };
+    (!slug.is_empty() && slug.chars().all(allowed)).then_some(ReaderTagSlug(slug))
+}
+
+/// The value of a query parameter, decoded as a browser decodes it, when it isn't blank.
+fn query_value(url: &url::Url, name: &str) -> Option<String> {
+    url.query_pairs()
+        .find(|(key, _)| key == name)
+        .map(|(_, value)| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+/// A search page: the search of its `q` and `sort`, or the search page when it has no query.
+fn search_address(url: &url::Url) -> ReaderAddress {
+    match query_value(url, "q") {
+        Some(query) => ReaderAddress::Stream(ReaderStream::Search {
+            query,
+            sort: match query_value(url, "sort").as_deref() {
+                Some("date") => ReaderSearchSort::Date,
+                _ => ReaderSearchSort::Relevance,
+            },
+        }),
+        None => ReaderAddress::SearchPage,
+    }
+}
+
 /// What a Reader address names, or `None` when the address isn't one of the Reader's: on
-/// another host, or with a path that doesn't start with `read` or `reader`. `host` is in lower
-/// case.
+/// another host, or with a path that doesn't start with one of [`READER_WORDS`], after any
+/// language. `host` is in lower case.
 fn reader_address(host: &str, url: &url::Url) -> Option<ReaderAddress> {
     if !READER_HOSTS.contains(&host) {
         return None;
     }
+    // The web matches the words of a Reader address in any case, and the IDs as digits.
     let segments: Vec<&str> = url
         .path_segments()?
         .filter(|segment| !segment.is_empty())
         .collect();
-    let (first, rest) = segments.split_first()?;
-    let is_read = first.eq_ignore_ascii_case("read");
-    if !is_read && !first.eq_ignore_ascii_case("reader") {
+    let lower: Vec<String> = segments
+        .iter()
+        .map(|word| word.to_ascii_lowercase())
+        .collect();
+    let mut words: Vec<&str> = lower.iter().map(String::as_str).collect();
+    let mut written = segments;
+    if words.len() > 1 && is_language(words[0]) && READER_WORDS.contains(&words[1]) {
+        words.remove(0);
+        written.remove(0);
+    }
+    let first = *words.first()?;
+    if !READER_WORDS.contains(&first) {
         return None;
     }
-    // The web matches the words of a Reader address in any case, and the IDs as digits.
-    let words: Vec<String> = rest.iter().map(|word| word.to_ascii_lowercase()).collect();
-    let words: Vec<&str> = words.iter().map(String::as_str).collect();
+    let stream = |stream: ReaderStream| Some(ReaderAddress::Stream(stream));
+    let discover = || stream(ReaderStream::Discover { tags: Vec::new() });
+    let tag = |slug: &str| tag_slug(slug).and_then(|slug| stream(ReaderStream::Tag { slug }));
+    let list = |owner: &str, slug: &str| {
+        let owner = percent_decoded(owner)?;
+        let slug = percent_decoded(slug)?;
+        stream(ReaderStream::ReaderList {
+            owner: ReaderListOwner(owner),
+            slug: ReaderListSlug(slug),
+        })
+    };
     let site = |id: &str| reader_id(id).map(WpComSiteId);
     let feed = |id: &str| reader_id(id).map(ReaderFeedId);
     let named = match words.as_slice() {
-        ["blogs", id] | ["blogs", id, "posts"] => site(id).map(ReaderAddress::Site),
-        ["feeds", id] | ["feeds", id, "posts"] => feed(id).map(ReaderAddress::Feed),
-        ["blogs", id, "posts", post] => site(id)
+        ["read" | "reader"] | ["read" | "reader" | "following", "following"] | ["following"] => {
+            stream(ReaderStream::Following)
+        }
+        ["activities", "likes"] => stream(ReaderStream::Liked),
+        ["read" | "reader", "a8c"] => stream(ReaderStream::Automattic),
+        ["read" | "reader", "p2"] => stream(ReaderStream::P2),
+        // `/tag/#cats`: the slug is the fragment.
+        ["tag"] => url.fragment().and_then(tag),
+        ["tag", _] => tag(written[1]),
+        ["read", "tag", _] | ["read" | "reader", "tags", _] => tag(written[2]),
+        ["read" | "reader", "list", _, _] => list(written[2], written[3]),
+        ["reader", "list", _, _, view] if !matches!(*view, "edit" | "export" | "delete") => {
+            list(written[2], written[3])
+        }
+        ["read" | "reader" | "discover", "search"] | ["recommendations"] => {
+            Some(search_address(url))
+        }
+        ["discover"] | ["discover", "recommended" | "latest"] | ["read" | "reader", "discover"] => {
+            discover()
+        }
+        ["discover", "freshly-pressed"] => stream(ReaderStream::FreshlyPressed),
+        ["discover", "tags"] => match url.query_pairs().find(|(key, _)| key == "selectedTag") {
+            Some((_, slug)) => tag_slug(&slug),
+            None => Some(ReaderTagSlug("dailyprompt".to_string())),
+        }
+        .and_then(|slug| stream(ReaderStream::Discover { tags: vec![slug] })),
+        ["read" | "reader", "blogs", id] | ["read" | "reader", "blogs", id, "posts"] => {
+            site(id).map(ReaderAddress::Site)
+        }
+        ["read" | "reader", "feeds", id] | ["read" | "reader", "feeds", id, "posts"] => {
+            feed(id).map(ReaderAddress::Feed)
+        }
+        ["read" | "reader", "blogs", id, "posts", post] => site(id)
             .zip(reader_id(post))
             .map(|(site, post)| ReaderAddress::SitePost(site, post)),
-        ["feeds", id, "posts", item] => feed(id)
+        ["read" | "reader", "feeds", id, "posts", item] => feed(id)
             .zip(reader_id(item).map(ReaderFeedItemId))
             .map(|(feed, item)| ReaderAddress::FeedPost(feed, item)),
-        ["blog", "id", id] if is_read => site(id).map(ReaderAddress::Site),
-        ["blog", "feed", id] if is_read => feed(id).map(ReaderAddress::Feed),
-        ["post", "id", id, post] if is_read => site(id)
+        ["read", "blog", "id", id] => site(id).map(ReaderAddress::Site),
+        ["read", "blog", "feed", id] => feed(id).map(ReaderAddress::Feed),
+        ["read", "post", "id", id, post] => site(id)
             .zip(reader_id(post))
             .map(|(site, post)| ReaderAddress::SitePost(site, post)),
-        ["post", "feed", id, item] if is_read => feed(id)
+        ["read", "post", "feed", id, item] => feed(id)
             .zip(reader_id(item).map(ReaderFeedItemId))
             .map(|(feed, item)| ReaderAddress::FeedPost(feed, item)),
         _ => None,
@@ -272,6 +438,11 @@ impl ReaderService {
     ///   [`Self::fetch_post`] fetch it: nothing is sent to the resolver, and a public site's or a
     ///   feed's needs no account. One that names nothing, or names IDs the server doesn't have, is
     ///   [`ReaderLinkNotInReader::NothingThere`]. The module's documentation lists the shapes.
+    /// - One of the Reader's own pages of another stream, such as `https://wordpress.com/tag/cats`
+    ///   or `https://wordpress.com/discover/search?q=cats`, is a [`ReaderLink::Stream`], and the
+    ///   search page with no query a [`ReaderLink::Search`]. Nothing is sent. Signed out, the
+    ///   address of a stream that needs an account, such as Following or Liked, is
+    ///   [`ReaderError::NeedsAccount`].
     /// - A site's home address, such as `https://example.com/`, is looked up as a WordPress.com
     ///   or Jetpack site, then as an address with a feed. It needs no account.
     /// - Any other address is resolved to a post, which needs an account: the server only does it
@@ -407,6 +578,13 @@ impl ReaderService {
                     })
                     .await?,
             },
+            ReaderAddress::Stream(stream) => {
+                if stream.needs_account() && self.context.owner == ReaderOwner::SignedOut {
+                    return Err(ReaderError::NeedsAccount);
+                }
+                ReaderLink::Stream { stream }
+            }
+            ReaderAddress::SearchPage => ReaderLink::Search,
             ReaderAddress::Nothing => ReaderLink::NotInReader {
                 reason: ReaderLinkNotInReader::NothingThere,
             },
