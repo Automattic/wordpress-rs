@@ -187,9 +187,10 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             let ctx = Arc::clone(&ctx);
             move || {
                 ctx.runtime.block_on(async {
-                    // The site's newest post, which is recent enough to still be in its feed.
+                    // The site's newest post that is in its feed. A post published in the last
+                    // few hours can come without a feed item ID, until the feed has picked it up.
                     let params = ReaderStreamParams {
-                        number: Some(1),
+                        number: Some(5),
                         ..Default::default()
                     };
                     let page = ctx
@@ -199,11 +200,13 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         .await
                         .map_err(|e| e.to_string())?
                         .data;
-                    let in_stream = page.posts.first().ok_or("The site has no posts")?;
-                    let (Some(feed), Some(item)) =
-                        (in_stream.identity.feed_id, in_stream.identity.feed_item_id)
-                    else {
-                        return Err("The site's newest post should have its feed IDs".into());
+                    if page.posts.is_empty() {
+                        return Err("The site has no posts".into());
+                    }
+                    let Some((in_stream, feed, item)) = page.posts.iter().find_map(|post| {
+                        Some((post, post.identity.feed_id?, post.identity.feed_item_id?))
+                    }) else {
+                        return Err("None of the site's newest posts has its feed IDs".into());
                     };
 
                     let post = ctx
