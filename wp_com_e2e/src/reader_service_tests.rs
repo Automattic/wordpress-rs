@@ -746,6 +746,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             {
                 let ctx = Arc::clone(&ctx);
                 move || {
+                    // It reads the site's comment emails, which only a followed site has.
+                    let _follows = reading(&ctx.locks.follows);
                     let _own_post = alone(&ctx.locks.own_post);
                     let Some(site_id) = own_site() else {
                         return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
