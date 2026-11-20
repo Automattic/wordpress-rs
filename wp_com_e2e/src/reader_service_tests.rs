@@ -467,17 +467,26 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 })
             }
         }),
+        // Follows and unfollows the site in `WP_COM_E2E_OWN_SITE_ID` when it's set, and the
+        // trial's site otherwise.
         Trial::test("reader_service::a_follow_is_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
                 ctx.runtime.block_on(async {
                     let service = new_service(ctx.delegate.clone(), account())?;
-                    let site_id = ctx.site_id;
+                    let site_id = own_site().unwrap_or(ctx.site_id);
                     let site = service
                         .fetch_site(site_id)
                         .await
                         .map_err(|e| e.to_string())?;
                     let was = site.is_following == Some(true);
+                    // A followed site's emails and notifications, to put back after it's
+                    // followed again.
+                    let delivery = if was {
+                        Some(delivery_on_the_server(&ctx, site_id).await?)
+                    } else {
+                        None
+                    };
                     let target = ReaderFollowTarget {
                         site_id: Some(site_id),
                         feed_id: site.feed_id,
@@ -504,6 +513,15 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         .set_followed(target, was)
                         .await
                         .map_err(|e| e.to_string())?;
+                    // A follow can come back with the server's default emails and
+                    // notifications, so those are put back as they were found too.
+                    if let Some(delivery) = &delivery {
+                        service
+                            .refresh_subscriptions()
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        restore_delivery(&ctx, &service, site_id, delivery).await?;
+                    }
 
                     if changed.map_err(|e| e.to_string())? != ReaderActionOutcome::Synced
                         || restored != ReaderActionOutcome::Synced
@@ -826,7 +844,6 @@ fn own_site() -> Option<WpComSiteId> {
         .map(WpComSiteId)
 }
 
-/// The newest post of a site, as the cache has it after a refresh of the site's stream.
 /// How many views a site's stats have for a post.
 async fn views_of(ctx: &TestContext, site_id: WpComSiteId, post_id: PostId) -> Result<u64, Failed> {
     Ok(ctx
@@ -839,6 +856,7 @@ async fn views_of(ctx: &TestContext, site_id: WpComSiteId, post_id: PostId) -> R
         .views)
 }
 
+/// The newest post of a site, as the cache has it after a refresh of the site's stream.
 async fn first_post_of(
     service: &ReaderService,
     site_id: WpComSiteId,
