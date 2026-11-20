@@ -511,16 +511,16 @@ impl Action {
                 };
                 let seen = context.client.reader_seen();
                 // An RSS post is marked by its feed's IDs, and any other by its site's.
-                if let (true, Some(feed_id)) = (post.is_feed_item(), post.feed_id) {
+                let marked = if let (true, Some(feed_id)) = (post.is_feed_item(), post.feed_id) {
                     let params = ReaderSeenFeedItemsParams {
                         feed_id,
                         feed_item_ids: vec![post.feed_item_id.unwrap_or(ReaderFeedItemId(post.id))],
                         source,
                     };
                     if on {
-                        seen.feed_items_seen(&params).await?;
+                        seen.feed_items_seen(&params).await?.data.status
                     } else {
-                        seen.feed_items_unseen(&params).await?;
+                        seen.feed_items_unseen(&params).await?.data.status
                     }
                 } else {
                     let (blog_id, post_id) = post.site_post().ok_or(ReaderError::MissingIds)?;
@@ -530,10 +530,19 @@ impl Action {
                         source,
                     };
                     if on {
-                        seen.site_posts_seen(&params).await?;
+                        seen.site_posts_seen(&params).await?.data.status
                     } else {
-                        seen.site_posts_unseen(&params).await?;
+                        seen.site_posts_unseen(&params).await?.data.status
                     }
+                };
+                // The API answers 200 with `status: false` when it didn't mark the post.
+                if !marked {
+                    return Err(ReaderError::Refused {
+                        reason: format!(
+                            "The server didn't mark the post as {}.",
+                            if on { "seen" } else { "unseen" }
+                        ),
+                    });
                 }
             }
             Self::BlockSite { site_id } => {

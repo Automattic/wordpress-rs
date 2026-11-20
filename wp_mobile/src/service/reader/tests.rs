@@ -1228,6 +1228,21 @@ mod actions {
     }
 
     #[tokio::test]
+    async fn a_mark_the_server_answers_no_to_is_refused_and_put_back() {
+        let (service, executor, stream) = following().await;
+        executor.push(Step::Respond(200, json!({ "status": false })));
+
+        let outcome = service.set_post_seen(identity(2), true).await;
+
+        assert!(
+            matches!(&outcome, Err(ReaderError::Refused { reason }) if reason == "The server didn't mark the post as seen."),
+            "{outcome:?}"
+        );
+        assert_eq!(is_seen(&stream, 2).await, Some(false));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
+    }
+
+    #[tokio::test]
     async fn an_rss_post_is_marked_by_its_feed() {
         let (service, executor) = service();
         executor.push(marked());
@@ -4577,6 +4592,25 @@ mod feed_items_with_no_post_id {
                 json!({ "feed_id": 100000002, "feed_item_ids": [100000003], "source": "reader-ios" })
             )
         );
+    }
+
+    #[tokio::test]
+    async fn a_seen_mark_the_server_answers_no_to_is_refused_and_put_back() {
+        let (service, executor) = service();
+        let stream = service.stream(ReaderStream::Feed { feed_id: FEED });
+        executor.push(Step::Respond(200, page()));
+        stream.refresh().await.unwrap();
+        executor.push(Step::Respond(200, json!({ "status": false })));
+
+        let outcome = service.set_post_seen(identity(100000003), true).await;
+
+        assert!(
+            matches!(&outcome, Err(ReaderError::Refused { reason }) if reason == "The server didn't mark the post as seen."),
+            "{outcome:?}"
+        );
+        let post = service.cached_post(key(100000003)).unwrap().unwrap();
+        assert_eq!(post.is_seen, Some(false));
+        assert_eq!(service.pending_action_count().unwrap(), 0);
     }
 
     #[tokio::test]
