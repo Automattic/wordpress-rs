@@ -129,6 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Reader no longer says a post was marked as seen or unseen when the server answered that it wasn't.
 - A site unblocked with `ReaderService::set_site_blocked` is no longer blocked again by a later `refresh_blocked_sites`. When reads of the list of blocked sites are on their way while the server takes an unblock, the server can go on listing the site for that page size until the next block or unblock (seen for over 10 minutes), and the refresh stored it, hiding the site's posts again. The refresh no longer reads the list while a block or unblock is being sent, nor stores a list read before one; and when the list disagrees with a block or unblock the server took from the service, it asks `read/sites/{id}`, whose `is_blocked` was right throughout, and keeps the change while it holds.
 - When the list of blocked sites disagrees with a block or unblock, `ReaderService::refresh_blocked_sites` now asks `read/sites/{id}` for the whole site rather than sending `fields`, since the server keeps an answer for each value of `fields`, and a kept answer is what the check exists to get around.
+- `ReaderService::search_sites` now finds the sites and feeds the reader already follows, as both WordPress apps do, by sending `exclude_followed=false`; the server leaves them out by default.
 
 ## [0.11.1] - 2026-11-18
 

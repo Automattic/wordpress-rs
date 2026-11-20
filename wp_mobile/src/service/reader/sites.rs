@@ -164,6 +164,11 @@ impl ReaderService {
     /// the first, and the previous page's `next_offset` after it. Needs no account. Not cached.
     ///
     /// A query that looks like an address finds the feed at that address.
+    ///
+    /// The sites and feeds the reader follows are among the results, with `is_following` set on
+    /// their site and feed, as both WordPress apps ask. The server leaves them out unless told not
+    /// to: on 2026-11-20 a search for a followed site's name found it only with
+    /// `exclude_followed=false`.
     pub async fn search_sites(
         &self,
         query: String,
@@ -172,6 +177,7 @@ impl ReaderService {
         let params = ReaderFeedSearchParams {
             q: Some(query),
             offset,
+            exclude_followed: Some(false),
             // Each result's site and feed, which have what a row of results shows.
             meta: Some("site,feed".to_string()),
             ..Default::default()

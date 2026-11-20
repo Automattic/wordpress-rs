@@ -3035,9 +3035,10 @@ mod menu_and_sites {
             .unwrap();
 
         assert!(!results.feeds.is_empty());
+        // The sites the reader follows are asked for too: the server leaves them out by default.
         assert_eq!(
             queries(&executor),
-            ["q=photography&offset=20&meta=site%2Cfeed"]
+            ["q=photography&offset=20&exclude_followed=false&meta=site%2Cfeed"]
         );
     }
 }
