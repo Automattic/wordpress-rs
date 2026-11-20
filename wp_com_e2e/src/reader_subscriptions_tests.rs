@@ -6,7 +6,7 @@ use wp_api::wp_com::reader_subscriptions::{
     ReaderSubscriptionsParams, ReaderSubscriptionsResponse,
 };
 
-use crate::context::TestContext;
+use crate::context::{TestContext, reading};
 use crate::reader_tags_tests::{expect_error_code, signed_out_client};
 
 /// The WordPress.com Blog, which is public.
@@ -43,6 +43,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_subscriptions::list", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = reading(&ctx.locks.follows);
                 ctx.runtime.block_on(async {
                     let whole = page(&ctx, 1, 100).await?;
                     if whole
@@ -108,6 +109,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_subscriptions::is_following_site", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = reading(&ctx.locks.follows);
                 ctx.runtime.block_on(async {
                     // Either answer is fine for a site the account may or may not follow.
                     ctx.client

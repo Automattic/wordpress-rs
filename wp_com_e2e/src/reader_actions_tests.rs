@@ -10,13 +10,14 @@ use wp_api::wp_com::reader_seen::{
     ReaderSeenFeedItemsParams, ReaderSeenSitePostsParams, ReaderSeenSource,
 };
 
-use crate::context::TestContext;
+use crate::context::{TestContext, alone, changing, reading};
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     vec![
         Trial::test("reader_blocks::block_and_unblock_a_site", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = changing(&ctx.locks.follows);
                 ctx.runtime.block_on(async {
                     let site = ctx.site_id;
                     if is_blocked(&ctx).await? {
@@ -65,6 +66,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_seen::mark_a_post_and_put_it_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = reading(&ctx.locks.follows);
+                let _seen = alone(&ctx.locks.seen);
                 ctx.runtime.block_on(async {
                     // The newest followed post that has a seen state. An account that follows
                     // nothing has none, and then there's nothing to try.
@@ -141,7 +144,7 @@ async fn mark(ctx: &TestContext, post: &ReaderPost, seen: bool) -> Result<(), Fa
     let seen_api = ctx.client.reader_seen();
     let identity = &post.identity;
     // Each request has its own response type around the same answer.
-    let marked = if identity.is_external {
+    let marked = if identity.is_feed_item() {
         let params = ReaderSeenFeedItemsParams {
             feed_id: identity.feed_id.ok_or("An RSS post has no feed ID")?,
             feed_item_ids: vec![

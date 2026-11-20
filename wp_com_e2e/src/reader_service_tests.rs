@@ -30,7 +30,7 @@ use wp_mobile_cache::db_types::reader::ReaderPostRecord;
 use wp_mobile_cache::repository::reader_comments::ReaderCommentSendState;
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
 
-use crate::context::TestContext;
+use crate::context::{TestContext, alone, changing, reading};
 
 /// The WordPress.com Blog, which is public and has years of posts.
 const SITE: WpComSiteId = WpComSiteId(3584907);
@@ -252,6 +252,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::seen_is_shown_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = reading(&ctx.locks.follows);
+                let _seen = alone(&ctx.locks.seen);
                 ctx.runtime.block_on(async {
                     let service = new_service(ctx.delegate.clone(), account())?;
                     let stream = service.stream(ReaderStream::Following);
@@ -301,6 +303,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_block_is_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = changing(&ctx.locks.follows);
                 ctx.runtime.block_on(async {
                     let service = new_service(ctx.delegate.clone(), account())?;
                     let site = ctx.site_id;
@@ -353,6 +356,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::menu_sites_subscriptions_and_comments", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = reading(&ctx.locks.follows);
                 ctx.runtime.block_on(async {
                     // Signed out: the menu's default streams and recommended tags, a site's info,
                     // and a post's comments.
@@ -487,6 +491,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_follow_is_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = changing(&ctx.locks.follows);
                 ctx.runtime.block_on(async {
                     let service = new_service(ctx.delegate.clone(), account())?;
                     let site_id = own_site().unwrap_or(ctx.site_id);
@@ -578,6 +583,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_comment_is_written_shown_and_deleted", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _own_post = alone(&ctx.locks.own_post);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
                 };
@@ -602,6 +608,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_like_is_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _own_post = alone(&ctx.locks.own_post);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
                 };
@@ -623,6 +630,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_comment_like_is_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _own_post = alone(&ctx.locks.own_post);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
                 };
@@ -658,6 +666,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             {
                 let ctx = Arc::clone(&ctx);
                 move || {
+                    let _own_post = alone(&ctx.locks.own_post);
                     let Some(site_id) = own_site() else {
                         return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
                     };
@@ -682,6 +691,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::delivery_settings_are_sent_and_put_back", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = changing(&ctx.locks.follows);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
                 };
@@ -707,6 +717,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_site_is_followed_and_unfollowed_by_id", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = changing(&ctx.locks.follows);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
                 };
@@ -732,6 +743,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("reader_service::a_page_view_of_an_own_post", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _follows = reading(&ctx.locks.follows);
+                let _seen = alone(&ctx.locks.seen);
                 let Some(site_id) = own_site() else {
                     return Err("Set WP_COM_E2E_OWN_SITE_ID to a site the account owns".into());
                 };
