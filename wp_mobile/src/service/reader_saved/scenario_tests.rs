@@ -199,6 +199,7 @@ fn respond(status_code: u32, body: Value) -> Result<WpNetworkResponse, RequestEx
         request_url: WpEndpointUrl(String::new()),
         request_method: RequestMethod::POST,
         request_header_map: Default::default(),
+        response_url: None,
     })
 }
 

@@ -769,6 +769,7 @@ async fn classify_live_response(
         request_url: WpEndpointUrl(url.to_string()),
         request_method: RequestMethod::GET,
         request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+        response_url: None,
     };
     match WpApiError::try_parse(&response) {
         Some(WpApiError::RequestExecutionFailed {

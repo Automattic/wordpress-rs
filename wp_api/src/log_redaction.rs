@@ -1028,6 +1028,7 @@ mod tests {
             request_url: WpEndpointUrl(TOKEN_INFO_URL.to_string()),
             request_method: RequestMethod::GET,
             request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+            response_url: None,
         };
         let reason = RequestExecutionErrorReason::try_from_response(&response)
             .expect("a 403 whose body is not a WpError is an execution failure");

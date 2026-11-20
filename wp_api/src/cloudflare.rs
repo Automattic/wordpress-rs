@@ -297,6 +297,7 @@ pub(crate) mod tests {
             request_url: WpEndpointUrl(request_url.to_string()),
             request_method: RequestMethod::GET,
             request_header_map: Arc::new(WpNetworkHeaderMap::default()),
+            response_url: None,
         }
     }
 
