@@ -139,6 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - Kotlin: `DebugMiddleware` no longer prints credentials. It prints `<redacted>` in place of the value of the `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie` and `X-WP-Nonce` headers (keeping an `Authorization` scheme such as `Bearer`), on requests and responses, redacts secret query values in the URL, and redacts secret members such as `access_token` and `password` in a JSON response body.
+- The `Debug` output of `WpNetworkHeaderMap`, and so of `WpNetworkRequest`, `WpMultipartFormRequest`, `WpNetworkResponse` and `ParsedResponse`, prints `<redacted>` in place of the value of the `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie` and `X-WP-Nonce` headers, keeping an `Authorization` scheme such as `Bearer`. `WpAuthentication`'s `Debug` output no longer includes its token or nonce, and the headers it adds are marked sensitive.
 
 ## [0.11.1] - 2026-11-18
 

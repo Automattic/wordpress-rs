@@ -270,12 +270,11 @@ impl WpNetworkRequest {
 
         let mut new_header_map = self.header_map.inner.clone();
 
-        new_header_map.insert(
-            http::header::AUTHORIZATION,
-            format!("Basic {encoded_credentials}").parse().expect(
-                "base64 can only produce ASCII, so this string is guaranteed to be parseable",
-            ),
-        );
+        let mut value: HeaderValue = format!("Basic {encoded_credentials}")
+            .parse()
+            .expect("base64 can only produce ASCII, so this string is guaranteed to be parseable");
+        value.set_sensitive(true);
+        new_header_map.insert(http::header::AUTHORIZATION, value);
 
         WpNetworkRequest {
             uuid: self.uuid.clone(),
@@ -469,9 +468,72 @@ pub struct WpNetworkResponse {
     pub request_header_map: Arc<WpNetworkHeaderMap>,
 }
 
-#[derive(Debug, Default, Clone, uniffi::Object)]
+// Has custom `Debug` trait implementation, which leaves out credentials
+#[derive(Default, Clone, uniffi::Object)]
 pub struct WpNetworkHeaderMap {
     inner: HeaderMap,
+}
+
+/// Headers whose value is a credential, as `http` names them (in lower case).
+const CREDENTIAL_HEADERS: &[&str] = &[
+    "authorization",
+    "proxy-authorization",
+    "cookie",
+    "set-cookie",
+    "x-wp-nonce",
+];
+
+/// Headers whose value starts with an authentication scheme, such as `Bearer`.
+const SCHEME_HEADERS: &[&str] = &["authorization", "proxy-authorization"];
+
+const REDACTED_HEADER_VALUE: &str = "<redacted>";
+
+/// Prints every header, but only the name of a header that carries a credential
+/// (see [`CREDENTIAL_HEADERS`]): its value is `<redacted>`, after the scheme for
+/// an `Authorization` header. A request or response that is `Debug`-formatted
+/// prints its headers this way.
+impl Debug for WpNetworkHeaderMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_map()
+            .entries(
+                self.inner
+                    .iter()
+                    .map(|(name, value)| (name.as_str(), DebugHeaderValue { name, value })),
+            )
+            .finish()
+    }
+}
+
+struct DebugHeaderValue<'a> {
+    name: &'a HeaderName,
+    value: &'a HeaderValue,
+}
+
+impl Debug for DebugHeaderValue<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = self.name.as_str();
+        if !CREDENTIAL_HEADERS.contains(&name) {
+            return Debug::fmt(self.value, f);
+        }
+        let scheme = self
+            .value
+            .to_str()
+            .ok()
+            .and_then(|value| value.trim().split_once(' '))
+            .map(|(scheme, _)| scheme)
+            .filter(|scheme| {
+                !scheme.is_empty()
+                    && scheme
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+            });
+        match scheme {
+            Some(scheme) if SCHEME_HEADERS.contains(&name) => {
+                Debug::fmt(&format!("{scheme} {REDACTED_HEADER_VALUE}"), f)
+            }
+            _ => Debug::fmt(REDACTED_HEADER_VALUE, f),
+        }
+    }
 }
 
 impl WpNetworkHeaderMap {
@@ -1155,6 +1217,119 @@ mod tests {
             let value = header_value.parse().expect("Header Value must be ascii");
             self.inner.insert(header_name, value);
         }
+    }
+
+    const NOT_A_REAL_TOKEN: &str = "not-a-real-token";
+
+    fn header_map_with_credentials() -> WpNetworkHeaderMap {
+        WpNetworkHeaderMap::from_multi_map(
+            [
+                (
+                    "Authorization".to_string(),
+                    vec![format!("Bearer {NOT_A_REAL_TOKEN}")],
+                ),
+                (
+                    "PROXY-AUTHORIZATION".to_string(),
+                    vec![format!("Basic {NOT_A_REAL_TOKEN}")],
+                ),
+                (
+                    "Cookie".to_string(),
+                    vec![format!("wordpress_logged_in={NOT_A_REAL_TOKEN}")],
+                ),
+                (
+                    "set-cookie".to_string(),
+                    vec![format!("session={NOT_A_REAL_TOKEN}")],
+                ),
+                ("X-WP-Nonce".to_string(), vec![NOT_A_REAL_TOKEN.to_string()]),
+                ("Accept".to_string(), vec!["application/json".to_string()]),
+            ]
+            .into(),
+        )
+        .expect("valid headers")
+    }
+
+    #[test]
+    fn debug_of_a_header_map_leaves_out_credentials() {
+        let printed = format!("{:?}", header_map_with_credentials());
+
+        assert!(!printed.contains(NOT_A_REAL_TOKEN), "{printed}");
+        assert!(
+            printed.contains(r#""authorization": "Bearer <redacted>""#),
+            "{printed}"
+        );
+        assert!(
+            printed.contains(r#""proxy-authorization": "Basic <redacted>""#),
+            "{printed}"
+        );
+        assert!(printed.contains(r#""cookie": "<redacted>""#), "{printed}");
+        assert!(
+            printed.contains(r#""set-cookie": "<redacted>""#),
+            "{printed}"
+        );
+        assert!(
+            printed.contains(r#""x-wp-nonce": "<redacted>""#),
+            "{printed}"
+        );
+        assert!(
+            printed.contains(r#""accept": "application/json""#),
+            "{printed}"
+        );
+    }
+
+    #[test]
+    fn debug_of_an_authorization_value_without_a_scheme_redacts_all_of_it() {
+        let header_map = WpNetworkHeaderMap::from_map(
+            [("Authorization".to_string(), NOT_A_REAL_TOKEN.to_string())].into(),
+        )
+        .expect("valid headers");
+        let printed = format!("{header_map:?}");
+
+        assert!(!printed.contains(NOT_A_REAL_TOKEN), "{printed}");
+        assert!(
+            printed.contains(r#""authorization": "<redacted>""#),
+            "{printed}"
+        );
+    }
+
+    #[test]
+    fn debug_of_a_request_and_its_response_leaves_out_credentials() {
+        let request = WpNetworkRequest {
+            uuid: "uuid".to_string(),
+            retry_count: 0,
+            method: RequestMethod::GET,
+            url: WpEndpointUrl("https://example.com/wp-json/wp/v2/posts".to_string()),
+            header_map: Arc::new(header_map_with_credentials()),
+            body: None,
+        };
+        let retried = request.adding_http_authentication("admin", NOT_A_REAL_TOKEN);
+        let response = WpNetworkResponse {
+            body: b"[]".to_vec(),
+            status_code: 200,
+            response_header_map: Arc::new(header_map_with_credentials()),
+            request_url: request.url.clone(),
+            request_method: RequestMethod::GET,
+            request_header_map: Arc::new(header_map_with_credentials()),
+        };
+        let parsed: ParsedResponse<(), ()> = ParsedResponse {
+            data: (),
+            header_map: Arc::new(header_map_with_credentials()),
+            next_page_params: None,
+            prev_page_params: None,
+        };
+
+        for printed in [
+            format!("{request:?}"),
+            format!("{retried:?}"),
+            format!("{response:?}"),
+            format!("{parsed:?}"),
+        ] {
+            assert!(!printed.contains(NOT_A_REAL_TOKEN), "{printed}");
+            assert!(printed.contains("<redacted>"), "{printed}");
+        }
+        // The retry's `Basic` credentials are base64, so check for them as sent.
+        let encoded =
+            base64::engine::general_purpose::STANDARD.encode(format!("admin:{NOT_A_REAL_TOKEN}"));
+        assert!(!format!("{retried:?}").contains(&encoded));
     }
 
     #[rstest]
