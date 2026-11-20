@@ -388,7 +388,7 @@ class WpRequestExecutorTest {
      */
     @Test
     fun `a nonce with a byte-order mark is sent as UTF-8`() = runTest {
-        // What a site sends as its nonce when a PHP file prints a byte-order mark first.
+        // An example nonce with a byte-order mark at the start.
         val nonce = "\uFEFFabc123def0"
         mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("[]"))
 
