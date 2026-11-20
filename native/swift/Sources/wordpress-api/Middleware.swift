@@ -3,6 +3,8 @@ import WordPressAPIInternal
 import OSLog
 #endif
 
+/// Logs each request's method and URL, for debugging. It logs no header or body, and the URL without its user info,
+/// its fragment and secret query values such as `token`.
 public final class DebugMiddleware: WpApiMiddleware {
     public init() {}
 
@@ -15,7 +17,8 @@ public final class DebugMiddleware: WpApiMiddleware {
         #if canImport(OSLog)
         Logger.requests.info("Performed Request:")
         Logger.requests.info("\t Method:\t\(request.method().rawValue)")
-        Logger.requests.info("\t URL:\t\(request.url())")
+        // Without the user info, the fragment and secret query values, such as `token`.
+        Logger.requests.info("\t URL:\t\(redactRequestUrlForLog(url: request.url(), detail: .full))")
         #endif
         return response
     }
