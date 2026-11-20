@@ -11,6 +11,7 @@ use wp_api::wp_com::reader_post::{
 };
 use wp_api::wp_com::reader_posts::ReaderStreamParams;
 use wp_api::wp_com::reader_saved::ReaderFeedId;
+use wp_api::wp_com::reader_sites::ReaderSiteParams;
 use wp_api::wp_com::sites::WpComSiteIdentifier;
 
 use crate::context::TestContext;
@@ -25,6 +26,13 @@ const POST_URL: &str =
     "https://en.blog.wordpress.com/2014/12/29/new-year-new-blog-make-it-a-great-one/";
 /// The xkcd RSS feed, which is public.
 const FEED: ReaderFeedId = ReaderFeedId(8857199);
+/// WordPress.org News: a self-hosted site, connected to WordPress.com with Jetpack.
+const JETPACK_SITE: WpComSiteId = WpComSiteId(14607090);
+/// Variety: a site on WordPress VIP, which is connected to WordPress.com with Jetpack too.
+const VIP_SITE: WpComSiteId = WpComSiteId(179338616);
+/// The WordPress.com account that a VIP site belongs to. Nothing in a VIP site's post says it's
+/// one: the site's owner does.
+const VIP_OWNER: &str = "wpcomvip";
 
 /// A client that sends no token, to check what answers signed out.
 pub(crate) fn signed_out_client(ctx: &TestContext) -> WpComApiClient {
@@ -227,6 +235,22 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                 })
             }
         }),
+        Trial::test("reader_post::jetpack_post", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime
+                    .block_on(check_jetpack_site_post(&ctx, JETPACK_SITE, false))
+                    .map_err(Failed::from)
+            }
+        }),
+        Trial::test("reader_post::vip_post", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                ctx.runtime
+                    .block_on(check_jetpack_site_post(&ctx, VIP_SITE, true))
+                    .map_err(Failed::from)
+            }
+        }),
         Trial::test("reader_post::feed_post_that_is_not_there", {
             let ctx = Arc::clone(&ctx);
             move || {
@@ -424,4 +448,129 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             }
         }),
     ]
+}
+
+/// Checks a Jetpack site's post, or a VIP site's, through the site's endpoint and its feed's.
+///
+/// The site has to still be that kind of site: a Jetpack site, owned by the VIP account when `vip`
+/// and by any other account when not. One of the site's newest posts that is in its feed is taken,
+/// so the post never ages. Through the site's endpoint it's the site's post. Through the feed's it's
+/// the same post, merged with its feed item and marked as a Jetpack post. A feed item the server
+/// hasn't merged with the site's post yet is external, so the next post is tried.
+async fn check_jetpack_site_post(
+    ctx: &TestContext,
+    site_id: WpComSiteId,
+    vip: bool,
+) -> Result<(), String> {
+    let site = ctx
+        .client
+        .reader_sites()
+        .site(
+            &WpComSiteIdentifier::Id { value: site_id.0 },
+            &ReaderSiteParams::default(),
+        )
+        .await
+        .map_err(|e| e.to_string())?
+        .data;
+    let name = site.name.clone().unwrap_or_else(|| site_id.0.to_string());
+    if site.is_jetpack != Some(true) {
+        return Err(format!(
+            "{name} is no longer a Jetpack site, so the trial needs another site"
+        ));
+    }
+    let owner = site.owner.as_ref().and_then(|owner| owner.login.as_deref());
+    if vip != (owner == Some(VIP_OWNER)) {
+        return Err(format!(
+            "{name} is owned by {owner:?}, so it's no longer a {} site: the trial needs another \
+             site",
+            if vip { "VIP" } else { "non-VIP Jetpack" }
+        ));
+    }
+
+    let params = ReaderStreamParams {
+        number: Some(10),
+        ..Default::default()
+    };
+    let page = ctx
+        .client
+        .reader_posts()
+        .site_posts(&site_id, &params)
+        .await
+        .map_err(|e| e.to_string())?
+        .data;
+    let in_feed: Vec<_> = page
+        .posts
+        .iter()
+        .filter_map(|post| Some((post, post.identity.feed_id?, post.identity.feed_item_id?)))
+        .collect();
+    if in_feed.is_empty() {
+        return Err(format!("None of {name}'s newest posts is in its feed"));
+    }
+
+    let mut not_merged = 0;
+    for (in_stream, feed, item) in in_feed {
+        let post_id = PostId(in_stream.identity.id as i64);
+        let post = ctx
+            .client
+            .reader_post()
+            .site_post(&site_id, &post_id, &ReaderPostParams::default())
+            .await
+            .map_err(|e| e.to_string())?
+            .data;
+        if post.identity.is_external
+            || post.identity.id != in_stream.identity.id
+            || post.identity.site_id != Some(site_id)
+            || post.identity.feed_id != Some(feed)
+        {
+            return Err(format!(
+                "Through the site's endpoint, {name}'s post should be the site's post, with its \
+                 feed ID: {:?}",
+                post.identity
+            ));
+        }
+        if post.is_jetpack.is_some() || post.identity.feed_item_id.is_some() {
+            return Err(format!(
+                "Through the site's endpoint, {name}'s post should leave out `is_jetpack` and its \
+                 feed item ID, as the `reader_post` module says"
+            ));
+        }
+
+        let copy = ctx
+            .client
+            .reader_post()
+            .feed_post(&feed, &item, &ReaderPostParams::default())
+            .await
+            .map_err(|e| e.to_string())?
+            .data;
+        if copy.is_jetpack != Some(true) {
+            return Err(format!(
+                "Through the feed's endpoint, {name}'s post should be a Jetpack post"
+            ));
+        }
+        if copy.identity.is_external {
+            // The feed item, not yet merged with the site's post: its ID is the feed item's.
+            if copy.identity.id != item.0 {
+                return Err(format!(
+                    "An external Jetpack post should have its feed item ID as its ID: {:?}",
+                    copy.identity
+                ));
+            }
+            not_merged += 1;
+            continue;
+        }
+        if copy.identity.id != in_stream.identity.id
+            || copy.identity.site_id != Some(site_id)
+            || copy.identity.feed_item_id != Some(item)
+        {
+            return Err(format!(
+                "Through the feed's endpoint, {name}'s post should be the site's post, with its \
+                 feed item ID: {:?}",
+                copy.identity
+            ));
+        }
+        return Ok(());
+    }
+    Err(format!(
+        "None of {name}'s {not_merged} newest posts in its feed is merged with the site's post"
+    ))
 }

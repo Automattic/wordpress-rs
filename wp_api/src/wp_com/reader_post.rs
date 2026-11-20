@@ -13,6 +13,10 @@
 //!   [`ReaderPost::word_count`], which no stream sends, and [`ReaderPost::is_jetpack`], which a
 //!   site's post leaves out. An RSS post asked for on its own has nothing about comment
 //!   subscriptions, which the same post in a stream has.
+//! - A Jetpack site's feed item that the server hasn't merged with the site's post yet is
+//!   external, with its feed item ID as its `ID`, and still has `is_jetpack`.
+//! - A VIP site is connected with Jetpack, so its post is a Jetpack site's post. Nothing in the
+//!   post says it's a VIP site's: only the site's owner, the `wpcomvip` account, does.
 //!
 //! Apart from those, a post asked for on its own has the fields the same post has in a stream, so
 //! the two can be kept as one. Its content isn't the same text every time, though: a post with an
@@ -347,6 +351,7 @@ mod tests {
     use super::*;
     use crate::wp_com::reader_saved::{
         ReaderFeedId, ReaderFeedItemId, ReaderSavedKey, reader_saved_key_for_post,
+        reader_saved_keys_for_post,
     };
     use serde_json::json;
 
@@ -423,6 +428,80 @@ mod tests {
         assert_eq!(post.like_count, Some(45));
         assert_eq!(post.word_count, Some(921));
         assert_eq!(post.is_jetpack, Some(false));
+    }
+
+    /// A recording of a Jetpack site's post through its feed's endpoint, with its details replaced:
+    /// the feed item merged with the site's post. It's the site's post, with its feed item ID, and
+    /// the only one of a site's posts that says it's a Jetpack post. Its `author` is `null`,
+    /// `metadata` is `false`, `tags` is an empty list, and `featured_media` is empty.
+    #[test]
+    fn test_deserialize_jetpack_post() {
+        let json = include_str!("../../tests/wpcom/reader_post/jetpack_post.json");
+        let post: ReaderPost = serde_json::from_str(json).expect("the post parses");
+
+        assert_eq!(post.is_jetpack, Some(true));
+        assert!(!post.identity.is_external);
+        assert_eq!(post.identity.id, 1001, "The post ID, not the feed item ID");
+        assert_eq!(post.identity.site_id, Some(WpComSiteId(2001)));
+        assert_eq!(post.identity.feed_id, Some(ReaderFeedId(3001)));
+        assert_eq!(post.identity.feed_item_id, Some(ReaderFeedItemId(4001)));
+        assert_eq!(
+            reader_saved_keys_for_post(post.identity.clone()),
+            vec![
+                ReaderSavedKey::Post {
+                    blog_id: WpComSiteId(2001),
+                    post_id: PostId(1001),
+                },
+                ReaderSavedKey::FeedItem {
+                    feed_item_id: ReaderFeedItemId(4001),
+                },
+            ],
+            "Saved as the site's post, or before its copy was merged as the feed item"
+        );
+        assert_eq!(post.author, None);
+        assert_eq!(post.tags, Some(vec![]));
+        assert_eq!(post.featured_media, None);
+        assert_eq!(post.featured_image, None);
+        assert_eq!(post.cross_post, None);
+        assert_eq!(post.organization_id, None);
+        assert_eq!(post.word_count, Some(634));
+        assert_eq!(post.comments_open, Some(false));
+        assert_eq!(post.site_name.as_deref(), Some("Example Jetpack Site"));
+    }
+
+    /// A recording of a VIP site's post through the site's endpoint, asked for with `meta=site`,
+    /// with its details replaced. A VIP site is connected with Jetpack, and nothing in its post
+    /// says it's a VIP site's: only the site's owner does. Like any site's post, it leaves out
+    /// `is_jetpack` and its feed item ID, and `meta.data.site.jetpack` is the only sign it's a
+    /// Jetpack site's. Its `author` is `null`, and its tags and categories are empty objects.
+    #[test]
+    fn test_deserialize_vip_post() {
+        let json = include_str!("../../tests/wpcom/reader_post/vip_post.json");
+        let post: ReaderPost = serde_json::from_str(json).expect("the post parses");
+
+        assert!(!post.identity.is_external);
+        assert_eq!(post.identity.id, 1236900001);
+        assert_eq!(post.identity.site_id, Some(WpComSiteId(2001)));
+        assert_eq!(post.identity.feed_id, Some(ReaderFeedId(3001)));
+        assert_eq!(post.identity.feed_item_id, None);
+        assert_eq!(post.is_jetpack, None);
+        assert_eq!(
+            reader_saved_key_for_post(post.identity.clone()),
+            Some(ReaderSavedKey::Post {
+                blog_id: WpComSiteId(2001),
+                post_id: PostId(1236900001),
+            })
+        );
+        assert_eq!(post.author, None);
+        assert_eq!(post.tags, Some(vec![]));
+        assert_eq!(post.likes_enabled, Some(false));
+        assert_eq!(post.use_excerpt, Some(true));
+        assert_eq!(post.site_locale.as_deref(), Some("en-US"));
+        assert_eq!(post.organization_id, Some(0));
+        assert_eq!(
+            post.display_image_url.as_deref(),
+            Some("https://example.com/wp-content/uploads/2026/11/example.jpg")
+        );
     }
 
     /// A recording of a post found by its slug, trimmed, with its details replaced.

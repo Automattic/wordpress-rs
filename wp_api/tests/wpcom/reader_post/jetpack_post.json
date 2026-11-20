@@ -1,0 +1,90 @@
+{
+  "ID": 1001,
+  "author": null,
+  "date": "2026-11-18T17:08:59+00:00",
+  "modified": "2026-11-18T17:08:59+00:00",
+  "title": "Example Jetpack post",
+  "URL": "https://example.com/news/2026/11/example-post/",
+  "short_URL": "https://example.com/news/?p=1001",
+  "content": "<p>Example content.</p>\n",
+  "excerpt": "<p>Example excerpt.</p>\n",
+  "slug": "",
+  "status": "",
+  "password": "",
+  "parent": false,
+  "type": "",
+  "discussion": {
+    "comments_open": false,
+    "comment_status": "closed",
+    "pings_open": false,
+    "ping_status": "",
+    "comment_count": 0,
+    "comments_require_registration": false,
+    "comments_allow_blocks": false
+  },
+  "like_count": 0,
+  "i_like": false,
+  "is_reblogged": false,
+  "is_following": false,
+  "featured_image": "",
+  "format": "standard",
+  "geo": false,
+  "publicize_URLs": {},
+  "tags": [],
+  "categories": {
+    "Example Category": {
+      "ID": 7001,
+      "name": "Example Category",
+      "slug": "example-category",
+      "description": "",
+      "post_count": 120,
+      "parent": 0,
+      "meta": {
+        "links": {
+          "self": "https://public-api.wordpress.com/rest/v1.1/sites/2001/categories/slug:example-category",
+          "help": "https://public-api.wordpress.com/rest/v1.2/sites/2001/categories/slug:example-category/help",
+          "site": "https://public-api.wordpress.com/rest/v1.2/sites/2001"
+        }
+      }
+    }
+  },
+  "attachments": {},
+  "metadata": false,
+  "meta": {
+    "links": {
+      "feed": "https://public-api.wordpress.com/rest/v1.1/read/feed/3001",
+      "site": "https://public-api.wordpress.com/rest/v1.1/read/sites/2001"
+    }
+  },
+  "word_count": 634,
+  "pseudo_ID": "00000000000000000000000000000002",
+  "global_ID": "00000000000000000000000000000002",
+  "site_ID": 2001,
+  "site_name": "Example Jetpack Site",
+  "site_URL": "https://example.com/news",
+  "site_is_private": false,
+  "featured_media": {},
+  "is_external": false,
+  "is_jetpack": true,
+  "site_icon": {
+    "img": "https://example.com/icon.png",
+    "ico": "https://example.com/icon.png"
+  },
+  "likes_enabled": true,
+  "is_following_conversation": null,
+  "post_thumbnail": null,
+  "capabilities": {
+    "publish_post": false,
+    "delete_post": false,
+    "edit_post": false
+  },
+  "has_password": false,
+  "custom_excerpt": "",
+  "reblogs_enabled": false,
+  "use_excerpt": false,
+  "feed_ID": 3001,
+  "feed_URL": "https://example.com/news/feed/",
+  "feed_item_ID": 4001,
+  "is_seen": false,
+  "views": null
+}
