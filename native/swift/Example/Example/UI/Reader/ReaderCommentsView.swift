@@ -119,9 +119,9 @@ final class ReaderCommentsViewModel {
     /// The letters typed after an `@` that ends the draft, or `nil` when the draft doesn't end with one. The `@`
     /// starts the draft or follows a space, so an email address isn't one.
     var mentionPrefix: String? {
-        guard let at = draft.lastIndex(of: "@") else { return nil }
-        let typed = draft[draft.index(after: at)...]
-        let startsWord = at == draft.startIndex || draft[draft.index(before: at)].isWhitespace
+        guard let atSign = draft.lastIndex(of: "@") else { return nil }
+        let typed = draft[draft.index(after: atSign)...]
+        let startsWord = atSign == draft.startIndex || draft[draft.index(before: atSign)].isWhitespace
         let isName = typed.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" || $0 == "." }
         return startsWord && isName ? String(typed) : nil
     }

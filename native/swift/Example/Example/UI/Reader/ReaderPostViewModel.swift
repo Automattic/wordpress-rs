@@ -73,12 +73,13 @@ final class ReaderPostViewModel {
     /// Likes or unlikes the post. A like counts a view when `countsPageViews` is on, as opening the post does.
     func setLiked(_ liked: Bool, countsPageViews: Bool) async {
         await act(liked ? "Like" : "Unlike") { post in
-            try await self.service.setPostLiked(
-                post: post.identity,
-                liked: liked,
-                pageView: .fromSwitch(countsPageViews)
-            )
-            .messageOrThrow()
+            try await self.service
+                .setPostLiked(
+                    post: post.identity,
+                    liked: liked,
+                    pageView: .fromSwitch(countsPageViews)
+                )
+                .messageOrThrow()
         }
     }
 
