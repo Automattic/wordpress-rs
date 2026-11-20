@@ -13,6 +13,7 @@
 
 use async_trait::async_trait;
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -62,6 +63,9 @@ pub struct IndexLine<'a> {
     /// How many more posts the page had that the library couldn't read. Left out when none.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unreadable_posts: Option<usize>,
+    /// For a stream of cards, how many of each kind the page had. Left out for other streams.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cards: Option<&'a BTreeMap<String, u64>>,
     /// How many things in it aren't right, counting those posts. Left out when none.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub findings: Option<usize>,
@@ -294,6 +298,7 @@ mod tests {
                 outcome: "request_failed",
                 posts: None,
                 unreadable_posts: None,
+                cards: None,
                 findings: None,
                 error: Some("timed out"),
             })

@@ -13,13 +13,29 @@
 //! # From the signed-in user's Following stream outwards, up to 2,000 requests
 //! cargo run -p wp_com_e2e --bin reader_sweep -- \
 //!     --out ~/reader-sweep/wide --stream following --discover --max-streams 500 --max-requests 2000
+//!
+//! # Discover's cards and a search, 50 pages each
+//! cargo run -p wp_com_e2e --bin reader_sweep -- \
+//!     --out ~/reader-sweep/cards --stream discover --stream search:date:photography \
+//!     --pages-per-stream 50
 //! ```
+//!
+//! Every stream the library has can be walked: see `--stream` for how to name each. A stream
+//! ordered by a date pages by it, as the library does: Liked by when each post was liked, Freshly
+//! Pressed by when each is shown, and the others by when each was published. The rest page by the
+//! handle each page gives. A stream of cards counts each kind of card it sees, and a kind the
+//! library doesn't know is a finding.
+//!
+//! Each post that's read also has its card's fields worked out (its summary, reading time and
+//! layout). A panic is a finding, and so is a post with words that gets no summary or reading time.
 //!
 //! The access token comes from `WP_COM_API_KEY`, or from `wp_com_test_credentials.json`, as it
 //! does for `wp_com_e2e`. `--anonymous` sends none, which is how a signed-out reader sees the API.
 //!
 //! The run's directory holds real posts, some of them private, so it can't be inside a Git
-//! checkout. It exits with `1` if any response didn't parse, or any post in one couldn't be read.
+//! checkout. It exits with `1` if any response didn't parse, any post or card in one couldn't be
+//! read, a card was of a kind the library doesn't know, or working out a post's card fields
+//! panicked.
 
 mod checks;
 mod recording;
@@ -41,8 +57,15 @@ use sweep::{Cursor, Queue, StreamKey, check_output_dir, next_before, parse_seeds
 use wp_api::prelude::*;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::client::WpComApiClient;
+use wp_api::wp_com::reader_post_display::{
+    reader_post_card_type, reader_post_reading_time_minutes, reader_post_summary,
+};
 use wp_api::wp_com::reader_posts::{
-    ReaderPost, ReaderStreamParams, ReaderTagPostsParams, ReaderTagSlug, ReaderUnreadablePost,
+    ReaderCard, ReaderDiscoverParams, ReaderFirstPostsParams, ReaderFreshlyPressedParams,
+    ReaderLikedPostsParams, ReaderListOwner, ReaderListPostsParams, ReaderListSlug,
+    ReaderOrganizationPostsParams, ReaderPost, ReaderPostsResponse, ReaderSearchPostsParams,
+    ReaderStreamParams, ReaderTagPostsParams, ReaderTagPostsResponse, ReaderTagSlug,
+    ReaderTagsPostsParams, ReaderUnreadableCard, ReaderUnreadablePost,
 };
 use wp_api::wp_com::reader_saved::ReaderFeedId;
 
@@ -56,8 +79,10 @@ struct Args {
     #[arg(long)]
     out: PathBuf,
 
-    /// A stream to start from: `following`, `site:<id>`, `feed:<id>` or `tag:<slug>`. Repeat it for
-    /// more.
+    /// A stream to start from: `following`, `liked`, `a8c` (Automattic's posts), `p2`,
+    /// `freshly-pressed`, `site:<id>`, `feed:<id>`, `tag:<slug>`, `tags:<slug>,<slug>` (several
+    /// tags' newest posts), `search:<relevance|date>:<query>`, `list:<owner>/<slug>`, `discover`,
+    /// `discover:<slug>,<slug>` (leaning toward those tags) or `first-posts`. Repeat it for more.
     #[arg(long = "stream")]
     streams: Vec<StreamKey>,
 
@@ -86,7 +111,8 @@ struct Args {
     #[arg(long, default_value_t = 500)]
     max_requests: u64,
 
-    /// Posts per page. The API returns at most 40, and at most 10 for a tag.
+    /// Posts per page. The API returns at most 40, and at most 10 for a tag. A search is sent 20 at
+    /// most, which is its limit, and the first posts stream 15, since it answers no posts to more.
     #[arg(long, default_value_t = 40)]
     page_size: u32,
 
@@ -109,7 +135,8 @@ struct Args {
     #[arg(long, default_value_t = 0)]
     delay_ms: u64,
 
-    /// Send no access token, as a signed-out reader would. `following` needs one.
+    /// Send no access token, as a signed-out reader would. `following`, `liked`, `a8c` and `p2`
+    /// need one.
     #[arg(long)]
     anonymous: bool,
 
@@ -153,6 +180,14 @@ struct Totals {
     request_failures: u64,
     streams_walked: u64,
     posts: u64,
+    /// The cards a stream of cards sent, by the kind the API gave each, posts among them.
+    cards: BTreeMap<String, u64>,
+    /// Cards of a kind the library doesn't know, which nothing can show.
+    unknown_cards: u64,
+    /// The cards on a list's page that came with `false` where the post would be.
+    missing_posts: u64,
+    /// What working out each post's card fields gave.
+    computed: Computed,
     wordpress_com_posts: u64,
     jetpack_posts: u64,
     rss_posts: u64,
@@ -160,6 +195,22 @@ struct Totals {
     /// Values that parsed but aren't right, by kind.
     findings: BTreeMap<&'static str, u64>,
     responses_kept: u64,
+}
+
+/// What working out each post's card fields gave: its summary, reading time and layout.
+#[derive(Debug, Default, Clone, Serialize)]
+struct Computed {
+    posts: u64,
+    /// Posts one of the functions panicked on. Each is a finding too.
+    panics: u64,
+    /// Posts with no summary, and how many of those have no words in their excerpt or content to
+    /// make one from, such as a post that is only an image.
+    no_summary: u64,
+    no_summary_and_no_words: u64,
+    /// Posts with no reading time, and how many of those have no words in their content to time.
+    no_reading_time: u64,
+    no_reading_time_and_no_words: u64,
+    card_types: BTreeMap<String, u64>,
 }
 
 struct Shared {
@@ -190,7 +241,14 @@ impl WpAppNotifier for NoNotifier {
 async fn main() -> ExitCode {
     let args = Args::parse();
     match run(args).await {
-        Ok(totals) if totals.parse_errors == 0 && totals.unreadable_posts == 0 => ExitCode::SUCCESS,
+        Ok(totals)
+            if totals.parse_errors == 0
+                && totals.unreadable_posts == 0
+                && totals.unknown_cards == 0
+                && totals.computed.panics == 0 =>
+        {
+            ExitCode::SUCCESS
+        }
         Ok(_) => ExitCode::FAILURE,
         Err(message) => {
             eprintln!("error: {message}");
@@ -210,10 +268,12 @@ async fn run(args: Args) -> Result<Totals, String> {
     if seeds.is_empty() {
         return Err("give at least one stream to start from, with --stream or --seeds".to_string());
     }
-    if args.anonymous && seeds.contains(&StreamKey::Following) {
-        return Err(
-            "`following` needs a signed-in user, so it can't be swept with --anonymous".to_string(),
-        );
+    if args.anonymous
+        && let Some(stream) = seeds.iter().find(|stream| stream.needs_account())
+    {
+        return Err(format!(
+            "`{stream}` needs a signed-in user, so it can't be swept with --anonymous"
+        ));
     }
     let token = if args.anonymous {
         None
@@ -292,8 +352,8 @@ fn this_year() -> i32 {
 fn progress_line(totals: &Totals, streams_seen: usize, elapsed: f64) -> String {
     format!(
         "{} requests in {:.0}s: {} ok, {} didn't parse, {} HTTP errors, {} failed | {} posts \
-         ({} WordPress.com, {} Jetpack, {} RSS), {} more unreadable | {} of {} streams walked | \
-         {:.1} MB | findings {:?}",
+         ({} WordPress.com, {} Jetpack, {} RSS), {} more unreadable | cards {:?}, {} unknown | \
+         {} of {} streams walked | {:.1} MB | findings {:?}",
         totals.requests,
         elapsed,
         totals.ok,
@@ -305,6 +365,8 @@ fn progress_line(totals: &Totals, streams_seen: usize, elapsed: f64) -> String {
         totals.jetpack_posts,
         totals.rss_posts,
         totals.unreadable_posts,
+        totals.cards,
+        totals.unknown_cards,
         totals.streams_walked,
         streams_seen,
         totals.bytes as f64 / 1_000_000.0,
@@ -362,10 +424,18 @@ fn out_of_time(shared: &Shared) -> bool {
 }
 
 /// A page of a stream, and where the next one starts.
+#[derive(Default)]
 struct Page {
+    /// The posts on the page, the posts of its cards among them.
     posts: Vec<ReaderPost>,
-    /// The posts on the page that the library couldn't read.
+    /// The posts or cards on the page that the library couldn't read.
     unreadable: Vec<ReaderUnreadablePost>,
+    /// For a stream of cards, how many of each kind it had, by the name the API gives the kind.
+    cards: BTreeMap<String, u64>,
+    /// The kinds of the page's cards that the library doesn't know, one entry per card.
+    unknown_cards: Vec<String>,
+    /// Cards on a list's page with no post.
+    missing_posts: u32,
     next: Option<Cursor>,
 }
 
@@ -453,57 +523,232 @@ async fn fetch_once(
     args: &Args,
 ) -> Result<Page, WpApiError> {
     let posts = client.reader_posts();
-    if let StreamKey::Tag(slug) = stream {
-        let params = ReaderTagPostsParams {
-            number: Some(args.page_size),
-            page_handle: match cursor {
-                Some(Cursor::Handle(handle)) => Some(handle.clone()),
-                _ => None,
-            },
-            ..Default::default()
-        };
-        let page = posts
-            .tag_posts(&ReaderTagSlug(slug.clone()), &params)
-            .await?
-            .data;
-        // A page without posts ends the stream, whatever handle it has.
-        let next = match page.posts.is_empty() {
-            true => None,
-            false => page.next_page_handle.map(Cursor::Handle),
-        };
-        return Ok(Page {
-            posts: page.posts,
-            unreadable: page.unreadable_posts,
-            next,
-        });
-    }
-
     let before = match cursor {
         Some(Cursor::Before(date)) => Some(*date),
         _ => None,
     };
-    let params = ReaderStreamParams {
-        number: Some(args.page_size),
-        before,
-        after: None,
-        meta: args.meta.clone(),
-        fields: args.fields.clone(),
+    let page_handle = match cursor {
+        Some(Cursor::Handle(handle)) => Some(handle.clone()),
+        _ => None,
     };
-    // Each endpoint has its own response type around the same page of posts.
+    let number = Some(args.page_size);
+    let (meta, fields) = (args.meta.clone(), args.fields.clone());
+
+    // Each endpoint has its own response type around a page of posts, or of cards.
     let page = match stream {
-        StreamKey::Following => posts.following(&params).await?.data,
-        StreamKey::Site(id) => posts.site_posts(&WpComSiteId(*id), &params).await?.data,
-        StreamKey::Feed(id) => posts.feed_posts(&ReaderFeedId(*id), &params).await?.data,
-        StreamKey::Tag(_) => unreachable!("a tag's stream is read above"),
+        StreamKey::Following | StreamKey::Site(_) | StreamKey::Feed(_) => {
+            let params = ReaderStreamParams {
+                number,
+                before,
+                after: None,
+                meta,
+                fields,
+            };
+            dated(match stream {
+                StreamKey::Following => posts.following(&params).await?.data,
+                StreamKey::Site(id) => posts.site_posts(&WpComSiteId(*id), &params).await?.data,
+                StreamKey::Feed(id) => posts.feed_posts(&ReaderFeedId(*id), &params).await?.data,
+                _ => unreachable!("only these three take these parameters"),
+            })
+        }
+        StreamKey::Liked => {
+            let params = ReaderLikedPostsParams {
+                number,
+                before,
+                meta,
+                fields,
+                ..Default::default()
+            };
+            dated(posts.liked(&params).await?.data)
+        }
+        StreamKey::Automattic | StreamKey::P2 => {
+            let params = ReaderOrganizationPostsParams {
+                number,
+                before,
+                meta,
+                fields,
+                ..Default::default()
+            };
+            dated(match stream {
+                StreamKey::Automattic => posts.automattic(&params).await?.data,
+                _ => posts.following_p_2(&params).await?.data,
+            })
+        }
+        StreamKey::FreshlyPressed => {
+            let params = ReaderFreshlyPressedParams {
+                number,
+                before,
+                meta,
+                fields,
+                ..Default::default()
+            };
+            dated(posts.freshly_pressed(&params).await?.data)
+        }
+        StreamKey::Tag(slug) => {
+            let params = ReaderTagPostsParams {
+                number,
+                page_handle,
+                ..Default::default()
+            };
+            tag_page(
+                posts
+                    .tag_posts(&ReaderTagSlug(slug.clone()), &params)
+                    .await?
+                    .data,
+            )
+        }
+        StreamKey::Tags(slugs) => {
+            let params = ReaderTagsPostsParams {
+                tags: slugs.iter().cloned().map(ReaderTagSlug).collect(),
+                number,
+                page_handle,
+                ..Default::default()
+            };
+            tag_page(posts.tags_posts(&params).await?.data)
+        }
+        StreamKey::Search { sort, query } => {
+            let params = ReaderSearchPostsParams {
+                q: query.clone(),
+                number: Some(args.page_size.min(SEARCH_PAGE_SIZE_MAX)),
+                page_handle,
+                sort: Some((*sort).into()),
+                meta,
+                fields,
+                ..Default::default()
+            };
+            let page = posts.search(&params).await?.data;
+            Page {
+                posts: page.posts.into_iter().map(|result| result.post).collect(),
+                unreadable: page.unreadable_posts,
+                next: page.next_page_handle.map(Cursor::Handle),
+                ..Default::default()
+            }
+        }
+        StreamKey::List { owner, slug } => {
+            let params = ReaderListPostsParams {
+                number,
+                page_handle,
+                ..Default::default()
+            };
+            let page = posts
+                .list_posts(
+                    &ReaderListOwner(owner.clone()),
+                    &ReaderListSlug(slug.clone()),
+                    &params,
+                )
+                .await?
+                .data;
+            // A page of only missing posts still moves on, so the handle decides.
+            let has_cards = !page.posts.is_empty()
+                || !page.unreadable_posts.is_empty()
+                || page.missing_posts > 0;
+            Page {
+                posts: page.posts,
+                unreadable: page.unreadable_posts,
+                missing_posts: page.missing_posts,
+                next: page
+                    .next_page_handle
+                    .filter(|_| has_cards)
+                    .map(Cursor::Handle),
+                ..Default::default()
+            }
+        }
+        StreamKey::Discover(tags) => {
+            let params = ReaderDiscoverParams {
+                count: number,
+                page_handle,
+                tags: tags.iter().cloned().map(ReaderTagSlug).collect(),
+                ..Default::default()
+            };
+            let page = posts.discover(&params).await?.data;
+            card_page(page.cards, page.unreadable_cards, page.next_page_handle)
+        }
+        StreamKey::FirstPosts => {
+            let params = ReaderFirstPostsParams {
+                count: Some(args.page_size.min(FIRST_POSTS_PAGE_SIZE_MAX)),
+                page_handle,
+            };
+            let page = posts.first_posts(&params).await?.data;
+            card_page(page.cards, page.unreadable_cards, page.next_page_handle)
+        }
     };
+    if !stream.pages_by_date() {
+        return Ok(page);
+    }
     // An unreadable post has no date to page from, so the next page starts from the oldest post
     // that was read, and returns the unreadable one again if that was older.
-    let next = next_before(&page.posts, before).map(Cursor::Before);
-    Ok(Page {
+    let next = next_before(page.posts.iter().map(|post| stream.sort_date(post)), before)
+        .map(Cursor::Before);
+    Ok(Page { next, ..page })
+}
+
+/// The most posts a page of search results can ask for: the API answers 400 to more.
+const SEARCH_PAGE_SIZE_MAX: u32 = 20;
+
+/// The most cards a page of the first posts stream can ask for: asked for more, the API answers
+/// no posts and no handle.
+const FIRST_POSTS_PAGE_SIZE_MAX: u32 = 15;
+
+/// A page of a stream ordered by date. Where the next page starts is worked out from its posts.
+fn dated(page: ReaderPostsResponse) -> Page {
+    Page {
+        posts: page.posts,
+        unreadable: page.unreadable_posts,
+        ..Default::default()
+    }
+}
+
+fn tag_page(page: ReaderTagPostsResponse) -> Page {
+    // A page without posts ends the stream, whatever handle it has.
+    let next = match page.posts.is_empty() {
+        true => None,
+        false => page.next_page_handle.map(Cursor::Handle),
+    };
+    Page {
         posts: page.posts,
         unreadable: page.unreadable_posts,
         next,
-    })
+        ..Default::default()
+    }
+}
+
+/// A page of cards: its posts, how many of each kind of card it had, and the kinds the library
+/// doesn't know.
+fn card_page(
+    cards: Vec<ReaderCard>,
+    unreadable: Vec<ReaderUnreadableCard>,
+    next_page_handle: Option<String>,
+) -> Page {
+    let mut page = Page::default();
+    for card in cards {
+        let kind = match card {
+            ReaderCard::Post { post } => {
+                page.posts.push(post);
+                "post".to_string()
+            }
+            ReaderCard::RecommendedSites { .. } => "recommended_blogs".to_string(),
+            ReaderCard::NewSites { .. } => "new_sites".to_string(),
+            ReaderCard::SuggestedTags { .. } => "interests_you_may_like".to_string(),
+            ReaderCard::Unknown { card_type } => {
+                page.unknown_cards.push(card_type.clone());
+                card_type
+            }
+        };
+        *page.cards.entry(kind).or_default() += 1;
+    }
+    for card in unreadable {
+        let kind = card.card_type.unwrap_or_else(|| "(no type)".to_string());
+        *page.cards.entry(kind.clone()).or_default() += 1;
+        page.unreadable.push(ReaderUnreadablePost {
+            identity: card.post,
+            error: format!("a `{kind}` card: {}", card.error),
+        });
+    }
+    // The API sends an empty handle on some last pages.
+    page.next = next_page_handle
+        .filter(|handle| !handle.is_empty())
+        .map(Cursor::Handle);
+    page
 }
 
 /// Looks at a request's result, keeps the response if it's worth keeping, and writes its lines.
@@ -534,6 +779,25 @@ fn report(
         _ => (Vec::new(), Census::default()),
     };
     findings.extend(unreadable.iter().map(unreadable_post));
+    if let Ok(page) = result {
+        findings.extend(page.unknown_cards.iter().map(|kind| Finding {
+            kind: "unknown_card",
+            site_id: None,
+            post_id: None,
+            field: "type".to_string(),
+            value: kind.clone(),
+            usual_offset: None,
+        }));
+    }
+    let computed: Vec<_> = result
+        .map(|page| page.posts.iter().map(computed_fields).collect())
+        .unwrap_or_default();
+    findings.extend(
+        computed
+            .iter()
+            .flat_map(|fields| fields.findings.iter().cloned())
+            .collect::<Vec<_>>(),
+    );
     shared
         .census
         .lock()
@@ -556,6 +820,10 @@ fn report(
         outcome,
         posts,
         unreadable_posts: Some(unreadable.len()).filter(|count| *count > 0),
+        cards: result
+            .ok()
+            .map(|page| &page.cards)
+            .filter(|cards| !cards.is_empty()),
         findings: Some(findings.len()).filter(|count| *count > 0),
         error: error.as_deref(),
     };
@@ -602,8 +870,26 @@ fn report(
         "http_error" => totals.http_errors += 1,
         _ => totals.request_failures += 1,
     }
+    for fields in &computed {
+        let totals = &mut totals.computed;
+        totals.posts += 1;
+        totals.panics += u64::from(fields.panicked);
+        totals.no_summary += u64::from(!fields.summary);
+        totals.no_summary_and_no_words += u64::from(!fields.summary && !fields.has_words);
+        totals.no_reading_time += u64::from(!fields.reading_time);
+        totals.no_reading_time_and_no_words +=
+            u64::from(!fields.reading_time && !fields.content_has_words);
+        if let Some(card_type) = &fields.card_type {
+            *totals.card_types.entry(card_type.clone()).or_default() += 1;
+        }
+    }
     if let Ok(page) = result {
         totals.posts += page.posts.len() as u64;
+        totals.unknown_cards += page.unknown_cards.len() as u64;
+        totals.missing_posts += u64::from(page.missing_posts);
+        for (kind, count) in &page.cards {
+            *totals.cards.entry(kind.clone()).or_default() += count;
+        }
         for post in &page.posts {
             match kind(post) {
                 PostKind::WordPressCom => totals.wordpress_com_posts += 1,
@@ -635,6 +921,100 @@ fn unreadable_post(post: &ReaderUnreadablePost) -> Finding {
         value: short(&post.error),
         usual_offset: None,
     }
+}
+
+/// What working out a post's card fields gave.
+struct ComputedFields {
+    summary: bool,
+    reading_time: bool,
+    card_type: Option<String>,
+    /// Whether the post's excerpt or content has a word in it, and whether its content does.
+    has_words: bool,
+    content_has_words: bool,
+    /// Whether one of the functions panicked on the post.
+    panicked: bool,
+    /// A panic, or a summary or reading time missing from a post with words to make one from.
+    findings: Vec<Finding>,
+}
+
+/// Works out a post's summary, reading time and layout, as an app showing it would.
+fn computed_fields(post: &ReaderPost) -> ComputedFields {
+    let content_has_words = has_words(post.content.as_deref());
+    let mut fields = ComputedFields {
+        summary: false,
+        reading_time: false,
+        card_type: None,
+        has_words: content_has_words || has_words(post.excerpt.as_deref()),
+        content_has_words,
+        panicked: false,
+        findings: Vec::new(),
+    };
+    let finding = |kind, value: String| Finding {
+        kind,
+        site_id: post.identity.site_id.map(|id| id.0),
+        post_id: Some(post.identity.id),
+        field: "post".to_string(),
+        value,
+        usual_offset: None,
+    };
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        (
+            reader_post_summary(post).is_some(),
+            reader_post_reading_time_minutes(post).is_some(),
+            reader_post_card_type(post).to_string(),
+        )
+    }));
+    match outcome {
+        Ok((summary, reading_time, card_type)) => {
+            fields.summary = summary;
+            fields.reading_time = reading_time;
+            fields.card_type = Some(card_type);
+            // Not wrong by itself, but worth a look: the words may be ones the rules leave out.
+            if !summary && fields.has_words {
+                let words = "its excerpt or content has words".to_string();
+                fields
+                    .findings
+                    .push(finding("no_summary_with_words", words));
+            }
+            if !reading_time && fields.content_has_words {
+                let words = "its content has words".to_string();
+                fields
+                    .findings
+                    .push(finding("no_reading_time_with_words", words));
+            }
+        }
+        Err(panic) => {
+            let message = panic
+                .downcast_ref::<&str>()
+                .map(|text| text.to_string())
+                .or_else(|| panic.downcast_ref::<String>().cloned())
+                .unwrap_or_else(|| "(no message)".to_string());
+            fields.panicked = true;
+            fields
+                .findings
+                .push(finding("computed_field_panic", short(&message)));
+        }
+    }
+    fields
+}
+
+/// Whether HTML has a letter or a digit outside its tags and character references: a rough check,
+/// to tell a post with nothing to summarize, such as one that is only an image, from one the
+/// functions should have summarized.
+fn has_words(html: Option<&str>) -> bool {
+    let mut inside = None;
+    for c in html.unwrap_or_default().chars() {
+        match (inside, c) {
+            (None, '<') => inside = Some('>'),
+            (None, '&') => inside = Some(';'),
+            (Some(end), c) if c == end => inside = None,
+            // A `&` that starts no reference ends at the next space.
+            (Some(';'), c) if c.is_whitespace() => inside = None,
+            (None, c) if c.is_alphanumeric() => return true,
+            _ => {}
+        }
+    }
+    false
 }
 
 /// One line of `anomalies.jsonl`.
@@ -689,5 +1069,25 @@ fn short(text: &str) -> String {
     match text.char_indices().nth(MAX) {
         Some((end, _)) => format!("{}…", &text[..end]),
         None => text.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn words_are_looked_for_outside_tags_and_references() {
+        assert!(has_words(Some("<p>A word</p>")));
+        assert!(has_words(Some(
+            "<figure><img alt=\"x\"></figure><p>写真</p>"
+        )));
+        assert!(has_words(Some("Fish &chips")));
+        assert!(!has_words(None));
+        assert!(!has_words(Some("")));
+        assert!(!has_words(Some(
+            "<figure><img src=\"a.jpg\" alt=\"A photo\"></figure>"
+        )));
+        assert!(!has_words(Some("<p>&nbsp;&#8230;</p>\n")));
     }
 }

@@ -12,7 +12,9 @@ use std::collections::BTreeMap;
 /// library couldn't read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Finding {
-    /// `odd_offset`, `unreadable_date`, `odd_year`, `negative_number` or `unreadable_post`.
+    /// `odd_offset`, `unreadable_date`, `odd_year` or `negative_number` from these checks;
+    /// `unreadable_post`, `unknown_card`, `computed_field_panic`, `no_summary_with_words` or
+    /// `no_reading_time_with_words` from the sweep.
     pub kind: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub site_id: Option<u64>,
@@ -173,13 +175,20 @@ pub fn examine(body: &[u8], this_year: i32) -> (Vec<Finding>, Census) {
     let Ok(Value::Object(response)) = serde_json::from_slice::<Value>(body) else {
         return (findings, census);
     };
-    let Some(Value::Array(posts)) = response.get("posts") else {
-        return (findings, census);
+    // A stream of cards has its posts in its `post` cards.
+    let posts: Vec<&Value> = match (response.get("posts"), response.get("cards")) {
+        (Some(Value::Array(posts)), _) => posts.iter().collect(),
+        (_, Some(Value::Array(cards))) => cards
+            .iter()
+            .filter(|card| card.get("type").and_then(Value::as_str) == Some("post"))
+            .filter_map(|card| card.get("data"))
+            .collect(),
+        _ => return (findings, census),
     };
 
     // The offset most of the page's posts have, to say what an odd one should have been.
     let mut offsets: BTreeMap<&str, usize> = BTreeMap::new();
-    for post in posts {
+    for post in &posts {
         if let Some((_, offset)) = post
             .get("date")
             .and_then(Value::as_str)
@@ -405,6 +414,21 @@ mod tests {
         assert_eq!(
             of(&census, "site_ID"),
             BTreeMap::from([("number", 2), ("numeric string", 1)])
+        );
+    }
+
+    #[test]
+    fn the_posts_of_a_stream_of_cards_are_examined() {
+        let body = json!({ "cards": [
+            { "type": "post", "data": { "ID": 1, "site_ID": 7, "date": "2026-11-16T16:45:34+91:00" } },
+            { "type": "recommended_blogs", "data": [{ "ID": 8, "date": "2026-11-16T16:45:34+91:00" }] },
+            { "type": "post", "data": false },
+        ]});
+        let (findings, census) = examine(body.to_string().as_bytes(), 2026);
+        assert_eq!(census.posts, 1);
+        assert_eq!(
+            kinds(&findings),
+            vec![("odd_offset", "date", "2026-11-16T16:45:34+91:00")]
         );
     }
 
