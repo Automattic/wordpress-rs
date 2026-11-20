@@ -11,6 +11,7 @@ use wp_api::wp_com::reader_seen::{
 };
 
 use crate::context::{TestContext, alone, changing, reading};
+use crate::reader_service_tests::settle_after_a_block;
 
 pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     vec![
@@ -32,6 +33,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         .block_site(&site)
                         .await
                         .map_err(|e| e.to_string());
+                    settle_after_a_block().await;
                     let listed = is_blocked(&ctx).await;
                     // Whatever happened, the site ends unblocked.
                     let unblocked = ctx
@@ -45,6 +47,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     if !blocked?.data.success || !listed? {
                         return Err("Blocking the site should list it as blocked".into());
                     }
+                    settle_after_a_block().await;
                     if !unblocked.success || is_blocked(&ctx).await? {
                         return Err("Unblocking the site should take it off the list".into());
                     }
@@ -77,7 +80,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let was = post.is_seen == Some(true);
 
                     let flipped = mark(&ctx, &post, !was).await;
-                    let after = seen_state(&ctx, &post).await;
+                    let after = seen_state(&ctx, &post, Some(!was)).await;
                     // Whatever happened, the post ends as it was.
                     mark(&ctx, &post, was).await?;
 
@@ -85,7 +88,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     if after? != Some(!was) {
                         return Err("The stream should show the post's new seen state".into());
                     }
-                    if seen_state(&ctx, &post).await? != Some(was) {
+                    if seen_state(&ctx, &post, Some(was)).await? != Some(was) {
                         return Err("The post should be back as it was".into());
                     }
                     Ok(())
@@ -130,12 +133,29 @@ async fn seen_posts(ctx: &TestContext) -> Result<Vec<ReaderPost>, Failed> {
         .collect())
 }
 
-async fn seen_state(ctx: &TestContext, post: &ReaderPost) -> Result<Option<bool>, Failed> {
-    Ok(seen_posts(ctx)
-        .await?
-        .into_iter()
-        .find(|other| other.identity == post.identity)
-        .and_then(|post| post.is_seen))
+/// A post's seen state, as the server answers. For a moment after a change, the server can answer
+/// with the state from before it, so it's asked again, 2 seconds apart, until it answers
+/// `expected` or has been asked 5 times. The last answer is returned.
+async fn seen_state(
+    ctx: &TestContext,
+    post: &ReaderPost,
+    expected: Option<bool>,
+) -> Result<Option<bool>, Failed> {
+    let mut seen = None;
+    for attempt in 0..5 {
+        if attempt > 0 {
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        }
+        seen = seen_posts(ctx)
+            .await?
+            .into_iter()
+            .find(|other| other.identity == post.identity)
+            .and_then(|post| post.is_seen);
+        if seen == expected {
+            break;
+        }
+    }
+    Ok(seen)
 }
 
 /// Marks a post as seen or unseen, by its site and post IDs, or by its feed's for an RSS post.

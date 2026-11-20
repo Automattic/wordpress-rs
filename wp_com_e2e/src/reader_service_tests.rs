@@ -271,12 +271,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let marked = service.set_post_seen(identity.clone(), !was).await;
                     let shown = seen_in(&stream, &key).await;
                     // What the server has, read by a service with a cache of its own.
-                    let other = new_service(ctx.delegate.clone(), account())?;
-                    let other_stream = other.stream(ReaderStream::Following);
-                    let fetched = match other_stream.refresh().await {
-                        Ok(_) => seen_in(&other_stream, &key).await,
-                        Err(error) => Err(error.to_string().into()),
-                    };
+                    let fetched = seen_on_the_server(&ctx, &key, Some(!was)).await;
                     // Whatever happened, the post ends as it was.
                     let restored = service
                         .set_post_seen(identity, was)
@@ -325,6 +320,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
 
                     let blocked = service.set_site_blocked(site, true).await;
                     // What the server has, read by a service with a cache of its own.
+                    settle_after_a_block().await;
                     let other = service_for_blocks(&ctx).await;
                     // Whatever happened, the site ends unblocked.
                     let unblocked = service
@@ -342,6 +338,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                             "The server's list should have the site while it's blocked".into()
                         );
                     }
+                    settle_after_a_block().await;
                     service
                         .refresh_blocked_sites()
                         .await
@@ -1010,6 +1007,41 @@ async fn service_for_blocks(ctx: &TestContext) -> Result<ReaderService, Failed> 
         .await
         .map_err(|e| e.to_string())?;
     Ok(service)
+}
+
+/// How long a trial waits after a block or an unblock before it reads the list of blocked sites.
+///
+/// The server keeps its answer to the list, for each page and page size, until the next block or
+/// unblock clears it. A read straight after one can be answered from data that hasn't caught up
+/// yet, and that answer is then kept: once, the list still had a site 14 minutes after it was
+/// unblocked, and another unblock cleared it. A short wait lets the data catch up first.
+pub(crate) async fn settle_after_a_block() {
+    tokio::time::sleep(Duration::from_secs(3)).await;
+}
+
+/// A post's seen state in the Following stream, as the server answers a service with a cache of
+/// its own. For a moment after a change, the server can answer with the state from before it, so
+/// it's asked again, 2 seconds apart, until it answers `expected` or has been asked 5 times. The
+/// last answer is returned.
+async fn seen_on_the_server(
+    ctx: &TestContext,
+    key: &ReaderSavedKey,
+    expected: Option<bool>,
+) -> Result<Option<bool>, Failed> {
+    let mut seen = None;
+    for attempt in 0..5 {
+        if attempt > 0 {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+        let other = new_service(ctx.delegate.clone(), account())?;
+        let stream = other.stream(ReaderStream::Following);
+        stream.refresh().await.map_err(|e| e.to_string())?;
+        seen = seen_in(&stream, key).await?;
+        if seen == expected {
+            break;
+        }
+    }
+    Ok(seen)
 }
 
 /// The seen state of a post in a stream's cached items.
