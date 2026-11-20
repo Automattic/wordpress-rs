@@ -386,6 +386,188 @@ async fn a_saved_post_that_cannot_be_read_is_still_a_save_and_says_why() {
     );
 }
 
+/// The server has posts `1..=count` saved, post `count` the newest save, and its list sends none of
+/// them. Each is then fetched on its own, newest save first: `count` down to 1.
+fn server_has_saves_the_list_does_not_send(reader: &Reader, count: u64) {
+    let keys: Vec<Value> = (1..=count)
+        .rev()
+        .map(|post| {
+            let mut key = post_json(post);
+            key["id"] = json!(post);
+            key["date_saved"] = json!(format!(
+                "2026-11-01T{:02}:{:02}:00+00:00",
+                post / 60,
+                post % 60
+            ));
+            key
+        })
+        .collect();
+    reader.respond(200, json!({ "keys": keys, "total": count }));
+    reader.respond(200, json!({ "posts": [] }));
+}
+
+/// The posts fetched on their own, in the order they were asked for.
+fn fetched_posts(sent: &[String]) -> Vec<u64> {
+    sent.iter()
+        .filter(|name| !["keys", "list"].contains(&name.as_str()))
+        .map(|name| name.parse().expect("a post's own request ends with its ID"))
+        .collect()
+}
+
+/// Every save's offline state, by post: `None` for a save the saved list doesn't show, which is
+/// one with no content.
+async fn states(reader: &Reader, count: u64) -> Vec<(u64, Option<ReaderOfflineState>)> {
+    let list = reader.list().await;
+    (1..=count)
+        .map(|post| {
+            let item = list.iter().find(|item| item.key == post_key(post as i64));
+            (post, item.map(|item| item.offline.clone()))
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn one_download_fills_in_every_save_the_list_does_not_send() {
+    let reader = Reader::signed_in();
+    server_has_saves_the_list_does_not_send(&reader, 120);
+    for post in (1..=120).rev() {
+        reader.respond(200, full_post(post, &format!("<p>{post}</p>")));
+    }
+
+    let report = reader.download(false).await;
+
+    assert_eq!(
+        report,
+        ReaderOfflineReport {
+            ready: 120,
+            ..empty_report()
+        }
+    );
+    // Each once, newest save first.
+    assert_eq!(
+        fetched_posts(&reader.sent()),
+        (1..=120).rev().collect::<Vec<_>>()
+    );
+    // Each save has its own post's content.
+    let list = reader.list().await;
+    for post in 1..=120 {
+        let item = list
+            .iter()
+            .find(|item| item.key == post_key(post))
+            .expect("every save is listed");
+        assert_eq!(item.offline, ready(false), "{post}");
+        let content = item.post.as_ref().and_then(|post| post.content.clone());
+        assert_eq!(content, Some(format!("<p>{post}</p>")));
+    }
+}
+
+#[tokio::test]
+async fn a_download_counts_the_saves_the_server_refuses_and_leaves_them_for_later() {
+    let reader = Reader::signed_in();
+    server_has_saves_the_list_does_not_send(&reader, 120);
+    // Every twelfth post can't be had now: ten of them.
+    let refused = |post: u64| post.is_multiple_of(12);
+    for post in (1..=120).rev() {
+        if refused(post) {
+            reader.respond(404, error_response());
+        } else {
+            reader.respond(200, full_post(post, "<p>Text</p>"));
+        }
+    }
+
+    let report = reader.download(false).await;
+
+    assert_eq!(
+        report,
+        ReaderOfflineReport {
+            ready: 110,
+            failed: 10,
+            ..empty_report()
+        }
+    );
+    // Each was asked for once, refused or not.
+    assert_eq!(fetched_posts(&reader.sent()).len(), 120);
+    // The refused ones have no content, and the report counts them as failed, not as waiting.
+    for (post, state) in states(&reader, 120).await {
+        let expected = (!refused(post)).then(|| ready(false));
+        assert_eq!(state, expected, "{post}");
+    }
+
+    // Straight away, the refused ones aren't asked for again.
+    let before = reader.sent().len();
+    server_has_saves_the_list_does_not_send(&reader, 120);
+    assert_eq!(reader.download(false).await, report);
+    assert!(fetched_posts(&reader.sent()[before..]).is_empty());
+
+    // An hour later they are, and only they.
+    let before = reader.sent().len();
+    reader.advance(RETRY_AFTER);
+    server_has_saves_the_list_does_not_send(&reader, 120);
+    for post in (1..=120).rev().filter(|post| refused(*post)) {
+        reader.respond(200, full_post(post, "<p>Text</p>"));
+    }
+    let report = reader.download(false).await;
+    assert_eq!(report.ready, 120);
+    assert_eq!(report.failed, 0);
+    assert_eq!(
+        fetched_posts(&reader.sent()[before..]),
+        [120, 108, 96, 84, 72, 60, 48, 36, 24, 12]
+    );
+}
+
+#[tokio::test]
+async fn a_download_that_loses_the_connection_stops_and_keeps_what_it_fetched() {
+    let reader = Reader::signed_in();
+    server_has_saves_the_list_does_not_send(&reader, 120);
+    // Posts 120 down to 51 arrive, then the connection goes.
+    for post in (51..=120).rev() {
+        reader.respond(200, full_post(post, "<p>Text</p>"));
+    }
+    reader.executor.push(Step::Offline);
+
+    let report = reader.download(false).await;
+
+    assert!(report.stopped_because.is_some(), "{report:?}");
+    assert_eq!(
+        report,
+        ReaderOfflineReport {
+            ready: 70,
+            not_downloaded: 50,
+            stopped_because: report.stopped_because.clone(),
+            ..empty_report()
+        }
+    );
+    // Nothing was asked for after the request that got no answer.
+    assert_eq!(
+        fetched_posts(&reader.sent()),
+        (50..=120).rev().collect::<Vec<_>>()
+    );
+    // The rest have no content, and the report counts them as waiting, not as failed.
+    for (post, state) in states(&reader, 120).await {
+        let expected = (post > 50).then(|| ready(false));
+        assert_eq!(state, expected, "{post}");
+    }
+
+    // The next download asks only for the rest, and finishes.
+    let before = reader.sent().len();
+    server_has_saves_the_list_does_not_send(&reader, 120);
+    for post in (1..=50).rev() {
+        reader.respond(200, full_post(post, "<p>Text</p>"));
+    }
+    let report = reader.download(false).await;
+    assert_eq!(
+        report,
+        ReaderOfflineReport {
+            ready: 120,
+            ..empty_report()
+        }
+    );
+    assert_eq!(
+        fetched_posts(&reader.sent()[before..]),
+        (1..=50).rev().collect::<Vec<_>>()
+    );
+}
+
 #[tokio::test]
 async fn a_signed_out_readers_save_is_fetched_without_the_saved_list() {
     let reader = Reader::signed_out();

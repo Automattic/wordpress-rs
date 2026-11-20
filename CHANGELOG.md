@@ -99,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Reader stream kept in the server's order now follows a page with no posts that isn't its last. A search by date pages by time window, and a window can come back empty with a handle to the next, several times in a row, so `ReaderStreamCollection::refresh` and `load_more` could return no posts while `has_more` stayed true. Each call now follows such pages, up to 8 past the first, and returns posts or the end; at the limit it returns no posts with `has_more` true, and the next `load_more` carries on from there.
 - A like or a comment subscription of a feed's post (an RSS post, or a feed item with no post ID) is now refused with `ReaderError::FeedPost`, which says "A feed's post can't be liked, and its comments can't be followed.", in place of `ReaderError::MissingIds`, which said the post was missing the IDs it needs. A post of a site that is missing its IDs is still refused with `MissingIds`.
 - The Reader's related posts stream asks for two posts from the post's own site and two from other sites, as both WordPress apps now do, rather than three of each.
+- `ReaderSavedService::download_for_offline` fetches every save the saved list doesn't send in one call: it no longer stops after 50, so a reader with more, such as after an import, doesn't need to call it again. Each save is still tried at most once a call, a refused one keeps its retry rule, and a request that gets no answer still stops the download and keeps what was fetched.
 
 ### Fixed
 

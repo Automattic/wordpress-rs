@@ -3,8 +3,8 @@
 //!
 //! A save can reach this device without its content: one another device made, one from an
 //! import, one made by tapping a link. [`ReaderSavedService::download_for_offline`] fetches what's
-//! missing. The saved list sends whole posts, so it loads the list until every save has its
-//! content, then fetches on its own any save the list didn't send.
+//! missing, all of it in one call. The saved list sends whole posts, so it loads the list until
+//! every save has its content, then fetches on its own each save the list didn't send.
 //!
 //! Images are stored only once the app says where, with
 //! [`ReaderSavedService::set_offline_image_store`], and only by a download the app asks to include
@@ -43,9 +43,6 @@ use wp_mobile_cache::{RowId, SqliteDbError};
 /// The most pages of the saved list one download loads to get saves' content: enough for the
 /// most saves an account can have.
 const MAX_CATCH_UP_PAGES: u32 = 30;
-
-/// The most saves one download fetches on their own, after the saved list.
-const MAX_FETCHES_PER_DOWNLOAD: usize = 50;
 
 /// How many times a save's content is tried, counting only tries the server answered.
 const MAX_ATTEMPTS: u32 = 5;
@@ -235,16 +232,22 @@ impl ReaderSavedService {
     /// called, when there's a connection worth using: it syncs first.
     ///
     /// It fetches the content of each save that has none, by loading the saved list as far as it
-    /// needs to and then fetching what's left one post at a time. A save the server can't give
-    /// the content of reads as [`ReaderOfflineState::Failed`], and is tried again an hour later,
-    /// five times at most.
+    /// needs to and then fetching what's left one post at a time, however many that is: one call
+    /// leaves every save with its content, or with the reason it has none. Each save is tried at
+    /// most once a call, so a call sends at most one request for each save, after the list. A save
+    /// the server can't give the content of reads as [`ReaderOfflineState::Failed`], and is tried
+    /// again an hour later, five times at most.
+    ///
+    /// Saves the list doesn't send, such as many imported at once, each take a request, so a call
+    /// can take a while. It holds the saved list's turn throughout: a save or unsave made meanwhile
+    /// shows at once, and is sent when the download ends.
     ///
     /// With `include_images`, and once [`Self::set_offline_image_store`] has said where, it then
     /// stores the images of each saved post, newest save first. When they'd take more room than
     /// allowed, the oldest saves' images are removed to fit the newer ones.
     ///
-    /// A failure to reach the server isn't an error here: the report says why the download
-    /// stopped, and what the device has so far.
+    /// A failure to reach the server isn't an error here: the download stops there, keeps what
+    /// it fetched, and the report says why it stopped and what the device has so far.
     pub async fn download_for_offline(
         &self,
         include_images: bool,
@@ -424,8 +427,8 @@ impl ReaderSavedService {
         })?)
     }
 
-    /// Fetches the content of every save that has none. Returns why it stopped, if it did before
-    /// it had tried them all. Call it holding the lane.
+    /// Fetches the content of every save that has none and is due a try. Returns why it stopped,
+    /// if it did before it had tried them all. Call it holding the lane.
     async fn fetch_missing_content(&self) -> Result<Option<String>, ReaderSavedError> {
         if !self.signed_out {
             // The saved list sends whole posts, many to a request, so it comes first.
@@ -451,14 +454,11 @@ impl ReaderSavedService {
         let saves = self.cache.execute(|connection| {
             ReaderOfflineRepository::select_without_content(&*connection, self.account)
         })?;
-        let mut fetched = 0;
+        // The saves as they were before any was fetched, each once: the loop ends after one
+        // request for each, whatever the server answers.
         for save in saves.iter().filter(|save| is_due(&save.offline, &now)) {
-            if fetched == MAX_FETCHES_PER_DOWNLOAD {
-                break;
-            }
-            match self.fetch_save(save).await? {
-                Fetch::Answered => fetched += 1,
-                Fetch::Stopped(reason) => return Ok(Some(reason)),
+            if let Fetch::Stopped(reason) = self.fetch_save(save).await? {
+                return Ok(Some(reason));
             }
         }
         Ok(None)
