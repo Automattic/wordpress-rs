@@ -3498,6 +3498,44 @@ mod links {
     }
 
     #[tokio::test]
+    async fn an_address_the_server_finds_no_site_for_is_its_feed_or_nothing() {
+        let (service, executor) = service();
+        // The server's answer for an address on another site since 2026-11-20. It says no site
+        // has the domain, so the address is only looked up for a feed.
+        executor.push(error(404, "blog_not_found"));
+        executor.push(error(404, "no_such_feed"));
+        let link = service
+            .resolve_link("https://example.com/learn".to_string())
+            .await
+            .unwrap();
+        assert_eq!(
+            link,
+            not_in_reader(ReaderLinkNotInReader::NotWordPressOrFeed)
+        );
+        assert_eq!(
+            paths(&executor)[1..],
+            ["/rest/v1.1/read/feed?url=https%3A%2F%2Fexample.com%2Flearn&meta=feed"]
+        );
+
+        executor.push(error(404, "blog_not_found"));
+        executor.push(feeds(456, None));
+        let link = service
+            .resolve_link("https://example.com/2026/11/18/a-post/".to_string())
+            .await
+            .unwrap();
+        assert!(
+            matches!(
+                link,
+                ReaderLink::Feed {
+                    feed_id: ReaderFeedId(456),
+                    ..
+                }
+            ),
+            "{link:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn the_servers_failure_on_a_sites_address_is_the_error() {
         let (service, executor) = service();
         executor.push(server_error());

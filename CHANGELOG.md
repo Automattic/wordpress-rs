@@ -145,6 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The live Reader trials in `wp_com_e2e` that change a setting now ask the server again before they fail on reading it back. In parallel runs, a post's comment notifications and a followed site's notifications have each read back as they were straight after the server took the change; every trial that writes then reads (likes, comment likes, comment subscriptions, delivery settings, follows, tag follows, blocks and seen marks) now asks up to 5 times, 2 seconds apart, through one shared helper, and still compares exactly.
 - A post's comment subscription and its notifications now show what the server answered, and a change the server's answer contradicts, such as notifications for a post it has no subscription to, is refused instead of reported as sent.
 - The live comment subscription trial in `wp_com_e2e` no longer runs alongside the delivery settings trial: turning the test site's comment emails on subscribes its post's comments and turning them off unsubscribes them, which is what made the trial read the subscription as something other than it had just set.
+- A link to a page on a site that isn't on WordPress.com or Jetpack opens its feed, or says it's not in the Reader, again: the server now answers such an address with a 404 `blog_not_found` instead of a 500, which the Reader reported as an error.
 
 ### Security
 

@@ -7,7 +7,8 @@
 //!   It needs a token: signed out, every address is a 401 `rest_forbidden`. A site's home address
 //!   is a 400, whether signed in or not: the API wants a path. Any other address on a WordPress.com
 //!   or Jetpack site, such as a page that isn't there, a category, a feed or a `wp.me` short link,
-//!   is a 404 `post_not_found`. An address on any other site is a 500 with no body.
+//!   is a 404 `post_not_found`. An address on any other site is a 404 `blog_not_found` (seen
+//!   from 2026-11-20 20:17 UTC; until 19:46 UTC that day it was a 500 with no body).
 //! - `GET /rest/v1.2/read/sites/{domain}` answers for a WordPress.com or Jetpack site's domain,
 //!   signed out too, and is a 404 `unknown_blog` for any other domain.
 //! - `GET /rest/v1.1/read/feed?url=` finds the feeds at an address, on any site, signed out too,
@@ -455,9 +456,11 @@ impl ReaderService {
     ///   server's refusal of the slug, such as no post with it, a host that's no site's, or a
     ///   private site, and an address with no slug, for which nothing is sent. A request that
     ///   fails, rather than being refused, is the error. See [`post_slug`] for what was measured.
-    /// - The server answers an address that isn't on a WordPress.com or Jetpack site with a 500.
-    ///   The site's domain is then looked up, and when no WordPress.com or Jetpack site has it,
-    ///   the address is looked up for a feed. When one does, the 500 is the error.
+    /// - The server answers an address that isn't on a WordPress.com or Jetpack site with a 404
+    ///   `blog_not_found`, and the address is looked up for a feed. Until 2026-11-20 it answered
+    ///   with a 500 instead: the site's domain is then looked up, and when no WordPress.com or
+    ///   Jetpack site has it, the address is looked up for a feed. When one does, the 500 is the
+    ///   error.
     /// - A `wp.me` short link isn't resolved by the server: [`ReaderLinkNotInReader::ShortLink`].
     pub async fn resolve_link(&self, url: String) -> Result<ReaderLink, ReaderError> {
         let not_in_reader = |reason| Ok(ReaderLink::NotInReader { reason });
@@ -513,6 +516,11 @@ impl ReaderService {
                 }
                 Err(error) if is_code(&error, "post_not_found") => {
                     ReaderLinkNotInReader::NothingThere
+                }
+                // The server's answer for an address on any other site since 2026-11-20: no
+                // WordPress.com or Jetpack site has the domain, so it's a feed or nothing.
+                Err(error) if is_code(&error, "blog_not_found") => {
+                    ReaderLinkNotInReader::NotWordPressOrFeed
                 }
                 Err(error) if error.status_code() == Some(500) => {
                     // The server's answer for an address on any other site. Unless the domain is

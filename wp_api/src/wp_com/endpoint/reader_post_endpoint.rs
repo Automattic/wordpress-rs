@@ -49,7 +49,9 @@ enum ReaderPostRequest {
     // The site and post IDs of the post at an address. Needs a signed-in user: signed out it's a
     // 401 `rest_forbidden`. An address that isn't a post's is a 404 `post_not_found`, and one
     // without a path a 400 `rest_invalid_param`. The API also answers a few addresses with a 500
-    // and no body, such as one on a `wordpress.com` subdomain that doesn't exist.
+    // and no body, such as one on a `wordpress.com` subdomain that doesn't exist. Since
+    // 2026-11-20, an address on a site that isn't on WordPress.com or Jetpack is a 404
+    // `blog_not_found` (it was a 500 with no body until then).
     #[get(url = "/mobile/resolve-reader-url", params = &ReaderResolveUrlParams, output = ReaderResolvedUrl)]
     ResolveUrl,
 }
