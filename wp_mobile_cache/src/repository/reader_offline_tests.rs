@@ -316,6 +316,32 @@ fn test_stored_bytes_count_a_shared_file_once() {
 }
 
 #[test]
+fn test_stored_bytes_without_some_posts_still_count_a_file_another_post_has() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let (_, first) = save(&conn, account, 1, "2026-11-01T00:00:00Z", Some(Some("1")));
+    let (_, second) = save(&conn, account, 2, "2026-11-02T00:00:00Z", Some(Some("2")));
+    let (first, second) = (first.unwrap(), second.unwrap());
+    ReaderOfflineRepository::record_file(&conn, first, "https://e.com/a.jpg", Some("a.jpg"), 100)
+        .unwrap();
+    ReaderOfflineRepository::record_file(&conn, first, "https://e.com/b.jpg", Some("b.jpg"), 30)
+        .unwrap();
+    ReaderOfflineRepository::record_file(&conn, second, "https://e.com/a.jpg", Some("a.jpg"), 100)
+        .unwrap();
+
+    assert_eq!(
+        ReaderOfflineRepository::stored_bytes_without(&conn, &[first]).unwrap(),
+        100
+    );
+    assert_eq!(
+        ReaderOfflineRepository::stored_bytes_without(&conn, &[first, second]).unwrap(),
+        0
+    );
+    // Nothing was removed.
+    assert_eq!(ReaderOfflineRepository::stored_bytes(&conn).unwrap(), 130);
+}
+
+#[test]
 fn test_deleting_a_posts_files_returns_only_files_no_post_has() {
     let conn = conn();
     let account = account(&conn, 1);

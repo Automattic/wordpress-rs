@@ -679,6 +679,21 @@ impl ReaderSavedService {
                         self.record_file(post.post, url, None, 0)?;
                         continue;
                     }
+                    if self.offline_image_bytes()? + size > store.max_bytes {
+                        let removable: Vec<RowId> = older
+                            .iter()
+                            .filter(|older| can_make_room(older, removed))
+                            .map(|older| older.post)
+                            .collect();
+                        let at_most = self.cache.execute(|connection| {
+                            ReaderOfflineRepository::stored_bytes_without(&*connection, &removable)
+                        })?;
+                        if at_most + size > store.max_bytes {
+                            // Removing every older save's images wouldn't make room, so none
+                            // are removed for nothing.
+                            return Ok(Images::NoRoom);
+                        }
+                    }
                     while self.offline_image_bytes()? + size > store.max_bytes {
                         let Some(oldest) = older
                             .iter()

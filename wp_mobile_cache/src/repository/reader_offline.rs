@@ -377,13 +377,24 @@ impl ReaderOfflineRepository {
     /// How many bytes the stored files take, each file counted once. It counts every reader's
     /// files: they share the directory.
     pub fn stored_bytes(executor: &impl QueryExecutor) -> Result<u64, SqliteDbError> {
-        let mut statement = executor.prepare(
+        Self::stored_bytes_without(executor, &[])
+    }
+
+    /// How many bytes the stored files would take once `posts` had none: a file another post has
+    /// still counts. Nothing is removed.
+    pub fn stored_bytes_without(
+        executor: &impl QueryExecutor,
+        posts: &[RowId],
+    ) -> Result<u64, SqliteDbError> {
+        let placeholders = vec!["?"; posts.len()].join(", ");
+        let mut statement = executor.prepare(&format!(
             "SELECT COALESCE(SUM(bytes), 0) FROM (
                 SELECT MAX(bytes) AS bytes FROM reader_offline_files
-                WHERE file_name IS NOT NULL GROUP BY file_name
-            )",
-        )?;
-        Ok(statement.query_row([], |row| row.get(0))?)
+                WHERE file_name IS NOT NULL AND post_id NOT IN ({placeholders})
+                GROUP BY file_name
+            )"
+        ))?;
+        Ok(statement.query_row(rusqlite::params_from_iter(posts), |row| row.get(0))?)
     }
 
     /// The names of every stored file, for any reader.

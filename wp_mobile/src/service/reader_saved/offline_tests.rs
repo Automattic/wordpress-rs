@@ -1024,6 +1024,52 @@ async fn the_oldest_saves_images_go_to_make_room_for_a_newer_saves() {
     assert_eq!(files_in(&directory), files);
 }
 
+#[tokio::test]
+async fn an_older_saves_images_are_kept_when_removing_them_would_not_make_room() {
+    let reader = Reader::signed_out();
+    let directory = reader.store_images_in(100);
+    save_with_images(&reader, 1, r#"<img src="https://example.com/oldest.jpg">"#).await;
+    reader.respond(200, image(30));
+    assert_eq!(reader.download(true).await.with_images, 1);
+    let oldest_file = files_in(&directory);
+
+    reader.advance(Duration::from_secs(60));
+    save_with_images(&reader, 2, r#"<img src="https://example.com/middle.jpg">"#).await;
+    reader.advance(Duration::from_secs(60));
+    save_with_images(&reader, 3, r#"<img src="https://example.com/newest.jpg">"#).await;
+    reader.respond(200, image(60));
+    // 60 and 50 don't fit in 100, even with the oldest post's 30 removed.
+    reader.respond(200, image(50));
+    let report = reader.download(true).await;
+
+    assert_eq!(report.image_bytes, 90);
+    assert_eq!(reader.state(3).await, ready(true));
+    assert_eq!(reader.state(2).await, ready(false));
+    assert_eq!(reader.state(1).await, ready(true));
+    let files = files_in(&directory);
+    assert_eq!(files.len(), 2);
+    assert!(files.contains(&oldest_file[0]), "{files:?}");
+    // Newest save first.
+    let images: Vec<_> = reader
+        .service
+        .cache
+        .execute(|connection| {
+            ReaderOfflineRepository::select_posts_for_images(&*connection, reader.service.account)
+        })
+        .unwrap()
+        .into_iter()
+        .map(|post| post.images)
+        .collect();
+    assert_eq!(
+        images,
+        [
+            DbReaderOfflineImages::Stored,
+            DbReaderOfflineImages::NoRoom,
+            DbReaderOfflineImages::Stored
+        ]
+    );
+}
+
 /// The posts with images are the newest ones: once one doesn't fit, no older post's are fetched.
 /// An older post that has none to fetch is complete all the same.
 #[tokio::test]
