@@ -9,7 +9,8 @@
 //! Images are stored only once the app says where, with
 //! [`ReaderSavedService::set_offline_image_store`], and only by a download the app asks to include
 //! them, so the app decides whether to wait for Wi-Fi. They stay inside the size the app gave:
-//! when a newer save's images need room, the oldest saves' images go, and their text stays.
+//! when a newer save's images need room, or the app gives less, the oldest saves' images go, and
+//! their text stays.
 //!
 //! An image is fetched into memory and then written, so one over 20 MB is left out. Video and
 //! audio aren't stored.
@@ -251,13 +252,18 @@ impl ReaderSavedService {
     ///
     /// `directory` is created if it isn't there. Give one that is only for these files and isn't
     /// cleared by the system, and give the same one each launch: the files are found by name.
-    /// Readers on one cache can share it. Nothing is fetched until
-    /// [`Self::download_for_offline`] is asked to include images.
+    /// Readers on one cache can share it, and `max_bytes` counts every reader's images. Nothing
+    /// is fetched until [`Self::download_for_offline`] is asked to include images.
     ///
-    /// It also deletes the files in `directory` that no reader's saved post has any more, such as
-    /// the images of an account removed with
-    /// [`wp_mobile_cache::WpApiCache::remove_wordpress_com_account`]. If that fails, it returns
-    /// the error, and the store is set all the same.
+    /// When the stored images take more than `max_bytes`, such as after the app gives less room
+    /// than before, it deletes this reader's oldest saves' images, each post's all together,
+    /// until they fit or this reader has none left. The posts keep their text, and a download
+    /// with more room fetches their images again. It also deletes the files in `directory` that
+    /// no reader's saved post has any more, such as the images of an account removed with
+    /// [`wp_mobile_cache::WpApiCache::remove_wordpress_com_account`].
+    ///
+    /// If deleting fails, it returns the error, and the store is set all the same. The next
+    /// download deletes what's left over.
     pub fn set_offline_image_store(
         &self,
         directory: String,
@@ -270,6 +276,7 @@ impl ReaderSavedService {
             directory,
             max_bytes,
         });
+        self.fit_images_in_store()?;
         self.remove_stray_files()
     }
 
@@ -323,7 +330,8 @@ impl ReaderSavedService {
     /// With `include_images`, and once [`Self::set_offline_image_store`] has said where, it then
     /// stores the images of each saved post, newest save first. When they'd take more room than
     /// allowed, the oldest saves' images are removed to fit a newer save's, and only when all of
-    /// that save's then fit.
+    /// that save's then fit. Whether or not it includes images, it ends by fitting the stored
+    /// images into the room, as [`Self::set_offline_image_store`] does.
     ///
     /// A failure to reach the server isn't an error here: the download stops there, keeps what
     /// it fetched, and the report says why it stopped and what the device has so far.
@@ -339,6 +347,8 @@ impl ReaderSavedService {
         if include_images && stopped.is_none() {
             stopped = self.store_images(!self.signed_out).await?;
         }
+        // Less room may have been given while this ran, or fitting into it may have failed then.
+        self.fit_images_in_store()?;
         self.offline_report(stopped)
     }
 
@@ -479,6 +489,35 @@ impl ReaderSavedService {
             delete_files(&store.directory, &names)?;
         }
         Ok(())
+    }
+
+    /// Forgets this reader's oldest saves' images, as making room for a newer save's does, until
+    /// the stored files take no more than the store's room. Another reader's images on the cache
+    /// count towards the room, and are never forgotten here.
+    fn fit_images_in_store(&self) -> Result<(), ReaderSavedError> {
+        let Some(store) = self.image_store() else {
+            return Ok(());
+        };
+        let made = self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            if ReaderOfflineRepository::stored_bytes(&transaction)? <= store.max_bytes {
+                return Ok(None);
+            }
+            let posts = ReaderOfflineRepository::select_posts_with_files_oldest_first(
+                &transaction,
+                self.account,
+            )?;
+            let made = ReaderOfflineRepository::make_room(&transaction, &posts, store.max_bytes)?;
+            transaction.commit().map_err(SqliteDbError::from)?;
+            Ok::<_, SqliteDbError>(Some(made))
+        })?;
+        let Some(made) = made else {
+            return Ok(());
+        };
+        if !made.posts.is_empty() {
+            self.notify();
+        }
+        delete_files(&store.directory, &made.unused_files)
     }
 
     /// Deletes the files in the directory that are this library's and that no post has: one

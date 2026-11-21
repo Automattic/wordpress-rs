@@ -451,19 +451,61 @@ impl ReaderOfflineRepository {
                 file.bytes,
             )?;
         }
+        let made = Self::make_room(executor, older, max_bytes)?;
+        Ok((Self::stored_bytes(executor)? <= max_bytes).then_some(made))
+    }
+
+    /// Forgets the images of `posts`, in that order, as [`Self::delete_files_of_post`] does,
+    /// until the stored files take at most `max_bytes`. Returns what was forgotten; the files may
+    /// still take more once every post's images are forgotten. Call it in a transaction.
+    pub fn make_room(
+        executor: &impl QueryExecutor,
+        posts: &[RowId],
+        max_bytes: u64,
+    ) -> Result<DbReaderRoomMade, SqliteDbError> {
         let mut made = DbReaderRoomMade::default();
-        for older in older {
+        for post in posts {
             if Self::stored_bytes(executor)? <= max_bytes {
                 break;
             }
             made.unused_files.extend(Self::delete_files_of_post(
                 executor,
-                *older,
+                *post,
                 DbReaderOfflineImages::NoRoom,
             )?);
-            made.posts.push(*older);
+            made.posts.push(*post);
         }
-        Ok((Self::stored_bytes(executor)? <= max_bytes).then_some(made))
+        Ok(made)
+    }
+
+    /// The account's saved posts that have stored files, oldest save first, each once: the
+    /// order their images go in when there's no room for them.
+    pub fn select_posts_with_files_oldest_first(
+        executor: &impl QueryExecutor,
+        account: RowId,
+    ) -> Result<Vec<RowId>, SqliteDbError> {
+        let sql = format!(
+            "SELECT p.rowid FROM reader_saved_posts s
+            JOIN reader_posts p ON p.rowid = s.post_id
+            WHERE s.account_id = ?1 AND s.saved = 1 AND EXISTS (
+                SELECT 1 FROM reader_offline_files f
+                WHERE f.post_id = p.rowid AND f.file_name IS NOT NULL
+            )
+            ORDER BY {NEWEST_SAVE_FIRST}"
+        );
+        let mut statement = executor.prepare(&sql)?;
+        let rows = statement.query_map([account], |row| row.get(0))?;
+        // A post saved twice takes its newest save's place.
+        let mut seen = HashSet::new();
+        let mut posts = Vec::new();
+        for post in rows {
+            let post: RowId = post?;
+            if seen.insert(post) {
+                posts.push(post);
+            }
+        }
+        posts.reverse();
+        Ok(posts)
     }
 
     /// The names of every stored file, for any reader.

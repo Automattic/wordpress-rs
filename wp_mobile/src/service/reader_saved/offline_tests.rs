@@ -1289,6 +1289,284 @@ async fn once_room_runs_out_older_posts_are_not_fetched_and_one_with_no_images_i
     assert_eq!(files_in(&directory).len(), 1);
 }
 
+/// Three saves with their images stored, 95 bytes in all: post 1, the oldest save, has two of
+/// 20, post 2 has one of 30, and post 3, the newest save, one of 25.
+async fn three_saves_with_images(reader: &Reader) -> tempfile::TempDir {
+    let directory = reader.store_images_in(1_000);
+    save_with_images(
+        reader,
+        1,
+        r#"<img src="https://example.com/1a.jpg"><img src="https://example.com/1b.jpg">"#,
+    )
+    .await;
+    reader.advance(Duration::from_secs(60));
+    save_with_images(reader, 2, r#"<img src="https://example.com/2.jpg">"#).await;
+    reader.advance(Duration::from_secs(60));
+    save_with_images(reader, 3, r#"<img src="https://example.com/3.jpg">"#).await;
+    for bytes in [25, 30, 20, 20] {
+        reader.respond(200, image(bytes));
+    }
+    assert_eq!(reader.download(true).await.image_bytes, 95);
+    directory
+}
+
+/// The names of a post's stored files, sorted.
+fn files_of(reader: &Reader, post_id: i64) -> Vec<String> {
+    let mut names: Vec<String> = reader
+        .service
+        .offline_post(post_key(post_id), String::new())
+        .unwrap()
+        .unwrap()
+        .images
+        .into_iter()
+        .map(|image| image.file_name)
+        .collect();
+    names.sort();
+    names
+}
+
+fn sorted(names: impl IntoIterator<Item = String>) -> Vec<String> {
+    let mut names: Vec<String> = names.into_iter().collect();
+    names.sort();
+    names
+}
+
+#[tokio::test]
+async fn a_smaller_room_forgets_the_oldest_saves_images_when_the_store_is_set() {
+    let reader = Reader::signed_out();
+    let directory = three_saves_with_images(&reader).await;
+    let (second, third) = (files_of(&reader, 2), files_of(&reader, 3));
+
+    // Forgetting one of post 1's two images would be enough, and both go.
+    set_store_with_room(&reader, &directory, 75).unwrap();
+
+    assert_eq!(reader.service.offline_image_bytes().unwrap(), 55);
+    assert_eq!(
+        images_of_posts(&reader),
+        [
+            DbReaderOfflineImages::Stored,
+            DbReaderOfflineImages::Stored,
+            DbReaderOfflineImages::NoRoom
+        ]
+    );
+    assert_eq!(files_of(&reader, 1), Vec::<String>::new());
+    assert_eq!(
+        files_in(&directory),
+        sorted(second.iter().chain(&third).cloned())
+    );
+    assert_eq!(reader.state(1).await, ready(false), "post 1 keeps its text");
+
+    set_store_with_room(&reader, &directory, 30).unwrap();
+
+    assert_eq!(reader.service.offline_image_bytes().unwrap(), 25);
+    assert_eq!(
+        images_of_posts(&reader),
+        [
+            DbReaderOfflineImages::Stored,
+            DbReaderOfflineImages::NoRoom,
+            DbReaderOfflineImages::NoRoom
+        ]
+    );
+    assert_eq!(files_in(&directory), third);
+    assert_eq!(reader.urls().len(), 4, "nothing is fetched");
+}
+
+#[tokio::test]
+async fn a_store_inside_its_room_is_left_as_it_is() {
+    let reader = Reader::signed_out();
+    let directory = three_saves_with_images(&reader).await;
+    let images = |reader: &Reader| {
+        (1..=3)
+            .map(|post_id| {
+                reader
+                    .service
+                    .offline_post(post_key(post_id), String::new())
+                    .unwrap()
+                    .unwrap()
+                    .images
+            })
+            .collect::<Vec<_>>()
+    };
+    let before = (
+        images(&reader),
+        images_of_posts(&reader),
+        files_in(&directory),
+    );
+
+    set_store_with_room(&reader, &directory, 95).unwrap();
+
+    assert_eq!(
+        (
+            images(&reader),
+            images_of_posts(&reader),
+            files_in(&directory)
+        ),
+        before
+    );
+    assert_eq!(reader.service.offline_image_bytes().unwrap(), 95);
+}
+
+#[tokio::test]
+async fn no_room_forgets_every_saves_images_and_keeps_their_text() {
+    let reader = Reader::signed_out();
+    let directory = three_saves_with_images(&reader).await;
+    reader.advance(Duration::from_secs(60));
+    save_with_images(&reader, 4, "<p>No images here.</p>").await;
+    assert_eq!(reader.download(true).await.with_images, 4);
+
+    set_store_with_room(&reader, &directory, 0).unwrap();
+
+    assert_eq!(files_in(&directory), Vec::<String>::new());
+    assert_eq!(reader.service.offline_image_bytes().unwrap(), 0);
+    assert_eq!(
+        images_of_posts(&reader),
+        [
+            DbReaderOfflineImages::Stored,
+            DbReaderOfflineImages::NoRoom,
+            DbReaderOfflineImages::NoRoom,
+            DbReaderOfflineImages::NoRoom
+        ],
+        "a post with no images has none to forget"
+    );
+    for post_id in 1..=3 {
+        assert_eq!(reader.state(post_id).await, ready(false));
+    }
+}
+
+#[tokio::test]
+async fn a_smaller_room_deletes_a_file_two_posts_share_only_once_neither_has_it() {
+    let reader = Reader::signed_out();
+    let directory = reader.store_images_in(1_000);
+    let shared = r#"<img src="https://example.com/shared.jpg">"#;
+    save_with_images(
+        &reader,
+        1,
+        &format!(r#"{shared}<img src="https://example.com/1.jpg">"#),
+    )
+    .await;
+    reader.advance(Duration::from_secs(60));
+    save_with_images(
+        &reader,
+        2,
+        &format!(r#"{shared}<img src="https://example.com/2.jpg">"#),
+    )
+    .await;
+    // Post 2's two, then post 1's own: the shared one is fetched once.
+    for bytes in [10, 20, 30] {
+        reader.respond(200, image(bytes));
+    }
+    assert_eq!(reader.download(true).await.image_bytes, 60);
+    let second = files_of(&reader, 2);
+
+    set_store_with_room(&reader, &directory, 35).unwrap();
+
+    assert_eq!(
+        files_in(&directory),
+        second,
+        "post 2 still has the shared file"
+    );
+    assert_eq!(reader.service.offline_image_bytes().unwrap(), 30);
+
+    set_store_with_room(&reader, &directory, 5).unwrap();
+
+    assert_eq!(files_in(&directory), Vec::<String>::new());
+    assert_eq!(
+        images_of_posts(&reader),
+        [DbReaderOfflineImages::NoRoom, DbReaderOfflineImages::NoRoom]
+    );
+}
+
+#[tokio::test]
+async fn images_forgotten_for_a_smaller_room_are_fetched_again_with_a_larger_one() {
+    let reader = Reader::signed_out();
+    let directory = three_saves_with_images(&reader).await;
+    set_store_with_room(&reader, &directory, 30).unwrap();
+    assert_eq!(reader.service.offline_image_bytes().unwrap(), 25);
+
+    set_store_with_room(&reader, &directory, 1_000).unwrap();
+    for bytes in [30, 20, 20] {
+        reader.respond(200, image(bytes));
+    }
+    let report = reader.download(true).await;
+
+    assert_eq!(report.with_images, 3);
+    assert_eq!(report.image_bytes, 95);
+    assert_eq!(
+        reader.urls()[4..],
+        [
+            "https://example.com/2.jpg",
+            "https://example.com/1a.jpg",
+            "https://example.com/1b.jpg",
+        ]
+    );
+    assert_eq!(files_in(&directory).len(), 4);
+}
+
+/// A download that was storing a post when the room shrank kept to the room it started with.
+#[tokio::test]
+async fn a_room_made_smaller_during_a_download_is_kept_to_when_it_ends() {
+    let reader = Reader::signed_out();
+    let directory = reader.store_images_in(1_000);
+    save_with_images(&reader, 1, r#"<img src="https://example.com/old.jpg">"#).await;
+    reader.respond(200, image(40));
+    assert_eq!(reader.download(true).await.image_bytes, 40);
+    reader.advance(Duration::from_secs(60));
+    save_with_images(&reader, 2, r#"<img src="https://example.com/new.jpg">"#).await;
+    let (release, held) = oneshot::channel::<()>();
+    reader.executor.push(Step::Hold(held, 200, image(30)));
+    let mut download = Box::pin(reader.service.download_for_offline(true));
+    assert!(futures::poll!(download.as_mut()).is_pending());
+
+    set_store_with_room(&reader, &directory, 50).unwrap();
+    assert_eq!(reader.service.offline_image_bytes().unwrap(), 40);
+    release.send(()).unwrap();
+    let report = download.await.unwrap();
+
+    assert_eq!(report.image_bytes, 30);
+    assert_eq!(
+        images_of_posts(&reader),
+        [DbReaderOfflineImages::Stored, DbReaderOfflineImages::NoRoom]
+    );
+    assert_eq!(files_in(&directory), files_of(&reader, 2));
+}
+
+/// The room counts every reader's images, and a reader forgets only its own.
+#[tokio::test]
+async fn a_smaller_room_forgets_only_the_readers_own_images() {
+    let cache = migrated_in_memory_cache();
+    let account = Reader::new(
+        ReaderOwner::Account {
+            user_id: WpComUserId(1),
+        },
+        cache.clone(),
+        |delegate| delegate,
+    );
+    let signed_out = Reader::new(ReaderOwner::SignedOut, cache.clone(), |delegate| delegate);
+    let directory = tempfile::tempdir().unwrap();
+    set_store(&account, &directory);
+    set_store(&signed_out, &directory);
+    account.server_has(
+        &[post_json(1)],
+        &[full_post(1, r#"<img src="https://example.com/a.jpg">"#)],
+    );
+    account.respond(200, image(10));
+    assert_eq!(account.download(true).await.with_images, 1);
+    save_with_images(&signed_out, 2, r#"<img src="https://example.com/b.jpg">"#).await;
+    signed_out.respond(200, image(20));
+    assert_eq!(signed_out.download(true).await.with_images, 1);
+    let accounts = files_of(&account, 1);
+
+    set_store_with_room(&signed_out, &directory, 5).unwrap();
+
+    assert_eq!(files_in(&directory), accounts);
+    assert_eq!(
+        images_of_posts(&signed_out),
+        [DbReaderOfflineImages::NoRoom]
+    );
+    assert_eq!(images_of_posts(&account), [DbReaderOfflineImages::Stored]);
+    assert_eq!(signed_out.service.offline_image_bytes().unwrap(), 10);
+}
+
 #[tokio::test]
 async fn an_image_bigger_than_all_the_room_is_done_without() {
     let reader = Reader::signed_out();
@@ -1341,10 +1619,17 @@ async fn a_download_deletes_stored_files_no_post_has_and_nothing_else() {
 }
 
 fn set_store(reader: &Reader, directory: &tempfile::TempDir) {
+    set_store_with_room(reader, directory, 1_000).unwrap();
+}
+
+fn set_store_with_room(
+    reader: &Reader,
+    directory: &tempfile::TempDir,
+    max_bytes: u64,
+) -> Result<(), ReaderSavedError> {
     reader
         .service
-        .set_offline_image_store(directory.path().to_str().unwrap().to_string(), 1_000)
-        .unwrap();
+        .set_offline_image_store(directory.path().to_str().unwrap().to_string(), max_bytes)
 }
 
 #[tokio::test]
