@@ -419,10 +419,8 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                                 .await
                                 .map_err(|e| e.to_string())?
                                 .data;
-                            match page.unreadable_cards.first() {
-                                Some(card) => Err(format!("A card couldn't be read: {card:?}")),
-                                None => Ok(page),
-                            }
+                            check_discover_cards(&page)?;
+                            Ok(page)
                         }
                     };
 
@@ -436,16 +434,11 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         |page: &ReaderDiscoverResponse| !card_posts(&page.cards).is_empty();
                     let next = |page: &ReaderDiscoverResponse| page.next_page_handle.clone();
 
-                    // A page is posts, with a card of recommended sites among them.
+                    // A page is posts, and usually a card of recommended sites among them, which
+                    // `check_discover_cards` reads. Which cards come depends on the account and
+                    // the moment: CI's account once had a page with none.
                     let first =
                         first_page_with_posts("Discover", None, by_handle, has_posts, next).await?;
-                    if !first
-                        .cards
-                        .iter()
-                        .any(|card| matches!(card, ReaderCard::RecommendedSites { .. }))
-                    {
-                        return Err("A page should have a card of recommended sites".into());
-                    }
                     let handle = first
                         .next_page_handle
                         .clone()
@@ -459,7 +452,9 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         return Err("The next page should be other posts".into());
                     }
 
-                    // Asked for with tags, a page ends with a card of tags the user may like.
+                    // Asked for with tags, a page ends with a card of tags the user may like. It
+                    // answers the tags asked for, not the account: signed out and signed in got
+                    // the same tags.
                     let tagged = page(ReaderDiscoverParams {
                         tags: vec![ReaderTagSlug("photography".to_string())],
                         ..Default::default()
@@ -752,6 +747,37 @@ fn card_posts(cards: &[ReaderCard]) -> std::collections::HashSet<(Option<WpComSi
             _ => None,
         })
         .collect()
+}
+
+/// Every card on a page of Discover can be read and is of a kind the library knows, and a card of
+/// recommended sites names each site, with its address. A card of recommended sites isn't
+/// required: the server doesn't promise one on a page, or for an account.
+fn check_discover_cards(page: &ReaderDiscoverResponse) -> Result<(), String> {
+    if let Some(card) = page.unreadable_cards.first() {
+        return Err(format!("A card couldn't be read: {card:?}"));
+    }
+    for card in &page.cards {
+        match card {
+            ReaderCard::Unknown { card_type } => {
+                return Err(format!(
+                    "A card is of a kind the library doesn't know: {card_type}"
+                ));
+            }
+            ReaderCard::RecommendedSites { sites } => {
+                if let Some(site) = sites.iter().find(|site| {
+                    site.site_id.is_none() || site.name.is_none() || site.url.is_none()
+                }) {
+                    return Err(format!(
+                        "A recommended site is missing its ID, name or address: {site:?}"
+                    ));
+                }
+            }
+            ReaderCard::Post { .. }
+            | ReaderCard::NewSites { .. }
+            | ReaderCard::SuggestedTags { .. } => {}
+        }
+    }
+    Ok(())
 }
 
 /// A page of the posts of two tags busy enough to always have a second page. `params` is the rest

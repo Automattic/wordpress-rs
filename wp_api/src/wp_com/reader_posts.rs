@@ -1078,8 +1078,9 @@ pub struct ReaderTagsPostsParams {
 pub enum ReaderCard {
     /// A post. The API calls the card `post`.
     Post { post: ReaderPost },
-    /// Sites to recommend. The API calls the card `recommended_blogs`. Discover sends one on each
-    /// page, at any position, with up to as many sites as the cards that were asked for.
+    /// Sites to recommend. The API calls the card `recommended_blogs`. Discover usually sends one
+    /// on each page, at any position, with up to as many sites as the cards that were asked for,
+    /// but doesn't promise one: a page for one account came without it.
     RecommendedSites { sites: Vec<ReaderCardSite> },
     /// Sites that have just started. The API calls the card `new_sites`. The first posts stream
     /// sends one at the end of each page, and it can be empty.

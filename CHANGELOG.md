@@ -152,6 +152,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Signed out, `ReaderService::resolve_link` no longer answers an address on a site that isn't on WordPress.com or Jetpack, such as `https://www.rust-lang.org/learn`, with `ReaderError::NeedsAccount`, though an account couldn't find a post there either. When the slug lookup answers `unknown_blog`, or an address with no slug has a host no site has, the address is looked up for a feed, as it is with an account.
 - `Documentation/reader-endpoints.md` is what `scripts/reader-endpoints-doc.py` writes again: the slug lookup's `unknown_blog` answer is now in the comment the document is made from, so `--check` passes.
 - The live trial `reader_service::resolve_link_to_a_post_needs_an_account` expects a signed-out address with no slug to send one request, the host's site lookup that `ReaderService::resolve_link` now makes, rather than none.
+- The live Discover trial in `wp_com_e2e` no longer requires a card of recommended sites on its first page with posts: the server doesn't promise one for every account, and CI's account had a page without it. Every card on the pages it reads must still be readable and of a kind the library knows, and a card of recommended sites, when there is one, must name each site with its ID and address. The doc of `ReaderCard::RecommendedSites` said Discover sends one on each page.
 
 ### Security
 
