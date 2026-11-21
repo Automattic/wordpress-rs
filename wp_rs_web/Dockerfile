@@ -28,7 +28,9 @@ RUN cargo build -p wp_rs_web --bin wp_rs_web --release
 # Build the runtime docker image
 #
 
-FROM debian:bookworm-slim
+# Use the same Debian release as the `rust:` builder image above (trixie). A binary
+# built against a newer glibc fails to start on an older one.
+FROM debian:trixie-slim
 
 RUN apt update && apt install -y openssl && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /app/wp_rs_web/assets
