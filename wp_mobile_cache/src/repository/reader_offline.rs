@@ -72,6 +72,15 @@ pub struct DbReaderOfflineFile {
     pub bytes: u64,
 }
 
+/// What [`ReaderOfflineRepository::record_files_making_room`] forgot to make room.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DbReaderRoomMade {
+    /// The posts whose images were forgotten, in the order they were.
+    pub posts: Vec<RowId>,
+    /// The files no post has any more, for the caller to delete.
+    pub unused_files: Vec<String>,
+}
+
 /// The saves of an account, newest first: the saved list's own order.
 const NEWEST_SAVE_FIRST: &str = "s.date_saved IS NULL, s.date_saved DESC, s.seq DESC, s.rowid DESC";
 
@@ -386,15 +395,75 @@ impl ReaderOfflineRepository {
         executor: &impl QueryExecutor,
         posts: &[RowId],
     ) -> Result<u64, SqliteDbError> {
-        let placeholders = vec!["?"; posts.len()].join(", ");
+        Self::stored_bytes_with(executor, &[], posts)
+    }
+
+    /// How many bytes the stored files would take once `files` were recorded too and `without`
+    /// had none: a file another post has still counts, and each file counts once. Nothing is
+    /// changed.
+    pub fn stored_bytes_with(
+        executor: &impl QueryExecutor,
+        files: &[DbReaderOfflineFile],
+        without: &[RowId],
+    ) -> Result<u64, SqliteDbError> {
+        let named: Vec<(&String, &u64)> = files
+            .iter()
+            .filter_map(|file| Some((file.file_name.as_ref()?, &file.bytes)))
+            .collect();
+        let placeholders = vec!["?"; without.len()].join(", ");
+        let adding = " UNION ALL SELECT ?, ?".repeat(named.len());
         let mut statement = executor.prepare(&format!(
             "SELECT COALESCE(SUM(bytes), 0) FROM (
-                SELECT MAX(bytes) AS bytes FROM reader_offline_files
-                WHERE file_name IS NOT NULL AND post_id NOT IN ({placeholders})
+                SELECT MAX(bytes) AS bytes FROM (
+                    SELECT file_name, bytes FROM reader_offline_files
+                    WHERE file_name IS NOT NULL AND post_id NOT IN ({placeholders})
+                    {adding}
+                )
                 GROUP BY file_name
             )"
         ))?;
-        Ok(statement.query_row(rusqlite::params_from_iter(posts), |row| row.get(0))?)
+        let mut parameters: Vec<&dyn rusqlite::ToSql> = Vec::new();
+        parameters.extend(without.iter().map(|post| post as &dyn rusqlite::ToSql));
+        for (name, bytes) in &named {
+            parameters.push(*name);
+            parameters.push(*bytes);
+        }
+        Ok(statement.query_row(parameters.as_slice(), |row| row.get(0))?)
+    }
+
+    /// Records images of `post`, then forgets the images of the `older` posts, in that order, as
+    /// [`Self::delete_files_of_post`] does, until the stored files take at most `max_bytes`.
+    /// Returns what was forgotten, or `None` when the files still take more. Call it in a
+    /// transaction, and roll that back on `None`: the rows have changed all the same.
+    pub fn record_files_making_room(
+        executor: &impl QueryExecutor,
+        post: RowId,
+        files: &[DbReaderOfflineFile],
+        older: &[RowId],
+        max_bytes: u64,
+    ) -> Result<Option<DbReaderRoomMade>, SqliteDbError> {
+        for file in files {
+            Self::record_file(
+                executor,
+                post,
+                &file.url,
+                file.file_name.as_deref(),
+                file.bytes,
+            )?;
+        }
+        let mut made = DbReaderRoomMade::default();
+        for older in older {
+            if Self::stored_bytes(executor)? <= max_bytes {
+                break;
+            }
+            made.unused_files.extend(Self::delete_files_of_post(
+                executor,
+                *older,
+                DbReaderOfflineImages::NoRoom,
+            )?);
+            made.posts.push(*older);
+        }
+        Ok((Self::stored_bytes(executor)? <= max_bytes).then_some(made))
     }
 
     /// The names of every stored file, for any reader.

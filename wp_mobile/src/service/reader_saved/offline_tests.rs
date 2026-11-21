@@ -7,6 +7,7 @@ use super::super::tests::{
 };
 use super::*;
 use crate::service::reader_saved::{ReaderSavedListItem, ReaderSavedStatus};
+use futures::channel::oneshot;
 use serde_json::{Value, json};
 use std::sync::Mutex;
 use std::time::SystemTime;
@@ -158,8 +159,11 @@ fn post_with(post_id: u64, fields: Value) -> ReaderPost {
 /// An image's answer. The scripted server sends no `Content-Type`, so the address says it's an
 /// image, and the body's length is `bytes`.
 fn image(bytes: usize) -> Value {
-    // A JSON string is written with its two quotes.
-    json!("x".repeat(bytes - 2))
+    match bytes {
+        1 => json!(0),
+        // A JSON string is written with its two quotes.
+        _ => json!("x".repeat(bytes - 2)),
+    }
 }
 
 fn files_in(directory: &tempfile::TempDir) -> Vec<String> {
@@ -1068,6 +1072,186 @@ async fn an_older_saves_images_are_kept_when_removing_them_would_not_make_room()
             DbReaderOfflineImages::Stored
         ]
     );
+}
+
+const FOUR_IMAGES: &str = concat!(
+    r#"<img src="https://example.com/p1.jpg"><img src="https://example.com/p2.jpg">"#,
+    r#"<img src="https://example.com/p3.jpg"><img src="https://example.com/p4.jpg">"#,
+);
+
+/// Room for 50, with the oldest save's 5 stored. Post 2 has four images, and post 3, the newest
+/// save, has one to fetch.
+async fn a_post_with_four_images_between_two_saves(reader: &Reader) -> tempfile::TempDir {
+    let directory = reader.store_images_in(50);
+    save_with_images(reader, 1, r#"<img src="https://example.com/oldest.jpg">"#).await;
+    reader.respond(200, image(5));
+    assert_eq!(reader.download(true).await.with_images, 1);
+    reader.advance(Duration::from_secs(60));
+    save_with_images(reader, 2, FOUR_IMAGES).await;
+    reader.advance(Duration::from_secs(60));
+    save_with_images(reader, 3, r#"<img src="https://example.com/newest.jpg">"#).await;
+    directory
+}
+
+fn images_of_posts(reader: &Reader) -> Vec<DbReaderOfflineImages> {
+    reader
+        .service
+        .cache
+        .execute(|connection| {
+            ReaderOfflineRepository::select_posts_for_images(&*connection, reader.service.account)
+        })
+        .unwrap()
+        .into_iter()
+        .map(|post| post.images)
+        .collect()
+}
+
+/// Post 2's images are fetched one at a time, so an image can fit when the post's others won't.
+#[tokio::test]
+async fn an_older_saves_images_are_kept_when_a_newer_saves_do_not_all_fit() {
+    let reader = Reader::signed_out();
+    let directory = a_post_with_four_images_between_two_saves(&reader).await;
+    let oldest_file = files_in(&directory);
+    reader.respond(200, image(45));
+    // 2 and 2 would fit with the oldest save's 5 removed, and a third 2 wouldn't.
+    for _ in 0..3 {
+        reader.respond(200, image(2));
+    }
+
+    let report = reader.download(true).await;
+
+    assert_eq!(report.image_bytes, 50);
+    assert_eq!(reader.state(3).await, ready(true));
+    assert_eq!(reader.state(2).await, ready(false));
+    assert_eq!(reader.state(1).await, ready(true));
+    assert_eq!(
+        images_of_posts(&reader),
+        [
+            DbReaderOfflineImages::Stored,
+            DbReaderOfflineImages::NoRoom,
+            DbReaderOfflineImages::Stored
+        ]
+    );
+    let files = files_in(&directory);
+    assert_eq!(files.len(), 2);
+    assert!(files.contains(&oldest_file[0]), "{files:?}");
+    assert_eq!(
+        reader.urls()[1..],
+        [
+            "https://example.com/newest.jpg",
+            "https://example.com/p1.jpg",
+            "https://example.com/p2.jpg",
+            "https://example.com/p3.jpg",
+        ],
+        "once post 2's images can't all fit, the rest aren't fetched"
+    );
+
+    // Another download asks for post 2's again, and changes nothing.
+    for _ in 0..3 {
+        reader.respond(200, image(2));
+    }
+    assert_eq!(reader.download(true).await, report);
+    assert_eq!(files_in(&directory), files);
+    assert_eq!(reader.urls().len(), 8);
+    assert_eq!(reader.state(1).await, ready(true));
+}
+
+#[tokio::test]
+async fn an_older_saves_images_go_when_all_of_a_newer_saves_then_fit() {
+    let reader = Reader::signed_out();
+    let directory = a_post_with_four_images_between_two_saves(&reader).await;
+    let oldest_file = files_in(&directory);
+    reader.respond(200, image(45));
+    for _ in 0..4 {
+        reader.respond(200, image(1));
+    }
+
+    let report = reader.download(true).await;
+
+    assert_eq!(report.image_bytes, 49);
+    assert_eq!(reader.state(3).await, ready(true));
+    assert_eq!(reader.state(2).await, ready(true));
+    assert_eq!(reader.state(1).await, ready(false));
+    let files = files_in(&directory);
+    assert_eq!(files.len(), 5);
+    assert!(!files.contains(&oldest_file[0]), "{files:?}");
+
+    // The oldest save's image is asked for again, doesn't fit, and takes nothing from the others.
+    reader.respond(200, image(5));
+    assert_eq!(reader.download(true).await, report);
+    assert_eq!(files_in(&directory), files);
+    assert_eq!(
+        images_of_posts(&reader),
+        [
+            DbReaderOfflineImages::Stored,
+            DbReaderOfflineImages::Stored,
+            DbReaderOfflineImages::NoRoom
+        ]
+    );
+}
+
+/// Post 2 may never fit while one of its images can't be had, so nothing goes for the others.
+#[tokio::test]
+async fn an_older_saves_images_are_kept_for_a_newer_save_that_still_lacks_some() {
+    let reader = Reader::signed_out();
+    let directory = a_post_with_four_images_between_two_saves(&reader).await;
+    reader.respond(200, image(45));
+    reader.respond(503, json!("Busy"));
+    for _ in 0..3 {
+        reader.respond(200, image(1));
+    }
+
+    let report = reader.download(true).await;
+
+    assert_eq!(report.image_bytes, 50);
+    assert_eq!(reader.state(2).await, ready(false));
+    assert_eq!(reader.state(1).await, ready(true));
+    let files = files_in(&directory);
+    assert_eq!(files.len(), 2);
+
+    // Once it can be had, all four are fetched and fit.
+    for _ in 0..4 {
+        reader.respond(200, image(1));
+    }
+    let report = reader.download(true).await;
+    assert_eq!(report.image_bytes, 49);
+    assert_eq!(reader.state(2).await, ready(true));
+    assert_eq!(reader.state(1).await, ready(false));
+    assert_eq!(reader.urls().len(), 2 + 4 + 4);
+}
+
+/// Kotlin cancels a call by dropping its future.
+#[tokio::test]
+async fn an_older_saves_images_are_kept_when_a_download_is_dropped_during_a_newer_saves() {
+    let reader = Reader::signed_out();
+    let directory = a_post_with_four_images_between_two_saves(&reader).await;
+    let oldest_file = files_in(&directory);
+    reader.respond(200, image(45));
+    // Post 2's would fit, with the oldest save's image removed.
+    reader.respond(200, image(1));
+    let (_release, held) = oneshot::channel::<()>();
+    reader.executor.push(Step::Hold(held, 200, image(1)));
+
+    let mut download = Box::pin(reader.service.download_for_offline(true));
+    assert!(futures::poll!(download.as_mut()).is_pending());
+    assert_eq!(
+        reader.urls().last().map(String::as_str),
+        Some("https://example.com/p2.jpg")
+    );
+    drop(download);
+
+    assert_eq!(reader.service.offline_image_bytes().unwrap(), 50);
+    assert_eq!(reader.state(1).await, ready(true));
+    // The newest save's image is stored, and post 2's first is deleted with no stray left.
+    let files = files_in(&directory);
+    assert_eq!(files.len(), 2);
+    assert!(files.contains(&oldest_file[0]), "{files:?}");
+    let offline = reader
+        .service
+        .offline_post(post_key(2), String::new())
+        .unwrap()
+        .unwrap();
+    assert!(offline.images.is_empty(), "{:?}", offline.images);
 }
 
 /// The posts with images are the newest ones: once one doesn't fit, no older post's are fetched.

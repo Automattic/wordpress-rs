@@ -341,6 +341,181 @@ fn test_stored_bytes_without_some_posts_still_count_a_file_another_post_has() {
     assert_eq!(ReaderOfflineRepository::stored_bytes(&conn).unwrap(), 130);
 }
 
+fn file(url: &str, file_name: Option<&str>, bytes: u64) -> DbReaderOfflineFile {
+    DbReaderOfflineFile {
+        url: url.to_string(),
+        file_name: file_name.map(str::to_string),
+        bytes,
+    }
+}
+
+#[test]
+fn test_stored_bytes_with_files_count_a_file_the_store_has_once() {
+    let conn = conn();
+    let account = account(&conn, 1);
+    let (_, first) = save(&conn, account, 1, "2026-11-01T00:00:00Z", Some(Some("1")));
+    let (_, second) = save(&conn, account, 2, "2026-11-02T00:00:00Z", Some(Some("2")));
+    let (first, second) = (first.unwrap(), second.unwrap());
+    ReaderOfflineRepository::record_file(&conn, first, "https://e.com/a.jpg", Some("a.jpg"), 100)
+        .unwrap();
+    let adding = [
+        file("https://e.com/a.jpg", Some("a.jpg"), 100),
+        file("https://e.com/b.jpg", Some("b.jpg"), 30),
+        file("https://e.com/gone.jpg", None, 0),
+    ];
+
+    assert_eq!(
+        ReaderOfflineRepository::stored_bytes_with(&conn, &adding, &[]).unwrap(),
+        130
+    );
+    // The file `first` has is still needed by the files being added.
+    assert_eq!(
+        ReaderOfflineRepository::stored_bytes_with(&conn, &adding, &[first]).unwrap(),
+        130
+    );
+    assert_eq!(
+        ReaderOfflineRepository::stored_bytes_with(&conn, &adding[1..], &[first]).unwrap(),
+        30
+    );
+    // Nothing was recorded.
+    assert_eq!(ReaderOfflineRepository::stored_bytes(&conn).unwrap(), 100);
+    assert_eq!(
+        ReaderOfflineRepository::select_files(&conn, second)
+            .unwrap()
+            .len(),
+        0
+    );
+}
+
+/// Posts 1 and 2 hold 10 each, oldest first, and post 3 is the newest.
+fn three_posts_with_room_for(conn: &Connection) -> [RowId; 3] {
+    let account = account(conn, 1);
+    let posts = [1, 2, 3].map(|id| {
+        save(
+            conn,
+            account,
+            id,
+            &format!("2026-11-0{id}T00:00:00Z"),
+            Some(Some("text")),
+        )
+        .1
+        .unwrap()
+    });
+    for (post, name) in [(posts[0], "one.jpg"), (posts[1], "two.jpg")] {
+        ReaderOfflineRepository::record_file(conn, post, name, Some(name), 10).unwrap();
+        ReaderOfflineRepository::set_images(conn, post, DbReaderOfflineImages::Stored).unwrap();
+    }
+    posts
+}
+
+#[test]
+fn test_recording_files_forgets_older_posts_images_in_order_only_until_they_fit() {
+    let mut conn = conn();
+    let [one, two, three] = three_posts_with_room_for(&conn);
+    let transaction = conn.transaction().unwrap();
+
+    let made = ReaderOfflineRepository::record_files_making_room(
+        &transaction,
+        three,
+        &[file("new.jpg", Some("new.jpg"), 15)],
+        &[one, two],
+        30,
+    )
+    .unwrap();
+    transaction.commit().unwrap();
+
+    assert_eq!(
+        made,
+        Some(DbReaderRoomMade {
+            posts: vec![one],
+            unused_files: vec!["one.jpg".to_string()],
+        })
+    );
+    assert_eq!(ReaderOfflineRepository::stored_bytes(&conn).unwrap(), 25);
+    assert_eq!(
+        ReaderOfflineRepository::select_files(&conn, one).unwrap(),
+        []
+    );
+    assert_eq!(
+        ReaderOfflineRepository::select_files(&conn, two)
+            .unwrap()
+            .len(),
+        1
+    );
+    let images: Vec<_> = ReaderOfflineRepository::select_posts_for_images(&conn, account(&conn, 1))
+        .unwrap()
+        .into_iter()
+        .map(|post| post.images)
+        .collect();
+    assert_eq!(
+        images,
+        [
+            DbReaderOfflineImages::NotStored,
+            DbReaderOfflineImages::Stored,
+            DbReaderOfflineImages::NoRoom
+        ]
+    );
+}
+
+#[test]
+fn test_recording_files_that_do_not_fit_returns_none_and_the_transaction_rolls_back() {
+    let mut conn = conn();
+    let [one, two, three] = three_posts_with_room_for(&conn);
+    let transaction = conn.transaction().unwrap();
+
+    let made = ReaderOfflineRepository::record_files_making_room(
+        &transaction,
+        three,
+        &[file("new.jpg", Some("new.jpg"), 35)],
+        &[one, two],
+        30,
+    )
+    .unwrap();
+    drop(transaction);
+
+    assert_eq!(made, None);
+    assert_eq!(ReaderOfflineRepository::stored_bytes(&conn).unwrap(), 20);
+    assert_eq!(
+        ReaderOfflineRepository::select_files(&conn, three).unwrap(),
+        []
+    );
+    for post in [one, two] {
+        assert_eq!(
+            ReaderOfflineRepository::select_files(&conn, post)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+}
+
+#[test]
+fn test_recording_files_that_fit_forgets_nothing() {
+    let conn = conn();
+    let [one, two, three] = three_posts_with_room_for(&conn);
+
+    let made = ReaderOfflineRepository::record_files_making_room(
+        &conn,
+        three,
+        &[
+            file("new.jpg", Some("new.jpg"), 5),
+            file("gone.jpg", None, 0),
+        ],
+        &[one, two],
+        30,
+    )
+    .unwrap();
+
+    assert_eq!(made, Some(DbReaderRoomMade::default()));
+    assert_eq!(ReaderOfflineRepository::stored_bytes(&conn).unwrap(), 25);
+    assert_eq!(
+        ReaderOfflineRepository::select_files(&conn, three)
+            .unwrap()
+            .len(),
+        2
+    );
+}
+
 #[test]
 fn test_deleting_a_posts_files_returns_only_files_no_post_has() {
     let conn = conn();

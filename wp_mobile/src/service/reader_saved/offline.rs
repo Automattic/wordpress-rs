@@ -19,7 +19,7 @@ use super::{ReaderSavedError, ReaderSavedService};
 use crate::service::is_sign_in_rejected;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 use wp_api::date::WpGmtDateTime;
 use wp_api::posts::PostId;
@@ -37,7 +37,7 @@ use wp_mobile_cache::db_types::reader::{
 };
 use wp_mobile_cache::repository::reader::{ReaderPostRepository, ReaderSavedRepository};
 use wp_mobile_cache::repository::reader_offline::{
-    DbReaderPostForImages, DbReaderSaveWithoutContent, ReaderOfflineRepository,
+    DbReaderOfflineFile, DbReaderPostForImages, DbReaderSaveWithoutContent, ReaderOfflineRepository,
 };
 use wp_mobile_cache::{RowId, SqliteDbError};
 
@@ -174,9 +174,74 @@ enum Images {
     Stored,
     /// Some may be had another time.
     Later,
-    /// They don't fit, and no older save has images to remove for them.
+    /// They don't all fit, even with every older save's images that may go removed.
     NoRoom,
     Stopped(String),
+}
+
+/// The names of files written to a store whose rows aren't recorded yet, for every reader: they
+/// share the directory, and one reader's download must not take another's for strays.
+static UNRECORDED_FILES: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
+
+/// Files written for a post whose rows aren't recorded yet. Dropping it deletes them, so a call
+/// that's dropped part-way leaves none behind.
+struct UnrecordedFiles {
+    directory: PathBuf,
+    names: Vec<String>,
+}
+
+impl UnrecordedFiles {
+    fn new(directory: &Path) -> Self {
+        Self {
+            directory: directory.to_path_buf(),
+            names: Vec::new(),
+        }
+    }
+
+    fn write(&mut self, name: String, bytes: &[u8]) -> Result<(), ReaderSavedError> {
+        unrecorded_files().insert(name.clone());
+        self.names.push(name);
+        let path = self.directory.join(self.names.last().expect("just pushed"));
+        std::fs::write(&path, bytes).map_err(|error| files_error("write", &path, error))
+    }
+
+    /// Their rows are recorded, so they're kept.
+    fn recorded(mut self) {
+        Self::forget(std::mem::take(&mut self.names));
+    }
+
+    fn discard(mut self) -> Result<(), ReaderSavedError> {
+        let names = std::mem::take(&mut self.names);
+        let deleted = delete_files(&self.directory, &names);
+        Self::forget(names);
+        deleted
+    }
+
+    fn forget(names: Vec<String>) {
+        let mut unrecorded = unrecorded_files();
+        for name in names {
+            unrecorded.remove(&name);
+        }
+    }
+}
+
+impl Drop for UnrecordedFiles {
+    fn drop(&mut self) {
+        let names = std::mem::take(&mut self.names);
+        if names.is_empty() {
+            return;
+        }
+        // A drop can't return the error. A file that isn't deleted has no row, so the next
+        // download deletes it as a stray.
+        let _ = delete_files(&self.directory, &names);
+        Self::forget(names);
+    }
+}
+
+fn unrecorded_files() -> std::sync::MutexGuard<'static, HashSet<String>> {
+    UNRECORDED_FILES
+        .lock()
+        .expect("unrecorded files lock poisoned")
 }
 
 #[uniffi::export]
@@ -248,7 +313,8 @@ impl ReaderSavedService {
     ///
     /// With `include_images`, and once [`Self::set_offline_image_store`] has said where, it then
     /// stores the images of each saved post, newest save first. When they'd take more room than
-    /// allowed, the oldest saves' images are removed to fit the newer ones.
+    /// allowed, the oldest saves' images are removed to fit a newer save's, and only when all of
+    /// that save's then fit.
     ///
     /// A failure to reach the server isn't an error here: the download stops there, keeps what
     /// it fetched, and the report says why it stopped and what the device has so far.
@@ -424,6 +490,7 @@ impl ReaderSavedService {
             if let Some(name) = entry.file_name().to_str()
                 && is_stored_file_name(name)
                 && !used.contains(name)
+                && !unrecorded_files().contains(name)
             {
                 strays.push(name.to_string());
             }
@@ -652,6 +719,11 @@ impl ReaderSavedService {
 
     /// Stores the images of one post that aren't stored yet. `older` are the saved posts older
     /// than it, newest first: the ones whose images go to make room.
+    ///
+    /// The images are written as they're fetched, and their rows are recorded together at the
+    /// end, with the removal of the older saves' images that had to go, so that nothing is
+    /// removed unless every image of the post is stored. Until then the stored files may take
+    /// more room than allowed, by this post's at most, but the count of it never does.
     async fn store_post_images(
         &self,
         store: &ImageStore,
@@ -661,60 +733,113 @@ impl ReaderSavedService {
         removed: &mut HashSet<RowId>,
         online: bool,
     ) -> Result<Images, ReaderSavedError> {
+        let removable: Vec<RowId> = older
+            .iter()
+            .rev()
+            .filter(|older| can_make_room(older, removed))
+            .map(|older| older.post)
+            .collect();
+        let mut files = Vec::new();
+        let mut written = UnrecordedFiles::new(&store.directory);
         let mut later = false;
         for url in missing {
+            let file = |file_name: Option<String>, bytes: u64| DbReaderOfflineFile {
+                url: url.clone(),
+                file_name,
+                bytes,
+            };
             // Another saved post may have the same image.
             let shared = self.cache.execute(|connection| {
                 ReaderOfflineRepository::select_stored_file(&*connection, self.account, url)
             })?;
-            if let Some((name, bytes)) = shared {
-                self.record_file(post.post, url, Some(&name), bytes)?;
-                continue;
-            }
-            match self.fetch_image(url, post.site_is_private, online).await {
-                Image::Fetched { bytes, extension } => {
-                    let size = bytes.len() as u64;
-                    if size > store.max_bytes {
-                        // It can never fit, so the post is whole without it.
-                        self.record_file(post.post, url, None, 0)?;
+            // The file's name and size, and its contents when it's to be written.
+            let (name, size, contents) = match shared {
+                Some((name, size)) => (name, size, None),
+                None => match self.fetch_image(url, post.site_is_private, online).await {
+                    // It can never fit, so the post is whole without it.
+                    Image::Fetched { bytes, .. } if bytes.len() as u64 > store.max_bytes => {
+                        files.push(file(None, 0));
                         continue;
                     }
-                    if self.offline_image_bytes()? + size > store.max_bytes {
-                        let removable: Vec<RowId> = older
-                            .iter()
-                            .filter(|older| can_make_room(older, removed))
-                            .map(|older| older.post)
-                            .collect();
-                        let at_most = self.cache.execute(|connection| {
-                            ReaderOfflineRepository::stored_bytes_without(&*connection, &removable)
-                        })?;
-                        if at_most + size > store.max_bytes {
-                            // Removing every older save's images wouldn't make room, so none
-                            // are removed for nothing.
-                            return Ok(Images::NoRoom);
-                        }
+                    Image::Fetched { bytes, extension } => (
+                        format!("{FILE_PREFIX}{:032x}.{extension}", rand::random::<u128>()),
+                        bytes.len() as u64,
+                        Some(bytes),
+                    ),
+                    Image::Unavailable => {
+                        files.push(file(None, 0));
+                        continue;
                     }
-                    while self.offline_image_bytes()? + size > store.max_bytes {
-                        let Some(oldest) = older
-                            .iter()
-                            .rev()
-                            .find(|older| can_make_room(older, removed))
-                        else {
-                            return Ok(Images::NoRoom);
-                        };
-                        self.remove_images(store, oldest.post)?;
-                        removed.insert(oldest.post);
+                    Image::Later => {
+                        later = true;
+                        continue;
                     }
-                    let name = format!("{FILE_PREFIX}{:032x}.{extension}", rand::random::<u128>());
-                    let path = store.directory.join(&name);
-                    std::fs::write(&path, &bytes)
-                        .map_err(|error| files_error("write", &path, error))?;
-                    self.record_file(post.post, url, Some(&name), size)?;
-                }
-                Image::Unavailable => self.record_file(post.post, url, None, 0)?,
-                Image::Later => later = true,
-                Image::Stopped(reason) => return Ok(Images::Stopped(reason)),
+                    Image::Stopped(reason) => {
+                        written.discard()?;
+                        return Ok(Images::Stopped(reason));
+                    }
+                },
+            };
+            files.push(file(Some(name.clone()), size));
+            // A shared file is counted too: removing the other post's images wouldn't free it.
+            let at_most = self.cache.execute(|connection| {
+                ReaderOfflineRepository::stored_bytes_with(&*connection, &files, &removable)
+            })?;
+            if at_most > store.max_bytes {
+                // The rest aren't fetched: the post can't fit, whatever they are.
+                written.discard()?;
+                return Ok(Images::NoRoom);
             }
+            if let Some(contents) = contents {
+                written.write(name, &contents)?;
+            }
+        }
+
+        // A post that still lacks some may never fit, so no older save's images go for it.
+        let room = if later { &[][..] } else { &removable[..] };
+        let made = self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            let made = ReaderOfflineRepository::record_files_making_room(
+                &transaction,
+                post.post,
+                &files,
+                room,
+                store.max_bytes,
+            )?;
+            if made.is_some() {
+                transaction.commit().map_err(SqliteDbError::from)?;
+            }
+            Ok::<_, SqliteDbError>(made)
+        })?;
+        let Some(made) = made else {
+            if !later {
+                written.discard()?;
+                return Ok(Images::NoRoom);
+            }
+            // The ones it has need room, so they're fetched again with the rest. The answers
+            // that it can't have any are kept.
+            files.retain(|file| file.file_name.is_none());
+            written.discard()?;
+            self.cache.execute(|connection| {
+                let transaction = connection.transaction()?;
+                for file in &files {
+                    ReaderOfflineRepository::record_file(
+                        &transaction,
+                        post.post,
+                        &file.url,
+                        None,
+                        0,
+                    )?;
+                }
+                transaction.commit().map_err(SqliteDbError::from)
+            })?;
+            return Ok(Images::Later);
+        };
+        written.recorded();
+        delete_files(&store.directory, &made.unused_files)?;
+        if !made.posts.is_empty() {
+            removed.extend(made.posts);
+            self.notify();
         }
         Ok(if later { Images::Later } else { Images::Stored })
     }
@@ -766,18 +891,6 @@ impl ReaderSavedService {
             }
             Err(error) => Image::Stopped(error.to_string()),
         }
-    }
-
-    fn record_file(
-        &self,
-        post: RowId,
-        url: &str,
-        file_name: Option<&str>,
-        bytes: u64,
-    ) -> Result<(), ReaderSavedError> {
-        Ok(self.cache.execute(|connection| {
-            ReaderOfflineRepository::record_file(&*connection, post, url, file_name, bytes)
-        })?)
     }
 
     fn set_images(
