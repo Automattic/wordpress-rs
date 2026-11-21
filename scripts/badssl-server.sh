@@ -107,7 +107,8 @@ worker_processes 1;
 pid $BADSSL_DIR/nginx.pid;
 # Logging at info records each TLS handshake a client refused, which shows the tests reached it.
 error_log $BADSSL_DIR/error.log info;
-events {}
+# The default 512 is over a macOS VM's limit of 256 open files.
+events { worker_connections 128; }
 http {
     access_log $BADSSL_DIR/access.log;
     include $SITE_DIR/nginx.conf;

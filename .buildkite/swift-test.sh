@@ -25,10 +25,8 @@ function start_badssl() {
     scripts/badssl-server.sh start
 
     # Trust its root, so the tests see the name mismatches it serves rather than an unknown root.
-    # The VM is thrown away after the job. Without the `authorizationdb` change, macOS asks for
-    # confirmation before changing what it trusts.
+    # The VM is thrown away after the job.
     local root; root=$(scripts/badssl-server.sh root-cert)
-    sudo security authorizationdb write com.apple.trust-settings.admin allow
     sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$root"
     # `scripts/xcodebuild-test.sh` adds it to each simulator.
     export BADSSL_ROOT_CERT="$root"
