@@ -253,6 +253,11 @@ impl ReaderSavedService {
     /// cleared by the system, and give the same one each launch: the files are found by name.
     /// Readers on one cache can share it. Nothing is fetched until
     /// [`Self::download_for_offline`] is asked to include images.
+    ///
+    /// It also deletes the files in `directory` that no reader's saved post has any more, such as
+    /// the images of an account removed with
+    /// [`wp_mobile_cache::WpApiCache::remove_wordpress_com_account`]. If that fails, it returns
+    /// the error, and the store is set all the same.
     pub fn set_offline_image_store(
         &self,
         directory: String,
@@ -265,11 +270,15 @@ impl ReaderSavedService {
             directory,
             max_bytes,
         });
-        Ok(())
+        self.remove_stray_files()
     }
 
     /// Deletes every stored image of this reader's saved posts, and stops storing them until
     /// [`Self::set_offline_image_store`] is called again. The posts' text stays.
+    ///
+    /// At sign-out, call it with the store set before
+    /// [`wp_mobile_cache::WpApiCache::remove_wordpress_com_account`], so the files go at once.
+    /// Otherwise they go the next time a reader on the cache sets its store or downloads images.
     pub fn remove_offline_images(&self) -> Result<(), ReaderSavedError> {
         let names = self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
@@ -478,6 +487,8 @@ impl ReaderSavedService {
         let Some(store) = self.image_store() else {
             return Ok(());
         };
+        // Held throughout, so a file recorded meanwhile is either among `used` or still listed.
+        let unrecorded = unrecorded_files();
         let used = self
             .cache
             .execute(|connection| ReaderOfflineRepository::select_file_names(&*connection))?;
@@ -490,7 +501,7 @@ impl ReaderSavedService {
             if let Some(name) = entry.file_name().to_str()
                 && is_stored_file_name(name)
                 && !used.contains(name)
-                && !unrecorded_files().contains(name)
+                && !unrecorded.contains(name)
             {
                 strays.push(name.to_string());
             }

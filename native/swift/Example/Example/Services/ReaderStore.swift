@@ -75,7 +75,8 @@ final class ReaderStore {
     /// Whether every Reader request fails as if the device had no connection.
     private(set) var isOffline = ReaderOfflineURLProtocol.isOffline
 
-    /// What went wrong when the account's cached data was deleted at sign-out, if anything did.
+    /// What went wrong when the account's cached data or its saved posts' images were deleted at sign-out, if
+    /// anything did.
     private(set) var signOutError: String?
 
     init(loginManager: LoginManager) {
@@ -85,7 +86,7 @@ final class ReaderStore {
             .removeDuplicates()
             .dropFirst()
             .sink { [weak self] isLoggedIn in
-                Task { @MainActor in self?.accountChanged(isLoggedIn: isLoggedIn) }
+                Task { @MainActor in await self?.accountChanged(isLoggedIn: isLoggedIn) }
             }
     }
 
@@ -195,7 +196,8 @@ final class ReaderStore {
         return cache
     }
 
-    private func accountChanged(isLoggedIn: Bool) {
+    private func accountChanged(isLoggedIn: Bool) async {
+        let accountTask = account
         account = nil
         let userID = UserDefaults.standard.object(forKey: Self.userIDKey) as? UInt64
         UserDefaults.standard.removeObject(forKey: Self.userIDKey)
@@ -203,11 +205,27 @@ final class ReaderStore {
 
         signOutError = nil
         guard !isLoggedIn, let userID else { return }
-        // The account signed out, so what was cached for it goes.
+        // The account signed out, so what was cached for it goes. The cache doesn't hold its saved posts' images,
+        // so they're deleted first. A session that failed to start stored none.
+        var errors: [String] = []
+        if case .success(let session)? = await accountTask?.result {
+            do {
+                let saved = session.service.saved()
+                // The store has to be known for its files to be deleted.
+                try saved.setOfflineImageStore(
+                    directory: ReaderOfflineImages.directory().path,
+                    maxBytes: ReaderOfflineImages.maxBytes
+                )
+                try saved.removeOfflineImages()
+            } catch {
+                errors.append(readerErrorMessage(error))
+            }
+        }
         do {
             try sharedCache().removeWordpressComAccount(userId: userID)
         } catch {
-            signOutError = readerErrorMessage(error)
+            errors.append(readerErrorMessage(error))
         }
+        signOutError = errors.isEmpty ? nil : errors.joined(separator: "\n")
     }
 }

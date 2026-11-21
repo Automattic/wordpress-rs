@@ -169,7 +169,8 @@ pub trait ReaderSavedObserver: Send + Sync {
 /// relaunch, and one the server hasn't got yet is sent by a later call. Call [`Self::sync`] at
 /// launch, when the app comes to the foreground, and when the device comes back online.
 ///
-/// [`WpApiCache::remove_wordpress_com_account`] deletes it all.
+/// [`WpApiCache::remove_wordpress_com_account`] deletes it all, except the stored image files: see
+/// [`Self::remove_offline_images`].
 ///
 /// Create one per account and share it: it sends one request at a time, and a second instance
 /// would send alongside it.

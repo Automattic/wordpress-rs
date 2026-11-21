@@ -223,7 +223,8 @@ impl ReaderContext {
 /// language, and only on the requests whose answer it changes, so that what it caches is always in
 /// the language its key says.
 ///
-/// [`WpApiCache::remove_reader_data`] deletes everything it keeps.
+/// [`WpApiCache::remove_reader_data`] deletes everything it keeps, except the saved posts' stored
+/// image files: see [`ReaderSavedService::remove_offline_images`].
 #[derive(uniffi::Object)]
 pub struct ReaderService {
     context: Arc<ReaderContext>,

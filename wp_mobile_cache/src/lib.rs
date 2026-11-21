@@ -493,8 +493,13 @@ impl WpApiCache {
         })
     }
 
-    /// Remove a WordPress.com account and everything cached for it, such as its Reader posts and
-    /// saved posts. Call it when the user signs out.
+    /// Remove a WordPress.com account and everything the cache holds for it, such as its Reader
+    /// posts and saved posts. Call it when the user signs out.
+    ///
+    /// The image files of the saved posts aren't in the cache, and this leaves them on disk. Call
+    /// `ReaderSavedService::remove_offline_images` first, with its image store set, to delete them
+    /// at once. Otherwise the saved service deletes them the next time a reader's image store is
+    /// set or images are downloaded.
     ///
     /// Returns `true` if the account was found and removed, `false` if nothing was cached for it.
     pub fn remove_wordpress_com_account(
@@ -508,6 +513,9 @@ impl WpApiCache {
     /// tags. For an account it's the same as [`Self::remove_wordpress_com_account`]. For
     /// [`ReaderOwner::SignedOut`] it removes what was kept while nobody was signed in, such as
     /// after it's been moved to an account.
+    ///
+    /// Like [`Self::remove_wordpress_com_account`], it leaves the saved posts' image files on
+    /// disk: call `ReaderSavedService::remove_offline_images` first to delete them at once.
     ///
     /// Returns `true` if anything was cached for the reader.
     pub fn remove_reader_data(&self, owner: ReaderOwner) -> Result<bool, SqliteDbError> {

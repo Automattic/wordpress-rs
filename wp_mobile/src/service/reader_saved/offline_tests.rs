@@ -1340,6 +1340,108 @@ async fn a_download_deletes_stored_files_no_post_has_and_nothing_else() {
     );
 }
 
+fn set_store(reader: &Reader, directory: &tempfile::TempDir) {
+    reader
+        .service
+        .set_offline_image_store(directory.path().to_str().unwrap().to_string(), 1_000)
+        .unwrap();
+}
+
+#[tokio::test]
+async fn setting_the_image_store_deletes_stored_files_no_post_has() {
+    let reader = Reader::signed_out();
+    save_with_images(&reader, 1, r#"<img src="https://example.com/a.jpg">"#).await;
+    let directory = reader.store_images_in(1_000);
+    reader.respond(200, image(10));
+    reader.download(true).await;
+    let kept = files_in(&directory);
+    assert_eq!(kept.len(), 1);
+    let stray = format!("{FILE_PREFIX}{:032x}.jpg", 7);
+    std::fs::write(directory.path().join(&stray), b"x").unwrap();
+
+    set_store(&reader, &directory);
+
+    assert_eq!(files_in(&directory), kept);
+}
+
+/// Signing out removes the account's rows from the cache, and its files then have none.
+#[tokio::test]
+async fn a_removed_accounts_images_are_deleted_when_another_reader_sets_the_store() {
+    let cache = migrated_in_memory_cache();
+    let account = Reader::new(
+        ReaderOwner::Account {
+            user_id: WpComUserId(1),
+        },
+        cache.clone(),
+        |delegate| delegate,
+    );
+    let signed_out = Reader::new(ReaderOwner::SignedOut, cache.clone(), |delegate| delegate);
+    let directory = tempfile::tempdir().unwrap();
+    set_store(&account, &directory);
+    set_store(&signed_out, &directory);
+    account.server_has(
+        &[post_json(1)],
+        &[full_post(1, r#"<img src="https://example.com/a.jpg">"#)],
+    );
+    account.respond(200, image(10));
+    assert_eq!(account.download(true).await.with_images, 1);
+    save_with_images(&signed_out, 2, r#"<img src="https://example.com/b.jpg">"#).await;
+    signed_out.respond(200, image(20));
+    assert_eq!(signed_out.download(true).await.with_images, 1);
+    let signed_out_files = signed_out
+        .service
+        .offline_post(post_key(2), String::new())
+        .unwrap()
+        .unwrap()
+        .images;
+    assert_eq!(files_in(&directory).len(), 2);
+
+    assert!(cache.remove_wordpress_com_account(WpComUserId(1)).unwrap());
+    set_store(&signed_out, &directory);
+
+    assert_eq!(
+        files_in(&directory),
+        signed_out_files
+            .iter()
+            .map(|image| image.file_name.clone())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn setting_the_image_store_keeps_a_file_another_download_has_not_recorded_yet() {
+    let cache = migrated_in_memory_cache();
+    let downloading = Reader::new(ReaderOwner::SignedOut, cache.clone(), |delegate| delegate);
+    let other = Reader::new(
+        ReaderOwner::Account {
+            user_id: WpComUserId(1),
+        },
+        cache,
+        |delegate| delegate,
+    );
+    let directory = tempfile::tempdir().unwrap();
+    set_store(&downloading, &directory);
+    save_with_images(&downloading, 1, TWO_IMAGES).await;
+    downloading.respond(200, image(10));
+    let (release, held) = oneshot::channel::<()>();
+    downloading.executor.push(Step::Hold(held, 200, image(20)));
+    let mut download = Box::pin(downloading.service.download_for_offline(true));
+    assert!(futures::poll!(download.as_mut()).is_pending());
+    let written = files_in(&directory);
+    assert_eq!(
+        written.len(),
+        1,
+        "the first image is written and not recorded"
+    );
+
+    set_store(&other, &directory);
+
+    assert_eq!(files_in(&directory), written);
+    release.send(()).unwrap();
+    assert_eq!(download.await.unwrap().with_images, 1);
+    assert_eq!(files_in(&directory).len(), 2);
+}
+
 #[tokio::test]
 async fn removing_offline_images_deletes_them_and_stops_storing_them() {
     let reader = Reader::signed_out();
