@@ -38,6 +38,7 @@ import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
+import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.HttpsURLConnection
@@ -247,9 +248,13 @@ class WpRequestExecutor @JvmOverloads constructor(
         } catch (e: UnknownHostException) {
             RequestExecutionErrorReason.unknownHost(e, networkAvailabilityProvider)
         } catch (e: NoRouteToHostException) {
-            RequestExecutionErrorReason.noRouteToHost(e)
+            // The host resolved, but `connect()` failed at once with EHOSTUNREACH. Not a
+            // `ConnectException`, so it needs its own branch. The JVM always reports EHOSTUNREACH this
+            // way. Android does only when the client has no connect timeout; with one (the
+            // `DefaultHttpClient` default), it reports a `ConnectException` instead.
+            RequestExecutionErrorReason.connectionError(e)
         } catch (e: ConnectException) {
-            RequestExecutionErrorReason.ConnectionError(reason = "Connection failed: ${e.localizedMessage}")
+            RequestExecutionErrorReason.connectionError(e)
         } catch (e: SocketTimeoutException) {
             RequestExecutionErrorReason.HttpTimeoutError
         } catch (e: InterruptedIOException) {
@@ -354,10 +359,14 @@ private fun RequestExecutionErrorReason.Companion.unknownHost(
     )
 }
 
-private fun RequestExecutionErrorReason.Companion.noRouteToHost(e: NoRouteToHostException) =
-    RequestExecutionErrorReason.HttpError(
-        reason = e.localizedMessage
-    )
+/**
+ * A connection to the server could not be established, so the request never reached it.
+ *
+ * The exception's message is passed through as-is: the localized `connection_error` text already
+ * starts with "Couldn't connect to the server", so a prefix here would repeat it.
+ */
+private fun RequestExecutionErrorReason.Companion.connectionError(e: SocketException) =
+    RequestExecutionErrorReason.ConnectionError(reason = e.localizedMessage ?: e.toString())
 
 @Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
 private fun RequestExecutionErrorReason.Companion.invalidSSLError(

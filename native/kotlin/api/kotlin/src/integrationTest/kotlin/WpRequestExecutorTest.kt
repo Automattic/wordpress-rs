@@ -21,6 +21,8 @@ import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpErrorCode
 import java.io.File
+import java.io.IOException
+import java.net.NoRouteToHostException
 import java.net.URI
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
@@ -283,6 +285,54 @@ class WpRequestExecutorTest {
         assertIs<RequestExecutionErrorReason.ConnectionError>(
             (result as WpRequestResult.RequestExecutionFailed<*>).reason
         )
+    }
+
+    @Test
+    fun `no route to host is mapped to ConnectionError`() = runTest {
+        // OkHttp passes `NoRouteToHostException` through unchanged. The JVM throws it whenever
+        // `connect()` fails with EHOSTUNREACH; Android does only when the client has no connect
+        // timeout (with one, it throws a `ConnectException`). A real one depends on the machine's
+        // network, so an interceptor throws it. No connection was made, so it must classify as
+        // ConnectionError, not the generic HttpError.
+        val reason = requestFailingWith(NoRouteToHostException("Host unreachable"))
+
+        assertIs<RequestExecutionErrorReason.ConnectionError>(reason)
+        assertTrue(reason.isSiteUnreachable)
+        // Passed through without a prefix: the localized message already says the connection failed.
+        assertEquals("Host unreachable", reason.reason)
+    }
+
+    @Test
+    fun `a connection failure without a message reports the exception type`() = runTest {
+        // A message-less exception must not render as the literal text "null".
+        val reason = requestFailingWith(NoRouteToHostException())
+
+        assertIs<RequestExecutionErrorReason.ConnectionError>(reason)
+        assertEquals("java.net.NoRouteToHostException", reason.reason)
+    }
+
+    private suspend fun requestFailingWith(exception: IOException): RequestExecutionErrorReason {
+        val client = OkHttpClient.Builder()
+            .addInterceptor { throw exception }
+            .build()
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(client),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+        return result.reason
     }
 
     @Test
