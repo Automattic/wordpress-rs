@@ -7,8 +7,9 @@
 //! - When the server agrees, the row goes.
 //! - When the server refuses, the cache goes back to what it showed before, the row goes, and the
 //!   tap's call returns the error.
-//! - When no answer comes, such as offline, the row stays and [`ReaderService::sync_actions`] sends
-//!   it later. Turning something on or off twice is the same as once, so sending again is safe.
+//! - When no answer comes, such as offline, or the server rejects the account's token, the row
+//!   stays and [`ReaderService::sync_actions`] sends it later. Turning something on or off twice
+//!   is the same as once, so sending again is safe.
 //!
 //! A refresh that brings the server's older state for something still waiting doesn't undo the
 //! tap: what's waiting is shown again after every page is stored.
@@ -1129,7 +1130,9 @@ impl ReaderContext {
 
             match action.send(self, row.wanted).await {
                 Ok(confirmation) => self.action_answered(&row, &action, Ok(confirmation))?,
-                Err(error) if is_refused(&error) => {
+                // A rejected sign-in is no answer to the change: it's kept and sent again after
+                // the reader signs in again.
+                Err(error) if is_refused(&error) && !is_sign_in_rejected(&error) => {
                     self.action_answered(&row, &action, Err(error))?
                 }
                 Err(error) => {
@@ -1180,8 +1183,8 @@ impl ReaderContext {
                     Err(error) => {
                         let error = ReaderError::from(error);
                         // The site can't be asked about, such as a deleted one, so the list
-                        // decides.
-                        if !is_refused(&error) {
+                        // decides. A rejected sign-in says nothing about the site.
+                        if !is_refused(&error) || is_sign_in_rejected(&error) {
                             return Err(error);
                         }
                         false
@@ -1295,7 +1298,8 @@ impl ReaderContext {
 /// Whether the server refused a request for good, rather than it failing on the way or for now.
 /// A request timeout and a rate limit pass, so their rows are sent again later. Any other answer
 /// in the 400s won't change by asking again, and nor will an action that's missing what it needs
-/// to be sent.
+/// to be sent. A rejected sign-in is in the 400s too: a caller that keeps the reader's change
+/// through one checks [`is_sign_in_rejected`] first.
 pub(super) fn is_refused(error: &ReaderError) -> bool {
     /// Request timeout, too many requests.
     const TEMPORARY: [u32; 2] = [408, 429];
@@ -1306,6 +1310,21 @@ pub(super) fn is_refused(error: &ReaderError) -> bool {
             | WpApiError::UnknownError { status_code, .. },
         ) => (400..500).contains(status_code) && !TEMPORARY.contains(status_code),
         ReaderError::Refused { .. } | ReaderError::MissingIds | ReaderError::FeedPost => true,
+        _ => false,
+    }
+}
+
+/// Whether the server rejected the account's token rather than the request, so the same request
+/// can work once the reader signs in again. WordPress.com answers a token it doesn't accept with
+/// 400 `invalid_token` on `rest/v1.x` and 401 `oauth2_invalid_token` on `wpcom/v2`.
+fn is_sign_in_rejected(error: &ReaderError) -> bool {
+    const REJECTED_TOKEN: [&str; 2] = ["invalid_token", "oauth2_invalid_token"];
+    match error {
+        ReaderError::Api(WpApiError::WpError {
+            error_code: WpErrorCode::CustomError(code),
+            ..
+        }) if REJECTED_TOKEN.contains(&code.as_str()) => true,
+        ReaderError::Api(error) => error.status_code() == Some(401),
         _ => false,
     }
 }

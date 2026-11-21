@@ -1624,6 +1624,59 @@ mod actions {
         assert_eq!(service.pending_action_count().unwrap(), 0);
     }
 
+    /// WordPress.com's answer on `wpcom/v2` to a token it doesn't accept.
+    fn sign_in_rejected() -> Step {
+        Step::Respond(
+            401,
+            json!({ "code": "oauth2_invalid_token", "message": "The OAuth2 token is invalid.", "data": { "status": 401 } }),
+        )
+    }
+
+    #[tokio::test]
+    async fn a_mark_whose_sign_in_is_rejected_waits_and_a_sync_sends_it() {
+        let (service, executor, stream) = following().await;
+        executor.push(sign_in_rejected());
+
+        let outcome = service.set_post_seen(identity(2), true).await.unwrap();
+
+        assert!(
+            matches!(&outcome, ReaderActionOutcome::Pending { reason } if reason.contains("The OAuth2 token is invalid.")),
+            "{outcome:?}"
+        );
+        assert_eq!(is_seen(&stream, 2).await, Some(true));
+        assert_eq!(service.pending_action_count().unwrap(), 1);
+
+        executor.push(marked());
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+        assert_eq!(is_seen(&stream, 2).await, Some(true));
+        assert_eq!(
+            sent_after(&executor, 2)[0].0,
+            "/wpcom/v2/seen-posts/seen/blog/new"
+        );
+    }
+
+    #[tokio::test]
+    async fn marks_made_offline_are_kept_when_a_sync_meets_a_rejected_sign_in() {
+        let (service, executor, stream) = following().await;
+        executor.push(Step::Offline);
+        service.set_post_seen(identity(2), true).await.unwrap();
+        executor.push(Step::Offline);
+        service.set_post_seen(identity(1), true).await.unwrap();
+
+        // Every mark would get the same answer, so the first one ends the round.
+        executor.push(sign_in_rejected());
+        assert_eq!(service.sync_actions().await.unwrap(), 2);
+        assert_eq!(executor.sent().len(), 4);
+        assert_eq!(is_seen(&stream, 2).await, Some(true));
+        assert_eq!(is_seen(&stream, 1).await, Some(true));
+
+        executor.push(marked());
+        executor.push(marked());
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+        assert_eq!(is_seen(&stream, 2).await, Some(true));
+        assert_eq!(is_seen(&stream, 1).await, Some(true));
+    }
+
     /// Gives the cache the subscriptions: site 123, with `unseen` posts not seen, and a feed's.
     async fn subscribed(service: &ReaderService, executor: &ScriptedExecutor, unseen: u64) {
         let mut page: Value = serde_json::from_str(include_str!(
@@ -2117,6 +2170,23 @@ mod actions {
         let result = service.refresh_blocked_sites().await;
 
         assert!(result.is_err());
+        assert!(blocked_ids(&service).is_empty());
+        assert_eq!(shown(&stream).await, ["2", "1"]);
+    }
+
+    #[tokio::test]
+    async fn a_site_check_whose_sign_in_is_rejected_fails_the_refresh_and_changes_nothing() {
+        let (service, executor, stream) = following().await;
+        blocked_then(&service, &executor, true).await;
+
+        executor.push(blocked_list(&[123, 7]));
+        executor.push(Step::Respond(
+            400,
+            json!({ "error": "invalid_token", "message": "The OAuth2 token is invalid." }),
+        ));
+        let result = service.refresh_blocked_sites().await;
+
+        assert!(matches!(result, Err(ReaderError::Api(_))), "{result:?}");
         assert!(blocked_ids(&service).is_empty());
         assert_eq!(shown(&stream).await, ["2", "1"]);
     }
@@ -4852,6 +4922,38 @@ mod more_actions {
         assert!(matches!(result, Err(ReaderError::Api(_))));
         let post = post(&stream).await;
         assert_eq!((post.i_like, post.like_count), (Some(false), Some(5)));
+    }
+
+    #[tokio::test]
+    async fn a_like_whose_sign_in_is_rejected_stays_liked_and_a_sync_sends_it() {
+        let (service, executor, stream) = reading().await;
+        // WordPress.com's answer on `rest/v1.x` to a token it doesn't accept.
+        executor.push(Step::Respond(
+            400,
+            json!({ "error": "invalid_token", "message": "The OAuth2 token is invalid." }),
+        ));
+
+        let outcome = set_liked(&service, identity(1), true).await.unwrap();
+
+        assert!(
+            matches!(&outcome, ReaderActionOutcome::Pending { reason } if reason.contains("The OAuth2 token is invalid.")),
+            "{outcome:?}"
+        );
+        let shown = post(&stream).await;
+        assert_eq!((shown.i_like, shown.like_count), (Some(true), Some(6)));
+        assert_eq!(service.pending_action_count().unwrap(), 1);
+
+        executor.push(Step::Respond(
+            200,
+            json!({ "success": true, "i_like": true, "like_count": 6 }),
+        ));
+        assert_eq!(service.sync_actions().await.unwrap(), 0);
+        let shown = post(&stream).await;
+        assert_eq!((shown.i_like, shown.like_count), (Some(true), Some(6)));
+        assert_eq!(
+            sent_after(&executor, 2)[0].0,
+            "/rest/v1.1/sites/123/posts/1/likes/new"
+        );
     }
 
     #[tokio::test]
