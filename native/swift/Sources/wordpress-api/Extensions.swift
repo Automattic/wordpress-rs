@@ -13,8 +13,10 @@ public extension MiddlewarePipeline {
 
 extension WpNetworkResponse {
     init(data: Data, request: NetworkRequestContent, response: URLResponse) throws {
+        // URLSession only produces `HTTPURLResponse` for http(s) loads, so this shouldn't happen —
+        // but the initializer already throws, so fail the request rather than crash. See #1515.
         guard let response = response as? HTTPURLResponse else {
-            preconditionFailure("We should never wind up here")
+            throw URLError(.badServerResponse)
         }
 
         self = WpNetworkResponse(
