@@ -5,7 +5,13 @@ use std::str::FromStr;
 use wp_api::date::WpGmtDateTime;
 use wp_api::posts::PostId;
 use wp_api::wp_com::WpComSiteId;
-use wp_api::wp_com::reader_posts::{ReaderPost, ReaderPostTag, reader_post_display_image_url};
+use wp_api::wp_com::reader_post_display::{
+    ReaderPostCardType, reader_post_card_type, reader_post_reading_time_minutes,
+    reader_post_summary,
+};
+use wp_api::wp_com::reader_posts::{
+    ReaderCrossPost, ReaderPost, ReaderPostTag, reader_post_display_image_url,
+};
 use wp_api::wp_com::reader_saved::{
     ReaderFeedItemId, ReaderPostSaveIdentity, ReaderSavedKey, reader_saved_key_for_post,
 };
@@ -74,6 +80,82 @@ pub struct ReaderPostRecord {
     /// saved by URL.
     #[uniffi(default = None)]
     pub comment_count: Option<u64>,
+    #[uniffi(default = None)]
+    pub short_url: Option<String>,
+    /// Whether the site asks readers to see the excerpt rather than the whole post.
+    #[uniffi(default = None)]
+    pub use_excerpt: Option<bool>,
+    /// `0` for an RSS post's author.
+    #[uniffi(default = None)]
+    pub author_id: Option<u64>,
+    /// The site's language, such as `en`.
+    #[uniffi(default = None)]
+    pub site_locale: Option<String>,
+    #[uniffi(default = None)]
+    pub site_is_private: Option<bool>,
+    #[uniffi(default = None)]
+    pub site_is_atomic: Option<bool>,
+    #[uniffi(default = None)]
+    pub is_jetpack: Option<bool>,
+    /// Set for an Automattic (`1`) or P2 (`2`) site.
+    #[uniffi(default = None)]
+    pub organization_id: Option<u64>,
+    /// Set when the post is a cross-post of another.
+    #[uniffi(default = None)]
+    pub cross_post: Option<ReaderCrossPost>,
+    #[uniffi(default = None)]
+    pub likes_enabled: Option<bool>,
+    #[uniffi(default = None)]
+    pub comments_open: Option<bool>,
+    #[uniffi(default = None)]
+    pub can_subscribe_comments: Option<bool>,
+    #[uniffi(default = None)]
+    pub is_subscribed_comments: Option<bool>,
+    /// Whether the user gets notifications for the post's comments.
+    #[uniffi(default = None)]
+    pub receives_comment_notifications: Option<bool>,
+    /// `None` when the post doesn't support seen status.
+    #[uniffi(default = None)]
+    pub is_seen: Option<bool>,
+    #[uniffi(default = None)]
+    pub word_count: Option<u64>,
+    /// The text to show on the post's card, worked out when the post was stored. See
+    /// [`reader_post_summary`]. `None` for a post with no text, and for one stored from a source
+    /// that sent neither its excerpt nor its content.
+    #[uniffi(default = None)]
+    pub summary: Option<String>,
+    /// How long the post takes to read, in minutes, worked out when the post was stored. See
+    /// [`reader_post_reading_time_minutes`]. `None` when the source sent no words to count.
+    #[uniffi(default = None)]
+    pub reading_time_minutes: Option<u32>,
+    /// Which layout the post gets in a stream, worked out when the post was stored. See
+    /// [`reader_post_card_type`]. `None` when the source didn't send the post's content, which
+    /// the layout depends on.
+    #[uniffi(default = None)]
+    pub card_type: Option<ReaderPostCardType>,
+}
+
+/// A card type as the cache stores it. The numbers never change, since rows outlive a launch.
+pub fn reader_card_type_number(card_type: ReaderPostCardType) -> i64 {
+    match card_type {
+        ReaderPostCardType::Default => 0,
+        ReaderPostCardType::Photo => 1,
+        ReaderPostCardType::Gallery => 2,
+        ReaderPostCardType::Video => 3,
+        ReaderPostCardType::CrossPost => 4,
+    }
+}
+
+/// Reads a card type stored by [`reader_card_type_number`]. A number this version doesn't know,
+/// which a newer version stored, reads as the default layout.
+pub fn reader_card_type_from_number(number: i64) -> ReaderPostCardType {
+    match number {
+        1 => ReaderPostCardType::Photo,
+        2 => ReaderPostCardType::Gallery,
+        3 => ReaderPostCardType::Video,
+        4 => ReaderPostCardType::CrossPost,
+        _ => ReaderPostCardType::Default,
+    }
 }
 
 impl ReaderPostRecord {
@@ -104,6 +186,25 @@ impl ReaderPostRecord {
             site_icon_url: None,
             tags: None,
             comment_count: None,
+            short_url: None,
+            use_excerpt: None,
+            author_id: None,
+            site_locale: None,
+            site_is_private: None,
+            site_is_atomic: None,
+            is_jetpack: None,
+            organization_id: None,
+            cross_post: None,
+            likes_enabled: None,
+            comments_open: None,
+            can_subscribe_comments: None,
+            is_subscribed_comments: None,
+            receives_comment_notifications: None,
+            is_seen: None,
+            word_count: None,
+            summary: None,
+            reading_time_minutes: None,
+            card_type: None,
         })
     }
 
@@ -144,6 +245,26 @@ impl ReaderPostRecord {
             site_icon_url: post.site_icon_url.clone(),
             tags: post.tags.clone(),
             comment_count: post.comment_count,
+            short_url: post.short_url.clone(),
+            use_excerpt: post.use_excerpt,
+            author_id: author.and_then(|author| author.id),
+            site_locale: post.site_locale.clone(),
+            site_is_private: post.site_is_private,
+            site_is_atomic: post.site_is_atomic,
+            is_jetpack: post.is_jetpack,
+            organization_id: post.organization_id,
+            cross_post: post.cross_post.clone(),
+            likes_enabled: post.likes_enabled,
+            comments_open: post.comments_open,
+            can_subscribe_comments: post.can_subscribe_comments,
+            is_subscribed_comments: post.is_subscribed_comments,
+            receives_comment_notifications: post.subscribed_comments_notifications,
+            is_seen: post.is_seen,
+            word_count: post.word_count,
+            summary: reader_post_summary(post),
+            reading_time_minutes: reader_post_reading_time_minutes(post),
+            // The layout is read from the content, so a source that sent none can't say.
+            card_type: post.content.as_ref().map(|_| reader_post_card_type(post)),
             ..Self::from_identity(post.identity.clone())?
         })
     }
@@ -168,6 +289,61 @@ pub struct DbReaderStreamItem {
     pub post: ReaderPostRecord,
     pub post_row_id: RowId,
     pub sort_key: String,
+    /// Posts may be missing between this one and the one above it.
+    pub gap_before: bool,
+}
+
+/// A post on a page of a stream, to add to the stream's items.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DbReaderPageItem {
+    /// The post's row in `reader_posts`.
+    pub post: RowId,
+    /// Where the post sorts in a stream ordered by date: [`reader_date_text`] of the date the
+    /// stream orders by. Not used by a stream kept in the order the server sent.
+    pub sort_key: String,
+    pub railcar: Option<String>,
+}
+
+/// Something on a page of a stream kept in the server's order: a post, or a card that isn't one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DbReaderPageEntry {
+    Post(DbReaderPageItem),
+    /// A card that isn't a post, as JSON.
+    Card(String),
+}
+
+/// A card in a stream that isn't a post.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DbReaderStreamCard {
+    /// The card, as JSON.
+    pub card: String,
+    /// The key of the post the card comes after, or `None` if it comes before every post.
+    pub after_post: Option<ReaderSavedKey>,
+}
+
+/// What adding a page to a stream did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DbReaderPageOutcome {
+    /// Posts the stream didn't have.
+    pub added: u64,
+    /// Posts the stream had that the server no longer returns.
+    pub removed: u64,
+    /// Whether the stream already had one of the page's posts.
+    pub overlapped: bool,
+}
+
+/// A post a stream's page had that couldn't be read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DbReaderUnreadablePost {
+    pub row_id: RowId,
+    pub stream_row_id: RowId,
+    pub identity: ReaderPostSaveIdentity,
+    pub error: String,
+    /// How many times it's been asked for on its own since.
+    pub attempts: u32,
+    /// When a page first had it.
+    pub first_seen_at: WpGmtDateTime,
+    pub last_attempt_at: Option<WpGmtDateTime>,
 }
 
 /// One save on the server, as far as this device knows, and what the user wants for it.
@@ -232,11 +408,60 @@ pub struct DbReaderSavedKey {
     pub url: Option<String>,
 }
 
+/// Whether a saved post's images are stored on this device.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DbReaderOfflineImages {
+    /// Not stored, or not all of them yet.
+    #[default]
+    NotStored,
+    /// Each image is stored, or the server said it can't be had.
+    Stored,
+    /// Not stored because there's no room: left out, or removed to make room for newer saves.
+    NoRoom,
+}
+
+impl DbReaderOfflineImages {
+    pub(crate) fn number(self) -> i64 {
+        match self {
+            Self::NotStored => 0,
+            Self::Stored => 1,
+            Self::NoRoom => 2,
+        }
+    }
+
+    pub(crate) fn from_number(number: i64) -> Self {
+        match number {
+            1 => Self::Stored,
+            2 => Self::NoRoom,
+            _ => Self::NotStored,
+        }
+    }
+}
+
+/// What this device has of a saved post for reading with no connection, besides the post itself.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DbReaderSavedOffline {
+    /// The post was stored in full, from the saved list or fetched on its own. The device then
+    /// has all the content there is, even if that's none.
+    pub fetched: bool,
+    /// Its content or images are being fetched.
+    pub downloading: bool,
+    /// Why the last try to get its content failed.
+    pub error: Option<String>,
+    /// How many tries the server answered with a failure.
+    pub attempts: u32,
+    /// When the last of those was.
+    pub attempted_at: Option<WpGmtDateTime>,
+    pub images: DbReaderOfflineImages,
+}
+
 /// A row of the saved list, with its post when the cache has it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DbReaderSavedListItem {
     pub row: DbReaderSavedRow,
     pub post: Option<ReaderPostRecord>,
+    /// What the device has of it for reading with no connection, besides the post.
+    pub offline: DbReaderSavedOffline,
 }
 
 /// A key as stored text: `post:{blog_id}:{post_id}`, `feed-item:{feed_item_id}` or `url:{url}`,

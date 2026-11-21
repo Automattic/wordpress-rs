@@ -27,6 +27,28 @@ struct SafeRequestExecutorTests {
         #expect(elapsed < .seconds(2))
     }
 
+    // A Reader page view is sent with the app's User-Agent, which the request carries. A site's stats don't
+    // count a view sent with the library's, so the executor mustn't add its own to it.
+    @Test("A request that names its own User-Agent keeps it")
+    func testRequestKeepsItsOwnUserAgent() throws {
+        let appUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) Mobile/15E148 wp-iphone/26.4"
+        let view = ReaderPageView(
+            siteId: 123,
+            postId: 456,
+            siteUrl: "https://example.wordpress.com",
+            siteIsPrivate: false,
+            userAgent: appUserAgent
+        )
+        let request = try #require(readerPageViewRequest(view: view))
+
+        let urlRequest = try request.buildURLRequest(
+            additionalHeaders: ["User-Agent": "the library's", "X-Extra": "1"]
+        )
+
+        #expect(urlRequest.value(forHTTPHeaderField: "User-Agent") == appUserAgent)
+        #expect(urlRequest.value(forHTTPHeaderField: "X-Extra") == "1")
+    }
+
     // Regression test for #1491: a URLSession timeout (`URLError.timedOut`) had no branch in
     // `perform(_:)`, so it fell through to `.genericError` and `HttpTimeoutError` was unreachable on
     // Apple platforms — even though reqwest (`is_timeout()`) and Kotlin (`SocketTimeoutException`)
@@ -192,6 +214,13 @@ struct SafeRequestExecutorTests {
             Issue.record("Expected .deviceIsOfflineError for \(code), got \(reason)")
             return
         }
+    }
+
+    @Test("A request with no User-Agent of its own gets the executor's")
+    func testRequestWithoutUserAgentGetsTheExecutors() throws {
+        let urlRequest = try TimingOutRequest().buildURLRequest(additionalHeaders: ["User-Agent": "the library's"])
+
+        #expect(urlRequest.value(forHTTPHeaderField: "User-Agent") == "the library's")
     }
     #endif // !os(watchOS)
     #endif

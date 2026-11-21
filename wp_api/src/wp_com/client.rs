@@ -10,8 +10,19 @@ use super::endpoint::{
     products_endpoint::{ProductsRequestBuilder, ProductsRequestExecutor},
     publicize_endpoint::{PublicizeRequestBuilder, PublicizeRequestExecutor},
     purchases_endpoint::{PurchasesRequestBuilder, PurchasesRequestExecutor},
+    reader_blocks_endpoint::{ReaderBlocksRequestBuilder, ReaderBlocksRequestExecutor},
+    reader_comments_endpoint::{ReaderCommentsRequestBuilder, ReaderCommentsRequestExecutor},
+    reader_likes_endpoint::{ReaderLikesRequestBuilder, ReaderLikesRequestExecutor},
+    reader_post_endpoint::{ReaderPostRequestBuilder, ReaderPostRequestExecutor},
     reader_posts_endpoint::{ReaderPostsRequestBuilder, ReaderPostsRequestExecutor},
     reader_saved_endpoint::{ReaderSavedRequestBuilder, ReaderSavedRequestExecutor},
+    reader_seen_endpoint::{ReaderSeenRequestBuilder, ReaderSeenRequestExecutor},
+    reader_sites_endpoint::{ReaderSitesRequestBuilder, ReaderSitesRequestExecutor},
+    reader_subscriptions_endpoint::{
+        ReaderSubscriptionsRequestBuilder, ReaderSubscriptionsRequestExecutor,
+    },
+    reader_tags_endpoint::{ReaderTagsRequestBuilder, ReaderTagsRequestExecutor},
+    reader_users_endpoint::{ReaderUsersRequestBuilder, ReaderUsersRequestExecutor},
     shopping_cart_endpoint::{ShoppingCartRequestBuilder, ShoppingCartRequestExecutor},
     site_plans_endpoint::{SitePlansRequestBuilder, SitePlansRequestExecutor},
     stats_archives_endpoint::{StatsArchivesRequestBuilder, StatsArchivesRequestExecutor},
@@ -89,8 +100,17 @@ pub struct WpComApiRequestBuilder {
     products: Arc<ProductsRequestBuilder>,
     publicize: Arc<PublicizeRequestBuilder>,
     purchases: Arc<PurchasesRequestBuilder>,
+    reader_post: Arc<ReaderPostRequestBuilder>,
+    reader_comments: Arc<ReaderCommentsRequestBuilder>,
+    reader_likes: Arc<ReaderLikesRequestBuilder>,
     reader_posts: Arc<ReaderPostsRequestBuilder>,
     reader_saved: Arc<ReaderSavedRequestBuilder>,
+    reader_blocks: Arc<ReaderBlocksRequestBuilder>,
+    reader_seen: Arc<ReaderSeenRequestBuilder>,
+    reader_subscriptions: Arc<ReaderSubscriptionsRequestBuilder>,
+    reader_tags: Arc<ReaderTagsRequestBuilder>,
+    reader_sites: Arc<ReaderSitesRequestBuilder>,
+    reader_users: Arc<ReaderUsersRequestBuilder>,
     shopping_cart: Arc<ShoppingCartRequestBuilder>,
     site_plans: Arc<SitePlansRequestBuilder>,
     sites: Arc<SitesRequestBuilder>,
@@ -145,8 +165,17 @@ impl WpComApiRequestBuilder {
             products,
             publicize,
             purchases,
+            reader_post,
+            reader_comments,
+            reader_likes,
             reader_posts,
             reader_saved,
+            reader_blocks,
+            reader_seen,
+            reader_subscriptions,
+            reader_tags,
+            reader_sites,
+            reader_users,
             shopping_cart,
             site_plans,
             sites,
@@ -208,8 +237,17 @@ pub struct WpComApiClient {
     products: Arc<ProductsRequestExecutor>,
     publicize: Arc<PublicizeRequestExecutor>,
     purchases: Arc<PurchasesRequestExecutor>,
+    reader_post: Arc<ReaderPostRequestExecutor>,
+    reader_comments: Arc<ReaderCommentsRequestExecutor>,
+    reader_likes: Arc<ReaderLikesRequestExecutor>,
     reader_posts: Arc<ReaderPostsRequestExecutor>,
     reader_saved: Arc<ReaderSavedRequestExecutor>,
+    reader_blocks: Arc<ReaderBlocksRequestExecutor>,
+    reader_seen: Arc<ReaderSeenRequestExecutor>,
+    reader_subscriptions: Arc<ReaderSubscriptionsRequestExecutor>,
+    reader_tags: Arc<ReaderTagsRequestExecutor>,
+    reader_sites: Arc<ReaderSitesRequestExecutor>,
+    reader_users: Arc<ReaderUsersRequestExecutor>,
     shopping_cart: Arc<ShoppingCartRequestExecutor>,
     site_plans: Arc<SitePlansRequestExecutor>,
     sites: Arc<SitesRequestExecutor>,
@@ -261,8 +299,17 @@ impl WpComApiClient {
             products,
             publicize,
             purchases,
+            reader_post,
+            reader_comments,
+            reader_likes,
             reader_posts,
             reader_saved,
+            reader_blocks,
+            reader_seen,
+            reader_subscriptions,
+            reader_tags,
+            reader_sites,
+            reader_users,
             shopping_cart,
             site_plans,
             sites,
@@ -307,8 +354,17 @@ api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, products);
 api_client_generate_endpoint_impl!(WpComApi, publicize);
 api_client_generate_endpoint_impl!(WpComApi, purchases);
+api_client_generate_endpoint_impl!(WpComApi, reader_post);
+api_client_generate_endpoint_impl!(WpComApi, reader_comments);
+api_client_generate_endpoint_impl!(WpComApi, reader_likes);
 api_client_generate_endpoint_impl!(WpComApi, reader_posts);
 api_client_generate_endpoint_impl!(WpComApi, reader_saved);
+api_client_generate_endpoint_impl!(WpComApi, reader_blocks);
+api_client_generate_endpoint_impl!(WpComApi, reader_seen);
+api_client_generate_endpoint_impl!(WpComApi, reader_subscriptions);
+api_client_generate_endpoint_impl!(WpComApi, reader_tags);
+api_client_generate_endpoint_impl!(WpComApi, reader_sites);
+api_client_generate_endpoint_impl!(WpComApi, reader_users);
 api_client_generate_endpoint_impl!(WpComApi, shopping_cart);
 api_client_generate_endpoint_impl!(WpComApi, site_plans);
 api_client_generate_endpoint_impl!(WpComApi, sites);

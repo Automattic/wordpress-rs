@@ -345,16 +345,20 @@ public extension WpNetworkHeaderMap {
 public extension WpNetworkRequest {
 
     #if DEBUG
+    /// Prints the request for debugging, leaving out what grants access to an account: the value of a header
+    /// that carries a credential (`Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-WP-Nonce`)
+    /// is `<redacted>`, after the scheme for `Authorization`; the URL loses its user info, its fragment and its
+    /// secret query values, such as `token` (see `redactRequestUrlForLog`); and the body is printed as its size
+    /// only, since a form body can carry a password or an OAuth client secret.
     func debugPrint() {
-        print("\(method().rawValue) \(self.url())")
-        for (name, value) in self.headerMap().toMap() {
-            print("\(name): \(value)")
-        }
-
-        print("")
-
-        if let bodyString = self.bodyAsString() {
-            print(bodyString)
+        let lines = DebugLogRedaction.requestLines(
+            method: method().rawValue,
+            url: redactRequestUrlForLog(url: self.url(), detail: .full),
+            headers: self.headerMap().toMap(),
+            body: self.bodyAsString()
+        )
+        for line in lines {
+            print(line)
         }
     }
     #endif

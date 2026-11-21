@@ -1,0 +1,141 @@
+{
+  "date_range": {
+    "before": "2026-11-17 11:00:00",
+    "after": "2026-11-17 12:00:00"
+  },
+  "posts": [
+    {
+      "ID": 1001,
+      "site_ID": 2001,
+      "feed_ID": 3001,
+      "is_external": false,
+      "date": "2026-11-17T14:59:53+03:00",
+      "modified": "2026-11-17T15:04:53+03:00",
+      "title": "Example post 1",
+      "URL": "https://example1.wordpress.com/2026/11/17/example-post/",
+      "short_URL": "https://wp.me/pEXAMPLE-1",
+      "excerpt": "<p>An example excerpt.</p>\n",
+      "content": "<p>Example content.</p>\n",
+      "author": {
+        "ID": 5001,
+        "login": "example1",
+        "email": false,
+        "name": "Example Author",
+        "first_name": "Example",
+        "last_name": "Author",
+        "nice_name": "example1",
+        "URL": "https://example1.wordpress.com",
+        "avatar_URL": "https://example.com/avatar.png",
+        "profile_URL": "https://example.com/example1",
+        "site_ID": 2001,
+        "has_avatar": true,
+        "wpcom_id": 5001,
+        "wpcom_login": "example1"
+      },
+      "site_name": "Example Site 1",
+      "site_URL": "https://example1.wordpress.com",
+      "featured_image": "https://example.com/image.jpg",
+      "like_count": 1,
+      "i_like": false,
+      "is_following": false,
+      "discussion": {
+        "comments_open": false,
+        "comment_status": "open",
+        "pings_open": false,
+        "ping_status": "open",
+        "comment_count": 1,
+        "comments_require_registration": false,
+        "comments_allow_blocks": true
+      },
+      "tags": {
+        "example": {
+          "ID": 1,
+          "name": "example",
+          "slug": "example",
+          "description": "",
+          "post_count": 3,
+          "display_name": "example"
+        }
+      },
+      "global_ID": "00000000000000000000000000000001",
+      "use_excerpt": false,
+      "comment_count": 1,
+      "date_added": "2026-11-17 12:00:00",
+      "score": 42.5,
+      "site_follower_count": 1,
+      "tagged_on": "2026-11-18T09:30:00+00:00",
+      "railcar": {
+        "railcar": "EXAMPLE00001",
+        "fetch_algo": "read:search:posts/11",
+        "fetch_position": 0,
+        "rec_blog_id": 2001,
+        "rec_post_id": 1001,
+        "fetch_lang": "en",
+        "fetch_query": "photography"
+      }
+    },
+    {
+      "ID": 1002,
+      "site_ID": 2002,
+      "feed_ID": 3002,
+      "is_external": false,
+      "date": "2026-11-17T03:59:53-07:00",
+      "modified": "2026-11-17T04:04:53-07:00",
+      "title": "Example post 2",
+      "URL": "https://example2.wordpress.com/2026/11/17/example-post/",
+      "short_URL": "https://wp.me/pEXAMPLE-2",
+      "excerpt": "<p>An example excerpt.</p>\n",
+      "content": "<p>Example content.</p>\n",
+      "author": {
+        "ID": 5002,
+        "login": "example2",
+        "email": false,
+        "name": "Example Author",
+        "first_name": "Example",
+        "last_name": "Author",
+        "nice_name": "example2",
+        "URL": "https://example2.wordpress.com",
+        "avatar_URL": "https://example.com/avatar.png",
+        "profile_URL": "https://example.com/example2",
+        "site_ID": 2002,
+        "has_avatar": true,
+        "wpcom_id": 5002,
+        "wpcom_login": "example2"
+      },
+      "site_name": "Example Site 2",
+      "site_URL": "https://example2.wordpress.com",
+      "featured_image": "",
+      "like_count": 2,
+      "i_like": false,
+      "is_following": false,
+      "discussion": {
+        "comments_open": true,
+        "comment_status": "open",
+        "pings_open": true,
+        "ping_status": "open",
+        "comment_count": 2,
+        "comments_require_registration": false,
+        "comments_allow_blocks": true
+      },
+      "tags": [],
+      "global_ID": "00000000000000000000000000000002",
+      "use_excerpt": false,
+      "comment_count": 2,
+      "date_added": "2026-11-17 11:00:00",
+      "score": 17.25,
+      "site_follower_count": 2,
+      "tagged_on": "2026-11-18T09:30:00+00:00",
+      "railcar": {
+        "railcar": "EXAMPLE00002",
+        "fetch_algo": "read:search:posts/11",
+        "fetch_position": 1,
+        "rec_blog_id": 2002,
+        "rec_post_id": 1002,
+        "fetch_lang": "en",
+        "fetch_query": "photography"
+      }
+    }
+  ],
+  "algorithm": "read:search:posts/11",
+  "next_page": "offset=2&algorithm=read:search:posts/11"
+}

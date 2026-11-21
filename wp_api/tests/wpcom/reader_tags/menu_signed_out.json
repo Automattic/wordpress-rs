@@ -1,0 +1,27 @@
+{
+  "default": {
+    "discover": {
+      "title": "Discover",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/sites/53424024/posts"
+    }
+  },
+  "subscribed": [],
+  "recommended": {
+    "2806": {
+      "ID": 2806,
+      "title": "Art &amp; Design",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/art-design/posts",
+      "slug": "art-design",
+      "display_name": "art-design",
+      "type": "tag"
+    },
+    "178": {
+      "ID": 178,
+      "title": "Books",
+      "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/books/posts",
+      "slug": "books",
+      "display_name": "books",
+      "type": "tag"
+    }
+  }
+}

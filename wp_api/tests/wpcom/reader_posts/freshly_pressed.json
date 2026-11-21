@@ -1,0 +1,161 @@
+{
+  "date_range": {
+    "before": "2026-11-17T12:00:00+00:00",
+    "after": "2026-11-16T12:00:00+00:00"
+  },
+  "number": 2,
+  "posts": [
+    {
+      "ID": 1001,
+      "site_ID": 2001,
+      "feed_ID": 3001,
+      "is_external": false,
+      "date": "2026-11-16T02:40:00-04:00",
+      "modified": "2026-11-16T02:45:00-04:00",
+      "title": "Example post 1",
+      "URL": "https://example1.wordpress.com/2026/11/17/example-post/",
+      "short_URL": "https://wp.me/pEXAMPLE-1",
+      "excerpt": "<p>An example excerpt.</p>\n",
+      "content": "<p>Example content.</p>\n",
+      "author": {
+        "ID": 5001,
+        "login": "example1",
+        "email": false,
+        "name": "Example Author",
+        "first_name": "Example",
+        "last_name": "Author",
+        "nice_name": "example1",
+        "URL": "https://example1.wordpress.com",
+        "avatar_URL": "https://example.com/avatar.png",
+        "profile_URL": "https://example.com/example1",
+        "site_ID": 2001,
+        "has_avatar": true,
+        "wpcom_id": 5001,
+        "wpcom_login": "example1"
+      },
+      "site_name": "Example Site 1",
+      "site_URL": "https://example1.wordpress.com",
+      "featured_image": "https://example.com/image.jpg",
+      "like_count": 1,
+      "i_like": false,
+      "is_following": false,
+      "discussion": {
+        "comments_open": true,
+        "comment_status": "open",
+        "pings_open": true,
+        "ping_status": "open",
+        "comment_count": 1,
+        "comments_require_registration": false,
+        "comments_allow_blocks": true
+      },
+      "tags": {
+        "example": {
+          "ID": 1,
+          "name": "example",
+          "slug": "example",
+          "description": "",
+          "post_count": 3,
+          "display_name": "example"
+        }
+      },
+      "global_ID": "00000000000000000000000000000001",
+      "editorial": {
+        "blog_id": "2001",
+        "post_id": "1001",
+        "image": "https://s0.wp.com/mshots/v1/https%3A%2F%2Fexample1.wordpress.com%2F2026%2F11%2F17%2Fexample-post%2F?w=252",
+        "custom_headline": "",
+        "custom_blog_title": "",
+        "displayed_on": "2026-11-17T12:00:00+00:00",
+        "picked_on": "1970-01-01T00:33:46+00:00",
+        "highlight_topic": "",
+        "highlight_topic_title": "",
+        "screen_offset": "0",
+        "blog_name": "Example Site 1",
+        "site_id": "1"
+      },
+      "railcar": {
+        "railcar": "EXAMPLE00001",
+        "fetch_algo": "read:recommendations:posts/freshly-pressed",
+        "fetch_position": 0,
+        "rec_blog_id": "2001",
+        "rec_post_id": "1001"
+      }
+    },
+    {
+      "ID": 1002,
+      "site_ID": 2002,
+      "feed_ID": 3002,
+      "is_external": false,
+      "date": "2026-11-15T02:40:00-08:00",
+      "modified": "2026-11-15T02:45:00-08:00",
+      "title": "Example post 2",
+      "URL": "https://example2.wordpress.com/2026/11/17/example-post/",
+      "short_URL": "https://wp.me/pEXAMPLE-2",
+      "excerpt": "<p>An example excerpt.</p>\n",
+      "content": "<p>Example content.</p>\n",
+      "author": {
+        "ID": 5002,
+        "login": "example2",
+        "email": false,
+        "name": "Example Author",
+        "first_name": "Example",
+        "last_name": "Author",
+        "nice_name": "example2",
+        "URL": "https://example2.wordpress.com",
+        "avatar_URL": "https://example.com/avatar.png",
+        "profile_URL": "https://example.com/example2",
+        "site_ID": 2002,
+        "has_avatar": true,
+        "wpcom_id": 5002,
+        "wpcom_login": "example2"
+      },
+      "site_name": "Example Site 2",
+      "site_URL": "https://example2.wordpress.com",
+      "featured_image": "https://example.com/image.jpg",
+      "like_count": 2,
+      "i_like": false,
+      "is_following": false,
+      "discussion": {
+        "comments_open": true,
+        "comment_status": "open",
+        "pings_open": true,
+        "ping_status": "open",
+        "comment_count": 2,
+        "comments_require_registration": false,
+        "comments_allow_blocks": true
+      },
+      "tags": {
+        "example": {
+          "ID": 1,
+          "name": "example",
+          "slug": "example",
+          "description": "",
+          "post_count": 3,
+          "display_name": "example"
+        }
+      },
+      "global_ID": "00000000000000000000000000000002",
+      "editorial": {
+        "blog_id": "2002",
+        "post_id": "1002",
+        "image": "https://s0.wp.com/mshots/v1/https%3A%2F%2Fexample2.wordpress.com%2F2026%2F11%2F17%2Fexample-post%2F?w=252",
+        "custom_headline": "",
+        "custom_blog_title": "",
+        "displayed_on": "2026-11-16T12:00:00+00:00",
+        "picked_on": "1970-01-01T00:33:46+00:00",
+        "highlight_topic": "",
+        "highlight_topic_title": "",
+        "screen_offset": "0",
+        "blog_name": "Example Site 2",
+        "site_id": "1"
+      },
+      "railcar": {
+        "railcar": "EXAMPLE00002",
+        "fetch_algo": "read:recommendations:posts/freshly-pressed",
+        "fetch_position": 1,
+        "rec_blog_id": "2002",
+        "rec_post_id": "1002"
+      }
+    }
+  ]
+}

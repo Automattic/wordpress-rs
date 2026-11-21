@@ -53,8 +53,8 @@ final class ReaderSavedPostsViewModel {
     private(set) var isLoading = false
 
     var urlToSave = ""
-    var error: MyError?
-    var shouldPresentAlert = false
+    /// What went wrong, in words, shown as an alert.
+    var errorMessage: String?
 
     init(serviceProvider: @escaping ServiceProvider) {
         self.serviceProvider = serviceProvider
@@ -138,8 +138,7 @@ final class ReaderSavedPostsViewModel {
         do {
             try await work()
         } catch {
-            self.error = MyError(underlyingError: error)
-            self.shouldPresentAlert = true
+            errorMessage = readerErrorMessage(error)
         }
     }
 }
@@ -149,11 +148,15 @@ struct ReaderSavedPostsView: View {
     @State
     var viewModel: ReaderSavedPostsViewModel
 
+    /// Whether a row opens its post. Only a screen inside the Reader's navigation can.
+    var opensPosts = false
+
     var body: some View {
         List {
             Section {
                 TextField("https://example.com/page", text: $viewModel.urlToSave)
                     .autocorrectionDisabled()
+                    .accessibilityIdentifier("saved-url")
                     .onSubmit { Task { await viewModel.saveURL() } }
                 Button("Save URL") {
                     Task { await viewModel.saveURL() }
@@ -164,13 +167,15 @@ struct ReaderSavedPostsView: View {
             Section(viewModel.total.map { "\($0) saved" } ?? "Saved") {
                 ForEach(viewModel.rows) { row in
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(row.title)
-                            Text(row.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        if opensPosts, let post = row.post {
+                            NavigationLink(value: ReaderRoute.post(key: row.id, identity: post)) {
+                                label(for: row)
+                            }
+                            .accessibilityIdentifier("saved-post")
+                        } else {
+                            label(for: row)
+                            Spacer()
                         }
-                        Spacer()
                         Button("Unsave", role: .destructive) {
                             Task { await viewModel.unsave(row) }
                         }
@@ -194,8 +199,25 @@ struct ReaderSavedPostsView: View {
         .navigationTitle("Saved Posts")
         .refreshable { await viewModel.reload() }
         .task { await viewModel.start() }
-        .alert(isPresented: $viewModel.shouldPresentAlert, error: viewModel.error) {
+        .alert(
+            "That didn't work",
+            isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )
+        ) {
             Button("OK") {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
+    }
+
+    private func label(for row: ReaderSavedPostRow) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(row.title)
+            Text(row.subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

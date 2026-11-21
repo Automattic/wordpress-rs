@@ -2,9 +2,10 @@
 #
 # Sign an example app into WordPress.com with a bearer token, in one command.
 #
-# Launches the Swift example app on an iOS Simulator (`xcrun simctl launch -wpcom-token`) or the
-# Android example app on an emulator/device (`adb shell am start --es wpcom-token`). The app stores
-# the token as its WordPress.com account at launch — no OAuth app credentials or taps required.
+# Writes the token to the Swift example app's `Library/wpcom-token` on an iOS Simulator, or to the
+# Android example app's private `files/wpcom-token` on an emulator/device, and launches the app. The
+# app stores the token as its WordPress.com account at launch and deletes the file — no OAuth app
+# credentials or taps required.
 # Build and install the app first (e.g. from Xcode or Android Studio).
 
 set -euo pipefail
@@ -204,16 +205,32 @@ if [[ "$platform" == ios ]]; then
     if [[ "$reset" == true ]]; then
         reset_ios_app
     fi
-    xcrun simctl launch --terminate-running-process "$device" "$IOS_BUNDLE_ID" -wpcom-token "$token"
+    # The token goes to the app through a file in its data container, written by this shell (`printf`
+    # is a builtin), so it's on no command line that `ps` would show. The app reads the file at launch
+    # and deletes it.
+    if ! data_container=$(xcrun simctl get_app_container "$device" "$IOS_BUNDLE_ID" data); then
+        echo "error: couldn't find $IOS_BUNDLE_ID's data on '$device'. Build and run it from Xcode first." >&2
+        exit 1
+    fi
+    mkdir -p "$data_container/Library"
+    (umask 077 && printf '%s' "$token" > "$data_container/Library/wpcom-token")
+    # Terminates a running instance first, so the file is read by a fresh launch.
+    xcrun simctl launch --terminate-running-process "$device" "$IOS_BUNDLE_ID" > /dev/null
 else
     if [[ "$reset" == true ]]; then
         reset_android_app
     fi
-    # `adb shell` joins its arguments into a command line for the device's shell, so single-quote the
-    # token — WordPress.com tokens contain shell metacharacters like `#`, `(`, and `$`.
-    quoted_token="'$(printf '%s' "$token" | sed "s/'/'\\\\''/g")'"
-    # `-S` force-stops a running instance first, so the extra is delivered to a fresh `onCreate`.
-    adb -s "$device" shell am start -S -W -n "$ANDROID_ACTIVITY" --es wpcom-token "$quoted_token" > /dev/null
+    # The token goes to the app through a file in its private storage, written from standard input
+    # (`printf` is a shell builtin), so it's on no command line that `ps` would show, on this Mac
+    # (`adb`) or on the device (`am`). `run-as` works for a debug build only, and starts in the app's
+    # data folder; the app reads the file at launch and deletes it.
+    if ! printf '%s' "$token" | adb -s "$device" exec-in \
+        "run-as $ANDROID_PACKAGE sh -c 'mkdir -p files && cat > files/wpcom-token'"; then
+        echo "error: couldn't hand the token to $ANDROID_PACKAGE on '$device'. Install a debug build first." >&2
+        exit 1
+    fi
+    # `-S` force-stops a running instance first, so the file is read by a fresh `onCreate`.
+    adb -s "$device" shell am start -S -W -n "$ANDROID_ACTIVITY" > /dev/null
 fi
 
 echo "Done. The app is signed into WordPress.com — open its WordPress.com section."

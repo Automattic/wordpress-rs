@@ -74,7 +74,7 @@ The Kotlin step builds for the **host**, not Android, so it needs no NDK. Only
 
 ## Signing an example app into WordPress.com
 
-The Swift and Android example apps accept a WordPress.com bearer token at launch and store it as
+The Swift and Android example apps read a WordPress.com bearer token at launch and store it as
 their WordPress.com account, so you can sign a Simulator or emulator in without configuring OAuth
 app credentials in `wp_com_test_credentials.json`. Build and install the app first, then:
 
@@ -100,16 +100,58 @@ The token is resolved from, in order:
 There's deliberately no command-line token flag — a token passed as an argument would be saved in
 your shell history.
 
-The app only uses the token when no WordPress.com account is signed in, and only once per launch,
-so signing out stays signed out. To launch with a token by hand:
+The script hands the token over in a file, never on a command line, where the process list would
+show it: the Swift example app's `Library/wpcom-token` in its Simulator data container, or the
+Android example app's private `files/wpcom-token`. The app reads the file at launch, deletes it, and
+uses the token only when no WordPress.com account is signed in, so signing out stays signed out.
+
+## Checking the Swift example app's screens from a script
+
+The Swift example app's screens can be checked on an iOS Simulator without tapping by hand. A UI test
+(`native/swift/Example/ExampleUITests/ScriptedUITests.swift`) reads a script of steps, such as `tap Reader`,
+`type #tag-slug => knitting` and `shot 01-home`, and saves a screenshot and a text list of what's on screen for
+each `shot`. The steps it knows are listed at the top of that file.
+
+Build the Rust library for the simulator only, which is much smaller than `make xcframework-only-ios`, boot a
+simulator, and run a script:
 
 ```bash
-# iOS Simulator
-xcrun simctl launch --terminate-running-process booted com.automattic.Example -wpcom-token <token>
+make _build-apple-aarch64-apple-ios-sim
+cargo run --quiet --bin xcframework -- --profile dev --targets aarch64-apple-ios-sim
 
-# Android (single-quote the token — the device shell interprets it)
-adb shell am start -S -n rs.wordpress.example/.ui.welcome.WelcomeActivity --es wpcom-token "'<token>'"
+scripts/example-app-ui-script.sh --build --device <udid> \
+    native/swift/Example/ExampleUITests/Scripts/reader-signed-out.txt ~/Desktop/reader-screens
 ```
 
-Either way, the token briefly appears in the process list while the launch command runs; that's
-inherent to passing it as a launch argument.
+`--build` builds the app and the UI test: leave it out to run another script against the same build. The script
+in the example goes through every Reader screen as a reader who isn't signed in, so it sends nothing that changes
+an account. To run a script as an account, sign the app in first with `make example-app-login`: the app stays
+signed in from one script to the next.
+
+Keep the output folder outside the checkout when the screens show real content.
+
+One launch argument helps a script: `launch -reader-offline` starts the app with every Reader request failing as it
+does with no connection, which shows the Reader's screens from the cache alone.
+
+`reader-offline-signed-out.txt`, next to that script, saves two posts, downloads their text and images, and opens
+one from the device. It needs a fresh install, so that neither post is saved yet.
+
+## Checking the Kotlin example app's screens from a script
+
+The Kotlin example app can be checked the same way on an Android emulator or device, over `adb`.
+`scripts/example-app-adb-script.py` reads a script of the same kind of steps, finds what's on screen with
+UI Automator, and saves a screenshot and a text list of the screen for each `shot`. The steps it knows are listed
+at the top of the file.
+
+```bash
+cd native/kotlin && ./gradlew :example:androidApp:installDebug -PcargoTarget=arm64 && cd ../..
+
+scripts/example-app-adb-script.py <adb serial> \
+    native/kotlin/example/ui-scripts/reader-signed-out.txt ~/Desktop/reader-screens
+```
+
+`-PcargoTarget=arm64` builds the Rust library for one ABI, which is what an emulator on an Apple Silicon Mac needs.
+`reader-signed-out.txt` goes through the Reader as a reader who isn't signed in, and
+`reader-offline-signed-out.txt` saves two posts, downloads their text and images, and opens one from the device.
+To run a script as an account, sign the app in first with `make example-app-login PLATFORM=android`. To check a
+screen with no connection, turn airplane mode on first: `adb shell cmd connectivity airplane-mode enable`.

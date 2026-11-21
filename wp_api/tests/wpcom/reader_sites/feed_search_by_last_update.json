@@ -1,0 +1,295 @@
+{
+  "feeds": [
+    {
+      "URL": "https://example1.wordpress.com",
+      "subscribe_URL": "https://example1.wordpress.com",
+      "blog_ID": "2001",
+      "title": "Example Site 1",
+      "railcar": {
+        "railcar": "EXAMPLErailcar",
+        "fetch_algo": "reader/manage/search:0",
+        "fetch_position": 0,
+        "rec_blog_id": 2001,
+        "fetch_lang": "en",
+        "fetch_query": "example"
+      },
+      "meta": {
+        "links": {
+          "site": "https://public-api.wordpress.com/rest/v1.1/read/sites/2001"
+        },
+        "data": {
+          "site": {
+            "ID": 2001,
+            "name": "Example Site",
+            "description": "An example site.",
+            "URL": "https://example1.wordpress.com",
+            "jetpack": true,
+            "jetpack_connection": true,
+            "post_count": 56,
+            "subscribers_count": 1234,
+            "lang": "en-US",
+            "logo": {
+              "id": 0,
+              "sizes": [],
+              "url": ""
+            },
+            "visible": true,
+            "is_private": false,
+            "is_coming_soon": false,
+            "is_following": false,
+            "organization_id": 0,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/read/sites/2001",
+                "help": "https://public-api.wordpress.com/rest/v1.1/read/sites/2001/help",
+                "posts": "https://public-api.wordpress.com/rest/v1.1/read/sites/2001/posts/",
+                "comments": "https://public-api.wordpress.com/rest/v1.1/sites/2001/comments/",
+                "xmlrpc": "https://example1.wordpress.com"
+              }
+            },
+            "launch_status": false,
+            "site_migration": {
+              "is_complete": false,
+              "in_progress": false
+            },
+            "is_fse_active": false,
+            "is_fse_eligible": false,
+            "is_core_site_editor_enabled": false,
+            "is_wpcom_atomic": false,
+            "is_wpcom_staging_site": false,
+            "is_deleted": false,
+            "is_a4a_client": false,
+            "is_a4a_dev_site": false,
+            "is_garden": false,
+            "garden_name": null,
+            "is_wpcom_flex": false,
+            "big_sky_enabled": false,
+            "capabilities": {
+              "edit_pages": false,
+              "edit_posts": false,
+              "edit_others_posts": false,
+              "edit_theme_options": false,
+              "list_users": false,
+              "manage_categories": false,
+              "manage_options": false,
+              "publish_posts": false,
+              "upload_files": false,
+              "view_stats": false
+            },
+            "is_multi_author": true,
+            "feed_ID": 3001,
+            "feed_URL": "https://example1.wordpress.com",
+            "header_image": false,
+            "owner": {
+              "ID": 5001,
+              "login": "example",
+              "name": "Example Name",
+              "first_name": "Example",
+              "last_name": "Name",
+              "nice_name": "example",
+              "URL": "",
+              "avatar_URL": "https://example.com/avatar.png",
+              "profile_URL": "https://example.com/example-author",
+              "ip_address": false,
+              "site_visible": false,
+              "has_avatar": true
+            },
+            "subscription": {
+              "delivery_methods": {
+                "email": null,
+                "notification": {
+                  "send_posts": false
+                }
+              }
+            },
+            "is_blocked": false,
+            "unseen_count": 7
+          }
+        }
+      }
+    },
+    {
+      "URL": "https://example2.wordpress.com",
+      "subscribe_URL": "https://example2.wordpress.com",
+      "blog_ID": "2002",
+      "title": "Example Site 2",
+      "railcar": {
+        "railcar": "EXAMPLErailcar",
+        "fetch_algo": "reader/manage/search:0",
+        "fetch_position": 1,
+        "rec_blog_id": 2002,
+        "fetch_lang": "en",
+        "fetch_query": "example"
+      },
+      "meta": {
+        "links": {
+          "site": "https://public-api.wordpress.com/rest/v1.1/read/sites/2002"
+        },
+        "data": {
+          "site": {
+            "errors": {
+              "site_gone": [
+                "The site has been deleted"
+              ]
+            },
+            "error_data": {
+              "site_gone": 410
+            }
+          }
+        }
+      }
+    },
+    {
+      "URL": "https://example3.wordpress.com",
+      "subscribe_URL": "https://example3.wordpress.com",
+      "blog_ID": "2003",
+      "title": "Example Site 3",
+      "railcar": {
+        "railcar": "EXAMPLErailcar",
+        "fetch_algo": "reader/manage/search:0",
+        "fetch_position": 2,
+        "rec_blog_id": 2003,
+        "fetch_lang": "en",
+        "fetch_query": "example"
+      },
+      "meta": {
+        "links": {
+          "feed": "https://public-api.wordpress.com/rest/v1.1/read/feed/3003",
+          "site": "https://public-api.wordpress.com/rest/v1.1/read/sites/2003"
+        },
+        "data": {
+          "site": {
+            "ID": 2003,
+            "name": "Example Site",
+            "description": "An example site.",
+            "URL": "https://example3.wordpress.com",
+            "jetpack": false,
+            "jetpack_connection": false,
+            "post_count": 56,
+            "subscribers_count": 1234,
+            "lang": "en",
+            "icon": {
+              "img": "https://example.com/icon.png",
+              "ico": "https://example.com/icon.png"
+            },
+            "logo": {
+              "id": 0,
+              "sizes": [],
+              "url": ""
+            },
+            "visible": true,
+            "is_private": false,
+            "is_coming_soon": false,
+            "is_following": false,
+            "organization_id": 0,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/read/sites/2003",
+                "help": "https://public-api.wordpress.com/rest/v1.1/read/sites/2003/help",
+                "posts": "https://public-api.wordpress.com/rest/v1.1/read/sites/2003/posts/",
+                "comments": "https://public-api.wordpress.com/rest/v1.1/sites/2003/comments/",
+                "xmlrpc": "https://example3.wordpress.com"
+              }
+            },
+            "launch_status": false,
+            "site_migration": {
+              "is_complete": false,
+              "in_progress": false
+            },
+            "is_fse_active": false,
+            "is_fse_eligible": false,
+            "is_core_site_editor_enabled": false,
+            "is_wpcom_atomic": false,
+            "is_wpcom_staging_site": false,
+            "is_deleted": false,
+            "is_a4a_client": false,
+            "is_a4a_dev_site": false,
+            "is_garden": false,
+            "garden_name": null,
+            "is_wpcom_flex": false,
+            "big_sky_enabled": false,
+            "capabilities": {
+              "edit_pages": false,
+              "edit_posts": false,
+              "edit_others_posts": false,
+              "edit_theme_options": false,
+              "list_users": false,
+              "manage_categories": false,
+              "manage_options": false,
+              "publish_posts": false,
+              "upload_files": false,
+              "view_stats": false
+            },
+            "is_multi_author": false,
+            "feed_ID": 3003,
+            "feed_URL": "https://example3.wordpress.com",
+            "header_image": {
+              "attachment_id": 10386,
+              "url": "https://example3.wordpress.com/example/",
+              "thumbnail_url": "https://example3.wordpress.com/example/",
+              "height": 198,
+              "width": 940
+            },
+            "owner": {
+              "ID": 5001,
+              "login": "example",
+              "name": "Example Name",
+              "first_name": "Example",
+              "last_name": "Name",
+              "nice_name": "example",
+              "URL": "https://example3.wordpress.com",
+              "avatar_URL": "https://example.com/avatar.png",
+              "profile_URL": "https://example.com/example-author",
+              "ip_address": false,
+              "site_visible": true,
+              "has_avatar": true
+            },
+            "subscription": {
+              "delivery_methods": {
+                "email": null,
+                "notification": {
+                  "send_posts": false
+                }
+              }
+            },
+            "is_blocked": false,
+            "unseen_count": 7
+          },
+          "feed": {
+            "blog_ID": "2003",
+            "feed_ID": "3003",
+            "blog_owner": {
+              "ID": 5001,
+              "name": "Example Name"
+            },
+            "name": "Example Feed",
+            "URL": "https://example3.wordpress.com/",
+            "feed_URL": "https://example3.wordpress.com",
+            "subscribers_count": 1234,
+            "is_following": false,
+            "last_update": "2026-11-19T04:29:52+00:00",
+            "last_checked": "2026-11-19T04:30:40+00:00",
+            "marked_for_refresh": false,
+            "next_refresh_time": null,
+            "organization_id": 0,
+            "subscription_id": null,
+            "unseen_count": 7,
+            "meta": {
+              "links": {
+                "self": "https://public-api.wordpress.com/rest/v1.1/read/feed/3003",
+                "site": "https://public-api.wordpress.com/rest/v1.1/read/sites/2003"
+              }
+            },
+            "image": "https://example.com/icon.png?w=32&amp;h=32",
+            "description": "News &amp; examples"
+          }
+        }
+      },
+      "feed_ID": 3003,
+      "subscribers_count": 102
+    }
+  ],
+  "total": 12345,
+  "algorithm": "reader/manage/search:0",
+  "next_page": "last=1795060447&algorithm=reader/manage/search:0&blog=2003&feed=0"
+}

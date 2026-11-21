@@ -1,10 +1,8 @@
 use super::*;
-use crate::testing::EmptyAppNotifier;
 use async_trait::async_trait;
 use futures::channel::oneshot;
 use rstest::rstest;
 use serde_json::{Value, json};
-use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use wp_api::posts::PostId;
 use wp_api::prelude::*;
@@ -18,26 +16,26 @@ pub(super) const NEW_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read
 pub(super) const DELETE_URL: &str = "https://public-api.wordpress.com/wpcom/v2/read/saved/delete";
 pub(super) const LIST_URL: &str = "https://public-api.wordpress.com/rest/v1.2/read/saved";
 
-pub(super) enum Step {
-    Respond(u32, Value),
-    /// Waits for the test to release it, so the test can act while the request is in flight.
-    Hold(oneshot::Receiver<()>, u32, Value),
-    /// The device is offline, so the request never left.
-    Offline,
-    /// The request timed out, so the server may have applied it.
-    TimedOut,
+pub(super) use crate::testing::scripted::{ScriptedExecutor, Sent, Step, delegate};
+
+/// The request in short: `keys`, `list`, `bulk`, or `new` or `delete` with its body.
+pub(super) trait SentShort {
+    fn short(&self) -> String;
 }
 
-#[derive(Debug, Clone)]
-pub(super) struct Sent {
-    pub(super) method: RequestMethod,
-    pub(super) url: String,
-    pub(super) body: Option<Value>,
+/// Every request sent, each in short.
+pub(super) trait SentInShort {
+    fn sent_short(&self) -> Vec<String>;
 }
 
-impl Sent {
-    /// The request in short: `keys`, `list`, `bulk`, or `new` or `delete` with its body.
-    pub(super) fn short(&self) -> String {
+impl SentInShort for ScriptedExecutor {
+    fn sent_short(&self) -> Vec<String> {
+        self.sent().iter().map(SentShort::short).collect()
+    }
+}
+
+impl SentShort for Sent {
+    fn short(&self) -> String {
         let endpoint = self.url.split('?').next().unwrap_or_default();
         let name = endpoint.rsplit('/').next().unwrap_or_default();
         match (name, &self.body) {
@@ -49,110 +47,6 @@ impl Sent {
             ("saved", _) => "list".to_string(),
             _ => name.to_string(),
         }
-    }
-}
-
-/// Plays back a script of responses, and records every request.
-#[derive(Debug, Default)]
-pub(super) struct ScriptedExecutor {
-    steps: Mutex<VecDeque<StepBox>>,
-    sent: Mutex<Vec<Sent>>,
-}
-
-pub(super) struct StepBox(Step);
-
-impl std::fmt::Debug for StepBox {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Step")
-    }
-}
-
-impl ScriptedExecutor {
-    pub(super) fn push(&self, step: Step) {
-        self.steps.lock().unwrap().push_back(StepBox(step));
-    }
-
-    pub(super) fn sent(&self) -> Vec<Sent> {
-        self.sent.lock().unwrap().clone()
-    }
-
-    pub(super) fn sent_short(&self) -> Vec<String> {
-        self.sent().iter().map(Sent::short).collect()
-    }
-}
-
-#[async_trait]
-impl RequestExecutor for ScriptedExecutor {
-    async fn execute(
-        &self,
-        request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        self.sent.lock().unwrap().push(Sent {
-            method: request.method(),
-            url: request.url().0,
-            body: request
-                .body_as_string()
-                .map(|body| serde_json::from_str(&body).unwrap()),
-        });
-
-        let step = self.steps.lock().unwrap().pop_front();
-        let (status_code, body) = match step.expect("Unexpected request").0 {
-            Step::Respond(status_code, body) => (status_code, body),
-            Step::Hold(release, status_code, body) => {
-                release.await.expect("The test dropped the release");
-                (status_code, body)
-            }
-            Step::Offline => {
-                return Err(RequestExecutionError::RequestExecutionFailed {
-                    status_code: None,
-                    redirects: None,
-                    reason: RequestExecutionErrorReason::DeviceIsOfflineError {
-                        error_message: "The Internet connection appears to be offline.".to_string(),
-                    },
-                    request_url: request.url().0,
-                    request_method: request.method(),
-                });
-            }
-            Step::TimedOut => {
-                return Err(RequestExecutionError::RequestExecutionFailed {
-                    status_code: None,
-                    redirects: None,
-                    reason: RequestExecutionErrorReason::HttpTimeoutError,
-                    request_url: request.url().0,
-                    request_method: request.method(),
-                });
-            }
-        };
-
-        Ok(WpNetworkResponse {
-            body: body.to_string().into_bytes(),
-            status_code,
-            response_header_map: Default::default(),
-            request_url: request.url(),
-            request_method: request.method(),
-            request_header_map: Default::default(),
-        })
-    }
-
-    async fn upload(
-        &self,
-        _request: Arc<WpMultipartFormRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        unimplemented!("The saved posts API doesn't upload")
-    }
-
-    async fn sleep(&self, _: u64) {}
-
-    fn cancel(&self, _: Arc<RequestContext>) {}
-}
-
-pub(super) fn delegate(executor: Arc<dyn RequestExecutor>) -> WpApiClientDelegate {
-    WpApiClientDelegate {
-        auth_provider: Arc::new(WpAuthenticationProvider::none()),
-        request_executor: executor,
-        middleware_pipeline: Arc::new(WpApiMiddlewarePipeline::default()),
-        app_notifier: Arc::new(EmptyAppNotifier),
-        language_provider: None,
     }
 }
 

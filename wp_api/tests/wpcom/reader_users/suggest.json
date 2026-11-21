@@ -1,0 +1,20 @@
+{
+  "suggestions": [
+    {
+      "ID": 100000001,
+      "user_login": "exampleauthor",
+      "display_name": "Example Author",
+      "source": ["site"],
+      "classes": "",
+      "image_URL": "https://0.gravatar.com/avatar/00000000000000000000000000000000?s=96&d=identicon&r=G"
+    },
+    {
+      "ID": 100000002,
+      "user_login": "janedoe",
+      "display_name": "Jane &amp; Co",
+      "source": ["site"],
+      "classes": "",
+      "image_URL": "https://0.gravatar.com/avatar/11111111111111111111111111111111?s=96&d=identicon&r=G"
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "cards": [
+    {
+      "type": "post",
+      "data": {
+        "ID": 1001,
+        "site_ID": 2001,
+        "is_external": false,
+        "date": "2026-11-17T12:00:00-07:00",
+        "modified": "2026-11-17T12:05:00-07:00",
+        "title": "Example post 1",
+        "URL": "https://example1.wordpress.com/2026/11/17/example-post/",
+        "short_URL": "https://wp.me/pEXAMPLE-1",
+        "excerpt": "<p>An example excerpt.</p>\n",
+        "content": "<p>Example content.</p>\n",
+        "author": {
+          "ID": 5001,
+          "login": "example1",
+          "email": false,
+          "name": "Example Author",
+          "first_name": "Example",
+          "last_name": "Author",
+          "nice_name": "example1",
+          "URL": "https://example1.wordpress.com",
+          "avatar_URL": "https://example.com/avatar.png",
+          "profile_URL": "https://example.com/example1",
+          "site_ID": 2001,
+          "has_avatar": false,
+          "wpcom_id": 5001,
+          "wpcom_login": "example1"
+        },
+        "site_name": "Example Site 1",
+        "site_URL": "https://example1.wordpress.com",
+        "featured_image": "",
+        "like_count": "1",
+        "i_like": false,
+        "is_following": false,
+        "discussion": {
+          "comments_open": true,
+          "comment_status": "open",
+          "pings_open": true,
+          "ping_status": "open",
+          "comment_count": 1,
+          "comments_require_registration": false,
+          "comments_allow_blocks": true
+        },
+        "tags": {},
+        "global_ID": "00000000000000000000000000000001",
+        "use_excerpt": false,
+        "blog_id": 2001,
+        "railcar": {
+          "railcar": "EXAMPLE00001",
+          "fetch_algo": "read:recommendations:posts/first-posts-stream",
+          "fetch_position": 0,
+          "rec_blog_id": 2001,
+          "rec_post_id": 1001
+        }
+      }
+    },
+    {
+      "type": "new_sites",
+      "data": [
+        {
+          "description": "An example site.",
+          "feed_ID": 7001,
+          "feed_URL": "https://examplesite1.wordpress.com/feed",
+          "icon": null,
+          "ID": 6001,
+          "is_private": false,
+          "jetpack": false,
+          "name": "Example Site 1",
+          "prefer_feed": false,
+          "subscribers_count": 10,
+          "subscription": {
+            "delivery_methods": {
+              "email": null,
+              "notification": {
+                "send_posts": false
+              }
+            }
+          },
+          "URL": "https://examplesite1.wordpress.com",
+          "blog_id": null
+        }
+      ]
+    }
+  ],
+  "next_page_handle": "RVhBTVBMRS1IQU5ETEU",
+  "success": true,
+  "lang": "en"
+}

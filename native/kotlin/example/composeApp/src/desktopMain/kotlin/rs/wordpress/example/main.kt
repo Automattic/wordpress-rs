@@ -7,6 +7,7 @@ import rs.wordpress.example.shared.App
 import rs.wordpress.example.shared.di.commonModules
 import uniffi.wp_mobile.AccountRepository
 import uniffi.wp_mobile.AesGcmPasswordTransformer
+import java.io.File
 
 fun main() {
     // Load native libraries before initializing the app
@@ -24,7 +25,7 @@ fun main() {
             title = "WordPressRsExample",
         ) {
             KoinApplication(application = {
-                modules(commonModules(accountRepository))
+                modules(commonModules(accountRepository, File("$homeDir/.wordpress-rs/reader-saved-posts")))
             }) {
                 // Authentication is not supported on Desktop
                 App(authenticationEnabled = false, authenticateSite = { _, _, _ -> }, authenticateWpCom = null)

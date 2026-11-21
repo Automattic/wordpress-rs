@@ -64,10 +64,11 @@ impl ReqwestRequestExecutor {
         wp_request: Arc<WpNetworkRequest>,
     ) -> Result<WpNetworkResponse, reqwest::Error> {
         let mut request_header_map = wp_request.header_map().to_header_map();
-        request_header_map.insert(
-            http::header::USER_AGENT,
-            user_agent::reqwest::user_agent_for_reqwest_request_executor(),
-        );
+        // A request that names its own `User-Agent` keeps it: a Reader page view is sent with the
+        // app's, and isn't counted with the library's.
+        request_header_map
+            .entry(http::header::USER_AGENT)
+            .or_insert_with(user_agent::reqwest::user_agent_for_reqwest_request_executor);
         let mut request = self
             .client
             .request(
@@ -291,12 +292,27 @@ impl From<&HyperError> for RequestExecutionErrorReason {
 }
 
 trait ExaminableError {
+    /// The request's URL as it can be printed: without the secrets
+    /// `redact_request_url_for_log` removes, such as a `token` query value.
+    fn url_for_log(&self) -> String;
     fn as_io_error(&self) -> Option<&std::io::Error>;
     fn as_tls_error(&self) -> Option<&TlsError>;
     fn as_hyper_error(&self) -> Option<&HyperError>;
 }
 
 impl ExaminableError for reqwest::Error {
+    fn url_for_log(&self) -> String {
+        self.url().map_or_else(
+            || "<no URL>".to_string(),
+            |url| {
+                crate::log_redaction::redact_request_url_for_log(
+                    url.as_str(),
+                    crate::log_redaction::WpRequestUrlLogDetail::Full,
+                )
+            },
+        )
+    }
+
     fn as_io_error(&self) -> Option<&std::io::Error> {
         self.find::<std::io::Error>()
     }
@@ -304,17 +320,17 @@ impl ExaminableError for reqwest::Error {
     fn as_tls_error(&self) -> Option<&TlsError> {
         if let Some(error) = self.as_io_error() {
             let Some(inner_error) = error.get_ref() else {
-                println!("No inner error found for {:?}", self.url());
+                println!("No inner error found for {}", self.url_for_log());
                 return None;
             };
 
             let Some(io_error) = inner_error.downcast_ref::<std::io::Error>()?.get_ref() else {
-                println!("No inner error found for {:?}", self.url());
+                println!("No inner error found for {}", self.url_for_log());
                 return None;
             };
 
             let Some(tls_error) = io_error.downcast_ref::<TlsError>() else {
-                println!("No inner error found for {:?}", self.url());
+                println!("No inner error found for {}", self.url_for_log());
                 return None;
             };
 

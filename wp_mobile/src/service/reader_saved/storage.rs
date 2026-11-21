@@ -1,32 +1,70 @@
 //! The saved list, the collection apps observe it through, and imports of saves.
 
+use super::offline::ReaderOfflineState;
 use super::{ReaderSavedError, ReaderSavedService};
 use std::collections::HashSet;
 use std::sync::Arc;
 use wp_api::date::WpGmtDateTime;
+use wp_api::wp_com::reader_posts::{ReaderStreamOrder, ReaderUnreadablePost};
 use wp_api::wp_com::reader_saved::{
-    ReaderPostSaveIdentity, ReaderSavedKey, ReaderSavedPostsParams, ReaderSavedPostsResponse,
-    reader_saved_key_for_post, reader_saved_keys_for_post,
+    ReaderPostSaveIdentity, ReaderSavedKey, ReaderSavedOrderBy, ReaderSavedPostsParams,
+    ReaderSavedPostsResponse, reader_saved_key_for_post, reader_saved_keys_for_post,
 };
 #[cfg(test)]
 use wp_mobile_cache::WpApiCache;
 use wp_mobile_cache::db_types::reader::ReaderPostRecord;
 use wp_mobile_cache::list_metadata::ListState;
+use wp_mobile_cache::repository::QueryExecutor;
 use wp_mobile_cache::repository::reader::{
     ReaderPostRepository, ReaderSavedRepository, ReaderStreamRepository,
 };
+use wp_mobile_cache::repository::reader_offline::ReaderOfflineRepository;
+use wp_mobile_cache::repository::wordpress_com_accounts::{
+    ReaderOwner, WordPressComAccountRepository,
+};
 use wp_mobile_cache::{DbTable, SqliteDbError, UpdateHook};
 
-/// The saved list's key in `reader_streams`, which keeps where the list is up to.
+/// The saved list's key in `reader_streams`, which keeps where the list is up to. The list in
+/// another order has its own, which starts with this and a colon.
 const SAVED_STREAM: &str = "saved";
 
 /// The tables the saved list is read from.
-const SAVED_LIST_TABLES: [DbTable; 4] = [
+const SAVED_LIST_TABLES: [DbTable; 5] = [
     DbTable::ReaderPosts,
     DbTable::ReaderStreams,
     DbTable::ReaderSavedState,
     DbTable::ReaderSavedPosts,
+    DbTable::ReaderSavedOffline,
 ];
+
+/// How many posts a page asks for when it's loaded to get saved posts' content, rather than for
+/// a reader scrolling the list. It's the most the API returns.
+pub(super) const CATCH_UP_PAGE_SIZE: u32 = 40;
+
+/// The order of a saved list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct SavedOrder {
+    pub(super) by: ReaderSavedOrderBy,
+    pub(super) order: ReaderStreamOrder,
+}
+
+impl SavedOrder {
+    /// Newest save first: the order the API returns the list in when it isn't asked for another.
+    pub(super) const NEWEST_SAVE_FIRST: Self = Self {
+        by: ReaderSavedOrderBy::Date,
+        order: ReaderStreamOrder::Desc,
+    };
+
+    /// The key in `reader_streams` of the list in this order. Each order pages on its own: a
+    /// page handle only continues the order that returned it.
+    fn stream_key(&self) -> String {
+        if *self == Self::NEWEST_SAVE_FIRST {
+            SAVED_STREAM.to_string()
+        } else {
+            format!("{SAVED_STREAM}:{}:{}", self.by, self.order)
+        }
+    }
+}
 
 /// A post in the saved list.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -44,6 +82,9 @@ pub struct ReaderSavedListItem {
     pub is_pending: bool,
     /// Pending because the account has reached its save cap. It's sent once there's room.
     pub is_waiting_for_room: bool,
+    /// Whether the post can be read with no connection. See
+    /// [`ReaderSavedService::download_for_offline`].
+    pub offline: ReaderOfflineState,
 }
 
 /// What a page of the saved list did.
@@ -107,9 +148,32 @@ pub struct ReaderSavedImportReport {
 
 #[uniffi::export]
 impl ReaderSavedService {
-    /// The saved list, from the cache.
+    /// The saved list, from the cache, newest save first.
     pub fn saved_posts(self: Arc<Self>) -> Arc<ReaderSavedPostsCollection> {
-        Arc::new(ReaderSavedPostsCollection { service: self })
+        Arc::new(ReaderSavedPostsCollection {
+            service: self,
+            order: SavedOrder::NEWEST_SAVE_FIRST,
+        })
+    }
+
+    /// The saved list in another order: by when each post was saved or published, newest or
+    /// oldest first. A save without that date comes last.
+    ///
+    /// It's the same saves, read from the cache in that order. Only loading differs: each order
+    /// loads its own pages from the server, so the list in one order may be further along than
+    /// in another.
+    pub fn saved_posts_ordered(
+        self: Arc<Self>,
+        order_by: ReaderSavedOrderBy,
+        order: ReaderStreamOrder,
+    ) -> Arc<ReaderSavedPostsCollection> {
+        Arc::new(ReaderSavedPostsCollection {
+            service: self,
+            order: SavedOrder {
+                by: order_by,
+                order,
+            },
+        })
     }
 
     /// Imports saves, given newest first, such as a device's saves from before saves were synced
@@ -172,6 +236,74 @@ impl ReaderSavedService {
             self.notify();
         }
 
+        self.send_imported(keys, unsaveable).await
+    }
+
+    /// Takes over the saves made on this device while nobody was signed in, as an import: each is
+    /// saved to this account, with what the device kept of its post, and the signed-out reader's
+    /// saved list is emptied. Call it after sign-in, on the account's service. A post the account
+    /// already saved stays as it is.
+    ///
+    /// When the account has room for only some of them under its save cap, which ones are saved
+    /// is up to the server: with room for one of two, it took the newer. The rest stay saved on
+    /// the device and wait for room.
+    pub async fn adopt_signed_out_saves(
+        &self,
+    ) -> Result<ReaderSavedImportReport, ReaderSavedError> {
+        let mut keys = Vec::new();
+        if !self.signed_out {
+            self.cache.execute(|connection| {
+                let transaction = connection.transaction()?;
+                let Some(signed_out) = WordPressComAccountRepository::select_owner(
+                    &transaction,
+                    ReaderOwner::SignedOut,
+                )?
+                else {
+                    return Ok(());
+                };
+                // Oldest first, so the newest are sent last and stay newest.
+                for item in ReaderSavedRepository::select_list(&transaction, signed_out)?
+                    .into_iter()
+                    .rev()
+                {
+                    let post = match &item.post {
+                        Some(post) => Some(ReaderPostRepository::fill_missing(
+                            &transaction,
+                            self.account,
+                            post,
+                        )?),
+                        None => None,
+                    };
+                    ReaderSavedRepository::import_save(
+                        &transaction,
+                        self.account,
+                        &item.row.key,
+                        post,
+                        item.row.date_saved.as_ref(),
+                    )?;
+                    if !keys.contains(&item.row.key) {
+                        keys.push(item.row.key);
+                    }
+                }
+                // They're the account's now.
+                ReaderSavedRepository::delete_all(&transaction, signed_out)?;
+                transaction.commit().map_err(SqliteDbError::from)
+            })?;
+        }
+        if !keys.is_empty() {
+            self.notify();
+        }
+        self.send_imported(keys, 0).await
+    }
+}
+
+impl ReaderSavedService {
+    /// Sends imported saves, and reports what became of them.
+    async fn send_imported(
+        &self,
+        keys: Vec<ReaderSavedKey>,
+        unsaveable: u64,
+    ) -> Result<ReaderSavedImportReport, ReaderSavedError> {
         let sent = {
             let _lane = self.lane.lock().await;
             self.send_pending().await?
@@ -219,11 +351,16 @@ impl ReaderSavedService {
         &self,
         response: &ReaderSavedPostsResponse,
         first: bool,
+        order: SavedOrder,
     ) -> Result<(), ReaderSavedError> {
+        let now = self.now();
         self.cache.execute(|connection| {
             let transaction = connection.transaction()?;
-            let stream =
-                ReaderStreamRepository::get_or_create(&transaction, self.account, SAVED_STREAM)?;
+            let stream = ReaderStreamRepository::get_or_create(
+                &transaction,
+                self.account,
+                &order.stream_key(),
+            )?;
             for post in &response.posts {
                 let Some(record) = ReaderPostRecord::from_reader_post(&post.post) else {
                     continue;
@@ -252,6 +389,11 @@ impl ReaderSavedService {
                     row,
                     post.date_saved.as_ref(),
                 )?;
+                // The list sends each post in full, so the device has all the content there is.
+                ReaderOfflineRepository::set_fetched_for_post(&transaction, row)?;
+            }
+            for post in &response.unreadable_posts {
+                self.store_unreadable(&transaction, post, &now)?;
             }
             ReaderStreamRepository::set_cursor(
                 &transaction,
@@ -265,15 +407,71 @@ impl ReaderSavedService {
         Ok(())
     }
 
+    /// Keeps a post the saved list sent that couldn't be read. It's still saved, so it shows in
+    /// the list as a save, with what the cache has of it and why its content couldn't be loaded.
+    /// One whose IDs couldn't be read either can't be told from any other save, so it's left to
+    /// the saved keys, which still have it.
+    fn store_unreadable(
+        &self,
+        transaction: &impl QueryExecutor,
+        post: &ReaderUnreadablePost,
+        now: &WpGmtDateTime,
+    ) -> Result<(), SqliteDbError> {
+        let Some(identity) = &post.identity else {
+            log::warn!("A saved post couldn't be read: {}", post.error);
+            return Ok(());
+        };
+        let Some(record) = ReaderPostRecord::from_identity(identity.clone()) else {
+            log::warn!("A saved post couldn't be read: {}", post.error);
+            return Ok(());
+        };
+        let row = ReaderPostRepository::fill_missing(transaction, self.account, &record)?;
+        let keys: Vec<_> = reader_saved_keys_for_post(identity.clone())
+            .into_iter()
+            .map(|key| key.normalized())
+            .collect();
+        ReaderSavedRepository::apply_listed(
+            transaction,
+            self.account,
+            &record.key,
+            &keys,
+            row,
+            None,
+        )?;
+        let Some((saved, _)) =
+            ReaderSavedRepository::select_row_id_for_key(transaction, self.account, &record.key)?
+        else {
+            return Ok(());
+        };
+        // A copy stored before, from a stream or an earlier page, is still good to read.
+        let has_content = ReaderPostRepository::select_by_row_id(transaction, row)?
+            .is_some_and(|post| post.content.is_some());
+        // The reason is recorded once: a later page that sends the post again says nothing new.
+        let offline = ReaderOfflineRepository::select(transaction, saved)?;
+        if !has_content && !offline.fetched && offline.error.is_none() {
+            ReaderOfflineRepository::record_failure(
+                transaction,
+                saved,
+                &format!("The post couldn't be read: {}", post.error),
+                now,
+            )?;
+        }
+        Ok(())
+    }
+
     fn set_list_state(
         &self,
         state: ListState,
         error: Option<&ReaderSavedError>,
+        order: SavedOrder,
     ) -> Result<(), ReaderSavedError> {
         let message = error.map(ToString::to_string);
         self.cache.execute(|connection| {
-            let stream =
-                ReaderStreamRepository::get_or_create(&*connection, self.account, SAVED_STREAM)?;
+            let stream = ReaderStreamRepository::get_or_create(
+                &*connection,
+                self.account,
+                &order.stream_key(),
+            )?;
             ReaderStreamRepository::set_state(
                 &*connection,
                 stream.row_id,
@@ -285,29 +483,51 @@ impl ReaderSavedService {
     }
 
     /// Syncs, then loads the first page of the list. Call it holding the lane.
-    async fn refresh_list_in_lane(&self) -> Result<ReaderSavedPageResult, ReaderSavedError> {
-        self.set_list_state(ListState::FetchingFirstPage, None)?;
+    pub(super) async fn refresh_list_in_lane(
+        &self,
+        order: SavedOrder,
+    ) -> Result<ReaderSavedPageResult, ReaderSavedError> {
+        if self.signed_out {
+            // The list is what this device saved, and all of it is in the cache.
+            return Ok(ReaderSavedPageResult {
+                post_count: 0,
+                has_more: false,
+            });
+        }
+        self.set_list_state(ListState::FetchingFirstPage, None, order)?;
         let result = async {
             self.sync_in_lane().await?;
             let response = self
                 .client
                 .reader_saved()
-                .list_posts(&saved_list_params(None))
+                .list_posts(&saved_list_params(None, order, None))
                 .await?
                 .data;
-            self.store_page(&response, true)?;
+            self.store_page(&response, true, order)?;
             Ok(page_result(&response))
         }
         .await;
-        self.list_result(result)
+        self.list_result(result, order)
     }
 
-    async fn load_next_page_in_lane(&self) -> Result<ReaderSavedPageResult, ReaderSavedError> {
+    /// Loads the page after the last one loaded. `number` is how many posts to ask for, or
+    /// `None` for the API's own page size. Call it holding the lane.
+    pub(super) async fn load_next_page_in_lane(
+        &self,
+        order: SavedOrder,
+        number: Option<u32>,
+    ) -> Result<ReaderSavedPageResult, ReaderSavedError> {
+        if self.signed_out {
+            return Ok(ReaderSavedPageResult {
+                post_count: 0,
+                has_more: false,
+            });
+        }
         let stream = self.cache.execute(|connection| {
-            ReaderStreamRepository::get_or_create(&*connection, self.account, SAVED_STREAM)
+            ReaderStreamRepository::get_or_create(&*connection, self.account, &order.stream_key())
         })?;
         if stream.last_refreshed_at.is_none() {
-            return self.refresh_list_in_lane().await;
+            return self.refresh_list_in_lane(order).await;
         }
         let Some(page_handle) = stream.next_page_handle else {
             return Ok(ReaderSavedPageResult {
@@ -315,28 +535,29 @@ impl ReaderSavedService {
                 has_more: false,
             });
         };
-        self.set_list_state(ListState::FetchingNextPage, None)?;
+        self.set_list_state(ListState::FetchingNextPage, None, order)?;
         let result = async {
             let response = self
                 .client
                 .reader_saved()
-                .list_posts(&saved_list_params(Some(page_handle)))
+                .list_posts(&saved_list_params(Some(page_handle), order, number))
                 .await?
                 .data;
-            self.store_page(&response, false)?;
+            self.store_page(&response, false, order)?;
             Ok(page_result(&response))
         }
         .await;
-        self.list_result(result)
+        self.list_result(result, order)
     }
 
     /// Records a failed page as the list's error, and returns the result.
     fn list_result(
         &self,
         result: Result<ReaderSavedPageResult, ReaderSavedError>,
+        order: SavedOrder,
     ) -> Result<ReaderSavedPageResult, ReaderSavedError> {
         if let Err(error) = &result
-            && let Err(record_error) = self.set_list_state(ListState::Error, Some(error))
+            && let Err(record_error) = self.set_list_state(ListState::Error, Some(error), order)
         {
             // The page's error is the one to return, so a failure to record it is only logged.
             log::error!("Couldn't record the saved list's error: {record_error}");
@@ -344,12 +565,26 @@ impl ReaderSavedService {
         result
     }
 
-    /// The saved list from the cache, newest first: what this device saved and what the list sent.
-    /// A post this device is unsaving is left out.
+    /// The saved list from the cache, newest save first.
+    #[cfg(test)]
     pub(super) fn saved_list_items(&self) -> Result<Vec<ReaderSavedListItem>, ReaderSavedError> {
-        let items = self
-            .cache
-            .execute(|connection| ReaderSavedRepository::select_list(&*connection, self.account))?;
+        self.saved_list_items_ordered(SavedOrder::NEWEST_SAVE_FIRST)
+    }
+
+    /// The saved list from the cache, in `order`: what this device saved and what the list sent.
+    /// A post this device is unsaving is left out.
+    fn saved_list_items_ordered(
+        &self,
+        order: SavedOrder,
+    ) -> Result<Vec<ReaderSavedListItem>, ReaderSavedError> {
+        let items = self.cache.execute(|connection| {
+            ReaderSavedRepository::select_list_ordered(
+                &*connection,
+                self.account,
+                order.by,
+                order.order,
+            )
+        })?;
         let mut shown = HashSet::new();
         Ok(items
             .into_iter()
@@ -358,6 +593,7 @@ impl ReaderSavedService {
             .map(|item| ReaderSavedListItem {
                 is_pending: item.row.is_pending(),
                 is_waiting_for_room: item.row.waiting_for_room,
+                offline: ReaderOfflineState::of(item.post.as_ref(), &item.offline),
                 key: item.row.key,
                 date_saved: item.row.date_saved,
                 post: item.post,
@@ -365,9 +601,9 @@ impl ReaderSavedService {
             .collect())
     }
 
-    fn saved_list_info(&self) -> Result<ReaderSavedListInfo, ReaderSavedError> {
+    fn saved_list_info(&self, order: SavedOrder) -> Result<ReaderSavedListInfo, ReaderSavedError> {
         let stream = self.cache.execute(|connection| {
-            ReaderStreamRepository::select(&*connection, self.account, SAVED_STREAM)
+            ReaderStreamRepository::select(&*connection, self.account, &order.stream_key())
         })?;
         Ok(match stream {
             Some(stream) => ReaderSavedListInfo {
@@ -388,10 +624,25 @@ impl ReaderSavedService {
 
 /// What the saved list asks for: `meta=site,feed` gives every post its site's icon, including an
 /// RSS post, which otherwise has none.
-fn saved_list_params(page_handle: Option<String>) -> ReaderSavedPostsParams {
+///
+/// The order is sent only when it isn't the API's own, so the list newest save first is asked for
+/// as it always was.
+fn saved_list_params(
+    page_handle: Option<String>,
+    order: SavedOrder,
+    number: Option<u32>,
+) -> ReaderSavedPostsParams {
+    let (order_by, order) = if order == SavedOrder::NEWEST_SAVE_FIRST {
+        (None, None)
+    } else {
+        (Some(order.by), Some(order.order))
+    };
     ReaderSavedPostsParams {
         page_handle,
+        number,
         meta: Some("site,feed".to_string()),
+        order_by,
+        order,
         ..Default::default()
     }
 }
@@ -411,31 +662,33 @@ fn page_result(response: &ReaderSavedPostsResponse) -> ReaderSavedPageResult {
 #[derive(uniffi::Object)]
 pub struct ReaderSavedPostsCollection {
     service: Arc<ReaderSavedService>,
+    order: SavedOrder,
 }
 
 #[uniffi::export]
 impl ReaderSavedPostsCollection {
-    /// The saved list, from the cache, newest first.
+    /// The saved list, from the cache, in the collection's order: newest save first, unless it
+    /// came from [`ReaderSavedService::saved_posts_ordered`].
     pub async fn load_items(&self) -> Result<Vec<ReaderSavedListItem>, ReaderSavedError> {
-        self.service.saved_list_items()
+        self.service.saved_list_items_ordered(self.order)
     }
 
     /// Syncs, then reloads the first page of the list. Posts past the first page stay, so the list
     /// is still whole offline.
     pub async fn refresh(&self) -> Result<ReaderSavedPageResult, ReaderSavedError> {
         let _lane = self.service.lane.lock().await;
-        self.service.refresh_list_in_lane().await
+        self.service.refresh_list_in_lane(self.order).await
     }
 
     /// Loads the page after the last one loaded, or refreshes if the list hasn't loaded yet. It
     /// waits for a refresh already running, then loads the page after it.
     pub async fn load_next_page(&self) -> Result<ReaderSavedPageResult, ReaderSavedError> {
         let _lane = self.service.lane.lock().await;
-        self.service.load_next_page_in_lane().await
+        self.service.load_next_page_in_lane(self.order, None).await
     }
 
     pub fn list_info(&self) -> Result<ReaderSavedListInfo, ReaderSavedError> {
-        self.service.saved_list_info()
+        self.service.saved_list_info(self.order)
     }
 
     /// Whether a change to the cache is one the saved list shows.

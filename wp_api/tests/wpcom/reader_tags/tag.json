@@ -1,0 +1,10 @@
+{
+  "tag": {
+    "ID": "436",
+    "slug": "photography",
+    "title": "Photography",
+    "display_name": "photography",
+    "description": null,
+    "URL": "https://public-api.wordpress.com/rest/v1.2/read/tags/photography/posts"
+  }
+}

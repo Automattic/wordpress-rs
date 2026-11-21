@@ -1,0 +1,51 @@
+{
+  "feeds": [
+    {
+      "URL": "https://example1.wordpress.com",
+      "subscribe_URL": "https://example1.wordpress.com",
+      "blog_ID": "2001",
+      "title": "Example Site 1",
+      "railcar": {
+        "railcar": "EXAMPLErailcar",
+        "fetch_algo": "reader/manage/search:0",
+        "fetch_position": 0,
+        "rec_blog_id": 2001,
+        "fetch_lang": "en",
+        "fetch_query": "example"
+      },
+      "meta": {
+        "links": {
+          "feed": "https://public-api.wordpress.com/rest/v1.1/read/feed/3001",
+          "site": "https://public-api.wordpress.com/rest/v1.1/read/sites/2001"
+        }
+      },
+      "feed_ID": 3001,
+      "subscribers_count": 100
+    },
+    {
+      "URL": "https://example2.wordpress.com",
+      "subscribe_URL": "https://example2.wordpress.com",
+      "blog_ID": "2002",
+      "title": "Example Site 2",
+      "railcar": {
+        "railcar": "EXAMPLErailcar",
+        "fetch_algo": "reader/manage/search:0",
+        "fetch_position": 1,
+        "rec_blog_id": 2002,
+        "fetch_lang": "en",
+        "fetch_query": "example"
+      },
+      "meta": {
+        "links": {
+          "feed": "https://public-api.wordpress.com/rest/v1.1/read/feed/3002",
+          "site": "https://public-api.wordpress.com/rest/v1.1/read/sites/2002"
+        }
+      },
+      "feed_ID": 3002,
+      "subscribers_count": 101
+    }
+  ],
+  "total": 12345,
+  "algorithm": "reader/manage/search:0",
+  "next_page": "offset=2&algorithm=reader/manage/search:0"
+}

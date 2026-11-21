@@ -1,0 +1,39 @@
+{
+  "found": 6,
+  "i_like": false,
+  "likes": [
+    {
+      "ID": 1001,
+      "login": "exampleuser1",
+      "email": false,
+      "name": "Example User One",
+      "first_name": "Example",
+      "last_name": "One",
+      "nice_name": "exampleuser1",
+      "URL": "http://exampleuser1.wordpress.com",
+      "avatar_URL": "https://0.gravatar.com/avatar/0000000000000000000000000000000000000000000000000000000000000001?s=96&d=retro",
+      "profile_URL": "https://gravatar.com/exampleuser1",
+      "ip_address": false,
+      "site_ID": 2001,
+      "site_visible": true,
+      "default_avatar": false,
+      "date_liked": "2026-04-30 16:24:55",
+      "bio": "An example bio.",
+      "primary_blog": "http://exampleuser1.wordpress.com",
+      "preferred_blog": {
+        "id": 2001,
+        "name": "Example Site One",
+        "url": "http://exampleuser1.wordpress.com",
+        "icon": null
+      }
+    }
+  ],
+  "meta": {
+    "links": {
+      "help": "https://public-api.wordpress.com/rest/v1.2/sites/3584907/comments/451572/likes/help",
+      "post": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/posts/85067",
+      "comment": "https://public-api.wordpress.com/rest/v1.1/sites/3584907/comments/451572",
+      "site": "https://public-api.wordpress.com/rest/v1.2/sites/3584907"
+    }
+  }
+}

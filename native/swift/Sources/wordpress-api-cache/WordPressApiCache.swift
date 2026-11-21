@@ -5,6 +5,13 @@ import WordPressAPIInternal
 @preconcurrency import Combine
 #endif
 
+/// A change to the cache: which table, which row, and what happened to it.
+public typealias UpdateHook = WordPressAPIInternal.UpdateHook
+/// A table of the cache.
+public typealias DbTable = WordPressAPIInternal.DbTable
+/// What a change to the cache did to a row.
+public typealias HookAction = WordPressAPIInternal.HookAction
+
 public final class WordPressApiCache: Sendable {
     package let cache: WpApiCache
     private let broadcaster: UpdateHookBroadcaster
@@ -53,6 +60,12 @@ public final class WordPressApiCache: Sendable {
     }
 
     #if canImport(Combine)
+    /// The cache's changes, as they happen.
+    ///
+    /// A change is sent on the thread that made it, not on the main one. In Swift 6, a closure written inside a
+    /// `@MainActor` type is taken to run on the main actor, and stops the app when it runs elsewhere: mark a
+    /// closure that handles a change here, such as a `filter`, as `@Sendable`, or move to the main queue first
+    /// with `receive(on:)`.
     public func databaseUpdatesPublisher() -> AnyPublisher<UpdateHook, Never> {
         NotificationCenter.default.publisher(for: UpdateHookBroadcaster.notification, object: broadcaster)
             .prefix(untilOutputFrom: stopUpdatesNotifier)

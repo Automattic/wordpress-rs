@@ -44,7 +44,7 @@ class ExampleApplication : Application() {
 
         startKoin {
             androidContext(this@ExampleApplication)
-            modules(listOf(networkModule) + commonModules(accountRepository))
+            modules(listOf(networkModule) + commonModules(accountRepository, filesDir.resolve("reader-saved-posts")))
         }
     }
 }

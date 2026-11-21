@@ -1,0 +1,116 @@
+{
+  "ID": 1236900001,
+  "site_ID": 2001,
+  "author": null,
+  "date": "2026-11-19T19:30:00-08:00",
+  "modified": "2026-11-19T03:38:23-08:00",
+  "title": "Example VIP post",
+  "URL": "https://example.com/2026/film/example-post-1236900001/",
+  "short_URL": "https://example.com/?p=1236900001",
+  "content": "<p>Example content.</p>\n",
+  "excerpt": "<p>Example excerpt.</p>\n",
+  "slug": "example-post",
+  "guid": "https://example.com/?p=1236900001",
+  "status": "publish",
+  "sticky": false,
+  "password": "",
+  "has_password": false,
+  "parent": false,
+  "type": "post",
+  "discussion": {
+    "comments_open": true,
+    "comment_status": "open",
+    "pings_open": false,
+    "ping_status": "closed",
+    "comment_count": 0,
+    "comments_require_registration": false,
+    "comments_allow_blocks": false
+  },
+  "likes_enabled": false,
+  "sharing_enabled": true,
+  "like_count": 0,
+  "i_like": false,
+  "is_reblogged": false,
+  "is_following": false,
+  "global_ID": "00000000000000000000000000000003",
+  "featured_image": "https://example.com/wp-content/uploads/2026/11/example.jpg",
+  "post_thumbnail": null,
+  "format": "standard",
+  "geo": false,
+  "menu_order": 0,
+  "page_template": "",
+  "publicize_URLs": [],
+  "terms": {
+    "category": {},
+    "post_tag": {},
+    "post_format": {},
+    "mentions": {}
+  },
+  "tags": {},
+  "categories": {},
+  "attachments": {},
+  "attachment_count": 0,
+  "metadata": [],
+  "meta": {
+    "links": {
+      "self": "https://public-api.wordpress.com/rest/v1.1/read/sites/2001/posts/1236900001",
+      "help": "https://public-api.wordpress.com/rest/v1.2/sites/2001/posts/1236900001/help",
+      "site": "https://public-api.wordpress.com/rest/v1.2/sites/2001",
+      "replies": "https://public-api.wordpress.com/rest/v1.1/sites/2001/posts/1236900001/replies/",
+      "likes": "https://public-api.wordpress.com/rest/v1.2/sites/2001/posts/1236900001/likes/"
+    },
+    "data": {
+      "site": {
+        "ID": 2001,
+        "name": "Example VIP Site",
+        "description": "An example description.",
+        "URL": "https://example.com",
+        "jetpack": true,
+        "jetpack_connection": true,
+        "post_count": 300000,
+        "subscribers_count": 1500,
+        "locale": "en-US",
+        "icon": {
+          "img": "https://example.com/icon.png",
+          "ico": "https://example.com/icon.png"
+        },
+        "visible": true,
+        "is_private": false,
+        "is_following": false,
+        "organization_id": 0,
+        "is_wpcom_atomic": false
+      }
+    }
+  },
+  "capabilities": {
+    "publish_post": false,
+    "delete_post": false,
+    "edit_post": false
+  },
+  "other_URLs": {},
+  "feed_ID": 3001,
+  "feed_URL": "https://example.com/feed",
+  "is_seen": false,
+  "pseudo_ID": "00000000000000000000000000000003",
+  "is_external": false,
+  "site_name": "Example VIP Site",
+  "site_URL": "https://example.com",
+  "site_is_private": false,
+  "organization_id": 0,
+  "site_icon": {
+    "img": "https://example.com/icon.png",
+    "ico": "https://example.com/icon.png"
+  },
+  "featured_media": {
+    "uri": "https://example.com/wp-content/uploads/2026/11/example.jpg",
+    "width": 1000,
+    "height": 563,
+    "type": "image"
+  },
+  "is_subscribed_comments": false,
+  "can_subscribe_comments": true,
+  "subscribed_comments_notifications": false,
+  "custom_excerpt": "",
+  "publish_date_changed": false,
+  "use_excerpt": true
+}

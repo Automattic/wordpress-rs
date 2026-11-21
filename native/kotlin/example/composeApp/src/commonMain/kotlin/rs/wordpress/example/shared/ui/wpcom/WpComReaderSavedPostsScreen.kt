@@ -35,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import rs.wordpress.cache.kotlin.createObservableCollection
+import rs.wordpress.example.shared.ui.reader.plainText
+import rs.wordpress.example.shared.ui.reader.readerErrorText
 import uniffi.wp_api.ReaderSavedKey
 import uniffi.wp_mobile.ReaderSavedListItem
 import uniffi.wp_mobile.ReaderSavedService
@@ -42,7 +44,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 private fun ReaderSavedListItem.title(): String =
-    post?.title ?: post?.identity?.url ?: (key as? ReaderSavedKey.Url)?.url ?: key.toString()
+    post?.title?.plainText() ?: post?.identity?.url ?: (key as? ReaderSavedKey.Url)?.url ?: key.toString()
 
 private fun ReaderSavedListItem.subtitle(): String {
     val saved = dateSaved?.let {
@@ -53,7 +55,7 @@ private fun ReaderSavedListItem.subtitle(): String {
         isPending -> "Not sent yet"
         else -> null
     }
-    return listOfNotNull(post?.siteName, saved, pending).joinToString(" · ")
+    return listOfNotNull(post?.siteName?.plainText(), saved, pending).joinToString(" · ")
 }
 
 /**
@@ -98,7 +100,7 @@ fun WpComReaderSavedPostsScreen(
             try {
                 request()
             } catch (e: Exception) {
-                error = e.toString()
+                error = readerErrorText(e)
             }
             isLoading = false
         }

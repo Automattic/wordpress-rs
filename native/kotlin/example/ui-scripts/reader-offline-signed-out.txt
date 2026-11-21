@@ -1,0 +1,38 @@
+// Offline reading, as the reader who isn't signed in: save two posts, download their text and images, and read
+// one from the device. Start from a fresh install, so that neither post is saved yet
+// (`adb shell pm clear rs.wordpress.example`).
+//
+// Run it with scripts/example-app-adb-script.py, which lists the steps.
+
+start
+wait 2
+tap Reader (signed out)
+wait 5
+tap Freshly Pressed
+waitfor #reader_post 40
+tapnow 0:~Actions for
+wait 1
+shot 01-post-menu
+tapnow Save
+wait 2
+tapnow 1:~Actions for
+wait 1
+tapnow Save
+wait 2
+back
+tap Offline reading
+wait 3
+shot 02-offline-before-download
+tapnow #offline_download_text
+wait 6
+shot 03-offline-after-text
+tapnow #offline_download_images
+wait 5
+waitgone #reader_busy 120
+wait 1
+shot 04-offline-after-images
+tap 0:#offline_post
+wait 5
+shot 05-offline-copy
+down 3
+shot 06-offline-copy-scrolled

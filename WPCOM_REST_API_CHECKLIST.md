@@ -16,8 +16,8 @@ investigate the relevant code before making decisions based on this document.
 
 - [x] `GET /rest/v1.1/me/` — fetch current user profile
 - [ ] `POST /rest/v1.1/me/account/close/` — close/delete account
-- [ ] `POST /rest/v1.1/me/block/sites/$site/delete` — unblock a blog
-- [ ] `GET /rest/v1.1/me/block/sites/$site/new` — block a blog
+- [x] `POST /rest/v1.1/me/block/sites/$site/delete` — unblock a blog
+- [x] `POST /rest/v1.1/me/block/sites/$site/new` — block a blog
 - [ ] `GET /rest/v1.1/me/domain-contact-information/` — fetch domain contact info
 - [ ] `POST /rest/v1.1/me/domain-contact-information/validate` — validate domain contact info
 - [ ] `GET /rest/v1.1/me/keyring-connections` — get keyring connections
@@ -37,17 +37,19 @@ investigate the relevant code before making decisions based on this document.
 - [ ] `GET /is-available/email/` — check email availability (v0)
 - [ ] `GET /is-available/username/` — check username availability (v0)
 - [ ] `GET /rest/v1.1/users/$user/auth-options/` — fetch auth options
+- [x] `GET /rest/v1.1/users/$user` — fetch a user's public profile
 - [ ] `POST /rest/v1.1/users/new/` — create new account (v1.1)
 - [ ] `POST /rest/v1/users/new/` — create new account (v1)
+- [x] `GET /wpcom/v2/me/blocks/sites` — list blocked blogs
 - [ ] `GET /wpcom/v2/users/username/suggestions/` — username suggestions
 
 ## Account — Subscriptions
 
-- [ ] `GET /rest/v1.2/read/following/mine/` — fetch blog subscriptions
-- [ ] `POST /rest/v1.2/read/site/$site/comment_email_subscriptions/$action/` — toggle comment email sub
-- [ ] `POST /rest/v1.2/read/site/$site/post_email_subscriptions/$action/` — toggle post email sub
-- [ ] `POST /rest/v1.2/read/site/$site/post_email_subscriptions/update/` — update email frequency
-- [ ] `POST /wpcom/v2/read/sites/$site/notification_subscriptions/$action/` — toggle push notification sub
+- [x] `GET /rest/v1.2/read/following/mine/` — fetch blog subscriptions
+- [x] `POST /rest/v1.2/read/site/$site/comment_email_subscriptions/$action/` — toggle comment email sub
+- [x] `POST /rest/v1.2/read/site/$site/post_email_subscriptions/$action/` — toggle post email sub
+- [x] `POST /rest/v1.2/read/site/$site/post_email_subscriptions/update/` — update email frequency
+- [x] `POST /wpcom/v2/read/sites/$site/notification-subscriptions/$action/` — toggle push notification sub
 
 ## Activity Log
 
@@ -188,49 +190,54 @@ investigate the relevant code before making decisions based on this document.
 
 ## Reader — Blogs & Feeds
 
-- [ ] `GET /rest/v1.1/read/feed/$feed` — get feed info
-- [ ] `POST /rest/v1.1/read/following/mine/delete` — unfollow a feed by URL
-- [ ] `POST /rest/v1.1/read/following/mine/new` — follow a feed by URL
-- [ ] `GET /rest/v1.1/read/sites/$site` — get blog info
-- [ ] `POST /rest/v1.1/sites/$site/follows/mine/delete` — unfollow a blog
-- [ ] `POST /rest/v1.1/sites/$site/follows/new` — follow a blog
-- [ ] `GET /rest/v1.2/read/following/mine` — list followed blogs (paginated)
-- [ ] `GET /rest/v1.3/read/menu` — get Reader menu (tags)
-- [ ] `GET /wpcom/v2/read/interests` — fetch interest/onboarding tags
+- [x] `GET /rest/v1.1/read/feed/$feed` — get feed info
+- [x] `POST /rest/v1.1/read/following/mine/delete` — unfollow a feed by URL
+- [x] `POST /rest/v1.1/read/following/mine/new` — follow a feed by URL
+- [x] `GET /rest/v1.1/read/sites/$site` — get blog info (implemented as `rest/v1.2`)
+- [x] `POST /rest/v1.1/sites/$site/follows/mine/delete` — unfollow a blog
+- [x] `POST /rest/v1.1/sites/$site/follows/new` — follow a blog
+- [x] `GET /rest/v1.2/read/following/mine` — list followed blogs (paginated)
+- [x] `GET /rest/v1.3/read/menu` — get Reader menu (tags)
+- [x] `GET /wpcom/v2/read/interests` — fetch interest/onboarding tags
 - [ ] `GET /wpcom/v2/read/streams/$stream` — named discover streams (generic)
-- [ ] `GET /wpcom/v2/read/streams/discover` — Discover recommended posts
+- [x] `GET /wpcom/v2/read/streams/discover` — Discover recommended posts
+- [x] `GET /wpcom/v2/read/streams/first-posts` — first posts of new blogs
 - [ ] `GET /wpcom/v2/read/tags/cards` — reader cards for tags
-- [ ] `GET /wpcom/v2/read/tags/posts` — Discover latest posts
+- [x] `GET /wpcom/v2/read/tags/posts` — Discover latest posts
 
 ## Reader — Comments
 
-- [ ] `GET /rest/v1.1/sites/$site/posts/$post_id/replies/` — fetch post comments (paginated)
+- [x] `GET /rest/v1.1/sites/$site/posts/$post_id/replies/` — fetch post comments (paginated)
 
 ## Reader — Following Status
 
-- [ ] `GET /rest/v1.1/sites/$site/follows/mine` — check if following site
+- [x] `GET /rest/v1.1/sites/$site/follows/mine` — check if following site
 
 ## Reader — Post Subscribers
 
-- [ ] `GET /rest/v1.1/sites/$site/posts/$post_id/subscribers/mine` — get my subscription
-- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/subscribers/mine/delete` — unsubscribe
-- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/subscribers/mine/update` — toggle push
-- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/subscribers/new` — subscribe to post
+- [x] `GET /rest/v1.1/sites/$site/posts/$post_id/subscribers/mine` — get my subscription
+- [x] `POST /rest/v1.1/sites/$site/posts/$post_id/subscribers/mine/delete` — unsubscribe
+- [x] `POST /rest/v1.1/sites/$site/posts/$post_id/subscribers/mine/update` — toggle push
+- [x] `POST /rest/v1.1/sites/$site/posts/$post_id/subscribers/new` — subscribe to post
 
 ## Reader — Posts
 
 - [ ] `GET /rest/v1.1/read/sites/$site/posts/$post_id` — fetch single reader post (v1.1)
-- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/likes/mine/delete` — unlike a post
-- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/likes/new` — like a post
-- [ ] `GET /rest/v1.1/sites/$site/posts/slug:$slug` — fetch post by slug
+- [x] `POST /rest/v1.1/sites/$site/posts/$post_id/likes/mine/delete` — unlike a post
+- [x] `POST /rest/v1.1/sites/$site/posts/$post_id/likes/new` — like a post
+- [x] `GET /rest/v1.1/sites/$site/posts/slug:$slug` — fetch post by slug
 - [x] `GET /rest/v1.2/read/feed/$feed/posts/` — fetch posts for a feed
+- [x] `GET /rest/v1.2/read/a8c` — posts from Automattic's own sites
 - [x] `GET /rest/v1.2/read/following` — posts from followed sites and feeds (paginated by date)
-- [ ] `GET /rest/v1.2/read/search` — search reader posts
-- [ ] `GET /rest/v1.2/read/site/$site/post/$post_id/related` — related posts
+- [x] `GET /rest/v1.2/read/following/p2` — posts from followed P2 sites
+- [x] `GET /rest/v1.2/read/liked` — posts the account liked
+- [x] `GET /rest/v1.2/read/search` — search reader posts
+- [x] `GET /rest/v1.2/read/site/$site/post/$post_id/related` — related posts
 - [x] `GET /rest/v1.2/read/sites/$site/posts/` — fetch posts for a blog
-- [ ] `GET /rest/v1.2/read/sites/$site/posts/$post_id` — fetch single reader post (v1.2)
-- [ ] `GET /rest/v1.2/read/tags/$tag/posts` — fetch posts for a tag
-- [ ] `GET /rest/v1.3/read/feed/$feed/posts/$post_id` — fetch feed post
+- [x] `GET /rest/v1.2/read/sites/$site/posts/$post_id` — fetch single reader post (v1.2)
+- [x] `GET /rest/v1.2/read/tags/$tag/posts` — fetch posts for a tag (implemented as `wpcom/v2`)
+- [x] `GET /rest/v1.3/read/feed/$feed/posts/$post_id` — fetch feed post
+- [x] `GET /rest/v1.3/read/list/$owner/$slug/posts` — fetch posts for a list
 
 ## Reader — Saved Posts
 
@@ -242,30 +249,30 @@ investigate the relevant code before making decisions based on this document.
 
 ## Reader — Search
 
-- [ ] `GET /rest/v1.1/read/feed/` — search reader sites/feeds
-- [ ] `GET /rest/v1.2/freshly-pressed` — freshly pressed posts
+- [x] `GET /rest/v1.1/read/feed/` — search reader sites/feeds
+- [x] `GET /rest/v1.2/freshly-pressed` — freshly pressed posts
 
 ## Reader — Seen Status
 
-- [ ] `POST /wpcom/v2/seen-posts/seen/blog/delete` — mark blog post as unseen
-- [ ] `POST /wpcom/v2/seen-posts/seen/blog/new` — mark blog post as seen
-- [ ] `POST /wpcom/v2/seen-posts/seen/delete` — mark feed post as unseen
-- [ ] `POST /wpcom/v2/seen-posts/seen/new` — mark feed post as seen
+- [x] `POST /wpcom/v2/seen-posts/seen/blog/delete` — mark blog post as unseen
+- [x] `POST /wpcom/v2/seen-posts/seen/blog/new` — mark blog post as seen
+- [x] `POST /wpcom/v2/seen-posts/seen/delete` — mark feed post as unseen
+- [x] `POST /wpcom/v2/seen-posts/seen/new` — mark feed post as seen
 
 ## Reader — Tags
 
-- [ ] `POST /rest/v1.1/read/tags/$tag/mine/delete` — delete followed tag
+- [x] `POST /rest/v1.1/read/tags/$tag/mine/delete` — delete followed tag
 - [ ] `POST /rest/v1.1/read/tags/$tag/mine/new` — follow a tag
-- [ ] `GET /rest/v1.2/read/tags/$slug` — fetch tag info by slug
-- [ ] `POST /rest/v1.2/read/tags/mine/new` — add followed tags (batch)
+- [x] `GET /rest/v1.2/read/tags/$slug` — fetch tag info by slug
+- [x] `POST /rest/v1.2/read/tags/mine/new` — add followed tags (batch)
 
 ## Reader — Tracking
 
-- [ ] `GET pixel.wp.com/g.gif` — page view tracking pixel
+- [x] `GET pixel.wp.com/g.gif` — page view tracking pixel
 
 ## Reader — URL Resolution
 
-- [ ] `GET /wpcom/v2/mobile/resolve-reader-url` — resolve URL to reader post/site
+- [x] `GET /wpcom/v2/mobile/resolve-reader-url` — resolve URL to reader post/site
 
 ## Scan
 
@@ -386,7 +393,7 @@ investigate the relevant code before making decisions based on this document.
 ## Suggestions
 
 - [ ] `GET /rest/v1/sites/$site/tags` — fetch site tags for suggestions
-- [ ] `GET /rest/v1/users/suggest` — fetch username suggestions
+- [x] `GET /rest/v1.1/users/suggest` — fetch username suggestions
 
 ## Timezones
 
@@ -428,11 +435,11 @@ the full list of implemented WP REST API endpoints.
 - [ ] `GET /rest/v1.1/sites/$site/comments/$comment_id` — fetch single comment
 - [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id` — update comment
 - [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/delete` — delete comment
-- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/likes/mine/delete` — unlike comment
-- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/likes/new` — like comment
-- [ ] `POST /rest/v1.1/sites/$site/comments/$comment_id/replies/new` — reply to comment
-- [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/replies/new` — new top-level comment
-- [ ] `GET /rest/v1.2/sites/$site/comments/$comment_id/likes` — fetch comment likes
+- [x] `POST /rest/v1.1/sites/$site/comments/$comment_id/likes/mine/delete` — unlike comment (implemented for the Reader)
+- [x] `POST /rest/v1.1/sites/$site/comments/$comment_id/likes/new` — like comment (implemented for the Reader)
+- [x] `POST /rest/v1.1/sites/$site/comments/$comment_id/replies/new` — reply to comment (implemented for the Reader)
+- [x] `POST /rest/v1.1/sites/$site/posts/$post_id/replies/new` — new top-level comment (implemented for the Reader)
+- [x] `GET /rest/v1.2/sites/$site/comments/$comment_id/likes` — fetch comment likes (implemented for the Reader)
 
 ### Media
 
@@ -473,7 +480,7 @@ the full list of implemented WP REST API endpoints.
 - [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/delete` — delete/trash post
 - [ ] `POST /rest/v1.1/sites/$site/posts/$post_id/restore` — restore trashed post
 - [ ] `POST /rest/v1.2/sites/$site/posts/$post_id` — update existing post
-- [ ] `GET /rest/v1.2/sites/$site/posts/$post_id/likes` — fetch post likes
+- [x] `GET /rest/v1.2/sites/$site/posts/$post_id/likes` — fetch post likes (implemented for the Reader)
 - [ ] `POST /rest/v1.2/sites/$site/posts/new` — create new post
 
 ### Revisions

@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "interests": [
+    { "title": "Food", "slug": "food" },
+    { "title": "Social Media", "slug": "social-media" },
+    { "title": "食べ物", "slug": "%e9%a3%9f%e3%81%b9%e7%89%a9" }
+  ]
+}
