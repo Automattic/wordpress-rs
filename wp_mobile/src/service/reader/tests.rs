@@ -6243,6 +6243,40 @@ mod comment_writing {
         ));
     }
 
+    /// Kotlin cancels a call by dropping it. The server may have taken the comment, so nothing
+    /// sends it again by itself, as with one left being sent when the app closed.
+    #[tokio::test]
+    async fn a_comment_whose_send_is_dropped_can_be_sent_again() {
+        let (service, executor, comments) = with_comments().await;
+        let (_release, held) = oneshot::channel::<()>();
+        executor.push(Step::Hold(held, 200, comment_json(2, 23, None)));
+
+        let mut posting = Box::pin(comments.post_comment("Nice post!".to_string(), None));
+        assert!(futures::poll!(posting.as_mut()).is_pending());
+        drop(posting);
+
+        let written = comments.load_items().await.unwrap().last().unwrap().clone();
+        assert_eq!(written.send_state, ReaderCommentSendState::Failed);
+        assert!(written.send_error.is_some());
+        service.sync_actions().await.unwrap();
+        let comments_sent = || {
+            executor
+                .sent()
+                .into_iter()
+                .filter(|sent| sent.url.ends_with("/replies/new"))
+                .count()
+        };
+        assert_eq!(comments_sent(), 1);
+
+        executor.push(Step::Respond(200, comment_json(3, 23, None)));
+        let posted = comments
+            .retry_comment(written.local_id.unwrap())
+            .await
+            .unwrap();
+        assert_eq!(posted.comment_id, Some(CommentId(3)));
+        assert_eq!(comments_sent(), 2);
+    }
+
     #[tokio::test]
     async fn a_refused_comment_can_be_discarded() {
         let (_service, executor, comments) = with_comments().await;

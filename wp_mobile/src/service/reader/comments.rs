@@ -48,6 +48,38 @@ const COMMENT_TABLES: [DbTable; 3] = [
     DbTable::ReaderBlockedUsers,
 ];
 
+/// Why a comment written here wasn't taken, when its call was dropped before an answer arrived.
+const SEND_STOPPED: &str = "The send stopped before an answer arrived.";
+
+/// Marks a comment as not taken if the call sending it is dropped before an answer arrives, which
+/// is how Kotlin cancels a call. The server may have taken it, so it isn't sent again by itself:
+/// the reader sends it again or discards it, as with one left being sent when the app closed.
+struct Unanswered<'a> {
+    context: &'a ReaderContext,
+    local_id: &'a str,
+    answered: bool,
+}
+
+impl Drop for Unanswered<'_> {
+    fn drop(&mut self) {
+        if self.answered {
+            return;
+        }
+        let marked = self.context.cache.execute(|connection| {
+            ReaderCommentRepository::set_send_state(
+                connection,
+                self.context.owner_row,
+                self.local_id,
+                ReaderCommentSendState::Failed,
+                Some(SEND_STOPPED),
+            )
+        });
+        if let Err(error) = marked {
+            log::error!("Couldn't mark a Reader comment whose send stopped as not taken: {error}");
+        }
+    }
+}
+
 /// Whether a post's comments are loading, and how many there are.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct ReaderCommentsInfo {
@@ -212,7 +244,8 @@ impl ReaderCommentsCollection {
     /// once. When the server takes it, the server's comment replaces it. When it doesn't, the
     /// comment stays, marked as not taken with the reason, and the error is returned: nothing
     /// sends it again until [`Self::retry_comment`] is called, so a comment is never posted twice
-    /// by itself. It's sent once no other change of the Reader's is being sent: see
+    /// by itself. A call dropped before the answer leaves it marked as not taken the same way. It's
+    /// sent once no other change of the Reader's is being sent: see
     /// [`ReaderService::set_tag_followed`](super::ReaderService::set_tag_followed).
     pub async fn post_comment(
         &self,
@@ -361,6 +394,11 @@ impl ReaderCommentsCollection {
             content: written.content.clone().unwrap_or_default(),
         };
         let comments = self.context.client.reader_comments();
+        let mut unanswered = Unanswered {
+            context: &self.context,
+            local_id: &local_id,
+            answered: false,
+        };
         let sent = {
             // Sent in the lane the service's other changes are sent in, so it doesn't overlap
             // one: see `ReaderService::set_tag_followed`.
@@ -376,6 +414,7 @@ impl ReaderCommentsCollection {
                     .map(|response| response.data),
             }
         };
+        unanswered.answered = true;
         match sent {
             Ok(comment) => {
                 let taken = comment_record(self.site_id, self.post_id, &comment);
