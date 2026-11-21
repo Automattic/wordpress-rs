@@ -242,8 +242,14 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         if first.feeds.len() != 5 || first.total.is_none_or(|total| total <= 5) {
                             return Err("The search should find more than a page of results".into());
                         }
-                        if first.feeds.iter().any(|result| result.title.is_none()) {
-                            return Err("A search result should have a title".into());
+                        // A feed's title is up to its owner and can be empty, and a search leaves
+                        // out some feed IDs, so only the address to follow it by is required.
+                        if first
+                            .feeds
+                            .iter()
+                            .any(|result| result.subscribe_url.is_none())
+                        {
+                            return Err("A search result should have an address to follow".into());
                         }
                         if first.next_page_handle.is_some() {
                             return Err("Sorted by relevance, a search pages by offset".into());
