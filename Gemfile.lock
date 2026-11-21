@@ -8,8 +8,8 @@ GEM
     artifactory (3.0.17)
     atomos (0.1.3)
     aws-eventstream (1.4.1)
-    aws-partitions (1.1308.0)
-    aws-sdk-core (3.270.0)
+    aws-partitions (1.1309.0)
+    aws-sdk-core (3.271.0)
       aws-eventstream (~> 1, >= 1.4.1)
       aws-partitions (~> 1, >= 1.992.0)
       aws-sigv4 (~> 1.9)
@@ -122,7 +122,7 @@ GEM
       xcodeproj (>= 1.13.0, < 2.0.0)
       xcpretty (~> 0.4.1)
       xcpretty-travis-formatter (>= 0.0.3, < 2.0.0)
-    fastlane-plugin-wpmreleasetoolkit (15.3.0)
+    fastlane-plugin-wpmreleasetoolkit (15.4.0)
       buildkit (~> 1.5)
       chroma (= 0.2.0)
       diffy (~> 3.3)
@@ -132,7 +132,7 @@ GEM
       git (~> 1.3)
       google-cloud-storage (~> 1.31)
       java-properties (~> 0.3.0)
-      nokogiri (~> 1.19, >= 1.19.4)
+      nokogiri (~> 1.19, >= 1.19.5)
       octokit (~> 6.1)
       parallel (~> 1.14)
       plist (~> 3.1)
@@ -358,7 +358,7 @@ PLATFORMS
 DEPENDENCIES
   buildkit (~> 1.6)
   fastlane (~> 2.242)
-  fastlane-plugin-wpmreleasetoolkit (~> 15.3)
+  fastlane-plugin-wpmreleasetoolkit (~> 15.4)
   fluent-tools (~> 0.3)
 
 BUNDLED WITH
