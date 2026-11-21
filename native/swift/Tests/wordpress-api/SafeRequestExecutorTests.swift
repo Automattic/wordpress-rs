@@ -245,6 +245,87 @@ struct SafeRequestExecutorTests {
         }
         #expect(requestUrl == "not a url")
     }
+
+    // Regression test for #1759: the certificate-mismatch error re-parsed the request's address with
+    // `URL(string:)`, which rejects some addresses, and so named the host "unknown host". It also named the original
+    // host after a redirect, when the certificate came from the redirect target. It now reads the host from the
+    // error's `failingURL`, the address URLSession checked the certificate against. The request here starts on
+    // another host, as after a redirect.
+    #if !os(Linux)
+    @Test(
+        "A certificate-mismatch error names the host the certificate was checked against",
+        arguments: [
+            ("https://wrong.example/wp-json/", "wrong.example"),
+            ("https://%7Bcdn%7D/wp-json/", "{cdn}")
+        ]
+    )
+    func testCertificateMismatchNamesFailingHost(failingURL: String, expected: String) throws {
+        let error = URLError(
+            .serverCertificateUntrusted,
+            userInfo: [
+                NSURLErrorFailingURLErrorKey: try #require(URL(string: failingURL)),
+                NSURLErrorFailingURLPeerTrustErrorKey: try exampleComTrust()
+            ]
+        )
+
+        #expect(certificateMismatchHostname(for: error, requestURL: "http://127.0.0.1/start") == expected)
+    }
+
+    // URLSession sets `failingURL` on these errors, but an error built by hand, such as by an app's own
+    // `URLProtocol`, may not. The error then names the request's host, read from the RFC 3986 form
+    // `buildURLRequest` sends, as `URL(string:)` rejects some addresses as given.
+    @Test(
+        "A certificate-mismatch error without a failing URL names the request's host",
+        arguments: [
+            ("https://{cdn}/wp-json/", "{cdn}"),
+            ("https://example.com/wp-json/a|b?q[0]=^", "example.com"),
+            ("https://example.com/wp-json/", "example.com")
+        ]
+    )
+    func testCertificateMismatchWithoutFailingURLNamesRequestHost(url: String, expected: String) throws {
+        let error = URLError(
+            .serverCertificateUntrusted,
+            userInfo: [NSURLErrorFailingURLPeerTrustErrorKey: try exampleComTrust()]
+        )
+
+        #expect(certificateMismatchHostname(for: error, requestURL: url) == expected)
+    }
+
+    /// The host named by the certificate-mismatch error `handleHttpsError` makes from `error`, or `nil` if it makes
+    /// another error.
+    private func certificateMismatchHostname(for error: URLError, requestURL: String) -> String? {
+        let executor = WpRequestExecutor(urlSession: .shared)
+        let result = executor.handleHttpsError(error, for: StubRequest(url: requestURL))
+
+        guard case .failure(.RequestExecutionFailed(_, _, let reason, _, _)) = result,
+            case .invalidSslError(.certificateNotValidForName(let hostname, let presentedHostnames)) = reason
+        else {
+            Issue.record("Expected .certificateNotValidForName, got \(result)")
+            return nil
+        }
+        #expect(presentedHostnames.contains("example.com"))
+        return hostname
+    }
+
+    /// A `SecTrust` for a self-signed certificate for `example.com`, standing in for the chain a server presents.
+    private func exampleComTrust() throws -> SecTrust {
+        let der = [
+            "MIIBejCCASCgAwIBAgIUC0qmNwyABN9Sg/5QF+Rr+xulnUswCgYIKoZIzj0EAwIwFjEUMBIGA1UEAwwLZXhhbXBsZS5jb20w",
+            "IBcNMjYxMTE5MjAzNzI5WhgPMjEyNjEwMjYyMDM3MjlaMBYxFDASBgNVBAMMC2V4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYI",
+            "KoZIzj0DAQcDQgAEaSdlBLYwfAZgkDBgMBNPkjFci+nfJ00K65NrnyAHLUZ415FH8teEpA9LuTdijuJDc22r386XbIms+gnI",
+            "2c8JX6NKMEgwHQYDVR0OBBYEFKD4xx0T45zoa1ouSe/m4txf/A5BMA8GA1UdEwEB/wQFMAMBAf8wFgYDVR0RBA8wDYILZXhh",
+            "bXBsZS5jb20wCgYIKoZIzj0EAwIDSAAwRQIhAOR7tGepLSZ2S7c/dwi60k61h1xe5On7VWhGsbOvdUAqAiA5ayrtBwCgYqRN",
+            "4Adz4i+jQElINq4eN9Irqkanpyfaew=="
+        ]
+        .joined()
+        let data = try #require(Data(base64Encoded: der))
+        let certificate = try #require(SecCertificateCreateWithData(nil, data as CFData))
+        var trust: SecTrust?
+        let status = SecTrustCreateWithCertificates(certificate, SecPolicyCreateSSL(true, nil), &trust)
+        #expect(status == errSecSuccess)
+        return try #require(trust)
+    }
+    #endif
 }
 
 /// A `NetworkRequestContent` with a given URL, for testing how a `URLRequest` is built from it. Like
