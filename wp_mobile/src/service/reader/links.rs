@@ -451,11 +451,14 @@ impl ReaderService {
     ///   site's address with a path, such as `https://wordpress.com/blog/`, opens the site.
     /// - Signed out, such an address is tried as a post by its slug instead, as the Android app
     ///   tries it: the address's host is the site, and the last part of its path the slug. A post
-    ///   found that way is a [`ReaderLink::Post`]. Anything else is
-    ///   [`ReaderError::NeedsAccount`], since the resolver might find what the slug didn't: a
-    ///   server's refusal of the slug, such as no post with it, a host that's no site's, or a
-    ///   private site, and an address with no slug, for which nothing is sent. A request that
-    ///   fails, rather than being refused, is the error. See [`post_slug`] for what was measured.
+    ///   found that way is a [`ReaderLink::Post`]. A host that's no WordPress.com or Jetpack
+    ///   site's (404 `unknown_blog`) is looked up for a feed, as it is with an account. Anything
+    ///   else is [`ReaderError::NeedsAccount`], since the resolver might find what the slug
+    ///   didn't: a server's refusal of the slug, such as no post with it or a private site. An
+    ///   address with no slug has its host looked up as a site instead: a feed or nothing when no
+    ///   site has it, and [`ReaderError::NeedsAccount`] when one does or the server refuses. A
+    ///   request that fails, rather than being refused, is the error. See [`post_slug`] for what
+    ///   was measured.
     /// - The server answers an address that isn't on a WordPress.com or Jetpack site with a 404
     ///   `blog_not_found`, and the address is looked up for a feed. Until 2026-11-20 it answered
     ///   with a 500 instead: the site's domain is then looked up, and when no WordPress.com or
@@ -488,10 +491,13 @@ impl ReaderService {
                 return Ok(site);
             }
             ReaderLinkNotInReader::NotWordPressOrFeed
-        } else {
-            if self.context.owner == ReaderOwner::SignedOut {
-                return self.post_by_slug_signed_out(&host, &parsed).await;
+        } else if self.context.owner == ReaderOwner::SignedOut {
+            match self.post_by_slug_signed_out(&host, &parsed).await? {
+                Some(link) => return Ok(link),
+                // No WordPress.com or Jetpack site has the host: a feed or nothing, as signed in.
+                None => ReaderLinkNotInReader::NotWordPressOrFeed,
             }
+        } else {
             let resolved = self
                 .context
                 .client
@@ -599,16 +605,24 @@ impl ReaderService {
         })
     }
 
-    /// Signed out, the post at an address by its slug, on the site of its host. Anything the server
-    /// refuses, and an address with no slug, is [`ReaderError::NeedsAccount`]: the resolver, which
-    /// needs an account, might still find it. See [`ReaderService::resolve_link`].
+    /// Signed out, the post at an address by its slug, on the site of its host. `None` when no
+    /// WordPress.com or Jetpack site has the host, so the resolver couldn't find a post there
+    /// either. Anything else the server refuses is [`ReaderError::NeedsAccount`]: the resolver,
+    /// which needs an account, might still find it. An address with no slug has its host looked
+    /// up instead, and is [`ReaderError::NeedsAccount`] when a site has it. See
+    /// [`ReaderService::resolve_link`].
     async fn post_by_slug_signed_out(
         &self,
         host: &str,
         url: &url::Url,
-    ) -> Result<ReaderLink, ReaderError> {
+    ) -> Result<Option<ReaderLink>, ReaderError> {
         let Some(slug) = post_slug(url) else {
-            return Err(ReaderError::NeedsAccount);
+            return match self.site_at(host).await {
+                Ok(None) => Ok(None),
+                Ok(Some(_)) => Err(ReaderError::NeedsAccount),
+                Err(error) if is_refused(&error) => Err(ReaderError::NeedsAccount),
+                Err(error) => Err(error),
+            };
         };
         let found = self
             .context
@@ -621,12 +635,21 @@ impl ReaderService {
                 &ReaderPostSlug(slug),
                 &ReaderPostBySlugParams::default(),
             )
-            .await
-            .map_err(ReaderError::from);
+            .await;
         let found = match found {
             Ok(found) => found.data,
-            Err(error) if is_refused(&error) => return Err(ReaderError::NeedsAccount),
-            Err(error) => return Err(error),
+            // Measured on 2026-11-20 for 19 hosts: only a host that's no WordPress.com or Jetpack
+            // site's answers this. Another form of a site's domain, such as with `www.`, finds
+            // the site.
+            Err(error) if is_code(&error, "unknown_blog") => return Ok(None),
+            Err(error) => {
+                let error = ReaderError::from(error);
+                return Err(if is_refused(&error) {
+                    ReaderError::NeedsAccount
+                } else {
+                    error
+                });
+            }
         };
         let post = self
             .fetch_post(ReaderPostSaveIdentity {
@@ -638,7 +661,7 @@ impl ReaderService {
                 url: found.url.or(Some(url.to_string())),
             })
             .await?;
-        Ok(ReaderLink::Post { post })
+        Ok(Some(ReaderLink::Post { post }))
     }
 
     /// The WordPress.com or Jetpack site with a domain, now in the cache, or `None` when no site

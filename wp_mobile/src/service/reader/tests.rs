@@ -3290,20 +3290,16 @@ mod links {
     #[tokio::test]
     async fn signed_out_a_post_link_the_slug_does_not_find_needs_an_account() {
         let (service, executor) = service_for(ReaderOwner::SignedOut);
-        // No post with the slug, a host that's no site's, and a private site: the resolver, with
-        // an account, might still find a post there.
-        for answer in [
-            error(404, "unknown_post"),
-            error(404, "unknown_blog"),
-            error(403, "unauthorized"),
-        ] {
+        // No post with the slug, and a private site: the resolver, with an account, might still
+        // find a post there.
+        for answer in [error(404, "unknown_post"), error(403, "unauthorized")] {
             executor.push(answer);
             assert!(matches!(
                 service.resolve_link(POST_URL.to_string()).await,
                 Err(ReaderError::NeedsAccount)
             ));
         }
-        assert_eq!(executor.sent().len(), 3);
+        assert_eq!(executor.sent().len(), 2);
 
         // A request that fails isn't a refusal, so it's the error.
         for answer in [Step::Offline, Step::Respond(500, json!(null))] {
@@ -3326,7 +3322,86 @@ mod links {
     }
 
     #[tokio::test]
-    async fn signed_out_a_post_link_with_no_slug_needs_an_account_and_sends_nothing() {
+    async fn signed_out_an_address_on_a_host_no_site_has_is_its_feed_or_nothing() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        // The slug lookup's answer for a host that's no WordPress.com or Jetpack site's. The
+        // resolver couldn't find a post there either, so the address is looked up for a feed.
+        executor.push(error(404, "unknown_blog"));
+        executor.push(error(404, "no_such_feed"));
+        let link = service
+            .resolve_link("https://www.example.org/learn".to_string())
+            .await
+            .unwrap();
+        assert_eq!(
+            link,
+            not_in_reader(ReaderLinkNotInReader::NotWordPressOrFeed)
+        );
+        assert_eq!(
+            paths(&executor),
+            [
+                "/rest/v1.1/sites/www.example.org/posts/slug:learn?",
+                "/rest/v1.1/read/feed?url=https%3A%2F%2Fwww.example.org%2Flearn&meta=feed",
+            ]
+        );
+
+        executor.push(error(404, "unknown_blog"));
+        executor.push(feeds(456, None));
+        let link = service
+            .resolve_link("https://example.org/2026/11/18/a-post/".to_string())
+            .await
+            .unwrap();
+        assert!(
+            matches!(
+                link,
+                ReaderLink::Feed {
+                    feed_id: ReaderFeedId(456),
+                    ..
+                }
+            ),
+            "{link:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn signed_out_an_address_with_no_slug_on_a_host_no_site_has_is_its_feed_or_nothing() {
+        let (service, executor) = service_for(ReaderOwner::SignedOut);
+        executor.push(error(404, "unknown_blog"));
+        executor.push(feeds(456, None));
+        let link = service
+            .resolve_link("https://example.org/2000/".to_string())
+            .await
+            .unwrap();
+        assert!(
+            matches!(
+                link,
+                ReaderLink::Feed {
+                    feed_id: ReaderFeedId(456),
+                    ..
+                }
+            ),
+            "{link:?}"
+        );
+        assert_eq!(
+            paths(&executor),
+            [
+                "/rest/v1.2/read/sites/example.org?",
+                "/rest/v1.1/read/feed?url=https%3A%2F%2Fexample.org%2F2000%2F&meta=feed",
+            ]
+        );
+
+        executor.push(error(404, "unknown_blog"));
+        executor.push(error(404, "no_such_feed"));
+        assert_eq!(
+            service
+                .resolve_link("https://example.org/feed/".to_string())
+                .await
+                .unwrap(),
+            not_in_reader(ReaderLinkNotInReader::NotWordPressOrFeed)
+        );
+    }
+
+    #[tokio::test]
+    async fn signed_out_a_post_link_with_no_slug_on_a_site_needs_an_account() {
         let (service, executor) = service_for(ReaderOwner::SignedOut);
         for link in [
             // Archives, a feed, a page of posts and a file: WordPress gives no post such a slug.
@@ -3340,6 +3415,9 @@ mod links {
             // Escapes that don't spell UTF-8.
             "https://example.com/%ff%fe/",
         ] {
+            // There's no slug to look up, so only the host is: a site has it, and the resolver
+            // might find a post there.
+            executor.push(site(123));
             assert!(
                 matches!(
                     service.resolve_link(link.to_string()).await,
@@ -3348,7 +3426,28 @@ mod links {
                 "{link}"
             );
         }
-        assert!(executor.sent().is_empty());
+        assert_eq!(executor.sent().len(), 8);
+        assert!(
+            paths(&executor)
+                .iter()
+                .all(|path| path == "/rest/v1.2/read/sites/example.com?")
+        );
+
+        // A private site needs an account too, and a request that fails is the error.
+        executor.push(error(403, "unauthorized"));
+        assert!(matches!(
+            service
+                .resolve_link("https://example.com/2026/11/".to_string())
+                .await,
+            Err(ReaderError::NeedsAccount)
+        ));
+        executor.push(Step::Offline);
+        assert!(matches!(
+            service
+                .resolve_link("https://example.com/2026/11/".to_string())
+                .await,
+            Err(ReaderError::Api(_))
+        ));
     }
 
     #[tokio::test]

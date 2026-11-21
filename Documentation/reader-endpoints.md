@@ -291,7 +291,7 @@ Public documentation: `rest/v1.3/help`. It declares `fields`, `meta`, which the 
 
 ### `GET /rest/v1.1/sites/$site/posts/slug:$slug`
 
-A site's post, found by its slug. The site can be an ID or a domain. This is the general posts endpoint, so the post isn't in the shape a stream sends. Answers signed out for a public site. A slug that isn't there is a 404 `unknown_post`, and a private site's post a 403 `unauthorized` to anyone who can't read the site.
+A site's post, found by its slug. The site can be an ID or a domain. This is the general posts endpoint, so the post isn't in the shape a stream sends. Answers signed out for a public site. A slug that isn't there is a 404 `unknown_post`, a domain that's no WordPress.com or Jetpack site's a 404 `unknown_blog` (another form of a site's domain, such as with `www.`, finds the site), and a private site's post a 403 `unauthorized` to anyone who can't read the site.
 
 Request `ReaderPostRequest::PostBySlug`, response `ReaderPostBySlug`.
 
