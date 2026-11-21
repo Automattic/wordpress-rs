@@ -130,6 +130,7 @@ BADSSL_DOMAIN=badssl.localhost swift test --filter LoginTests
 `make test-server` starts it too, and `make test-kotlin-integration` runs the Kotlin tests against
 it as CI does.
 
-The copy's certificates are signed by a root it generates. CI trusts that root; don't add it to a
-laptop's trust store. Without it, the Swift tests see an unknown root as well as the name
-mismatch, which the Swift executor reports the same way for now (#1498), so they still pass.
+The copy's certificates are signed by a root it generates. CI trusts that root in the simulators
+and in the Kotlin tests' Java runtime; don't add it to a laptop's trust store. Without it, as on a
+laptop and in CI's macOS and Mac Catalyst runs, the Swift tests see an unknown root as well as the
+name mismatch. The Swift executor reports both the same way for now (#1498), so they still pass.
