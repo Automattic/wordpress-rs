@@ -763,12 +763,15 @@ fn check_discover_cards(page: &ReaderDiscoverResponse) -> Result<(), String> {
                     "A card is of a kind the library doesn't know: {card_type}"
                 ));
             }
+            // A site's name is up to its owner and can be empty, so only the ID and address are
+            // required.
             ReaderCard::RecommendedSites { sites } => {
-                if let Some(site) = sites.iter().find(|site| {
-                    site.site_id.is_none() || site.name.is_none() || site.url.is_none()
-                }) {
+                if let Some(site) = sites
+                    .iter()
+                    .find(|site| site.site_id.is_none() || site.url.is_none())
+                {
                     return Err(format!(
-                        "A recommended site is missing its ID, name or address: {site:?}"
+                        "A recommended site is missing its ID or address: {site:?}"
                     ));
                 }
             }
