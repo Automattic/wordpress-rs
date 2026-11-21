@@ -1336,19 +1336,10 @@ pub(super) fn is_refused(error: &ReaderError) -> bool {
     }
 }
 
-/// Whether the server rejected the account's token rather than the request, so the same request
-/// can work once the reader signs in again. WordPress.com answers a token it doesn't accept with
-/// 400 `invalid_token` on `rest/v1.x` and 401 `oauth2_invalid_token` on `wpcom/v2`.
+/// Whether the server rejected the account's token rather than the request: see
+/// [`crate::service::is_sign_in_rejected`].
 pub(super) fn is_sign_in_rejected(error: &ReaderError) -> bool {
-    const REJECTED_TOKEN: [&str; 2] = ["invalid_token", "oauth2_invalid_token"];
-    match error {
-        ReaderError::Api(WpApiError::WpError {
-            error_code: WpErrorCode::CustomError(code),
-            ..
-        }) if REJECTED_TOKEN.contains(&code.as_str()) => true,
-        ReaderError::Api(error) => error.status_code() == Some(401),
-        _ => false,
-    }
+    matches!(error, ReaderError::Api(error) if crate::service::is_sign_in_rejected(error))
 }
 
 #[uniffi::export]

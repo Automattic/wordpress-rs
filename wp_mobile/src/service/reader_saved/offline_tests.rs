@@ -337,6 +337,38 @@ async fn retrying_a_failed_save_fetches_it_now() {
     assert_eq!(reader.sent().len(), 6);
 }
 
+/// WordPress.com's answer on `rest/v1.x` to a token it doesn't accept.
+fn sign_in_rejected() -> Value {
+    json!({ "error": "invalid_token", "message": "The OAuth2 token is invalid." })
+}
+
+#[tokio::test]
+async fn a_rejected_sign_in_does_not_count_against_a_save() {
+    let reader = Reader::signed_in();
+    reader.server_has(&[post_json(1)], &[]);
+    reader.respond(404, error_response());
+    reader.download(false).await;
+
+    reader.respond(400, sign_in_rejected());
+    let rejected = reader.service.retry_offline(post_key(1)).await;
+    assert!(
+        matches!(&rejected, Err(ReaderSavedError::Api(error)) if error.to_string().contains("The OAuth2 token is invalid.")),
+        "{rejected:?}"
+    );
+
+    // A download that meets it stops there, as it does when the list's request is rejected.
+    reader.server_has(&[post_json(1)], &[]);
+    reader.respond(400, sign_in_rejected());
+    let report = reader.download(false).await;
+    assert!(report.stopped_because.is_some(), "{report:?}");
+    assert_eq!((report.failed, report.not_downloaded), (0, 1));
+
+    // Signed in again, it's fetched straight away.
+    reader.server_has(&[post_json(1)], &[]);
+    reader.respond(200, full_post(1, "<p>One</p>"));
+    assert_eq!(reader.download(false).await.ready, 1);
+}
+
 #[tokio::test]
 async fn no_connection_stops_a_download_without_counting_against_a_save() {
     let reader = Reader::signed_in();
@@ -806,6 +838,26 @@ async fn an_image_the_server_cannot_send_now_is_asked_for_again() {
             "https://example.com/a.jpg",
         ]
     );
+}
+
+#[tokio::test]
+async fn a_private_sites_image_whose_sign_in_is_rejected_is_asked_for_again() {
+    let reader = Reader::signed_in();
+    let mut private = full_post(
+        1,
+        r#"<img src="https://private.files.wordpress.com/a.jpg">"#,
+    );
+    private["site_is_private"] = json!(true);
+    reader.server_has(&[post_json(1)], std::slice::from_ref(&private));
+    let _directory = reader.store_images_in(1_000);
+    reader.respond(401, sign_in_rejected());
+
+    assert_eq!(reader.download(true).await.with_images, 0);
+    assert_eq!(reader.state(1).await, ready(false));
+
+    reader.server_has(&[post_json(1)], &[private]);
+    reader.respond(200, image(10));
+    assert_eq!(reader.download(true).await.with_images, 1);
 }
 
 #[tokio::test]

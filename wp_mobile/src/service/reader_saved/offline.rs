@@ -16,6 +16,7 @@
 
 use super::storage::{CATCH_UP_PAGE_SIZE, SavedOrder};
 use super::{ReaderSavedError, ReaderSavedService};
+use crate::service::is_sign_in_rejected;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -149,6 +150,9 @@ enum Fetch {
     Answered,
     /// No answer came, so nothing more is tried now.
     Stopped(String),
+    /// The server rejected the account's token, which says nothing about the save, so nothing
+    /// more is tried now.
+    SignInRejected(WpApiError),
 }
 
 /// What became of a try to fetch one image.
@@ -265,7 +269,9 @@ impl ReaderSavedService {
 
     /// Tries again, now, to fetch the content of a save that
     /// [`ReaderOfflineState::Failed`], whatever its earlier tries. Returns what it is afterwards.
-    /// Fails with [`ReaderSavedError::OfflineUnreachable`] if the server can't be reached.
+    /// Fails with [`ReaderSavedError::OfflineUnreachable`] if the server can't be reached, and with
+    /// the server's [`ReaderSavedError::Api`] error if it rejects the account's token. Neither
+    /// counts against the save.
     pub async fn retry_offline(
         &self,
         key: ReaderSavedKey,
@@ -287,10 +293,14 @@ impl ReaderSavedService {
         let Some((row, save)) = found else {
             return Ok(ReaderOfflineState::NotDownloaded);
         };
-        if let Some(save) = save
-            && let Fetch::Stopped(reason) = self.fetch_save(&save).await?
-        {
-            return Err(ReaderSavedError::OfflineUnreachable { reason });
+        if let Some(save) = save {
+            match self.fetch_save(&save).await? {
+                Fetch::Answered => {}
+                Fetch::Stopped(reason) => {
+                    return Err(ReaderSavedError::OfflineUnreachable { reason });
+                }
+                Fetch::SignInRejected(error) => return Err(ReaderSavedError::Api(error)),
+            }
         }
         // Read from the save's own row: one that failed again isn't in the saved list.
         Ok(self.cache.execute(|connection| {
@@ -457,8 +467,11 @@ impl ReaderSavedService {
         // The saves as they were before any was fetched, each once: the loop ends after one
         // request for each, whatever the server answers.
         for save in saves.iter().filter(|save| is_due(&save.offline, &now)) {
-            if let Fetch::Stopped(reason) = self.fetch_save(save).await? {
-                return Ok(Some(reason));
+            match self.fetch_save(save).await? {
+                Fetch::Answered => {}
+                Fetch::Stopped(reason) => return Ok(Some(reason)),
+                // As when the saved list's request is rejected.
+                Fetch::SignInRejected(error) => return Ok(Some(error.to_string())),
             }
         }
         Ok(None)
@@ -514,17 +527,27 @@ impl ReaderSavedService {
                 Ok(Fetch::Answered)
             }
             Err(error @ WpApiError::RequestExecutionFailed { .. }) => {
-                self.cache.execute(|connection| {
-                    ReaderOfflineRepository::set_downloading(&*connection, save.row_id, false)
-                })?;
-                self.notify();
+                self.not_downloading(save.row_id)?;
                 Ok(Fetch::Stopped(error.to_string()))
+            }
+            // Signed out, no token was sent, so a 401 is the server's answer about the post.
+            Err(error) if !self.signed_out && is_sign_in_rejected(&error) => {
+                self.not_downloading(save.row_id)?;
+                Ok(Fetch::SignInRejected(error))
             }
             Err(error) => {
                 self.record_failure(save.row_id, &error.to_string())?;
                 Ok(Fetch::Answered)
             }
         }
+    }
+
+    fn not_downloading(&self, saved: RowId) -> Result<(), ReaderSavedError> {
+        self.cache.execute(|connection| {
+            ReaderOfflineRepository::set_downloading(&*connection, saved, false)
+        })?;
+        self.notify();
+        Ok(())
     }
 
     fn record_failure(&self, saved: RowId, reason: &str) -> Result<(), ReaderSavedError> {
@@ -701,7 +724,9 @@ impl ReaderSavedService {
                     }
                     _ => Image::Unavailable,
                 },
-                408 | 429 | 500..=599 => Image::Later,
+                // A private site's image is asked for with the account's token, which the server
+                // may reject for now.
+                401 | 408 | 429 | 500..=599 => Image::Later,
                 _ => Image::Unavailable,
             },
             Err(RequestExecutionError::RequestExecutionFailed {
@@ -714,7 +739,7 @@ impl ReaderSavedService {
                     (Reason::DeviceIsOfflineError { .. } | Reason::CancellationError, _) => {
                         Image::Stopped(reason.to_string())
                     }
-                    (_, Some(408 | 429 | 500..=599)) => Image::Later,
+                    (_, Some(401 | 408 | 429 | 500..=599)) => Image::Later,
                     // The host answered, and not with the image.
                     (_, Some(_)) => Image::Unavailable,
                     (Reason::HttpTimeoutError, None) if online => Image::Later,
