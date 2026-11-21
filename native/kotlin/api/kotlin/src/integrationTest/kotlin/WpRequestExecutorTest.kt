@@ -333,6 +333,58 @@ class WpRequestExecutorTest {
     }
 
     /**
+     * OkHttp only requests `http` and `https` addresses. Anything else must fail the request with
+     * `GenericError` (as reqwest and the Swift executor do), not escape the UniFFI callback as
+     * OkHttp's `IllegalArgumentException`, which makes `WpApiClient.request` throw an `InternalException`.
+     */
+    @Test
+    fun `a non-web address is mapped to GenericError`() = runTest {
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(NON_WEB_API_ROOT).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+        assertIs<RequestExecutionErrorReason.GenericError>(
+            (result as WpRequestResult.RequestExecutionFailed<*>).reason
+        )
+    }
+
+    @Test
+    fun `an upload to a non-web address is mapped to GenericError`() = runTest {
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true },
+            fileResolver = ClasspathFileResolver()
+        )
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(NON_WEB_API_ROOT).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.media().create(
+                params = MediaCreateParams(title = "Non-web upload", filePath = "test_media.jpg")
+            )
+        }
+
+        assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+        assertIs<RequestExecutionErrorReason.GenericError>(
+            (result as WpRequestResult.RequestExecutionFailed<*>).reason
+        )
+    }
+
+    /**
      * Cloudflare only sends its JSON error body when the request carries `Accept-Encoding`
      * alongside `Accept: application/json`. OkHttp adds `Accept-Encoding` itself; this guards
      * against anything removing it, and checks the Kotlin path classifies the JSON body.
@@ -387,5 +439,10 @@ class WpRequestExecutorTest {
     private class ClasspathFileResolver : FileResolver {
         override fun getFile(path: String): File? =
             this::class.java.classLoader?.getResource(path)?.file?.let { File(it) }
+    }
+
+    private companion object {
+        // Has a path, so the request reaches the executor. `data:,` would not (#1781).
+        const val NON_WEB_API_ROOT = "file:///tmp/wp-json"
     }
 }
