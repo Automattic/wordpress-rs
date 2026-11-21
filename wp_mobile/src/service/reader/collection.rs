@@ -3,6 +3,7 @@
 //! A page is stored in one transaction, so a reader of the cache never sees half of one. How a
 //! page is merged depends on what orders the stream: see [`ReaderStreamOrdering`].
 
+use super::actions::is_sign_in_rejected;
 use super::language::ReaderLanguage;
 use super::stream::{ReaderStreamCardKind, StreamCursor, StreamEntry, StreamPage};
 use super::{ReaderContext, ReaderError, ReaderStream, ReaderStreamOrdering};
@@ -366,7 +367,8 @@ impl ReaderStreamCollection {
                                 &message,
                             )
                         } else {
-                            // The request didn't get an answer, which says nothing about the post.
+                            // No answer came, or the account's sign-in was rejected: neither says
+                            // anything about the post.
                             Ok(())
                         }
                     })?;
@@ -869,10 +871,12 @@ fn is_gone(error: &ReaderError) -> bool {
 }
 
 /// Whether an error is the server's answer about the post, as opposed to a request that failed on
-/// the way: an answer that couldn't be read, or one in the 400s.
+/// the way: an answer that couldn't be read, or one in the 400s. A rejected sign-in is about the
+/// account, not the post.
 fn was_answered(error: &ReaderError) -> bool {
     match error {
         ReaderError::Api(WpApiError::ResponseParsingError { .. }) => true,
+        _ if is_sign_in_rejected(error) => false,
         ReaderError::Api(error) => {
             matches!(error.status_code(), Some(status) if (400..500).contains(&status))
         }

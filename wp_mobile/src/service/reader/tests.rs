@@ -2729,6 +2729,25 @@ mod posts {
     }
 
     #[tokio::test]
+    async fn an_unreadable_post_is_not_counted_as_tried_when_the_sign_in_is_rejected() {
+        let (_service, executor, stream, now) = with_an_unreadable_post().await;
+        for _ in 0..6 {
+            *now.lock().unwrap() += Duration::from_secs(61 * 60);
+            // WordPress.com's answer on `rest/v1.x` to a token it doesn't accept.
+            executor.push(Step::Respond(
+                400,
+                json!({ "error": "invalid_token", "message": "The OAuth2 token is invalid." }),
+            ));
+            assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 0);
+        }
+
+        // Signed in again, it's still asked for.
+        *now.lock().unwrap() += Duration::from_secs(61 * 60);
+        executor.push(Step::Respond(200, post_json(2, 11)));
+        assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 1);
+    }
+
+    #[tokio::test]
     async fn a_refresh_asks_again_for_unreadable_posts_that_are_due() {
         let (_service, executor, stream, now) = with_an_unreadable_post().await;
         *now.lock().unwrap() += Duration::from_secs(61 * 60);
