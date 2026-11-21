@@ -1609,7 +1609,7 @@ impl ReaderService {
     /// Pass the same `page_view` as to [`Self::post_opened`]. A like counts a view under the same
     /// rules as opening the post, as both WordPress apps count one: an unlike, or a like of a post
     /// the cache shows liked already, counts none, and a like made offline is sent later but its
-    /// view isn't. See [`super::page_views`].
+    /// view isn't. See the `page_views` module.
     ///
     /// The like and the view are done together and reported apart: an error of one is in its own
     /// part of the outcome. The call fails with [`ReaderError::NeedsAccount`] signed out, sending

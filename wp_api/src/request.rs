@@ -489,7 +489,7 @@ const SCHEME_HEADERS: &[&str] = &["authorization", "proxy-authorization"];
 const REDACTED_HEADER_VALUE: &str = "<redacted>";
 
 /// Prints every header, but only the name of a header that carries a credential
-/// (see [`CREDENTIAL_HEADERS`]): its value is `<redacted>`, after the scheme for
+/// (see `CREDENTIAL_HEADERS`): its value is `<redacted>`, after the scheme for
 /// an `Authorization` header. A request or response that is `Debug`-formatted
 /// prints its headers this way.
 impl Debug for WpNetworkHeaderMap {

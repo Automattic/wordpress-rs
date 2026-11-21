@@ -457,7 +457,7 @@ impl ReaderService {
     ///   didn't: a server's refusal of the slug, such as no post with it or a private site. An
     ///   address with no slug has its host looked up as a site instead: a feed or nothing when no
     ///   site has it, and [`ReaderError::NeedsAccount`] when one does or the server refuses. A
-    ///   request that fails, rather than being refused, is the error. See [`post_slug`] for what
+    ///   request that fails, rather than being refused, is the error. See `post_slug` for what
     ///   was measured.
     /// - The server answers an address that isn't on a WordPress.com or Jetpack site with a 404
     ///   `blog_not_found`, and the address is looked up for a feed. Until 2026-11-20 it answered
