@@ -200,6 +200,9 @@ private fun readerSession(
             owner = owner,
             savedSource = ReaderSavedSource.ANDROID
         )
+        // Set each launch, as the library asks. Setting it also deletes the images no saved post
+        // has any more, such as those of an account that signed out.
+        service.saved().setOfflineImageStore(readerOfflineImageDirectory.path, READER_OFFLINE_IMAGE_BYTES)
         ReaderSession(service, label, isSignedIn = owner is ReaderOwner.Account)
     }.also { session ->
         // The device's language, set each time a screen asks for the session, since Android can

@@ -160,6 +160,13 @@ final class ReaderStore {
         // The device's language, so tag streams, Discover, searches, the menu and the interests are in it. iOS
         // relaunches the app when the reader changes it, so it's set once.
         service.setLanguage(language: Self.deviceLanguage)
+        // Set each launch, as the library asks. Setting it also deletes the images no saved post has any more, such
+        // as those of an account that signed out.
+        let saved = service.saved()
+        try saved.setOfflineImageStore(
+            directory: ReaderOfflineImages.directory().path,
+            maxBytes: ReaderOfflineImages.maxBytes
+        )
         return ReaderSession(service: service, cache: cache, owner: owner, name: name, client: client)
     }
 
