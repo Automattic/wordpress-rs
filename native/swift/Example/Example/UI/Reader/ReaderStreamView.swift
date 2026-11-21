@@ -197,6 +197,10 @@ private struct ReaderStreamPostRow: View {
                 }
             }
             .accessibilityIdentifier("stream-post")
+            #if os(tvOS)
+            // The remote can't move from the row to the menu beside it.
+            .contextMenu { actionItems }
+            #endif
             actions
         }
     }
@@ -237,38 +241,43 @@ private struct ReaderStreamPostRow: View {
 
     private var actions: some View {
         Menu {
-            let liked = post.iLike == true
-            Button(liked ? "Unlike" : "Like") {
-                Task { await viewModel.setLiked(post, !liked, countsPageViews: store.countsPageViews) }
-            }
-            Button(isSaved ? "Unsave" : "Save") {
-                Task { await viewModel.setSaved(post, !isSaved) }
-            }
-            // Only a post from a stream that sends a seen state has one to change.
-            if let isSeen = post.isSeen {
-                Button(isSeen ? "Mark as unseen" : "Mark as seen") {
-                    Task { await viewModel.setSeen(post, !isSeen) }
-                }
-            }
-            let following = post.isFollowing == true
-            Button(following ? "Unfollow site" : "Follow site") {
-                Task { await viewModel.setFollowed(post, !following) }
-            }
-            if post.wordPressSiteID != nil {
-                Button("Block site", role: .destructive) {
-                    Task { await viewModel.blockSite(of: post) }
-                }
-            }
-            if let authorID = post.authorId, authorID != 0 {
-                Button("Block author", role: .destructive) {
-                    Task { await viewModel.blockAuthor(of: post) }
-                }
-            }
+            actionItems
         } label: {
             Image(systemName: "ellipsis.circle")
                 .accessibilityLabel("Actions for \(post.displayTitle)")
         }
         .buttonStyle(.borderless)
         .accessibilityIdentifier("stream-post-actions")
+    }
+
+    @ViewBuilder
+    private var actionItems: some View {
+        let liked = post.iLike == true
+        Button(liked ? "Unlike" : "Like") {
+            Task { await viewModel.setLiked(post, !liked, countsPageViews: store.countsPageViews) }
+        }
+        Button(isSaved ? "Unsave" : "Save") {
+            Task { await viewModel.setSaved(post, !isSaved) }
+        }
+        // Only a post from a stream that sends a seen state has one to change.
+        if let isSeen = post.isSeen {
+            Button(isSeen ? "Mark as unseen" : "Mark as seen") {
+                Task { await viewModel.setSeen(post, !isSeen) }
+            }
+        }
+        let following = post.isFollowing == true
+        Button(following ? "Unfollow site" : "Follow site") {
+            Task { await viewModel.setFollowed(post, !following) }
+        }
+        if post.wordPressSiteID != nil {
+            Button("Block site", role: .destructive) {
+                Task { await viewModel.blockSite(of: post) }
+            }
+        }
+        if let authorID = post.authorId, authorID != 0 {
+            Button("Block author", role: .destructive) {
+                Task { await viewModel.blockAuthor(of: post) }
+            }
+        }
     }
 }

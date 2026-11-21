@@ -204,6 +204,20 @@ extension ReaderPostRecord {
 
 // MARK: - Small views
 
+extension View {
+    /// Lets the Apple TV remote move onto a view with nothing to press. The remote scrolls a list
+    /// only by moving between views it can focus, and a lazy list hasn't made one that's far off
+    /// screen. Elsewhere it changes nothing.
+    @ViewBuilder
+    func readerRemoteFocusable() -> some View {
+        #if os(tvOS)
+        focusable()
+        #else
+        self
+        #endif
+    }
+}
+
 /// What the last action did, such as "Waiting to be sent".
 struct ReaderNoticeRow: View {
     let message: String

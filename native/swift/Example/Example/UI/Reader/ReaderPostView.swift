@@ -39,28 +39,31 @@ struct ReaderPostView: View {
 
     private var statusSection: some View {
         Section("Status") {
-            HStack {
-                Text(status)
-                    .accessibilityIdentifier("post-state")
-                if viewModel.isWorking {
-                    ProgressView()
+            Group {
+                HStack {
+                    Text(status)
+                        .accessibilityIdentifier("post-state")
+                    if viewModel.isWorking {
+                        ProgressView()
+                    }
+                }
+                if let error = viewModel.loadError {
+                    Text("Last error: \(error)")
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("post-error")
+                }
+                if let seen = viewModel.seenOnOpen {
+                    LabeledContent("Seen on opening", value: seen)
+                        .accessibilityIdentifier("post-seen-on-open")
+                }
+                if let pageView = viewModel.pageView {
+                    LabeledContent("Page view", value: pageView)
+                }
+                if let notice = viewModel.notice {
+                    ReaderNoticeRow(message: notice)
                 }
             }
-            if let error = viewModel.loadError {
-                Text("Last error: \(error)")
-                    .foregroundStyle(.red)
-                    .accessibilityIdentifier("post-error")
-            }
-            if let seen = viewModel.seenOnOpen {
-                LabeledContent("Seen on opening", value: seen)
-                    .accessibilityIdentifier("post-seen-on-open")
-            }
-            if let pageView = viewModel.pageView {
-                LabeledContent("Page view", value: pageView)
-            }
-            if let notice = viewModel.notice {
-                ReaderNoticeRow(message: notice)
-            }
+            .readerRemoteFocusable()
         }
     }
 
@@ -76,28 +79,31 @@ struct ReaderPostView: View {
 
     private func detailsSection(_ post: ReaderPostRecord) -> some View {
         Section("Post") {
-            Text(post.displayTitle)
-                .font(.headline)
-            if let author = post.authorName {
-                LabeledContent("Author", value: author)
+            Group {
+                Text(post.displayTitle)
+                    .font(.headline)
+                if let author = post.authorName {
+                    LabeledContent("Author", value: author)
+                }
+                if let site = post.siteName?.decodingHTMLEntities() {
+                    LabeledContent("Site", value: site)
+                }
+                if let date = post.date {
+                    LabeledContent("Date", value: date.readerLabel)
+                }
+                LabeledContent("Likes", value: post.likeCount.map { "\($0)" } ?? "Unknown")
+                LabeledContent("Comments", value: post.commentCount.map { "\($0)" } ?? "Unknown")
+                if let words = post.wordCount {
+                    LabeledContent("Words", value: "\(words)")
+                }
+                if let minutes = post.readingTimeMinutes {
+                    LabeledContent("Reading time", value: "\(minutes) min")
+                }
+                if let cardType = post.cardType {
+                    LabeledContent("Card", value: cardType.label)
+                }
             }
-            if let site = post.siteName?.decodingHTMLEntities() {
-                LabeledContent("Site", value: site)
-            }
-            if let date = post.date {
-                LabeledContent("Date", value: date.readerLabel)
-            }
-            LabeledContent("Likes", value: post.likeCount.map { "\($0)" } ?? "Unknown")
-            LabeledContent("Comments", value: post.commentCount.map { "\($0)" } ?? "Unknown")
-            if let words = post.wordCount {
-                LabeledContent("Words", value: "\(words)")
-            }
-            if let minutes = post.readingTimeMinutes {
-                LabeledContent("Reading time", value: "\(minutes) min")
-            }
-            if let cardType = post.cardType {
-                LabeledContent("Card", value: cardType.label)
-            }
+            .readerRemoteFocusable()
         }
     }
 
@@ -116,6 +122,7 @@ struct ReaderPostView: View {
                 }
             } else {
                 LabeledContent("Seen", value: "This post has no seen state")
+                    .readerRemoteFocusable()
             }
             let following = post.isFollowing == true
             toggleRow("Following its site", isOn: following, turnOn: "Follow", turnOff: "Unfollow") {
@@ -193,10 +200,12 @@ struct ReaderPostView: View {
                 let text = content.readerPlainText
                 Text(text.count > 600 ? String(text.prefix(600)) + "…" : text)
                     .font(.callout)
+                    .readerRemoteFocusable()
                 NavigationLink("Read the whole post", value: ReaderRoute.content(key: post.key))
             } else {
                 Text("The cache has no content for this post yet.")
                     .foregroundStyle(.secondary)
+                    .readerRemoteFocusable()
             }
         }
     }

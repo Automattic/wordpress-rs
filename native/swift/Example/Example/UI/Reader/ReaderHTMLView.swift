@@ -100,9 +100,23 @@ struct ReaderHTMLView: View {
 
     var body: some View {
         ScrollView {
-            Text(html.readerPlainText)
-                .padding()
+            LazyVStack(alignment: .leading, spacing: 16) {
+                // One view per paragraph, so the remote can move down through the post.
+                ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                    Text(paragraph)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .readerRemoteFocusable()
+                }
+            }
+            .padding()
         }
+    }
+
+    private var paragraphs: [String] {
+        html.readerPlainText
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
     }
 }
 
