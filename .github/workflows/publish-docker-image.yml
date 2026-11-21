@@ -4,9 +4,50 @@ on:
   push:
     branches:
       - trunk
+  # Builds and starts the image on changes that can break it. Only a push to trunk publishes.
+  pull_request:
+    paths:
+      - .dockerignore
+      - .github/workflows/publish-docker-image.yml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - wp_rs_web/**
+
+permissions: {}
 
 jobs:
-  build:
+  smoke-test:
+    name: Build and start the image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+    # Only amd64: `load` can't put a multi-platform image in the local image store.
+    - name: Build
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      with:
+        context: .
+        platforms: linux/amd64
+        file: ./wp_rs_web/Dockerfile
+        load: true
+        tags: wordpress-rs-web:smoke-test
+
+    - name: Start the image and request its home page
+      run: wp_rs_web/smoke-test.sh wordpress-rs-web:smoke-test
+
+  publish:
+    name: Publish
+    if: github.event_name == 'push'
+    needs: smoke-test
     runs-on: ubuntu-latest
 
     permissions:
@@ -19,7 +60,7 @@ jobs:
     - uses: actions/checkout@v7.0.1
 
     - name: Login to Docker Hub
-      uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}

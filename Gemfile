@@ -3,6 +3,6 @@
 source 'https://rubygems.org'
 
 gem 'buildkit', '~> 1.6'
-gem 'fastlane', '~> 2.241'
-gem 'fastlane-plugin-wpmreleasetoolkit', '~> 15.3'
+gem 'fastlane', '~> 2.242'
+gem 'fastlane-plugin-wpmreleasetoolkit', '~> 15.4'
 gem 'fluent-tools', '~> 0.3'

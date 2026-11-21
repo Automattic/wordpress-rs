@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.Call
+import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType
@@ -37,6 +38,7 @@ import java.io.IOException
 import java.io.InterruptedIOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
+import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.HttpsURLConnection
@@ -104,7 +106,7 @@ class WpRequestExecutor @JvmOverloads constructor(
                 }
             )
 
-            addRequestHeaders(requestBuilder, request.headerMap())
+            setRequestHeaders(requestBuilder, request.headerMap())
             val urlRequest = requestBuilder.build()
 
             executeRequestSafely(urlRequest, request.url(), request.method(), request.headerMap())
@@ -117,7 +119,7 @@ class WpRequestExecutor @JvmOverloads constructor(
             val requestBuilder = Request.Builder().url(request.url())
             requestBuilder.method(request.method().toString(), bodyWithProgress)
 
-            addRequestHeaders(requestBuilder, request.headerMap())
+            setRequestHeaders(requestBuilder, request.headerMap())
             val urlRequest = requestBuilder.build()
 
             executeRequestSafely(
@@ -177,12 +179,16 @@ class WpRequestExecutor @JvmOverloads constructor(
         }
     }
 
-    private fun addRequestHeaders(requestBuilder: Request.Builder, headerMap: WpNetworkHeaderMap) {
+    private fun setRequestHeaders(requestBuilder: Request.Builder, headerMap: WpNetworkHeaderMap) {
+        val headers = Headers.Builder()
         headerMap.toMap().forEach { (key, values) ->
             values.forEach { value ->
-                requestBuilder.addHeader(key, value)
+                // `addHeader` throws for a non-ASCII value; this sends it as UTF-8, as reqwest does.
+                // Skipping OkHttp's value checks is safe: `http::HeaderValue` already refuses CR and LF.
+                headers.addUnsafeNonAscii(key, value)
             }
         }
+        requestBuilder.headers(headers.build())
         // A request that names its own User-Agent keeps it. A Reader page view is sent with the
         // app's, and a site's stats don't count one sent with the library's.
         val namesItsOwn = headerMap.toMap().keys.any { it.equals(USER_AGENT_HEADER_NAME, ignoreCase = true) }
@@ -247,9 +253,13 @@ class WpRequestExecutor @JvmOverloads constructor(
         } catch (e: UnknownHostException) {
             RequestExecutionErrorReason.unknownHost(e, networkAvailabilityProvider)
         } catch (e: NoRouteToHostException) {
-            RequestExecutionErrorReason.noRouteToHost(e)
+            // The host resolved, but `connect()` failed at once with EHOSTUNREACH. Not a
+            // `ConnectException`, so it needs its own branch. The JVM always reports EHOSTUNREACH this
+            // way. Android does only when the client has no connect timeout; with one (the
+            // `DefaultHttpClient` default), it reports a `ConnectException` instead.
+            RequestExecutionErrorReason.connectionError(e)
         } catch (e: ConnectException) {
-            RequestExecutionErrorReason.ConnectionError(reason = "Connection failed: ${e.localizedMessage}")
+            RequestExecutionErrorReason.connectionError(e)
         } catch (e: SocketTimeoutException) {
             RequestExecutionErrorReason.HttpTimeoutError
         } catch (e: InterruptedIOException) {
@@ -354,10 +364,14 @@ private fun RequestExecutionErrorReason.Companion.unknownHost(
     )
 }
 
-private fun RequestExecutionErrorReason.Companion.noRouteToHost(e: NoRouteToHostException) =
-    RequestExecutionErrorReason.HttpError(
-        reason = e.localizedMessage
-    )
+/**
+ * A connection to the server could not be established, so the request never reached it.
+ *
+ * The exception's message is passed through as-is: the localized `connection_error` text already
+ * starts with "Couldn't connect to the server", so a prefix here would repeat it.
+ */
+private fun RequestExecutionErrorReason.Companion.connectionError(e: SocketException) =
+    RequestExecutionErrorReason.ConnectionError(reason = e.localizedMessage ?: e.toString())
 
 @Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
 private fun RequestExecutionErrorReason.Companion.invalidSSLError(

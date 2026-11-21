@@ -17,8 +17,12 @@ import uniffi.wp_api.CloudflareErrorKind
 import uniffi.wp_api.MediaCreateParams
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.UserListParams
+import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.WpAuthenticationProvider
+import uniffi.wp_api.WpErrorCode
 import java.io.File
+import java.io.IOException
+import java.net.NoRouteToHostException
 import java.net.URI
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
@@ -284,6 +288,54 @@ class WpRequestExecutorTest {
     }
 
     @Test
+    fun `no route to host is mapped to ConnectionError`() = runTest {
+        // OkHttp passes `NoRouteToHostException` through unchanged. The JVM throws it whenever
+        // `connect()` fails with EHOSTUNREACH; Android does only when the client has no connect
+        // timeout (with one, it throws a `ConnectException`). A real one depends on the machine's
+        // network, so an interceptor throws it. No connection was made, so it must classify as
+        // ConnectionError, not the generic HttpError.
+        val reason = requestFailingWith(NoRouteToHostException("Host unreachable"))
+
+        assertIs<RequestExecutionErrorReason.ConnectionError>(reason)
+        assertTrue(reason.isSiteUnreachable)
+        // Passed through without a prefix: the localized message already says the connection failed.
+        assertEquals("Host unreachable", reason.reason)
+    }
+
+    @Test
+    fun `a connection failure without a message reports the exception type`() = runTest {
+        // A message-less exception must not render as the literal text "null".
+        val reason = requestFailingWith(NoRouteToHostException())
+
+        assertIs<RequestExecutionErrorReason.ConnectionError>(reason)
+        assertEquals("java.net.NoRouteToHostException", reason.reason)
+    }
+
+    private suspend fun requestFailingWith(exception: IOException): RequestExecutionErrorReason {
+        val client = OkHttpClient.Builder()
+            .addInterceptor { throw exception }
+            .build()
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(client),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.none(),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        assertIs<WpRequestResult.RequestExecutionFailed<*>>(result)
+        return result.reason
+    }
+
+    @Test
     fun `a file that fails while its bytes are read is mapped to MediaFileUnreadable`() = runTest {
         // A file that passes the pre-upload check (`exists()`/`isFile`/`canRead()`) but then fails
         // when OkHttp reads its bytes to stream the body — e.g. deleted after the check, or a storage
@@ -378,6 +430,68 @@ class WpRequestExecutorTest {
         assertEquals(522u, reason.cloudflareCode)
         assertEquals("a50c80a41cb4ff4c", reason.rayId)
         assertEquals(120uL, reason.retryAfter)
+    }
+
+    /**
+     * A non-ASCII header value must reach the site as UTF-8, as reqwest sends it. OkHttp's `addHeader`
+     * throws for one, and `WpApiClient.request` then throws an `InternalException`.
+     */
+    @Test
+    fun `a nonce with a byte-order mark is sent as UTF-8`() = runTest {
+        // An example nonce with a byte-order mark at the start.
+        val nonce = "\uFEFFabc123def0"
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("[]"))
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.staticWithAuth(WpAuthentication.Nonce(nonce = nonce)),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        assertEquals(nonce, mockWebServer.takeRequest().getHeader("X-WP-Nonce"))
+        assertIs<WpRequestResult.Success<*>>(result)
+    }
+
+    @Test
+    fun `an upload with a non-ASCII token is sent as UTF-8`() = runTest {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(401)
+                .setHeader("Content-Type", "application/json; charset=UTF-8")
+                .setBody(
+                    """{"code":"rest_not_logged_in","message":"You are not currently logged in.",""" +
+                        """"data":{"status":401}}"""
+                )
+        )
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true },
+            fileResolver = ClasspathFileResolver()
+        )
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.staticWithAuth(WpAuthentication.Bearer(token = "tökén")),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.media().create(
+                params = MediaCreateParams(title = "Non-ASCII token", filePath = "test_media.jpg")
+            )
+        }
+
+        assertEquals("Bearer tökén", mockWebServer.takeRequest().getHeader("Authorization"))
+        assertIs<WpRequestResult.WpError<*>>(result)
+        assertIs<WpErrorCode.Unauthorized>((result as WpRequestResult.WpError<*>).errorCode)
     }
 
     /**

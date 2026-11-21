@@ -1,3 +1,4 @@
+import Foundation
 import WordPressAPIInternal
 
 public extension BotMessageContext {
@@ -36,5 +37,60 @@ extension WpComSiteIdentifier: ExpressibleByStringLiteral, ExpressibleByIntegerL
         }
 
         self = WpComSiteIdentifier(integerLiteral: value)
+    }
+}
+
+// MARK: - Attachments
+
+/// Support attachments cross the bindings as filesystem paths, and the request executor opens each
+/// one directly. `URL.path()` percent-encodes by default, so passing it produces a path that
+/// doesn't exist on disk — a filename with a space is enough — and the request fails with
+/// `MediaFileNotFound`:
+///
+/// ```swift
+/// let url = URL(fileURLWithPath: "/tmp/Screen Shot 1.png")
+/// url.path()  // "/tmp/Screen%20Shot%201.png"  ❌
+/// url.path    // "/tmp/Screen Shot 1.png"      ✅
+/// ```
+///
+/// The decoded `path` is also what `MultipartFormContent` uses to open the file, so the value
+/// produced here and the value consumed there are read the same way.
+///
+/// These initializers take the URLs and own the conversion, so a caller holding a file URL — from
+/// a photo picker, say, where the filename comes from the user's library — can't get it wrong.
+///
+/// `attachmentURLs` deliberately has no default value. Giving it one would make a call that
+/// passes no attachments at all match both this initializer and the generated one.
+///
+/// Keep the parameter lists in sync with the generated memberwise initializers in `wp_api.swift`.
+
+public extension CreateSupportTicketParams {
+    init(
+        subject: String,
+        message: String,
+        application: String,
+        wpcomSiteId: UInt64? = nil,
+        tags: [String] = [],
+        encryptedLogIds: [String] = [],
+        attachmentURLs: [URL]
+    ) {
+        self.init(
+            subject: subject,
+            message: message,
+            application: application,
+            wpcomSiteId: wpcomSiteId,
+            tags: tags,
+            encryptedLogIds: encryptedLogIds,
+            attachments: attachmentURLs.map(\.path)
+        )
+    }
+}
+
+public extension AddMessageToSupportConversationParams {
+    init(message: String, attachmentURLs: [URL]) {
+        self.init(
+            message: message,
+            attachments: attachmentURLs.map(\.path)
+        )
     }
 }
