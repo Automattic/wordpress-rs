@@ -17,7 +17,9 @@ import uniffi.wp_api.CloudflareErrorKind
 import uniffi.wp_api.MediaCreateParams
 import uniffi.wp_api.RequestExecutionErrorReason
 import uniffi.wp_api.UserListParams
+import uniffi.wp_api.WpAuthentication
 import uniffi.wp_api.WpAuthenticationProvider
+import uniffi.wp_api.WpErrorCode
 import java.io.File
 import java.net.URI
 import java.util.concurrent.TimeUnit
@@ -378,6 +380,68 @@ class WpRequestExecutorTest {
         assertEquals(522u, reason.cloudflareCode)
         assertEquals("a50c80a41cb4ff4c", reason.rayId)
         assertEquals(120uL, reason.retryAfter)
+    }
+
+    /**
+     * A non-ASCII header value must reach the site as UTF-8, as reqwest sends it. OkHttp's `addHeader`
+     * throws for one, and `WpApiClient.request` then throws an `InternalException`.
+     */
+    @Test
+    fun `a nonce with a byte-order mark is sent as UTF-8`() = runTest {
+        // An example nonce with a byte-order mark at the start.
+        val nonce = "\uFEFFabc123def0"
+        mockWebServer.enqueue(MockResponse().setResponseCode(200).setBody("[]"))
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true }
+        )
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.staticWithAuth(WpAuthentication.Nonce(nonce = nonce)),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.users().listWithEditContext(params = UserListParams())
+        }
+
+        assertEquals(nonce, mockWebServer.takeRequest().getHeader("X-WP-Nonce"))
+        assertIs<WpRequestResult.Success<*>>(result)
+    }
+
+    @Test
+    fun `an upload with a non-ASCII token is sent as UTF-8`() = runTest {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(401)
+                .setHeader("Content-Type", "application/json; charset=UTF-8")
+                .setBody(
+                    """{"code":"rest_not_logged_in","message":"You are not currently logged in.",""" +
+                        """"data":{"status":401}}"""
+                )
+        )
+
+        val executor = WpRequestExecutor(
+            httpClient = WpHttpClient.CustomOkHttpClient(OkHttpClient()),
+            networkAvailabilityProvider = NetworkAvailabilityProvider { true },
+            fileResolver = ClasspathFileResolver()
+        )
+        val apiClient = WpApiClient(
+            wpOrgSiteApiRootUrl = URI(mockWebServer.url("/wp-json").toString()).toURL(),
+            authProvider = WpAuthenticationProvider.staticWithAuth(WpAuthentication.Bearer(token = "tökén")),
+            requestExecutor = executor
+        )
+
+        val result = apiClient.request { requestBuilder ->
+            requestBuilder.media().create(
+                params = MediaCreateParams(title = "Non-ASCII token", filePath = "test_media.jpg")
+            )
+        }
+
+        assertEquals("Bearer tökén", mockWebServer.takeRequest().getHeader("Authorization"))
+        assertIs<WpRequestResult.WpError<*>>(result)
+        assertIs<WpErrorCode.Unauthorized>((result as WpRequestResult.WpError<*>).errorCode)
     }
 
     /**
