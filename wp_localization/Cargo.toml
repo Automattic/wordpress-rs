@@ -3,16 +3,10 @@ name = "wp_localization"
 version.workspace = true
 edition = "2024"
 
-[build-dependencies]
-uniffi = { workspace = true , features = [ "build", "cli" ] }
-
 [dependencies]
 fluent-bundle = { workspace = true }
 fluent-langneg = { workspace = true }
 fluent-templates = { workspace = true }
-paste = { workspace = true }
-strum = { workspace = true }
-strum_macros = { workspace = true }
 thiserror = { workspace = true }
 unic-langid = { workspace = true }
 uniffi = { workspace = true }

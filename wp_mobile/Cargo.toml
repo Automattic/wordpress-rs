@@ -42,6 +42,3 @@ rusqlite = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
 wp_mobile_cache = { path = "../wp_mobile_cache", features = ["test-helpers"] }
-
-[build-dependencies]
-uniffi = { workspace = true , features = [ "build", "cli" ] }
