@@ -2635,6 +2635,19 @@ mod posts {
         Arc<ReaderStreamCollection>,
         Arc<Mutex<SystemTime>>,
     ) {
+        with_an_unreadable_post_in(ACCOUNT, ReaderStream::Following).await
+    }
+
+    /// A service for `owner` with a clock the test moves, whose `stream` had post 2 unreadable.
+    async fn with_an_unreadable_post_in(
+        owner: ReaderOwner,
+        stream: ReaderStream,
+    ) -> (
+        ReaderService,
+        Arc<ScriptedExecutor>,
+        Arc<ReaderStreamCollection>,
+        Arc<Mutex<SystemTime>>,
+    ) {
         let executor = Arc::new(ScriptedExecutor::default());
         let now = Arc::new(Mutex::new(SystemTime::now()));
         let clock = {
@@ -2644,12 +2657,12 @@ mod posts {
         let service = ReaderService::with_clock(
             delegate(executor.clone()),
             cache(),
-            ACCOUNT,
+            owner,
             ReaderSavedSource::Ios,
             clock,
         )
         .unwrap();
-        let stream = service.stream(ReaderStream::Following);
+        let stream = service.stream(stream);
         let mut unreadable = post_json(2, 11);
         unreadable["date"] = json!("2026-11-18T11:00:00+91:00");
         executor.push(Step::Respond(
@@ -2745,6 +2758,27 @@ mod posts {
         *now.lock().unwrap() += Duration::from_secs(61 * 60);
         executor.push(Step::Respond(200, post_json(2, 11)));
         assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 1);
+    }
+
+    /// Signed out, no token is sent, so a 401 is the server's answer about the post.
+    #[tokio::test]
+    async fn signed_out_an_unreadable_post_answered_with_a_401_is_tried_five_times() {
+        let (_service, executor, stream, now) =
+            with_an_unreadable_post_in(ReaderOwner::SignedOut, tag()).await;
+        for attempt in 1..=6 {
+            *now.lock().unwrap() += Duration::from_secs(61 * 60);
+            if attempt <= 5 {
+                executor.push(Step::Respond(
+                    401,
+                    json!({ "error": "unauthorized", "message": "User cannot view this post." }),
+                ));
+            }
+            assert_eq!(stream.retry_unreadable_posts().await.unwrap(), 0);
+        }
+
+        // Five requests for the post, and none the sixth time.
+        assert_eq!(executor.sent().len(), 6);
+        assert_eq!(stream.info().unwrap().unreadable_post_count, 1);
     }
 
     #[tokio::test]

@@ -359,7 +359,7 @@ impl ReaderStreamCollection {
                     self.context.cache.execute(|connection| {
                         if is_gone(&error) {
                             ReaderUnreadablePostRepository::delete(&*connection, post.row_id)
-                        } else if was_answered(&error) {
+                        } else if was_answered(&error, self.context.owner) {
                             ReaderUnreadablePostRepository::record_attempt(
                                 &*connection,
                                 post.row_id,
@@ -367,7 +367,7 @@ impl ReaderStreamCollection {
                                 &message,
                             )
                         } else {
-                            // No answer came, or the account's sign-in was rejected: neither says
+                            // No answer came, or the account's token was rejected: neither says
                             // anything about the post.
                             Ok(())
                         }
@@ -871,12 +871,12 @@ fn is_gone(error: &ReaderError) -> bool {
 }
 
 /// Whether an error is the server's answer about the post, as opposed to a request that failed on
-/// the way: an answer that couldn't be read, or one in the 400s. A rejected sign-in is about the
-/// account, not the post.
-fn was_answered(error: &ReaderError) -> bool {
+/// the way: an answer that couldn't be read, or one in the 400s. A rejected token is about the
+/// account, not the post. Signed out, no token is sent, so a 401 is about the post.
+fn was_answered(error: &ReaderError, owner: ReaderOwner) -> bool {
     match error {
         ReaderError::Api(WpApiError::ResponseParsingError { .. }) => true,
-        _ if is_sign_in_rejected(error) => false,
+        _ if owner != ReaderOwner::SignedOut && is_sign_in_rejected(error) => false,
         ReaderError::Api(error) => {
             matches!(error.status_code(), Some(status) if (400..500).contains(&status))
         }
