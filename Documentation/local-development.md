@@ -113,3 +113,23 @@ adb shell am start -S -n rs.wordpress.example/.ui.welcome.WelcomeActivity --es w
 
 Either way, the token briefly appears in the process list while the launch command runs; that's
 inherent to passing it as a launch argument.
+
+## Running the TLS tests against a local badssl.com
+
+A few login tests check how TLS failures are reported, against sites from
+[badssl.com](https://badssl.com). CI runs a copy of badssl.com on each machine with
+`scripts/badssl-server.sh`, so they don't depend on the live site, which sometimes drops
+connections. Without `BADSSL_DOMAIN`, the tests use the live site.
+
+To use a copy on a Mac, with nginx from Homebrew:
+
+```bash
+scripts/badssl-server.sh prepare
+scripts/badssl-server.sh start
+BADSSL_DOMAIN=badssl.localhost swift test --filter LoginTests
+scripts/badssl-server.sh stop
+```
+
+`make test-server` also starts a copy, as the `badssl` Docker service, for the Kotlin integration
+tests. The copy's certificates are signed by a root it generates, which nothing trusts unless it's
+added: the Kotlin tests add it inside the `wordpress` container, and the Swift tests leave it out.

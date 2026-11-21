@@ -26,6 +26,10 @@ import uniffi.wp_api.RequestExecutionException
 import kotlin.test.assertContains
 import kotlin.test.assertNotNull
 
+// The badssl.com sites the TLS tests use. CI serves a copy as `badssl.localhost`
+// (`scripts/badssl-server.sh`), so the tests don't depend on the live site.
+private val badsslDomain = System.getenv("BADSSL_DOMAIN") ?: "badssl.com"
+
 @Execution(ExecutionMode.CONCURRENT)
 class ApiUrlDiscoveryTest {
     private val loginClient: WpLoginClient = WpLoginClient(emptyList(), NetworkAvailabilityProvider { true })
@@ -284,19 +288,19 @@ class ApiUrlDiscoveryTest {
         assertContains(presentedHostnames, "vanilla.wpmt.co")
     }
 
-    // `wrong.host.badssl.com` serves a valid `*.badssl.com` certificate on a host
+    // `wrong.host.<badssl domain>` serves a valid `*.<badssl domain>` certificate on a host
     // it doesn't cover — a genuine name mismatch whose identities live in the SANs.
-    // The old code reported only the Common Name; assert the `badssl.com` SAN is
+    // The old code reported only the Common Name; assert the `<badssl domain>` SAN is
     // now included too.
     //
-    // The CN-less case (`no-common-name.badssl.com`) isn't exercised here: that
-    // certificate is expired, which OkHttp raises as an `SSLHandshakeException` —
-    // not the `SSLPeerUnverifiedException` that routes to certificate inspection —
-    // and the inspection's re-connect would fail on the expiry regardless. The
-    // Rust `parse_certificate` unit test covers the CN-less parse directly.
+    // The CN-less case (`no-common-name.<badssl domain>`) isn't exercised here: no copy
+    // gives the name mismatch that routes to certificate inspection. badssl.com's
+    // certificate is expired, which OkHttp raises as an `SSLHandshakeException`, and the
+    // local copy's is valid for its name. The Rust `parse_certificate` unit test covers
+    // the CN-less parse directly.
     @Test
     fun testNameMismatchReportsAllPresentedNames() = runTest {
-        val reason = loginClient.apiDiscovery("https://wrong.host.badssl.com")
+        val reason = loginClient.apiDiscovery("https://wrong.host.$badsslDomain")
             .assertFailureFindApiRoot().getRequestExecutionErrorReason()
         assertInstanceOf(RequestExecutionErrorReason.InvalidSslError::class.java, reason)
 
@@ -308,7 +312,7 @@ class ApiUrlDiscoveryTest {
 
         val presentedHostnames =
             (sslError as InvalidSslErrorReason.CertificateNotValidForName).presentedHostnames
-        assertContains(presentedHostnames, "badssl.com")
+        assertContains(presentedHostnames, badsslDomain)
     }
 
     @Test // Spec Example 17 (with exception)

@@ -12,7 +12,20 @@ restore_swiftpm_cache --package-resolved Package.resolved
 function run_tests() {
     local platform; platform=$1
     echo "--- :swift: Testing on $platform"
+    local refused; refused=$(scripts/badssl-server.sh refused-handshakes)
     make "test-swift-$platform"
+    echo "The badssl.com copy saw $(( $(scripts/badssl-server.sh refused-handshakes) - refused )) refused TLS handshakes"
+}
+
+# The TLS tests use a copy of badssl.com on this machine rather than the live site.
+function start_badssl() {
+    echo "--- :lock: Starting a copy of badssl.com"
+    command -v nginx > /dev/null || brew install nginx
+    scripts/badssl-server.sh prepare
+    scripts/badssl-server.sh start
+    export BADSSL_DOMAIN=badssl.localhost
+    # `xcodebuild test` passes a `TEST_RUNNER_` variable to the tests without its prefix.
+    export TEST_RUNNER_BADSSL_DOMAIN=badssl.localhost
 }
 
 function build_for_real_device() {
@@ -33,6 +46,10 @@ function build_for_real_device() {
 }
 
 func=$1
+
+if [ "$func" == "run_tests" ]; then
+    start_badssl
+fi
 
 for platform in "iOS" "macOS" "Catalyst" "tvOS" "watchOS"; do
     $func $platform
