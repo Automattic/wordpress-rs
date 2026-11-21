@@ -85,7 +85,12 @@ struct LoginView: View {
                 let loginClient = WordPressLoginClient(urlSession: .shared)
                 let siteDetails = try await loginClient.details(ofSite: url)
 
-                if let applicationPasswordUrl = siteDetails.authentication.loginURL(for: application) {
+                switch siteDetails.authentication {
+                case .applicationPasswords:
+                    guard let applicationPasswordUrl = siteDetails.authentication.loginURL(for: application) else {
+                        preconditionFailure("Application Passwords discovery always carries a login URL")
+                    }
+
                     let callbackUrl = try await self.webAuthenticationSession.authenticate(
                         using: applicationPasswordUrl,
                         callbackURLScheme: "x-wordpress-app"
@@ -94,20 +99,19 @@ struct LoginView: View {
                     let loginDetails = try loginClient.credentials(from: callbackUrl)
                     try await loginManager
                         .setLoginCredentials(to: loginDetails, apiRootURL: siteDetails.parsedSiteUrl.asURL())
-                }
+                case .oAuth2(let endpoints):
+                    // Throws a localized error if the site's OAuth provider isn't one this app has credentials for.
+                    let configuration = try loginManager.oauthRegistry.configurationFor(endpoints: endpoints)
 
-                if let endpoints = siteDetails.authentication.oauthEndpoints {
-                    if let configuration = loginManager.oauthRegistry.findConfiguration(endpoints: endpoints) {
-                        guard let host = siteDetails.parsedSiteUrl.asURL().host() else {
-                            preconditionFailure("Invalid site details response")
-                        }
-
-                        try await loginManager.logInToWpCom(
-                            configuration: configuration,
-                            webAuthenticationSession: webAuthenticationSession,
-                            blogId: .slug(value: host)
-                        )
+                    guard let host = siteDetails.parsedSiteUrl.asURL().host() else {
+                        preconditionFailure("Invalid site details response")
                     }
+
+                    try await loginManager.logInToWpCom(
+                        configuration: configuration,
+                        webAuthenticationSession: webAuthenticationSession,
+                        blogId: .slug(value: host)
+                    )
                 }
             } catch let err {
                 handleLoginError(err)
@@ -135,6 +139,16 @@ struct LoginView: View {
 
     private func handleLoginError(_ error: Error) {
         self.isLoggingIn = false
+
+        // The user backed out, so there's nothing to report. Showing `localizedDescription` here would
+        // surface Foundation's generic "The operation couldn't be completed" text.
+        if error is CancellationError {
+            return
+        }
+        if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+            return
+        }
+
         self.loginError = error.localizedDescription
     }
 }

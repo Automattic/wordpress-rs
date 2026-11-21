@@ -10,11 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `CreateSupportTicketParams` and `AddMessageToSupportConversationParams` accept `attachmentURLs: [URL]` alongside the existing `attachments: [String]`. Attachments cross the bindings as filesystem paths and the request executor opens each one directly, so a caller converting a file URL with `URL.path()` — which percent-encodes by default — produced a path that doesn't exist on disk and failed the request with `MediaFileNotFound`. A filename with a space is enough, and non-ASCII names are escaped too. The new initializers own the conversion.
+- `OAuth2ConfigurationStore.configuration_for(endpoints)`: like `find_configuration`, but fails with a localized `OAuth2ConfigurationStoreError` when the site's OAuth2 provider isn't registered, so apps can show a message instead of silently doing nothing.
 
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
 - **Internal:** Bumped the pinned stable Rust toolchain from `1.99.1` to `1.100.0`, and removed the unused dependencies its Cargo now warns about.
+- Reworded several login-discovery error messages so they explain what went wrong and what to do next: invalid SSL certificates, unknown hostnames, connection timeouts, and an unreadable REST API root response (which also fixes a doubled "the"). Translations for these strings will lag until GlotPress catches up.
 
 ### Fixed
 
