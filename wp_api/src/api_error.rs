@@ -776,7 +776,8 @@ impl RequestExecutionErrorReason {
     /// connection (`notConnectedToInternet`, `networkConnectionLost`) or is barred
     /// from using one right now (`dataNotAllowed`, `internationalRoamingOff`,
     /// `callIsActive`). Kotlin consults a caller-supplied
-    /// `NetworkAvailabilityProvider` when a DNS lookup fails. The
+    /// `NetworkAvailabilityProvider` when a DNS lookup fails or a connection
+    /// can't be established. The
     /// `reqwest` executor has neither and never constructs `DeviceIsOfflineError`,
     /// so this always returns `false` there — an offline request typically
     /// surfaces as a DNS failure (`NonExistentSiteError`) or a connect error

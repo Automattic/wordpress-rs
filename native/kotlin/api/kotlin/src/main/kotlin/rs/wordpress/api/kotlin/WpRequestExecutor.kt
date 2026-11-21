@@ -252,9 +252,9 @@ class WpRequestExecutor @JvmOverloads constructor(
             // `ConnectException`, so it needs its own branch. The JVM always reports EHOSTUNREACH this
             // way. Android does only when the client has no connect timeout; with one (the
             // `DefaultHttpClient` default), it reports a `ConnectException` instead.
-            RequestExecutionErrorReason.connectionError(e)
+            RequestExecutionErrorReason.connectionError(e, networkAvailabilityProvider)
         } catch (e: ConnectException) {
-            RequestExecutionErrorReason.connectionError(e)
+            RequestExecutionErrorReason.connectionError(e, networkAvailabilityProvider)
         } catch (e: SocketTimeoutException) {
             RequestExecutionErrorReason.HttpTimeoutError
         } catch (e: InterruptedIOException) {
@@ -344,13 +344,7 @@ private fun RequestExecutionErrorReason.Companion.unknownHost(
     networkAvailabilityProvider: NetworkAvailabilityProvider
 ): RequestExecutionErrorReason {
     if (!networkAvailabilityProvider.isNetworkAvailable()) {
-        // Leave the message empty so the library renders its own localized, translated
-        // offline string (`device_is_offline`). The raw `UnknownHostException` text is a
-        // DNS diagnostic, not something to show a user; iOS instead passes Apple's
-        // localized `URLError` description here, which the library renders as-is.
-        return RequestExecutionErrorReason.DeviceIsOfflineError(
-            errorMessage = ""
-        )
+        return deviceIsOffline()
     }
 
     return RequestExecutionErrorReason.NonExistentSiteError(
@@ -362,11 +356,30 @@ private fun RequestExecutionErrorReason.Companion.unknownHost(
 /**
  * A connection to the server could not be established, so the request never reached it.
  *
+ * If the device has no network, that is the cause, so it is reported instead of blaming the site.
+ * A connect can fail this way without a DNS failure first, for example when the address was
+ * already cached, or the site's URL is an IP address.
+ *
  * The exception's message is passed through as-is: the localized `connection_error` text already
  * starts with "Couldn't connect to the server", so a prefix here would repeat it.
  */
-private fun RequestExecutionErrorReason.Companion.connectionError(e: SocketException) =
-    RequestExecutionErrorReason.ConnectionError(reason = e.localizedMessage ?: e.toString())
+private fun RequestExecutionErrorReason.Companion.connectionError(
+    e: SocketException,
+    networkAvailabilityProvider: NetworkAvailabilityProvider
+): RequestExecutionErrorReason {
+    if (!networkAvailabilityProvider.isNetworkAvailable()) {
+        return deviceIsOffline()
+    }
+
+    return RequestExecutionErrorReason.ConnectionError(reason = e.localizedMessage ?: e.toString())
+}
+
+// Leave the message empty so the library renders its own localized, translated offline string
+// (`device_is_offline`). The raw exception text is a socket or DNS diagnostic, not something to
+// show a user; iOS instead passes Apple's localized `URLError` description here, which the
+// library renders as-is.
+private fun RequestExecutionErrorReason.Companion.deviceIsOffline() =
+    RequestExecutionErrorReason.DeviceIsOfflineError(errorMessage = "")
 
 @Suppress("UNUSED_PARAMETER", "TooGenericExceptionCaught", "SwallowedException")
 private fun RequestExecutionErrorReason.Companion.invalidSSLError(
