@@ -151,6 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The live mention suggestions trial in `wp_com_e2e` now asks about the trial account's own test site: the server only suggests the people of a site the account is a member of, and answers with no one for any other, which made the trial fail for CI's account. The docs of `ReaderCommentsCollection::mention_suggestions` and the endpoint said it answers for any site.
 - Signed out, `ReaderService::resolve_link` no longer answers an address on a site that isn't on WordPress.com or Jetpack, such as `https://www.rust-lang.org/learn`, with `ReaderError::NeedsAccount`, though an account couldn't find a post there either. When the slug lookup answers `unknown_blog`, or an address with no slug has a host no site has, the address is looked up for a feed, as it is with an account.
 - `Documentation/reader-endpoints.md` is what `scripts/reader-endpoints-doc.py` writes again: the slug lookup's `unknown_blog` answer is now in the comment the document is made from, so `--check` passes.
+- The live trial `reader_service::resolve_link_to_a_post_needs_an_account` expects a signed-out address with no slug to send one request, the host's site lookup that `ReaderService::resolve_link` now makes, rather than none.
 
 ### Security
 

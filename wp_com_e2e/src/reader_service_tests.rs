@@ -1054,12 +1054,13 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                         ..signed_out(&ctx.delegate)
                     };
                     let service = new_service(delegate, ReaderOwner::SignedOut)?;
-                    // Signed out, an address whose path ends in no slug (a day's archive) sends
-                    // nothing, and a slug the site doesn't have is refused after one request. Only
-                    // the resolver, which needs an account, could still find either.
+                    // Signed out, an address whose path ends in no slug (a day's archive) has its
+                    // host looked up as a site, which finds one, and a slug the site doesn't have
+                    // is refused: one request each. Only the resolver, which needs an account,
+                    // could still find either.
                     let no_slug = format!("{SITE_URL}2014/12/29/");
                     let unknown_slug = format!("{SITE_URL}2014/12/29/no-post-has-this-slug-wp-rs-e2e/");
-                    for (address, expected_sent) in [(no_slug, 0), (unknown_slug, 1)] {
+                    for (address, expected_sent) in [(no_slug, 1), (unknown_slug, 1)] {
                         let sent_before = executor.sent.load(Ordering::SeqCst);
                         match service.resolve_link(address.clone()).await {
                             Err(ReaderError::NeedsAccount) => {}
