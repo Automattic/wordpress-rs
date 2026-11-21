@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Internal:** `wp_rs_cli wpcom-login` signs in to WordPress.com in a browser with the OAuth2 authorization code flow and saves the account's bearer token to a file only you can read, without printing it. It reads the application's client ID and secret from a JSON file such as `wp_com_test_credentials.json`. It catches the sign-in itself when the application lists `http://localhost:8765/callback` as a redirect URL, and asks for the address the browser was sent to for any other redirect URL.
+
 ### Changed
 
 - **Internal:** Disabled Dependabot updates for rusqlite to preserve compatibility with Apple's system SQLite on iOS 18.
