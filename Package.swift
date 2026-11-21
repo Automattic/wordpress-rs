@@ -3,7 +3,7 @@
 import Foundation
 import PackageDescription
 
-let libwordpressFFIVersion: WordPressRSVersion = .local
+let libwordpressFFIVersion: WordPressRSVersion = .release(version: "pr-builds/1793/7008", checksum: "b7a97713a076d755f4c8763c5e66c0e6bd9daaf72b6c2952fd6aa6c8d5c15545")
 
 #if os(Linux)
 let libwordpressFFI: Target = .systemLibrary(
