@@ -23,6 +23,16 @@ function start_badssl() {
     command -v nginx > /dev/null || brew install nginx
     scripts/badssl-server.sh prepare
     scripts/badssl-server.sh start
+
+    # Trust its root, so the tests see the name mismatches it serves rather than an unknown root.
+    # The VM is thrown away after the job. Without the `authorizationdb` change, macOS asks for
+    # confirmation before changing what it trusts.
+    local root; root=$(scripts/badssl-server.sh root-cert)
+    sudo security authorizationdb write com.apple.trust-settings.admin allow
+    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$root"
+    # `scripts/xcodebuild-test.sh` adds it to each simulator.
+    export BADSSL_ROOT_CERT="$root"
+
     export BADSSL_DOMAIN=badssl.localhost
     # `xcodebuild test` passes a `TEST_RUNNER_` variable to the tests without its prefix.
     export TEST_RUNNER_BADSSL_DOMAIN=badssl.localhost

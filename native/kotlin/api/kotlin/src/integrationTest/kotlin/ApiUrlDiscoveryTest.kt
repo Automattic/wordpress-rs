@@ -3,6 +3,7 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.junit.jupiter.api.parallel.Execution
 import org.junit.jupiter.api.parallel.ExecutionMode
 import uniffi.wp_api.ApiDiscoveryAuthenticationMiddleware
@@ -26,9 +27,10 @@ import uniffi.wp_api.RequestExecutionException
 import kotlin.test.assertContains
 import kotlin.test.assertNotNull
 
-// The badssl.com sites the TLS tests use. CI serves a copy as `badssl.localhost`
-// (`scripts/badssl-server.sh`), so the tests don't depend on the live site.
-private val badsslDomain = System.getenv("BADSSL_DOMAIN") ?: "badssl.com"
+// Where the TLS tests find the copy of badssl.com that `scripts/badssl-server.sh` runs, such as
+// `badssl.localhost`. They need its root trusted: OkHttp only reports a name mismatch once it
+// trusts the chain.
+private val badsslDomain: String? = System.getenv("BADSSL_DOMAIN")
 
 @Execution(ExecutionMode.CONCURRENT)
 class ApiUrlDiscoveryTest {
@@ -292,27 +294,37 @@ class ApiUrlDiscoveryTest {
     // it doesn't cover — a genuine name mismatch whose identities live in the SANs.
     // The old code reported only the Common Name; assert the `<badssl domain>` SAN is
     // now included too.
-    //
-    // The CN-less case (`no-common-name.<badssl domain>`) isn't exercised here: no copy
-    // gives the name mismatch that routes to certificate inspection. badssl.com's
-    // certificate is expired, which OkHttp raises as an `SSLHandshakeException`, and the
-    // local copy's is valid for its name. The Rust `parse_certificate` unit test covers
-    // the CN-less parse directly.
     @Test
+    @EnabledIfEnvironmentVariable(named = "BADSSL_DOMAIN", matches = ".+")
     fun testNameMismatchReportsAllPresentedNames() = runTest {
-        val reason = loginClient.apiDiscovery("https://wrong.host.$badsslDomain")
+        val domain = assertNotNull(badsslDomain)
+        val sslError = certificateNotValidForName("wrong.host.$domain")
+
+        assertEquals("wrong.host.$domain", sslError.hostname)
+        assertContains(sslError.presentedHostnames, domain)
+    }
+
+    // `no-common-name-mismatch.<badssl domain>` serves a certificate with no Common Name and
+    // a single SAN, `no-common-name.<badssl domain>`, on a host it doesn't cover. That SAN is
+    // the whole list of presented names.
+    @Test
+    @EnabledIfEnvironmentVariable(named = "BADSSL_DOMAIN", matches = ".+")
+    fun testCommonNameLessCertificateReportsSan() = runTest {
+        val domain = assertNotNull(badsslDomain)
+        val sslError = certificateNotValidForName("no-common-name-mismatch.$domain")
+
+        assertEquals("no-common-name-mismatch.$domain", sslError.hostname)
+        assertEquals(listOf("no-common-name.$domain"), sslError.presentedHostnames)
+    }
+
+    private suspend fun certificateNotValidForName(host: String): InvalidSslErrorReason.CertificateNotValidForName {
+        val reason = loginClient.apiDiscovery("https://$host")
             .assertFailureFindApiRoot().getRequestExecutionErrorReason()
         assertInstanceOf(RequestExecutionErrorReason.InvalidSslError::class.java, reason)
 
         val sslError = (reason as RequestExecutionErrorReason.InvalidSslError).reason
-        assertInstanceOf(
-            InvalidSslErrorReason.CertificateNotValidForName::class.java,
-            sslError
-        )
-
-        val presentedHostnames =
-            (sslError as InvalidSslErrorReason.CertificateNotValidForName).presentedHostnames
-        assertContains(presentedHostnames, badsslDomain)
+        assertInstanceOf(InvalidSslErrorReason.CertificateNotValidForName::class.java, sslError)
+        return sslError as InvalidSslErrorReason.CertificateNotValidForName
     }
 
     @Test // Spec Example 17 (with exception)

@@ -7,9 +7,9 @@ import Testing
 import FoundationNetworking
 #endif
 
-/// The badssl.com sites the TLS tests use. CI serves a copy as `badssl.localhost`
-/// (`scripts/badssl-server.sh`), so the tests don't depend on the live site.
-private let badsslDomain = ProcessInfo.processInfo.environment["BADSSL_DOMAIN"] ?? "badssl.com"
+/// Where the TLS tests find the copy of badssl.com that `scripts/badssl-server.sh` runs, such as
+/// `badssl.localhost`. See `Documentation/local-development.md`.
+private let badsslDomain = ProcessInfo.processInfo.environment["BADSSL_DOMAIN"]
 
 // swiftlint:disable line_length
 @Suite("Login Tests", .enabled(if: !isLinux()))
@@ -351,64 +351,20 @@ class LoginTests {
     }
 
     /// Regression for a SAN-only (Common-Name-less) leaf certificate — see #1508.
-    /// `no-common-name.<badssl domain>` serves a certificate whose subject carries no
-    /// Common Name and a single SAN. Before the fix the leaf failed to parse, the
-    /// `compactMap` dropped it, and element 0 of the survivors — the issuer CA —
-    /// was reported, so `presentedHostnames` was the CA's name (`COMODO ...`)
+    /// `no-common-name-mismatch.<badssl domain>` serves a certificate whose subject carries no
+    /// Common Name and a single SAN, `no-common-name.<badssl domain>`, so it's a name mismatch.
+    /// Before the fix the leaf failed to parse, the `compactMap` dropped it, and element 0 of
+    /// the survivors — the issuer CA — was reported, so `presentedHostnames` was the CA's name
     /// rather than the site's.
-    @Test("SAN-only certificate reports its SAN, not the issuer CA")
+    @Test(
+        "SAN-only certificate reports its SAN, not the issuer CA",
+        .enabled(if: badsslDomain != nil, "Needs BADSSL_DOMAIN")
+    )
     func testCommonNameLessCertificateReportsSan() async throws {
+        let domain = try #require(badsslDomain)
         await #expect(
             performing: {
-                _ = try await self.client.details(ofSite: "https://no-common-name.\(badsslDomain)")
-            },
-            throws: { error in
-                let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
-
-                guard case .invalidSslError(let underlyingReason) = reason else {
-                    Issue.record("The transport error must be `invalidSslError`")
-                    return false
-                }
-
-                #if os(watchOS) // watchOS doesn't make the underlying certificate available to us
-                guard case .genericSslError = underlyingReason else {
-                    Issue.record("The underlying error must be `genericSslError`")
-                    return false
-                }
-                #else
-                // Breadcrumb (#1498): this certificate is valid for its name, and fails for another
-                // reason: badssl.com's is expired, and nothing here trusts the local copy's root.
-                // The executor currently reports either as `certificateNotValidForName`. Once #1498
-                // reports them as what they are, the assertion below breaks: this then needs a
-                // Common-Name-less certificate served on a host it doesn't cover. The parsing itself
-                // is already covered #1498-proof by the Rust `ssl` unit tests.
-                guard case .certificateNotValidForName(_, let presentedHostnames) = underlyingReason else {
-                    Issue.record("The underlying error must be `certificateNotValidForName`")
-                    return false
-                }
-
-                // The leaf carries no Common Name and exactly one SAN, so that SAN
-                // is the entire presented-hostname list. The bug reported the
-                // COMODO issuer CA's name here instead.
-                #expect(presentedHostnames == ["no-common-name.\(badsslDomain)"])
-                #endif
-
-                return true
-            }
-        )
-    }
-
-    /// Regression for the SANs half of the same payload — see #1507.
-    /// `wrong.host.<badssl domain>` serves a `*.<badssl domain>` certificate on a host
-    /// it doesn't cover, so it's a name mismatch whose identities live in the SANs.
-    /// `presentedHostnames` must include them, not only the Common Name. Nothing here
-    /// trusts the local copy's root, so its failure is also an unknown root, which the
-    /// executor reports the same way (#1498).
-    @Test("Name-mismatch certificate reports its SANs, not only its CN")
-    func testNameMismatchReportsAllPresentedNames() async throws {
-        await #expect(
-            performing: {
-                _ = try await self.client.details(ofSite: "https://wrong.host.\(badsslDomain)")
+                _ = try await self.client.details(ofSite: "https://no-common-name-mismatch.\(domain)")
             },
             throws: { error in
                 let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
@@ -429,13 +385,58 @@ class LoginTests {
                     return false
                 }
 
-                #expect(hostname == "wrong.host.\(badsslDomain)")
+                #expect(hostname == "no-common-name-mismatch.\(domain)")
+                // The leaf carries no Common Name and exactly one SAN, so that SAN
+                // is the entire presented-hostname list. The bug reported the
+                // issuer CA's name here instead.
+                #expect(presentedHostnames == ["no-common-name.\(domain)"])
+                #endif
+
+                return true
+            }
+        )
+    }
+
+    /// Regression for the SANs half of the same payload — see #1507.
+    /// `wrong.host.<badssl domain>` serves a valid `*.<badssl domain>` certificate on a host
+    /// it doesn't cover, so it's a genuine name mismatch whose identities live in the SANs.
+    /// `presentedHostnames` must include them, not only the Common Name.
+    @Test(
+        "Name-mismatch certificate reports its SANs, not only its CN",
+        .enabled(if: badsslDomain != nil, "Needs BADSSL_DOMAIN")
+    )
+    func testNameMismatchReportsAllPresentedNames() async throws {
+        let domain = try #require(badsslDomain)
+        await #expect(
+            performing: {
+                _ = try await self.client.details(ofSite: "https://wrong.host.\(domain)")
+            },
+            throws: { error in
+                let reason = try #require(try self.getRequestExecutionErrorReason(from: error))
+
+                guard case .invalidSslError(let underlyingReason) = reason else {
+                    Issue.record("The transport error must be `invalidSslError`")
+                    return false
+                }
+
+                #if os(watchOS) // watchOS doesn't make the underlying certificate available to us
+                guard case .genericSslError = underlyingReason else {
+                    Issue.record("The underlying error must be `genericSslError`")
+                    return false
+                }
+                #else
+                guard case .certificateNotValidForName(let hostname, let presentedHostnames) = underlyingReason else {
+                    Issue.record("The underlying error must be `certificateNotValidForName`")
+                    return false
+                }
+
+                #expect(hostname == "wrong.host.\(domain)")
                 // The certificate is for `*.<badssl domain>` with SANs `*.<badssl domain>`
                 // and `<badssl domain>`. The old code reported only the CN, so the
                 // `<badssl domain>` SAN is the discriminator that proves SANs are now
                 // included.
-                #expect(presentedHostnames.contains(badsslDomain))
-                #expect(presentedHostnames.contains("*.\(badsslDomain)"))
+                #expect(presentedHostnames.contains(domain))
+                #expect(presentedHostnames.contains("*.\(domain)"))
                 #endif
 
                 return true

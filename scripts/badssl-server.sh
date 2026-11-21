@@ -3,7 +3,11 @@
 # Runs a copy of badssl.com (https://github.com/chromium/badssl.com) on this machine, so the
 # tests of how TLS failures are reported don't depend on the live site. It serves the same
 # sites under `badssl.localhost`, with certificates signed by a root it generates. Nothing
-# trusts that root unless it's added to a trust store.
+# trusts that root unless it's added to a trust store: CI adds it, a laptop shouldn't.
+#
+# It adds one site badssl.com doesn't have: `no-common-name-mismatch` serves the
+# `no-common-name` certificate, so it fails on the name even when the root is trusted. The
+# certificates are new each time, so `expired` isn't: badssl.com signs it for one day.
 #
 #   prepare      Fetch badssl.com, generate its certificates and write its nginx config.
 #   serve        Run nginx in the foreground (for Docker).
@@ -84,6 +88,9 @@ render_site() {
                 }
                 close ARGV if eof;    # so `$.` counts each file from 1
             '
+
+    sed 's/server_name no-common-name\./server_name no-common-name-mismatch./' \
+        "$SITE_DIR/domains/cert/no-common-name.conf" >"$SITE_DIR/domains/cert/no-common-name-mismatch.conf"
 }
 
 prepare() {

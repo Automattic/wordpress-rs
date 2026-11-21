@@ -47,18 +47,21 @@ services:
             MYSQL_RANDOM_ROOT_PASSWORD: true
 
     # A copy of badssl.com, for the tests of how TLS failures are reported. Each site a test uses
-    # needs an alias here.
+    # needs an alias here. Port 443 is how tests on this machine reach it, as `*.badssl.localhost`.
     badssl:
         build:
             context: .
             dockerfile: badssl.Dockerfile
         container_name: 'badssl'
+        ports:
+            - '443:443'
         volumes:
             - badssl-root:/badssl-root
         networks:
             default:
                 aliases:
                     - no-common-name.badssl.localhost
+                    - no-common-name-mismatch.badssl.localhost
                     - wrong.host.badssl.localhost
 
 volumes:
