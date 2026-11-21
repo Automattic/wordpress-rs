@@ -5680,14 +5680,175 @@ mod more_actions {
             200,
             json!({ "subscribed": true, "tags": [], "added_tags": [] }),
         ));
-        let adopted = account.adopt_signed_out_tags().await.unwrap();
+        let report = account.adopt_signed_out_tags().await.unwrap();
 
-        assert_eq!(adopted, 1);
+        assert_eq!(report.adopted, 1);
+        assert!(report.refused.is_empty());
         assert_eq!(account.followed_tags().unwrap()[0].key, "art");
         assert!(signed_out.followed_tags().unwrap().is_empty());
         assert_eq!(executor.sent().len(), 1);
         // There's nothing left to take over.
-        assert_eq!(account.adopt_signed_out_tags().await.unwrap(), 0);
+        let report = account.adopt_signed_out_tags().await.unwrap();
+        assert_eq!(report.adopted, 0);
+        assert!(report.refused.is_empty());
+        assert_eq!(executor.sent().len(), 1);
+    }
+
+    /// A signed-out reader that followed `slugs` on the device, the account's service, and the
+    /// executor both share.
+    async fn signed_out_with_tags(
+        slugs: &[&str],
+    ) -> (ReaderService, ReaderService, Arc<ScriptedExecutor>) {
+        let cache = cache();
+        let executor = Arc::new(ScriptedExecutor::default());
+        let new = |owner| {
+            ReaderService::new(
+                delegate(executor.clone()),
+                cache.clone(),
+                owner,
+                ReaderSavedSource::Ios,
+            )
+            .unwrap()
+        };
+        let signed_out = new(ReaderOwner::SignedOut);
+        for slug in slugs {
+            signed_out
+                .set_tag_followed(ReaderTagSlug(slug.to_string()), None, true)
+                .await
+                .unwrap();
+        }
+        (signed_out, new(ACCOUNT), executor)
+    }
+
+    fn tag_followed() -> Step {
+        Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [], "added_tags": [] }),
+        )
+    }
+
+    fn followed_keys(service: &ReaderService) -> Vec<String> {
+        service
+            .followed_tags()
+            .unwrap()
+            .into_iter()
+            .map(|tag| tag.key)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_signed_out_tag_the_server_refuses_is_reported_and_the_others_are_followed() {
+        let (signed_out, account, executor) =
+            signed_out_with_tags(&["art", "travel", "food"]).await;
+        executor.push(tag_followed());
+        executor.push(refused("unauthorized"));
+        executor.push(tag_followed());
+
+        let report = account.adopt_signed_out_tags().await.unwrap();
+
+        assert_eq!(report.adopted, 2);
+        assert_eq!(report.refused.len(), 1, "{report:?}");
+        let refusal = &report.refused[0];
+        assert_eq!(refusal.slug, ReaderTagSlug("travel".to_string()));
+        assert!(
+            matches!(
+                &refusal.error,
+                ReaderError::Api(wp_api::prelude::WpApiError::WpError {
+                    error_code: wp_api::prelude::WpErrorCode::CustomError(code),
+                    ..
+                }) if code == "unauthorized"
+            ),
+            "{:?}",
+            refusal.error
+        );
+        assert_eq!(followed_keys(&account), ["art", "food"]);
+        assert!(signed_out.followed_tags().unwrap().is_empty());
+        assert_eq!(account.pending_action_count().unwrap(), 0);
+        assert_eq!(executor.sent().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn signed_out_tags_taken_over_offline_wait_to_be_sent() {
+        let (signed_out, account, executor) =
+            signed_out_with_tags(&["art", "travel", "food"]).await;
+        executor.push(Step::Offline);
+
+        let report = account.adopt_signed_out_tags().await.unwrap();
+
+        assert_eq!(report.adopted, 3);
+        assert!(report.refused.is_empty());
+        assert_eq!(followed_keys(&account), ["art", "travel", "food"]);
+        assert_eq!(account.pending_action_count().unwrap(), 3);
+        assert!(signed_out.followed_tags().unwrap().is_empty());
+
+        for _ in 0..3 {
+            executor.push(tag_followed());
+        }
+        assert_eq!(account.sync_actions().await.unwrap(), 0);
+        let follows: Vec<_> = sent_after(&executor, 1);
+        assert_eq!(
+            follows,
+            ["art", "travel", "food"].map(|slug| (
+                "/rest/v1.2/read/tags/mine/new".to_string(),
+                json!({ "tags": [slug] })
+            ))
+        );
+        assert_eq!(followed_keys(&account), ["art", "travel", "food"]);
+    }
+
+    /// Kotlin cancels a call by dropping it. The tags are the account's before anything is sent.
+    #[tokio::test]
+    async fn signed_out_tags_taken_over_by_a_dropped_call_wait_to_be_sent() {
+        let (signed_out, account, executor) =
+            signed_out_with_tags(&["art", "travel", "food"]).await;
+        let (_release, held) = oneshot::channel::<()>();
+        executor.push(Step::Hold(held, 200, json!({ "subscribed": true })));
+
+        let mut adopting = Box::pin(account.adopt_signed_out_tags());
+        assert!(futures::poll!(adopting.as_mut()).is_pending());
+        assert_eq!(account.context.actions.waiting.lock().unwrap().len(), 3);
+        drop(adopting);
+
+        assert!(account.context.actions.waiting.lock().unwrap().is_empty());
+        assert!(account.context.actions.refusals.lock().unwrap().is_empty());
+        assert_eq!(followed_keys(&account), ["art", "travel", "food"]);
+        assert_eq!(account.pending_action_count().unwrap(), 3);
+        assert!(signed_out.followed_tags().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_signed_out_tag_the_account_follows_already_stays_followed() {
+        let (signed_out, account, executor) = signed_out_with_tags(&["knitting"]).await;
+        executor.push(Step::Respond(
+            200,
+            json!({
+                "default": {},
+                "subscribed": { "1336": knitting_json() },
+                "recommended": {}
+            }),
+        ));
+        account.refresh_menu().await.unwrap();
+        // The server says so with no tag added.
+        executor.push(Step::Respond(
+            200,
+            json!({ "subscribed": true, "tags": [knitting_json()], "added_tags": [] }),
+        ));
+
+        let report = account.adopt_signed_out_tags().await.unwrap();
+
+        assert_eq!(report.adopted, 1);
+        assert!(report.refused.is_empty());
+        assert_eq!(followed_slugs(&account), [Some("knitting".to_string())]);
+        assert_eq!(account.pending_action_count().unwrap(), 0);
+        assert!(signed_out.followed_tags().unwrap().is_empty());
+        // It's sent again, as a tap on a followed tag's follow is.
+        assert_eq!(
+            sent_after(&executor, 1),
+            [(
+                "/rest/v1.2/read/tags/mine/new".to_string(),
+                json!({ "tags": ["knitting"] })
+            )]
+        );
     }
 
     #[tokio::test]

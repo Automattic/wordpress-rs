@@ -986,10 +986,10 @@ pub(crate) struct ActionQueue {
     /// [`ReaderService::refresh_blocked_sites`] and [`ReaderService::refresh_menu`].
     pub(super) lane: AsyncMutex<()>,
     /// The targets taps are waiting on, and how many taps wait on each.
-    waiting: Mutex<HashMap<Target, usize>>,
+    pub(super) waiting: Mutex<HashMap<Target, usize>>,
     /// Why the server refused a target a tap is waiting on, until the tap takes it. The call that
     /// sends a row isn't always its tap's: whichever call holds the lane sends every row.
-    refusals: Mutex<HashMap<Target, ReaderError>>,
+    pub(super) refusals: Mutex<HashMap<Target, ReaderError>>,
     /// Blocks and unblocks the server took from this service, by site, until the server's list
     /// of blocked sites agrees: whether the site was blocked. See
     /// [`ReaderService::refresh_blocked_sites`].
@@ -1042,47 +1042,19 @@ impl ReaderContext {
         if self.owner == ReaderOwner::SignedOut {
             return Err(ReaderError::NeedsAccount);
         }
-        let target = (
-            action.kind(),
-            action.target().ok_or_else(|| action.unsendable())?,
-        );
-        let payload = serde_json::to_string(&action)
-            .map_err(|error| SqliteDbError::SqliteError(error.to_string()))?;
-        self.cache.execute(|connection| {
-            let transaction = connection.transaction()?;
-            let was = action.shown(&transaction, self.owner_row)?;
-            action.show(&transaction, self.owner_row, on)?;
-            action.move_unseen_count(&transaction, self.owner_row, was, on)?;
-            ReaderActionRepository::tap(
-                &transaction,
-                self.owner_row,
-                target.0,
-                &target.1,
-                on,
-                was,
-                &payload,
-            )?;
-            transaction.commit().map_err(SqliteDbError::from)
+        let target = self.cache.execute(|connection| {
+            let transaction = connection.transaction().map_err(SqliteDbError::from)?;
+            let target = self.record_action(&transaction, &action, on)?;
+            transaction.commit().map_err(SqliteDbError::from)?;
+            Ok::<_, ReaderError>(target)
         })?;
-        // A refusal from before this tap was of an older one.
-        self.actions
-            .refusals
-            .lock()
-            .expect("refusals lock poisoned")
-            .remove(&target);
-        let _waiting = Waiting::new(&self.actions, target.clone());
+        let _waiting = self.wait_on(target.clone());
 
         let unsent = {
             let _lane = self.actions.lane.lock().await;
             self.send_pending_actions().await?
         };
-        if let Some(error) = self
-            .actions
-            .refusals
-            .lock()
-            .expect("refusals lock poisoned")
-            .remove(&target)
-        {
+        if let Some(error) = self.take_refusal(&target) {
             return Err(error);
         }
         let row = self.cache.execute(|connection| {
@@ -1097,6 +1069,56 @@ impl ReaderContext {
                     .unwrap_or_else(|| "It wasn't sent yet.".to_string()),
             },
         })
+    }
+
+    /// Records a tap in `executor`, a transaction: shows it, and stores its row to be sent.
+    /// Returns its target. Fails for an action that can't be sent.
+    fn record_action(
+        &self,
+        executor: &impl QueryExecutor,
+        action: &Action,
+        on: bool,
+    ) -> Result<Target, ReaderError> {
+        let target = (
+            action.kind(),
+            action.target().ok_or_else(|| action.unsendable())?,
+        );
+        let payload = serde_json::to_string(action)
+            .map_err(|error| SqliteDbError::SqliteError(error.to_string()))?;
+        let was = action.shown(executor, self.owner_row)?;
+        action.show(executor, self.owner_row, on)?;
+        action.move_unseen_count(executor, self.owner_row, was, on)?;
+        ReaderActionRepository::tap(
+            executor,
+            self.owner_row,
+            target.0,
+            &target.1,
+            on,
+            was,
+            &payload,
+        )?;
+        Ok(target)
+    }
+
+    /// Marks `target` as waited on, so a refusal of the tap just recorded for it is kept for
+    /// [`Self::take_refusal`].
+    fn wait_on(&self, target: Target) -> Waiting<'_> {
+        // A refusal from before this tap was of an older one.
+        self.actions
+            .refusals
+            .lock()
+            .expect("refusals lock poisoned")
+            .remove(&target);
+        Waiting::new(&self.actions, target)
+    }
+
+    /// Takes why the server refused `target`, if it did while it was waited on.
+    fn take_refusal(&self, target: &Target) -> Option<ReaderError> {
+        self.actions
+            .refusals
+            .lock()
+            .expect("refusals lock poisoned")
+            .remove(target)
     }
 
     /// Sends every waiting row, oldest tap first. Stops at the first that gets no answer, since
@@ -1543,6 +1565,27 @@ pub struct ReaderFollowTarget {
     pub name: Option<String>,
 }
 
+/// What [`ReaderService::adopt_signed_out_tags`] did.
+#[derive(Debug, Default, uniffi::Record)]
+pub struct ReaderTagAdoptionReport {
+    /// Tags this account now follows: the server has the follow, or it waits to be sent with
+    /// [`ReaderService::sync_actions`].
+    pub adopted: u64,
+    /// Tags the server refused to follow. Each shows for this account as it did before, which is
+    /// unfollowed unless the account followed it already, and isn't put back on the device.
+    pub refused: Vec<ReaderRefusedTag>,
+}
+
+/// A tag the server refused to follow.
+#[derive(Debug, uniffi::Record)]
+pub struct ReaderRefusedTag {
+    pub slug: ReaderTagSlug,
+    /// The tag's name, when the device had one.
+    pub title: Option<String>,
+    /// Why the server refused it.
+    pub error: ReaderError,
+}
+
 /// What becomes of something a signed-out reader turned on or off: it only happens on this
 /// device.
 fn only_on_this_device(on: bool) -> ReaderActionOutcome {
@@ -1697,45 +1740,73 @@ impl ReaderService {
 
     /// Follows, for this account, the tags that were followed on this device while nobody was
     /// signed in, and empties the signed-out reader's list. Call it after sign-in, on the
-    /// account's service. Returns how many tags it took over. A tag the account already follows
-    /// stays followed.
-    pub async fn adopt_signed_out_tags(&self) -> Result<u64, ReaderError> {
+    /// account's service.
+    ///
+    /// Every tag is a follow of this account's before anything is sent, as if the reader had
+    /// tapped it, so none is lost if the call stops part-way: what isn't sent waits for
+    /// [`Self::sync_actions`]. A tag the server refuses goes back to how this account had it, and
+    /// is listed in [`ReaderTagAdoptionReport::refused`]; the others are still sent. A tag the
+    /// account already follows stays followed.
+    pub async fn adopt_signed_out_tags(&self) -> Result<ReaderTagAdoptionReport, ReaderError> {
         use wp_api::wp_com::reader_tags::ReaderMenuSection;
         use wp_mobile_cache::repository::reader_sites::ReaderMenuRepository;
         use wp_mobile_cache::repository::wordpress_com_accounts::WordPressComAccountRepository;
 
         let context = &self.context;
         if context.owner == ReaderOwner::SignedOut {
-            return Ok(0);
+            return Ok(ReaderTagAdoptionReport::default());
         }
         let tags = context.cache.execute(|connection| {
+            let transaction = connection.transaction().map_err(SqliteDbError::from)?;
             let Some(signed_out) =
-                WordPressComAccountRepository::select_owner(&*connection, ReaderOwner::SignedOut)?
+                WordPressComAccountRepository::select_owner(&transaction, ReaderOwner::SignedOut)?
             else {
-                return Ok::<_, SqliteDbError>(Vec::new());
+                return Ok::<_, ReaderError>(Vec::new());
             };
-            let tags = ReaderMenuRepository::select_section(
-                &*connection,
+            let mut tags: Vec<(Target, ReaderTagSlug, Option<String>)> = Vec::new();
+            for tag in ReaderMenuRepository::select_section(
+                &transaction,
                 signed_out,
                 ReaderMenuSection::Subscribed,
-            )?;
+            )? {
+                let slug = ReaderTagSlug(tag.slug.unwrap_or(tag.key));
+                let action = Action::FollowTag {
+                    slug: slug.clone(),
+                    title: tag.title.clone(),
+                };
+                let target = context.record_action(&transaction, &action, true)?;
+                if !tags.iter().any(|(listed, _, _)| *listed == target) {
+                    tags.push((target, slug, tag.title));
+                }
+            }
             // They're the account's now.
             ReaderMenuRepository::replace_section(
-                &*connection,
+                &transaction,
                 signed_out,
                 ReaderMenuSection::Subscribed,
                 &[],
             )?;
+            transaction.commit().map_err(SqliteDbError::from)?;
             Ok(tags)
         })?;
-        let mut adopted = 0;
-        for tag in tags {
-            let slug = ReaderTagSlug(tag.slug.unwrap_or(tag.key));
-            // A follow that can't be sent now waits, as any other does.
-            self.set_tag_followed(slug, tag.title, true).await?;
-            adopted += 1;
+        let _waiting: Vec<_> = tags
+            .iter()
+            .map(|(target, _, _)| context.wait_on(target.clone()))
+            .collect();
+
+        {
+            let _lane = context.actions.lane.lock().await;
+            context.send_pending_actions().await?;
         }
-        Ok(adopted)
+        let mut report = ReaderTagAdoptionReport::default();
+        for (target, slug, title) in tags {
+            match context.take_refusal(&target) {
+                Some(error) => report.refused.push(ReaderRefusedTag { slug, title, error }),
+                // Followed, or waiting to be sent.
+                None => report.adopted += 1,
+            }
+        }
+        Ok(report)
     }
 
     /// Likes or unlikes a comment. Needs an account.

@@ -30,7 +30,9 @@ mod sites;
 mod stream;
 mod tags;
 
-pub use actions::{ReaderActionOutcome, ReaderFollowTarget};
+pub use actions::{
+    ReaderActionOutcome, ReaderFollowTarget, ReaderRefusedTag, ReaderTagAdoptionReport,
+};
 pub use collection::{
     ReaderStreamCard, ReaderStreamCollection, ReaderStreamInfo, ReaderStreamItem,
     ReaderStreamPageResult,

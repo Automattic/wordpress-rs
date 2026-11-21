@@ -137,10 +137,14 @@ final class ReaderHomeViewModel {
         await run {
             let saves = try await self.service.saved().adoptSignedOutSaves()
             let tags = try await self.service.adoptSignedOutTags()
+            let refusedTags = tags.refused.map {
+                " The server refused to follow the tag \($0.title ?? $0.slug): \(readerErrorMessage($0.error))"
+            }
             self.notice =
-                "Took over \(readerCount(tags, "tag")). Saved posts: \(saves.imported) on the server, "
+                "Took over \(readerCount(tags.adopted, "tag")). Saved posts: \(saves.imported) on the server, "
                 + "\(saves.pending) waiting to be sent, \(saves.rejected.count) refused, "
                 + "\(saves.waitingForRoom) waiting for room, \(saves.unsaveable) that can't be saved."
+                + refusedTags.joined()
         }
     }
 

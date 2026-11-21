@@ -90,8 +90,11 @@ internal class ReaderHomeState(val session: ReaderSession, val requests: ReaderR
     fun adoptSignedOut() = requests.run {
         val saves = service.saved().adoptSignedOutSaves()
         val tags = service.adoptSignedOutTags()
+        val refusedTags = tags.refused.joinToString("") {
+            " The server refused to follow the tag ${it.title ?: it.slug}: ${readerErrorText(it.error)}"
+        }
         "Took over ${saves.imported} saves (${saves.pending} waiting, ${saves.rejected.size} refused, " +
-            "${saves.waitingForRoom} over the limit) and $tags tags."
+            "${saves.waitingForRoom} over the limit) and ${tags.adopted} tags." + refusedTags
     }
 
     fun setTagFollowed(slug: String, title: String?, followed: Boolean) = requests.run {
