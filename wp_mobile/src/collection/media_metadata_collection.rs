@@ -275,13 +275,11 @@ impl MediaMetadataCollectionWithEditContext {
 
 /// Action to take when a media item's membership in a filtered list changes.
 ///
-/// Mirrors `MembershipAction` in `post_metadata_collection.rs`. The two-variant
-/// design is intentional: when local ordering cannot be resolved (non-deterministic
-/// filter, missing sort keys), `compute_final_list` returns `None` and the caller
-/// silently skips the list write — there is no third "needs refresh" variant.
+/// Mirrors `MembershipAction` in `post_metadata_collection.rs`.
 enum MembershipAction {
     Remove,
     Insert,
+    Update,
 }
 
 impl MediaMetadataCollectionWithEditContext {
@@ -325,11 +323,13 @@ impl MediaMetadataCollectionWithEditContext {
                 Some(MembershipAction::Remove)
             } else if !is_in_list && matches_filter {
                 Some(MembershipAction::Insert)
+            } else if is_in_list && matches_filter {
+                Some(MembershipAction::Update)
             } else {
                 None
             }
         } else if is_in_list {
-            // No longer in DB — remove from list.
+            // No longer in DB: remove from list.
             Some(MembershipAction::Remove)
         } else {
             None
@@ -349,11 +349,13 @@ impl MediaMetadataCollectionWithEditContext {
                 .map_err(|e| CollectionError::DatabaseError {
                     err_message: e.to_string(),
                 }),
-            MembershipAction::Insert => self.insert_media_into_list(media_id_i64),
+            MembershipAction::Insert | MembershipAction::Update => {
+                self.insert_media_into_list(media_id_i64)
+            }
         }
     }
 
-    /// Insert a media into the stored list, maintaining sort order.
+    /// Insert or update a media into the stored list, maintaining sort order.
     ///
     /// Mirrors `PostMetadataCollectionWithEditContext::insert_post_into_list`.
     fn insert_media_into_list(&self, media_id: i64) -> Result<(), CollectionError> {
@@ -365,7 +367,11 @@ impl MediaMetadataCollectionWithEditContext {
                 err_message: e.to_string(),
             })?
             .unwrap_or_default();
-        let current_ids: Vec<i64> = current_metadata.iter().map(|m| m.id).collect();
+        let current_ids: Vec<i64> = current_metadata
+            .iter()
+            .map(|m| m.id)
+            .filter(|&id| id != media_id)
+            .collect();
         let metadata_by_id: HashMap<i64, &EntityMetadata> =
             current_metadata.iter().map(|m| (m.id, m)).collect();
 
@@ -396,10 +402,25 @@ impl MediaMetadataCollectionWithEditContext {
             &metadata_by_id,
         ) {
             Some(items) => items,
-            // Non-deterministic ordering or missing sort-key data: silently skip,
-            // matching the post-side behaviour. The new media will appear on the
-            // next explicit collection refresh.
-            None => return Ok(()),
+            None => {
+                // If ordering cannot be determined locally (e.g. relevance search or missing
+                // sort-key data for existing items), and the media was already in the list,
+                // update its metadata in-place preserving its existing position.
+                if current_metadata.iter().any(|m| m.id == media_id) {
+                    current_metadata
+                        .iter()
+                        .map(|m| {
+                            if m.id == media_id {
+                                Self::media_to_item_input(media_to_insert)
+                            } else {
+                                Self::id_to_item_input(m.id, &media_by_id, &metadata_by_id)
+                            }
+                        })
+                        .collect()
+                } else {
+                    return Ok(());
+                }
+            }
         };
 
         self.service
@@ -495,11 +516,13 @@ impl MediaMetadataCollectionWithEditContext {
 mod tests {
     use super::*;
     use crate::service::media::MediaService;
+    use crate::sync::{CollectionItem, DbEntityState};
     use crate::testing::mock_api_client;
     use rstest::*;
     use rusqlite::Connection;
     use std::sync::Arc;
     use wp_api::api_client::WpApiClient;
+    use wp_api::prelude::WpGmtDateTime;
     use wp_mobile_cache::{
         MigrationManager, WpApiCache, db_types::self_hosted_site::SelfHostedSite,
         repository::sites::SiteRepository,
@@ -547,5 +570,168 @@ mod tests {
 
         let filter = collection.filter();
         assert_eq!(filter, MediaListFilter::default());
+    }
+
+    #[test]
+    fn test_media_metadata_collection_item_from_collection_item_with_modified_gmt() {
+        let modified_gmt = "2026-10-20 12:34:56"
+            .parse::<WpGmtDateTime>()
+            .expect("Valid datetime string should parse");
+        let metadata = EntityMetadata::new(101, Some(modified_gmt), Some(50), None);
+        let collection_item = CollectionItem::new(metadata, DbEntityState::Fresh);
+
+        let item = MediaMetadataCollectionItem::from((collection_item, None));
+
+        assert_eq!(item.id, 101);
+        assert_eq!(item.modified_gmt, Some(modified_gmt));
+        assert_eq!(item.parent, Some(50));
+        assert_eq!(item.menu_order, None);
+        assert!(matches!(item.state, MediaItemState::Missing));
+    }
+
+    #[test]
+    fn test_media_metadata_collection_item_from_collection_item_without_modified_gmt() {
+        let metadata = EntityMetadata::new(101, None, None, None);
+        let collection_item = CollectionItem::new(metadata, DbEntityState::Missing);
+
+        let item = MediaMetadataCollectionItem::from((collection_item, None));
+
+        assert_eq!(item.id, 101);
+        assert_eq!(item.modified_gmt, None);
+        assert_eq!(item.parent, None);
+        assert_eq!(item.menu_order, None);
+        assert!(matches!(item.state, MediaItemState::Missing));
+    }
+
+    #[test]
+    fn test_media_metadata_collection_item_retains_list_metadata_time_when_entity_time_differs() {
+        let list_time = "2026-10-20 12:00:00"
+            .parse::<WpGmtDateTime>()
+            .expect("Valid datetime string should parse");
+        let media_time = "2026-10-20 15:00:00"
+            .parse::<WpGmtDateTime>()
+            .expect("Valid datetime string should parse");
+
+        let metadata = EntityMetadata::new(101, Some(list_time), Some(50), None);
+        let collection_item = CollectionItem::new(metadata, DbEntityState::Stale);
+
+        let mut media = wp_mobile_cache::test_fixtures::media::MediaBuilder::minimal()
+            .with_id(101)
+            .build();
+        media.modified_gmt = media_time;
+        let full_entity = crate::FullEntityMediaWithEditContext {
+            entity_id: wp_mobile_cache::entity::EntityId {
+                db_site: wp_mobile_cache::db_types::db_site::DbSite {
+                    row_id: wp_mobile_cache::RowId(1),
+                    site_type: wp_mobile_cache::db_types::db_site::DbSiteType::SelfHosted,
+                    mapped_site_id: wp_mobile_cache::RowId(1),
+                },
+                table: wp_mobile_cache::DbTable::MediaEditContext,
+                rowid: wp_mobile_cache::RowId(1),
+            },
+            data: media,
+        };
+
+        let item = MediaMetadataCollectionItem::from((collection_item, Some(full_entity)));
+
+        assert_eq!(item.id, 101);
+        assert_eq!(item.modified_gmt, Some(list_time));
+        if let MediaItemState::Stale { data } = item.state {
+            assert_eq!(data.data.modified_gmt, media_time);
+        } else {
+            panic!("Expected Stale state, got {:?}", item.state);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_modified_gmt_updated_after_local_edit_of_listed_media() {
+        use wp_mobile_cache::context::EditContext;
+        use wp_mobile_cache::repository::{
+            list_metadata::ListMetadataRepository, media::MediaRepository,
+        };
+        use wp_mobile_cache::test_fixtures::media::MediaBuilder;
+
+        let mut conn = Connection::open_in_memory().unwrap();
+        MigrationManager::new(&conn)
+            .unwrap()
+            .perform_migrations()
+            .unwrap();
+        let db_site = SiteRepository
+            .upsert_self_hosted_site(
+                &mut conn,
+                &SelfHostedSite {
+                    url: "https://test.local".to_string(),
+                    api_root: "https://test.local/wp-json".to_string(),
+                },
+            )
+            .unwrap()
+            .db_site;
+        let cache = Arc::new(WpApiCache::try_from(conn).unwrap());
+        let db_site = Arc::new(db_site);
+        let service = Arc::new(MediaService::new(
+            mock_api_client(),
+            db_site.clone(),
+            cache.clone(),
+        ));
+        let collection = service
+            .create_media_metadata_collection_with_edit_context(MediaListFilter::default(), 20);
+
+        let t1: WpGmtDateTime = "2024-01-01T00:00:00Z".parse().unwrap();
+        let t2: WpGmtDateTime = "2026-11-04T12:00:00Z".parse().unwrap();
+
+        // List was synced while the media's modified_gmt was T1.
+        let mut media = MediaBuilder::minimal().with_id(101).build();
+        media.modified_gmt = t1;
+        cache
+            .execute(|conn| {
+                MediaRepository::<EditContext>::new().upsert(conn, &db_site, &media)?;
+                let list_id = ListMetadataRepository::get_or_create(
+                    conn,
+                    &db_site,
+                    collection.core.key(),
+                    20,
+                )?;
+                ListMetadataRepository::set_items_by_list_metadata_id(
+                    conn,
+                    list_id,
+                    &[ListMetadataItemInput {
+                        entity_id: 101,
+                        modified_gmt: Some(t1),
+                        parent: None,
+                        menu_order: None,
+                    }],
+                )
+            })
+            .unwrap();
+
+        // The user edits the media: the server returns modified_gmt = T2, which
+        // is upserted, and update_media_membership is called.
+        media.modified_gmt = t2;
+        cache
+            .execute(|conn| MediaRepository::<EditContext>::new().upsert(conn, &db_site, &media))
+            .unwrap();
+        collection
+            .update_media_membership(wp_api::media::MediaId(101))
+            .unwrap();
+
+        let items = collection.load_items().await.unwrap();
+        assert_eq!(items.len(), 1);
+        let data_modified_gmt = match &items[0].state {
+            MediaItemState::FetchingWithData { data }
+            | MediaItemState::Fresh { data }
+            | MediaItemState::Stale { data }
+            | MediaItemState::FailedWithData { data, .. } => data.data.modified_gmt,
+            other => panic!("expected cached data, got {other:?}"),
+        };
+
+        assert_eq!(
+            data_modified_gmt, t2,
+            "cached media has the edited timestamp"
+        );
+        assert_eq!(
+            items[0].modified_gmt,
+            Some(t2),
+            "item.modified_gmt should match the edited media timestamp"
+        );
     }
 }
