@@ -142,11 +142,15 @@ fun createWpComApiClient(
     )
 }
 
-/** Where the Reader keeps its cache and each account's user ID, across launches. */
-private val readerDirectory = File(System.getProperty("java.io.tmpdir"), "reader-saved-posts")
+/**
+ * Where the Reader keeps its cache, each account's user ID and saved posts' images, across
+ * launches. Set by [commonModules]. It must be a folder the system doesn't clear, so not Android's
+ * cache directory, or the cache would keep rows for images whose files are gone.
+ */
+private lateinit var readerDirectory: File
 
 /** Where the Reader keeps saved posts' images, for reading them with no connection. */
-val readerOfflineImageDirectory: File = File(readerDirectory, "offline-images")
+val readerOfflineImageDirectory: File get() = File(readerDirectory, "offline-images")
 
 /** How much room saved posts' images may take: enough for a few dozen posts. */
 const val READER_OFFLINE_IMAGE_BYTES: ULong = 50_000_000uL
@@ -240,7 +244,12 @@ suspend fun accountReaderSession(
     )
 }
 
-fun commonModules(accountRepository: AccountRepository): List<org.koin.core.module.Module> {
+/** Returns the app's modules. [readerRoot] is where the Reader keeps its files across launches. */
+fun commonModules(
+    accountRepository: AccountRepository,
+    readerRoot: File
+): List<org.koin.core.module.Module> {
+    readerDirectory = readerRoot
     val accountModule = module {
         single { accountRepository }
     }
