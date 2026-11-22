@@ -511,6 +511,15 @@ Plugins' save hooks don't run for pushes made after the editor closes, because t
 
 `[not designed]` Autosaves, previews and revisions aren't designed yet. Their requests are below the post's path (`/wp/v2/posts/{id}/autosaves` and `/wp/v2/posts/{id}/revisions`), so the middleware in A hands them to the app, and `perform_editor_request` in C is where they plug in. A preview needs the post's content on the server, because the server renders the preview.
 
+## What the proof of concept leaves out
+
+The proof of concept, on the `editor-save-poc` branches of wordpress-rs and GutenbergKit, builds the main path and new posts. These parts are left out of it until we agree on the proposal:
+
+- **Posts only.** `PostEditorService` reads and pushes `/wp/v2/posts`. Pages have working copies in wordpress-rs, but no editor sessions; custom post types have neither. In GutenbergKit's example app, pages and custom post types save the way they do today.
+- **Lists of posts go to the server directly.** Only requests for the post's own path, and for the paths below it, go through wordpress-rs. A request for a list of posts of its type, such as the one a Query Loop block makes, goes to the server, and core-data stores the post from the response over the one the editor has. `persistedPostOverlayMiddleware` puts the editor's values back on lists of the post's type. With this proposal, these requests go through wordpress-rs too.
+- **Nothing reports core-data replacing the post.** Code in the editor can store a post in core-data without sending a request, by calling `receiveEntityRecords`. With this proposal, GutenbergKit reports every change to the post's saved version that didn't come from opening the editor, a save, or switching a new post to its ID.
+- **Undo across a new post's first save.** The proof of concept doesn't clear the undo history when a new post gets its ID (CMM-2742). Undo steps from before that save apply to the `-1` post, so they change nothing the editor shows.
+
 ## Not verified yet
 
 The pseudocode is written against the code of GutenbergKit and wordpress-rs, but these points haven't been tried. A proof of concept in GutenbergKit's example app comes next, and anything it contradicts comes back to this proposal.
