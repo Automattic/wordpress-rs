@@ -5717,7 +5717,7 @@ dependencies = [
 
 [[package]]
 name = "wp_mobile_local_content"
-version = "0.1.0"
+version = "0.11.1"
 dependencies = [
  "chrono",
  "rusqlite",
@@ -5733,7 +5733,7 @@ dependencies = [
 
 [[package]]
 name = "wp_mobile_sqlite"
-version = "0.1.0"
+version = "0.11.1"
 dependencies = [
  "rusqlite",
  "tempfile",
