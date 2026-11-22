@@ -12,6 +12,7 @@ pub mod local_content;
 pub mod media;
 pub mod metadata;
 pub mod mock_post_service;
+pub mod post_editor;
 pub mod post_types;
 pub mod posts;
 pub mod reader_saved;
@@ -44,6 +45,8 @@ impl From<wp_mobile_cache::SqliteDbError> for WpServiceError {
 /// domain-specific services like PostService, PostTypeService, etc.
 #[derive(uniffi::Object)]
 pub struct WpService {
+    api_client: Arc<WpApiClient>,
+    api_url_resolver: Arc<dyn ApiUrlResolver>,
     media: Arc<MediaService>,
     post_types: Arc<PostTypeService>,
     posts: Arc<PostService>,
@@ -60,7 +63,7 @@ impl WpService {
         site_service: Arc<SiteService>,
     ) -> Self {
         let request_executor = delegate.request_executor.clone();
-        let api_client = Arc::new(WpApiClient::new(api_url_resolver, delegate));
+        let api_client = Arc::new(WpApiClient::new(api_url_resolver.clone(), delegate));
         let db_site_arc = Arc::new(db_site);
 
         let media = Arc::new(MediaService::new(
@@ -73,9 +76,11 @@ impl WpService {
             db_site_arc.clone(),
             cache.clone(),
         ));
-        let post_types = Arc::new(PostTypeService::new(api_client, db_site_arc, cache));
+        let post_types = Arc::new(PostTypeService::new(api_client.clone(), db_site_arc, cache));
 
         Self {
+            api_client,
+            api_url_resolver,
             media,
             post_types,
             posts,
