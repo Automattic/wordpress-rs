@@ -242,7 +242,9 @@ fn base_version(ctx: &Context, session: &PostEditorSession) -> Option<RemotePost
         .remote_post
 }
 
-async fn open_post_42(ctx: &Context) -> Arc<PostEditorSession> {
+/// Answer the next request with post 42 as `open_post_42` fetched it, as the
+/// fetch before a push finds it when nobody else changed it.
+fn serve_post_42_unchanged(ctx: &Context) {
     ctx.server.then(|sent| {
         response(
             sent,
@@ -250,6 +252,10 @@ async fn open_post_42(ctx: &Context) -> Arc<PostEditorSession> {
             &server_post(42, "On the server", "2024-01-16T00:00:00"),
         )
     });
+}
+
+async fn open_post_42(ctx: &Context) -> Arc<PostEditorSession> {
+    serve_post_42_unchanged(ctx);
     ctx.service
         .clone()
         .open_post(PostId(42))
@@ -294,6 +300,7 @@ async fn test_editor_save_records_the_edits_pushes_and_returns_the_response_unch
     let session = open_post_42(&ctx).await;
     let saved = server_post(42, "Saved", "2024-02-01T00:00:00");
     let saved_for_server = saved.clone();
+    serve_post_42_unchanged(&ctx);
     ctx.server
         .then(move |sent| response(sent, 200, &saved_for_server));
 
@@ -314,12 +321,12 @@ async fn test_editor_save_records_the_edits_pushes_and_returns_the_response_unch
     let update = ctx.server.requests().pop().expect("The update was sent");
     assert_eq!(update.method, RequestMethod::POST);
     assert_eq!(update.url, format!("{SITE_URL}/wp-json/wp/v2/posts/42"));
-    let body = update.body.expect("The update has a body");
-    // Every field is sent, with the editor's edits recorded first.
-    assert_eq!(body["title"], json!("Saved"));
-    assert_eq!(body["content"], json!("<p>Content</p>"));
-    assert_eq!(body["meta"], json!({ "footnotes": "", "plugin_meta": "1" }));
-    assert_eq!(body["plugin_field"], json!("plugin value"));
+    // The editor's edits are recorded first, and the update sends what
+    // differs from the post as just fetched.
+    assert_eq!(
+        update.body,
+        Some(json!({ "title": "Saved", "meta": { "plugin_meta": "1" } }))
+    );
     assert_eq!(
         base_version(&ctx, &session).map(|remote| remote.base_modified_gmt),
         Some("2024-02-01T00:00:00".parse().expect("Date parses"))
@@ -348,6 +355,7 @@ async fn test_error_response_goes_back_as_it_is_and_records_no_push() {
     let error =
         json!({ "code": "rest_cannot_edit", "message": "Sorry", "data": { "status": 403 } });
     let error_for_server = error.clone();
+    serve_post_42_unchanged(&ctx);
     ctx.server
         .then(move |sent| response(sent, 403, &error_for_server));
     let before = base_version(&ctx, &session);
@@ -409,6 +417,7 @@ async fn test_new_post_is_created_on_its_first_push() {
 async fn test_push_that_was_never_sent_leaves_nothing_unconfirmed() {
     let ctx = context();
     let session = open_post_42(&ctx).await;
+    serve_post_42_unchanged(&ctx);
     ctx.server.then(|sent| {
         failure(
             sent,
@@ -443,6 +452,7 @@ async fn test_lost_push_is_settled_when_its_session_is_recovered() {
                 .expect("JSON serializes"),
         )
         .expect("Recording should succeed");
+    serve_post_42_unchanged(&ctx);
     ctx.server
         .then(|sent| failure(sent, RequestExecutionErrorReason::HttpTimeoutError));
     let result = session.push().await;
@@ -575,6 +585,7 @@ async fn test_lost_push_that_did_not_land_is_not_recorded() {
                 .expect("JSON serializes"),
         )
         .expect("Recording should succeed");
+    serve_post_42_unchanged(&ctx);
     ctx.server
         .then(|sent| failure(sent, RequestExecutionErrorReason::HttpTimeoutError));
     let _ = session.push().await;
@@ -602,4 +613,91 @@ async fn test_lost_push_that_did_not_land_is_not_recorded() {
         .expect("Read should succeed")
         .expect("The working copy exists");
     assert_eq!(working_copy.remote_target.remote_post, before);
+}
+
+#[tokio::test]
+async fn test_push_after_a_failed_fetch_is_not_sent() {
+    let ctx = context();
+    let session = open_post_42(&ctx).await;
+    ctx.server.then(|sent| {
+        failure(
+            sent,
+            RequestExecutionErrorReason::ConnectionError {
+                reason: "refused".to_string(),
+            },
+        )
+    });
+
+    let result = session.push().await;
+
+    assert!(
+        matches!(result, Err(PostEditorError::NotSent { .. })),
+        "{result:?}"
+    );
+    assert_eq!(ctx.server.requests().len(), 2, "Only the fetches were sent");
+}
+
+#[tokio::test]
+async fn test_push_is_refused_when_the_server_and_the_working_copy_both_changed() {
+    let ctx = context();
+    let session = open_post_42(&ctx).await;
+    session
+        .record_change(
+            serde_json::to_vec(&server_post(42, "The user's title", "2024-01-16T00:00:00"))
+                .expect("JSON serializes"),
+        )
+        .expect("Recording should succeed");
+    let before = base_version(&ctx, &session);
+    ctx.server.then(|sent| {
+        response(
+            sent,
+            200,
+            &server_post(42, "Someone else's title", "2024-06-01T00:00:00"),
+        )
+    });
+
+    let result = session.push().await;
+
+    assert_eq!(
+        result,
+        Err(PostEditorError::Conflict {
+            differing_fields: vec!["title".to_string()],
+        })
+    );
+    assert_eq!(ctx.server.requests().len(), 2, "Nothing was pushed");
+    assert_eq!(base_version(&ctx, &session), before);
+}
+
+#[tokio::test]
+async fn test_push_settles_a_lost_push_that_landed_instead_of_reporting_a_conflict() {
+    let ctx = context();
+    let session = open_post_42(&ctx).await;
+    session
+        .record_change(
+            serde_json::to_vec(&server_post(42, "Lost", "2024-01-16T00:00:00"))
+                .expect("JSON serializes"),
+        )
+        .expect("Recording should succeed");
+    serve_post_42_unchanged(&ctx);
+    ctx.server
+        .then(|sent| failure(sent, RequestExecutionErrorReason::HttpTimeoutError));
+    let _ = session.push().await;
+
+    // The lost push had landed, so the server changed, but only by it.
+    ctx.server
+        .then(|sent| response(sent, 200, &server_post(42, "Lost", "2024-07-01T00:00:00")));
+    ctx.server
+        .then(|sent| response(sent, 200, &server_post(42, "Lost", "2024-07-01T00:00:01")));
+    session.push().await.expect("The push should succeed");
+
+    let update = ctx.server.requests().pop().expect("The update was sent");
+    assert_eq!(
+        update.body,
+        Some(json!({})),
+        "Nothing differs from the server"
+    );
+    assert_eq!(
+        base_version(&ctx, &session).map(|remote| remote.base_modified_gmt),
+        Some("2024-07-01T00:00:01".parse().expect("Date parses"))
+    );
 }

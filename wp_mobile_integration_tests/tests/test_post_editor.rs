@@ -192,7 +192,7 @@ async fn test_editor_save_pushes_the_working_copy_and_records_the_push() {
     assert_eq!(response.status_code, 200);
     let saved = json_body(&response.body);
     assert_eq!(saved["title"]["raw"], json!("Saved from the editor"));
-    // Fields the editor didn't send are pushed as the working copy has them.
+    // Only what changed was sent, so the rest stays as it was.
     assert_eq!(saved["excerpt"]["raw"], json!("An excerpt"));
     let on_server = ctx
         .api
@@ -330,6 +330,73 @@ async fn test_editor_date_is_pushed_in_the_site_timezone_and_null_floats_it() {
             .common
             .publish_date,
         PublishDate::Immediately
+    );
+
+    RestoreServer::db().await;
+}
+
+/// A post someone else changed isn't a conflict when the working copy already
+/// has what the server has: every other field converted from the fetched post
+/// equals the working copy's, so nothing differs.
+#[tokio::test]
+#[serial]
+async fn test_push_matching_the_server_is_not_a_conflict() {
+    let ctx = create_test_context();
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let local_content = open_local_content(&dir);
+    let post_id = create_draft(&ctx.api, "Before").await;
+    let other_client = WpApiClient::new(test_site_api_url_resolver(), api_client_delegate());
+    let service = Arc::new(PostEditorService::new(
+        Arc::new(ctx.service),
+        local_content.clone(),
+        site(),
+    ));
+    let session = service
+        .clone()
+        .open_post(post_id)
+        .await
+        .expect("Opening the post should succeed");
+
+    // The modified date has a resolution of a second.
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    let changed = other_client
+        .posts()
+        .update(
+            &PostEndpointType::Posts,
+            &post_id,
+            &PostUpdateParams {
+                excerpt: Some("Changed elsewhere".to_string()),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("The other update should succeed")
+        .data;
+    let working_copy = local_content
+        .read_post_working_copy(session.working_copy_id())
+        .expect("Read should succeed")
+        .expect("The working copy exists");
+    let mut fields = working_copy.fields.clone();
+    fields.common.excerpt = "Changed elsewhere".to_string();
+    local_content
+        .save_post_working_copy(working_copy.id, fields)
+        .expect("Saving should succeed");
+
+    let response = session.push().await.expect("The push should succeed");
+
+    assert_eq!(response.status_code, 200);
+    let base = local_content
+        .read_post_working_copy(session.working_copy_id())
+        .expect("Read should succeed")
+        .expect("The working copy exists")
+        .remote_target
+        .remote_post
+        .map(|remote| remote.base_modified_gmt)
+        .expect("The post is on the server");
+    assert!(
+        base.0 >= changed.modified_gmt.0,
+        "The base version {base:?} is at least the other client's {:?}",
+        changed.modified_gmt
     );
 
     RestoreServer::db().await;

@@ -94,6 +94,12 @@ pub enum PostEditorError {
     AnotherPost { path: String },
     #[error("The post isn't on the server yet")]
     NotOnServer,
+    /// The post changed on the server since the working copy's base version,
+    /// and the working copy differs from it in `differing_fields`. Which side
+    /// changed each field isn't known, since the cache holds only the server's
+    /// latest version. Nothing was sent.
+    #[error("The post changed on the server, and differs in {differing_fields:?}")]
+    Conflict { differing_fields: Vec<String> },
     /// Autosaves, previews, revisions and trashing aren't designed yet.
     #[error("{method} {path} isn't designed yet")]
     NotDesigned { method: String, path: String },
@@ -219,7 +225,10 @@ impl PostEditorService {
     /// Use it after the editor has closed. While it's open, push through its
     /// session, which also records the push on the session.
     ///
-    /// Fails with `NotSent` or `MaybeSent` if no answer came. Any answer,
+    /// Updating a post fetches it first, then sends only the fields that
+    /// differ from the server's. Fails with `Conflict` if the post changed on
+    /// the server since the base version and the working copy differs from
+    /// it, and with `NotSent` or `MaybeSent` if no answer came. Any answer,
     /// error statuses included, is returned. On a successful one, the post
     /// goes into the cache and becomes the working copy's base version.
     pub async fn push_working_copy(
@@ -371,13 +380,16 @@ impl PostEditorService {
             .clone();
         let _in_flight = lock.lock().await;
         let working_copy = self.read_working_copy(working_copy_id)?;
-        let remote_post = working_copy.remote_target.remote_post;
-
-        // [decision] Don't fetch the post first to check for a conflict: a push
-        // overwrites changes made on the server since the base version.
-        // [decision] Send every field the working copy has, not only the
-        // changed ones.
-        let body = working_copy.fields.to_rest_fields();
+        let (remote_post, body) = match working_copy.remote_target.remote_post {
+            // A new post: every field goes into the create.
+            None => (None, working_copy.fields.to_rest_fields()),
+            Some(remote_post) => {
+                let (remote_post, changes) = self
+                    .changes_to_push(working_copy_id, remote_post, session_id)
+                    .await?;
+                (Some(remote_post), changes)
+            }
+        };
         let request = self.write_request(remote_post.map(|remote_post| remote_post.post_id), &body);
         let body = serde_json::to_string(&body).expect("A JSON object always serializes");
 
@@ -430,32 +442,105 @@ impl PostEditorService {
         Ok(ServerResponse::from(response))
     }
 
+    /// Fetch the post a working copy updates, and return its remote post
+    /// and the fields that differ from the server's.
+    ///
+    /// The fetch settles a push the session is waiting on first, so a push
+    /// whose answer was lost isn't mistaken for someone else's change. Fails
+    /// with `Conflict` if the post changed on the server since the base
+    /// version and the working copy differs from it, and with `NotSent` if
+    /// the fetch failed.
+    async fn changes_to_push(
+        &self,
+        working_copy_id: &WorkingCopyId,
+        remote_post: RemotePostReference,
+        session_id: Option<&EditorSessionId>,
+    ) -> Result<(RemotePostReference, Map<String, Value>), PostEditorError> {
+        // [decision] Fetch the post first, to check for a conflict and to send
+        // only what changed.
+        let server_post =
+            self.fetch_post(remote_post.post_id)
+                .await
+                .map_err(|err| PostEditorError::NotSent {
+                    reason: format!("Fetching the post before pushing failed: {err}"),
+                })?;
+        if let Some(session) = session_id
+            .map(|session_id| self.local_content.read_editor_session(session_id))
+            .transpose()?
+            .flatten()
+        {
+            self.settle_with(&session, &server_post)?;
+        }
+
+        // The base version may have moved while settling.
+        let working_copy = self.read_working_copy(working_copy_id)?;
+        let remote_post = working_copy
+            .remote_target
+            .remote_post
+            .unwrap_or(remote_post);
+        let server_fields = PostWorkingCopyFields::from_remote(&server_post)?;
+        // [decision] Send only the fields that differ from the server's.
+        let changes = working_copy.fields.rest_fields_changed_from(&server_fields);
+
+        if server_post.modified_gmt != remote_post.base_modified_gmt {
+            if changes.is_empty() {
+                // The server already has what the user has: nothing conflicts.
+                let remote_post = RemotePostReference::from_remote(&server_post);
+                self.local_content
+                    .record_post_working_copy_push(working_copy_id.clone(), remote_post)?;
+                return Ok((remote_post, changes));
+            }
+            // [not designed] What happens to a conflict. The working copy keeps
+            // everything, and nothing is sent.
+            return Err(PostEditorError::Conflict {
+                differing_fields: changes.into_iter().map(|(key, _)| key).collect(),
+            });
+        }
+        Ok((remote_post, changes))
+    }
+
     /// Find out whether the push a session was waiting on landed, and record
     /// it if it did. The unconfirmed push is cleared either way, and the
-    /// working copy is compared with the cache as usual.
+    /// working copy is compared with the server as usual.
     async fn settle_unconfirmed_push(
         &self,
         session: &EditorSession,
     ) -> Result<(), PostEditorError> {
-        let Some(push) = &session.unconfirmed_push else {
-            return Ok(());
-        };
         // [decision] How to find a post a lost create may have made: not
         // designed. The unconfirmed create stays on the session for the app to
         // see.
-        let Some(remote_post) = push.remote_post else {
+        let Some(remote_post) = session
+            .unconfirmed_push
+            .as_ref()
+            .and_then(|push| push.remote_post)
+        else {
             return Ok(());
         };
         let server_post = self.fetch_post(remote_post.post_id).await?;
+        self.settle_with(session, &server_post)
+    }
 
+    /// Settle the session's unconfirmed update with `server_post`, the post as
+    /// just fetched: the push landed if the post holds every field it sent.
+    fn settle_with(
+        &self,
+        session: &EditorSession,
+        server_post: &AnyPostWithEditContext,
+    ) -> Result<(), PostEditorError> {
+        let Some(push) = &session.unconfirmed_push else {
+            return Ok(());
+        };
+        if push.remote_post.is_none() {
+            return Ok(());
+        }
         let sent: Map<String, Value> =
             serde_json::from_str(&push.body).map_err(|err| PostEditorError::LocalContent {
                 reason: format!("The unconfirmed push's body isn't a JSON object: {err}"),
             })?;
-        if push_landed(&sent, &PostWorkingCopyFields::from_remote(&server_post)?) {
+        if push_landed(&sent, &PostWorkingCopyFields::from_remote(server_post)?) {
             self.local_content.record_post_working_copy_push(
                 session.working_copy_id.clone(),
-                RemotePostReference::from_remote(&server_post),
+                RemotePostReference::from_remote(server_post),
             )?;
         }
         self.local_content.clear_unconfirmed_push(&session.id)?;
@@ -592,7 +677,7 @@ impl PostEditorSession {
     /// arrived: while the editor is open, it's the source of truth, and the
     /// working copy follows it.
     ///
-    /// Fails with `NotSent` or `MaybeSent` if no answer came, and with
+    /// A write fails as `PostEditorService::push_working_copy` does. Fails with
     /// `NotDesigned` for autosaves, revisions and trashing.
     pub async fn perform_editor_request(
         &self,
