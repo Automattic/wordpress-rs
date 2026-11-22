@@ -166,20 +166,22 @@ struct ReaderSavedPostsView: View {
 
             Section(viewModel.total.map { "\($0) saved" } ?? "Saved") {
                 ForEach(viewModel.rows) { row in
-                    HStack {
+                    ReaderRowWithControls {
                         if opensPosts, let post = row.post {
                             NavigationLink(value: ReaderRoute.post(key: row.id, identity: post)) {
                                 label(for: row)
                             }
                             .accessibilityIdentifier("saved-post")
                         } else {
-                            label(for: row)
-                            Spacer()
+                            HStack {
+                                label(for: row)
+                                Spacer()
+                            }
                         }
+                    } controls: {
                         Button("Unsave", role: .destructive) {
                             Task { await viewModel.unsave(row) }
                         }
-                        .buttonStyle(.borderless)
                     }
                 }
 

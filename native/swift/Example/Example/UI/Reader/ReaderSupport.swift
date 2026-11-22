@@ -218,6 +218,33 @@ extension View {
     }
 }
 
+/// A list row's content with the buttons that act on it beside it.
+///
+/// On Apple TV the buttons are rows of their own, because the remote can't move from a row's link
+/// to a button beside it, or down to a button that isn't below anything it can focus.
+struct ReaderRowWithControls<Content: View, Controls: View>: View {
+    var alignment: VerticalAlignment = .center
+
+    @ViewBuilder
+    let content: Content
+
+    @ViewBuilder
+    let controls: Controls
+
+    var body: some View {
+        #if os(tvOS)
+        content
+        controls
+        #else
+        HStack(alignment: alignment) {
+            content
+            controls
+                .buttonStyle(.borderless)
+        }
+        #endif
+    }
+}
+
 /// What the last action did, such as "Waiting to be sent".
 struct ReaderNoticeRow: View {
     let message: String

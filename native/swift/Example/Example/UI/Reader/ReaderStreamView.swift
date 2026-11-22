@@ -126,7 +126,7 @@ struct ReaderStreamView: View {
     }
 
     private func siteRow(_ site: ReaderStreamCardSite) -> some View {
-        HStack {
+        ReaderRowWithControls {
             let title = site.name?.decodingHTMLEntities() ?? site.url ?? "A site"
             if let stream = site.stream {
                 NavigationLink(value: ReaderRoute.stream(stream)) {
@@ -135,11 +135,11 @@ struct ReaderStreamView: View {
             } else {
                 siteLabel(title: title, site: site)
             }
+        } controls: {
             let isFollowing = !viewModel.followedSites.isDisjoint(with: site.followKeys)
             Button(isFollowing ? "Unfollow" : "Follow") {
                 Task { await viewModel.setFollowed(site.followTarget, !isFollowing) }
             }
-            .buttonStyle(.borderless)
         }
     }
 
@@ -155,14 +155,14 @@ struct ReaderStreamView: View {
     }
 
     private func tagRow(_ tag: ReaderStreamCardTag) -> some View {
-        HStack {
+        ReaderRowWithControls {
             let title = tag.title?.decodingHTMLEntities() ?? tag.slug
             NavigationLink(title, value: ReaderRoute.stream(.tag(slug: tag.slug)))
+        } controls: {
             let isFollowing = viewModel.followedTags.contains(tag.slug)
             Button(isFollowing ? "Unfollow" : "Follow") {
                 Task { await viewModel.setTagFollowed(slug: tag.slug, title: tag.title, !isFollowing) }
             }
-            .buttonStyle(.borderless)
         }
     }
 }
@@ -177,32 +177,33 @@ private struct ReaderStreamPostRow: View {
     private var store
 
     var body: some View {
-        HStack(alignment: .top) {
-            NavigationLink(value: ReaderRoute.post(post)) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(post.displayTitle)
-                        .font(.headline)
-                    Text(byline)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if let summary = post.summary, !summary.isEmpty {
-                        Text(summary)
-                            .font(.subheadline)
-                            .lineLimit(3)
-                    }
-                    Text(counts)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    marks
-                }
-            }
-            .accessibilityIdentifier("stream-post")
-            #if os(tvOS)
-            // The remote can't move from the row to the menu beside it.
-            .contextMenu { actionItems }
-            #endif
+        ReaderRowWithControls(alignment: .top) {
+            link
+        } controls: {
             actions
         }
+    }
+
+    private var link: some View {
+        NavigationLink(value: ReaderRoute.post(post)) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(post.displayTitle)
+                    .font(.headline)
+                Text(byline)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let summary = post.summary, !summary.isEmpty {
+                    Text(summary)
+                        .font(.subheadline)
+                        .lineLimit(3)
+                }
+                Text(counts)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                marks
+            }
+        }
+        .accessibilityIdentifier("stream-post")
     }
 
     private var byline: String {
@@ -243,10 +244,13 @@ private struct ReaderStreamPostRow: View {
         Menu {
             actionItems
         } label: {
+            #if os(tvOS)
+            Label("Actions", systemImage: "ellipsis.circle")
+            #else
             Image(systemName: "ellipsis.circle")
                 .accessibilityLabel("Actions for \(post.displayTitle)")
+            #endif
         }
-        .buttonStyle(.borderless)
         .accessibilityIdentifier("stream-post-actions")
     }
 

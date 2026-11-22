@@ -130,12 +130,12 @@ struct ReaderHomeView: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(viewModel.followedTags) { tag in
-                HStack {
+                ReaderRowWithControls {
                     NavigationLink(tag.title, value: ReaderRoute.stream(.tag(slug: tag.slug)))
+                } controls: {
                     Button("Unfollow", role: .destructive) {
                         Task { await viewModel.setTagFollowed(slug: tag.slug, title: tag.title, followed: false) }
                     }
-                    .buttonStyle(.borderless)
                     .accessibilityIdentifier("unfollow-tag-\(tag.slug)")
                 }
             }
@@ -179,15 +179,15 @@ struct ReaderHomeView: View {
     }
 
     private func suggestedTagRow(_ tag: ReaderTagEntry) -> some View {
-        HStack {
+        ReaderRowWithControls {
             NavigationLink(tag.title, value: ReaderRoute.stream(.tag(slug: tag.slug)))
+        } controls: {
             if tag.isFollowed {
                 ReaderBadge("Following")
             } else {
                 Button("Follow") {
                     Task { await viewModel.setTagFollowed(slug: tag.slug, title: tag.title, followed: true) }
                 }
-                .buttonStyle(.borderless)
                 .accessibilityIdentifier("follow-tag-\(tag.slug)")
             }
         }

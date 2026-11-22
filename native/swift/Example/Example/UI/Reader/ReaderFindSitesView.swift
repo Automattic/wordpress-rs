@@ -211,7 +211,7 @@ struct ReaderFindSitesView: View {
     }
 
     private func row(for site: ReaderFoundSite) -> some View {
-        HStack {
+        ReaderRowWithControls {
             if let stream = site.stream {
                 NavigationLink(value: ReaderRoute.stream(stream)) {
                     label(for: site)
@@ -219,10 +219,10 @@ struct ReaderFindSitesView: View {
             } else {
                 label(for: site)
             }
+        } controls: {
             Button(site.isFollowing ? "Unfollow" : "Follow") {
                 Task { await viewModel.setFollowed(site, !site.isFollowing) }
             }
-            .buttonStyle(.borderless)
             .disabled(viewModel.isWorking)
         }
     }

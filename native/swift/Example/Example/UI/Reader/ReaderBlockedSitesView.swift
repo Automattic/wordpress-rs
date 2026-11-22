@@ -134,18 +134,20 @@ struct ReaderBlockedSitesView: View {
                         .accessibilityIdentifier("blocked-sites-signed-out")
                 }
                 ForEach(viewModel.sites, id: \.id) { site in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(site.name?.decodingHTMLEntities() ?? "Site \(site.id)")
-                            Text(site.url ?? "Site \(site.id)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    ReaderRowWithControls {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(site.name?.decodingHTMLEntities() ?? "Site \(site.id)")
+                                Text(site.url ?? "Site \(site.id)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
                         }
-                        Spacer()
+                    } controls: {
                         Button("Unblock") {
                             Task { await viewModel.unblock(site) }
                         }
-                        .buttonStyle(.borderless)
                         .disabled(viewModel.isWorking)
                     }
                 }
@@ -164,14 +166,16 @@ struct ReaderBlockedSitesView: View {
 
             Section {
                 ForEach(viewModel.users, id: \.self) { userID in
-                    HStack {
-                        // Not a number to read: no thousands separators.
-                        Text(verbatim: "User \(userID)")
-                        Spacer()
+                    ReaderRowWithControls {
+                        HStack {
+                            // Not a number to read: no thousands separators.
+                            Text(verbatim: "User \(userID)")
+                            Spacer()
+                        }
+                    } controls: {
                         Button("Unblock") {
                             Task { await viewModel.unblockUser(userID) }
                         }
-                        .buttonStyle(.borderless)
                     }
                 }
             } header: {
