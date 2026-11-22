@@ -101,6 +101,11 @@ extension SiteIdentity: Hashable {}
 extension WorkingCopyRemoteTarget: Hashable {}
 extension PostWorkingCopy: Hashable {}
 extension PageWorkingCopy: Hashable {}
+
+// `PostWorkingCopyFields` contains `PostMeta` and `WpAdditionalFields`
+// (reference types), which prevent automatic Hashable synthesis. Both are
+// Hashable, so add the conformance manually.
+extension PostWorkingCopyFields: Hashable {}
 PATCH
 }
 
