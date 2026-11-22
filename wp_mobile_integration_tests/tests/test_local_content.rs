@@ -370,3 +370,50 @@ fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
         Err(LocalContentError::WorkingCopyNotFound { id: unknown_id })
     );
 }
+
+#[test]
+fn test_unfinished_editor_session_and_its_unconfirmed_push_survive_reopening_the_database() {
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let (working_copy_id, unfinished_id) = {
+        let service = open_service(&dir);
+        let working_copy_id = service
+            .create_post_working_copy(new_post_on(self_hosted_site()), post("Draft"))
+            .expect("Create should succeed")
+            .id;
+        let ended = service
+            .create_editor_session(working_copy_id.clone())
+            .expect("Creating a session should succeed");
+        service
+            .end_editor_session(ended.id)
+            .expect("Ending a session should succeed");
+        let unfinished = service
+            .create_editor_session(working_copy_id.clone())
+            .expect("Creating a session should succeed");
+        service
+            .record_editor_session_change(unfinished.id.clone())
+            .expect("Recording a change should succeed");
+        service
+            .record_unconfirmed_push(&unfinished.id, None, r#"{"title":"Draft"}"#)
+            .expect("Recording the push should succeed");
+        (working_copy_id, unfinished.id)
+    };
+
+    let unfinished = open_service(&dir)
+        .read_unfinished_editor_sessions()
+        .expect("Read should succeed");
+
+    assert_eq!(unfinished.len(), 1);
+    let session = &unfinished[0];
+    assert_eq!(session.id, unfinished_id);
+    assert_eq!(session.working_copy_id, working_copy_id);
+    assert!(session.last_recorded_at.is_some());
+    assert_eq!(session.ended_at, None);
+    let push = session
+        .unconfirmed_push
+        .as_ref()
+        .expect("The unconfirmed push should survive");
+    assert_eq!(
+        (push.remote_post, push.body.as_str()),
+        (None, r#"{"title":"Draft"}"#)
+    );
+}

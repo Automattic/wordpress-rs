@@ -3,13 +3,14 @@ use wp_api::posts::PostId;
 use wp_mobile_local_content::{
     LocalContentError, WpLocalContentStore,
     db_types::{
+        editor_session::{EditorSession, EditorSessionId},
         working_copy::{
             PageWorkingCopy, PageWorkingCopyFields, PostWorkingCopy, PostWorkingCopyFields,
             WorkingCopyId,
         },
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
-    repository::working_copies::WorkingCopyRepository,
+    repository::{editor_sessions::EditorSessionRepository, working_copies::WorkingCopyRepository},
 };
 
 /// Stores the posts and pages the user creates or edits on the device, as
@@ -317,5 +318,98 @@ impl LocalContentService {
     pub fn read_all_page_working_copies(&self) -> Result<Vec<PageWorkingCopy>, LocalContentError> {
         self.store
             .execute(|conn| WorkingCopyRepository.select_all_pages(conn))
+    }
+
+    /// Start an editor session for a working copy, and return it.
+    ///
+    /// Fails with `WorkingCopyNotFound` if no working copy has the ID.
+    pub fn create_editor_session(
+        &self,
+        working_copy_id: WorkingCopyId,
+    ) -> Result<EditorSession, LocalContentError> {
+        self.store.execute(|conn| {
+            let id = EditorSessionRepository.insert(conn, &working_copy_id)?;
+            EditorSessionRepository
+                .select(conn, &id)?
+                .ok_or(LocalContentError::EditorSessionNotFound { id })
+        })
+    }
+
+    /// Record that a change was just recorded in the session's working copy.
+    ///
+    /// Fails with `EditorSessionNotFound` if no session has the ID.
+    pub fn record_editor_session_change(
+        &self,
+        id: EditorSessionId,
+    ) -> Result<(), LocalContentError> {
+        let recorded = self
+            .store
+            .execute(|conn| EditorSessionRepository.record_change(conn, &id))?;
+        found_session(recorded, id)
+    }
+
+    /// End a session: when its editor closes, or once a session that didn't
+    /// end normally has been dealt with. Ending a session that has already
+    /// ended keeps its first `ended_at`.
+    ///
+    /// Fails with `EditorSessionNotFound` if no session has the ID.
+    pub fn end_editor_session(&self, id: EditorSessionId) -> Result<(), LocalContentError> {
+        let ended = self
+            .store
+            .execute(|conn| EditorSessionRepository.end(conn, &id))?;
+        found_session(ended, id)
+    }
+
+    /// Read every session that hasn't ended, oldest first.
+    ///
+    /// That includes sessions an editor still has open.
+    pub fn read_unfinished_editor_sessions(&self) -> Result<Vec<EditorSession>, LocalContentError> {
+        self.store
+            .execute(|conn| EditorSessionRepository.select_unfinished(conn))
+    }
+}
+
+impl LocalContentService {
+    /// Read a session by its ID, or `None` if no session has it.
+    pub fn read_editor_session(
+        &self,
+        id: &EditorSessionId,
+    ) -> Result<Option<EditorSession>, LocalContentError> {
+        self.store
+            .execute(|conn| EditorSessionRepository.select(conn, id))
+    }
+
+    /// Record a push that is about to be sent, so it's known after the app
+    /// ends if no answer arrives. It replaces the session's previous
+    /// unconfirmed push.
+    ///
+    /// `remote_post` is the post the push updates, with its base version, or
+    /// `None` if the push creates the post. `body` is the JSON object it sends.
+    pub fn record_unconfirmed_push(
+        &self,
+        id: &EditorSessionId,
+        remote_post: Option<RemotePostReference>,
+        body: &str,
+    ) -> Result<(), LocalContentError> {
+        let recorded = self.store.execute(|conn| {
+            EditorSessionRepository.record_unconfirmed_push(conn, id, remote_post, body)
+        })?;
+        found_session(recorded, id.clone())
+    }
+
+    /// Delete the session's unconfirmed push, once it's known whether it landed.
+    pub fn clear_unconfirmed_push(&self, id: &EditorSessionId) -> Result<(), LocalContentError> {
+        let cleared = self
+            .store
+            .execute(|conn| EditorSessionRepository.clear_unconfirmed_push(conn, id))?;
+        found_session(cleared, id.clone())
+    }
+}
+
+fn found_session(found: bool, id: EditorSessionId) -> Result<(), LocalContentError> {
+    if found {
+        Ok(())
+    } else {
+        Err(LocalContentError::EditorSessionNotFound { id })
     }
 }
