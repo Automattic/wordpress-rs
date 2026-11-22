@@ -37,6 +37,8 @@ pub enum LocalContentError {
         remote_post_id: PostId,
         pushed_post_id: PostId,
     },
+    #[error("A working copy's {field} must be a JSON object")]
+    NotAJsonObject { field: String },
 }
 
 impl From<rusqlite::Error> for LocalContentError {
@@ -115,9 +117,10 @@ impl WpLocalContentStore {
 /// reference, such as `working_copies`, the way SQLite documents: create the
 /// new table, copy the rows into it, drop the old one, then rename the new one
 /// to the old name.
-pub static MIGRATIONS: [&str; 1] = [include_str!(
-    "../migrations/0001-create-working-copies-tables.sql"
-)];
+pub static MIGRATIONS: [&str; 2] = [
+    include_str!("../migrations/0001-create-working-copies-tables.sql"),
+    include_str!("../migrations/0002-add-meta-and-additional-fields-to-post-working-copies.sql"),
+];
 
 uniffi::setup_scaffolding!();
 

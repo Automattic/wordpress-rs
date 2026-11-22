@@ -5,13 +5,16 @@
 //! and formats that plugins register. See
 //! `Documentation/local-content-principles.md`.
 
+use std::sync::Arc;
+
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use wp_api::{
+    WpAdditionalFields,
     date::WpGmtDateTime,
     media::MediaId,
-    posts::{PostCommentStatus, PostFormat, PostId, PostPingStatus, PostStatus},
+    posts::{PostCommentStatus, PostFormat, PostId, PostMeta, PostPingStatus, PostStatus},
     terms::TermId,
     users::UserId,
 };
@@ -135,6 +138,11 @@ pub struct PostWorkingCopyFields {
     pub tags: Vec<WorkingCopyTag>,
     pub format: PostFormat,
     pub sticky: bool,
+    /// Post meta, one value per meta key.
+    pub meta: Arc<PostMeta>,
+    /// The post's fields that have no typed field here, such as fields plugins
+    /// add, one value per key.
+    pub additional_fields: Arc<WpAdditionalFields>,
 }
 
 /// A page as the user edits it on the device, holding what the editor and its
@@ -268,6 +276,44 @@ pub(crate) fn tags_from_json(json: &str) -> Result<Vec<WorkingCopyTag>, FromSqlE
     serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))
 }
 
+/// The `meta` column value: a JSON object.
+pub(crate) fn meta_to_json(meta: &PostMeta) -> Result<String, LocalContentError> {
+    serde_json::to_value(meta)
+        .map_err(json_error)
+        .and_then(|value| object_to_json("meta", &value))
+}
+
+pub(crate) fn meta_from_json(json: &str) -> Result<Arc<PostMeta>, FromSqlError> {
+    serde_json::from_str(json)
+        .map(Arc::new)
+        .map_err(|e| FromSqlError::Other(e.into()))
+}
+
+/// The `additional_fields` column value: a JSON object.
+pub(crate) fn additional_fields_to_json(
+    additional_fields: &WpAdditionalFields,
+) -> Result<String, LocalContentError> {
+    object_to_json("additional_fields", &additional_fields.raw)
+}
+
+pub(crate) fn additional_fields_from_json(
+    json: &str,
+) -> Result<Arc<WpAdditionalFields>, FromSqlError> {
+    serde_json::from_str(json)
+        .map(|raw| Arc::new(WpAdditionalFields { raw }))
+        .map_err(|e| FromSqlError::Other(e.into()))
+}
+
+fn object_to_json(field: &str, value: &serde_json::Value) -> Result<String, LocalContentError> {
+    if value.is_object() {
+        serde_json::to_string(value).map_err(json_error)
+    } else {
+        Err(LocalContentError::NotAJsonObject {
+            field: field.to_string(),
+        })
+    }
+}
+
 fn json_error(err: serde_json::Error) -> LocalContentError {
     LocalContentError::Sqlite {
         err_message: format!("Failed to serialize to JSON: {err}"),
@@ -351,6 +397,8 @@ pub(crate) enum PostFieldsColumn {
     Tags = 2,
     Format = 3,
     Sticky = 4,
+    Meta = 5,
+    AdditionalFields = 6,
 }
 
 impl ColumnIndex for PostFieldsColumn {

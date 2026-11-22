@@ -48,10 +48,12 @@ fn test_column_enums_match_schema() {
         (PostFieldsColumn::Tags, "tags"),
         (PostFieldsColumn::Format, "format"),
         (PostFieldsColumn::Sticky, "sticky"),
+        (PostFieldsColumn::Meta, "meta"),
+        (PostFieldsColumn::AdditionalFields, "additional_fields"),
     ] {
         assert_eq!(columns[column.as_index()], name);
     }
-    assert_eq!(columns.len(), 5);
+    assert_eq!(columns.len(), 7);
 
     let columns = column_names(&conn, PAGE_FIELDS);
     assert_eq!(columns[PageFieldsColumn::ParentId.as_index()], "parent_id");

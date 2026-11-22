@@ -1,10 +1,11 @@
 use std::sync::Arc;
 use tempfile::TempDir;
 use wp_api::{
+    JsonValue, WpAdditionalFields,
     date::WpGmtDateTime,
     media::MediaId,
     parsed_url::ParsedUrl,
-    posts::{PostCommentStatus, PostFormat, PostId},
+    posts::{PostCommentStatus, PostFormat, PostId, PostMeta},
     terms::TermId,
     users::UserId,
     wp_com::WpComSiteId,
@@ -65,6 +66,8 @@ fn post(title: &str) -> PostWorkingCopyFields {
         tags: vec![],
         format: PostFormat::Standard,
         sticky: false,
+        meta: PostMeta::new(),
+        additional_fields: WpAdditionalFields::new(),
     }
 }
 
@@ -113,6 +116,11 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
         ],
         format: PostFormat::Aside,
         sticky: true,
+        meta: PostMeta::new().with_value(
+            "plugin_meta".to_string(),
+            JsonValue::String("plugin value".to_string()),
+        ),
+        additional_fields: WpAdditionalFields::new(),
     };
 
     let id = {

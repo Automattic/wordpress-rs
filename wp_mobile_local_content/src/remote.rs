@@ -6,14 +6,22 @@
 //! would show as "Immediately" gets `PublishDate::Immediately` instead of its
 //! date.
 //!
-//! Some of the post's values have no working copy field, such as its template,
-//! menu order and meta. They stay as they are on the server only if pushing
+//! A post's meta goes into `meta`. The keys of the post that `wp_api` doesn't
+//! model, such as fields plugins add, go into `additional_fields`, except
+//! those starting with `_`, such as `_links`, which describe the response
+//! rather than the post.
+//!
+//! Some of the post's values have no working copy field, such as its template
+//! and menu order. They stay as they are on the server only if pushing
 //! sends just the fields the user changed.
 
+use std::sync::Arc;
+
 use wp_api::{
+    WpAdditionalFields,
     date::WpDateString,
     media::MediaId,
-    posts::{AnyPostWithEditContext, PostFormat, PostId, PostStatus},
+    posts::{AnyPostWithEditContext, PostFormat, PostId, PostMeta, PostStatus},
     users::UserId,
 };
 
@@ -55,6 +63,8 @@ impl PostWorkingCopyFields {
                 .collect(),
             format: post.format.clone().unwrap_or(PostFormat::Standard),
             sticky: post.sticky.unwrap_or(false),
+            meta: post.meta.clone().unwrap_or_else(PostMeta::new),
+            additional_fields: additional_fields_from_remote(post.additional_fields.as_deref()),
         })
     }
 }
@@ -119,6 +129,24 @@ pub fn page_working_copy_fields_from_remote(
 #[uniffi::export]
 pub fn remote_post_reference_from_remote(post: AnyPostWithEditContext) -> RemotePostReference {
     RemotePostReference::from_remote(&post)
+}
+
+fn additional_fields_from_remote(
+    additional_fields: Option<&WpAdditionalFields>,
+) -> Arc<WpAdditionalFields> {
+    let fields = additional_fields
+        .and_then(|fields| fields.raw.as_object())
+        .map(|object| {
+            object
+                .iter()
+                .filter(|(key, _)| !key.starts_with('_'))
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    Arc::new(WpAdditionalFields {
+        raw: serde_json::Value::Object(fields),
+    })
 }
 
 fn expect_post_type(
@@ -240,6 +268,7 @@ fn is_date_floating(status: &PostStatus, date: &WpDateString, modified: &WpDateS
 mod tests {
     use super::*;
     use wp_api::{
+        JsonValue,
         date::WpGmtDateTime,
         posts::{
             PostCommentStatus, PostContentWithEditContext, PostGuidWithEditContext,
@@ -291,14 +320,22 @@ mod tests {
             comment_status: Some(PostCommentStatus::Open),
             ping_status: None,
             format: Some(PostFormat::Aside),
-            meta: None,
+            meta: Some(
+                PostMeta::new()
+                    .with_value("footnotes".to_string(), JsonValue::String(String::new())),
+            ),
             sticky: Some(false),
             template: String::new(),
             categories: Some(vec![TermId(1)]),
             tags: Some(vec![TermId(7), TermId(8)]),
             parent: None,
             menu_order: None,
-            additional_fields: None,
+            additional_fields: Some(Arc::new(WpAdditionalFields {
+                raw: serde_json::json!({
+                    "plugin_field": "plugin value",
+                    "_links": { "self": [{ "href": "https://example.com/wp-json/wp/v2/posts/42" }] },
+                }),
+            })),
         }
     }
 
@@ -332,6 +369,12 @@ mod tests {
                 ],
                 format: PostFormat::Aside,
                 sticky: false,
+                meta: PostMeta::new()
+                    .with_value("footnotes".to_string(), JsonValue::String(String::new()),),
+                // `_links` describes the response, not the post, so it's left out.
+                additional_fields: Arc::new(WpAdditionalFields {
+                    raw: serde_json::json!({ "plugin_field": "plugin value" }),
+                }),
             }
         );
     }

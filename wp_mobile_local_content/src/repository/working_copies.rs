@@ -13,7 +13,8 @@ use crate::{
             FeaturedImage, PageFieldsColumn, PageWorkingCopy, PageWorkingCopyFields,
             PostFieldsColumn, PostWorkingCopy, PostWorkingCopyFields, PublishDate, StatusSetting,
             WorkingCopyColumn, WorkingCopyCommonFields, WorkingCopyId, WorkingCopyKind,
-            categories_from_json, categories_to_json, tags_from_json, tags_to_json,
+            additional_fields_from_json, additional_fields_to_json, categories_from_json,
+            categories_to_json, meta_from_json, meta_to_json, tags_from_json, tags_to_json,
         },
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
@@ -61,8 +62,9 @@ impl WorkingCopyRepository {
         let (id, rowid) = insert_common(transaction, WorkingCopyKind::Post, &fields.common)?;
         transaction.execute(
             &format!(
-                "INSERT INTO {POST_FIELDS} (working_copy_rowid, category_ids, tags, format, sticky)
-                 VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO {POST_FIELDS} (
+                     working_copy_rowid, category_ids, tags, format, sticky, meta, additional_fields
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?)"
             ),
             rusqlite::params![
                 rowid,
@@ -70,6 +72,8 @@ impl WorkingCopyRepository {
                 tags_to_json(&fields.tags)?,
                 fields.format.as_str(),
                 fields.sticky,
+                meta_to_json(&fields.meta)?,
+                additional_fields_to_json(&fields.additional_fields)?,
             ],
         )?;
         insert_remote_target(transaction, rowid, remote_target)?;
@@ -113,7 +117,9 @@ impl WorkingCopyRepository {
         };
         transaction.execute(
             &format!(
-                "UPDATE {POST_FIELDS} SET category_ids = ?, tags = ?, format = ?, sticky = ?
+                "UPDATE {POST_FIELDS} SET
+                     category_ids = ?, tags = ?, format = ?, sticky = ?, meta = ?,
+                     additional_fields = ?
                  WHERE working_copy_rowid = ?"
             ),
             rusqlite::params![
@@ -121,6 +127,8 @@ impl WorkingCopyRepository {
                 tags_to_json(&fields.tags)?,
                 fields.format.as_str(),
                 fields.sticky,
+                meta_to_json(&fields.meta)?,
+                additional_fields_to_json(&fields.additional_fields)?,
                 rowid,
             ],
         )?;
@@ -243,19 +251,27 @@ impl WorkingCopyRepository {
         let mut stmt = executor.prepare(&format!(
             "SELECT * FROM {POST_FIELDS} WHERE working_copy_rowid = ?"
         ))?;
-        let (categories, tags, format, sticky) = stmt.query_row([common_row.rowid], |row| {
-            use PostFieldsColumn::*;
-            let categories_json: String = row.get_column(CategoryIds)?;
-            let tags_json: String = row.get_column(Tags)?;
-            let format: String = row.get_column(Format)?;
-            Ok((
-                categories_from_json(&categories_json)
-                    .map_err(|e| conversion_error(CategoryIds, Type::Text, e))?,
-                tags_from_json(&tags_json).map_err(|e| conversion_error(Tags, Type::Text, e))?,
-                format,
-                row.get_column::<bool, _>(Sticky)?,
-            ))
-        })?;
+        let (categories, tags, format, sticky, meta, additional_fields) =
+            stmt.query_row([common_row.rowid], |row| {
+                use PostFieldsColumn::*;
+                let categories_json: String = row.get_column(CategoryIds)?;
+                let tags_json: String = row.get_column(Tags)?;
+                let format: String = row.get_column(Format)?;
+                let meta_json: String = row.get_column(Meta)?;
+                let additional_fields_json: String = row.get_column(AdditionalFields)?;
+                Ok((
+                    categories_from_json(&categories_json)
+                        .map_err(|e| conversion_error(CategoryIds, Type::Text, e))?,
+                    tags_from_json(&tags_json)
+                        .map_err(|e| conversion_error(Tags, Type::Text, e))?,
+                    format,
+                    row.get_column::<bool, _>(Sticky)?,
+                    meta_from_json(&meta_json)
+                        .map_err(|e| conversion_error(Meta, Type::Text, e))?,
+                    additional_fields_from_json(&additional_fields_json)
+                        .map_err(|e| conversion_error(AdditionalFields, Type::Text, e))?,
+                ))
+            })?;
         let remote_target = select_remote_target(executor, common_row.rowid)?;
 
         Ok(Some(PostWorkingCopy {
@@ -268,6 +284,8 @@ impl WorkingCopyRepository {
                     .parse::<PostFormat>()
                     .unwrap_or(PostFormat::Custom(format)),
                 sticky,
+                meta,
+                additional_fields,
             },
             remote_target,
             created_at: common_row.created_at,

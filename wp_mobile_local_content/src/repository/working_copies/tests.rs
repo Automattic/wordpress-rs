@@ -9,10 +9,11 @@ use crate::{
 use rusqlite::Connection;
 use std::sync::Arc;
 use wp_api::{
+    JsonValue, WpAdditionalFields,
     date::WpGmtDateTime,
     media::MediaId,
     parsed_url::ParsedUrl,
-    posts::{PostCommentStatus, PostPingStatus},
+    posts::{PostCommentStatus, PostMeta, PostPingStatus},
     terms::TermId,
     wp_com::WpComSiteId,
 };
@@ -81,6 +82,11 @@ fn detailed_post() -> PostWorkingCopyFields {
         ],
         format: PostFormat::Custom("theme-specific".to_string()),
         sticky: true,
+        meta: PostMeta::new()
+            .with_value("footnotes".to_string(), JsonValue::String("[]".to_string())),
+        additional_fields: Arc::new(WpAdditionalFields {
+            raw: serde_json::json!({ "plugin_field": { "nested": [1, 2] } }),
+        }),
     }
 }
 
@@ -91,6 +97,8 @@ fn simple_post(title: &str) -> PostWorkingCopyFields {
         tags: vec![],
         format: PostFormat::Standard,
         sticky: false,
+        meta: PostMeta::new(),
+        additional_fields: WpAdditionalFields::new(),
     }
 }
 

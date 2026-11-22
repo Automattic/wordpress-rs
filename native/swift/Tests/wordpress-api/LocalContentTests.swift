@@ -55,7 +55,15 @@ final class LocalContentTests {
     }
 
     private func post(title: String) -> PostWorkingCopyFields {
-        PostWorkingCopyFields(common: common(title: title), categories: [], tags: [], format: .standard, sticky: false)
+        PostWorkingCopyFields(
+            common: common(title: title),
+            categories: [],
+            tags: [],
+            format: .standard,
+            sticky: false,
+            meta: PostMeta(),
+            additionalFields: WpAdditionalFields()
+        )
     }
 
     @Test func openingAnInMemoryDatabaseThrows() {
@@ -77,7 +85,9 @@ final class LocalContentTests {
             categories: [1, 5],
             tags: [.existing(id: 3), .new(name: "not on the site yet")],
             format: .aside,
-            sticky: true
+            sticky: true,
+            meta: PostMeta().withValue(key: "plugin_meta", value: .string("plugin value")),
+            additionalFields: WpAdditionalFields()
         )
 
         let target = newPost(on: SiteIdentity(url: siteUrl, wordpressComSiteId: 123_456_789))
