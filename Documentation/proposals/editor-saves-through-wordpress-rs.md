@@ -155,6 +155,8 @@ The app returns the server's response exactly as the server sent it. Gutenberg t
 
 **Opening the editor** needs no change in GutenbergKit. It builds the post from what the app passes in when it creates the editor, and doesn't fetch the post itself ([`src/utils/prime-post-entity.js`](https://github.com/wordpress-mobile/GutenbergKit/blob/c776c07c64acbd9cec72dcd8ac9fdf819944238b/src/utils/prime-post-entity.js#L10-L32)). With this proposal, the app passes in what wordpress-rs returns from `editor_post()`.
 
+GutenbergKit takes that post as the post's saved version. Gutenberg counts as unsaved only the edits made in the editor after that ([`isEditedPostDirty`](https://github.com/WordPress/gutenberg/blob/%40wordpress/editor%4016.1.0/packages/editor/src/store/selectors.js#L94-L107)), so changes in the working copy that were never pushed don't show as unsaved. That's how GutenbergKit works today, with the content the app passes in, and this proposal doesn't change it. The next save still sends them, since wordpress-rs pushes what differs from the server, whatever the editor shows.
+
 ### B. The app
 
 The app connects GutenbergKit to wordpress-rs. It implements GutenbergKit's interfaces by calling the editor session in wordpress-rs, and converts requests and responses between the two libraries' types. The rest is decided in `wp_mobile`, so every app behaves the same: how changes are recorded, whether to fetch before pushing, which fields to send, and how to record the result. The one exception is when to push after the editor has closed (see "Pushing after the editor closes").
@@ -295,7 +297,8 @@ impl PostEditorSession {
     }
 
     /// The editor reading the post during the session: fetch, fill the cache,
-    /// and answer with the working copy laid over it.
+    /// and answer with the server's response as it is. While the editor is
+    /// open, it's the source of truth.
     async fn fetch(&self, request: EditorRequest) -> Result<RawResponse, PushError>;
 
     /// End the session normally, when the editor closes.
