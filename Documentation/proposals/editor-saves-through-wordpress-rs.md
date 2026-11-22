@@ -65,11 +65,13 @@ The main path comes first, layer by layer: the user edits a post, and then saves
 
 ### A. GutenbergKit
 
-GutenbergKit gains three things the app can use:
+GutenbergKit gains these things the app can use:
 
 1. **Change reports.** Whenever anything in the post changes, the editor tells the app. This includes the content, settings such as the categories, and plugins' fields. It happens whether or not the user saves. The app then reads the post from the editor and records the change.
 2. **A request handler.** The editor sends its network requests for the post to the app, instead of to the server. These include the request that reads the post, and the one that sends it to the server when the user saves.
 3. **Setting the post's ID.** Once a new post has been created on the server, the app tells the editor its ID.
+4. **Opening with the app's changes as edits.** The app passes in the server's version of the post as its saved version, and the working copy's changes to it separately. The editor opens with those as unsaved edits. See "Opening the editor".
+5. **Saved version reports.** Whenever the editor's saved version of the post changes, the editor tells the app, which checks it with wordpress-rs. The app can give the editor a newer saved version. See "Four versions of the post".
 
 `[decision]` What a change report carries, to agree with GutenbergKit. It can be only the fact that something changed, with the app reading the whole post afterwards, as in the sketch below. It can also carry the changes, or the whole post. Any of these works for wordpress-rs. Today GutenbergKit reports only that the content changed, and the app can read only the title and the content (`getTitleAndContent()`). This proposal needs every field, including the settings and plugins' fields.
 
@@ -110,8 +112,22 @@ data class EditorPostResponse(
 // 3. Setting the post's ID.
 fun GutenbergView.setPostId(id: Long)
 
+// 4. Opening with the app's changes as edits: passed with the editor's
+// dependencies, beside the preloaded saved version.
+EditorDependencies(/* ... */ postEdits = edits)   // JSON, in the REST API's write shape
+
+// 5. Saved version reports.
+interface EditorSavedPostChangeListener {
+    /** The saved version changed: its `modified_gmt` and the fields that changed. */
+    fun onSavedPostChanged(change: String)   // JSON
+}
+
+// A newer version from the server, as the saved version. The unsaved edits stay.
+fun GutenbergView.setSavedPost(post: String)   // JSON, in the REST API's edit shape
+
 // Optional, like `mediaUploader` today: set them before the editor loads.
 gutenbergView.postChangeListener = listener
+gutenbergView.savedPostChangeListener = savedPostListener
 gutenbergView.postRequestHandler = handler
 ```
 
@@ -153,11 +169,34 @@ async function postRequestMiddleware( options, next ) {
 
 The app returns the server's response exactly as the server sent it. Gutenberg takes that response as the post's saved version. If wordpress-rs rebuilt it from its own types, it could leave out fields wordpress-rs doesn't model, and the editor would show them as unsaved.
 
-**Opening the editor** needs no change in GutenbergKit. It builds the post from what the app passes in when it creates the editor, and doesn't fetch the post itself ([`src/utils/prime-post-entity.js`](https://github.com/wordpress-mobile/GutenbergKit/blob/c776c07c64acbd9cec72dcd8ac9fdf819944238b/src/utils/prime-post-entity.js#L10-L32)). With this proposal, the app passes in what wordpress-rs returns from `editor_post()`.
+**Opening the editor.** GutenbergKit builds the post from what the app passes in when it creates the editor, and doesn't fetch the post itself ([`src/utils/prime-post-entity.js`](https://github.com/wordpress-mobile/GutenbergKit/blob/c776c07c64acbd9cec72dcd8ac9fdf819944238b/src/utils/prime-post-entity.js#L10-L32)). With this proposal, the app passes in the two parts wordpress-rs returns from `editor_post()`:
 
-GutenbergKit takes that post as the post's saved version. Gutenberg counts as unsaved only the edits made in the editor after that ([`isEditedPostDirty`](https://github.com/WordPress/gutenberg/blob/%40wordpress/editor%4016.1.0/packages/editor/src/store/selectors.js#L94-L107)), so changes in the working copy that were never pushed don't show as unsaved. That's how GutenbergKit works today, with the content the app passes in, and this proposal doesn't change it. The next save still sends them, since wordpress-rs pushes what differs from the server, whatever the editor shows.
+- **The saved version:** the post as wordpress-rs last fetched it from the server. GutenbergKit takes it as the post's saved version, as it takes the host's post today.
+- **The edits:** the working copy's changes that the server doesn't have. The editor opens with them as unsaved edits, outside the undo history, so undo never goes back to the server's version.
 
-Because the post it opens with can hold changes the server doesn't have, GutenbergKit keeps them when the editor later reads the post. Core-data stores a fetched copy of the post over the one it opened with, so a read, such as `getEntityRecord()` with a query or a list that includes the post, would replace them with the server's values. GutenbergKit's [`persistedPostOverlayMiddleware`](https://github.com/wordpress-mobile/GutenbergKit/blob/c776c07c64acbd9cec72dcd8ac9fdf819944238b/src/utils/api-fetch.js#L1098-L1148) puts the opened values back on fetched copies. Today it does this for the title and the content, the only fields the app passes in. With this proposal the app passes in every field of the working copy, so the middleware has to cover all of them. wordpress-rs answers the read with the server's response as it is, and the middleware works on that response in the editor.
+Gutenberg counts as unsaved the edits over the saved version ([`isEditedPostDirty`](https://github.com/WordPress/gutenberg/blob/%40wordpress/editor%4016.1.0/packages/editor/src/store/selectors.js#L94-L107)), so the working copy's changes show as unsaved, and the next save sends them.
+
+Keeping them out of the saved version matters because core-data stores any copy of the post it takes in over the saved version: a read of the post, a list that includes it, such as a Query Loop block's, or a plugin's call to `receiveEntityRecords`. With the changes in the saved version, as GutenbergKit seeds the host's title and content today, such a copy would replace them with the server's values, and the next change report would record those in the working copy. As edits, they stay over whatever saved version core-data holds. GutenbergKit's [`persistedPostOverlayMiddleware`](https://github.com/wordpress-mobile/GutenbergKit/blob/c776c07c64acbd9cec72dcd8ac9fdf819944238b/src/utils/api-fetch.js#L1098-L1148), which puts the host's title and content back on fetched copies, isn't needed with a request handler.
+
+**Four versions of the post.** While the editor is open, there are four versions of the post:
+
+| | Version | Kept by |
+| -- | -- | -- |
+| A | What the editor believes the server has: its saved version | the editor |
+| B | What wordpress-rs believes the server has: its cache | wordpress-rs |
+| C | What the editor has: A with the unsaved edits over it | the editor |
+| D | The working copy | wordpress-rs |
+
+C and D agree through change reports: the editor is the source of truth, and every report records C in D. A and B can drift apart, since core-data takes in copies of the post that don't come through wordpress-rs. So whenever A changes, GutenbergKit reports its `modified_gmt` and the fields that changed in it, and wordpress-rs checks it against B. wordpress-rs never takes the editor's version as the server's: the server decides what the server has.
+
+| A, compared with B | wordpress-rs |
+| -- | -- |
+| Same `modified_gmt`, same fields | Nothing to do. This is the case when wordpress-rs made the request itself. |
+| A newer | Fetches the post, and checks again. |
+| B newer | Answers with B, and the app gives it to the editor as its saved version. The unsaved edits stay over it. |
+| Same `modified_gmt`, different fields | Records a base mismatch on the editor session: only something other than the server changes the saved version that way. |
+
+`modified_gmt` alone misses changes: core-data merges a copy that has only some fields into the saved version, so a read with `_fields=title,excerpt` changes those fields and leaves the date as it was. That's why reports carry the changed fields too.
 
 ### B. The app
 
@@ -166,9 +205,11 @@ The app connects GutenbergKit to wordpress-rs. It implements GutenbergKit's inte
 ```kotlin
 // Opening a post starts an editor session.
 val session = postEditorService.openPost(site = site, postId = postId)
+val editorPost = session.editorPost()
 val gutenbergView = GutenbergView(
-    configuration = configurationFor(session.editorPost()),   // what the editor shows
-    dependencies = dependencies,
+    configuration = configuration,
+    // The saved version preloaded, and the working copy's changes as edits.
+    dependencies = dependencies.withPost(editorPost.savedPost, postEdits = editorPost.edits),
     coroutineScope = scope,
     context = context,
 )
@@ -176,6 +217,17 @@ val gutenbergView = GutenbergView(
 // Every change is recorded in the working copy, in the background.
 gutenbergView.postChangeListener = EditorPostChangeListener {
     scope.launch { session.recordChange(gutenbergView.currentPost()) }
+}
+
+// The editor's saved version is checked against what wordpress-rs knows the
+// server has. See "Four versions of the post".
+gutenbergView.savedPostChangeListener = EditorSavedPostChangeListener { change ->
+    scope.launch {
+        val check = session.recordSavedPostChange(change)
+        if (check is SavedPostCheck.Newer) {
+            gutenbergView.setSavedPost(check.savedPost)
+        }
+    }
 }
 
 // Every request for the post goes through the session.
@@ -259,9 +311,30 @@ impl PostEditorService {
 }
 
 impl PostEditorSession {
-    /// What the editor shows when it opens: the cached post with the working
-    /// copy laid over it.
+    /// What the editor opens with: the cached post as its saved version, and
+    /// the working copy's changes to it as edits.
     pub fn editor_post(&self) -> EditorPost;
+
+    /// Check the editor's saved version against the cache, after the editor
+    /// reported a change to it. See "Four versions of the post".
+    pub async fn record_saved_post_change(&self, change: SavedPostChange) -> Result<SavedPostCheck> {
+        let cached = self.cache.read_post(self.post_id)?;
+        let server = if change.modified_gmt > cached.modified_gmt {
+            // The editor took in a newer version. The server decides what it is.
+            self.service.fetch_post(self.post_id).await?   // fills the cache
+        } else {
+            cached
+        };
+        if server.modified_gmt > change.modified_gmt {
+            return Ok(SavedPostCheck::Newer { saved_post: server });
+        }
+        let differing = change.fields_differing_from(&server);
+        if !differing.is_empty() {
+            self.local_content.record_base_mismatch(self.session_id, &differing)?;
+            return Ok(SavedPostCheck::Mismatch { fields: differing });
+        }
+        Ok(SavedPostCheck::InSync)
+    }
 
     /// Record the post, as the editor has it now, in the working copy. Called
     /// after every change, in the background.
@@ -359,6 +432,9 @@ pub struct EditorSession {
     pub ended_at: Option<WpGmtDateTime>,
     /// The push sent without an answer yet. See "Lost responses".
     pub unconfirmed_push: Option<PushAttempt>,
+    /// The latest time the editor's saved version differed from the server's
+    /// with the same modified date. See "Four versions of the post".
+    pub base_mismatch: Option<BaseMismatch>,
 }
 
 pub fn create_editor_session(&self, working_copy_id: WorkingCopyId) -> Result<EditorSession>;
@@ -516,8 +592,7 @@ Plugins' save hooks don't run for pushes made after the editor closes, because t
 The proof of concept, on the `editor-save-poc` branches of wordpress-rs and GutenbergKit, builds the main path and new posts. These parts are left out of it until we agree on the proposal:
 
 - **Posts only.** `PostEditorService` reads and pushes `/wp/v2/posts`. Pages have working copies in wordpress-rs, but no editor sessions; custom post types have neither. In GutenbergKit's example app, pages and custom post types save the way they do today.
-- **Lists of posts go to the server directly.** Only requests for the post's own path, and for the paths below it, go through wordpress-rs. A request for a list of posts of its type, such as the one a Query Loop block makes, goes to the server, and core-data stores the post from the response over the one the editor has. `persistedPostOverlayMiddleware` puts the editor's values back on lists of the post's type. With this proposal, these requests go through wordpress-rs too.
-- **Nothing reports core-data replacing the post.** Code in the editor can store a post in core-data without sending a request, by calling `receiveEntityRecords`. With this proposal, GutenbergKit reports every change to the post's saved version that didn't come from opening the editor, a save, or switching a new post to its ID.
+- **Lists of posts go to the server directly.** Only requests for the post's own path, and for the paths below it, go through wordpress-rs. A request for a list of posts of its type, such as the one a Query Loop block makes, goes to the server. The unsaved edits stay over the copy core-data stores from it, and the saved version report tells wordpress-rs about it, but wordpress-rs's cache doesn't get the response. With this proposal, these requests go through wordpress-rs too.
 - **Undo across a new post's first save.** The proof of concept doesn't clear the undo history when a new post gets its ID (CMM-2742). Undo steps from before that save apply to the `-1` post, so they change nothing the editor shows.
 
 ## Not verified yet
