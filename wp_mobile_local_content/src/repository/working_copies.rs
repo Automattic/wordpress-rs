@@ -560,7 +560,7 @@ fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
 
     let status: String = row.get_column(C::Status)?;
     let password: Option<String> = row.get_column(C::Password)?;
-    let publish_date: Option<i64> = row.get_column(C::PublishDate)?;
+    let publish_date: Option<String> = row.get_column(C::PublishDate)?;
     let author: Option<i64> = row.get_column(C::AuthorId)?;
     let featured_media_id: Option<i64> = row.get_column(C::FeaturedMediaId)?;
     let comment_status: Option<String> = row.get_column(C::CommentStatus)?;
@@ -576,8 +576,7 @@ fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
             slug: row.get_column(C::Slug)?,
             status: StatusSetting::from_columns(&status, password)
                 .map_err(|e| conversion_error(C::Status, Type::Text, e))?,
-            publish_date: PublishDate::from_column(publish_date)
-                .map_err(|e| conversion_error(C::PublishDate, Type::Integer, e))?,
+            publish_date: PublishDate::from_column(publish_date),
             author: author.map(UserId),
             featured_image: FeaturedImage::from_column(featured_media_id),
             comment_status: comment_status

@@ -10,7 +10,7 @@ use rusqlite::Connection;
 use std::sync::Arc;
 use wp_api::{
     JsonValue, WpAdditionalFields,
-    date::WpGmtDateTime,
+    date::{WpDateString, WpGmtDateTime},
     media::MediaId,
     parsed_url::ParsedUrl,
     posts::{PostCommentStatus, PostMeta, PostPingStatus},
@@ -65,7 +65,7 @@ fn detailed_post() -> PostWorkingCopyFields {
                 password: Some("secret".to_string()),
             },
             publish_date: PublishDate::At {
-                date: date(1_900_000_000),
+                date: WpDateString::new("2030-03-17T19:46:40"),
             },
             author: Some(UserId(7)),
             featured_image: FeaturedImage::Remote {

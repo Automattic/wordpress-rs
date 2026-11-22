@@ -17,7 +17,11 @@ use wp_mobile::service::{
 };
 use wp_mobile_integration_tests::*;
 use wp_mobile_local_content::{
-    WpLocalContentStore, db_types::working_copy_remote_target::SiteIdentity,
+    WpLocalContentStore,
+    db_types::{
+        working_copy::{PostWorkingCopyFields, PublishDate},
+        working_copy_remote_target::SiteIdentity,
+    },
 };
 
 fn open_local_content(dir: &TempDir) -> Arc<LocalContentService> {
@@ -273,6 +277,60 @@ async fn test_new_post_is_created_on_its_first_push() {
     );
     let editor_post = json_body(&session.editor_post().expect("Reading should succeed"));
     assert_eq!(editor_post["id"], json!(post_id.0));
+
+    RestoreServer::db().await;
+}
+
+/// The working copy keeps the editor's `date` in the site's timezone, and a
+/// push sends it as it is. `null` makes the date float again.
+#[tokio::test]
+#[serial]
+async fn test_editor_date_is_pushed_in_the_site_timezone_and_null_floats_it() {
+    let ctx = create_test_context();
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let post_id = create_draft(&ctx.api, "Dated").await;
+    let service = Arc::new(PostEditorService::new(
+        Arc::new(ctx.service),
+        open_local_content(&dir),
+        site(),
+    ));
+    let session = service
+        .clone()
+        .open_post(post_id)
+        .await
+        .expect("Opening the post should succeed");
+    let save = |date: Value| EditorRequest {
+        method: "PUT".to_string(),
+        path: format!("/wp/v2/posts/{}", post_id.0),
+        body: Some(serde_json::to_vec(&json!({ "date": date })).expect("JSON serializes")),
+    };
+
+    let dated = json_body(
+        &session
+            .perform_editor_request(save(json!("2030-01-15T10:30:00")))
+            .await
+            .expect("The save should get an answer")
+            .body,
+    );
+    assert_eq!(dated["date"], json!("2030-01-15T10:30:00"));
+    assert_ne!(
+        dated["date_gmt"], dated["date"],
+        "The test site's timezone isn't UTC, so the server converts the date"
+    );
+
+    let floating = session
+        .perform_editor_request(save(Value::Null))
+        .await
+        .expect("The save should get an answer");
+    let floating: wp_api::posts::AnyPostWithEditContext =
+        serde_json::from_slice(&floating.body).expect("The response is a post");
+    assert_eq!(
+        PostWorkingCopyFields::from_remote(&floating)
+            .expect("Conversion should succeed")
+            .common
+            .publish_date,
+        PublishDate::Immediately
+    );
 
     RestoreServer::db().await;
 }

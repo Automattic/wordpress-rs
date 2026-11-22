@@ -11,7 +11,7 @@ use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, 
 use uuid::Uuid;
 use wp_api::{
     WpAdditionalFields,
-    date::WpGmtDateTime,
+    date::{WpDateString, WpGmtDateTime},
     media::MediaId,
     posts::{PostCommentStatus, PostFormat, PostId, PostMeta, PostPingStatus, PostStatus},
     terms::TermId,
@@ -82,10 +82,15 @@ pub enum StatusSetting {
 
 /// When the post is published. With `Immediately`, WordPress sets the date
 /// when the post is published.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum PublishDate {
     Immediately,
-    At { date: WpGmtDateTime },
+    /// `date` is in the site's timezone, as the REST API's `date` field, such
+    /// as `2024-01-15T10:30:00`. WordPress works out the UTC date from the
+    /// site's timezone setting.
+    At {
+        date: WpDateString,
+    },
 }
 
 /// The image the user picked as the featured image.
@@ -289,16 +294,16 @@ fn json_error(err: serde_json::Error) -> LocalContentError {
 
 impl PublishDate {
     /// The `publish_date` column value.
-    pub(crate) fn to_column(self) -> Option<i64> {
+    pub(crate) fn to_column(&self) -> Option<&str> {
         match self {
             Self::Immediately => None,
-            Self::At { date } => Some(date.0.timestamp()),
+            Self::At { date } => Some(&date.value),
         }
     }
 
-    pub(crate) fn from_column(timestamp: Option<i64>) -> Result<Self, FromSqlError> {
-        timestamp.map_or(Ok(Self::Immediately), |seconds| {
-            date_from_timestamp(seconds).map(|date| Self::At { date })
+    pub(crate) fn from_column(date: Option<String>) -> Self {
+        date.map_or(Self::Immediately, |date| Self::At {
+            date: WpDateString::new(date),
         })
     }
 }

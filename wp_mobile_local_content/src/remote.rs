@@ -199,7 +199,7 @@ fn common_from_remote(
             PublishDate::Immediately
         } else {
             PublishDate::At {
-                date: post.date_gmt,
+                date: post.date.clone(),
             }
         },
         // WordPress uses 0 for "none" in both fields.
@@ -279,7 +279,8 @@ mod tests {
     fn remote_post() -> AnyPostWithEditContext {
         AnyPostWithEditContext {
             id: PostId(42),
-            date: WpDateString::new("2024-01-15T10:30:00".to_string()),
+            // A site two hours ahead of UTC.
+            date: WpDateString::new("2024-01-15T12:30:00".to_string()),
             date_gmt: gmt("2024-01-15T10:30:00Z"),
             guid: PostGuidWithEditContext {
                 raw: Some("https://example.com/?p=42".to_string()),
@@ -348,8 +349,9 @@ mod tests {
                     excerpt: "An excerpt".to_string(),
                     slug: Some("a-post".to_string()),
                     status: StatusSetting::Publish { password: None },
+                    // The site's date, not `date_gmt`.
                     publish_date: PublishDate::At {
-                        date: gmt("2024-01-15T10:30:00Z"),
+                        date: WpDateString::new("2024-01-15T12:30:00"),
                     },
                     author: Some(UserId(10)),
                     featured_image: FeaturedImage::None,
@@ -442,17 +444,17 @@ mod tests {
             // A draft with a date the user picked keeps it.
             (
                 PostStatus::Draft,
-                WpDateString::new("2024-01-15T10:30:00".to_string()),
+                WpDateString::new("2024-01-15T12:30:00".to_string()),
                 PublishDate::At {
-                    date: gmt("2024-01-15T10:30:00Z"),
+                    date: WpDateString::new("2024-01-15T12:30:00"),
                 },
             ),
             // A published post's date never floats, even when it equals modified.
             (
                 PostStatus::Publish,
-                same_as_modified,
+                same_as_modified.clone(),
                 PublishDate::At {
-                    date: gmt("2024-01-15T10:30:00Z"),
+                    date: same_as_modified,
                 },
             ),
         ] {

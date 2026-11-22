@@ -24,8 +24,9 @@ CREATE TABLE `working_copies` (
   -- WordPress, which clears the password when saving a private post.
   `password` TEXT CHECK (`status` <> 'private' OR `password` IS NULL),
 
-  -- Unix timestamp in seconds. NULL: publish immediately
-  `publish_date` INTEGER,
+  -- In the site's timezone, as WordPress's `date`, such as
+  -- 2024-01-15T10:30:00. NULL: publish immediately
+  `publish_date` TEXT,
 
   -- NULL: the user hasn't chosen an author
   `author_id` INTEGER,

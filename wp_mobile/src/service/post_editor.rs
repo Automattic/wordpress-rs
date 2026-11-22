@@ -19,9 +19,8 @@ use futures::lock::Mutex as AsyncMutex;
 use serde_json::{Map, Value};
 use wp_api::{
     WpAdditionalFields,
-    api_client::{IsWpApiClientDelegate, WpApiClient, WpApiRequestBuilder},
+    api_client::{IsWpApiClientDelegate, WpApiClient},
     api_error::{RequestExecutionError, RequestExecutionErrorReason},
-    date::WpGmtDateTime,
     middleware::PerformsRequests,
     posts::{AnyPostWithEditContext, PostId, PostMeta, PostRetrieveParams},
     request::{
@@ -145,7 +144,6 @@ impl From<RemotePostConversionError> for PostEditorError {
 pub struct PostEditorService {
     api_client: Arc<WpApiClient>,
     api_url_resolver: Arc<dyn ApiUrlResolver>,
-    request_builder: WpApiRequestBuilder,
     posts: Arc<PostService>,
     local_content: Arc<LocalContentService>,
     site: SiteIdentity,
@@ -199,7 +197,7 @@ impl PostEditorService {
                 PostWorkingCopyFields::from_remote(&cached)?,
             )?,
         };
-        self.start_session(working_copy.id, utc_offset_seconds(&cached))
+        self.start_session(working_copy.id)
     }
 
     /// Start an editor session for a new post: a working copy with no remote
@@ -212,7 +210,7 @@ impl PostEditorService {
             },
             empty_post_fields(),
         )?;
-        self.start_session(working_copy.id, None)
+        self.start_session(working_copy.id)
     }
 
     /// Send a working copy to the server, creating the post there if it
@@ -228,9 +226,7 @@ impl PostEditorService {
         &self,
         working_copy_id: WorkingCopyId,
     ) -> Result<ServerResponse, PostEditorError> {
-        self.push(&working_copy_id, None)
-            .await
-            .map(|(response, _)| response)
+        self.push(&working_copy_id, None).await
     }
 
     /// The editor sessions on this site that didn't end normally, such as
@@ -285,9 +281,7 @@ impl PostEditorService {
         local_content: Arc<LocalContentService>,
         site: SiteIdentity,
     ) -> Self {
-        let auth_provider = api_client.posts().get_delegate().auth_provider.clone();
         Self {
-            request_builder: WpApiRequestBuilder::new(api_url_resolver.clone(), auth_provider),
             api_client,
             api_url_resolver,
             posts,
@@ -301,7 +295,6 @@ impl PostEditorService {
     fn start_session(
         self: Arc<Self>,
         working_copy_id: WorkingCopyId,
-        utc_offset_seconds: Option<i32>,
     ) -> Result<Arc<PostEditorSession>, PostEditorError> {
         let session = self
             .local_content
@@ -314,7 +307,6 @@ impl PostEditorService {
             service: self,
             id: session.id,
             working_copy_id,
-            utc_offset_seconds: Mutex::new(utc_offset_seconds),
         }))
     }
 
@@ -343,14 +335,31 @@ impl PostEditorService {
         Ok(post)
     }
 
+    /// A request that creates a post with `body`, or updates `post_id` with it.
+    fn write_request(
+        &self,
+        post_id: Option<PostId>,
+        body: &Map<String, Value>,
+    ) -> WpNetworkRequest {
+        let segments = std::iter::once("posts".to_string())
+            .chain(post_id.map(|post_id| post_id.0.to_string()))
+            .collect();
+        let url = self
+            .api_url_resolver
+            .resolve("wp/v2".to_string(), segments)
+            .inner
+            .clone();
+        InnerRequestBuilder::new(self.api_client.posts().get_delegate().auth_provider.clone())
+            .post(ApiEndpointUrl::new(url), Some(body))
+    }
+
     /// Push a working copy, recording the attempt on `session_id` if it's
-    /// given. Returns the server's response, and the post in it if the push
-    /// succeeded.
+    /// given, and return the server's response.
     async fn push(
         &self,
         working_copy_id: &WorkingCopyId,
         session_id: Option<&EditorSessionId>,
-    ) -> Result<(ServerResponse, Option<AnyPostWithEditContext>), PostEditorError> {
+    ) -> Result<ServerResponse, PostEditorError> {
         // [decision] One push at a time per working copy: a push waits for one
         // already in flight.
         let lock = self
@@ -368,29 +377,9 @@ impl PostEditorService {
         // overwrites changes made on the server since the base version.
         // [decision] Send every field the working copy has, not only the
         // changed ones.
-        let (request, body) = match remote_post {
-            None => {
-                let params = working_copy.fields.to_create_params();
-                (
-                    self.request_builder
-                        .posts()
-                        .create(&PostEndpointType::Posts, &params),
-                    serde_json::to_string(&params),
-                )
-            }
-            Some(remote_post) => {
-                let params = working_copy.fields.to_update_params();
-                (
-                    self.request_builder.posts().update(
-                        &PostEndpointType::Posts,
-                        &remote_post.post_id,
-                        &params,
-                    ),
-                    serde_json::to_string(&params),
-                )
-            }
-        };
-        let body = body.expect("Post parameters always serialize");
+        let body = working_copy.fields.to_rest_fields();
+        let request = self.write_request(remote_post.map(|remote_post| remote_post.post_id), &body);
+        let body = serde_json::to_string(&body).expect("A JSON object always serializes");
 
         // [decision] Record the attempt before sending, so a push whose
         // answer is lost is found later. Only a push through a session is
@@ -420,7 +409,7 @@ impl PostEditorService {
             self.local_content.clear_unconfirmed_push(session_id)?;
         }
         if !is_success(&response) {
-            return Ok((ServerResponse::from(response), None));
+            return Ok(ServerResponse::from(response));
         }
 
         let post: AnyPostWithEditContext =
@@ -438,7 +427,7 @@ impl PostEditorService {
             working_copy_id.clone(),
             RemotePostReference::from_remote(&post),
         )?;
-        Ok((ServerResponse::from(response), Some(post)))
+        Ok(ServerResponse::from(response))
     }
 
     /// Find out whether the push a session was waiting on landed, and record
@@ -459,17 +448,11 @@ impl PostEditorService {
         };
         let server_post = self.fetch_post(remote_post.post_id).await?;
 
-        // The push landed if pushing the server's post now would send exactly
-        // what the push sent.
-        let sent: Value =
+        let sent: Map<String, Value> =
             serde_json::from_str(&push.body).map_err(|err| PostEditorError::LocalContent {
-                reason: format!("The unconfirmed push's body isn't JSON: {err}"),
+                reason: format!("The unconfirmed push's body isn't a JSON object: {err}"),
             })?;
-        let server_as_sent = serde_json::to_value(
-            PostWorkingCopyFields::from_remote(&server_post)?.to_update_params(),
-        )
-        .expect("Post parameters always serialize");
-        if sent == server_as_sent {
+        if push_landed(&sent, &PostWorkingCopyFields::from_remote(&server_post)?) {
             self.local_content.record_post_working_copy_push(
                 session.working_copy_id.clone(),
                 RemotePostReference::from_remote(&server_post),
@@ -530,9 +513,6 @@ pub struct PostEditorSession {
     service: Arc<PostEditorService>,
     id: EditorSessionId,
     working_copy_id: WorkingCopyId,
-    /// The site's offset from UTC, which the editor's `date` is in. Known from
-    /// a post the server returned.
-    utc_offset_seconds: Mutex<Option<i32>>,
 }
 
 impl Drop for PostEditorSession {
@@ -581,9 +561,7 @@ impl PostEditorSession {
             },
             None => Map::from_iter([("type".to_string(), Value::from("post"))]),
         };
-        working_copy
-            .fields
-            .lay_over_editor_post(&mut post, self.utc_offset_seconds());
+        working_copy.fields.lay_over_editor_post(&mut post);
         Ok(serde_json::to_vec(&post).expect("A JSON object always serializes"))
     }
 
@@ -594,9 +572,7 @@ impl PostEditorSession {
     pub fn record_change(&self, post: Vec<u8>) -> Result<(), PostEditorError> {
         let post = json_object(&post)?;
         let mut working_copy = self.service.read_working_copy(&self.working_copy_id)?;
-        working_copy
-            .fields
-            .apply_editor_post(&post, self.utc_offset_seconds())?;
+        working_copy.fields.apply_editor_post(&post)?;
         self.service
             .local_content
             .save_post_working_copy(working_copy.id, working_copy.fields)?;
@@ -642,12 +618,9 @@ impl PostEditorSession {
     /// there yet, and return the server's response. For a new post, call it
     /// when the user first saves, then give the editor `remote_post_id`.
     pub async fn push(&self) -> Result<ServerResponse, PostEditorError> {
-        let (response, post) = self
-            .service
+        self.service
             .push(&self.working_copy_id, Some(&self.id))
-            .await?;
-        self.learn_utc_offset(post.as_ref());
-        Ok(response)
+            .await
     }
 
     /// End the session normally, when the editor closes.
@@ -660,22 +633,6 @@ impl PostEditorSession {
 }
 
 impl PostEditorSession {
-    fn utc_offset_seconds(&self) -> Option<i32> {
-        *self
-            .utc_offset_seconds
-            .lock()
-            .expect("The UTC offset lock isn't poisoned")
-    }
-
-    fn learn_utc_offset(&self, post: Option<&AnyPostWithEditContext>) {
-        if let Some(offset) = post.and_then(utc_offset_seconds) {
-            *self
-                .utc_offset_seconds
-                .lock()
-                .expect("The UTC offset lock isn't poisoned") = Some(offset);
-        }
-    }
-
     async fn record_and_push(
         &self,
         body: Option<&[u8]>,
@@ -685,9 +642,7 @@ impl PostEditorSession {
         // sending, so it's recorded first.
         let edits = body.map(json_object).transpose()?.unwrap_or_default();
         let mut working_copy = self.service.read_working_copy(&self.working_copy_id)?;
-        working_copy
-            .fields
-            .apply_editor_edits(&edits, self.utc_offset_seconds())?;
+        working_copy.fields.apply_editor_edits(&edits)?;
         self.service
             .local_content
             .save_post_working_copy(working_copy.id, working_copy.fields)?;
@@ -702,16 +657,13 @@ impl PostEditorSession {
         post_id: PostId,
         query: Option<&str>,
     ) -> Result<ServerResponse, PostEditorError> {
-        let (response, post) = self.service.fetch_for_editor(post_id, query).await?;
-        self.learn_utc_offset(post.as_ref());
+        let (response, _) = self.service.fetch_for_editor(post_id, query).await?;
         let mut response = ServerResponse::from(response);
         if (200..300).contains(&response.status_code)
             && let Ok(Value::Object(mut server_post)) = serde_json::from_slice(&response.body)
         {
             let working_copy = self.service.read_working_copy(&self.working_copy_id)?;
-            working_copy
-                .fields
-                .lay_over_editor_post(&mut server_post, self.utc_offset_seconds());
+            working_copy.fields.lay_over_editor_post(&mut server_post);
             response.body =
                 serde_json::to_vec(&server_post).expect("A JSON object always serializes");
             // The body changed, so the server's length no longer applies.
@@ -796,6 +748,21 @@ fn push_failure(err: RequestExecutionError) -> PostEditorError {
     }
 }
 
+/// Whether the server's post holds every field `sent` sent: for `meta`, every
+/// meta key it sent.
+fn push_landed(sent: &Map<String, Value>, server: &PostWorkingCopyFields) -> bool {
+    let server = server.to_rest_fields();
+    sent.iter().all(|(key, value)| match (key.as_str(), value) {
+        ("meta", Value::Object(meta)) => meta.iter().all(|(meta_key, meta_value)| {
+            server
+                .get("meta")
+                .and_then(|server_meta| server_meta.get(meta_key))
+                == Some(meta_value)
+        }),
+        _ => server.get(key) == Some(value),
+    })
+}
+
 fn is_success(response: &WpNetworkResponse) -> bool {
     (200..300).contains(&response.status_code)
 }
@@ -808,13 +775,6 @@ fn json_object(bytes: &[u8]) -> Result<Map<String, Value>, PostEditorError> {
             reason: err.to_string(),
         }),
     }
-}
-
-/// The site's offset from UTC when `post` was published, from its `date`,
-/// which is in the site's timezone, and its `date_gmt`.
-fn utc_offset_seconds(post: &AnyPostWithEditContext) -> Option<i32> {
-    let local: WpGmtDateTime = post.date.value.parse().ok()?;
-    (local.0 - post.date_gmt.0).num_seconds().try_into().ok()
 }
 
 fn empty_post_fields() -> PostWorkingCopyFields {

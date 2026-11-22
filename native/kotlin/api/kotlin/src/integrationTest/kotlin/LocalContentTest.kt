@@ -15,6 +15,7 @@ import uniffi.wp_api.PostListParams
 import uniffi.wp_api.PostMeta
 import uniffi.wp_api.PostRetrieveParams
 import uniffi.wp_api.WpAdditionalFields
+import uniffi.wp_api.WpDateString
 import uniffi.wp_mobile.LocalContentService
 import uniffi.wp_mobile_local_content.FeaturedImage
 import uniffi.wp_mobile_local_content.LocalContentException
@@ -105,7 +106,7 @@ class LocalContentTest {
         val edited = PostWorkingCopyFields(
             common = common("Edited").copy(
                 status = StatusSetting.Custom(status = "in-review", password = "secret"),
-                publishDate = PublishDate.At(date = Date(1_900_000_000_000L)),
+                publishDate = PublishDate.At(date = WpDateString("2030-03-17T19:46:40")),
                 author = 7L,
                 featuredImage = FeaturedImage.Remote(mediaId = 42L),
                 commentStatus = PostCommentStatus.Closed

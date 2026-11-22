@@ -79,7 +79,7 @@ final class LocalContentTests {
             common: common(
                 title: "Edited",
                 status: .custom(status: "in-review", password: "secret"),
-                publishDate: .at(date: Date(timeIntervalSince1970: 1_900_000_000)),
+                publishDate: .at(date: WpDateString(value: "2030-03-17T19:46:40")),
                 author: 7,
                 featuredImage: .remote(mediaId: 42),
                 commentStatus: .closed

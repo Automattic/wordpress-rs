@@ -5,8 +5,9 @@
 //!
 //! - A key with a working copy field, such as `title`, `status` or `date`,
 //!   converts into that field. `meta` goes into `meta`.
-//! - A key the server sets, such as `id`, `modified` or `link`, is left out.
-//!   The user can't change it, so it isn't part of what the user wrote.
+//! - A key the server sets, such as `id`, `modified`, `link` or `date_gmt`, is
+//!   left out. The user can't change it, so it isn't part of what the user
+//!   wrote.
 //! - Any other key, such as a field a plugin adds, goes into
 //!   `additional_fields` as it is, except keys starting with `_`, such as
 //!   `_links`, which describe a response rather than the post.
@@ -16,12 +17,8 @@ use std::sync::Arc;
 use serde_json::{Map, Value};
 use wp_api::{
     WpAdditionalFields,
-    date::WpGmtDateTime,
-    media::MediaId,
-    posts::{
-        PostCommentStatus, PostCreateParams, PostFormat, PostMeta, PostPingStatus, PostStatus,
-        PostUpdateParams,
-    },
+    date::WpDateString,
+    posts::{PostCommentStatus, PostFormat, PostMeta, PostPingStatus, PostStatus},
     terms::TermId,
     users::UserId,
 };
@@ -32,16 +29,42 @@ use crate::{
 };
 
 /// The keys the server sets, which the user can't change.
-const SERVER_KEYS: [&str; 8] = [
+const SERVER_KEYS: [&str; 9] = [
     "id",
     "guid",
     "link",
     "modified",
     "modified_gmt",
+    "date_gmt",
     "type",
     "permalink_template",
     "generated_slug",
 ];
+
+/// The keys with a working copy field.
+const KEYS_WITH_A_FIELD: [&str; 18] = [
+    "title",
+    "content",
+    "excerpt",
+    "slug",
+    "status",
+    "password",
+    "date",
+    "author",
+    "featured_media",
+    "comment_status",
+    "ping_status",
+    "template",
+    "menu_order",
+    "format",
+    "sticky",
+    "categories",
+    "tags",
+    "meta",
+];
+
+/// The format of the REST API's `date`, in the site's timezone.
+const DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 
 /// Why an editor's post can't be converted into working copy fields.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
@@ -52,28 +75,20 @@ pub enum EditorPostConversionError {
     InvalidField { field: String, reason: String },
     #[error("A post with status {status} can't be edited")]
     UneditableStatus { status: String },
-    #[error(
-        "The editor's date is in the site's timezone, and the site's offset from UTC isn't known"
-    )]
-    UnknownSiteTimezone,
 }
 
 impl PostWorkingCopyFields {
     /// Take the whole post as the editor has it.
     ///
     /// The fields whose keys `post` has are replaced, and the others stay as
-    /// they are. `meta` and `additional_fields` are replaced as a whole.
-    ///
-    /// `utc_offset_seconds` is the site's offset from UTC. The editor's `date`
-    /// is in the site's timezone, so without the offset it can only be read
-    /// from `date_gmt`. An unpublished post whose `date` equals its `modified`
-    /// gets `PublishDate::Immediately`, as in `from_remote`.
+    /// they are. `meta` and `additional_fields` are replaced as a whole. An
+    /// unpublished post whose `date` equals its `modified` gets
+    /// `PublishDate::Immediately`, as in `from_remote`.
     pub fn apply_editor_post(
         &mut self,
         post: &Map<String, Value>,
-        utc_offset_seconds: Option<i32>,
     ) -> Result<(), EditorPostConversionError> {
-        self.apply_editor_keys(post, utc_offset_seconds, Merge::Replace)
+        self.apply_editor_keys(post, Merge::Replace)
     }
 
     /// Take the fields an editor's write sends: only the ones that changed.
@@ -84,9 +99,8 @@ impl PostWorkingCopyFields {
     pub fn apply_editor_edits(
         &mut self,
         edits: &Map<String, Value>,
-        utc_offset_seconds: Option<i32>,
     ) -> Result<(), EditorPostConversionError> {
-        self.apply_editor_keys(edits, utc_offset_seconds, Merge::KeyByKey)
+        self.apply_editor_keys(edits, Merge::KeyByKey)
     }
 
     /// Lay these fields over `post`, a post in the REST API's edit shape, so
@@ -95,154 +109,123 @@ impl PostWorkingCopyFields {
     /// The keys of `post` with no working copy field keep their values, and so
     /// do `rendered` values, which can be out of date afterwards. The meta and
     /// additional fields are laid over key by key.
-    pub fn lay_over_editor_post(
-        &self,
-        post: &mut Map<String, Value>,
-        utc_offset_seconds: Option<i32>,
-    ) {
-        let common = &self.common;
-        set_raw(post, "title", &common.title);
-        set_raw(post, "content", &common.content);
-        set_raw(post, "excerpt", &common.excerpt);
-        if let Some(slug) = &common.slug {
-            post.insert("slug".into(), slug.clone().into());
-        }
-        let (status, password) = common.status.to_columns();
-        post.insert("status".into(), status.into());
-        post.insert("password".into(), password.unwrap_or_default().into());
-        match common.publish_date {
-            PublishDate::Immediately => {
-                post.insert("date".into(), Value::Null);
-                post.insert("date_gmt".into(), Value::Null);
-            }
-            PublishDate::At { date } => {
-                post.insert("date_gmt".into(), date_to_json(date, 0));
-                if let Some(offset) = utc_offset_seconds {
-                    post.insert("date".into(), date_to_json(date, offset));
+    pub fn lay_over_editor_post(&self, post: &mut Map<String, Value>) {
+        let mut fields = self.to_rest_fields();
+        for key in ["title", "content", "excerpt"] {
+            if let Some(raw) = fields.remove(key) {
+                match post.get_mut(key).and_then(Value::as_object_mut) {
+                    Some(object) => {
+                        object.insert("raw".into(), raw);
+                    }
+                    None => {
+                        post.insert(key.into(), serde_json::json!({ "raw": raw }));
+                    }
                 }
             }
         }
-        if let Some(author) = common.author {
-            post.insert("author".into(), author.0.into());
+        if let Some(Value::Object(working_copy_meta)) = fields.remove("meta") {
+            match post.get_mut("meta").and_then(Value::as_object_mut) {
+                Some(meta) => meta.extend(working_copy_meta),
+                None => {
+                    post.insert("meta".into(), Value::Object(working_copy_meta));
+                }
+            }
         }
-        post.insert(
+        post.extend(fields);
+    }
+
+    /// Every field, as the REST API takes it when creating or updating a post.
+    ///
+    /// `Immediately` is a `date` of `null`. A field the user hasn't set, such
+    /// as a slug or an author, is left out, and so is a private post's
+    /// password, which WordPress clears. The additional fields are top-level
+    /// keys, as the server returns them.
+    pub fn to_rest_fields(&self) -> Map<String, Value> {
+        let common = &self.common;
+        let mut fields = Map::new();
+        fields.insert("title".into(), common.title.clone().into());
+        fields.insert("content".into(), common.content.clone().into());
+        fields.insert("excerpt".into(), common.excerpt.clone().into());
+        if let Some(slug) = &common.slug {
+            fields.insert("slug".into(), slug.clone().into());
+        }
+        let (status, password) = common.status.to_columns();
+        fields.insert("status".into(), status.into());
+        if status != "private" {
+            // An empty password removes the one the post has on the server.
+            fields.insert("password".into(), password.unwrap_or_default().into());
+        }
+        fields.insert(
+            "date".into(),
+            match &common.publish_date {
+                PublishDate::Immediately => Value::Null,
+                PublishDate::At { date } => date.value.clone().into(),
+            },
+        );
+        if let Some(author) = common.author {
+            fields.insert("author".into(), author.0.into());
+        }
+        fields.insert(
             "featured_media".into(),
             common.featured_image.to_column().unwrap_or(0).into(),
         );
         if let Some(comment_status) = &common.comment_status {
-            post.insert("comment_status".into(), comment_status.to_string().into());
+            fields.insert("comment_status".into(), comment_status.to_string().into());
         }
         if let Some(ping_status) = &common.ping_status {
-            post.insert("ping_status".into(), ping_status.to_string().into());
+            fields.insert("ping_status".into(), ping_status.to_string().into());
         }
-        post.insert(
+        fields.insert(
             "template".into(),
             common.template.clone().unwrap_or_default().into(),
         );
         if let Some(menu_order) = common.menu_order {
-            post.insert("menu_order".into(), menu_order.into());
+            fields.insert("menu_order".into(), menu_order.into());
         }
-        post.insert("format".into(), self.format.as_str().into());
-        post.insert("sticky".into(), self.sticky.into());
-        post.insert(
+        fields.insert("format".into(), self.format.as_str().into());
+        fields.insert("sticky".into(), self.sticky.into());
+        fields.insert(
             "categories".into(),
             self.categories.iter().map(|id| id.0).collect(),
         );
-        post.insert("tags".into(), self.tags.iter().map(|id| id.0).collect());
-
-        let meta = post
-            .entry("meta")
-            .or_insert_with(|| Value::Object(Map::new()));
-        if let (Some(meta), Some(working_copy_meta)) =
-            (meta.as_object_mut(), meta_object(&self.meta))
-        {
-            meta.extend(working_copy_meta);
-        }
+        fields.insert("tags".into(), self.tags.iter().map(|id| id.0).collect());
+        fields.insert(
+            "meta".into(),
+            Value::Object(meta_object(&self.meta).unwrap_or_default()),
+        );
         if let Some(additional_fields) = self.additional_fields.raw.as_object() {
-            post.extend(additional_fields.clone());
+            fields.extend(
+                additional_fields
+                    .iter()
+                    .filter(|(key, _)| is_additional_field(key))
+                    .map(|(key, value)| (key.clone(), value.clone())),
+            );
         }
+        fields
     }
 
-    /// The parameters that update a remote post to every one of these fields.
-    ///
-    /// A `PublishDate::Immediately` sends no date, so the post keeps its date on
-    /// the server.
-    pub fn to_update_params(&self) -> PostUpdateParams {
-        let common = &self.common;
-        let (status, password) = status_and_password_params(&common.status);
-        PostUpdateParams {
-            date_gmt: publish_date_param(common.publish_date),
-            slug: common.slug.clone(),
-            status: Some(status),
-            password,
-            title: Some(common.title.clone()),
-            content: Some(common.content.clone()),
-            author: common.author,
-            excerpt: Some(common.excerpt.clone()),
-            featured_media: Some(MediaId(common.featured_image.to_column().unwrap_or(0))),
-            comment_status: common.comment_status.clone(),
-            ping_status: common.ping_status.clone(),
-            format: Some(self.format.clone()),
-            meta: Some(self.meta.clone()),
-            sticky: Some(self.sticky),
-            template: Some(common.template.clone().unwrap_or_default()),
-            menu_order: common.menu_order,
-            categories: self.categories.clone(),
-            tags: self.tags.clone(),
-            additional_fields: Some(self.additional_fields_with_empty_term_lists()),
-            ..Default::default()
-        }
-    }
-
-    /// The parameters that create a remote post from these fields. The same
-    /// fields as `to_update_params`.
-    pub fn to_create_params(&self) -> PostCreateParams {
-        let PostUpdateParams {
-            date,
-            date_gmt,
-            slug,
-            status,
-            password,
-            title,
-            content,
-            author,
-            excerpt,
-            featured_media,
-            comment_status,
-            ping_status,
-            format,
-            meta,
-            sticky,
-            template,
-            categories,
-            tags,
-            parent,
-            menu_order,
-            additional_fields,
-        } = self.to_update_params();
-        PostCreateParams {
-            date,
-            date_gmt,
-            slug,
-            status,
-            password,
-            title,
-            content,
-            author,
-            excerpt,
-            featured_media,
-            comment_status,
-            ping_status,
-            format,
-            meta,
-            sticky,
-            template,
-            categories,
-            tags,
-            parent,
-            menu_order,
-            additional_fields,
-        }
+    /// The fields of `to_rest_fields` whose values differ from `server`'s,
+    /// such as a working copy's from the post on the server. The meta keys are
+    /// compared one by one, and `meta` holds only those that differ.
+    pub fn rest_fields_changed_from(&self, server: &PostWorkingCopyFields) -> Map<String, Value> {
+        let server = server.to_rest_fields();
+        self.to_rest_fields()
+            .into_iter()
+            .filter_map(|(key, value)| match (key.as_str(), value) {
+                ("meta", Value::Object(meta)) => {
+                    let server_meta = server.get("meta").and_then(Value::as_object);
+                    let changed: Map<String, Value> = meta
+                        .into_iter()
+                        .filter(|(meta_key, meta_value)| {
+                            server_meta.and_then(|server_meta| server_meta.get(meta_key))
+                                != Some(meta_value)
+                        })
+                        .collect();
+                    (!changed.is_empty()).then_some((key, Value::Object(changed)))
+                }
+                (_, value) => (server.get(&key) != Some(&value)).then_some((key, value)),
+            })
+            .collect()
     }
 }
 
@@ -258,7 +241,6 @@ impl PostWorkingCopyFields {
     fn apply_editor_keys(
         &mut self,
         post: &Map<String, Value>,
-        utc_offset_seconds: Option<i32>,
         merge: Merge,
     ) -> Result<(), EditorPostConversionError> {
         let common = &mut self.common;
@@ -277,7 +259,7 @@ impl PostWorkingCopyFields {
         if post.contains_key("status") || post.contains_key("password") {
             common.status = status_from_editor(&common.status, post)?;
         }
-        if let Some(publish_date) = publish_date_from_editor(post, utc_offset_seconds, merge)? {
+        if let Some(publish_date) = publish_date_from_editor(post, merge)? {
             common.publish_date = publish_date;
         }
         if let Some(value) = post.get("author") {
@@ -358,51 +340,9 @@ impl PostWorkingCopyFields {
         });
         Ok(())
     }
-
-    /// `PostUpdateParams` leaves out empty term lists, so a post whose last
-    /// category or tag was removed would keep them on the server. The empty
-    /// lists are sent with the additional fields instead.
-    fn additional_fields_with_empty_term_lists(&self) -> Arc<WpAdditionalFields> {
-        let mut fields = self
-            .additional_fields
-            .raw
-            .as_object()
-            .cloned()
-            .unwrap_or_default();
-        if self.categories.is_empty() {
-            fields.insert("categories".into(), Value::Array(vec![]));
-        }
-        if self.tags.is_empty() {
-            fields.insert("tags".into(), Value::Array(vec![]));
-        }
-        Arc::new(WpAdditionalFields {
-            raw: Value::Object(fields),
-        })
-    }
 }
 
 fn is_additional_field(key: &str) -> bool {
-    const KEYS_WITH_A_FIELD: [&str; 19] = [
-        "title",
-        "content",
-        "excerpt",
-        "slug",
-        "status",
-        "password",
-        "date",
-        "date_gmt",
-        "author",
-        "featured_media",
-        "comment_status",
-        "ping_status",
-        "format",
-        "sticky",
-        "categories",
-        "tags",
-        "meta",
-        "template",
-        "menu_order",
-    ];
     !key.starts_with('_') && !KEYS_WITH_A_FIELD.contains(&key) && !SERVER_KEYS.contains(&key)
 }
 
@@ -497,107 +437,41 @@ fn status_from_editor(
     })
 }
 
-/// The publish date from the editor's `date` and `date_gmt`, or `None` if it
-/// has neither.
-///
-/// `date` wins over `date_gmt`, since `date` is what the editor edits. A
-/// whole post can hold a `date_gmt` from before the user changed `date`.
+/// The publish date from the editor's `date`, which is in the site's
+/// timezone, or `None` if the editor didn't send one. `null` is how the block
+/// editor resets a date to "Immediately".
 fn publish_date_from_editor(
     post: &Map<String, Value>,
-    utc_offset_seconds: Option<i32>,
     merge: Merge,
 ) -> Result<Option<PublishDate>, EditorPostConversionError> {
-    let date = post
-        .get("date")
-        .map(|value| optional_string("date", value))
-        .transpose()?;
-    let date_gmt = post
-        .get("date_gmt")
-        .map(|value| optional_string("date_gmt", value))
-        .transpose()?;
-
-    // The block editor's `isEditedPostDateFloating`, which `from_remote` follows too.
+    let Some(date) = post.get("date") else {
+        return Ok(None);
+    };
+    let Some(date) = optional_string("date", date)? else {
+        return Ok(Some(PublishDate::Immediately));
+    };
+    // The block editor's `isEditedPostDateFloating`, which `from_remote`
+    // follows too.
     let floats = merge == Merge::Replace
         && matches!(
             post.get("status").and_then(Value::as_str),
             Some("draft" | "pending" | "auto-draft")
         )
-        && date.as_ref().and_then(Option::as_deref) == post.get("modified").and_then(Value::as_str);
-
-    match (date, date_gmt) {
-        (None, None) => Ok(None),
-        (Some(None), _) | (None, Some(None)) => Ok(Some(PublishDate::Immediately)),
-        (Some(Some(_)), _) if floats => Ok(Some(PublishDate::Immediately)),
-        (Some(Some(date)), date_gmt) => match (utc_offset_seconds, date_gmt.flatten()) {
-            (Some(offset), _) => {
-                let local = parse_date("date", &date)?;
-                Ok(Some(PublishDate::At {
-                    date: WpGmtDateTime(local.0 - chrono::Duration::seconds(offset.into())),
-                }))
-            }
-            (None, Some(date_gmt)) => Ok(Some(PublishDate::At {
-                date: parse_date("date_gmt", &date_gmt)?,
-            })),
-            (None, None) => Err(EditorPostConversionError::UnknownSiteTimezone),
-        },
-        (None, Some(Some(date_gmt))) => Ok(Some(PublishDate::At {
-            date: parse_date("date_gmt", &date_gmt)?,
-        })),
+        && post.get("modified").and_then(Value::as_str) == Some(date.as_str());
+    if floats {
+        return Ok(Some(PublishDate::Immediately));
     }
-}
-
-/// Parses a date in WordPress's format. A date without a timezone reads as
-/// UTC.
-fn parse_date(field: &str, value: &str) -> Result<WpGmtDateTime, EditorPostConversionError> {
-    value
-        .parse()
-        .map_err(|_| invalid(field, "expected a date such as 2024-01-15T10:30:00"))
-}
-
-/// A date in WordPress's format, without a timezone, at `offset_seconds` from
-/// UTC.
-fn date_to_json(date: WpGmtDateTime, offset_seconds: i32) -> Value {
-    (date.0 + chrono::Duration::seconds(offset_seconds.into()))
-        .format("%Y-%m-%dT%H:%M:%S")
-        .to_string()
-        .into()
-}
-
-fn set_raw(post: &mut Map<String, Value>, key: &str, raw: &str) {
-    match post.get_mut(key).and_then(Value::as_object_mut) {
-        Some(object) => {
-            object.insert("raw".into(), raw.into());
-        }
-        None => {
-            post.insert(key.into(), serde_json::json!({ "raw": raw }));
-        }
-    }
+    chrono::NaiveDateTime::parse_from_str(&date, DATE_FORMAT)
+        .map_err(|_| invalid("date", "expected a date such as 2024-01-15T10:30:00"))?;
+    Ok(Some(PublishDate::At {
+        date: WpDateString::new(date),
+    }))
 }
 
 fn meta_object(meta: &PostMeta) -> Option<Map<String, Value>> {
     match serde_json::to_value(meta) {
         Ok(Value::Object(object)) => Some(object),
         _ => None,
-    }
-}
-
-fn status_and_password_params(status: &StatusSetting) -> (PostStatus, Option<String>) {
-    let (status, password) = status.to_columns();
-    let status = status
-        .parse()
-        .unwrap_or_else(|_| PostStatus::Custom(status.to_string()));
-    match status {
-        // WordPress clears a private post's password itself.
-        PostStatus::Private => (status, None),
-        // An empty password removes the one the post has on the server.
-        status => (status, Some(password.unwrap_or_default().to_string())),
-    }
-}
-
-fn publish_date_param(publish_date: PublishDate) -> Option<WpGmtDateTime> {
-    match publish_date {
-        PublishDate::Immediately => None,
-        PublishDate::At { date } => Some(date),
     }
 }
 
@@ -608,8 +482,10 @@ mod tests {
     use serde_json::json;
     use wp_api::JsonValue;
 
-    fn gmt(value: &str) -> WpGmtDateTime {
-        value.parse().expect("Date should parse")
+    fn date(value: &str) -> PublishDate {
+        PublishDate::At {
+            date: WpDateString::new(value),
+        }
     }
 
     fn object(value: Value) -> Map<String, Value> {
@@ -688,7 +564,7 @@ mod tests {
         let mut fields = empty_fields();
 
         fields
-            .apply_editor_post(&editor_post(), Some(2 * 3600))
+            .apply_editor_post(&editor_post())
             .expect("Conversion should succeed");
 
         assert_eq!(
@@ -700,9 +576,8 @@ mod tests {
                     excerpt: String::new(),
                     slug: Some("a-post".to_string()),
                     status: StatusSetting::Publish { password: None },
-                    publish_date: PublishDate::At {
-                        date: gmt("2024-01-15T10:30:00Z"),
-                    },
+                    // The site's date, not `date_gmt`.
+                    publish_date: date("2024-01-15T12:30:00"),
                     author: Some(UserId(10)),
                     featured_image: FeaturedImage::None,
                     comment_status: Some(PostCommentStatus::Open),
@@ -733,7 +608,7 @@ mod tests {
         };
 
         fields
-            .apply_editor_post(&editor_post(), Some(0))
+            .apply_editor_post(&editor_post())
             .expect("Conversion should succeed");
 
         assert_eq!(fields.meta, meta("footnotes", ""));
@@ -751,7 +626,7 @@ mod tests {
             ..empty_fields()
         };
         fields
-            .apply_editor_post(&editor_post(), Some(0))
+            .apply_editor_post(&editor_post())
             .expect("Conversion should succeed");
         let before = PostWorkingCopyFields {
             meta: meta("kept_meta", "kept"),
@@ -761,15 +636,12 @@ mod tests {
         let mut fields = before.clone();
 
         fields
-            .apply_editor_edits(
-                &object(json!({
-                    "id": 42,
-                    "title": "Edited title",
-                    "meta": { "edited_meta": "new" },
-                    "edited_field": 2,
-                })),
-                None,
-            )
+            .apply_editor_edits(&object(json!({
+                "id": 42,
+                "title": "Edited title",
+                "meta": { "edited_meta": "new" },
+                "edited_field": 2,
+            })))
             .expect("Conversion should succeed");
 
         assert_eq!(
@@ -790,56 +662,40 @@ mod tests {
     }
 
     #[test]
-    fn test_editor_date_converts_with_the_site_offset() {
-        let date_only = object(json!({ "date": "2024-01-15T12:30:00" }));
-        let with_date_gmt = object(json!({
-            "date": "2024-01-15T12:30:00",
-            "date_gmt": "2024-01-15T10:30:00",
-        }));
-        for (edits, offset, expected) in [
-            // `date` is in the site's timezone.
+    fn test_editor_date_is_kept_in_the_site_timezone() {
+        for (edits, expected) in [
             (
-                &date_only,
-                Some(2 * 3600),
-                Ok(PublishDate::At {
-                    date: gmt("2024-01-15T10:30:00Z"),
-                }),
-            ),
-            // Without the offset, only `date_gmt` says when it is.
-            (
-                &with_date_gmt,
-                None,
-                Ok(PublishDate::At {
-                    date: gmt("2024-01-15T10:30:00Z"),
-                }),
-            ),
-            (
-                &date_only,
-                None,
-                Err(EditorPostConversionError::UnknownSiteTimezone),
+                json!({ "date": "2024-01-15T12:30:00", "date_gmt": "2024-01-15T10:30:00" }),
+                Ok(date("2024-01-15T12:30:00")),
             ),
             // `null` is how the block editor resets a date to "Immediately".
+            (json!({ "date": null }), Ok(PublishDate::Immediately)),
+            // `date_gmt` is the server's, worked out from `date`.
             (
-                &object(json!({ "date": null })),
-                None,
-                Ok(PublishDate::Immediately),
+                json!({ "date_gmt": "2024-01-15T10:30:00" }),
+                Ok(date("2000-01-01T00:00:00")),
+            ),
+            (
+                json!({ "date": "15 January 2024" }),
+                Err(EditorPostConversionError::InvalidField {
+                    field: "date".to_string(),
+                    reason: "expected a date such as 2024-01-15T10:30:00".to_string(),
+                }),
             ),
         ] {
             let mut fields = PostWorkingCopyFields {
                 common: WorkingCopyCommonFields {
-                    publish_date: PublishDate::At {
-                        date: gmt("2000-01-01T00:00:00Z"),
-                    },
+                    publish_date: date("2000-01-01T00:00:00"),
                     ..empty_fields().common
                 },
                 ..empty_fields()
             };
 
             let result = fields
-                .apply_editor_edits(edits, offset)
-                .map(|()| fields.common.publish_date);
+                .apply_editor_edits(&object(edits.clone()))
+                .map(|()| fields.common.publish_date.clone());
 
-            assert_eq!(result, expected, "edits {edits:?}, offset {offset:?}");
+            assert_eq!(result, expected, "edits {edits}");
         }
     }
 
@@ -851,7 +707,7 @@ mod tests {
         let mut fields = empty_fields();
 
         fields
-            .apply_editor_post(&post, Some(0))
+            .apply_editor_post(&post)
             .expect("Conversion should succeed");
 
         assert_eq!(fields.common.publish_date, PublishDate::Immediately);
@@ -896,7 +752,7 @@ mod tests {
             };
 
             let result = fields
-                .apply_editor_edits(&object(edits.clone()), None)
+                .apply_editor_edits(&object(edits.clone()))
                 .map(|()| fields.common.status);
 
             assert_eq!(result, expected, "edits {edits}");
@@ -907,7 +763,7 @@ mod tests {
     fn test_editor_post_with_a_value_of_the_wrong_type_is_refused() {
         let mut fields = empty_fields();
 
-        let result = fields.apply_editor_edits(&object(json!({ "categories": ["1"] })), None);
+        let result = fields.apply_editor_edits(&object(json!({ "categories": ["1"] })));
 
         assert_eq!(
             result,
@@ -919,14 +775,11 @@ mod tests {
     }
 
     #[test]
-    fn test_update_params_send_every_field() {
+    fn test_rest_fields_hold_every_field() {
         let fields = PostWorkingCopyFields {
             common: WorkingCopyCommonFields {
                 title: "A post".to_string(),
                 status: StatusSetting::Publish { password: None },
-                publish_date: PublishDate::At {
-                    date: gmt("2024-01-15T10:30:00Z"),
-                },
                 ..empty_fields().common
             },
             meta: meta("footnotes", ""),
@@ -934,56 +787,77 @@ mod tests {
             ..empty_fields()
         };
 
-        let body =
-            serde_json::to_value(fields.to_update_params()).expect("Params should serialize");
-
         assert_eq!(
-            body,
+            Value::Object(fields.to_rest_fields()),
             json!({
-                "date_gmt": "2024-01-15T10:30:00",
-                "status": "publish",
-                // An empty password removes the post's password on the server.
-                "password": "",
                 "title": "A post",
                 "content": "",
                 "excerpt": "",
+                "status": "publish",
+                // An empty password removes the post's password on the server.
+                "password": "",
+                // `Immediately`.
+                "date": null,
                 "featured_media": 0,
+                // An empty template is the default one.
+                "template": "",
                 "format": "standard",
-                "meta": { "footnotes": "" },
                 "sticky": false,
                 // Empty term lists are sent, so removing the last one is pushed too.
                 "categories": [],
                 "tags": [],
-                // An empty template is the default one.
-                "template": "",
+                "meta": { "footnotes": "" },
                 "plugin_field": 1,
             })
         );
     }
 
     #[test]
-    fn test_editor_post_round_trips_through_update_params() {
+    fn test_editor_post_round_trips_through_rest_fields() {
         let mut fields = empty_fields();
         fields
-            .apply_editor_post(&editor_post(), Some(2 * 3600))
+            .apply_editor_post(&editor_post())
             .expect("Conversion should succeed");
-        let body = object(
-            serde_json::to_value(fields.to_update_params()).expect("Params should serialize"),
-        );
 
         let mut round_tripped = empty_fields();
         round_tripped
-            .apply_editor_post(&body, None)
+            .apply_editor_post(&fields.to_rest_fields())
             .expect("Conversion should succeed");
 
         assert_eq!(round_tripped, fields);
     }
 
     #[test]
+    fn test_changed_rest_fields_hold_only_what_differs_from_the_server() {
+        let mut server = empty_fields();
+        server
+            .apply_editor_post(&editor_post())
+            .expect("Conversion should succeed");
+        let mut fields = server.clone();
+        fields
+            .apply_editor_edits(&object(json!({
+                "title": "Edited",
+                "tags": [],
+                "meta": { "plugin_meta": "1" },
+            })))
+            .expect("Conversion should succeed");
+
+        assert_eq!(
+            Value::Object(fields.rest_fields_changed_from(&server)),
+            json!({
+                "title": "Edited",
+                "tags": [],
+                // Only the meta key that changed.
+                "meta": { "plugin_meta": "1" },
+            })
+        );
+    }
+
+    #[test]
     fn test_laying_over_an_editor_post_keeps_what_the_working_copy_lacks() {
         let mut fields = empty_fields();
         fields
-            .apply_editor_post(&editor_post(), Some(2 * 3600))
+            .apply_editor_post(&editor_post())
             .expect("Conversion should succeed");
         fields.common.title = "Working copy title".to_string();
         fields.meta = meta("footnotes", "").with_value(
@@ -992,7 +866,7 @@ mod tests {
         );
         let mut post = editor_post();
 
-        fields.lay_over_editor_post(&mut post, Some(2 * 3600));
+        fields.lay_over_editor_post(&mut post);
 
         assert_eq!(
             post.get("title"),
@@ -1006,7 +880,7 @@ mod tests {
         assert_eq!(post.get("date"), Some(&json!("2024-01-15T12:30:00")));
         let mut converted_back = empty_fields();
         converted_back
-            .apply_editor_post(&post, Some(2 * 3600))
+            .apply_editor_post(&post)
             .expect("Conversion should succeed");
         assert_eq!(converted_back, fields);
     }

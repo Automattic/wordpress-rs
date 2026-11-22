@@ -56,6 +56,18 @@ public typealias WorkingCopyRemoteTarget = WordPressAPIInternal.WorkingCopyRemot
 public typealias SiteIdentity = WordPressAPIInternal.SiteIdentity
 public typealias RemotePostReference = WordPressAPIInternal.RemotePostReference
 public typealias RemotePostConversionError = WordPressAPIInternal.RemotePostConversionError
+public typealias PostMeta = WordPressAPIInternal.PostMeta
+public typealias WpDateString = WordPressAPIInternal.WpDateString
+public typealias EditorSessionId = WordPressAPIInternal.EditorSessionId
+public typealias EditorSession = WordPressAPIInternal.EditorSession
+public typealias UnconfirmedPush = WordPressAPIInternal.UnconfirmedPush
+
+// MARK: - Post Editor
+public typealias PostEditorService = WordPressAPIInternal.PostEditorService
+public typealias PostEditorSession = WordPressAPIInternal.PostEditorSession
+public typealias PostEditorError = WordPressAPIInternal.PostEditorError
+public typealias EditorRequest = WordPressAPIInternal.EditorRequest
+public typealias ServerResponse = WordPressAPIInternal.ServerResponse
 
 // MARK: - Login
 
