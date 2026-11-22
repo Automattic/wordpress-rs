@@ -252,6 +252,8 @@ mod tests {
                 featured_image: FeaturedImage::None,
                 comment_status: None,
                 ping_status: None,
+                template: None,
+                menu_order: None,
             },
             categories: vec![],
             tags: vec![],

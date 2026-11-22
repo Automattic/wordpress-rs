@@ -38,7 +38,12 @@ CREATE TABLE `working_copies` (
   `ping_status` TEXT,
 
   `created_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  `updated_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  `updated_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+
+  -- NULL: the default template
+  `template` TEXT,
+  -- NULL: the post type has no custom order
+  `menu_order` INTEGER
 ) STRICT;
 
 CREATE TABLE `post_working_copy_fields` (

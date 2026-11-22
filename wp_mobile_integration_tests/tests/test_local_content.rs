@@ -56,6 +56,8 @@ fn common(title: &str) -> WorkingCopyCommonFields {
         featured_image: FeaturedImage::None,
         comment_status: None,
         ping_status: None,
+        template: None,
+        menu_order: None,
     }
 }
 

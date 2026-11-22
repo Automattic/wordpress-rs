@@ -58,7 +58,9 @@ class LocalContentTest {
         author = null,
         featuredImage = FeaturedImage.None,
         commentStatus = null,
-        pingStatus = null
+        pingStatus = null,
+        template = null,
+        menuOrder = null
     )
 
     private fun post(title: String) = PostWorkingCopyFields(

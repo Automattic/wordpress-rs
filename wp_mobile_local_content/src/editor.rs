@@ -5,9 +5,8 @@
 //!
 //! - A key with a working copy field, such as `title`, `status` or `date`,
 //!   converts into that field. `meta` goes into `meta`.
-//! - A key `wp_api` models but the working copy has no field for, such as
-//!   `id`, `modified`, `link` or `template`, is left out. The server sets most
-//!   of them, and the others stay as they are on the server.
+//! - A key the server sets, such as `id`, `modified` or `link`, is left out.
+//!   The user can't change it, so it isn't part of what the user wrote.
 //! - Any other key, such as a field a plugin adds, goes into
 //!   `additional_fields` as it is, except keys starting with `_`, such as
 //!   `_links`, which describe a response rather than the post.
@@ -32,8 +31,8 @@ use crate::{
     remote::{RemotePostConversionError, status_from_remote},
 };
 
-/// The keys `wp_api` models that have no working copy field.
-const KEYS_WITHOUT_A_FIELD: [&str; 11] = [
+/// The keys the server sets, which the user can't change.
+const SERVER_KEYS: [&str; 8] = [
     "id",
     "guid",
     "link",
@@ -42,9 +41,6 @@ const KEYS_WITHOUT_A_FIELD: [&str; 11] = [
     "type",
     "permalink_template",
     "generated_slug",
-    "template",
-    "parent",
-    "menu_order",
 ];
 
 /// Why an editor's post can't be converted into working copy fields.
@@ -139,6 +135,13 @@ impl PostWorkingCopyFields {
         if let Some(ping_status) = &common.ping_status {
             post.insert("ping_status".into(), ping_status.to_string().into());
         }
+        post.insert(
+            "template".into(),
+            common.template.clone().unwrap_or_default().into(),
+        );
+        if let Some(menu_order) = common.menu_order {
+            post.insert("menu_order".into(), menu_order.into());
+        }
         post.insert("format".into(), self.format.as_str().into());
         post.insert("sticky".into(), self.sticky.into());
         post.insert(
@@ -163,9 +166,7 @@ impl PostWorkingCopyFields {
     /// The parameters that update a remote post to every one of these fields.
     ///
     /// A `PublishDate::Immediately` sends no date, so the post keeps its date on
-    /// the server. Template,
-    /// parent and menu order aren't sent, since the working copy has no field
-    /// for them.
+    /// the server.
     pub fn to_update_params(&self) -> PostUpdateParams {
         let common = &self.common;
         let (status, password) = status_and_password_params(&common.status);
@@ -184,6 +185,8 @@ impl PostWorkingCopyFields {
             format: Some(self.format.clone()),
             meta: Some(self.meta.clone()),
             sticky: Some(self.sticky),
+            template: Some(common.template.clone().unwrap_or_default()),
+            menu_order: common.menu_order,
             categories: self.categories.clone(),
             tags: self.tags.clone(),
             additional_fields: Some(self.additional_fields_with_empty_term_lists()),
@@ -292,6 +295,20 @@ impl PostWorkingCopyFields {
             common.ping_status = optional_string("ping_status", value)?
                 .map(|status| status.parse().unwrap_or(PostPingStatus::Custom(status)));
         }
+        if let Some(value) = post.get("template") {
+            common.template =
+                optional_string("template", value)?.filter(|template| !template.is_empty());
+        }
+        if let Some(value) = post.get("menu_order") {
+            common.menu_order = match value {
+                Value::Null => None,
+                value => Some(
+                    value
+                        .as_i64()
+                        .ok_or_else(|| invalid("menu_order", "expected an integer"))?,
+                ),
+            };
+        }
         if let Some(value) = post.get("format") {
             let format = string("format", value)?;
             self.format = format.parse().unwrap_or(PostFormat::Custom(format));
@@ -365,7 +382,7 @@ impl PostWorkingCopyFields {
 }
 
 fn is_additional_field(key: &str) -> bool {
-    const KEYS_WITH_A_FIELD: [&str; 17] = [
+    const KEYS_WITH_A_FIELD: [&str; 19] = [
         "title",
         "content",
         "excerpt",
@@ -383,10 +400,10 @@ fn is_additional_field(key: &str) -> bool {
         "categories",
         "tags",
         "meta",
+        "template",
+        "menu_order",
     ];
-    !key.starts_with('_')
-        && !KEYS_WITH_A_FIELD.contains(&key)
-        && !KEYS_WITHOUT_A_FIELD.contains(&key)
+    !key.starts_with('_') && !KEYS_WITH_A_FIELD.contains(&key) && !SERVER_KEYS.contains(&key)
 }
 
 fn invalid(field: &str, reason: &str) -> EditorPostConversionError {
@@ -615,6 +632,8 @@ mod tests {
                 featured_image: FeaturedImage::None,
                 comment_status: None,
                 ping_status: None,
+                template: None,
+                menu_order: None,
             },
             categories: vec![],
             tags: vec![],
@@ -655,7 +674,7 @@ mod tests {
             "ping_status": "closed",
             "format": "aside",
             "sticky": true,
-            "template": "",
+            "template": "wide.php",
             "categories": [1],
             "tags": [7, 8],
             "meta": { "footnotes": "" },
@@ -688,14 +707,16 @@ mod tests {
                     featured_image: FeaturedImage::None,
                     comment_status: Some(PostCommentStatus::Open),
                     ping_status: Some(PostPingStatus::Closed),
+                    template: Some("wide.php".to_string()),
+                    menu_order: None,
                 },
                 categories: vec![TermId(1)],
                 tags: vec![TermId(7), TermId(8)],
                 format: PostFormat::Aside,
                 sticky: true,
                 meta: meta("footnotes", ""),
-                // `id`, `link`, `template` and the rest have no field, and
-                // `_links` describes a response.
+                // `id`, `link` and the rest are the server's, and `_links`
+                // describes a response.
                 additional_fields: additional_fields(
                     json!({ "plugin_field": { "nested": [1, 2] } })
                 ),
@@ -933,6 +954,8 @@ mod tests {
                 // Empty term lists are sent, so removing the last one is pushed too.
                 "categories": [],
                 "tags": [],
+                // An empty template is the default one.
+                "template": "",
                 "plugin_field": 1,
             })
         );

@@ -423,8 +423,8 @@ fn insert_common(
     let mut stmt = transaction.prepare(&format!(
         "INSERT INTO {WORKING_COPIES} (
              uuid, kind, title, content, excerpt, slug, status, password, publish_date,
-             author_id, featured_media_id, comment_status, ping_status
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             author_id, featured_media_id, comment_status, ping_status, template, menu_order
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING rowid"
     ))?;
     let rowid = stmt.query_row(
@@ -442,6 +442,8 @@ fn insert_common(
             common.featured_image.to_column(),
             common.comment_status.as_ref().map(ToString::to_string),
             common.ping_status.as_ref().map(ToString::to_string),
+            common.template,
+            common.menu_order,
         ],
         |row| row.get(0),
     )?;
@@ -460,7 +462,8 @@ fn update_common(
         "UPDATE {WORKING_COPIES} SET
              title = ?, content = ?, excerpt = ?, slug = ?, status = ?, password = ?,
              publish_date = ?, author_id = ?, featured_media_id = ?, comment_status = ?,
-             ping_status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+             ping_status = ?, template = ?, menu_order = ?,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
          WHERE uuid = ? AND kind = ?
          RETURNING rowid"
     ))?;
@@ -478,6 +481,8 @@ fn update_common(
                 common.featured_image.to_column(),
                 common.comment_status.as_ref().map(ToString::to_string),
                 common.ping_status.as_ref().map(ToString::to_string),
+                common.template,
+                common.menu_order,
                 id,
                 kind.as_str(),
             ],
@@ -579,6 +584,8 @@ fn common_from_row(row: &Row) -> rusqlite::Result<CommonRow> {
                 .map(|status| status.parse().unwrap_or(PostCommentStatus::Custom(status))),
             ping_status: ping_status
                 .map(|status| status.parse().unwrap_or(PostPingStatus::Custom(status))),
+            template: row.get_column(C::Template)?,
+            menu_order: row.get_column(C::MenuOrder)?,
         },
         created_at: row.get_column(C::CreatedAt)?,
         updated_at: row.get_column(C::UpdatedAt)?,

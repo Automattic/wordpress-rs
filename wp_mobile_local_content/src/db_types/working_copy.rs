@@ -112,6 +112,11 @@ pub struct WorkingCopyCommonFields {
     pub comment_status: Option<PostCommentStatus>,
     /// `None` when the user hasn't chosen whether pings are open.
     pub ping_status: Option<PostPingStatus>,
+    /// The theme template the post uses, or `None` for the default one.
+    pub template: Option<String>,
+    /// The post's place in a custom order, or `None` if its post type has no
+    /// such order, as posts don't.
+    pub menu_order: Option<i64>,
 }
 
 /// A post as the user edits it on the device, holding what the editor and its
@@ -341,6 +346,8 @@ pub(crate) enum WorkingCopyColumn {
     PingStatus = 13,
     CreatedAt = 14,
     UpdatedAt = 15,
+    Template = 16,
+    MenuOrder = 17,
 }
 
 impl ColumnIndex for WorkingCopyColumn {

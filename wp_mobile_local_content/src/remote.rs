@@ -10,10 +10,6 @@
 //! model, such as fields plugins add, go into `additional_fields`, except
 //! those starting with `_`, such as `_links`, which describe the response
 //! rather than the post.
-//!
-//! Some of the post's values have no working copy field, such as its template
-//! and menu order. They stay as they are on the server only if pushing
-//! sends just the fields the user changed.
 
 use std::sync::Arc;
 
@@ -214,6 +210,9 @@ fn common_from_remote(
         },
         comment_status: post.comment_status.clone(),
         ping_status: post.ping_status.clone(),
+        // WordPress uses an empty template for the default one.
+        template: Some(post.template.clone()).filter(|template| !template.is_empty()),
+        menu_order: post.menu_order,
     })
 }
 
@@ -356,6 +355,8 @@ mod tests {
                     featured_image: FeaturedImage::None,
                     comment_status: Some(PostCommentStatus::Open),
                     ping_status: None,
+                    template: None,
+                    menu_order: None,
                 },
                 categories: vec![TermId(1)],
                 tags: vec![TermId(7), TermId(8)],

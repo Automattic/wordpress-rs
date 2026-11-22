@@ -49,6 +49,8 @@ fn common(title: &str) -> WorkingCopyCommonFields {
         featured_image: FeaturedImage::None,
         comment_status: None,
         ping_status: None,
+        template: None,
+        menu_order: None,
     }
 }
 
@@ -71,6 +73,8 @@ fn detailed_post() -> PostWorkingCopyFields {
             },
             comment_status: Some(PostCommentStatus::Closed),
             ping_status: Some(PostPingStatus::Custom("moderated".to_string())),
+            template: Some("wide-template.php".to_string()),
+            menu_order: Some(3),
             ..common("Detailed post")
         },
         categories: vec![TermId(1), TermId(5)],

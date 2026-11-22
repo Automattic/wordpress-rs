@@ -46,7 +46,9 @@ final class LocalContentTests {
             author: author,
             featuredImage: featuredImage,
             commentStatus: commentStatus,
-            pingStatus: nil
+            pingStatus: nil,
+            template: nil,
+            menuOrder: nil
         )
     }
 
