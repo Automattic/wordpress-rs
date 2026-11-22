@@ -120,11 +120,9 @@ impl WpLocalContentStore {
 /// reference, such as `working_copies`, the way SQLite documents: create the
 /// new table, copy the rows into it, drop the old one, then rename the new one
 /// to the old name.
-pub static MIGRATIONS: [&str; 3] = [
-    include_str!("../migrations/0001-create-working-copies-tables.sql"),
-    include_str!("../migrations/0002-add-meta-and-additional-fields-to-post-working-copies.sql"),
-    include_str!("../migrations/0003-create-editor-sessions-tables.sql"),
-];
+pub static MIGRATIONS: [&str; 1] = [include_str!(
+    "../migrations/0001-create-local-content-tables.sql"
+)];
 
 uniffi::setup_scaffolding!();
 
