@@ -391,7 +391,7 @@ session.onRemotePostCreated { postId ->
 - **As soon as it has something in it.** `record_change` pushes the working copy after the first change that leaves it non-empty. The user's first tap on Save is then an ordinary update. A post the user abandons stays on the site as a draft.
 - **When the user first taps Save.** The app asks the session to create the post, gives the editor the ID, and then calls the editor's `savePost()`. Nothing reaches the server before the user asks for it.
 
-A save can also start inside the editor, from a keyboard shortcut or a plugin. If the post has no ID yet, the editor refuses it, as editor-driven saving plans, and the app runs the same steps.
+A save can also start inside the editor, from a keyboard shortcut or a plugin, before the post has an ID. wordpress-rs then creates the post from that save, and GutenbergKit switches the editor to the new ID before Gutenberg handles the response, so Gutenberg keeps a single post. Plugins' save hooks get `-1` for that one save, because `savePost()` reads the ID before it sends the request. Later saves get the real ID.
 
 Inside Gutenberg, the post's ID is the key it stores the post under, so switching it means moving the post to the new key with its unsaved edits. Editor-driven saving plans this as `adoptPost` ([CMM-2564](https://linear.app/a8c/issue/CMM-2564/let-the-host-hand-a-newly-created-post-id-to-the-editor)), which a spike showed works without reloading the editor ([CMM-2558](https://linear.app/a8c/issue/CMM-2558/spike-switch-the-editor-to-a-new-post-id-without-remounting)). It clears the undo history ([CMM-2742](https://linear.app/a8c/issue/CMM-2742/clear-the-undo-history-when-the-editor-adopts-a-new-post-id)).
 
