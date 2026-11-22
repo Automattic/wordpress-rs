@@ -222,7 +222,7 @@ fn common_from_remote(
     })
 }
 
-fn status_from_remote(
+pub(crate) fn status_from_remote(
     status: &PostStatus,
     password: Option<&str>,
 ) -> Result<StatusSetting, RemotePostConversionError> {
