@@ -13,8 +13,8 @@ use crate::{
             FeaturedImage, PageFieldsColumn, PageWorkingCopy, PageWorkingCopyFields,
             PostFieldsColumn, PostWorkingCopy, PostWorkingCopyFields, PublishDate, StatusSetting,
             WorkingCopyColumn, WorkingCopyCommonFields, WorkingCopyId, WorkingCopyKind,
-            additional_fields_from_json, additional_fields_to_json, categories_from_json,
-            categories_to_json, meta_from_json, meta_to_json, tags_from_json, tags_to_json,
+            additional_fields_from_json, additional_fields_to_json, meta_from_json, meta_to_json,
+            term_ids_from_json, term_ids_to_json,
         },
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
@@ -63,13 +63,13 @@ impl WorkingCopyRepository {
         transaction.execute(
             &format!(
                 "INSERT INTO {POST_FIELDS} (
-                     working_copy_rowid, category_ids, tags, format, sticky, meta, additional_fields
+                     working_copy_rowid, category_ids, tag_ids, format, sticky, meta, additional_fields
                  ) VALUES (?, ?, ?, ?, ?, ?, ?)"
             ),
             rusqlite::params![
                 rowid,
-                categories_to_json(&fields.categories)?,
-                tags_to_json(&fields.tags)?,
+                term_ids_to_json(&fields.categories)?,
+                term_ids_to_json(&fields.tags)?,
                 fields.format.as_str(),
                 fields.sticky,
                 meta_to_json(&fields.meta)?,
@@ -118,13 +118,13 @@ impl WorkingCopyRepository {
         transaction.execute(
             &format!(
                 "UPDATE {POST_FIELDS} SET
-                     category_ids = ?, tags = ?, format = ?, sticky = ?, meta = ?,
+                     category_ids = ?, tag_ids = ?, format = ?, sticky = ?, meta = ?,
                      additional_fields = ?
                  WHERE working_copy_rowid = ?"
             ),
             rusqlite::params![
-                categories_to_json(&fields.categories)?,
-                tags_to_json(&fields.tags)?,
+                term_ids_to_json(&fields.categories)?,
+                term_ids_to_json(&fields.tags)?,
                 fields.format.as_str(),
                 fields.sticky,
                 meta_to_json(&fields.meta)?,
@@ -255,15 +255,15 @@ impl WorkingCopyRepository {
             stmt.query_row([common_row.rowid], |row| {
                 use PostFieldsColumn::*;
                 let categories_json: String = row.get_column(CategoryIds)?;
-                let tags_json: String = row.get_column(Tags)?;
+                let tags_json: String = row.get_column(TagIds)?;
                 let format: String = row.get_column(Format)?;
                 let meta_json: String = row.get_column(Meta)?;
                 let additional_fields_json: String = row.get_column(AdditionalFields)?;
                 Ok((
-                    categories_from_json(&categories_json)
+                    term_ids_from_json(&categories_json)
                         .map_err(|e| conversion_error(CategoryIds, Type::Text, e))?,
-                    tags_from_json(&tags_json)
-                        .map_err(|e| conversion_error(Tags, Type::Text, e))?,
+                    term_ids_from_json(&tags_json)
+                        .map_err(|e| conversion_error(TagIds, Type::Text, e))?,
                     format,
                     row.get_column::<bool, _>(Sticky)?,
                     meta_from_json(&meta_json)

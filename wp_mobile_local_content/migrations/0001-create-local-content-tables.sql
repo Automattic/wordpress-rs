@@ -46,8 +46,8 @@ CREATE TABLE `post_working_copy_fields` (
 
   -- JSON array of term IDs
   `category_ids` TEXT NOT NULL CHECK (json_valid(`category_ids`) AND json_type(`category_ids`) = 'array'),
-  -- JSON array of tags, each {"existing": {"id": <term ID>}} or {"new": {"name": <name>}}
-  `tags` TEXT NOT NULL CHECK (json_valid(`tags`) AND json_type(`tags`) = 'array'),
+  -- JSON array of term IDs
+  `tag_ids` TEXT NOT NULL CHECK (json_valid(`tag_ids`) AND json_type(`tag_ids`) = 'array'),
   `format` TEXT NOT NULL,
   `sticky` INTEGER NOT NULL CHECK (`sticky` IN (0, 1)),
   -- Post meta, as a JSON object with one value per meta key

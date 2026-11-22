@@ -26,7 +26,6 @@ import uniffi.wp_mobile_local_content.RemotePostReference
 import uniffi.wp_mobile_local_content.SiteIdentity
 import uniffi.wp_mobile_local_content.StatusSetting
 import uniffi.wp_mobile_local_content.WorkingCopyCommonFields
-import uniffi.wp_mobile_local_content.WorkingCopyTag
 import uniffi.wp_mobile_local_content.WorkingCopyRemoteTarget
 import uniffi.wp_mobile_local_content.WpLocalContentStore
 import uniffi.wp_mobile_local_content.postWorkingCopyFieldsFromRemote
@@ -110,7 +109,7 @@ class LocalContentTest {
                 commentStatus = PostCommentStatus.Closed
             ),
             categories = listOf(1L, 5L),
-            tags = listOf(WorkingCopyTag.Existing(id = 3L), WorkingCopyTag.New(name = "not on the site yet")),
+            tags = listOf(3L, 4L),
             format = PostFormat.Aside,
             sticky = true,
             meta = PostMeta().withValue("plugin_meta", JsonValue.String("plugin value")),

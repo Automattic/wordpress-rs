@@ -45,7 +45,7 @@ fn test_column_enums_match_schema() {
     let columns = column_names(&conn, POST_FIELDS);
     for (column, name) in [
         (PostFieldsColumn::CategoryIds, "category_ids"),
-        (PostFieldsColumn::Tags, "tags"),
+        (PostFieldsColumn::TagIds, "tag_ids"),
         (PostFieldsColumn::Format, "format"),
         (PostFieldsColumn::Sticky, "sticky"),
         (PostFieldsColumn::Meta, "meta"),

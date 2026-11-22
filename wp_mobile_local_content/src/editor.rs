@@ -28,9 +28,7 @@ use wp_api::{
 };
 
 use crate::{
-    db_types::working_copy::{
-        FeaturedImage, PostWorkingCopyFields, PublishDate, StatusSetting, WorkingCopyTag,
-    },
+    db_types::working_copy::{FeaturedImage, PostWorkingCopyFields, PublishDate, StatusSetting},
     remote::{RemotePostConversionError, status_from_remote},
 };
 
@@ -100,8 +98,7 @@ impl PostWorkingCopyFields {
     ///
     /// The keys of `post` with no working copy field keep their values, and so
     /// do `rendered` values, which can be out of date afterwards. The meta and
-    /// additional fields are laid over key by key. Tags that aren't on the site
-    /// yet are left out of `tags`, which holds IDs.
+    /// additional fields are laid over key by key.
     pub fn lay_over_editor_post(
         &self,
         post: &mut Map<String, Value>,
@@ -148,10 +145,7 @@ impl PostWorkingCopyFields {
             "categories".into(),
             self.categories.iter().map(|id| id.0).collect(),
         );
-        post.insert(
-            "tags".into(),
-            existing_tag_ids(&self.tags).map(|id| id.0).collect(),
-        );
+        post.insert("tags".into(), self.tags.iter().map(|id| id.0).collect());
 
         let meta = post
             .entry("meta")
@@ -169,7 +163,7 @@ impl PostWorkingCopyFields {
     /// The parameters that update a remote post to every one of these fields.
     ///
     /// A `PublishDate::Immediately` sends no date, so the post keeps its date on
-    /// the server. Tags that aren't on the site yet aren't sent. Template,
+    /// the server. Template,
     /// parent and menu order aren't sent, since the working copy has no field
     /// for them.
     pub fn to_update_params(&self) -> PostUpdateParams {
@@ -191,7 +185,7 @@ impl PostWorkingCopyFields {
             meta: Some(self.meta.clone()),
             sticky: Some(self.sticky),
             categories: self.categories.clone(),
-            tags: existing_tag_ids(&self.tags).collect(),
+            tags: self.tags.clone(),
             additional_fields: Some(self.additional_fields_with_empty_term_lists()),
             ..Default::default()
         }
@@ -311,9 +305,7 @@ impl PostWorkingCopyFields {
             self.categories = id_list("categories", value)?.map(TermId).collect();
         }
         if let Some(value) = post.get("tags") {
-            self.tags = id_list("tags", value)?
-                .map(|id| WorkingCopyTag::Existing { id: TermId(id) })
-                .collect();
+            self.tags = id_list("tags", value)?.map(TermId).collect();
         }
         if let Some(value) = post.get("meta") {
             let edited = value
@@ -363,7 +355,7 @@ impl PostWorkingCopyFields {
         if self.categories.is_empty() {
             fields.insert("categories".into(), Value::Array(vec![]));
         }
-        if existing_tag_ids(&self.tags).next().is_none() {
+        if self.tags.is_empty() {
             fields.insert("tags".into(), Value::Array(vec![]));
         }
         Arc::new(WpAdditionalFields {
@@ -572,13 +564,6 @@ fn meta_object(meta: &PostMeta) -> Option<Map<String, Value>> {
     }
 }
 
-fn existing_tag_ids(tags: &[WorkingCopyTag]) -> impl Iterator<Item = TermId> + '_ {
-    tags.iter().filter_map(|tag| match tag {
-        WorkingCopyTag::Existing { id } => Some(*id),
-        WorkingCopyTag::New { .. } => None,
-    })
-}
-
 fn status_and_password_params(status: &StatusSetting) -> (PostStatus, Option<String>) {
     let (status, password) = status.to_columns();
     let status = status
@@ -705,10 +690,7 @@ mod tests {
                     ping_status: Some(PostPingStatus::Closed),
                 },
                 categories: vec![TermId(1)],
-                tags: vec![
-                    WorkingCopyTag::Existing { id: TermId(7) },
-                    WorkingCopyTag::Existing { id: TermId(8) },
-                ],
+                tags: vec![TermId(7), TermId(8)],
                 format: PostFormat::Aside,
                 sticky: true,
                 meta: meta("footnotes", ""),

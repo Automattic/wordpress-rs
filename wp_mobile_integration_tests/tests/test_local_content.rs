@@ -16,7 +16,7 @@ use wp_mobile_local_content::{
     db_types::{
         working_copy::{
             FeaturedImage, PageWorkingCopyFields, PostWorkingCopyFields, PublishDate,
-            StatusSetting, WorkingCopyCommonFields, WorkingCopyId, WorkingCopyTag,
+            StatusSetting, WorkingCopyCommonFields, WorkingCopyId,
         },
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
@@ -108,12 +108,7 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
             ..common("Edited")
         },
         categories: vec![TermId(1)],
-        tags: vec![
-            WorkingCopyTag::Existing { id: TermId(3) },
-            WorkingCopyTag::New {
-                name: "new tag".to_string(),
-            },
-        ],
+        tags: vec![TermId(3), TermId(4)],
         format: PostFormat::Aside,
         sticky: true,
         meta: PostMeta::new().with_value(

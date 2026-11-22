@@ -83,7 +83,7 @@ final class LocalContentTests {
                 commentStatus: .closed
             ),
             categories: [1, 5],
-            tags: [.existing(id: 3), .new(name: "not on the site yet")],
+            tags: [3, 4],
             format: .aside,
             sticky: true,
             meta: PostMeta().withValue(key: "plugin_meta", value: .string("plugin value")),

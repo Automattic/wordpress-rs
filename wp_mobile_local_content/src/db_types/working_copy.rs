@@ -8,7 +8,6 @@
 use std::sync::Arc;
 
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use wp_api::{
     WpAdditionalFields,
@@ -96,20 +95,6 @@ pub enum FeaturedImage {
     Remote { media_id: MediaId },
 }
 
-/// A tag on a post.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
-#[serde(rename_all = "snake_case")]
-pub enum WorkingCopyTag {
-    /// A tag that exists on the site.
-    Existing {
-        #[serde(with = "term_id")]
-        id: TermId,
-    },
-    /// A tag the user entered that the site doesn't have yet, or that hasn't
-    /// been matched to an existing tag.
-    New { name: String },
-}
-
 /// Fields shared by post and page working copies.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct WorkingCopyCommonFields {
@@ -135,7 +120,7 @@ pub struct WorkingCopyCommonFields {
 pub struct PostWorkingCopyFields {
     pub common: WorkingCopyCommonFields,
     pub categories: Vec<TermId>,
-    pub tags: Vec<WorkingCopyTag>,
+    pub tags: Vec<TermId>,
     pub format: PostFormat,
     pub sticky: bool,
     /// Post meta, one value per meta key.
@@ -242,38 +227,15 @@ impl StatusSetting {
     }
 }
 
-/// Serializes a `TermId` as its bare number in the stored tags JSON.
-mod term_id {
-    use serde::{Deserialize, Deserializer, Serializer};
-    use wp_api::terms::TermId;
-
-    pub fn serialize<S: Serializer>(id: &TermId, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_i64(id.0)
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TermId, D::Error> {
-        i64::deserialize(deserializer).map(TermId)
-    }
-}
-
-/// The `category_ids` column value: a JSON array of term IDs.
-pub(crate) fn categories_to_json(categories: &[TermId]) -> Result<String, LocalContentError> {
-    let ids: Vec<i64> = categories.iter().map(|category| category.0).collect();
+/// The `category_ids` and `tag_ids` column values: a JSON array of term IDs.
+pub(crate) fn term_ids_to_json(term_ids: &[TermId]) -> Result<String, LocalContentError> {
+    let ids: Vec<i64> = term_ids.iter().map(|term_id| term_id.0).collect();
     serde_json::to_string(&ids).map_err(json_error)
 }
 
-pub(crate) fn categories_from_json(json: &str) -> Result<Vec<TermId>, FromSqlError> {
+pub(crate) fn term_ids_from_json(json: &str) -> Result<Vec<TermId>, FromSqlError> {
     let ids: Vec<i64> = serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))?;
     Ok(ids.into_iter().map(TermId).collect())
-}
-
-/// The `tags` column value: a JSON array of tags.
-pub(crate) fn tags_to_json(tags: &[WorkingCopyTag]) -> Result<String, LocalContentError> {
-    serde_json::to_string(tags).map_err(json_error)
-}
-
-pub(crate) fn tags_from_json(json: &str) -> Result<Vec<WorkingCopyTag>, FromSqlError> {
-    serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))
 }
 
 /// The `meta` column value: a JSON object.
@@ -394,7 +356,7 @@ impl ColumnIndex for WorkingCopyColumn {
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PostFieldsColumn {
     CategoryIds = 1,
-    Tags = 2,
+    TagIds = 2,
     Format = 3,
     Sticky = 4,
     Meta = 5,

@@ -48,7 +48,6 @@ public typealias PageWorkingCopyFields = WordPressAPIInternal.PageWorkingCopyFie
 public typealias PostWorkingCopy = WordPressAPIInternal.PostWorkingCopy
 public typealias PageWorkingCopy = WordPressAPIInternal.PageWorkingCopy
 public typealias StatusSetting = WordPressAPIInternal.StatusSetting
-public typealias WorkingCopyTag = WordPressAPIInternal.WorkingCopyTag
 public typealias PostCommentStatus = WordPressAPIInternal.PostCommentStatus
 public typealias PostPingStatus = WordPressAPIInternal.PostPingStatus
 public typealias PublishDate = WordPressAPIInternal.PublishDate

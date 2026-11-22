@@ -4,7 +4,7 @@
 use super::*;
 use crate::{
     MIGRATIONS,
-    db_types::working_copy::{StatusSetting, WorkingCopyId, WorkingCopyTag, date_from_timestamp},
+    db_types::working_copy::{StatusSetting, WorkingCopyId, date_from_timestamp},
 };
 use rusqlite::Connection;
 use std::sync::Arc;
@@ -74,12 +74,7 @@ fn detailed_post() -> PostWorkingCopyFields {
             ..common("Detailed post")
         },
         categories: vec![TermId(1), TermId(5)],
-        tags: vec![
-            WorkingCopyTag::Existing { id: TermId(3) },
-            WorkingCopyTag::New {
-                name: "not on the site yet".to_string(),
-            },
-        ],
+        tags: vec![TermId(3), TermId(4)],
         format: PostFormat::Custom("theme-specific".to_string()),
         sticky: true,
         meta: PostMeta::new()
