@@ -10,9 +10,10 @@ use rusqlite::Connection;
 use wp_api::posts::PostId;
 use wp_mobile_sqlite::{ConnectionError, DbConnection, MigrationManager};
 
-use crate::db_types::working_copy::WorkingCopyId;
+use crate::db_types::{editor_session::EditorSessionId, working_copy::WorkingCopyId};
 
 pub mod db_types;
+pub mod editor;
 pub mod remote;
 pub mod repository;
 
@@ -37,6 +38,10 @@ pub enum LocalContentError {
         remote_post_id: PostId,
         pushed_post_id: PostId,
     },
+    #[error("A working copy's {field} must be a JSON object")]
+    NotAJsonObject { field: String },
+    #[error("No editor session with id {}", id.0)]
+    EditorSessionNotFound { id: EditorSessionId },
 }
 
 impl From<rusqlite::Error> for LocalContentError {
@@ -116,7 +121,7 @@ impl WpLocalContentStore {
 /// new table, copy the rows into it, drop the old one, then rename the new one
 /// to the old name.
 pub static MIGRATIONS: [&str; 1] = [include_str!(
-    "../migrations/0001-create-working-copies-tables.sql"
+    "../migrations/0001-create-local-content-tables.sql"
 )];
 
 uniffi::setup_scaffolding!();

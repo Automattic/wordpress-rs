@@ -4,15 +4,16 @@
 use super::*;
 use crate::{
     MIGRATIONS,
-    db_types::working_copy::{StatusSetting, WorkingCopyId, WorkingCopyTag, date_from_timestamp},
+    db_types::working_copy::{StatusSetting, WorkingCopyId, date_from_timestamp},
 };
 use rusqlite::Connection;
 use std::sync::Arc;
 use wp_api::{
-    date::WpGmtDateTime,
+    JsonValue, WpAdditionalFields,
+    date::{WpDateString, WpGmtDateTime},
     media::MediaId,
     parsed_url::ParsedUrl,
-    posts::{PostCommentStatus, PostPingStatus},
+    posts::{PostCommentStatus, PostMeta, PostPingStatus},
     terms::TermId,
     wp_com::WpComSiteId,
 };
@@ -48,6 +49,8 @@ fn common(title: &str) -> WorkingCopyCommonFields {
         featured_image: FeaturedImage::None,
         comment_status: None,
         ping_status: None,
+        template: None,
+        menu_order: None,
     }
 }
 
@@ -62,7 +65,7 @@ fn detailed_post() -> PostWorkingCopyFields {
                 password: Some("secret".to_string()),
             },
             publish_date: PublishDate::At {
-                date: date(1_900_000_000),
+                date: WpDateString::new("2030-03-17T19:46:40"),
             },
             author: Some(UserId(7)),
             featured_image: FeaturedImage::Remote {
@@ -70,17 +73,19 @@ fn detailed_post() -> PostWorkingCopyFields {
             },
             comment_status: Some(PostCommentStatus::Closed),
             ping_status: Some(PostPingStatus::Custom("moderated".to_string())),
+            template: Some("wide-template.php".to_string()),
+            menu_order: Some(3),
             ..common("Detailed post")
         },
         categories: vec![TermId(1), TermId(5)],
-        tags: vec![
-            WorkingCopyTag::Existing { id: TermId(3) },
-            WorkingCopyTag::New {
-                name: "not on the site yet".to_string(),
-            },
-        ],
+        tags: vec![TermId(3), TermId(4)],
         format: PostFormat::Custom("theme-specific".to_string()),
         sticky: true,
+        meta: PostMeta::new()
+            .with_value("footnotes".to_string(), JsonValue::String("[]".to_string())),
+        additional_fields: Arc::new(WpAdditionalFields {
+            raw: serde_json::json!({ "plugin_field": { "nested": [1, 2] } }),
+        }),
     }
 }
 
@@ -91,6 +96,8 @@ fn simple_post(title: &str) -> PostWorkingCopyFields {
         tags: vec![],
         format: PostFormat::Standard,
         sticky: false,
+        meta: PostMeta::new(),
+        additional_fields: WpAdditionalFields::new(),
     }
 }
 

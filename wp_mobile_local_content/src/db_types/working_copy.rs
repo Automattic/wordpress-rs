@@ -5,13 +5,15 @@
 //! and formats that plugins register. See
 //! `Documentation/local-content-principles.md`.
 
+use std::sync::Arc;
+
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use wp_api::{
-    date::WpGmtDateTime,
+    WpAdditionalFields,
+    date::{WpDateString, WpGmtDateTime},
     media::MediaId,
-    posts::{PostCommentStatus, PostFormat, PostId, PostPingStatus, PostStatus},
+    posts::{PostCommentStatus, PostFormat, PostId, PostMeta, PostPingStatus, PostStatus},
     terms::TermId,
     users::UserId,
 };
@@ -80,10 +82,15 @@ pub enum StatusSetting {
 
 /// When the post is published. With `Immediately`, WordPress sets the date
 /// when the post is published.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum PublishDate {
     Immediately,
-    At { date: WpGmtDateTime },
+    /// `date` is in the site's timezone, as the REST API's `date` field, such
+    /// as `2024-01-15T10:30:00`. WordPress works out the UTC date from the
+    /// site's timezone setting.
+    At {
+        date: WpDateString,
+    },
 }
 
 /// The image the user picked as the featured image.
@@ -91,20 +98,6 @@ pub enum PublishDate {
 pub enum FeaturedImage {
     None,
     Remote { media_id: MediaId },
-}
-
-/// A tag on a post.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
-#[serde(rename_all = "snake_case")]
-pub enum WorkingCopyTag {
-    /// A tag that exists on the site.
-    Existing {
-        #[serde(with = "term_id")]
-        id: TermId,
-    },
-    /// A tag the user entered that the site doesn't have yet, or that hasn't
-    /// been matched to an existing tag.
-    New { name: String },
 }
 
 /// Fields shared by post and page working copies.
@@ -124,6 +117,11 @@ pub struct WorkingCopyCommonFields {
     pub comment_status: Option<PostCommentStatus>,
     /// `None` when the user hasn't chosen whether pings are open.
     pub ping_status: Option<PostPingStatus>,
+    /// The theme template the post uses, or `None` for the default one.
+    pub template: Option<String>,
+    /// The post's place in a custom order, or `None` if its post type has no
+    /// such order, as posts don't.
+    pub menu_order: Option<i64>,
 }
 
 /// A post as the user edits it on the device, holding what the editor and its
@@ -132,9 +130,14 @@ pub struct WorkingCopyCommonFields {
 pub struct PostWorkingCopyFields {
     pub common: WorkingCopyCommonFields,
     pub categories: Vec<TermId>,
-    pub tags: Vec<WorkingCopyTag>,
+    pub tags: Vec<TermId>,
     pub format: PostFormat,
     pub sticky: bool,
+    /// Post meta, one value per meta key.
+    pub meta: Arc<PostMeta>,
+    /// The post's fields that have no typed field here, such as fields plugins
+    /// add, one value per key.
+    pub additional_fields: Arc<WpAdditionalFields>,
 }
 
 /// A page as the user edits it on the device, holding what the editor and its
@@ -234,38 +237,53 @@ impl StatusSetting {
     }
 }
 
-/// Serializes a `TermId` as its bare number in the stored tags JSON.
-mod term_id {
-    use serde::{Deserialize, Deserializer, Serializer};
-    use wp_api::terms::TermId;
-
-    pub fn serialize<S: Serializer>(id: &TermId, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_i64(id.0)
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TermId, D::Error> {
-        i64::deserialize(deserializer).map(TermId)
-    }
-}
-
-/// The `category_ids` column value: a JSON array of term IDs.
-pub(crate) fn categories_to_json(categories: &[TermId]) -> Result<String, LocalContentError> {
-    let ids: Vec<i64> = categories.iter().map(|category| category.0).collect();
+/// The `category_ids` and `tag_ids` column values: a JSON array of term IDs.
+pub(crate) fn term_ids_to_json(term_ids: &[TermId]) -> Result<String, LocalContentError> {
+    let ids: Vec<i64> = term_ids.iter().map(|term_id| term_id.0).collect();
     serde_json::to_string(&ids).map_err(json_error)
 }
 
-pub(crate) fn categories_from_json(json: &str) -> Result<Vec<TermId>, FromSqlError> {
+pub(crate) fn term_ids_from_json(json: &str) -> Result<Vec<TermId>, FromSqlError> {
     let ids: Vec<i64> = serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))?;
     Ok(ids.into_iter().map(TermId).collect())
 }
 
-/// The `tags` column value: a JSON array of tags.
-pub(crate) fn tags_to_json(tags: &[WorkingCopyTag]) -> Result<String, LocalContentError> {
-    serde_json::to_string(tags).map_err(json_error)
+/// The `meta` column value: a JSON object.
+pub(crate) fn meta_to_json(meta: &PostMeta) -> Result<String, LocalContentError> {
+    serde_json::to_value(meta)
+        .map_err(json_error)
+        .and_then(|value| object_to_json("meta", &value))
 }
 
-pub(crate) fn tags_from_json(json: &str) -> Result<Vec<WorkingCopyTag>, FromSqlError> {
-    serde_json::from_str(json).map_err(|e| FromSqlError::Other(e.into()))
+pub(crate) fn meta_from_json(json: &str) -> Result<Arc<PostMeta>, FromSqlError> {
+    serde_json::from_str(json)
+        .map(Arc::new)
+        .map_err(|e| FromSqlError::Other(e.into()))
+}
+
+/// The `additional_fields` column value: a JSON object.
+pub(crate) fn additional_fields_to_json(
+    additional_fields: &WpAdditionalFields,
+) -> Result<String, LocalContentError> {
+    object_to_json("additional_fields", &additional_fields.raw)
+}
+
+pub(crate) fn additional_fields_from_json(
+    json: &str,
+) -> Result<Arc<WpAdditionalFields>, FromSqlError> {
+    serde_json::from_str(json)
+        .map(|raw| Arc::new(WpAdditionalFields { raw }))
+        .map_err(|e| FromSqlError::Other(e.into()))
+}
+
+fn object_to_json(field: &str, value: &serde_json::Value) -> Result<String, LocalContentError> {
+    if value.is_object() {
+        serde_json::to_string(value).map_err(json_error)
+    } else {
+        Err(LocalContentError::NotAJsonObject {
+            field: field.to_string(),
+        })
+    }
 }
 
 fn json_error(err: serde_json::Error) -> LocalContentError {
@@ -276,16 +294,16 @@ fn json_error(err: serde_json::Error) -> LocalContentError {
 
 impl PublishDate {
     /// The `publish_date` column value.
-    pub(crate) fn to_column(self) -> Option<i64> {
+    pub(crate) fn to_column(&self) -> Option<&str> {
         match self {
             Self::Immediately => None,
-            Self::At { date } => Some(date.0.timestamp()),
+            Self::At { date } => Some(&date.value),
         }
     }
 
-    pub(crate) fn from_column(timestamp: Option<i64>) -> Result<Self, FromSqlError> {
-        timestamp.map_or(Ok(Self::Immediately), |seconds| {
-            date_from_timestamp(seconds).map(|date| Self::At { date })
+    pub(crate) fn from_column(date: Option<String>) -> Self {
+        date.map_or(Self::Immediately, |date| Self::At {
+            date: WpDateString::new(date),
         })
     }
 }
@@ -333,6 +351,8 @@ pub(crate) enum WorkingCopyColumn {
     PingStatus = 13,
     CreatedAt = 14,
     UpdatedAt = 15,
+    Template = 16,
+    MenuOrder = 17,
 }
 
 impl ColumnIndex for WorkingCopyColumn {
@@ -348,9 +368,11 @@ impl ColumnIndex for WorkingCopyColumn {
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PostFieldsColumn {
     CategoryIds = 1,
-    Tags = 2,
+    TagIds = 2,
     Format = 3,
     Sticky = 4,
+    Meta = 5,
+    AdditionalFields = 6,
 }
 
 impl ColumnIndex for PostFieldsColumn {

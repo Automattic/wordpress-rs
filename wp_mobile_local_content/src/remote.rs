@@ -6,21 +6,25 @@
 //! would show as "Immediately" gets `PublishDate::Immediately` instead of its
 //! date.
 //!
-//! Some of the post's values have no working copy field, such as its template,
-//! menu order and meta. They stay as they are on the server only if pushing
-//! sends just the fields the user changed.
+//! A post's meta goes into `meta`. The keys of the post that `wp_api` doesn't
+//! model, such as fields plugins add, go into `additional_fields`, except
+//! those starting with `_`, such as `_links`, which describe the response
+//! rather than the post.
+
+use std::sync::Arc;
 
 use wp_api::{
+    WpAdditionalFields,
     date::WpDateString,
     media::MediaId,
-    posts::{AnyPostWithEditContext, PostFormat, PostId, PostStatus},
+    posts::{AnyPostWithEditContext, PostFormat, PostId, PostMeta, PostStatus},
     users::UserId,
 };
 
 use crate::db_types::{
     working_copy::{
         FeaturedImage, PageWorkingCopyFields, PostWorkingCopyFields, PublishDate, StatusSetting,
-        WorkingCopyCommonFields, WorkingCopyTag,
+        WorkingCopyCommonFields,
     },
     working_copy_remote_target::RemotePostReference,
 };
@@ -47,14 +51,11 @@ impl PostWorkingCopyFields {
         Ok(Self {
             common: common_from_remote(post)?,
             categories: post.categories.clone().unwrap_or_default(),
-            tags: post
-                .tags
-                .iter()
-                .flatten()
-                .map(|id| WorkingCopyTag::Existing { id: *id })
-                .collect(),
+            tags: post.tags.clone().unwrap_or_default(),
             format: post.format.clone().unwrap_or(PostFormat::Standard),
             sticky: post.sticky.unwrap_or(false),
+            meta: post.meta.clone().unwrap_or_else(PostMeta::new),
+            additional_fields: additional_fields_from_remote(post.additional_fields.as_deref()),
         })
     }
 }
@@ -121,6 +122,24 @@ pub fn remote_post_reference_from_remote(post: AnyPostWithEditContext) -> Remote
     RemotePostReference::from_remote(&post)
 }
 
+fn additional_fields_from_remote(
+    additional_fields: Option<&WpAdditionalFields>,
+) -> Arc<WpAdditionalFields> {
+    let fields = additional_fields
+        .and_then(|fields| fields.raw.as_object())
+        .map(|object| {
+            object
+                .iter()
+                .filter(|(key, _)| !key.starts_with('_'))
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    Arc::new(WpAdditionalFields {
+        raw: serde_json::Value::Object(fields),
+    })
+}
+
 fn expect_post_type(
     post: &AnyPostWithEditContext,
     expected: &'static str,
@@ -180,7 +199,7 @@ fn common_from_remote(
             PublishDate::Immediately
         } else {
             PublishDate::At {
-                date: post.date_gmt,
+                date: post.date.clone(),
             }
         },
         // WordPress uses 0 for "none" in both fields.
@@ -191,10 +210,13 @@ fn common_from_remote(
         },
         comment_status: post.comment_status.clone(),
         ping_status: post.ping_status.clone(),
+        // WordPress uses an empty template for the default one.
+        template: Some(post.template.clone()).filter(|template| !template.is_empty()),
+        menu_order: post.menu_order,
     })
 }
 
-fn status_from_remote(
+pub(crate) fn status_from_remote(
     status: &PostStatus,
     password: Option<&str>,
 ) -> Result<StatusSetting, RemotePostConversionError> {
@@ -240,6 +262,7 @@ fn is_date_floating(status: &PostStatus, date: &WpDateString, modified: &WpDateS
 mod tests {
     use super::*;
     use wp_api::{
+        JsonValue,
         date::WpGmtDateTime,
         posts::{
             PostCommentStatus, PostContentWithEditContext, PostGuidWithEditContext,
@@ -256,7 +279,8 @@ mod tests {
     fn remote_post() -> AnyPostWithEditContext {
         AnyPostWithEditContext {
             id: PostId(42),
-            date: WpDateString::new("2024-01-15T10:30:00".to_string()),
+            // A site two hours ahead of UTC.
+            date: WpDateString::new("2024-01-15T12:30:00".to_string()),
             date_gmt: gmt("2024-01-15T10:30:00Z"),
             guid: PostGuidWithEditContext {
                 raw: Some("https://example.com/?p=42".to_string()),
@@ -291,14 +315,22 @@ mod tests {
             comment_status: Some(PostCommentStatus::Open),
             ping_status: None,
             format: Some(PostFormat::Aside),
-            meta: None,
+            meta: Some(
+                PostMeta::new()
+                    .with_value("footnotes".to_string(), JsonValue::String(String::new())),
+            ),
             sticky: Some(false),
             template: String::new(),
             categories: Some(vec![TermId(1)]),
             tags: Some(vec![TermId(7), TermId(8)]),
             parent: None,
             menu_order: None,
-            additional_fields: None,
+            additional_fields: Some(Arc::new(WpAdditionalFields {
+                raw: serde_json::json!({
+                    "plugin_field": "plugin value",
+                    "_links": { "self": [{ "href": "https://example.com/wp-json/wp/v2/posts/42" }] },
+                }),
+            })),
         }
     }
 
@@ -317,21 +349,27 @@ mod tests {
                     excerpt: "An excerpt".to_string(),
                     slug: Some("a-post".to_string()),
                     status: StatusSetting::Publish { password: None },
+                    // The site's date, not `date_gmt`.
                     publish_date: PublishDate::At {
-                        date: gmt("2024-01-15T10:30:00Z"),
+                        date: WpDateString::new("2024-01-15T12:30:00"),
                     },
                     author: Some(UserId(10)),
                     featured_image: FeaturedImage::None,
                     comment_status: Some(PostCommentStatus::Open),
                     ping_status: None,
+                    template: None,
+                    menu_order: None,
                 },
                 categories: vec![TermId(1)],
-                tags: vec![
-                    WorkingCopyTag::Existing { id: TermId(7) },
-                    WorkingCopyTag::Existing { id: TermId(8) },
-                ],
+                tags: vec![TermId(7), TermId(8)],
                 format: PostFormat::Aside,
                 sticky: false,
+                meta: PostMeta::new()
+                    .with_value("footnotes".to_string(), JsonValue::String(String::new()),),
+                // `_links` describes the response, not the post, so it's left out.
+                additional_fields: Arc::new(WpAdditionalFields {
+                    raw: serde_json::json!({ "plugin_field": "plugin value" }),
+                }),
             }
         );
     }
@@ -406,17 +444,17 @@ mod tests {
             // A draft with a date the user picked keeps it.
             (
                 PostStatus::Draft,
-                WpDateString::new("2024-01-15T10:30:00".to_string()),
+                WpDateString::new("2024-01-15T12:30:00".to_string()),
                 PublishDate::At {
-                    date: gmt("2024-01-15T10:30:00Z"),
+                    date: WpDateString::new("2024-01-15T12:30:00"),
                 },
             ),
             // A published post's date never floats, even when it equals modified.
             (
                 PostStatus::Publish,
-                same_as_modified,
+                same_as_modified.clone(),
                 PublishDate::At {
-                    date: gmt("2024-01-15T10:30:00Z"),
+                    date: same_as_modified,
                 },
             ),
         ] {

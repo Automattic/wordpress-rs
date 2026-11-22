@@ -8,6 +8,7 @@ publish = false
 integration_test_credentials = { path = "../integration_test_credentials" }
 reqwest = { workspace = true, features = [ "multipart", "json", "stream", "gzip", "brotli", "zstd", "deflate" ] }
 rstest = { workspace = true }
+serde_json = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = [ "full" ] }

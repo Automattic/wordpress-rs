@@ -6,12 +6,16 @@ import rs.wordpress.api.kotlin.TestCredentials
 import rs.wordpress.api.kotlin.assertSuccessAndRetrieveData
 import rs.wordpress.api.kotlin.defaultApiClient
 import uniffi.wp_api.AnyPostWithEditContext
+import uniffi.wp_api.JsonValue
 import uniffi.wp_api.ParsedUrl
 import uniffi.wp_api.PostCommentStatus
 import uniffi.wp_api.PostEndpointType
 import uniffi.wp_api.PostFormat
 import uniffi.wp_api.PostListParams
+import uniffi.wp_api.PostMeta
 import uniffi.wp_api.PostRetrieveParams
+import uniffi.wp_api.WpAdditionalFields
+import uniffi.wp_api.WpDateString
 import uniffi.wp_mobile.LocalContentService
 import uniffi.wp_mobile_local_content.FeaturedImage
 import uniffi.wp_mobile_local_content.LocalContentException
@@ -23,7 +27,6 @@ import uniffi.wp_mobile_local_content.RemotePostReference
 import uniffi.wp_mobile_local_content.SiteIdentity
 import uniffi.wp_mobile_local_content.StatusSetting
 import uniffi.wp_mobile_local_content.WorkingCopyCommonFields
-import uniffi.wp_mobile_local_content.WorkingCopyTag
 import uniffi.wp_mobile_local_content.WorkingCopyRemoteTarget
 import uniffi.wp_mobile_local_content.WpLocalContentStore
 import uniffi.wp_mobile_local_content.postWorkingCopyFieldsFromRemote
@@ -56,7 +59,9 @@ class LocalContentTest {
         author = null,
         featuredImage = FeaturedImage.None,
         commentStatus = null,
-        pingStatus = null
+        pingStatus = null,
+        template = null,
+        menuOrder = null
     )
 
     private fun post(title: String) = PostWorkingCopyFields(
@@ -64,7 +69,9 @@ class LocalContentTest {
         categories = emptyList(),
         tags = emptyList(),
         format = PostFormat.Standard,
-        sticky = false
+        sticky = false,
+        meta = PostMeta(),
+        additionalFields = WpAdditionalFields()
     )
 
     private val client = defaultApiClient()
@@ -99,15 +106,17 @@ class LocalContentTest {
         val edited = PostWorkingCopyFields(
             common = common("Edited").copy(
                 status = StatusSetting.Custom(status = "in-review", password = "secret"),
-                publishDate = PublishDate.At(date = Date(1_900_000_000_000L)),
+                publishDate = PublishDate.At(date = WpDateString("2030-03-17T19:46:40")),
                 author = 7L,
                 featuredImage = FeaturedImage.Remote(mediaId = 42L),
                 commentStatus = PostCommentStatus.Closed
             ),
             categories = listOf(1L, 5L),
-            tags = listOf(WorkingCopyTag.Existing(id = 3L), WorkingCopyTag.New(name = "not on the site yet")),
+            tags = listOf(3L, 4L),
             format = PostFormat.Aside,
-            sticky = true
+            sticky = true,
+            meta = PostMeta().withValue("plugin_meta", JsonValue.String("plugin value")),
+            additionalFields = WpAdditionalFields()
         )
 
         val service = openService()

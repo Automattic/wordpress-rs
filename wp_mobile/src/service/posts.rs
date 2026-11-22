@@ -1050,6 +1050,31 @@ impl PostService {
 }
 
 impl PostService {
+    /// Store a post the server returned for one of wordpress-rs's own requests
+    /// in the cache, and tell the collections it changed.
+    pub(crate) fn cache_post_from_server(
+        &self,
+        post: &AnyPostWithEditContext,
+    ) -> Result<(), wp_mobile_cache::SqliteDbError> {
+        self.cache.execute(|conn| {
+            PostRepository::<EditContext>::new().upsert(conn, &self.db_site, post)
+        })?;
+        self.notify_collections(post.id.0);
+        Ok(())
+    }
+
+    /// Read post `post_id` from the cache, or `None` if it isn't there.
+    pub(crate) fn read_cached_post(
+        &self,
+        post_id: PostId,
+    ) -> Result<Option<AnyPostWithEditContext>, wp_mobile_cache::SqliteDbError> {
+        Ok(self
+            .read_post_full_entities_by_ids_from_db(&[post_id.0])?
+            .into_iter()
+            .next()
+            .map(|full_entity| full_entity.data))
+    }
+
     /// Notify all active collections about a changed post ID.
     ///
     /// Upgrades weak references, prunes dead ones, then calls

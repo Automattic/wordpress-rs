@@ -1,10 +1,11 @@
 use std::sync::Arc;
 use tempfile::TempDir;
 use wp_api::{
-    date::WpGmtDateTime,
+    JsonValue, WpAdditionalFields,
+    date::{WpDateString, WpGmtDateTime},
     media::MediaId,
     parsed_url::ParsedUrl,
-    posts::{PostCommentStatus, PostFormat, PostId},
+    posts::{PostCommentStatus, PostFormat, PostId, PostMeta},
     terms::TermId,
     users::UserId,
     wp_com::WpComSiteId,
@@ -15,7 +16,7 @@ use wp_mobile_local_content::{
     db_types::{
         working_copy::{
             FeaturedImage, PageWorkingCopyFields, PostWorkingCopyFields, PublishDate,
-            StatusSetting, WorkingCopyCommonFields, WorkingCopyId, WorkingCopyTag,
+            StatusSetting, WorkingCopyCommonFields, WorkingCopyId,
         },
         working_copy_remote_target::{RemotePostReference, SiteIdentity, WorkingCopyRemoteTarget},
     },
@@ -55,6 +56,8 @@ fn common(title: &str) -> WorkingCopyCommonFields {
         featured_image: FeaturedImage::None,
         comment_status: None,
         ping_status: None,
+        template: None,
+        menu_order: None,
     }
 }
 
@@ -65,6 +68,8 @@ fn post(title: &str) -> PostWorkingCopyFields {
         tags: vec![],
         format: PostFormat::Standard,
         sticky: false,
+        meta: PostMeta::new(),
+        additional_fields: WpAdditionalFields::new(),
     }
 }
 
@@ -95,7 +100,7 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
                 password: Some("secret".to_string()),
             },
             publish_date: PublishDate::At {
-                date: date("2030-03-17T17:46:40Z"),
+                date: WpDateString::new("2030-03-17T19:46:40"),
             },
             author: Some(UserId(7)),
             featured_image: FeaturedImage::Remote {
@@ -105,14 +110,14 @@ fn test_saved_post_working_copy_survives_reopening_the_database() {
             ..common("Edited")
         },
         categories: vec![TermId(1)],
-        tags: vec![
-            WorkingCopyTag::Existing { id: TermId(3) },
-            WorkingCopyTag::New {
-                name: "new tag".to_string(),
-            },
-        ],
+        tags: vec![TermId(3), TermId(4)],
         format: PostFormat::Aside,
         sticky: true,
+        meta: PostMeta::new().with_value(
+            "plugin_meta".to_string(),
+            JsonValue::String("plugin value".to_string()),
+        ),
+        additional_fields: WpAdditionalFields::new(),
     };
 
     let id = {
@@ -360,5 +365,52 @@ fn test_a_new_post_recorded_as_pushed_is_found_by_its_remote_post() {
     assert_eq!(
         service.record_post_working_copy_push(unknown_id.clone(), pushed),
         Err(LocalContentError::WorkingCopyNotFound { id: unknown_id })
+    );
+}
+
+#[test]
+fn test_unfinished_editor_session_and_its_unconfirmed_push_survive_reopening_the_database() {
+    let dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let (working_copy_id, unfinished_id) = {
+        let service = open_service(&dir);
+        let working_copy_id = service
+            .create_post_working_copy(new_post_on(self_hosted_site()), post("Draft"))
+            .expect("Create should succeed")
+            .id;
+        let ended = service
+            .create_editor_session(working_copy_id.clone())
+            .expect("Creating a session should succeed");
+        service
+            .end_editor_session(ended.id)
+            .expect("Ending a session should succeed");
+        let unfinished = service
+            .create_editor_session(working_copy_id.clone())
+            .expect("Creating a session should succeed");
+        service
+            .record_editor_session_change(unfinished.id.clone())
+            .expect("Recording a change should succeed");
+        service
+            .record_unconfirmed_push(&unfinished.id, None, r#"{"title":"Draft"}"#)
+            .expect("Recording the push should succeed");
+        (working_copy_id, unfinished.id)
+    };
+
+    let unfinished = open_service(&dir)
+        .read_unfinished_editor_sessions()
+        .expect("Read should succeed");
+
+    assert_eq!(unfinished.len(), 1);
+    let session = &unfinished[0];
+    assert_eq!(session.id, unfinished_id);
+    assert_eq!(session.working_copy_id, working_copy_id);
+    assert!(session.last_recorded_at.is_some());
+    assert_eq!(session.ended_at, None);
+    let push = session
+        .unconfirmed_push
+        .as_ref()
+        .expect("The unconfirmed push should survive");
+    assert_eq!(
+        (push.remote_post, push.body.as_str()),
+        (None, r#"{"title":"Draft"}"#)
     );
 }

@@ -224,7 +224,7 @@ async fn test_working_copies_from_server_posts_keep_status_password_and_date() {
         );
         // A post whose date doesn't float keeps the server's date.
         let expected_publish_date = expected_publish_date.unwrap_or(PublishDate::At {
-            date: post.date_gmt,
+            date: post.date.clone(),
         });
         assert_eq!(
             common.publish_date, expected_publish_date,

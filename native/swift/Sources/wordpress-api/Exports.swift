@@ -48,7 +48,6 @@ public typealias PageWorkingCopyFields = WordPressAPIInternal.PageWorkingCopyFie
 public typealias PostWorkingCopy = WordPressAPIInternal.PostWorkingCopy
 public typealias PageWorkingCopy = WordPressAPIInternal.PageWorkingCopy
 public typealias StatusSetting = WordPressAPIInternal.StatusSetting
-public typealias WorkingCopyTag = WordPressAPIInternal.WorkingCopyTag
 public typealias PostCommentStatus = WordPressAPIInternal.PostCommentStatus
 public typealias PostPingStatus = WordPressAPIInternal.PostPingStatus
 public typealias PublishDate = WordPressAPIInternal.PublishDate
@@ -57,6 +56,21 @@ public typealias WorkingCopyRemoteTarget = WordPressAPIInternal.WorkingCopyRemot
 public typealias SiteIdentity = WordPressAPIInternal.SiteIdentity
 public typealias RemotePostReference = WordPressAPIInternal.RemotePostReference
 public typealias RemotePostConversionError = WordPressAPIInternal.RemotePostConversionError
+public typealias PostMeta = WordPressAPIInternal.PostMeta
+public typealias WpDateString = WordPressAPIInternal.WpDateString
+public typealias EditorSessionId = WordPressAPIInternal.EditorSessionId
+public typealias EditorSession = WordPressAPIInternal.EditorSession
+public typealias UnconfirmedPush = WordPressAPIInternal.UnconfirmedPush
+public typealias BaseMismatch = WordPressAPIInternal.BaseMismatch
+
+// MARK: - Post Editor
+public typealias PostEditorService = WordPressAPIInternal.PostEditorService
+public typealias PostEditorSession = WordPressAPIInternal.PostEditorSession
+public typealias PostEditorError = WordPressAPIInternal.PostEditorError
+public typealias EditorRequest = WordPressAPIInternal.EditorRequest
+public typealias ServerResponse = WordPressAPIInternal.ServerResponse
+public typealias EditorPost = WordPressAPIInternal.EditorPost
+public typealias SavedPostCheck = WordPressAPIInternal.SavedPostCheck
 
 // MARK: - Login
 

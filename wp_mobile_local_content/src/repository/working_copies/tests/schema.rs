@@ -36,22 +36,26 @@ fn test_column_enums_match_schema() {
         (WorkingCopyColumn::PingStatus, "ping_status"),
         (WorkingCopyColumn::CreatedAt, "created_at"),
         (WorkingCopyColumn::UpdatedAt, "updated_at"),
+        (WorkingCopyColumn::Template, "template"),
+        (WorkingCopyColumn::MenuOrder, "menu_order"),
     ] {
         assert_eq!(columns[column.as_index()], name);
     }
     assert_eq!(columns[2], "kind");
-    assert_eq!(columns.len(), 16);
+    assert_eq!(columns.len(), 18);
 
     let columns = column_names(&conn, POST_FIELDS);
     for (column, name) in [
         (PostFieldsColumn::CategoryIds, "category_ids"),
-        (PostFieldsColumn::Tags, "tags"),
+        (PostFieldsColumn::TagIds, "tag_ids"),
         (PostFieldsColumn::Format, "format"),
         (PostFieldsColumn::Sticky, "sticky"),
+        (PostFieldsColumn::Meta, "meta"),
+        (PostFieldsColumn::AdditionalFields, "additional_fields"),
     ] {
         assert_eq!(columns[column.as_index()], name);
     }
-    assert_eq!(columns.len(), 5);
+    assert_eq!(columns.len(), 7);
 
     let columns = column_names(&conn, PAGE_FIELDS);
     assert_eq!(columns[PageFieldsColumn::ParentId.as_index()], "parent_id");
