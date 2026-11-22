@@ -469,7 +469,7 @@ impl PostEditorService {
         &self,
         post_id: PostId,
         query: Option<&str>,
-    ) -> Result<(WpNetworkResponse, Option<AnyPostWithEditContext>), PostEditorError> {
+    ) -> Result<WpNetworkResponse, PostEditorError> {
         let mut url = self
             .api_url_resolver
             .resolve(
@@ -491,14 +491,12 @@ impl PostEditorService {
             .perform(Arc::new(request), None)
             .await
             .map_err(push_failure)?;
-        if !is_success(&response) {
-            return Ok((response, None));
+        if is_success(&response)
+            && let Ok(post) = serde_json::from_slice::<AnyPostWithEditContext>(&response.body)
+        {
+            self.posts.cache_post_from_server(&post)?;
         }
-        let post = serde_json::from_slice::<AnyPostWithEditContext>(&response.body).ok();
-        if let Some(post) = &post {
-            self.posts.cache_post_from_server(post)?;
-        }
-        Ok((response, post))
+        Ok(response)
     }
 }
 
@@ -589,10 +587,10 @@ impl PostEditorSession {
     ///
     /// A write (`POST`, `PUT` or `PATCH`) means the user saved: the fields it
     /// sends are recorded in the working copy, and the working copy is
-    /// pushed. A read (`GET`) is sent to the server, and the working copy is
-    /// laid over a successful response. Either way, the server's status and
-    /// headers come back as they arrived. The body does too, except a read's,
-    /// which shows the working copy.
+    /// pushed. A read (`GET`) is sent to the server as it is, and a successful
+    /// one fills the cache. Either way, the server's response comes back as it
+    /// arrived: while the editor is open, it's the source of truth, and the
+    /// working copy follows it.
     ///
     /// Fails with `NotSent` or `MaybeSent` if no answer came, and with
     /// `NotDesigned` for autosaves, revisions and trashing.
@@ -605,7 +603,10 @@ impl PostEditorSession {
             EditorRequestKind::Write => self.record_and_push(request.body.as_deref()).await,
             EditorRequestKind::Read { query } => {
                 let post_id = remote_post_id.ok_or(PostEditorError::NotOnServer)?;
-                self.read_for_editor(post_id, query.as_deref()).await
+                self.service
+                    .fetch_for_editor(post_id, query.as_deref())
+                    .await
+                    .map(ServerResponse::from)
             }
             EditorRequestKind::NotDesigned => Err(PostEditorError::NotDesigned {
                 method: request.method,
@@ -650,26 +651,6 @@ impl PostEditorSession {
             .local_content
             .record_editor_session_change(self.id.clone())?;
         self.push().await
-    }
-
-    async fn read_for_editor(
-        &self,
-        post_id: PostId,
-        query: Option<&str>,
-    ) -> Result<ServerResponse, PostEditorError> {
-        let (response, _) = self.service.fetch_for_editor(post_id, query).await?;
-        let mut response = ServerResponse::from(response);
-        if (200..300).contains(&response.status_code)
-            && let Ok(Value::Object(mut server_post)) = serde_json::from_slice(&response.body)
-        {
-            let working_copy = self.service.read_working_copy(&self.working_copy_id)?;
-            working_copy.fields.lay_over_editor_post(&mut server_post);
-            response.body =
-                serde_json::to_vec(&server_post).expect("A JSON object always serializes");
-            // The body changed, so the server's length no longer applies.
-            response.headers.remove("content-length");
-        }
-        Ok(response)
     }
 }
 

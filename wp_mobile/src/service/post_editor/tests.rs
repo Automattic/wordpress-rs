@@ -526,7 +526,7 @@ async fn test_editor_requests_outside_the_designed_paths_are_refused() {
 }
 
 #[tokio::test]
-async fn test_editor_read_fills_the_cache_and_shows_the_working_copy() {
+async fn test_editor_read_fills_the_cache_and_returns_the_response_unchanged() {
     let ctx = context();
     let session = open_post_42(&ctx).await;
     session
@@ -534,13 +534,10 @@ async fn test_editor_read_fills_the_cache_and_shows_the_working_copy() {
             serde_json::to_vec(&json!({ "title": "Not pushed" })).expect("JSON serializes"),
         )
         .expect("Recording should succeed");
-    ctx.server.then(|sent| {
-        response(
-            sent,
-            200,
-            &server_post(42, "Changed on the server", "2024-05-01T00:00:00"),
-        )
-    });
+    let on_server = server_post(42, "Changed on the server", "2024-05-01T00:00:00");
+    let on_server_for_server = on_server.clone();
+    ctx.server
+        .then(move |sent| response(sent, 200, &on_server_for_server));
 
     let answer = session
         .perform_editor_request(editor_request("GET", "/wp/v2/posts/42?context=edit", None))
@@ -552,10 +549,11 @@ async fn test_editor_read_fills_the_cache_and_shows_the_working_copy() {
         read.url,
         format!("{SITE_URL}/wp-json/wp/v2/posts/42?context=edit")
     );
-    let body: Value = serde_json::from_slice(&answer.body).expect("The answer is JSON");
+    // The editor is the source of truth while it's open, so the working copy
+    // isn't laid over the server's answer.
     assert_eq!(
-        body["title"],
-        json!({ "raw": "Not pushed", "rendered": "Changed on the server" })
+        answer.body,
+        serde_json::to_vec(&on_server).expect("JSON serializes")
     );
     assert_eq!(
         ctx.posts
