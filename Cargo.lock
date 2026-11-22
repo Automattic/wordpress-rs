@@ -5704,6 +5704,7 @@ dependencies = [
  "integration_test_credentials",
  "reqwest",
  "rstest",
+ "serde_json",
  "serial_test",
  "tempfile",
  "tokio",
