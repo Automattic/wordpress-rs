@@ -148,9 +148,10 @@ async function postRequestMiddleware( options, next ) {
 	if ( ! isPostPath( options.path ) ) {
 		return next( options );
 	}
-	// No handler from the app: the request goes to the server as it does today.
+	// No handler from the app: as today, reads go to the server and writes are
+	// rejected.
 	if ( ! getGBKit().hasPostRequestHandler ) {
-		return next( options );
+		return blockPostWritesMiddleware( options, next );
 	}
 
 	// Rejects only when the app couldn't reach the server, like a failed fetch.
@@ -171,7 +172,7 @@ The app returns the server's response exactly as the server sent it. Gutenberg t
 
 **Opening the editor.** GutenbergKit builds the post from what the app passes in when it creates the editor, and doesn't fetch the post itself ([`src/utils/prime-post-entity.js`](https://github.com/wordpress-mobile/GutenbergKit/blob/c776c07c64acbd9cec72dcd8ac9fdf819944238b/src/utils/prime-post-entity.js#L10-L32)). With this proposal, the app passes in the two parts wordpress-rs returns from `editor_post()`:
 
-- **The saved version:** the post as wordpress-rs last fetched it from the server. GutenbergKit takes it as the post's saved version, as it takes the host's post today.
+- **The saved version:** the post as wordpress-rs last fetched it from the server. GutenbergKit takes it as the post's saved version, as it takes the host's post today. It comes from wordpress-rs's cache, so it's rebuilt from wordpress-rs's types: they keep every top-level field, plugins' fields included, but not keys inside `title`, `content`, `excerpt` and `guid` beyond the ones WordPress sends.
 - **The edits:** the working copy's changes that the server doesn't have. The editor opens with them as unsaved edits, outside the undo history, so undo never goes back to the server's version.
 
 Gutenberg counts as unsaved the edits over the saved version ([`isEditedPostDirty`](https://github.com/WordPress/gutenberg/blob/%40wordpress/editor%4016.1.0/packages/editor/src/store/selectors.js#L94-L107)), so the working copy's changes show as unsaved, and the next save sends them.
@@ -338,7 +339,7 @@ impl PostEditorSession {
 
     /// Record the post, as the editor has it now, in the working copy. Called
     /// after every change, in the background.
-    pub async fn record_change(&self, post: EditorPost) -> Result<()> {
+    pub async fn record_change(&self, post: Json) -> Result<()> {
         let mut working_copy = self.local_content.read_post_working_copy(self.working_copy_id)?;
         working_copy.fields.apply_editor_post(post)?;
         self.local_content.save_post_working_copy(working_copy.id, working_copy.fields.clone())?;
@@ -406,7 +407,7 @@ impl PostWorkingCopyFields {
     /// their REST shape (`date`, `status`, ...) to the working copy's
     /// (`PublishDate`, `StatusSetting`, ...). Other keys go into `meta` and
     /// `additional_fields`, one value per key.
-    pub fn apply_editor_post(&mut self, post: EditorPost) -> Result<()>;
+    pub fn apply_editor_post(&mut self, post: &Json) -> Result<()>;
 
     /// Apply the fields an editor write sends: the same conversion, for only the
     /// fields that changed. Other keys are merged key by key, so earlier edits
@@ -453,7 +454,7 @@ Opening a new post creates its working copy and its editor session straight away
 - Plugins' save hooks get the post's ID, and need a real one to attach their changes to.
 - Requests outside the post endpoint carry the ID to the server. Media uploads, for example, attach the file to the post by its ID.
 
-So a new post gets its server ID before the editor's first `savePost()`. wordpress-rs creates the post from the working copy, which already holds what the user wrote, since every change is recorded in it. Then the app gives the editor the ID.
+So the app gives a new post its server ID before the editor's first `savePost()`, unless the save starts inside the editor (below). wordpress-rs creates the post from the working copy, which already holds what the user wrote, since every change is recorded in it. Then the app gives the editor the ID.
 
 ```kotlin
 // B. The app, once the session has the post's server ID.
@@ -597,8 +598,8 @@ The proof of concept, on the `editor-save-poc` branches of wordpress-rs and Gute
 
 ## Not verified yet
 
-The pseudocode is written against the code of GutenbergKit and wordpress-rs, but these points haven't been tried. A proof of concept in GutenbergKit's example app comes next, and anything it contradicts comes back to this proposal.
+The pseudocode is written against the code of GutenbergKit and wordpress-rs. The proof of concept answers some of what it relies on; anything it contradicts comes back to this proposal.
 
-- That answering the editor's save with the server's response, through the app, leaves Gutenberg in the same state as when the editor sends the request itself.
-- Whether Gutenberg sends all of a post's meta in a save, or only the meta keys that changed.
-- That a WordPress update response always holds the whole post in the edit context, whichever fields the request sent.
+- Not tried yet: that answering the editor's save with the server's response, through the app, leaves Gutenberg in the same state as when the editor sends the request itself.
+- From Gutenberg's source, not tried: a save sends either all of a post's meta or none of it. Core-data merges a meta edit into the post's whole meta (`mergedEdits: { meta: true }` for post types), so a save that changes any meta key sends every key.
+- Verified against WordPress 6.8.1, for update requests sending only the title, only the status, and no fields: the response holds the whole post in the edit context.
