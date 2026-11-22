@@ -150,3 +150,17 @@ CREATE TABLE `editor_session_unconfirmed_pushes` (
 
   CHECK ((`remote_post_id` IS NULL) = (`base_modified_gmt` IS NULL))
 ) STRICT;
+
+-- The fields in which the version of the post an editor saved differed from
+-- the server's version wordpress-rs has, both with the same modified date, at
+-- most one per session. Only something other than the server can change the
+-- editor's version that way.
+CREATE TABLE `editor_session_base_mismatches` (
+  `editor_session_rowid` INTEGER PRIMARY KEY REFERENCES `editor_sessions`(`rowid`) ON DELETE CASCADE,
+
+  -- Unix timestamp in seconds
+  `detected_at` INTEGER NOT NULL,
+
+  -- The REST API keys of the differing fields
+  `fields` TEXT NOT NULL CHECK (json_valid(`fields`) AND json_type(`fields`) = 'array')
+) STRICT;

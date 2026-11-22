@@ -404,6 +404,19 @@ impl LocalContentService {
             .execute(|conn| EditorSessionRepository.clear_unconfirmed_push(conn, id))?;
         found_session(cleared, id.clone())
     }
+
+    /// Record that the editor's version of the post differed from the
+    /// server's in `fields`, replacing the mismatch the session had.
+    pub fn record_base_mismatch(
+        &self,
+        id: &EditorSessionId,
+        fields: &[String],
+    ) -> Result<(), LocalContentError> {
+        let recorded = self
+            .store
+            .execute(|conn| EditorSessionRepository.record_base_mismatch(conn, id, fields))?;
+        found_session(recorded, id.clone())
+    }
 }
 
 fn found_session(found: bool, id: EditorSessionId) -> Result<(), LocalContentError> {

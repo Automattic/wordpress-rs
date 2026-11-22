@@ -264,7 +264,7 @@ async fn open_post_42(ctx: &Context) -> Arc<PostEditorSession> {
 }
 
 #[tokio::test]
-async fn test_opening_a_post_fetches_it_and_shows_the_working_copy() {
+async fn test_opening_a_post_gives_the_server_version_as_saved_and_the_working_copy_as_edits() {
     let ctx = context();
     let session = open_post_42(&ctx).await;
     session
@@ -276,22 +276,149 @@ async fn test_opening_a_post_fetches_it_and_shows_the_working_copy() {
         )
         .expect("Recording should succeed");
 
-    let editor_post: Value =
-        serde_json::from_slice(&session.editor_post().expect("Reading should succeed"))
-            .expect("The editor's post is JSON");
+    let editor_post = session.editor_post().expect("Reading should succeed");
+    let saved_post: Value = serde_json::from_slice(
+        &editor_post
+            .saved_post
+            .expect("The post is on the server, so it has a saved version"),
+    )
+    .expect("The saved post is JSON");
+    let edits: Value = serde_json::from_slice(&editor_post.edits).expect("The edits are JSON");
 
     assert_eq!(
         ctx.server.requests().len(),
         1,
         "Only the first open fetches"
     );
-    assert_eq!(editor_post["id"], json!(42));
+    assert_eq!(saved_post["id"], json!(42));
     assert_eq!(
-        editor_post["title"],
-        json!({ "raw": "Recorded", "rendered": "On the server" })
+        saved_post["title"],
+        json!({ "raw": "On the server", "rendered": "On the server" })
     );
-    assert_eq!(editor_post["plugin_field"], json!("edited"));
-    assert_eq!(editor_post["meta"], json!({ "footnotes": "" }));
+    assert_eq!(
+        edits,
+        json!({ "title": "Recorded", "plugin_field": "edited" })
+    );
+}
+
+#[tokio::test]
+async fn test_new_post_has_no_saved_version_and_no_edits_until_something_is_written() {
+    let ctx = context();
+    let session = ctx
+        .service
+        .clone()
+        .open_new_post()
+        .expect("Opening a new post should succeed");
+
+    let editor_post = session.editor_post().expect("Reading should succeed");
+
+    assert_eq!(editor_post.saved_post, None);
+    assert_eq!(
+        serde_json::from_slice::<Value>(&editor_post.edits).expect("The edits are JSON"),
+        json!({})
+    );
+}
+
+fn saved_post_change(modified_gmt: &str, fields: Value) -> Vec<u8> {
+    serde_json::to_vec(&json!({ "modified_gmt": modified_gmt, "fields": fields }))
+        .expect("JSON serializes")
+}
+
+#[tokio::test]
+async fn test_saved_version_matching_the_cache_is_in_sync() {
+    let ctx = context();
+    let session = open_post_42(&ctx).await;
+
+    let check = session
+        .record_saved_post_change(saved_post_change(
+            "2024-01-16T00:00:00",
+            json!({ "title": { "raw": "On the server", "rendered": "On the server" } }),
+        ))
+        .await
+        .expect("Checking should succeed");
+
+    assert_eq!(check, SavedPostCheck::InSync);
+    assert_eq!(ctx.server.requests().len(), 1, "Nothing is fetched");
+}
+
+#[tokio::test]
+async fn test_saved_version_newer_than_the_cache_is_fetched() {
+    let ctx = context();
+    let session = open_post_42(&ctx).await;
+    ctx.server.then(|sent| {
+        response(
+            sent,
+            200,
+            &server_post(42, "Changed elsewhere", "2024-01-17T00:00:00"),
+        )
+    });
+
+    let check = session
+        .record_saved_post_change(saved_post_change(
+            "2024-01-17T00:00:00",
+            json!({ "title": { "raw": "Changed elsewhere" } }),
+        ))
+        .await
+        .expect("Checking should succeed");
+
+    assert_eq!(check, SavedPostCheck::InSync);
+    assert_eq!(ctx.server.requests().len(), 2, "The post is fetched");
+    assert_eq!(
+        ctx.posts
+            .read_cached_post(PostId(42))
+            .expect("Read should succeed")
+            .and_then(|post| post.title)
+            .and_then(|title| title.raw),
+        Some("Changed elsewhere".to_string()),
+        "The fetched post is cached, not the editor's"
+    );
+}
+
+#[tokio::test]
+async fn test_saved_version_older_than_the_cache_gets_the_newer_one() {
+    let ctx = context();
+    let session = open_post_42(&ctx).await;
+
+    let check = session
+        .record_saved_post_change(saved_post_change("2024-01-15T00:00:00", json!({})))
+        .await
+        .expect("Checking should succeed");
+
+    let SavedPostCheck::Newer { saved_post } = check else {
+        panic!("Expected the newer version, got {check:?}");
+    };
+    let saved_post: Value = serde_json::from_slice(&saved_post).expect("The saved post is JSON");
+    assert_eq!(saved_post["modified_gmt"], json!("2024-01-16T00:00:00"));
+}
+
+#[tokio::test]
+async fn test_saved_version_changed_without_the_server_is_a_mismatch_on_the_session() {
+    let ctx = context();
+    let session = open_post_42(&ctx).await;
+
+    let check = session
+        .record_saved_post_change(saved_post_change(
+            "2024-01-16T00:00:00",
+            json!({ "excerpt": { "raw": "Not from the server" }, "modified": "2024-01-16T00:00:00" }),
+        ))
+        .await
+        .expect("Checking should succeed");
+
+    assert_eq!(
+        check,
+        SavedPostCheck::Mismatch {
+            fields: vec!["excerpt".to_string()]
+        }
+    );
+    assert_eq!(
+        ctx.local_content
+            .read_editor_session(&session.id())
+            .expect("Read should succeed")
+            .expect("The session exists")
+            .base_mismatch
+            .map(|mismatch| mismatch.fields),
+        Some(vec!["excerpt".to_string()])
+    );
 }
 
 #[tokio::test]

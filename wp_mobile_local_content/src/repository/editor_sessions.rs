@@ -3,7 +3,7 @@ use rusqlite::{OptionalExtension, Row, types::Type};
 use crate::{
     LocalContentError,
     db_types::{
-        editor_session::{EditorSession, EditorSessionId, UnconfirmedPush},
+        editor_session::{BaseMismatch, EditorSession, EditorSessionId, UnconfirmedPush},
         working_copy::{WorkingCopyId, date_from_timestamp},
         working_copy_remote_target::RemotePostReference,
     },
@@ -13,6 +13,7 @@ use wp_api::posts::PostId;
 
 const EDITOR_SESSIONS: &str = "editor_sessions";
 const UNCONFIRMED_PUSHES: &str = "editor_session_unconfirmed_pushes";
+const BASE_MISMATCHES: &str = "editor_session_base_mismatches";
 const WORKING_COPIES: &str = "working_copies";
 
 /// The current time as a Unix timestamp in seconds, in SQL.
@@ -128,6 +129,27 @@ impl EditorSessionRepository {
         Ok(true)
     }
 
+    /// Record that the editor's version of the post differed from the
+    /// server's in `fields`, now, replacing the mismatch the session had.
+    ///
+    /// Returns `false` if no session has the ID.
+    pub fn record_base_mismatch(
+        &self,
+        executor: &impl QueryExecutor,
+        id: &EditorSessionId,
+        fields: &[String],
+    ) -> Result<bool, LocalContentError> {
+        let fields = serde_json::to_string(fields).expect("A list of strings always serializes");
+        let inserted = executor.execute(
+            &format!(
+                "INSERT OR REPLACE INTO {BASE_MISMATCHES} (editor_session_rowid, detected_at, fields)
+                 SELECT rowid, {NOW}, ? FROM {EDITOR_SESSIONS} WHERE uuid = ?"
+            ),
+            rusqlite::params![fields, id],
+        )?;
+        Ok(inserted > 0)
+    }
+
     /// Select a session by its ID, or `None` if no session has it.
     pub fn select(
         &self,
@@ -158,10 +180,12 @@ impl EditorSessionRepository {
 /// The columns `session_from_row` reads, in its order.
 const SELECT_SESSIONS: &str = "
     SELECT s.uuid, w.uuid, s.started_at, s.last_recorded_at, s.ended_at,
-           p.remote_post_id, p.base_modified_gmt, p.sent_at, p.body
+           p.remote_post_id, p.base_modified_gmt, p.sent_at, p.body,
+           m.detected_at, m.fields
     FROM editor_sessions s
     JOIN working_copies w ON w.rowid = s.working_copy_rowid
-    LEFT JOIN editor_session_unconfirmed_pushes p ON p.editor_session_rowid = s.rowid";
+    LEFT JOIN editor_session_unconfirmed_pushes p ON p.editor_session_rowid = s.rowid
+    LEFT JOIN editor_session_base_mismatches m ON m.editor_session_rowid = s.rowid";
 
 fn session_from_row(row: &Row) -> rusqlite::Result<EditorSession> {
     let date = |index: usize| -> rusqlite::Result<_> {
@@ -187,6 +211,18 @@ fn session_from_row(row: &Row) -> rusqlite::Result<EditorSession> {
         }),
         None => None,
     };
+    let base_mismatch = match date(9)? {
+        Some(detected_at) => {
+            let fields: String = row.get(10)?;
+            Some(BaseMismatch {
+                detected_at,
+                fields: serde_json::from_str(&fields).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(10, Type::Text, Box::new(e))
+                })?,
+            })
+        }
+        None => None,
+    };
     Ok(EditorSession {
         id: row.get(0)?,
         working_copy_id: row.get(1)?,
@@ -198,6 +234,7 @@ fn session_from_row(row: &Row) -> rusqlite::Result<EditorSession> {
         last_recorded_at: date(3)?,
         ended_at: date(4)?,
         unconfirmed_push,
+        base_mismatch,
     })
 }
 
@@ -368,6 +405,29 @@ mod tests {
             .clear_unconfirmed_push(&conn, &id)
             .expect("Clearing should succeed");
         assert_eq!(select(&conn, &id).unconfirmed_push, None);
+    }
+
+    #[test]
+    fn test_base_mismatch_is_replaced_by_the_latest() {
+        let (conn, working_copy_id) = connection_with_working_copy();
+        let id = EditorSessionRepository
+            .insert(&conn, &working_copy_id)
+            .expect("Insert should succeed");
+        assert_eq!(select(&conn, &id).base_mismatch, None);
+
+        EditorSessionRepository
+            .record_base_mismatch(&conn, &id, &["title".to_string()])
+            .expect("Recording should succeed");
+        EditorSessionRepository
+            .record_base_mismatch(&conn, &id, &["excerpt".to_string(), "meta".to_string()])
+            .expect("Recording should succeed");
+
+        assert_eq!(
+            select(&conn, &id)
+                .base_mismatch
+                .map(|mismatch| mismatch.fields),
+            Some(vec!["excerpt".to_string(), "meta".to_string()])
+        );
     }
 
     #[test]

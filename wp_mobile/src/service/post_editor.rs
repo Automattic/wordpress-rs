@@ -21,6 +21,7 @@ use wp_api::{
     WpAdditionalFields,
     api_client::{IsWpApiClientDelegate, WpApiClient},
     api_error::{RequestExecutionError, RequestExecutionErrorReason},
+    date::WpGmtDateTime,
     middleware::PerformsRequests,
     posts::{AnyPostWithEditContext, PostId, PostMeta, PostRetrieveParams},
     request::{
@@ -53,6 +54,40 @@ pub struct EditorRequest {
     pub path: String,
     /// The JSON body, if the request has one.
     pub body: Option<Vec<u8>>,
+}
+
+/// What the editor opens with: the version of the post it takes as saved,
+/// and the working copy's changes to it as unsaved edits.
+///
+/// Keeping the working copy's changes out of the saved version means that
+/// when the editor later takes in another copy of the post from the server,
+/// they stay: only the saved version under them changes.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct EditorPost {
+    /// The post as wordpress-rs last fetched it from the server, a JSON object
+    /// in the REST API's edit shape. `None` for a post that isn't on the
+    /// server yet, for which the editor starts from an empty post.
+    pub saved_post: Option<Vec<u8>>,
+    /// The working copy's fields that differ from `saved_post`, or from an
+    /// empty post if there's none, as a JSON object in the shape the REST API
+    /// takes them in a write.
+    pub edits: Vec<u8>,
+}
+
+/// What wordpress-rs found when the editor reported that its saved version of
+/// the post changed.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
+pub enum SavedPostCheck {
+    /// The editor's saved version is the server's version wordpress-rs has.
+    InSync,
+    /// wordpress-rs has a newer version from the server. Give it to the editor
+    /// as its saved version.
+    Newer { saved_post: Vec<u8> },
+    /// The editor's saved version has the same modified date as the server's
+    /// version wordpress-rs has, but differs from it in `fields`. Only
+    /// something other than the server changes it that way, so it's recorded
+    /// on the session, and the editor's version isn't taken as the server's.
+    Mismatch { fields: Vec<String> },
 }
 
 /// The server's response, as it arrived.
@@ -626,26 +661,89 @@ impl PostEditorSession {
             .map(|remote_post| remote_post.post_id))
     }
 
-    /// What the editor shows when it opens, as a JSON object in the REST
-    /// API's edit shape: the cached post with the working copy laid over it.
-    ///
-    /// A new post has no cached post, so it holds only the working copy's
-    /// fields and `type`.
-    pub fn editor_post(&self) -> Result<Vec<u8>, PostEditorError> {
+    /// What the editor opens with: the cached post as its saved version, and
+    /// the working copy's changes to it as edits.
+    pub fn editor_post(&self) -> Result<EditorPost, PostEditorError> {
         let working_copy = self.service.read_working_copy(&self.working_copy_id)?;
         let cached = match working_copy.remote_target.remote_post {
             Some(remote_post) => self.service.posts.read_cached_post(remote_post.post_id)?,
             None => None,
         };
-        let mut post = match &cached {
-            Some(cached) => match serde_json::to_value(cached) {
-                Ok(Value::Object(post)) => post,
-                _ => Map::new(),
-            },
-            None => Map::from_iter([("type".to_string(), Value::from("post"))]),
+        let (saved_post, base) = match &cached {
+            Some(cached) => (
+                Some(serde_json::to_vec(cached).expect("A post always serializes")),
+                PostWorkingCopyFields::from_remote(cached)?,
+            ),
+            None => (None, empty_post_fields()),
         };
-        working_copy.fields.lay_over_editor_post(&mut post);
-        Ok(serde_json::to_vec(&post).expect("A JSON object always serializes"))
+        let edits = working_copy.fields.rest_fields_changed_from(&base);
+        Ok(EditorPost {
+            saved_post,
+            edits: serde_json::to_vec(&edits).expect("A JSON object always serializes"),
+        })
+    }
+
+    /// Check the editor's saved version of the post against the server's
+    /// version wordpress-rs has, after the editor reported that it changed.
+    ///
+    /// `change` is a JSON object: `modified_gmt`, the saved version's modified
+    /// date, and `fields`, the fields that changed in it, in the REST API's
+    /// edit shape. The editor's version is never taken as the server's: if
+    /// it's newer than the cached one, wordpress-rs fetches the post.
+    pub async fn record_saved_post_change(
+        &self,
+        change: Vec<u8>,
+    ) -> Result<SavedPostCheck, PostEditorError> {
+        let Some(post_id) = self.remote_post_id()? else {
+            return Ok(SavedPostCheck::InSync);
+        };
+        let change = json_object(&change)?;
+        let invalid = |reason: &str| PostEditorError::InvalidEditorPost {
+            reason: format!("The saved post change {reason}"),
+        };
+        let editor_modified: WpGmtDateTime = change
+            .get("modified_gmt")
+            .cloned()
+            .and_then(|modified| serde_json::from_value(modified).ok())
+            .ok_or_else(|| invalid("has no valid `modified_gmt`"))?;
+        let changed_fields = match change.get("fields") {
+            Some(Value::Object(fields)) => fields.clone(),
+            None => Map::new(),
+            Some(_) => return Err(invalid("has `fields` that isn't an object")),
+        };
+
+        let mut server = match self.service.posts.read_cached_post(post_id)? {
+            Some(cached) if cached.modified_gmt.0 >= editor_modified.0 => cached,
+            // The editor took in a newer version than wordpress-rs has, or
+            // wordpress-rs has none.
+            _ => self.service.fetch_post(post_id).await?,
+        };
+        if server.modified_gmt.0 < editor_modified.0 {
+            // Still older after fetching: the server doesn't have the
+            // editor's version, so it didn't come from the server.
+            server = self.service.fetch_post(post_id).await?;
+        }
+        if server.modified_gmt.0 > editor_modified.0 {
+            return Ok(SavedPostCheck::Newer {
+                saved_post: serde_json::to_vec(&server).expect("A post always serializes"),
+            });
+        }
+
+        let server_fields = PostWorkingCopyFields::from_remote(&server)?;
+        let mut editor_fields = server_fields.clone();
+        editor_fields.apply_editor_edits(&changed_fields)?;
+        let differing: Vec<String> = editor_fields
+            .rest_fields_changed_from(&server_fields)
+            .into_iter()
+            .map(|(key, _)| key)
+            .collect();
+        if differing.is_empty() {
+            return Ok(SavedPostCheck::InSync);
+        }
+        self.service
+            .local_content
+            .record_base_mismatch(&self.id, &differing)?;
+        Ok(SavedPostCheck::Mismatch { fields: differing })
     }
 
     /// Record the post, as the editor has it now, in the working copy. Call it

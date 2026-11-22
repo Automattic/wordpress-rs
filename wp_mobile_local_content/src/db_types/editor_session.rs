@@ -52,6 +52,20 @@ pub struct EditorSession {
     pub ended_at: Option<WpGmtDateTime>,
     /// The push sent during the session that has no answer yet.
     pub unconfirmed_push: Option<UnconfirmedPush>,
+    /// The latest time the editor's version of the post differed from the
+    /// server's.
+    pub base_mismatch: Option<BaseMismatch>,
+}
+
+/// The editor's version of the post, the one it takes as saved, differed
+/// from the server's version wordpress-rs has, though both had the same
+/// modified date. Only something other than the server changes the editor's
+/// version that way.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct BaseMismatch {
+    pub detected_at: WpGmtDateTime,
+    /// The REST API keys of the fields that differed, such as `excerpt`.
+    pub fields: Vec<String>,
 }
 
 /// A push that was sent and has no answer yet, so it may or may not have

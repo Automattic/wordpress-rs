@@ -103,37 +103,6 @@ impl PostWorkingCopyFields {
         self.apply_editor_keys(edits, Merge::KeyByKey)
     }
 
-    /// Lay these fields over `post`, a post in the REST API's edit shape, so
-    /// it shows what the working copy holds.
-    ///
-    /// The keys of `post` with no working copy field keep their values, and so
-    /// do `rendered` values, which can be out of date afterwards. The meta and
-    /// additional fields are laid over key by key.
-    pub fn lay_over_editor_post(&self, post: &mut Map<String, Value>) {
-        let mut fields = self.to_rest_fields();
-        for key in ["title", "content", "excerpt"] {
-            if let Some(raw) = fields.remove(key) {
-                match post.get_mut(key).and_then(Value::as_object_mut) {
-                    Some(object) => {
-                        object.insert("raw".into(), raw);
-                    }
-                    None => {
-                        post.insert(key.into(), serde_json::json!({ "raw": raw }));
-                    }
-                }
-            }
-        }
-        if let Some(Value::Object(working_copy_meta)) = fields.remove("meta") {
-            match post.get_mut("meta").and_then(Value::as_object_mut) {
-                Some(meta) => meta.extend(working_copy_meta),
-                None => {
-                    post.insert("meta".into(), Value::Object(working_copy_meta));
-                }
-            }
-        }
-        post.extend(fields);
-    }
-
     /// Every field, as the REST API takes it when creating or updating a post.
     ///
     /// `Immediately` is a `date` of `null`. A field the user hasn't set, such
@@ -851,37 +820,5 @@ mod tests {
                 "meta": { "plugin_meta": "1" },
             })
         );
-    }
-
-    #[test]
-    fn test_laying_over_an_editor_post_keeps_what_the_working_copy_lacks() {
-        let mut fields = empty_fields();
-        fields
-            .apply_editor_post(&editor_post())
-            .expect("Conversion should succeed");
-        fields.common.title = "Working copy title".to_string();
-        fields.meta = meta("footnotes", "").with_value(
-            "working_copy_meta".to_string(),
-            JsonValue::String("value".to_string()),
-        );
-        let mut post = editor_post();
-
-        fields.lay_over_editor_post(&mut post);
-
-        assert_eq!(
-            post.get("title"),
-            Some(&json!({ "raw": "Working copy title", "rendered": "A post" }))
-        );
-        assert_eq!(
-            post.get("meta"),
-            Some(&json!({ "footnotes": "", "working_copy_meta": "value" }))
-        );
-        assert_eq!(post.get("id"), Some(&json!(42)));
-        assert_eq!(post.get("date"), Some(&json!("2024-01-15T12:30:00")));
-        let mut converted_back = empty_fields();
-        converted_back
-            .apply_editor_post(&post)
-            .expect("Conversion should succeed");
-        assert_eq!(converted_back, fields);
     }
 }

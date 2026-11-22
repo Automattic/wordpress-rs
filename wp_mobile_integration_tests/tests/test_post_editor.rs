@@ -275,8 +275,14 @@ async fn test_new_post_is_created_on_its_first_push() {
         on_server.title.and_then(|title| title.raw),
         Some("Written on the device".to_string())
     );
-    let editor_post = json_body(&session.editor_post().expect("Reading should succeed"));
-    assert_eq!(editor_post["id"], json!(post_id.0));
+    let saved_post = json_body(
+        &session
+            .editor_post()
+            .expect("Reading should succeed")
+            .saved_post
+            .expect("The post is on the server now"),
+    );
+    assert_eq!(saved_post["id"], json!(post_id.0));
 
     RestoreServer::db().await;
 }
