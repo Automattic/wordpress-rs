@@ -11,6 +11,7 @@ pub mod jetpack_connection;
 pub mod language;
 pub mod me;
 pub mod me_connections;
+pub mod notifications;
 pub mod oauth2;
 pub mod products;
 pub mod publicize;

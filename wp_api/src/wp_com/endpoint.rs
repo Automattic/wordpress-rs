@@ -13,6 +13,7 @@ pub mod jetpack_connection_endpoint;
 pub mod languages_endpoint;
 pub mod me_connections_endpoint;
 pub mod me_endpoint;
+pub mod notifications_endpoint;
 pub mod oauth2;
 pub mod products_endpoint;
 pub mod publicize_endpoint;

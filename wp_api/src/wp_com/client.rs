@@ -6,6 +6,7 @@ use super::endpoint::{
     },
     me_connections_endpoint::{MeConnectionsRequestBuilder, MeConnectionsRequestExecutor},
     me_endpoint::{MeRequestBuilder, MeRequestExecutor},
+    notifications_endpoint::{NotificationsRequestBuilder, NotificationsRequestExecutor},
     oauth2::{Oauth2RequestBuilder, Oauth2RequestExecutor},
     products_endpoint::{ProductsRequestBuilder, ProductsRequestExecutor},
     publicize_endpoint::{PublicizeRequestBuilder, PublicizeRequestExecutor},
@@ -96,6 +97,7 @@ pub struct WpComApiRequestBuilder {
     languages: Arc<LanguagesRequestBuilder>,
     me: Arc<MeRequestBuilder>,
     me_connections: Arc<MeConnectionsRequestBuilder>,
+    notifications: Arc<NotificationsRequestBuilder>,
     oauth2: Arc<Oauth2RequestBuilder>,
     products: Arc<ProductsRequestBuilder>,
     publicize: Arc<PublicizeRequestBuilder>,
@@ -161,6 +163,7 @@ impl WpComApiRequestBuilder {
             languages,
             me,
             me_connections,
+            notifications,
             oauth2,
             products,
             publicize,
@@ -233,6 +236,7 @@ pub struct WpComApiClient {
     languages: Arc<LanguagesRequestExecutor>,
     me: Arc<MeRequestExecutor>,
     me_connections: Arc<MeConnectionsRequestExecutor>,
+    notifications: Arc<NotificationsRequestExecutor>,
     oauth2: Arc<Oauth2RequestExecutor>,
     products: Arc<ProductsRequestExecutor>,
     publicize: Arc<PublicizeRequestExecutor>,
@@ -295,6 +299,7 @@ impl WpComApiClient {
             languages,
             me,
             me_connections,
+            notifications,
             oauth2,
             products,
             publicize,
@@ -350,6 +355,7 @@ api_client_generate_endpoint_impl!(WpComApi, jetpack_connection);
 api_client_generate_endpoint_impl!(WpComApi, languages);
 api_client_generate_endpoint_impl!(WpComApi, me);
 api_client_generate_endpoint_impl!(WpComApi, me_connections);
+api_client_generate_endpoint_impl!(WpComApi, notifications);
 api_client_generate_endpoint_impl!(WpComApi, oauth2);
 api_client_generate_endpoint_impl!(WpComApi, products);
 api_client_generate_endpoint_impl!(WpComApi, publicize);

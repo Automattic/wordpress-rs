@@ -143,8 +143,8 @@ investigate the relevant code before making decisions based on this document.
 
 ## Notifications
 
-- [ ] `GET /rest/v1.1/notifications` — list notifications
-- [ ] `GET /rest/v1.1/notifications/$note_id` — fetch single notification
+- [x] `GET /rest/v1.1/notifications` — list notifications
+- [x] `GET /rest/v1.1/notifications/$note_id` — fetch single notification
 - [ ] `POST /rest/v1.1/notifications/read` — mark notification as read
 - [ ] `POST /rest/v1.1/notifications/seen` — mark notifications as seen
 - [ ] `POST /rest/v1/devices/$device_id/delete` — unregister device
