@@ -29,7 +29,8 @@ Every request needs a token. The endpoints are in `wp_api/src/wp_com/endpoint/no
 
 ## Traps
 
-- **A short page is not the end.** A page can have fewer notes than asked for, or none, while older notes exist. The API leaves out notes it can't show after it has picked the page. To page back, send the oldest note's time as `before`.
+- **A short page is not the end.** A page can have fewer notes than asked for, or none, while older notes exist. The API leaves out notes it can't show, and a page that left some out can be short. To page back, send the oldest note's time as `before`.
+- **A list of IDs or hashes has notes a list of whole notes leaves out.** The notes the API can't show are left out of whole notes, but `list_ids` and `list_hashes` still list them. Take an ID to fetch from a list of whole notes.
 - **`before` includes its second**, so the oldest note of one page comes back at the top of the next.
 - **Hashes only compare between requests made the same way.** A note's hash changes when anything in it changes, including that it was read. It also differs between requests that ask for different fields, and between requests in different languages.
 - **Send one fixed language.** A request in a different `locale` from the one before it changes every note's hash, so send the same `locale` on every request.
@@ -96,3 +97,7 @@ Public documentation: not listed in WordPress.com's REST API reference.
 | Notice | every other type, and every note without note context |
 
 Text the API wrote comes through as it was sent, as styled runs where it has ranges. A label the library writes, such as "12 likes on your post", is a `NotificationLabel`, in the web panel's words. `localize_notification_label` returns it in the user's language, or in English until it's translated.
+
+## Testing against WordPress.com
+
+- **Live trials:** `wp_com_e2e/src/notifications_tests.rs` checks both endpoints against the account of `WP_COM_API_KEY`. Every request is a GET, so nothing is marked read or seen. Run them with `cargo run -q -p wp_com_e2e --bin wp_com_e2e -- notifications`.

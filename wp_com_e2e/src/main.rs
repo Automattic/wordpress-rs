@@ -8,6 +8,8 @@ mod context;
 mod domains_tests;
 mod languages_tests;
 mod me_tests;
+mod notification_checks;
+mod notifications_tests;
 mod products_tests;
 mod purchases_tests;
 mod reader_actions_tests;
@@ -70,6 +72,7 @@ fn collect_tests(ctx: Arc<TestContext>) -> Vec<Trial> {
     tests.extend(domains_tests::tests(Arc::clone(&ctx)));
     tests.extend(languages_tests::tests(Arc::clone(&ctx)));
     tests.extend(me_tests::tests(Arc::clone(&ctx)));
+    tests.extend(notifications_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_actions_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_post_tests::tests(Arc::clone(&ctx)));
     tests.extend(reader_comments_tests::tests(Arc::clone(&ctx)));
