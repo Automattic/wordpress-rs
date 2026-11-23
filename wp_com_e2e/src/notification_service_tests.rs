@@ -1,6 +1,6 @@
 //! `NotificationService` against the live API: the account's notes synced into a cache of the
-//! trial's own, in memory, and paged back to the oldest. Every request is a GET: nothing here
-//! marks a note read or seen.
+//! trial's own, in memory, and paged back to the oldest, in every tab. Every request is a GET:
+//! nothing here marks a note read or seen.
 //!
 //! The service compares hashes, and any request for whole notes gives the notes it sends new
 //! hashes. So each trial holds `AccountLocks::notification_hashes` for writing, and runs while no
@@ -10,19 +10,22 @@
 use libtest_mimic::{Failed, Trial};
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use wp_api::date::WpGmtDateTime;
+use wp_api::prelude::WpApiClientDelegate;
 use wp_api::wp_com::language::WPComLanguage;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::notifications::{
-    NotificationId, NotificationType, NotificationsParams, NotificationsQuery, WpComNotification,
+    NotificationId, NotificationTab, NotificationType, NotificationsParams, NotificationsQuery,
+    WpComNotification,
 };
 use wp_mobile::service::notifications::{
-    NotificationService, NotificationSyncResult, NotificationsFilter,
+    NotificationRefreshResult, NotificationService, NotificationSyncResult, NotificationsFilter,
 };
 use wp_mobile_cache::WpApiCache;
 
-use crate::context::{TestContext, changing};
+use crate::context::{CountingExecutor, TestContext, changing};
 use crate::walk::{Page, Step, Walk};
 
 /// The most older pages a trial loads before it gives up: more than any test account has.
@@ -35,13 +38,58 @@ const PAUSE: Duration = Duration::from_millis(250);
 const AGAIN_ATTEMPTS: usize = 3;
 
 fn service(ctx: &TestContext) -> Result<NotificationService, Failed> {
+    service_with(ctx.delegate.clone())
+}
+
+fn service_with(delegate: WpApiClientDelegate) -> Result<NotificationService, Failed> {
     let cache = WpApiCache::new(None).map_err(|e| e.to_string())?;
     cache.perform_migrations().map_err(|e| e.to_string())?;
     // The cache is the trial's own, so any user ID keys it.
     Ok(
-        NotificationService::new(ctx.delegate.clone(), Arc::new(cache), WpComUserId(1))
+        NotificationService::new(delegate, Arc::new(cache), WpComUserId(1))
             .map_err(|e| e.to_string())?,
     )
+}
+
+/// A service whose requests are counted.
+fn counted_service(
+    ctx: &TestContext,
+) -> Result<(NotificationService, Arc<CountingExecutor>), Failed> {
+    let executor = Arc::new(CountingExecutor {
+        inner: Arc::clone(&ctx.delegate.request_executor),
+        sent: AtomicU64::new(0),
+    });
+    let service = service_with(WpApiClientDelegate {
+        request_executor: executor.clone(),
+        ..ctx.delegate.clone()
+    })?;
+    Ok((service, executor))
+}
+
+fn ids(notes: &[WpComNotification]) -> HashSet<NotificationId> {
+    notes.iter().map(|note| note.id).collect()
+}
+
+/// Syncs `tab` and loads its older pages until its end, and returns how many older pages it
+/// took.
+async fn page_to_the_end(
+    service: &NotificationService,
+    tab: NotificationTab,
+) -> Result<usize, Failed> {
+    let mut result = service.sync_tab(tab).await.map_err(|e| e.to_string())?;
+    let mut pages = 0;
+    while !result.reached_end {
+        if pages == MAX_OLDER_PAGES {
+            return Err(format!("{tab:?}: no end after {pages} older pages").into());
+        }
+        tokio::time::sleep(PAUSE).await;
+        result = service
+            .load_older_in_tab(tab)
+            .await
+            .map_err(|e| e.to_string())?;
+        pages += 1;
+    }
+    Ok(pages)
 }
 
 fn cached(service: &NotificationService) -> Result<Vec<WpComNotification>, Failed> {
@@ -134,7 +182,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
             move || {
                 let _hashes = changing(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
-                    let service = service(&ctx)?;
+                    let (service, executor) = counted_service(&ctx)?;
                     let first = service.sync().await.map_err(|e| e.to_string())?;
                     println!("First sync: {}", counts(&first));
                     // Another client of the account, such as another CI build, can fetch notes
@@ -144,14 +192,26 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     for _ in 0..AGAIN_ATTEMPTS {
                         let before: HashSet<NotificationId> =
                             cached(&service)?.iter().map(|note| note.id).collect();
+                        let sent_before = executor.sent.load(Ordering::SeqCst);
                         let again = service.sync().await.map_err(|e| e.to_string())?;
+                        let sent = executor.sent.load(Ordering::SeqCst) - sent_before;
                         // A note that arrived in between is new, not changed.
                         let arrived = cached(&service)?
                             .iter()
                             .filter(|note| !before.contains(&note.id))
                             .count() as u64;
-                        println!("Sync again: {}, {arrived} new", counts(&again));
+                        println!(
+                            "Sync again: {}, {arrived} new, {sent} request(s)",
+                            counts(&again)
+                        );
                         if again.downloaded_count <= arrived && again.not_sent_count == 0 {
+                            // With nothing to download, the check is the only request.
+                            if again.downloaded_count == 0 && sent != 1 {
+                                return Err(format!(
+                                    "A sync that downloaded nothing sent {sent} requests"
+                                )
+                                .into());
+                            }
                             return Ok(());
                         }
                         failure = format!(
@@ -222,6 +282,201 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
                     let dated: Vec<i64> = notes.iter().filter_map(seconds).collect();
                     if dated.windows(2).any(|pair| pair[0] < pair[1]) {
                         return Err("The cached notes aren't newest first".into());
+                    }
+                    Ok(())
+                })
+            }
+        }),
+        Trial::test(
+            "notification_service::each_tab_has_the_notes_calypso_shows",
+            {
+                let ctx = Arc::clone(&ctx);
+                move || {
+                    let _hashes = changing(&ctx.locks.notification_hashes);
+                    ctx.runtime.block_on(async {
+                    let started = now();
+                    // Notes newer than the start may have arrived in one walk and not another.
+                    let before_start = |note: &&WpComNotification| {
+                        seconds(note).is_none_or(|time| time < started)
+                    };
+                    // Each tab in a cache of its own, so no other tab's downloads fill it in.
+                    let mut tabs = Vec::new();
+                    for tab in NotificationTab::EVERY_TAB {
+                        if tab == NotificationTab::All {
+                            continue;
+                        }
+                        let service = service(&ctx)?;
+                        let pages = page_to_the_end(&service, tab).await?;
+                        no_unreadable(&service)?;
+                        let notes = cached(&service)?;
+                        // A tab's own syncs download only notes the tab shows.
+                        let foreign = notes.iter().filter(|note| !tab.includes(note)).count();
+                        if foreign > 0 {
+                            return Err(format!(
+                                "{tab:?} downloaded {foreign} note(s) it doesn't show"
+                            )
+                            .into());
+                        }
+                        tabs.push((tab, pages, notes));
+                    }
+                    let all = service(&ctx)?;
+                    let all_pages = page_to_the_end(&all, NotificationTab::All).await?;
+                    no_unreadable(&all)?;
+                    let every_note = cached(&all)?;
+                    let every_id = ids(&every_note);
+                    println!(
+                        "All: {} notes after {all_pages} older pages: {:?}",
+                        every_note.len(),
+                        types(&every_note)
+                    );
+
+                    let mut failures = Vec::new();
+                    for (tab, pages, notes) in tabs {
+                        let expected: HashSet<NotificationId> = every_note
+                            .iter()
+                            .filter(before_start)
+                            .filter(|note| tab.includes(note))
+                            .map(|note| note.id)
+                            .collect();
+                        let got: HashSet<NotificationId> =
+                            notes.iter().filter(before_start).map(|note| note.id).collect();
+                        let missing = expected.difference(&got).count();
+                        let extra = got.difference(&every_id).count();
+                        println!(
+                            "{tab:?}: {} notes after {pages} older pages, {missing} missing, {extra} not in All: {:?}",
+                            notes.len(),
+                            types(&notes)
+                        );
+                        if missing > 0 || extra > 0 {
+                            failures.push(format!(
+                                "{tab:?}: {missing} note(s) Calypso's rule picks are missing, {extra} aren't in All"
+                            ));
+                        }
+                    }
+                    if failures.is_empty() {
+                        Ok(())
+                    } else {
+                        Err(failures.join("; ").into())
+                    }
+                })
+                }
+            },
+        ),
+        Trial::test(
+            "notification_service::a_tab_downloads_no_note_another_tab_has",
+            {
+                let ctx = Arc::clone(&ctx);
+                move || {
+                    let _hashes = changing(&ctx.locks.notification_hashes);
+                    ctx.runtime.block_on(async {
+                    let service = service(&ctx)?;
+                    let first = service.sync().await.map_err(|e| e.to_string())?;
+                    println!("All: {}", counts(&first));
+                    for tab in NotificationTab::EVERY_TAB {
+                        if tab == NotificationTab::All {
+                            continue;
+                        }
+                        // Another client of the account can fetch notes whole in between, which
+                        // gives them new hashes, so a tab that downloaded more is tried again.
+                        let mut failure = None;
+                        for _ in 0..AGAIN_ATTEMPTS {
+                            let before = ids(&cached(&service)?);
+                            let result = service.sync_tab(tab).await.map_err(|e| e.to_string())?;
+                            let new = ids(&cached(&service)?).difference(&before).count() as u64;
+                            println!("{tab:?}: {}, {new} new to the cache", counts(&result));
+                            if result.downloaded_count <= new {
+                                failure = None;
+                                break;
+                            }
+                            failure = Some(format!(
+                                "{tab:?} downloaded {} note(s) the cache had with the same hash",
+                                result.downloaded_count - new
+                            ));
+                        }
+                        if let Some(failure) = failure {
+                            return Err(failure.into());
+                        }
+                    }
+                    let info = service.info().map_err(|e| e.to_string())?;
+                    let stored = cached(&service)?.len() as u64;
+                    if info.note_count != stored {
+                        return Err(format!(
+                            "{} rows for {stored} notes: a note is stored more than once",
+                            info.note_count
+                        )
+                        .into());
+                    }
+                    Ok(())
+                })
+                }
+            },
+        ),
+        Trial::test("notification_service::refresh_and_remove_a_note", {
+            let ctx = Arc::clone(&ctx);
+            move || {
+                let _hashes = changing(&ctx.locks.notification_hashes);
+                ctx.runtime.block_on(async {
+                    let (service, executor) = counted_service(&ctx)?;
+                    service.sync().await.map_err(|e| e.to_string())?;
+                    let Some(newest) = cached(&service)?.first().map(|note| note.id) else {
+                        println!("The account has no note the API sends whole: nothing to refresh");
+                        return Ok(());
+                    };
+                    let count = || -> Result<u64, Failed> {
+                        Ok(service.info().map_err(|e| e.to_string())?.note_count)
+                    };
+                    let notes = count()?;
+
+                    let sent = executor.sent.load(Ordering::SeqCst);
+                    let refreshed = service
+                        .refresh_note(newest)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let sent = executor.sent.load(Ordering::SeqCst) - sent;
+                    println!("Refreshing the newest note: {refreshed:?}, {sent} request(s)");
+                    if refreshed != NotificationRefreshResult::Stored
+                        || sent != 1
+                        || count()? != notes
+                    {
+                        return Err(format!(
+                            "Refreshing a cached note gave {refreshed:?} with {sent} request(s)"
+                        )
+                        .into());
+                    }
+
+                    // No note has an ID this small.
+                    let missing = service
+                        .refresh_note(NotificationId(1))
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    println!("Refreshing a note that doesn't exist: {missing:?}");
+                    if missing != NotificationRefreshResult::NotSent || count()? != notes {
+                        return Err(format!(
+                            "Refreshing a note that doesn't exist gave {missing:?}"
+                        )
+                        .into());
+                    }
+
+                    let sent = executor.sent.load(Ordering::SeqCst);
+                    let removed = service
+                        .remove_note(newest)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let sent = executor.sent.load(Ordering::SeqCst) - sent;
+                    if !removed || sent != 0 || ids(&cached(&service)?).contains(&newest) {
+                        return Err(format!(
+                            "Removing a cached note: removed {removed}, {sent} request(s)"
+                        )
+                        .into());
+                    }
+                    // The server still has it, so the next sync brings it back.
+                    let again = service.sync().await.map_err(|e| e.to_string())?;
+                    println!(
+                        "Removing it sent nothing; the next sync: {}",
+                        counts(&again)
+                    );
+                    if !ids(&cached(&service)?).contains(&newest) {
+                        return Err("A sync after removing a note didn't bring it back".into());
                     }
                     Ok(())
                 })

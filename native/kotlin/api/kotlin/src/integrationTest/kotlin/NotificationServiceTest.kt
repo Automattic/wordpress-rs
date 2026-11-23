@@ -3,12 +3,16 @@ package rs.wordpress.api.kotlin
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import rs.wordpress.cache.kotlin.WordPressApiCache
+import uniffi.wp_api.NotificationTab
 import uniffi.wp_api.RequestMethod
 import uniffi.wp_api.WpAuthenticationProvider
 import uniffi.wp_api.WpNetworkHeaderMap
 import uniffi.wp_api.WpNetworkResponse
+import uniffi.wp_api.localizedDescription
 import uniffi.wp_mobile.NotificationsFilter
+import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Syncs an invented account's notes through stubs, as an app does. Nothing reaches a server. */
@@ -59,5 +63,24 @@ class NotificationServiceTest {
         assertEquals(1, service.loadNotes(NotificationsFilter(unreadOnly = true)).size)
         // Two notes on a page of 100: every note there is.
         assertTrue(service.info().reachedEnd)
+    }
+
+    @Test
+    fun eachTabShowsItsOwnNotesAndANoteCanBeRemoved() = runTest {
+        val cache = WordPressApiCache()
+        cache.performMigrations()
+        val service = client.makeNotificationService(cache, 1uL)
+        service.sync()
+
+        assertEquals(listOf(10_000_000_002uL), service.loadTabNotes(NotificationTab.UNREAD).map { it.id })
+        assertEquals(listOf(10_000_000_001uL), service.loadTabNotes(NotificationTab.COMMENTS).map { it.id })
+        assertEquals(listOf(10_000_000_002uL), service.loadTabNotes(NotificationTab.LIKES).map { it.id })
+        assertTrue(service.loadTabNotes(NotificationTab.SUBSCRIBERS).isEmpty())
+        assertFalse(service.tabReachedEnd(NotificationTab.LIKES))
+        assertEquals("Subscribers", NotificationTab.SUBSCRIBERS.localizedDescription(listOf(Locale.US)))
+
+        // Removing a note sends no request.
+        assertTrue(service.removeNote(10_000_000_002uL))
+        assertTrue(service.loadTabNotes(NotificationTab.UNREAD).isEmpty())
     }
 }

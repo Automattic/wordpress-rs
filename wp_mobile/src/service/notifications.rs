@@ -2,7 +2,9 @@
 //!
 //! A sync lists the newest notes' IDs and hashes, downloads only the notes that are new or
 //! changed, and removes the notes the server no longer lists. Older notes load a page at a time,
-//! back to the account's oldest note.
+//! back to the account's oldest note. Each tab of the list ([`NotificationTab`]) syncs and pages
+//! against the server's list of its own notes, and keeps its own place; a note is stored once,
+//! however many tabs show it.
 //!
 //! What the API does that the sync is built around:
 //!
@@ -19,6 +21,9 @@
 //!   refilled with an older one. The end is a list of IDs shorter than asked for.
 //! - `before` includes its second, so the next page starts at the oldest note's second, and no
 //!   note sharing it is skipped.
+//! - A tab's list of IDs and hashes has the same hashes as the list of every note, so a note
+//!   another tab downloaded isn't downloaded again. A note missing from the Unread tab's list
+//!   may only have been read, so that list never removes a note.
 
 use futures::lock::Mutex as AsyncMutex;
 use std::collections::{HashMap, HashSet};
@@ -30,10 +35,12 @@ use wp_api::wp_com::client::WpComApiClient;
 use wp_api::wp_com::language::WPComLanguage;
 use wp_api::wp_com::me::WpComUserId;
 use wp_api::wp_com::notifications::{
-    NotificationId, NotificationType, NotificationsParams, NotificationsQuery, WpComNotification,
+    NotificationId, NotificationTab, NotificationType, NotificationsParams, NotificationsQuery,
+    NotificationsWithJsonResponse, WpComNotification,
 };
 use wp_mobile_cache::repository::notifications::{
-    DbKnownHash, DbNotificationFilter, DbNotificationWindow, NotificationRepository, UNDATED_BEFORE,
+    DbKnownHash, DbNotificationFilter, DbNotificationSyncState, DbNotificationTabState,
+    DbNotificationWindow, NotificationRepository, UNDATED_BEFORE,
 };
 use wp_mobile_cache::repository::wordpress_com_accounts::WordPressComAccountRepository;
 use wp_mobile_cache::{DbTable, RowId, SqliteDbError, UpdateHook, WpApiCache};
@@ -48,10 +55,11 @@ const MAX_PAGE_SIZE: u32 = 200;
 const DOWNLOAD_AT_A_TIME: usize = 100;
 
 /// The tables the cached notes and their state are read from.
-const NOTIFICATION_TABLES: [DbTable; 3] = [
+const NOTIFICATION_TABLES: [DbTable; 4] = [
     DbTable::Notifications,
     DbTable::NotificationListedOnly,
     DbTable::NotificationSyncState,
+    DbTable::NotificationTabState,
 ];
 
 #[allow(clippy::large_enum_variant)] // Boxing doesn't cross the FFI boundary.
@@ -93,15 +101,27 @@ pub struct NotificationSyncResult {
     pub not_sent_count: u64,
     /// How many cached notes were removed because the server no longer lists them.
     pub removed_count: u64,
-    /// Whether the oldest note has been reached, so [`NotificationService::load_older`] has
-    /// nothing more to load.
+    /// Whether the tab's oldest note has been reached, so [`NotificationService::load_older`]
+    /// or [`NotificationService::load_older_in_tab`] has nothing more to load.
     pub reached_end: bool,
+}
+
+/// What [`NotificationService::refresh_note`] did with the note.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum NotificationRefreshResult {
+    /// The note came whole and is stored.
+    Stored,
+    /// The note didn't come: it was deleted, or the API doesn't send it whole. Whatever the
+    /// cache had of it is removed.
+    NotSent,
+    /// The note came and couldn't be read. It's left out of the cached list until it changes.
+    Unreadable,
 }
 
 /// Which cached notes [`NotificationService::load_notes`] returns.
 #[derive(Debug, Clone, Default, PartialEq, Eq, uniffi::Record)]
 pub struct NotificationsFilter {
-    /// Only notes the user hasn't read.
+    /// Only notes the user hasn't read. A note that doesn't say whether it was read is unread.
     #[uniffi(default = false)]
     pub unread_only: bool,
     /// Only notes of these types. Empty for every type.
@@ -118,9 +138,9 @@ pub struct NotificationsInfo {
     pub listed_only_count: u64,
     /// How many of those came and couldn't be read.
     pub unreadable_count: u64,
-    /// Whether the oldest note has been reached.
+    /// Whether the oldest note has been reached in the All tab.
     pub reached_end: bool,
-    /// When the newest notes were last synced. `None` before the first sync.
+    /// When the newest notes of the All tab were last synced. `None` before the first sync.
     #[uniffi(default = None)]
     pub last_synced_at: Option<WpGmtDateTime>,
     /// When the user last looked at their notifications, as the API last said.
@@ -133,10 +153,16 @@ pub(crate) type Clock = Arc<dyn Fn() -> SystemTime + Send + Sync>;
 /// A WordPress.com account's notifications: read from the cache, and kept up to date from the
 /// server. Every request it sends is a GET: nothing here marks a note read or seen.
 ///
-/// Create one per account and share it. Read the cached notes with [`Self::load_notes`], which
-/// doesn't touch the network, and read them again when [`Self::is_relevant_update`] says a change
-/// to the cache is one they show. [`Self::sync`] brings the newest notes up to date, and
-/// [`Self::load_older`] loads the next older page, until [`NotificationSyncResult::reached_end`].
+/// Create one per account and share it. Read the cached notes with [`Self::load_notes`] or
+/// [`Self::load_tab_notes`], which don't touch the network, and read them again when
+/// [`Self::is_relevant_update`] says a change to the cache is one they show. [`Self::sync`] brings
+/// the newest notes up to date, and [`Self::load_older`] loads the next older page, until
+/// [`NotificationSyncResult::reached_end`]. [`Self::sync_tab`] and [`Self::load_older_in_tab`] do
+/// the same for one tab's notes.
+///
+/// An app that hears of a change some other way, such as a push, passes the note's ID to
+/// [`Self::refresh_note`] or [`Self::remove_note`]. With no such channel, calling [`Self::sync`]
+/// on a timer costs one small request when nothing changed.
 ///
 /// Which notes the API sends can depend on the request's `User-Agent`, which the delegate's
 /// request executor sets, not this service.
@@ -192,26 +218,51 @@ impl NotificationService {
 
     /// Brings the newest notes up to date: lists the newest 100 notes' IDs and hashes, downloads
     /// the ones that are new or changed, and removes cached notes the list should have had and
-    /// didn't. A call made while another sync or page is running waits for it.
+    /// didn't. When nothing changed, that's one request, for IDs and hashes only. A call made
+    /// while another sync or page is running waits for it.
     ///
     /// If more notes arrived since the last sync than the list holds, the notes between them and
-    /// the cached ones are loaded by [`Self::load_older`] again, so none is missed.
+    /// the cached ones are loaded by [`Self::load_older`] again, so none is missed. The same as
+    /// [`Self::sync_tab`] with [`NotificationTab::All`].
     pub async fn sync(&self) -> Result<NotificationSyncResult, NotificationServiceError> {
+        self.sync_tab(NotificationTab::All).await
+    }
+
+    /// Loads the next older page of notes, the same way [`Self::sync`] brings the newest up to
+    /// date. Once the oldest note has been reached, it sends nothing and says so. The same as
+    /// [`Self::load_older_in_tab`] with [`NotificationTab::All`].
+    ///
+    /// Fails with [`NotificationServiceError::CannotPageFurther`] if it can't move on without
+    /// skipping notes.
+    pub async fn load_older(&self) -> Result<NotificationSyncResult, NotificationServiceError> {
+        self.load_older_in_tab(NotificationTab::All).await
+    }
+
+    /// Brings the newest notes of `tab` up to date, from the server's list of the tab's notes: as
+    /// [`Self::sync`] does, but a note another tab already downloaded, with the same hash, isn't
+    /// downloaded again.
+    ///
+    /// The Unread tab removes no note: a note missing from its list may only have been read. A
+    /// cached unread note its list should have had is downloaded again instead, which brings
+    /// whether it was read.
+    pub async fn sync_tab(
+        &self,
+        tab: NotificationTab,
+    ) -> Result<NotificationSyncResult, NotificationServiceError> {
         let _lane = self.lane.lock().await;
-        let (had_notes, mut state) = self.cache.execute(|connection| {
-            let notes = NotificationRepository::count(&*connection, self.account)?
-                + NotificationRepository::count_listed_only(&*connection, self.account)?.0;
-            Ok::<_, SqliteDbError>((
-                notes > 0,
-                NotificationRepository::sync_state(&*connection, self.account)?,
-            ))
-        })?;
+        let (mut sync_state, mut state) = self.states(tab)?;
 
-        let window = self.sync_window(None, self.page_size).await?;
+        let window = self.sync_window(tab, None, self.page_size).await?;
 
-        state.last_synced_at = Some(self.now());
-        state.last_seen_time = window.last_seen_time.or(state.last_seen_time);
-        let gap = had_notes && !window.reached_cached_notes;
+        if tab == NotificationTab::All {
+            sync_state.last_synced_at = Some(self.now());
+        }
+        sync_state.last_seen_time = window.last_seen_time.or(sync_state.last_seen_time);
+        // A full list with no cached note from the last sync's newest back leaves notes between
+        // them and the older pages, so the older pages run again from here.
+        let gap = state
+            .newest_time
+            .is_some_and(|newest| !window.reaches(newest));
         if gap || state.older_number.is_none() || window.is_short() {
             match next_position(None, self.page_size, self.page_size, &window) {
                 Position::Page { before, number } => {
@@ -229,22 +280,23 @@ impl NotificationService {
                 }
             }
         }
-        self.cache.execute(|connection| {
-            NotificationRepository::set_sync_state(&*connection, self.account, &state)
-        })?;
+        state.newest_time = dated(&window.times).max().or(state.newest_time);
+        self.save_states(tab, &sync_state, &state)?;
         Ok(window.result(state.reached_end))
     }
 
-    /// Loads the next older page of notes, the same way [`Self::sync`] brings the newest up to
-    /// date. Once the oldest note has been reached, it sends nothing and says so.
+    /// Loads the next older page of `tab`'s notes, the same way [`Self::sync_tab`] brings the
+    /// newest up to date. Each tab keeps its own place. Once the tab's oldest note has been
+    /// reached, it sends nothing and says so.
     ///
     /// Fails with [`NotificationServiceError::CannotPageFurther`] if it can't move on without
     /// skipping notes.
-    pub async fn load_older(&self) -> Result<NotificationSyncResult, NotificationServiceError> {
+    pub async fn load_older_in_tab(
+        &self,
+        tab: NotificationTab,
+    ) -> Result<NotificationSyncResult, NotificationServiceError> {
         let _lane = self.lane.lock().await;
-        let mut state = self
-            .cache
-            .execute(|connection| NotificationRepository::sync_state(&*connection, self.account))?;
+        let (mut sync_state, mut state) = self.states(tab)?;
         if state.reached_end {
             return Ok(NotificationSyncResult {
                 listed_count: 0,
@@ -258,9 +310,9 @@ impl NotificationService {
             state.older_before,
             state.older_number.unwrap_or(self.page_size),
         );
-        let window = self.sync_window(before, number).await?;
+        let window = self.sync_window(tab, before, number).await?;
 
-        state.last_seen_time = window.last_seen_time.or(state.last_seen_time);
+        sync_state.last_seen_time = window.last_seen_time.or(sync_state.last_seen_time);
         match next_position(before, number, self.page_size, &window) {
             Position::Page { before, number } => {
                 state.older_before = before;
@@ -269,10 +321,77 @@ impl NotificationService {
             Position::End => state.reached_end = true,
             Position::Stuck => return Err(NotificationServiceError::CannotPageFurther),
         }
-        self.cache.execute(|connection| {
-            NotificationRepository::set_sync_state(&*connection, self.account, &state)
-        })?;
+        self.save_states(tab, &sync_state, &state)?;
         Ok(window.result(state.reached_end))
+    }
+
+    /// Fetches one note whole and stores it, for an app told some other way, such as by a push,
+    /// that the note is new or changed. It's fetched the way a sync downloads notes, so the next
+    /// sync doesn't download it again. A call made while a sync or page is running waits for it.
+    ///
+    /// A note that doesn't come is removed from the cache: the app can't show it either way, and
+    /// the next sync finds out whether the API lists it.
+    pub async fn refresh_note(
+        &self,
+        note_id: NotificationId,
+    ) -> Result<NotificationRefreshResult, NotificationServiceError> {
+        let _lane = self.lane.lock().await;
+        let page = self.fetch_whole(&[note_id]).await?;
+        Ok(self.cache.execute(|connection| {
+            if let Some(note) = page.notes.iter().find(|note| note.note.id == note_id) {
+                NotificationRepository::upsert(&*connection, self.account, note)?;
+                return Ok::<_, SqliteDbError>(NotificationRefreshResult::Stored);
+            }
+            if let Some(unreadable) = page
+                .unreadable_notes
+                .iter()
+                .find(|note| note.id == Some(note_id))
+            {
+                NotificationRepository::record_listed_only(
+                    &*connection,
+                    self.account,
+                    note_id,
+                    None,
+                    Some(&unreadable.error),
+                )?;
+                return Ok(NotificationRefreshResult::Unreadable);
+            }
+            NotificationRepository::delete(&*connection, self.account, note_id)?;
+            Ok(NotificationRefreshResult::NotSent)
+        })?)
+    }
+
+    /// Removes a note from the cache, for an app told some other way, such as by a push, that it
+    /// was deleted. Sends no request. Returns whether the cache had it. A call made while a sync
+    /// or page is running waits for it.
+    pub async fn remove_note(
+        &self,
+        note_id: NotificationId,
+    ) -> Result<bool, NotificationServiceError> {
+        let _lane = self.lane.lock().await;
+        Ok(self.cache.execute(|connection| {
+            NotificationRepository::delete(&*connection, self.account, note_id)
+        })?)
+    }
+
+    /// The cached notes `tab` shows, newest first, as [`Self::load_notes`] returns them. Doesn't
+    /// touch the network.
+    pub fn load_tab_notes(
+        &self,
+        tab: NotificationTab,
+    ) -> Result<Vec<WpComNotification>, NotificationServiceError> {
+        self.load_notes(tab_filter(tab))
+    }
+
+    /// Whether the oldest of `tab`'s notes has been reached, so
+    /// [`Self::load_older_in_tab`] has nothing more to load. Doesn't touch the network.
+    pub fn tab_reached_end(&self, tab: NotificationTab) -> Result<bool, NotificationServiceError> {
+        Ok(self
+            .cache
+            .execute(|connection| {
+                NotificationRepository::tab_state(&*connection, self.account, tab.key())
+            })?
+            .reached_end)
     }
 
     /// The cached notes that pass `filter`, newest first, each read from the JSON it came as. A
@@ -282,14 +401,7 @@ impl NotificationService {
         filter: NotificationsFilter,
     ) -> Result<Vec<WpComNotification>, NotificationServiceError> {
         let rows = self.cache.execute(|connection| {
-            NotificationRepository::select(
-                &*connection,
-                self.account,
-                &DbNotificationFilter {
-                    unread_only: filter.unread_only,
-                    types: filter.types,
-                },
-            )
+            NotificationRepository::select(&*connection, self.account, &filter.into())
         })?;
         Ok(rows
             .into_iter()
@@ -311,13 +423,18 @@ impl NotificationService {
     pub fn info(&self) -> Result<NotificationsInfo, NotificationServiceError> {
         Ok(self.cache.execute(|connection| {
             let state = NotificationRepository::sync_state(&*connection, self.account)?;
+            let all = NotificationRepository::tab_state(
+                &*connection,
+                self.account,
+                NotificationTab::All.key(),
+            )?;
             let (listed_only_count, unreadable_count) =
                 NotificationRepository::count_listed_only(&*connection, self.account)?;
             Ok::<_, SqliteDbError>(NotificationsInfo {
                 note_count: NotificationRepository::count(&*connection, self.account)?,
                 listed_only_count,
                 unreadable_count,
-                reached_end: state.reached_end,
+                reached_end: all.reached_end,
                 last_synced_at: state.last_synced_at.and_then(date),
                 last_seen_time: state.last_seen_time.and_then(date),
             })
@@ -372,23 +489,50 @@ impl NotificationService {
         self.language().unwrap_or(WPComLanguage::English)
     }
 
-    /// Checks the `number` newest notes at or before `before`, downloads the new and changed
-    /// ones, and removes the cached notes the list covers and didn't have.
+    fn states(
+        &self,
+        tab: NotificationTab,
+    ) -> Result<(DbNotificationSyncState, DbNotificationTabState), SqliteDbError> {
+        self.cache.execute(|connection| {
+            Ok((
+                NotificationRepository::sync_state(&*connection, self.account)?,
+                NotificationRepository::tab_state(&*connection, self.account, tab.key())?,
+            ))
+        })
+    }
+
+    fn save_states(
+        &self,
+        tab: NotificationTab,
+        sync_state: &DbNotificationSyncState,
+        state: &DbNotificationTabState,
+    ) -> Result<(), SqliteDbError> {
+        self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            NotificationRepository::set_sync_state(&transaction, self.account, sync_state)?;
+            NotificationRepository::set_tab_state(&transaction, self.account, tab.key(), state)?;
+            transaction.commit()?;
+            Ok(())
+        })
+    }
+
+    /// Checks `tab`'s `number` newest notes at or before `before`, downloads the new and changed
+    /// ones, and removes the cached notes of the tab the list covers and didn't have.
     async fn sync_window(
         &self,
+        tab: NotificationTab,
         before: Option<i64>,
         number: u32,
     ) -> Result<Window, NotificationServiceError> {
-        let locale = self.locale();
         let check = self
             .client
             .notifications()
-            .list_hashes(&NotificationsQuery {
+            .list_hashes(&tab.narrow(NotificationsQuery {
                 number: Some(number),
                 before: before.and_then(date),
-                locale: Some(locale),
+                locale: Some(self.locale()),
                 ..Default::default()
-            })
+            }))
             .await?
             .data;
         // An entry that couldn't be read still takes a place in the list.
@@ -400,14 +544,21 @@ impl NotificationService {
             .map(|note| (note.id, note.note_hash))
             .collect();
 
-        let known = self.cache.execute(|connection| {
-            NotificationRepository::known_hashes(&*connection, self.account, &listed_ids)
+        let (known, read) = self.cache.execute(|connection| {
+            Ok::<_, SqliteDbError>((
+                NotificationRepository::known_hashes(&*connection, self.account, &listed_ids)?,
+                NotificationRepository::read_states(&*connection, self.account, &listed_ids)?,
+            ))
         })?;
         let mut seen = HashSet::new();
         let wanted: Vec<NotificationId> = listed_ids
             .iter()
             .filter(|id| seen.insert(**id))
             .filter(|id| {
+                // The Unread tab lists a note cached as read: it was marked unread since.
+                if tab.unread_only() && read.get(id) == Some(&Some(true)) {
+                    return true;
+                }
                 let listed = listed_hashes[id].map(|hash| hash.to_string());
                 let kept = match known.get(id) {
                     Some(DbKnownHash::Whole(hash) | DbKnownHash::ListedOnly(hash)) => hash,
@@ -421,31 +572,112 @@ impl NotificationService {
         let mut downloaded_count = 0;
         let mut not_sent_count = 0;
         for chunk in wanted.chunks(DOWNLOAD_AT_A_TIME) {
-            let page = self
-                .client
-                .notifications()
-                .list_with_json(&NotificationsParams {
-                    query: NotificationsQuery {
-                        number: Some(chunk.len() as u32),
-                        ids: chunk.to_vec(),
-                        locale: Some(locale),
-                        ..Default::default()
-                    },
-                    include_body: true,
-                    include_context: true,
-                })
-                .await?
-                .data;
-            let requested: HashSet<NotificationId> = chunk.iter().copied().collect();
-            let (downloaded, not_sent) = self.cache.execute(|connection| {
-                let transaction = connection.transaction()?;
-                let mut came = HashSet::new();
-                for note in &page.notes {
-                    if requested.contains(&note.note.id) && came.insert(note.note.id) {
-                        NotificationRepository::upsert(&transaction, self.account, note)?;
-                    }
+            let (downloaded, not_sent) = self.download(chunk, Some(&listed_hashes)).await?;
+            downloaded_count += downloaded;
+            not_sent_count += not_sent;
+        }
+
+        let filter: DbNotificationFilter = tab_filter(tab).into();
+        let listed: HashSet<NotificationId> = listed_ids.iter().copied().collect();
+        let times = self.cache.execute(|connection| {
+            let times = NotificationRepository::times(&*connection, self.account, &listed_ids)?;
+            Ok::<_, SqliteDbError>(
+                listed_ids
+                    .iter()
+                    .filter_map(|id| times.get(id).copied())
+                    .collect::<Vec<Option<i64>>>(),
+            )
+        })?;
+        let covered = if listed_count < number as usize {
+            Some(match before {
+                None => DbNotificationWindow::Everything,
+                Some(before) => DbNotificationWindow::AtOrBefore { before },
+            })
+        } else {
+            oldest_dated(&times).map(|after| DbNotificationWindow::DatedBetween { after, before })
+        };
+        let mut removed_count = 0;
+        if let Some(covered) = covered {
+            if tab.unread_only() {
+                let unlisted = self.cache.execute(|connection| {
+                    NotificationRepository::unlisted(
+                        &*connection,
+                        self.account,
+                        covered,
+                        &filter,
+                        &listed,
+                    )
+                })?;
+                for chunk in unlisted.chunks(DOWNLOAD_AT_A_TIME) {
+                    downloaded_count += self.download(chunk, None).await?.0;
                 }
-                let downloaded = came.len() as u64;
+            } else {
+                removed_count = self.cache.execute(|connection| {
+                    NotificationRepository::delete_unlisted(
+                        &*connection,
+                        self.account,
+                        covered,
+                        &filter,
+                        &listed,
+                    )
+                })?;
+            }
+        }
+
+        Ok(Window {
+            listed_count,
+            number,
+            times,
+            last_seen_time: check.last_seen_time.map(|time| time.0.timestamp()),
+            downloaded_count,
+            not_sent_count,
+            removed_count,
+        })
+    }
+
+    /// Fetches `ids` whole, the way every note is downloaded, so their hashes compare with the
+    /// next list of hashes.
+    async fn fetch_whole(
+        &self,
+        ids: &[NotificationId],
+    ) -> Result<NotificationsWithJsonResponse, NotificationServiceError> {
+        Ok(self
+            .client
+            .notifications()
+            .list_with_json(&NotificationsParams {
+                query: NotificationsQuery {
+                    number: Some(ids.len() as u32),
+                    ids: ids.to_vec(),
+                    locale: Some(self.locale()),
+                    ..Default::default()
+                },
+                include_body: true,
+                include_context: true,
+            })
+            .await?
+            .data)
+    }
+
+    /// Downloads `ids` and stores the notes that come, and returns how many came and how many
+    /// didn't. With `listed_hashes`, the hashes the list gave them, a note that doesn't come,
+    /// or comes and can't be read, is remembered as listed only. Without, it's left as it was.
+    async fn download(
+        &self,
+        ids: &[NotificationId],
+        listed_hashes: Option<&HashMap<NotificationId, Option<u64>>>,
+    ) -> Result<(u64, u64), NotificationServiceError> {
+        let page = self.fetch_whole(ids).await?;
+        let requested: HashSet<NotificationId> = ids.iter().copied().collect();
+        Ok(self.cache.execute(|connection| {
+            let transaction = connection.transaction()?;
+            let mut came = HashSet::new();
+            for note in &page.notes {
+                if requested.contains(&note.note.id) && came.insert(note.note.id) {
+                    NotificationRepository::upsert(&transaction, self.account, note)?;
+                }
+            }
+            let downloaded = came.len() as u64;
+            if let Some(listed_hashes) = listed_hashes {
                 for unreadable in &page.unreadable_notes {
                     if let Some(id) = unreadable.id
                         && requested.contains(&id)
@@ -460,7 +692,7 @@ impl NotificationService {
                         )?;
                     }
                 }
-                for id in chunk {
+                for id in ids {
                     if !came.contains(id) {
                         NotificationRepository::record_listed_only(
                             &transaction,
@@ -471,53 +703,27 @@ impl NotificationService {
                         )?;
                     }
                 }
-                transaction.commit()?;
-                Ok::<_, SqliteDbError>((downloaded, chunk.len() as u64 - downloaded))
-            })?;
-            downloaded_count += downloaded;
-            not_sent_count += not_sent;
-        }
-
-        let listed: HashSet<NotificationId> = listed_ids.iter().copied().collect();
-        let (times, removed_count) = self.cache.execute(|connection| {
-            let transaction = connection.transaction()?;
-            let times = NotificationRepository::times(&transaction, self.account, &listed_ids)?;
-            let times: Vec<Option<i64>> = listed_ids
-                .iter()
-                .filter_map(|id| times.get(id).copied())
-                .collect();
-            let window = if listed_count < number as usize {
-                Some(match before {
-                    None => DbNotificationWindow::Everything,
-                    Some(before) => DbNotificationWindow::AtOrBefore { before },
-                })
-            } else {
-                oldest_dated(&times)
-                    .map(|after| DbNotificationWindow::DatedBetween { after, before })
-            };
-            let removed = match window {
-                Some(window) => NotificationRepository::delete_unlisted(
-                    &transaction,
-                    self.account,
-                    window,
-                    &listed,
-                )?,
-                None => 0,
-            };
+            }
             transaction.commit()?;
-            Ok::<_, SqliteDbError>((times, removed))
-        })?;
+            Ok::<_, SqliteDbError>((downloaded, ids.len() as u64 - downloaded))
+        })?)
+    }
+}
 
-        Ok(Window {
-            listed_count,
-            number,
-            times,
-            reached_cached_notes: !known.is_empty(),
-            last_seen_time: check.last_seen_time.map(|time| time.0.timestamp()),
-            downloaded_count,
-            not_sent_count,
-            removed_count,
-        })
+/// The cached notes `tab` shows.
+fn tab_filter(tab: NotificationTab) -> NotificationsFilter {
+    NotificationsFilter {
+        unread_only: tab.unread_only(),
+        types: tab.types(),
+    }
+}
+
+impl From<NotificationsFilter> for DbNotificationFilter {
+    fn from(filter: NotificationsFilter) -> Self {
+        DbNotificationFilter {
+            unread_only: filter.unread_only,
+            types: filter.types,
+        }
     }
 }
 
@@ -529,8 +735,6 @@ struct Window {
     number: u32,
     /// The times of the listed notes that are cached whole, in seconds since 1970.
     times: Vec<Option<i64>>,
-    /// Whether the list had a note the cache already knew.
-    reached_cached_notes: bool,
     last_seen_time: Option<i64>,
     downloaded_count: u64,
     not_sent_count: u64,
@@ -542,6 +746,12 @@ impl Window {
     /// it started.
     fn is_short(&self) -> bool {
         self.listed_count < self.number as usize
+    }
+
+    /// Whether the list had a cached dated note at or before `newest`, the newest note of the
+    /// last sync, so it joins up with what that sync checked.
+    fn reaches(&self, newest: i64) -> bool {
+        dated(&self.times).any(|time| time <= newest)
     }
 
     fn result(&self, reached_end: bool) -> NotificationSyncResult {
@@ -598,13 +808,16 @@ fn next_position(before: Option<i64>, number: u32, page_size: u32, window: &Wind
     Position::Stuck
 }
 
-/// The oldest dated time.
-fn oldest_dated(times: &[Option<i64>]) -> Option<i64> {
+fn dated(times: &[Option<i64>]) -> impl Iterator<Item = i64> + '_ {
     times
         .iter()
         .filter_map(|time| *time)
         .filter(|time| *time >= UNDATED_BEFORE)
-        .min()
+}
+
+/// The oldest dated time.
+fn oldest_dated(times: &[Option<i64>]) -> Option<i64> {
+    dated(times).min()
 }
 
 /// The second the next page starts at: the oldest dated note's, or, on a page of notes with no

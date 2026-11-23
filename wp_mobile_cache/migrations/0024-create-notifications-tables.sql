@@ -32,14 +32,25 @@ CREATE TABLE `notification_listed_only` (
 
 CREATE UNIQUE INDEX idx_notification_listed_only_note ON notification_listed_only(account_id, note_id);
 
--- Where an account's notifications are up to.
+-- When an account's notifications were last synced and looked at.
 CREATE TABLE `notification_sync_state` (
   `account_id` INTEGER PRIMARY KEY,
-  `older_before` INTEGER,             -- the `before` of the next older page, in seconds since 1970. NULL until a sync sets it
-  `older_number` INTEGER,             -- the `number` of the next older page
-  `reached_end` INTEGER NOT NULL DEFAULT 0, -- 1 once the oldest note has been reached
   `last_synced_at` INTEGER,           -- when the newest notes were last synced, in seconds since 1970
   `last_seen_time` INTEGER,           -- when the user last looked at their notifications, as the API last said, in seconds since 1970
 
+  FOREIGN KEY (account_id) REFERENCES wordpress_com_accounts(rowid) ON DELETE CASCADE
+) STRICT;
+
+-- Where each tab of an account's notifications is up to in loading older notes. A tab's notes are
+-- the rows of `notifications` it shows: a note is stored once, however many tabs show it.
+CREATE TABLE `notification_tab_state` (
+  `account_id` INTEGER NOT NULL,
+  `tab` TEXT NOT NULL,                -- all, unread, comments, subscribers or likes
+  `older_before` INTEGER,             -- the `before` of the tab's next older page, in seconds since 1970. NULL for the newest notes
+  `older_number` INTEGER,             -- the `number` of the tab's next older page. NULL until a sync sets it
+  `reached_end` INTEGER NOT NULL DEFAULT 0, -- 1 once the tab's oldest note has been reached
+  `newest_time` INTEGER,              -- the time of the newest dated note the tab's last sync listed, in seconds since 1970
+
+  PRIMARY KEY (account_id, tab),
   FOREIGN KEY (account_id) REFERENCES wordpress_com_accounts(rowid) ON DELETE CASCADE
 ) STRICT;

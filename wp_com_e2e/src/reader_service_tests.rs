@@ -33,7 +33,8 @@ use wp_mobile_cache::repository::reader_comments::ReaderCommentSendState;
 use wp_mobile_cache::repository::wordpress_com_accounts::ReaderOwner;
 
 use crate::context::{
-    TestContext, alone, changing, changing_alone, making_a_change, read_back, reading,
+    CountingExecutor, TestContext, alone, changing, changing_alone, making_a_change, read_back,
+    reading,
 };
 
 /// The WordPress.com Blog, which is public and has years of posts.
@@ -2012,39 +2013,6 @@ async fn download_saved_posts(
         return Err(format!("A second download lost content: {again:?}").into());
     }
     Ok(())
-}
-
-/// A request executor that counts the requests it sends.
-struct CountingExecutor {
-    inner: Arc<dyn RequestExecutor>,
-    sent: AtomicU64,
-}
-
-#[async_trait::async_trait]
-impl RequestExecutor for CountingExecutor {
-    async fn execute(
-        &self,
-        request: Arc<WpNetworkRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        self.sent.fetch_add(1, Ordering::SeqCst);
-        self.inner.execute(request).await
-    }
-
-    async fn upload(
-        &self,
-        request: Arc<wp_api::request::WpMultipartFormRequest>,
-    ) -> Result<WpNetworkResponse, RequestExecutionError> {
-        self.sent.fetch_add(1, Ordering::SeqCst);
-        self.inner.upload(request).await
-    }
-
-    async fn sleep(&self, millis: u64) {
-        self.inner.sleep(millis).await
-    }
-
-    fn cancel(&self, context: Arc<wp_api::request::RequestContext>) {
-        self.inner.cancel(context)
-    }
 }
 
 /// A service with a new, empty cache.

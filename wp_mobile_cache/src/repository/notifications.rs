@@ -30,10 +30,37 @@ pub enum DbKnownHash {
 /// Which notes [`NotificationRepository::select`] returns.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DbNotificationFilter {
-    /// Only notes the user hasn't read.
+    /// Only notes the user hasn't read. A note that doesn't say counts as unread.
     pub unread_only: bool,
     /// Only notes of these types. Empty for every type.
     pub types: Vec<NotificationType>,
+}
+
+impl DbNotificationFilter {
+    /// Whether the filter passes every note.
+    pub fn is_everything(&self) -> bool {
+        !self.unread_only && self.types.is_empty()
+    }
+
+    /// The filter as SQL conditions, each starting with ` AND`, with its values added to `values`.
+    fn conditions(&self, values: &mut Vec<Value>) -> String {
+        let mut sql = String::new();
+        if self.unread_only {
+            sql.push_str(" AND is_read IS NOT 1");
+        }
+        if !self.types.is_empty() {
+            sql.push_str(&format!(
+                " AND note_type IN ({})",
+                vec!["?"; self.types.len()].join(",")
+            ));
+            values.extend(
+                self.types
+                    .iter()
+                    .map(|note_type| Value::Text(note_type.as_str().to_string())),
+            );
+        }
+        sql
+    }
 }
 
 /// The notes a list of IDs covers, so the stored notes in it that the list didn't have can go.
@@ -51,18 +78,25 @@ pub enum DbNotificationWindow {
     DatedBetween { after: i64, before: Option<i64> },
 }
 
-/// Where an account's notifications are up to.
+/// When an account's notifications were last synced and looked at.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DbNotificationSyncState {
+    /// When the newest notes were last synced, in seconds since 1970.
+    pub last_synced_at: Option<i64>,
+    /// When the user last looked at their notifications, in seconds since 1970.
+    pub last_seen_time: Option<i64>,
+}
+
+/// Where one tab of an account's notifications is up to in loading older notes.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DbNotificationTabState {
     /// The `before` of the next older page, in seconds since 1970. `None` for the newest notes.
     pub older_before: Option<i64>,
     /// The `number` of the next older page. `None` until a sync sets it.
     pub older_number: Option<u32>,
     pub reached_end: bool,
-    /// When the newest notes were last synced, in seconds since 1970.
-    pub last_synced_at: Option<i64>,
-    /// When the user last looked at their notifications, in seconds since 1970.
-    pub last_seen_time: Option<i64>,
+    /// The time of the newest dated note the tab's last sync listed, in seconds since 1970.
+    pub newest_time: Option<i64>,
 }
 
 fn hash_text(hash: Option<u64>) -> Option<String> {
@@ -172,6 +206,19 @@ impl NotificationRepository {
         )
     }
 
+    /// Whether each of `ids` that's stored whole was read, or `None` when it didn't say.
+    pub fn read_states(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        ids: &[NotificationId],
+    ) -> Result<HashMap<NotificationId, Option<bool>>, SqliteDbError> {
+        Ok(
+            Self::select_by_ids(executor, account, ids, "notifications", "is_read")?
+                .into_iter()
+                .collect(),
+        )
+    }
+
     fn select_by_ids<T: rusqlite::types::FromSql>(
         executor: &impl QueryExecutor,
         account: RowId,
@@ -204,25 +251,12 @@ impl NotificationRepository {
         account: RowId,
         filter: &DbNotificationFilter,
     ) -> Result<Vec<DbNotification>, SqliteDbError> {
-        let mut sql =
-            String::from("SELECT rowid, note_id, json FROM notifications WHERE account_id = ?");
         let mut values = vec![Value::Integer(account.0)];
-        if filter.unread_only {
-            sql.push_str(" AND is_read = 0");
-        }
-        if !filter.types.is_empty() {
-            sql.push_str(&format!(
-                " AND note_type IN ({})",
-                vec!["?"; filter.types.len()].join(",")
-            ));
-            values.extend(
-                filter
-                    .types
-                    .iter()
-                    .map(|note_type| Value::Text(note_type.as_str().to_string())),
-            );
-        }
-        sql.push_str(" ORDER BY timestamp IS NULL, timestamp DESC, note_id DESC");
+        let sql = format!(
+            "SELECT rowid, note_id, json FROM notifications WHERE account_id = ?{} \
+             ORDER BY timestamp IS NULL, timestamp DESC, note_id DESC",
+            filter.conditions(&mut values)
+        );
         let mut statement = executor.prepare(&sql)?;
         let rows = statement.query_map(params_from_iter(values), |row| {
             Ok(DbNotification {
@@ -268,56 +302,70 @@ impl NotificationRepository {
         Ok(statement.query_row([account], |row| row.get(0))?)
     }
 
-    /// Deletes the notes in `window` that aren't in `listed`, and returns how many whole notes
-    /// went. Notes a list had that never came whole only go with [`DbNotificationWindow::Everything`]:
-    /// without a time, there's no telling whether they're in a narrower window.
-    pub fn delete_unlisted(
+    /// The stored notes in `window` that pass `filter` and aren't in `listed`, newest first.
+    pub fn unlisted(
         executor: &impl QueryExecutor,
         account: RowId,
         window: DbNotificationWindow,
+        filter: &DbNotificationFilter,
         listed: &HashSet<NotificationId>,
-    ) -> Result<u64, SqliteDbError> {
+    ) -> Result<Vec<NotificationId>, SqliteDbError> {
         let (condition, bounds): (&str, Vec<i64>) = match window {
-            DbNotificationWindow::Everything => ("1", Vec::new()),
+            DbNotificationWindow::Everything => ("", Vec::new()),
             DbNotificationWindow::AtOrBefore { before } => (
-                "timestamp >= ?2 AND timestamp <= ?3",
+                " AND timestamp >= ? AND timestamp <= ?",
                 vec![UNDATED_BEFORE, before],
             ),
             DbNotificationWindow::DatedBetween {
                 after,
                 before: None,
             } => (
-                "timestamp >= ?2 AND timestamp > ?3",
+                " AND timestamp >= ? AND timestamp > ?",
                 vec![UNDATED_BEFORE, after],
             ),
             DbNotificationWindow::DatedBetween {
                 after,
                 before: Some(before),
             } => (
-                "timestamp >= ?2 AND timestamp > ?3 AND timestamp <= ?4",
+                " AND timestamp >= ? AND timestamp > ? AND timestamp <= ?",
                 vec![UNDATED_BEFORE, after, before],
             ),
         };
-        let candidates: Vec<(RowId, NotificationId)> = {
-            let mut statement = executor.prepare(&format!(
-                "SELECT rowid, note_id FROM notifications WHERE account_id = ?1 AND {condition}"
-            ))?;
-            let values = std::iter::once(account.0).chain(bounds);
-            statement
-                .query_map(params_from_iter(values), |row| {
-                    Ok((row.get(0)?, NotificationId(row.get(1)?)))
-                })?
-                .collect::<Result<_, _>>()?
-        };
+        let mut values = vec![Value::Integer(account.0)];
+        values.extend(bounds.into_iter().map(Value::Integer));
+        let sql = format!(
+            "SELECT note_id FROM notifications WHERE account_id = ?{condition}{} \
+             ORDER BY timestamp IS NULL, timestamp DESC, note_id DESC",
+            filter.conditions(&mut values)
+        );
+        let mut statement = executor.prepare(&sql)?;
+        let ids = statement
+            .query_map(params_from_iter(values), |row| {
+                Ok(NotificationId(row.get(0)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(ids.into_iter().filter(|id| !listed.contains(id)).collect())
+    }
+
+    /// Deletes the notes in `window` that pass `filter` and aren't in `listed`, and returns how
+    /// many whole notes went. Notes a list had that never came whole only go with
+    /// [`DbNotificationWindow::Everything`] and a filter that passes every note: without a time
+    /// and a type, there's no telling whether they're in a narrower window.
+    pub fn delete_unlisted(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        window: DbNotificationWindow,
+        filter: &DbNotificationFilter,
+        listed: &HashSet<NotificationId>,
+    ) -> Result<u64, SqliteDbError> {
         let mut deleted = 0;
-        for (row_id, note_id) in candidates {
-            if !listed.contains(&note_id) {
-                deleted += executor
-                    .execute("DELETE FROM notifications WHERE rowid = ?1", [row_id])?
-                    as u64;
-            }
+        for note_id in Self::unlisted(executor, account, window, filter, listed)? {
+            deleted += executor.execute(
+                "DELETE FROM notifications WHERE account_id = ?1 AND note_id = ?2",
+                params![account, note_id.0],
+            )? as u64;
         }
-        if window == DbNotificationWindow::Everything {
+        if window == DbNotificationWindow::Everything && filter.is_everything() {
             let listed_only: Vec<NotificationId> = {
                 let mut statement = executor.prepare(
                     "SELECT note_id FROM notification_listed_only WHERE account_id = ?1",
@@ -338,52 +386,105 @@ impl NotificationRepository {
         Ok(deleted)
     }
 
-    /// Where the account's notifications are up to. The default before the first sync.
+    /// Deletes what's stored of a note, whole or listed only. Returns whether there was any.
+    pub fn delete(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        note_id: NotificationId,
+    ) -> Result<bool, SqliteDbError> {
+        let mut deleted = 0;
+        for table in ["notifications", "notification_listed_only"] {
+            deleted += executor.execute(
+                &format!("DELETE FROM {table} WHERE account_id = ?1 AND note_id = ?2"),
+                params![account, note_id.0],
+            )?;
+        }
+        Ok(deleted > 0)
+    }
+
+    /// When the account's notifications were last synced and looked at. The default before the
+    /// first sync.
     pub fn sync_state(
         executor: &impl QueryExecutor,
         account: RowId,
     ) -> Result<DbNotificationSyncState, SqliteDbError> {
         let mut statement = executor.prepare(
-            "SELECT older_before, older_number, reached_end, last_synced_at, last_seen_time
-             FROM notification_sync_state WHERE account_id = ?1",
+            "SELECT last_synced_at, last_seen_time FROM notification_sync_state WHERE account_id = ?1",
         )?;
         Ok(statement
             .query_row([account], |row| {
                 Ok(DbNotificationSyncState {
-                    older_before: row.get(0)?,
-                    older_number: row.get(1)?,
-                    reached_end: row.get(2)?,
-                    last_synced_at: row.get(3)?,
-                    last_seen_time: row.get(4)?,
+                    last_synced_at: row.get(0)?,
+                    last_seen_time: row.get(1)?,
                 })
             })
             .optional()?
             .unwrap_or_default())
     }
 
-    /// Replaces where the account's notifications are up to.
+    /// Replaces when the account's notifications were last synced and looked at.
     pub fn set_sync_state(
         executor: &impl QueryExecutor,
         account: RowId,
         state: &DbNotificationSyncState,
     ) -> Result<(), SqliteDbError> {
         executor.execute(
-            "INSERT INTO notification_sync_state
-               (account_id, older_before, older_number, reached_end, last_synced_at, last_seen_time)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "INSERT INTO notification_sync_state (account_id, last_synced_at, last_seen_time)
+             VALUES (?1, ?2, ?3)
              ON CONFLICT(account_id) DO UPDATE SET
+               last_synced_at = excluded.last_synced_at,
+               last_seen_time = excluded.last_seen_time",
+            params![account, state.last_synced_at, state.last_seen_time],
+        )?;
+        Ok(())
+    }
+
+    /// Where the tab named `tab` is up to. The default before its first sync.
+    pub fn tab_state(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        tab: &str,
+    ) -> Result<DbNotificationTabState, SqliteDbError> {
+        let mut statement = executor.prepare(
+            "SELECT older_before, older_number, reached_end, newest_time
+             FROM notification_tab_state WHERE account_id = ?1 AND tab = ?2",
+        )?;
+        Ok(statement
+            .query_row(params![account, tab], |row| {
+                Ok(DbNotificationTabState {
+                    older_before: row.get(0)?,
+                    older_number: row.get(1)?,
+                    reached_end: row.get(2)?,
+                    newest_time: row.get(3)?,
+                })
+            })
+            .optional()?
+            .unwrap_or_default())
+    }
+
+    /// Replaces where the tab named `tab` is up to.
+    pub fn set_tab_state(
+        executor: &impl QueryExecutor,
+        account: RowId,
+        tab: &str,
+        state: &DbNotificationTabState,
+    ) -> Result<(), SqliteDbError> {
+        executor.execute(
+            "INSERT INTO notification_tab_state
+               (account_id, tab, older_before, older_number, reached_end, newest_time)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(account_id, tab) DO UPDATE SET
                older_before = excluded.older_before,
                older_number = excluded.older_number,
                reached_end = excluded.reached_end,
-               last_synced_at = excluded.last_synced_at,
-               last_seen_time = excluded.last_seen_time",
+               newest_time = excluded.newest_time",
             params![
                 account,
+                tab,
                 state.older_before,
                 state.older_number,
                 state.reached_end,
-                state.last_synced_at,
-                state.last_seen_time,
+                state.newest_time,
             ],
         )?;
         Ok(())
@@ -492,10 +593,11 @@ mod tests {
         NotificationRepository::upsert(&conn, first, &note(1, 200_000, 11, true, "like")).unwrap();
         NotificationRepository::upsert(&conn, second, &note(1, 200_000, 99, true, "like")).unwrap();
         NotificationRepository::upsert(&conn, second, &note(2, 300_000, 12, true, "like")).unwrap();
-        NotificationRepository::set_sync_state(
+        NotificationRepository::set_tab_state(
             &conn,
             first,
-            &DbNotificationSyncState {
+            "all",
+            &DbNotificationTabState {
                 reached_end: true,
                 ..Default::default()
             },
@@ -509,12 +611,12 @@ mod tests {
             DbKnownHash::Whole(Some("11".to_string()))
         );
         assert!(
-            NotificationRepository::sync_state(&conn, first)
+            NotificationRepository::tab_state(&conn, first, "all")
                 .unwrap()
                 .reached_end
         );
         assert!(
-            !NotificationRepository::sync_state(&conn, second)
+            !NotificationRepository::tab_state(&conn, second, "all")
                 .unwrap()
                 .reached_end
         );
@@ -523,6 +625,7 @@ mod tests {
             &conn,
             first,
             DbNotificationWindow::Everything,
+            &DbNotificationFilter::default(),
             &HashSet::new(),
         )
         .unwrap();
@@ -538,6 +641,7 @@ mod tests {
         NotificationRepository::upsert(&conn, first, &note(1, 200_000, 11, true, "like")).unwrap();
         NotificationRepository::record_listed_only(&conn, first, id(2), Some(5), None).unwrap();
         NotificationRepository::set_sync_state(&conn, first, &Default::default()).unwrap();
+        NotificationRepository::set_tab_state(&conn, first, "likes", &Default::default()).unwrap();
         NotificationRepository::upsert(&conn, second, &note(1, 200_000, 11, true, "like")).unwrap();
 
         WordPressComAccountRepository::delete(&conn, WpComUserId(1)).unwrap();
@@ -546,6 +650,7 @@ mod tests {
             "notifications",
             "notification_listed_only",
             "notification_sync_state",
+            "notification_tab_state",
         ] {
             let rows: i64 = conn
                 .query_row(
@@ -627,6 +732,7 @@ mod tests {
                 after: 200_000,
                 before: None,
             },
+            &DbNotificationFilter::default(),
             &listed(&[5, 2]),
         )
         .unwrap();
@@ -642,6 +748,7 @@ mod tests {
                 after: 100_000,
                 before: Some(300_000),
             },
+            &DbNotificationFilter::default(),
             &listed(&[4, 1]),
         )
         .unwrap();
@@ -653,6 +760,7 @@ mod tests {
             &conn,
             account,
             DbNotificationWindow::AtOrBefore { before: 200_000 },
+            &DbNotificationFilter::default(),
             &listed(&[3]),
         )
         .unwrap();
@@ -666,6 +774,7 @@ mod tests {
             &conn,
             account,
             DbNotificationWindow::Everything,
+            &DbNotificationFilter::default(),
             &listed(&[4, 8]),
         )
         .unwrap();
@@ -685,9 +794,6 @@ mod tests {
             DbNotificationSyncState::default()
         );
         let state = DbNotificationSyncState {
-            older_before: Some(1_700_000_000),
-            older_number: Some(200),
-            reached_end: true,
             last_synced_at: Some(1_700_000_100),
             last_seen_time: Some(1_700_000_050),
         };
@@ -695,6 +801,113 @@ mod tests {
         assert_eq!(
             NotificationRepository::sync_state(&conn, account).unwrap(),
             state
+        );
+    }
+
+    #[test]
+    fn test_each_tab_keeps_its_own_state() {
+        let conn = conn();
+        let account = account(&conn, 1);
+        let likes = DbNotificationTabState {
+            older_before: Some(1_700_000_000),
+            older_number: Some(200),
+            reached_end: true,
+            newest_time: Some(1_700_000_200),
+        };
+        NotificationRepository::set_tab_state(&conn, account, "likes", &likes).unwrap();
+        assert_eq!(
+            NotificationRepository::tab_state(&conn, account, "likes").unwrap(),
+            likes
+        );
+        assert_eq!(
+            NotificationRepository::tab_state(&conn, account, "all").unwrap(),
+            DbNotificationTabState::default()
+        );
+    }
+
+    #[test]
+    fn test_a_filter_narrows_what_a_window_removes() {
+        let conn = conn();
+        let account = account(&conn, 1);
+        for note in [
+            note(1, 100_000, 1, false, "like"),
+            note(2, 200_000, 2, true, "comment"),
+            note(3, 300_000, 3, false, "comment"),
+        ] {
+            NotificationRepository::upsert(&conn, account, &note).unwrap();
+        }
+        NotificationRepository::record_listed_only(&conn, account, id(4), None, None).unwrap();
+        let comments = DbNotificationFilter {
+            types: vec![NotificationType::Comment],
+            ..Default::default()
+        };
+        let unread = DbNotificationFilter {
+            unread_only: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            NotificationRepository::unlisted(
+                &conn,
+                account,
+                DbNotificationWindow::Everything,
+                &unread,
+                &[id(3)].into(),
+            )
+            .unwrap(),
+            [id(1)]
+        );
+        let removed = NotificationRepository::delete_unlisted(
+            &conn,
+            account,
+            DbNotificationWindow::Everything,
+            &comments,
+            &[id(3)].into(),
+        )
+        .unwrap();
+        assert_eq!(removed, 1);
+        assert_eq!(everything(&conn, account), [3, 1]);
+        // A note listed only has no type, so a narrowed window leaves it.
+        assert_eq!(
+            NotificationRepository::count_listed_only(&conn, account).unwrap(),
+            (1, 0)
+        );
+    }
+
+    #[test]
+    fn test_a_note_that_does_not_say_whether_it_was_read_is_unread() {
+        let conn = conn();
+        let account = account(&conn, 1);
+        let json = format!(r#"{{"id":{},"type":"like"}}"#, id(1).0);
+        let no_read = NotificationWithJson {
+            note: serde_json::from_str(&json).unwrap(),
+            json,
+        };
+        NotificationRepository::upsert(&conn, account, &no_read).unwrap();
+        NotificationRepository::upsert(&conn, account, &note(2, 200_000, 2, true, "like")).unwrap();
+        let unread = DbNotificationFilter {
+            unread_only: true,
+            ..Default::default()
+        };
+        assert_eq!(stored(&conn, account, &unread), [1]);
+        assert_eq!(
+            NotificationRepository::read_states(&conn, account, &[id(1), id(2)]).unwrap(),
+            HashMap::from([(id(1), None), (id(2), Some(true))])
+        );
+    }
+
+    #[test]
+    fn test_deleting_a_note_removes_it_whole_or_listed_only() {
+        let conn = conn();
+        let account = account(&conn, 1);
+        NotificationRepository::upsert(&conn, account, &note(1, 200_000, 1, true, "like")).unwrap();
+        NotificationRepository::record_listed_only(&conn, account, id(2), None, None).unwrap();
+        assert!(NotificationRepository::delete(&conn, account, id(1)).unwrap());
+        assert!(NotificationRepository::delete(&conn, account, id(2)).unwrap());
+        assert!(!NotificationRepository::delete(&conn, account, id(3)).unwrap());
+        assert!(everything(&conn, account).is_empty());
+        assert_eq!(
+            NotificationRepository::count_listed_only(&conn, account).unwrap(),
+            (0, 0)
         );
     }
 }

@@ -11,6 +11,8 @@ use wp_api::request::{NetworkRequestAccessor, RequestContext, WpMultipartFormReq
 
 pub(crate) enum Step {
     Respond(u32, Value),
+    /// A response body no `Value` can hold, such as an object with a key twice.
+    RespondText(u32, String),
     /// Waits for the test to release it, so the test can act while the request is in flight.
     Hold(oneshot::Receiver<()>, u32, Value),
     /// The device is offline, so the request never left.
@@ -83,10 +85,11 @@ impl RequestExecutor for ScriptedExecutor {
 
         let step = self.steps.lock().unwrap().pop_front();
         let (status_code, body) = match step.expect("Unexpected request").0 {
-            Step::Respond(status_code, body) => (status_code, body),
+            Step::Respond(status_code, body) => (status_code, body.to_string()),
+            Step::RespondText(status_code, body) => (status_code, body),
             Step::Hold(release, status_code, body) => {
                 release.await.expect("The test dropped the release");
-                (status_code, body)
+                (status_code, body.to_string())
             }
             Step::Offline => {
                 return Err(RequestExecutionError::RequestExecutionFailed {
@@ -122,7 +125,7 @@ impl RequestExecutor for ScriptedExecutor {
         };
 
         Ok(WpNetworkResponse {
-            body: body.to_string().into_bytes(),
+            body: body.into_bytes(),
             status_code,
             response_header_map: Default::default(),
             request_url: request.url(),

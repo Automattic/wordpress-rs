@@ -668,6 +668,7 @@ public typealias NotificationRangeKind = WordPressAPIInternal.NotificationRangeK
 public typealias NotificationReactionsLayout = WordPressAPIInternal.NotificationReactionsLayout
 public typealias NotificationSiteCard = WordPressAPIInternal.NotificationSiteCard
 public typealias NotificationSiteContext = WordPressAPIInternal.NotificationSiteContext
+public typealias NotificationTab = WordPressAPIInternal.NotificationTab
 public typealias NotificationText = WordPressAPIInternal.NotificationText
 public typealias NotificationTitles = WordPressAPIInternal.NotificationTitles
 public typealias NotificationType = WordPressAPIInternal.NotificationType
@@ -687,6 +688,7 @@ public typealias UnreadableNotification = WordPressAPIInternal.UnreadableNotific
 public typealias WpComNotification = WordPressAPIInternal.WpComNotification
 
 // MARK: Notification Service
+public typealias NotificationRefreshResult = WordPressAPIInternal.NotificationRefreshResult
 public typealias NotificationService = WordPressAPIInternal.NotificationService
 public typealias NotificationServiceError = WordPressAPIInternal.NotificationServiceError
 public typealias NotificationSyncResult = WordPressAPIInternal.NotificationSyncResult

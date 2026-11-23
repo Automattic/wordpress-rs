@@ -161,8 +161,10 @@ pub enum DbTable {
     Notifications,
     /// Notes a list of IDs had that never came whole
     NotificationListedOnly,
-    /// Where each account's notifications are up to
+    /// When each account's notifications were last synced and looked at
     NotificationSyncState,
+    /// Where each tab of each account's notifications is up to
+    NotificationTabState,
 }
 
 impl DbTable {
@@ -209,6 +211,7 @@ impl DbTable {
             DbTable::Notifications => "notifications",
             DbTable::NotificationListedOnly => "notification_listed_only",
             DbTable::NotificationSyncState => "notification_sync_state",
+            DbTable::NotificationTabState => "notification_tab_state",
         }
     }
 }
@@ -268,6 +271,7 @@ impl TryFrom<&str> for DbTable {
             "notifications" => Ok(DbTable::Notifications),
             "notification_listed_only" => Ok(DbTable::NotificationListedOnly),
             "notification_sync_state" => Ok(DbTable::NotificationSyncState),
+            "notification_tab_state" => Ok(DbTable::NotificationTabState),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }

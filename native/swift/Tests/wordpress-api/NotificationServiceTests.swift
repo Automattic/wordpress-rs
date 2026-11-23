@@ -34,6 +34,24 @@ struct NotificationServiceTests {
     }
 
     @Test
+    func eachTabStartsEmptyAndHasItsName() async throws {
+        let cache = try openCache()
+        let service = try client.makeNotificationService(cache: cache, userID: 1)
+
+        let tabs: [NotificationTab] = [.all, .unread, .comments, .subscribers, .likes]
+        for tab in tabs {
+            #expect(try service.loadTabNotes(tab: tab).isEmpty)
+            #expect(try service.tabReachedEnd(tab: tab) == false)
+        }
+        #expect(
+            tabs.map { $0.localizedText(languages: ["en-US"]) }
+                == ["All", "Unread", "Comments", "Subscribers", "Likes"]
+        )
+        // Removing a note sends no request, so it works with no server at all.
+        #expect(try await service.removeNote(noteId: 10_000_000_001) == false)
+    }
+
+    @Test
     func signingOutRemovesTheAccountsNotifications() throws {
         let cache = try openCache()
         _ = try client.makeNotificationService(cache: cache, userID: 1)

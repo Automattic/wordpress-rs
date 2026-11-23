@@ -1610,6 +1610,9 @@ pub use layout::{
     NotificationReactionsLayout, NotificationSiteCard, notification_layout,
 };
 
+mod tab;
+pub use tab::NotificationTab;
+
 #[cfg(test)]
 mod corpus;
 
