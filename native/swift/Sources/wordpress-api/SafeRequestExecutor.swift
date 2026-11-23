@@ -606,9 +606,9 @@ protocol NetworkRequestContent {
 
 extension NetworkRequestContent {
     func buildURLRequest(additionalHeaders: [String: String]) throws -> URLRequest {
-        // The request's URL can contain characters, such as `{` in a host or `|` in a path, that `URL(string:)`
-        // rejects. Its RFC 3986 form percent-encodes them. See #1746.
-        guard let rfc3986 = wpEndpointUrlRfc3986(url: self.url()), let url = URL(string: rfc3986) else {
+        // Rust's `url` crate leaves characters RFC 3986 doesn't allow, such as `{` in a host or `|` in a path,
+        // unencoded. Only those addresses are re-encoded, so every other address is sent as it is. See #1746.
+        guard let url = strictURL(self.url()) ?? wpEndpointUrlRfc3986(url: self.url()).flatMap(strictURL) else {
             throw URLError(.badURL, userInfo: [NSURLErrorFailingURLStringErrorKey: self.url()])
         }
         var request = URLRequest(url: url)
@@ -621,6 +621,17 @@ extension NetworkRequestContent {
         try self.encodeBody(into: &request)
         return request
     }
+}
+
+/// Parses `string` as a `URL`, or returns `nil` if it isn't valid RFC 3986.
+///
+/// Don't use `URL(string:)` for this. From iOS 17 and macOS 14 it encodes invalid characters instead of failing,
+/// and also re-encodes the escapes beside them: `/a%20b|c` becomes `/a%2520b%7Cc`, which is a different path.
+private func strictURL(_ string: String) -> URL? {
+    if #available(macOS 14, iOS 17, tvOS 17, watchOS 10, *) {
+        return URL(string: string, encodingInvalidCharacters: false)
+    }
+    return URL(string: string)
 }
 
 extension WpNetworkRequest: NetworkRequestContent {
