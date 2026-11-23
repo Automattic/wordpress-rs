@@ -24,6 +24,8 @@ struct NotificationStyledRunsTests {
         ]
     )
 
+    // `AttributedString` has no `inlinePresentationIntent` in Linux's Foundation.
+    #if !os(Linux)
     @Test
     func buildsAttributedText() throws {
         var text = AttributedString()
@@ -42,6 +44,7 @@ struct NotificationStyledRunsTests {
         let bold = try #require(text.range(of: "post"))
         #expect(text[bold].inlinePresentationIntent == .stronglyEmphasized)
     }
+    #endif
 
     @Test
     func readsRuns() throws {
