@@ -138,17 +138,21 @@ notification_kind! {
 notification_kind! {
     /// What a range of a block's text is.
     ///
-    /// Besides these, most ranges are named after HTML elements (`p`, `em`, `li`, …) and
-    /// mark up the text the way that element would. Those are `Other`.
+    /// Many ranges are named after HTML elements and mark up the text the way that element
+    /// would. Those that change how the text looks have a case. Those that only give it
+    /// structure, such as `p`, `div` and `span`, are `Other`: the text usually breaks its lines
+    /// where they do already.
     NotificationRangeKind {
-        /// A person. The range's `id` has been their user ID.
+        /// A person. The range's `id` is their user ID, and its `site_id` their site.
         User => "user",
-        /// A post, on the site in the range's `site_id`.
+        /// A post. The range's `id` is the post's ID, and its `site_id` the post's site.
         Post => "post",
+        /// A page, with the same IDs as a post.
         Page => "page",
-        /// A site, in the range's `site_id`.
+        /// A site. The range's `id` is the site's ID.
         Site => "site",
-        /// A comment, on the post in the range's `post_id`.
+        /// A comment. The range's `id` is the comment's ID, and its `post_id` and `site_id`
+        /// the post and site it's on.
         Comment => "comment",
         /// A link to the site's stats.
         Stat => "stat",
@@ -169,6 +173,32 @@ notification_kind! {
         Anchor => "a",
         Bold => "b",
         Italic => "i",
+        Emphasis => "em",
+        Code => "code",
+        /// Text whose spaces and line breaks are kept.
+        Preformatted => "pre",
+        Strikethrough => "s",
+        /// Deleted text, shown struck through.
+        Deleted => "del",
+        Superscript => "sup",
+        Subscript => "sub",
+        /// The title of a work.
+        Citation => "cite",
+        Heading1 => "h1",
+        Heading2 => "h2",
+        Heading3 => "h3",
+        Heading4 => "h4",
+        Heading5 => "h5",
+        Heading6 => "h6",
+        /// A numbered list, whose items are the [`Self::ListItem`] ranges inside it.
+        OrderedList => "ol",
+        /// A bulleted list, whose items are the [`Self::ListItem`] ranges inside it.
+        UnorderedList => "ul",
+        ListItem => "li",
+        /// A line break. It covers no text.
+        LineBreak => "br",
+        /// A line across the text, between two parts of it. It covers no text.
+        HorizontalRule => "hr",
         /// A button that opens the range's `url`.
         Button => "button",
         /// A link whose clicks the web panel records under the range's `context`.
@@ -274,6 +304,8 @@ pub struct WpComNotification {
 }
 
 /// A line of text with its ranges and media: a note's subject or header, or a context summary.
+///
+/// [`notification_text_styled_runs`] turns it into runs to show.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct NotificationText {
     /// Plain text. It can be empty while its ranges and media still say something.
@@ -288,6 +320,8 @@ pub struct NotificationText {
 }
 
 /// A block of a note's body.
+///
+/// [`notification_block_styled_runs`] turns its text into runs to show.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct NotificationBlock {
     /// Plain text. It can be empty while its ranges and media still say something.
@@ -353,9 +387,9 @@ pub struct NotificationRange {
     #[serde(default, deserialize_with = "lenient::text")]
     #[uniffi(default = None)]
     pub url: Option<String>,
-    /// What the API calls the range's ID, as text. For most ranges it's a number that changes
-    /// from one request to the next and means nothing outside the response: don't keep it, and
-    /// don't compare notes by it.
+    /// What the API calls the range's ID, as text. For a person, site, post or comment range,
+    /// it's that thing's ID. For other ranges it's a number that changes from one request to the
+    /// next and means nothing outside the response: don't keep it, and don't compare notes by it.
     #[serde(default, deserialize_with = "lenient::text")]
     #[uniffi(default = None)]
     pub id: Option<String>,
@@ -1504,6 +1538,9 @@ mod lenient {
             .collect())
     }
 }
+
+mod styled_runs;
+pub use styled_runs::{notification_block_styled_runs, notification_text_styled_runs};
 
 #[cfg(test)]
 mod corpus;

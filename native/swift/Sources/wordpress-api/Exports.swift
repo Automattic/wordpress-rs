@@ -660,6 +660,12 @@ public typealias NotificationsResponse = WordPressAPIInternal.NotificationsRespo
 public typealias UnreadableNotification = WordPressAPIInternal.UnreadableNotification
 public typealias WpComNotification = WordPressAPIInternal.WpComNotification
 
+// MARK: Styled text
+public typealias StyledTextRun = WordPressAPIInternal.StyledTextRun
+public typealias TextRunAttachment = WordPressAPIInternal.TextRunAttachment
+public typealias TextRunLink = WordPressAPIInternal.TextRunLink
+public typealias TextRunStyle = WordPressAPIInternal.TextRunStyle
+
 // MARK: Subscribers
 public typealias SubscribersListParams = WordPressAPIInternal.SubscribersListParams
 public typealias SubscriberImportJobsListParams = WordPressAPIInternal.SubscriberImportJobsListParams

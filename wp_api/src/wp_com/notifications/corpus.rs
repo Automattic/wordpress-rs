@@ -1,5 +1,7 @@
 //! Reads a folder of recorded notes and reports every note the model can't read, and every
-//! value that lands in an `Other` case.
+//! value that lands in an `Other` case. It also turns every text in every note into styled runs,
+//! checks that the runs put back together are the text, and counts how often each rule for a
+//! position that doesn't fit its text was used.
 //!
 //! The notes are kept outside the repository. Each `.jsonl` file holds one note per line: the
 //! note as the API sends it, or an object with the note under `note`. Name the folders, separated
@@ -13,7 +15,8 @@
 //! Set `NOTIFICATIONS_CORPUS_REPORT` to a file to write the report there as well. The report
 //! holds only counts, type names and key paths, never a value from a note.
 
-use super::*;
+use super::{styled_runs::notification_styled_text, *};
+use crate::wp_com::styled_text::{StyledTextAdjustments, StyledTextRun, TextRunAttachment};
 use serde_json::Value;
 use std::{
     collections::BTreeMap,
@@ -43,6 +46,17 @@ struct Tally {
     /// Ranges and media whose positions don't fit their text, by key path.
     out_of_bounds: BTreeMap<String, u64>,
     undated: u64,
+    /// Texts turned into styled runs.
+    styled_texts: u64,
+    styled_runs: u64,
+    /// Texts whose runs aren't the text, by key path and what's wrong.
+    styled_failures: BTreeMap<(String, &'static str), u64>,
+    /// How often each rule for a position that doesn't fit its text was used.
+    adjustments: StyledTextAdjustments,
+    /// Texts that needed any of those rules, by key path.
+    adjusted_texts: BTreeMap<String, u64>,
+    /// Runs with an attachment, by its kind.
+    attachments: BTreeMap<&'static str, u64>,
     pages: u64,
     pages_failed: u64,
     pages_miscounted: u64,
@@ -363,6 +377,7 @@ fn check_parts(
         }
         check_indices(&format!("{path}.ranges[]"), range.indices, length, tally);
     }
+    check_styled_runs(path, text, ranges, media, tally);
     for medium in media {
         match &medium.kind {
             Some(NotificationMediaKind::Other(name)) => {
@@ -376,6 +391,66 @@ fn check_parts(
         }
         check_indices(&format!("{path}.media[]"), medium.indices, length, tally);
     }
+}
+
+fn check_styled_runs(
+    path: &str,
+    text: &str,
+    ranges: &[NotificationRange],
+    media: &[NotificationMedia],
+    tally: &mut Tally,
+) {
+    tally.styled_texts += 1;
+    let styled = std::panic::catch_unwind(|| notification_styled_text(text, ranges, media));
+    let Ok(styled) = styled else {
+        *tally
+            .styled_failures
+            .entry((path.to_string(), "panicked"))
+            .or_default() += 1;
+        return;
+    };
+    tally.styled_runs += styled.runs.len() as u64;
+    if let Some(problem) = runs_problem(text, &styled.runs) {
+        *tally
+            .styled_failures
+            .entry((path.to_string(), problem))
+            .or_default() += 1;
+    }
+    if styled.adjustments != StyledTextAdjustments::default() {
+        *tally.adjusted_texts.entry(path.to_string()).or_default() += 1;
+    }
+    tally.adjustments.add(&styled.adjustments);
+    for run in &styled.runs {
+        let kind = match &run.attachment {
+            None => continue,
+            Some(TextRunAttachment::Image { is_badge: true, .. }) => "badge",
+            Some(TextRunAttachment::Image { is_emoji: true, .. }) => "emoji image",
+            Some(TextRunAttachment::Image { .. }) => "image",
+            Some(TextRunAttachment::Icon { .. }) => "icon",
+            Some(TextRunAttachment::LineBreak) => "line break",
+            Some(TextRunAttachment::Separator) => "separator",
+        };
+        *tally.attachments.entry(kind).or_default() += 1;
+    }
+}
+
+/// What's wrong with a text's runs, if anything.
+fn runs_problem(text: &str, runs: &[StyledTextRun]) -> Option<&'static str> {
+    let mut offset = 0u32;
+    for run in runs {
+        if run.utf16_offset != offset {
+            return Some("a run doesn't start where the one before it ends");
+        }
+        if run.utf16_length as usize != run.text.encode_utf16().count() {
+            return Some("a run's length isn't the length of its text");
+        }
+        if run.utf16_length == 0 && run.attachment.is_none() {
+            return Some("a run has no text and no attachment");
+        }
+        offset += run.utf16_length;
+    }
+    let joined: String = runs.iter().map(|run| run.text.as_str()).collect();
+    (joined != text).then_some("the runs put together aren't the text")
 }
 
 fn check_indices(path: &str, indices: Option<NotificationIndices>, length: u32, tally: &mut Tally) {
@@ -440,6 +515,57 @@ fn report(tally: &Tally) -> String {
         for (path, count) in entries {
             line(format!("  {count:>8}  {path}"));
         }
+    }
+    line(String::new());
+    line(format!(
+        "Texts turned into styled runs: {}, runs: {}",
+        tally.styled_texts, tally.styled_runs
+    ));
+    line("Texts whose runs aren't the text, by key path:".to_string());
+    if tally.styled_failures.is_empty() {
+        line("  none".to_string());
+    }
+    for ((path, problem), count) in &tally.styled_failures {
+        line(format!("  {count:>8}  {path}: {problem}"));
+    }
+    let adjustments = &tally.adjustments;
+    line("Positions that didn't fit their text, by the rule used:".to_string());
+    for (rule, count) in [
+        ("no position: left out", adjustments.no_position),
+        (
+            "ends before it starts: covers no text at its start",
+            adjustments.reversed,
+        ),
+        (
+            "starts past the end: moved to the end",
+            adjustments.start_past_text,
+        ),
+        (
+            "ends past the end: cut at the end",
+            adjustments.end_past_text,
+        ),
+        (
+            "inside a character: widened to the whole character",
+            adjustments.inside_character,
+        ),
+        (
+            "attachment over another attachment: left out",
+            adjustments.overlapping_attachment,
+        ),
+        (
+            "icon or image with nothing to show: left out",
+            adjustments.nothing_to_show,
+        ),
+    ] {
+        line(format!("  {count:>8}  {rule}"));
+    }
+    line("Texts that needed any of those rules, by key path:".to_string());
+    for (path, count) in &tally.adjusted_texts {
+        line(format!("  {count:>8}  {path}"));
+    }
+    line("Runs with an attachment, by kind:".to_string());
+    for (kind, count) in &tally.attachments {
+        line(format!("  {count:>8}  {kind}"));
     }
     line(String::new());
     line("Values read as absent although the note had one:".to_string());

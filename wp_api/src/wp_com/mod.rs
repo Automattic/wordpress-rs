@@ -54,6 +54,7 @@ pub mod stats_top_posts;
 pub mod stats_utm;
 pub mod stats_video_plays;
 pub mod stats_visits;
+pub mod styled_text;
 pub mod subscribers;
 pub mod support_bots;
 pub mod support_eligibility;
