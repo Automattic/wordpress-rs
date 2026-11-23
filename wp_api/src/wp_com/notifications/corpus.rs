@@ -97,7 +97,7 @@ fn corpus() {
     }
 }
 
-fn note_files(folder: &Path) -> Vec<PathBuf> {
+pub(super) fn note_files(folder: &Path) -> Vec<PathBuf> {
     let mut files: Vec<_> = fs::read_dir(folder)
         .expect("the folder can be read")
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))

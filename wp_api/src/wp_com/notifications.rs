@@ -1557,6 +1557,9 @@ pub use layout::{
 mod corpus;
 
 #[cfg(test)]
+mod fixture_check;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use rstest::rstest;
