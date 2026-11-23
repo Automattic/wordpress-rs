@@ -1542,6 +1542,17 @@ mod lenient {
 mod styled_runs;
 pub use styled_runs::{notification_block_styled_runs, notification_text_styled_runs};
 
+mod layout;
+pub use layout::{
+    NotificationBlockRole, NotificationCommentLayout, NotificationFollowLayout,
+    NotificationFollowOffer, NotificationHeadline, NotificationLabel, NotificationLayout,
+    NotificationLayoutBlock, NotificationLayoutContent, NotificationLayoutFallback,
+    NotificationLayoutText, NotificationMetaLine, NotificationNewPostByline,
+    NotificationNewPostLayout, NotificationNoticeLayout, NotificationOthers, NotificationPostCard,
+    NotificationPostLink, NotificationQuoteStyle, NotificationQuotedComment,
+    NotificationReactionsLayout, NotificationSiteCard, notification_layout,
+};
+
 #[cfg(test)]
 mod corpus;
 

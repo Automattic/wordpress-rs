@@ -1,7 +1,8 @@
 //! Reads a folder of recorded notes and reports every note the model can't read, and every
 //! value that lands in an `Other` case. It also turns every text in every note into styled runs,
 //! checks that the runs put back together are the text, and counts how often each rule for a
-//! position that doesn't fit its text was used.
+//! position that doesn't fit its text was used. Last, it builds every note's layout and counts
+//! the layouts by note type and the notices by why the note has no layout of its own.
 //!
 //! The notes are kept outside the repository. Each `.jsonl` file holds one note per line: the
 //! note as the API sends it, or an object with the note under `note`. Name the folders, separated
@@ -15,7 +16,11 @@
 //! Set `NOTIFICATIONS_CORPUS_REPORT` to a file to write the report there as well. The report
 //! holds only counts, type names and key paths, never a value from a note.
 
-use super::{styled_runs::notification_styled_text, *};
+use super::{
+    layout::{NotificationLayoutContent, NotificationLayoutFallback, notification_layout},
+    styled_runs::notification_styled_text,
+    *,
+};
 use crate::wp_com::styled_text::{StyledTextAdjustments, StyledTextRun, TextRunAttachment};
 use serde_json::Value;
 use std::{
@@ -60,6 +65,12 @@ struct Tally {
     pages: u64,
     pages_failed: u64,
     pages_miscounted: u64,
+    /// Layouts built, by note type and layout.
+    layouts: BTreeMap<(String, &'static str), u64>,
+    /// Notices, by why the note has no layout of its own.
+    fallbacks: BTreeMap<&'static str, u64>,
+    /// Notes whose layout couldn't be built, by note type.
+    layout_failures: BTreeMap<String, u64>,
 }
 
 #[test]
@@ -159,6 +170,7 @@ fn read_note(raw: &Value, json: &str, tally: &mut Tally) {
             counts.1 += 1;
             tally.parsed += 1;
             check_note(raw, &note, tally);
+            check_layout(&note_type, &note, tally);
         }
         Err(error) => {
             *tally
@@ -166,6 +178,37 @@ fn read_note(raw: &Value, json: &str, tally: &mut Tally) {
                 .entry((note_type, without_values(&error.to_string())))
                 .or_default() += 1;
         }
+    }
+}
+
+fn check_layout(note_type: &str, note: &WpComNotification, tally: &mut Tally) {
+    let Ok(layout) = std::panic::catch_unwind(|| notification_layout(note)) else {
+        *tally
+            .layout_failures
+            .entry(note_type.to_string())
+            .or_default() += 1;
+        return;
+    };
+    let name = match (&layout.content, layout.fallback) {
+        (NotificationLayoutContent::Comment { .. }, _) => "comment",
+        (NotificationLayoutContent::Reactions { .. }, _) => "reactions",
+        (NotificationLayoutContent::Follow { .. }, _) => "follow",
+        (NotificationLayoutContent::NewPost { .. }, _) => "new post",
+        (NotificationLayoutContent::Notice { .. }, Some(NotificationLayoutFallback::NoContext)) => {
+            "notice (no note context)"
+        }
+        (NotificationLayoutContent::Notice { .. }, _) => "notice (type has no layout of its own)",
+    };
+    *tally
+        .layouts
+        .entry((note_type.to_string(), name))
+        .or_default() += 1;
+    if let Some(fallback) = layout.fallback {
+        let reason = match fallback {
+            NotificationLayoutFallback::NoContext => "no note context",
+            NotificationLayoutFallback::NoLayoutForType => "type has no layout of its own",
+        };
+        *tally.fallbacks.entry(reason).or_default() += 1;
     }
 }
 
@@ -574,6 +617,33 @@ fn report(tally: &Tally) -> String {
     }
     for (path, count) in &tally.read_as_absent {
         line(format!("  {count:>8}  {path}"));
+    }
+    line(String::new());
+    let built: u64 = tally.layouts.values().sum();
+    let failed: u64 = tally.layout_failures.values().sum();
+    line(format!("Layouts built: {built}, failed: {failed}"));
+    line("Notes whose layout couldn't be built, by note type:".to_string());
+    if tally.layout_failures.is_empty() {
+        line("  none".to_string());
+    }
+    for (note_type, count) in &tally.layout_failures {
+        line(format!("  {count:>8}  {note_type}"));
+    }
+    line("Layouts by kind:".to_string());
+    let mut by_kind: BTreeMap<&str, u64> = BTreeMap::new();
+    for ((_, kind), count) in &tally.layouts {
+        *by_kind.entry(kind).or_default() += count;
+    }
+    for (kind, count) in by_kind {
+        line(format!("  {count:>8}  {kind}"));
+    }
+    line("Notices by why the note has no layout of its own:".to_string());
+    for (reason, count) in &tally.fallbacks {
+        line(format!("  {count:>8}  {reason}"));
+    }
+    line("Layouts by note type:".to_string());
+    for ((note_type, kind), count) in &tally.layouts {
+        line(format!("  {count:>8}  {note_type}: {kind}"));
     }
     line(String::new());
     line("Notes read and parsed, by note type:".to_string());

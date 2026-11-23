@@ -21,8 +21,6 @@ investigate the relevant code before making decisions based on this document.
 - [ ] `GET /rest/v1.1/me/domain-contact-information/` — fetch domain contact info
 - [ ] `POST /rest/v1.1/me/domain-contact-information/validate` — validate domain contact info
 - [ ] `GET /rest/v1.1/me/keyring-connections` — get keyring connections
-- [ ] `GET /rest/v1.1/me/notifications/settings/` — get push notification settings
-- [ ] `POST /rest/v1.1/me/notifications/settings/` — save notification settings
 - [ ] `POST /rest/v1.1/me/send-verification-email/` — send verification email
 - [ ] `GET /rest/v1.1/me/settings/` — fetch account settings
 - [ ] `POST /rest/v1.1/me/settings/` — update account settings
@@ -147,6 +145,8 @@ investigate the relevant code before making decisions based on this document.
 - [x] `GET /rest/v1.1/notifications/$note_id` — fetch single notification
 - [ ] `POST /rest/v1.1/notifications/read` — mark notification as read
 - [ ] `POST /rest/v1.1/notifications/seen` — mark notifications as seen
+- [ ] `GET /rest/v1.1/me/notifications/settings/` — get notification settings
+- [ ] `POST /rest/v1.1/me/notifications/settings/` — save notification settings
 - [ ] `POST /rest/v1/devices/$device_id/delete` — unregister device
 - [ ] `POST /rest/v1/devices/new` — register device for push
 

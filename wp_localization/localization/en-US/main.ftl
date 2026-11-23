@@ -94,3 +94,35 @@ parse_api_root_failure_reason_wordfence_blocking_access = Wordfence is blocking 
 already_logged_in = You are already logged in as {$username}.
 
 database_generic_message = There was a problem loading your data: {$reason}.
+
+notification_likes = Likes
+notification_likes_on_your_comment = { $count ->
+    [one] { $count } like on your comment
+   *[other] { $count } likes on your comment
+}
+notification_likes_on_your_post = { $count ->
+    [one] { $count } like on your post
+   *[other] { $count } likes on your post
+}
+notification_people_subscribed = { $count ->
+    [one] { $count } person subscribed
+   *[other] { $count } people subscribed
+}
+notification_subscribers = Subscribers
+notification_followers = Followers
+notification_reposts = Reposts
+notification_others_liked_your_comment = { $count ->
+    [one] And { $count } other liked your comment.
+   *[other] And { $count } others liked your comment.
+}
+notification_others_subscribed = { $count ->
+    [one] And { $count } other subscribed.
+   *[other] And { $count } others subscribed.
+}
+notification_others_liked_your_post = { $count ->
+    [one] And { $count } other liked your post.
+   *[other] And { $count } others liked your post.
+}
+notification_in_reply_to = In reply to { $name }
+notification_no_title = No title
+notification_pending = Pending
