@@ -157,6 +157,12 @@ pub enum DbTable {
     ReaderSavedOffline,
     /// The stored images of saved posts
     ReaderOfflineFiles,
+    /// WordPress.com notifications, one per note per account
+    Notifications,
+    /// Notes a list of IDs had that never came whole
+    NotificationListedOnly,
+    /// Where each account's notifications are up to
+    NotificationSyncState,
 }
 
 impl DbTable {
@@ -200,6 +206,9 @@ impl DbTable {
             DbTable::ReaderCommentThreads => "reader_comment_threads",
             DbTable::ReaderSavedOffline => "reader_saved_offline",
             DbTable::ReaderOfflineFiles => "reader_offline_files",
+            DbTable::Notifications => "notifications",
+            DbTable::NotificationListedOnly => "notification_listed_only",
+            DbTable::NotificationSyncState => "notification_sync_state",
         }
     }
 }
@@ -256,6 +265,9 @@ impl TryFrom<&str> for DbTable {
             "reader_comment_threads" => Ok(DbTable::ReaderCommentThreads),
             "reader_saved_offline" => Ok(DbTable::ReaderSavedOffline),
             "reader_offline_files" => Ok(DbTable::ReaderOfflineFiles),
+            "notifications" => Ok(DbTable::Notifications),
+            "notification_listed_only" => Ok(DbTable::NotificationListedOnly),
+            "notification_sync_state" => Ok(DbTable::NotificationSyncState),
             _ => Err(DbTableError::UnknownTable(table_name.to_string())),
         }
     }
@@ -494,7 +506,7 @@ impl WpApiCache {
     }
 
     /// Remove a WordPress.com account and everything the cache holds for it, such as its Reader
-    /// posts and saved posts. Call it when the user signs out.
+    /// posts, saved posts and notifications. Call it when the user signs out.
     ///
     /// The image files of the saved posts aren't in the cache, and this leaves them on disk. Call
     /// `ReaderSavedService::remove_offline_images` first, with its image store set, to delete them
@@ -590,7 +602,7 @@ impl TryFrom<Connection> for WpApiCache {
     }
 }
 
-static MIGRATION_QUERIES: [&str; 23] = [
+static MIGRATION_QUERIES: [&str; 24] = [
     include_str!("../migrations/0001-create-sites-table.sql"),
     include_str!("../migrations/0002-create-posts-table.sql"),
     include_str!("../migrations/0003-create-term-relationships.sql"),
@@ -614,6 +626,7 @@ static MIGRATION_QUERIES: [&str; 23] = [
     include_str!("../migrations/0021-create-reader-menu-subscriptions-and-sites-tables.sql"),
     include_str!("../migrations/0022-create-reader-comments-tables.sql"),
     include_str!("../migrations/0023-create-reader-offline-tables.sql"),
+    include_str!("../migrations/0024-create-notifications-tables.sql"),
 ];
 
 pub struct MigrationManager<'a> {

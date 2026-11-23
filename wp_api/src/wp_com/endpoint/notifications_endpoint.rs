@@ -5,7 +5,7 @@ use crate::{
         notifications::{
             NOTE_HASH_FIELDS, NOTE_ID_FIELDS, NotificationHashesResponse, NotificationId,
             NotificationIdsResponse, NotificationParams, NotificationsParams, NotificationsQuery,
-            NotificationsResponse,
+            NotificationsResponse, NotificationsWithJsonResponse,
         },
     },
 };
@@ -16,6 +16,9 @@ enum NotificationsRequest {
     // A page of the user's notes, newest first, whole.
     #[get(url = "/notifications", params = &NotificationsParams, output = NotificationsResponse)]
     List,
+    // The same page, with each note's JSON as the API sent it, for a cache to keep.
+    #[get(url = "/notifications", params = &NotificationsParams, output = NotificationsWithJsonResponse)]
+    ListWithJson,
     // A page of the user's notes as IDs and hashes, to find the ones that changed.
     #[get(url = "/notifications", params = &NotificationsQuery, output = NotificationHashesResponse)]
     ListHashes,
@@ -34,7 +37,9 @@ impl DerivedRequest for NotificationsRequest {
         match self {
             NotificationsRequest::ListHashes => vec![("fields", NOTE_HASH_FIELDS.to_string())],
             NotificationsRequest::ListIds => vec![("fields", NOTE_ID_FIELDS.to_string())],
-            NotificationsRequest::List | NotificationsRequest::Get => Vec::new(),
+            NotificationsRequest::List
+            | NotificationsRequest::ListWithJson
+            | NotificationsRequest::Get => Vec::new(),
         }
     }
 
@@ -110,6 +115,22 @@ mod tests {
         #[case] expected_path: String,
     ) {
         validate_wp_com_rest_v1_1_endpoint(endpoint.list(&params), &expected_path);
+    }
+
+    /// The same request as `list`: only what's kept of the answer differs.
+    #[rstest]
+    fn list_with_json(endpoint: NotificationsRequestEndpoint) {
+        let params = NotificationsParams {
+            query: every_filter(),
+            include_context: true,
+            ..Default::default()
+        };
+        validate_wp_com_rest_v1_1_endpoint(
+            endpoint.list_with_json(&params),
+            &format!(
+                "/notifications?{EVERY_FILTER}&{WHOLE_NOTE_FIELDS}%2Cheader%2Cbody%2Cnote_context"
+            ),
+        );
     }
 
     #[rstest]

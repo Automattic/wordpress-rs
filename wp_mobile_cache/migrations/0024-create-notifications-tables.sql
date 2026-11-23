@@ -1,0 +1,45 @@
+-- One row per WordPress.com notification (a note) per account, as the API sent it whole. The note
+-- is read back from `json`, so a later version of the library can read fields this one doesn't
+-- store. The other columns are what a list sorts and filters by.
+CREATE TABLE `notifications` (
+  `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
+  `account_id` INTEGER NOT NULL,
+  `note_id` INTEGER NOT NULL,
+  `note_type` TEXT,                   -- as the API sent it, e.g. comment
+  `is_read` INTEGER,                  -- 1 read, 0 unread, NULL when the note didn't say
+  `timestamp` INTEGER,                -- seconds since 1970. A note with no date has one in the first day of 1970
+  `note_hash` TEXT,                   -- the hash the whole note came with. Only compares with the hashes of requests made the same way
+  `json` TEXT NOT NULL,               -- the note's JSON object, as the API sent it
+  `fetched_at` TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+
+  FOREIGN KEY (account_id) REFERENCES wordpress_com_accounts(rowid) ON DELETE CASCADE
+) STRICT;
+
+CREATE UNIQUE INDEX idx_notifications_note ON notifications(account_id, note_id);
+CREATE INDEX idx_notifications_timestamp ON notifications(account_id, timestamp);
+
+-- A note a list of IDs had that didn't come whole when asked for, or came and couldn't be read. It
+-- isn't asked for again until the list gives it a different hash.
+CREATE TABLE `notification_listed_only` (
+  `rowid` INTEGER PRIMARY KEY AUTOINCREMENT,
+  `account_id` INTEGER NOT NULL,
+  `note_id` INTEGER NOT NULL,
+  `note_hash` TEXT,                   -- the hash the list gave it when it was asked for
+  `error` TEXT,                       -- why it couldn't be read, when it came. NULL when it didn't come
+
+  FOREIGN KEY (account_id) REFERENCES wordpress_com_accounts(rowid) ON DELETE CASCADE
+) STRICT;
+
+CREATE UNIQUE INDEX idx_notification_listed_only_note ON notification_listed_only(account_id, note_id);
+
+-- Where an account's notifications are up to.
+CREATE TABLE `notification_sync_state` (
+  `account_id` INTEGER PRIMARY KEY,
+  `older_before` INTEGER,             -- the `before` of the next older page, in seconds since 1970. NULL until a sync sets it
+  `older_number` INTEGER,             -- the `number` of the next older page
+  `reached_end` INTEGER NOT NULL DEFAULT 0, -- 1 once the oldest note has been reached
+  `last_synced_at` INTEGER,           -- when the newest notes were last synced, in seconds since 1970
+  `last_seen_time` INTEGER,           -- when the user last looked at their notifications, as the API last said, in seconds since 1970
+
+  FOREIGN KEY (account_id) REFERENCES wordpress_com_accounts(rowid) ON DELETE CASCADE
+) STRICT;
