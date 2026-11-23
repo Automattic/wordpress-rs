@@ -49,6 +49,10 @@ pub struct AccountLocks {
     /// subscription too: turning them on subscribes the account to the post's comments, and
     /// turning them off unsubscribes it.
     pub own_post: Mutex<()>,
+    /// The hashes of the account's notifications. Any request for whole notes gives the notes it
+    /// sends new hashes, so the trials that sync notes by comparing hashes hold it for writing,
+    /// and every other trial that asks for whole notes holds it for reading.
+    pub notification_hashes: RwLock<()>,
 }
 
 /// Holds account state for a trial that changes it. A trial that failed by panicking leaves the

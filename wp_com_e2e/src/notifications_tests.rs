@@ -4,6 +4,10 @@
 //! between two requests. So each trial checks only what the API promises of one answer, and a
 //! trial that needs a note and finds none passes and says so. No trial prints anything from a
 //! note but its type. No request sends a `locale`, which would change every note's hash.
+//!
+//! A request for whole notes gives them new hashes, so each trial holds
+//! `AccountLocks::notification_hashes` for reading, and runs while the sync trials, which compare
+//! hashes, don't.
 
 use libtest_mimic::{Failed, Trial};
 use std::collections::{BTreeMap, HashSet};
@@ -13,7 +17,7 @@ use wp_api::wp_com::notifications::{
     NotificationsResponse, UnreadableNotification, WpComNotification,
 };
 
-use crate::context::TestContext;
+use crate::context::{TestContext, reading};
 use crate::notification_checks::{check_note, without_values};
 
 /// Notes per page: enough to see several types, few enough to stay quick.
@@ -87,6 +91,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("notifications::list_whole_notes", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _hashes = reading(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
                     let page = list(&ctx, first_page(), true, true).await?;
                     if page.last_seen_time.is_none() {
@@ -145,6 +150,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("notifications::list_without_body_or_context", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _hashes = reading(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
                     let page = list(&ctx, first_page(), false, false).await?;
                     for note in &page.notes {
@@ -179,6 +185,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("notifications::list_hashes", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _hashes = reading(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
                     let page = ctx
                         .client
@@ -203,6 +210,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("notifications::list_ids", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _hashes = reading(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
                     let page = ctx
                         .client
@@ -229,6 +237,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("notifications::get_one", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _hashes = reading(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
                     // Taken from whole notes: a list of IDs also has the notes the API leaves
                     // out of whole notes because it can't show them.
@@ -266,6 +275,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("notifications::get_one_that_does_not_exist", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _hashes = reading(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
                     // Far beyond the IDs the API hands out.
                     let id = NotificationId(999_999_999_999_999);
@@ -286,6 +296,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("notifications::paging_with_before", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _hashes = reading(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
                     const SMALL_PAGE: u32 = 5;
                     let query = NotificationsQuery {
@@ -347,6 +358,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("notifications::unread_and_read_filters", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _hashes = reading(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
                     for unread in [true, false] {
                         let query = NotificationsQuery {
@@ -377,6 +389,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("notifications::type_filter", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _hashes = reading(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
                     // A type the account has, or a common one when it has none.
                     let first = list(&ctx, first_page(), false, false).await?;
@@ -418,6 +431,7 @@ pub fn tests(ctx: Arc<TestContext>) -> Vec<Trial> {
         Trial::test("notifications::styled_runs_and_layouts", {
             let ctx = Arc::clone(&ctx);
             move || {
+                let _hashes = reading(&ctx.locks.notification_hashes);
                 ctx.runtime.block_on(async {
                     let query = NotificationsQuery {
                         number: Some(50),

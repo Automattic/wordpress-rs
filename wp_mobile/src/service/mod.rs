@@ -11,6 +11,7 @@ pub mod entity_state_service;
 pub mod media;
 pub mod metadata;
 pub mod mock_post_service;
+pub mod notifications;
 pub mod post_types;
 pub mod posts;
 pub mod reader;

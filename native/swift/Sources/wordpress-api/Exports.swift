@@ -678,9 +678,20 @@ public typealias NotificationsRequestGetResponse = WordPressAPIInternal.Notifica
 public typealias NotificationsRequestListHashesResponse = WordPressAPIInternal.NotificationsRequestListHashesResponse
 public typealias NotificationsRequestListIdsResponse = WordPressAPIInternal.NotificationsRequestListIdsResponse
 public typealias NotificationsRequestListResponse = WordPressAPIInternal.NotificationsRequestListResponse
+public typealias NotificationsRequestListWithJsonResponse =
+    WordPressAPIInternal.NotificationsRequestListWithJsonResponse
 public typealias NotificationsResponse = WordPressAPIInternal.NotificationsResponse
+public typealias NotificationsWithJsonResponse = WordPressAPIInternal.NotificationsWithJsonResponse
+public typealias NotificationWithJson = WordPressAPIInternal.NotificationWithJson
 public typealias UnreadableNotification = WordPressAPIInternal.UnreadableNotification
 public typealias WpComNotification = WordPressAPIInternal.WpComNotification
+
+// MARK: Notification Service
+public typealias NotificationService = WordPressAPIInternal.NotificationService
+public typealias NotificationServiceError = WordPressAPIInternal.NotificationServiceError
+public typealias NotificationSyncResult = WordPressAPIInternal.NotificationSyncResult
+public typealias NotificationsFilter = WordPressAPIInternal.NotificationsFilter
+public typealias NotificationsInfo = WordPressAPIInternal.NotificationsInfo
 
 // MARK: Styled text
 public typealias StyledTextRun = WordPressAPIInternal.StyledTextRun

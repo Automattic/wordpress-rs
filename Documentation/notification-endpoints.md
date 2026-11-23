@@ -1,6 +1,6 @@
 # WordPress.com notification endpoints
 
-Every WordPress.com notification endpoint the library has: what it's for, the parameters it sends, what comes back, and the traps a caller must know. `WPCOM_REST_API_CHECKLIST.md` lists the notification endpoints that aren't built yet.
+Every WordPress.com notification endpoint the library has: what it's for, the parameters it sends, what comes back, and the traps a caller must know. `WPCOM_REST_API_CHECKLIST.md` lists the notification endpoints that aren't built yet. To keep an account's notes in the cache and sync them, use `NotificationService`: see [notification-sync.md](notification-sync.md).
 
 The most common task is fetching the newest page of notes with their note context, and showing each one:
 
@@ -47,6 +47,7 @@ A page of the user's notes, newest first. The library has three requests for it,
 | Request | `fields` sent | Response |
 |---|---|---|
 | `NotificationsRequest::List` | the whole note, with or without its header and body, and with or without its note context | `NotificationsResponse` |
+| `NotificationsRequest::ListWithJson` | as `List` | `NotificationsWithJsonResponse`: each note with its JSON as the API sent it, for a cache to keep |
 | `NotificationsRequest::ListHashes` | `id,note_hash` | `NotificationHashesResponse` |
 | `NotificationsRequest::ListIds` | `id` | `NotificationIdsResponse` |
 
@@ -100,5 +101,5 @@ Text the API wrote comes through as it was sent, as styled runs where it has ran
 
 ## Testing against WordPress.com
 
-- **Live trials:** `wp_com_e2e/src/notifications_tests.rs` checks both endpoints against the account of `WP_COM_API_KEY`. Every request is a GET, so nothing is marked read or seen. Run them with `cargo run -q -p wp_com_e2e --bin wp_com_e2e -- notifications`.
+- **Live trials:** `wp_com_e2e/src/notifications_tests.rs` checks both endpoints against the account of `WP_COM_API_KEY`, and `notification_service_tests.rs` syncs and pages the account's notes with `NotificationService`. Every request is a GET, so nothing is marked read or seen. Run both with `cargo run -q -p wp_com_e2e --bin wp_com_e2e -- notification`.
 - **A whole account:** `notifications_sweep` walks every note of an account and reports any note the library can't read, can't turn into styled runs or can't lay out. `--report-only` writes only counts and type names, so someone can run it on their own account and send back the report. Its module comment, in `wp_com_e2e/src/bin/notifications_sweep/main.rs`, says how to run it.
