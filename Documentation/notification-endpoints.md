@@ -101,3 +101,4 @@ Text the API wrote comes through as it was sent, as styled runs where it has ran
 ## Testing against WordPress.com
 
 - **Live trials:** `wp_com_e2e/src/notifications_tests.rs` checks both endpoints against the account of `WP_COM_API_KEY`. Every request is a GET, so nothing is marked read or seen. Run them with `cargo run -q -p wp_com_e2e --bin wp_com_e2e -- notifications`.
+- **A whole account:** `notifications_sweep` walks every note of an account and reports any note the library can't read, can't turn into styled runs or can't lay out. `--report-only` writes only counts and type names, so someone can run it on their own account and send back the report. Its module comment, in `wp_com_e2e/src/bin/notifications_sweep/main.rs`, says how to run it.

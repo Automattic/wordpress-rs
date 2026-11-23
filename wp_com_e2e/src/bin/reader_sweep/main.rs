@@ -40,12 +40,14 @@
 mod checks;
 mod recording;
 mod sweep;
+#[path = "../../sweep_support.rs"]
+mod sweep_support;
 
 use async_trait::async_trait;
 use checks::{Census, Finding};
 use clap::Parser;
 use integration_test_credentials::WpComTestCredentials;
-use recording::{Captured, IndexLine, Recorder, RecordingExecutor};
+use recording::{IndexLine, Recorder};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -53,7 +55,8 @@ use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use sweep::{Cursor, Queue, StreamKey, check_output_dir, next_before, parse_seeds, streams_of};
+use sweep::{Cursor, Queue, StreamKey, next_before, parse_seeds, streams_of};
+use sweep_support::{Captured, RecordingExecutor, check_output_dir};
 use wp_api::prelude::*;
 use wp_api::wp_com::WpComSiteId;
 use wp_api::wp_com::client::WpComApiClient;
@@ -378,7 +381,7 @@ fn progress_line(totals: &Totals, streams_seen: usize, elapsed: f64) -> String {
 async fn work(shared: Arc<Shared>, token: Option<String>) {
     let executor = Arc::new(RecordingExecutor::new(
         Arc::new(ReqwestRequestExecutor::new(false, Duration::from_secs(60))),
-        Arc::clone(&shared.recorder),
+        shared.recorder.sequence(),
     ));
     let authentication = match token {
         Some(token) => WpAuthentication::Bearer { token },

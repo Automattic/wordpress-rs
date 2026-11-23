@@ -2,7 +2,6 @@
 
 use std::collections::{HashSet, VecDeque};
 use std::fmt;
-use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use wp_api::prelude::WpGmtDateTime;
 use wp_api::wp_com::reader_posts::{ReaderPost, ReaderSearchSort};
@@ -276,27 +275,6 @@ impl Queue {
     }
 }
 
-/// Refuses an output directory inside a Git checkout.
-///
-/// A run holds real posts, some of them private, and they mustn't end up committed.
-pub fn check_output_dir(dir: &Path) -> Result<PathBuf, String> {
-    let absolute = std::path::absolute(dir).map_err(|err| format!("{}: {err}", dir.display()))?;
-    let mut ancestor = Some(absolute.as_path());
-    while let Some(path) = ancestor {
-        // A worktree has a `.git` file rather than a directory.
-        if path.join(".git").exists() {
-            return Err(format!(
-                "{} is inside the Git checkout at {}. A run holds real posts, some of them \
-                 private, so choose a directory outside any checkout.",
-                absolute.display(),
-                path.display()
-            ));
-        }
-        ancestor = path.parent();
-    }
-    Ok(absolute)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -517,20 +495,5 @@ mod tests {
         assert_eq!(queue.next(), Some(StreamKey::Feed(1)));
         assert_eq!(queue.next(), None);
         assert!(!queue.add(StreamKey::Site(3)));
-    }
-
-    #[test]
-    fn an_output_directory_inside_a_checkout_is_refused() {
-        let inside = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/reader-sweep");
-        assert!(
-            check_output_dir(&inside)
-                .unwrap_err()
-                .contains("Git checkout")
-        );
-        let outside = std::env::temp_dir().join("reader-sweep-outside");
-        assert_eq!(
-            check_output_dir(&outside),
-            Ok(std::path::absolute(&outside).unwrap())
-        );
     }
 }

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 integration_test_credentials = { path = "../integration_test_credentials" }
 libtest-mimic = "0.8"
@@ -24,3 +25,8 @@ name = "wp_com_e2e"
 [[bin]]
 name = "reader_sweep"
 path = "src/bin/reader_sweep/main.rs"
+
+# Walks an account's whole notification history. See its module docs.
+[[bin]]
+name = "notifications_sweep"
+path = "src/bin/notifications_sweep/main.rs"
